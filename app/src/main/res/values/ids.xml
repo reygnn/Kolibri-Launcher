@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Context Menu IDs für ZoomableWallpaperView -->
+    <item name="context_center_both" type="id" />
+    <item name="context_center_x" type="id" />
+    <item name="context_center_y" type="id" />
+    <item name="context_reset_zoom" type="id" />
+    <item name="context_fit_screen" type="id" />
+</resources>

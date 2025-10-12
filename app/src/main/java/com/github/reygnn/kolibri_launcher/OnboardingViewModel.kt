@@ -1,0 +1,164 @@
+/*
+    * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+    *
+    * This program is free software: you can redistribute it and/or modify
+    * it under the terms of the GNU General Public License as published by
+    * the Free Software Foundation, either version 3 of the License, or
+    * (at your option) any later version.
+    */
+
+package com.github.reygnn.kolibri_launcher
+
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
+
+data class SelectableAppInfo(
+    val appInfo: AppInfo,
+    val isSelected: Boolean
+)
+
+data class OnboardingUiState(
+    val titleResId: Int = R.string.onboarding_title_welcome,
+    val subtitleResId: Int = R.string.onboarding_subtitle_welcome,
+    val selectableApps: List<SelectableAppInfo> = emptyList(),
+    val selectedApps: List<AppInfo> = emptyList()
+)
+
+enum class LaunchMode {
+    INITIAL_SETUP,
+    EDIT_FAVORITES
+}
+
+@HiltViewModel
+class OnboardingViewModel @Inject constructor(
+    private val onboardingAppsUseCase: GetOnboardingAppsUseCaseRepository,
+    private val favoritesRepository: FavoritesRepository,
+    private val settingsRepository: SettingsRepository
+) : BaseViewModel() {
+
+    private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
+    private val _uiState = MutableStateFlow(OnboardingUiState())
+    val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+
+    private val _event = MutableSharedFlow<OnboardingEvent>()
+    val event = _event.asSharedFlow()
+
+    private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
+    private val searchQuery = MutableStateFlow("")
+
+    init {
+        viewModelScope.launch {
+            try {
+                combine(
+                    onboardingAppsUseCase.onboardingAppsFlow,
+                    selectedComponents,
+                    searchQuery
+                ) { allApps, selected, query ->
+                    val filteredApps = if (query.isBlank()) {
+                        allApps
+                    } else {
+                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                    }
+
+                    val selectableList = filteredApps.map { app ->
+                        SelectableAppInfo(
+                            appInfo = app,
+                            isSelected = selected.contains(app.componentName)
+                        )
+                    }
+
+                    val selectedAppInfos = allApps
+                        .filter { selected.contains(it.componentName) }
+                        .sortedBy { it.displayName.lowercase() }
+
+                    _uiState.value.copy(
+                        selectableApps = selectableList,
+                        selectedApps = selectedAppInfos
+                    )
+                }.collect { newState ->
+                    _uiState.value = newState
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                TimberWrapper.silentError(e, "Failed to load apps.")
+                _event.emit(OnboardingEvent.ShowError("Could not load apps. Please try again."))
+            }
+        }
+    }
+
+    fun initialize(mode: LaunchMode) {
+        this.launchMode = mode
+
+        val titleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_title_edit_favorites else R.string.onboarding_title_welcome
+        val subtitleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
+        _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
+
+        viewModelScope.launch {
+            val initialSelection = when (mode) {
+                LaunchMode.INITIAL_SETUP -> emptySet()
+                LaunchMode.EDIT_FAVORITES -> {
+                    try {
+                        favoritesRepository.favoriteComponentsFlow.first()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        TimberWrapper.silentError(e, "Error loading initial favorites.")
+                        _event.emit(OnboardingEvent.ShowError("Could not load favorites."))
+                        emptySet()
+                    }
+                }
+            }
+            selectedComponents.value = initialSelection
+        }
+    }
+
+    fun onSearchQueryChanged(query: String) {
+        searchQuery.value = query
+    }
+
+    fun onAppToggled(app: AppInfo) {
+        viewModelScope.launch {
+            val currentSelection = selectedComponents.value
+            val component = app.componentName
+
+            if (currentSelection.contains(component)) {
+                selectedComponents.value = currentSelection - component
+            } else {
+                if (currentSelection.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
+                    _event.emit(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FAVORITES_ON_HOME))
+                } else {
+                    selectedComponents.value = currentSelection + component
+                }
+            }
+        }
+    }
+
+    fun onDoneClicked() {
+        viewModelScope.launch {
+            try {
+                favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
+
+                if (launchMode == LaunchMode.INITIAL_SETUP) {
+                    settingsRepository.setOnboardingCompleted()
+                }
+
+                _event.emit(OnboardingEvent.NavigateToMain)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                TimberWrapper.silentError(e, "CRITICAL: Failed to save favorites or complete onboarding.")
+                _event.emit(OnboardingEvent.ShowError("Save failed. Please try again."))
+            }
+        }
+    }
+}

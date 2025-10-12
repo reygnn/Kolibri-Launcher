@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:zAdjustment="top">
+    
+    <alpha
+        android:fromAlpha="@fraction/anim_alpha_transparent"
+        android:toAlpha="@fraction/anim_alpha_opaque"
+        android:duration="@integer/anim_duration_app_close"
+        android:interpolator="@android:interpolator/fast_out_slow_in" />
+    
+    <scale
+        android:fromXScale="@fraction/anim_scale_app_open_from"
+        android:toXScale="@fraction/anim_scale_app_open_to"
+        android:fromYScale="@fraction/anim_scale_app_open_from"
+        android:toYScale="@fraction/anim_scale_app_open_to"
+        android:pivotX="@fraction/anim_pivot_center"
+        android:pivotY="@fraction/anim_pivot_center"
+        android:duration="@integer/anim_duration_app_open"
+        android:interpolator="@android:interpolator/fast_out_slow_in" />
+</set>

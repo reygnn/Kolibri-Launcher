@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Animation Durations -->
+    <integer name="anim_duration_app_open">350</integer>
+    <integer name="anim_duration_app_close">300</integer>
+    <integer name="anim_duration_launcher_fade_in">200</integer>
+    <integer name="anim_duration_launcher_fade_out">150</integer>
+    <integer name="anim_duration_app_open_exit">350</integer>
+    <integer name="anim_duration_app_close_enter">250</integer>
+    <integer name="anim_duration_screen_lock">300</integer>
+    
+    <!-- Start Offsets -->
+    <integer name="anim_offset_app_close_enter">100</integer>
+</resources>

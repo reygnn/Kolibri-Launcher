@@ -1,0 +1,115 @@
+package com.github.reygnn.kolibri_launcher
+
+import android.os.Bundle
+import android.view.View
+import androidx.recyclerview.widget.RecyclerView
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import org.hamcrest.Description
+import org.hamcrest.Matcher
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@ExperimentalCoroutinesApi
+@RunWith(AndroidJUnit4::class)
+@HiltAndroidTest
+class FavoritesSortFragmentTest : BaseAndroidTest() {
+
+    private val testApps = arrayListOf(
+        AppInfo("Zebra Browser", "Zebra Browser", "com.zebra", "com.zebra.MainActivity"),
+        AppInfo("Apple Mail", "Apple Mail", "com.apple", "com.apple.MainActivity"),
+        AppInfo("Banana Calc", "Banana Calc", "com.banana", "com.banana.MainActivity")
+    )
+
+    private val fragmentArgs = Bundle().apply {
+        putParcelableArrayList(AppConstants.ARG_FAVORITES, testApps)
+    }
+
+    @Before
+    fun setup() {
+    }
+
+    @Test
+    fun displaysInitialOrderCorrectly() = testCoroutineRule.runTestAndLaunchUI {
+        launchFragmentInHiltContainer<FavoritesSortFragment>(fragmentArgs)
+        // KORRIGIERTER AUFRUF
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(0, "Zebra Browser")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(1, "Apple Mail")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(2, "Banana Calc")))
+    }
+
+    @Test
+    fun clickAlphabeticalButton_sortsListAndSavesOrder() = testCoroutineRule.runTestAndLaunchUI {
+        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
+        launchFragmentInHiltContainer<FavoritesSortFragment>(fragmentArgs)
+
+        onView(withId(R.id.buttonAlphabetical)).perform(click())
+        // KORRIGIERTER AUFRUF
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(0, "Apple Mail")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(1, "Banana Calc")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(2, "Zebra Browser")))
+
+        val expectedOrder = listOf("com.apple/com.apple.MainActivity", "com.banana/com.banana.MainActivity", "com.zebra/com.zebra.MainActivity")
+        assertThat(fakeRepo.savedOrder).isEqualTo(expectedOrder)
+    }
+
+    @Test
+    fun clickResetButton_fromInitialState_doesNothing() = testCoroutineRule.runTestAndLaunchUI {
+        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
+        launchFragmentInHiltContainer<FavoritesSortFragment>(fragmentArgs)
+
+        onView(withId(R.id.buttonReset)).perform(click())
+        // KORRIGIERTER AUFRUF
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(0, "Zebra Browser")))
+        assertThat(fakeRepo.saveOrderCallCount).isEqualTo(0)
+    }
+
+    @Test
+    fun clickResetButton_resetsToOriginalOrder_afterSorting() = testCoroutineRule.runTestAndLaunchUI {
+        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
+        launchFragmentInHiltContainer<FavoritesSortFragment>(fragmentArgs)
+
+        onView(withId(R.id.buttonAlphabetical)).perform(click())
+        // KORRIGIERTER AUFRUF
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        onView(withId(R.id.buttonReset)).perform(click())
+        // KORRIGIERTER AUFRUF
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(0, "Zebra Browser")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(1, "Apple Mail")))
+        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(2, "Banana Calc")))
+
+        val originalOrderComponents = listOf("com.zebra/com.zebra.MainActivity", "com.apple/com.apple.MainActivity", "com.banana/com.banana.MainActivity")
+        assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
+        assertThat(fakeRepo.saveOrderCallCount).isEqualTo(2)
+    }
+}
+
+fun withItemTextAtPosition(position: Int, expectedText: String): Matcher<View> {
+    return object : androidx.test.espresso.matcher.BoundedMatcher<View, RecyclerView>(RecyclerView::class.java) {
+        override fun describeTo(description: Description) {
+            description.appendText("has item with text '$expectedText' at position $position")
+        }
+
+        override fun matchesSafely(recyclerView: RecyclerView): Boolean {
+            val viewHolder = recyclerView.findViewHolderForAdapterPosition(position)
+            val textView = viewHolder?.itemView?.findViewById<android.widget.TextView>(R.id.app_name)
+            return textView?.text.toString() == expectedText
+        }
+    }
+}
