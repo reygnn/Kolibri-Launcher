@@ -98,18 +98,26 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     fun contextMenu_hideAppAction_updatesStateAndUI() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         val appToHide = testApps.first { it.displayName == "Alphabet" }
 
+        // Arrange & Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withText(appToHide.displayName)).check(matches(isDisplayed()))
 
+        // Act
         onView(withText(appToHide.displayName)).perform(longClick())
         onView(withText(R.string.hide_app_from_drawer)).inRoot(isDialog()).perform(click())
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle() // Warten auf ViewModel-Aktion
 
+        // Simulate & Wait
         val remainingApps = testApps.filter { it.componentName != appToHide.componentName }
-        setDrawerAppsState(remainingApps)
+        setDrawerAppsState(remainingApps) // Synchrones Update auf dem UI-Thread
 
+        // KORREKTUR: Zwinge Espresso, auf die Neuzeichnung des RecyclerViews zu warten,
+        // NACHDEM die neue, kürzere Liste gesetzt wurde.
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
+        // Assert
         onView(withText(appToHide.displayName)).check(doesNotExist())
     }
 
