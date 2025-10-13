@@ -24,9 +24,7 @@ class HomeFragmentBasicTest : BaseAndroidTest() {
      * bis die UI bereit ist.
      */
     private fun launchFragmentWithFavorites(apps: List<AppInfo>) {
-        // KORREKTUR: Setze die Farbeinstellung, BEVOR das Fragment startet.
-        // Das ViewModel wird diese Einstellung beim Starten lesen.
-        // "smart_contrast" mit null wallpaperColors ergibt schwarzen Text.
+
         val fakeSettingsRepo = settingsRepository as FakeSettingsRepository
         runBlocking { // runBlocking ist hier sicher, da es nur eine schnelle In-Memory-Operation ist.
             fakeSettingsRepo.setReadabilityMode("smart_contrast")
@@ -96,6 +94,8 @@ class HomeFragmentBasicTest : BaseAndroidTest() {
         val testApp = AppInfo("MyTestApp", "MyTestApp", "com.test", "com.test.Main")
         launchFragmentWithFavorites(listOf(testApp))
         onView(withText("MyTestApp")).check(matches(isDisplayed()))
+
+        onView(withId(R.id.favorite_apps_container)).check(matches(hasChildCount(1)))
     }
 
     @Test
@@ -109,12 +109,15 @@ class HomeFragmentBasicTest : BaseAndroidTest() {
         onView(withText("App1")).check(matches(isDisplayed()))
         onView(withText("App2")).check(matches(isDisplayed()))
         onView(withText("App3")).check(matches(isDisplayed()))
+
+        onView(withId(R.id.favorite_apps_container)).check(matches(hasChildCount(3)))
     }
 
     @Test
     fun stateUpdateAfterLaunchAddsButton() = testCoroutineRule.runTestAndLaunchUI(mode = TestCoroutineRule.Mode.SAFE) {
         launchFragmentWithFavorites(emptyList())
         onView(withText("NewApp")).check(doesNotExist())
+        onView(withId(R.id.favorite_apps_container)).check(matches(hasChildCount(0)))
 
         val newApp = AppInfo("NewApp", "NewApp", "com.new", "com.new.Main")
         (installedAppsRepository as FakeInstalledAppsRepository).appsFlow.value = listOf(newApp)
@@ -123,6 +126,7 @@ class HomeFragmentBasicTest : BaseAndroidTest() {
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         onView(withText("NewApp")).check(matches(isDisplayed()))
+        onView(withId(R.id.favorite_apps_container)).check(matches(hasChildCount(1)))
     }
 
     @Test
