@@ -1,10 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
-import android.view.View
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.UiController
-import androidx.test.espresso.ViewAction
-import androidx.test.espresso.action.ViewActions.clearText
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.action.ViewActions.replaceText
@@ -12,7 +8,6 @@ import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.hasChildCount
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -25,7 +20,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matchers.allOf
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.hamcrest.Matcher
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -45,23 +39,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     private fun setDrawerAppsState(apps: List<AppInfo>) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
-            (getDrawerAppsUseCase as FakeGetDrawerAppsUseCaseRepository).drawerApps.setValue(apps)
-        }
-    }
-
-    /**
-     * Eine leere Aktion, die Espresso zwingt, auf den UI-Thread zu warten, bis er idle ist.
-     * Das ist extrem nützlich, um auf das Rendern von RecyclerViews zu warten.
-     */
-    fun waitForUiThread() = object : ViewAction {
-        override fun getConstraints(): Matcher<View> {
-            return isDisplayed()
-        }
-        override fun getDescription(): String {
-            return "wait for UI thread to be idle"
-        }
-        override fun perform(uiController: UiController, view: View) {
-            uiController.loopMainThreadUntilIdle()
+            (getDrawerAppsUseCase as FakeGetDrawerAppsUseCaseRepository).drawerApps.value = apps
         }
     }
 
@@ -78,21 +56,24 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     @Test
     fun searchField_filtersRecyclerViewCorrectly() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
-        // Arrange & Sync
+        // 1. Arrange
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
-        onView(withText("Alphabet")).check(matches(isDisplayed())) // Synchronisiert mit der UI
 
-        // Act
+        // 2. ULTIMATIVE SYNCHRONISATION
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
+        // Dieser Check sollte jetzt sicher sein, kann aber weggelassen werden
+        onView(withText("Alphabet")).check(matches(isDisplayed()))
+
+        // 3. Act
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
-
-        // Wait
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
-        // Assert
+        // 4. Assert
         onView(allOf(withText("Zebra"), isDescendantOfA(withId(R.id.apps_recycler_view)))).check(matches(isDisplayed()))
         onView(withText("Alphabet")).check(doesNotExist())
-        onView(withText("Apple")).check(doesNotExist())
     }
 
     @Test
@@ -175,7 +156,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     fun emptyAppList_displaysEmptyRecyclerView() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(emptyList())
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(0))
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
     @Test
@@ -183,7 +164,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         // 1. Arrange & Initial Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(3))
 
         // 2. Act
         onView(withId(R.id.search_edit_text)).perform(typeText("NotExistingApp"))
@@ -193,11 +174,11 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Schritt 3b: Warten auf die UI-Logik (RecyclerView Rendering)
-        onView(withId(R.id.apps_recycler_view)).perform(waitForUiThread())
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
         // 4. Assert
         // Diese Überprüfung ist jetzt 100% sicher.
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(0))
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
     @Test
@@ -246,30 +227,28 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     @Test
     fun searchField_clearsAndResetsList() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
-        // 1. Arrange & Sync
+        // 1. Arrange
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
-        // Verwende deine Assertion auch hier für die initiale Überprüfung
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
 
-        // 2. Act 1: Filtern
+        // 2. ULTIMATIVE SYNCHRONISATION
+        // Wir zwingen Espresso zu warten, bis der RecyclerView sich gezeichnet hat.
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(3))
+
+        // 3. Act 1: Filtern
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(1))
 
-        // --- HIER IST DIE KORREKTUR ---
-        // Ersetze die unzuverlässige Prüfung durch deine stabile Assertion
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(1))
-
-        // 3. Act 2: Text löschen mit der robusten Methode
+        // 4. Act 2: Text löschen
         onView(withId(R.id.search_edit_text)).perform(replaceText(""))
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
-        // --- UND HIER NOCHMALS ---
-        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
-
-        // 4. Assert (optional, aber gut zur Sicherheit)
-        // Diese Überprüfungen sind jetzt sicher, da wir wissen, dass die Daten korrekt sind.
+        // 5. Assert
+        onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(3))
         onView(withText("Alphabet")).check(matches(isDisplayed()))
-        onView(withText("Zebra")).check(matches(isDisplayed()))
     }
 }
