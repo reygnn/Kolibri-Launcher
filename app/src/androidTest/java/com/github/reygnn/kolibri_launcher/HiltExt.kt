@@ -10,16 +10,19 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 
 /**
- * launchFragmentInContainer from the androidx.fragment:fragment-testing library
+ * KORRIGIERT: Gibt jetzt das ActivityScenario zurück für proper Cleanup!
+ *
+ * launchFragmentInContainer from androidx.fragment:fragment-testing library
  * is NOT possible to use with Hilt fragments.
  *
- * This extension function launches a fragment authenticated by Hilt.
+ * This extension function launches a fragment authenticated by Hilt and returns
+ * the ActivityScenario so tests can properly clean it up.
  */
 inline fun <reified T : Fragment> launchFragmentInHiltContainer(
     fragmentArgs: Bundle? = null,
     @StyleRes themeResId: Int = R.style.AppTheme,
     crossinline action: Fragment.() -> Unit = {}
-) {
+): ActivityScenario<HiltTestActivity> {
     val startActivityIntent = Intent.makeMainActivity(
         ComponentName(
             ApplicationProvider.getApplicationContext(),
@@ -30,7 +33,9 @@ inline fun <reified T : Fragment> launchFragmentInHiltContainer(
         themeResId
     )
 
-    ActivityScenario.launch<HiltTestActivity>(startActivityIntent).onActivity { activity ->
+    val scenario = ActivityScenario.launch<HiltTestActivity>(startActivityIntent)
+
+    scenario.onActivity { activity ->
         val fragment: Fragment = activity.supportFragmentManager.fragmentFactory.instantiate(
             Preconditions.checkNotNull(T::class.java.classLoader),
             T::class.java.name
@@ -43,4 +48,7 @@ inline fun <reified T : Fragment> launchFragmentInHiltContainer(
 
         fragment.action()
     }
+
+    // WICHTIG: Scenario zurückgeben für Cleanup!
+    return scenario
 }

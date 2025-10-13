@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher // or a shared test utility package
+package com.github.reygnn.kolibri_launcher
 
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
@@ -13,6 +13,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import com.google.android.material.chip.Chip
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.`is`
+import org.hamcrest.Matchers.any
 
 object EspressoTestUtils {
 
@@ -20,14 +21,9 @@ object EspressoTestUtils {
     // --- Custom ViewActions ---
     // =================================================================================
 
-    /**
-     * Eine benutzerdefinierte ViewAction, die den Klick auf das Schließen-Icon eines
-     * com.google.android.material.chip.Chip simuliert.
-     */
     fun clickOnChipCloseIcon(): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                // Stellt sicher, dass diese Aktion nur auf Chip-Widgets angewendet wird.
                 return isAssignableFrom(Chip::class.java)
             }
 
@@ -37,16 +33,14 @@ object EspressoTestUtils {
 
             override fun perform(uiController: UiController, view: View) {
                 val chip = view as Chip
-                // Ruft die interne Methode auf, die der OnClickListener des Icons auslösen würde.
                 chip.performCloseIconClick()
             }
         }
     }
 
     /**
-     * Eine leere Aktion, die Espresso zwingt, auf den UI-Thread zu warten, bis er idle ist.
-     * Das ist nützlich, um auf das Rendern von RecyclerViews zu warten.
-     * HINWEIS: Oft nicht notwendig, da Espresso dies automatisch tut.
+     * Wartet auf den UI-Thread für bereits sichtbare Views.
+     * Verwendet isDisplayed() als Constraint.
      */
     fun waitForUiThread(): ViewAction {
         return object : ViewAction {
@@ -55,7 +49,7 @@ object EspressoTestUtils {
             }
 
             override fun getDescription(): String {
-                return "wait for UI thread to be idle"
+                return "wait for UI thread to be idle (displayed views)"
             }
 
             override fun perform(uiController: UiController, view: View) {
@@ -64,13 +58,54 @@ object EspressoTestUtils {
         }
     }
 
+    /**
+     * Wartet auf den UI-Thread für beliebige Views (auch unsichtbare).
+     * WICHTIG: Nutze diese Version, wenn du auf State-Updates wartest,
+     * bei denen Views erst noch erscheinen müssen.
+     */
+    fun waitForUiThreadAnyView(): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> {
+                return any(View::class.java) // Akzeptiert jede View
+            }
+
+            override fun getDescription(): String {
+                return "wait for UI thread to be idle (any view state)"
+            }
+
+            override fun perform(uiController: UiController, view: View) {
+                uiController.loopMainThreadUntilIdle()
+            }
+        }
+    }
+
+    /**
+     * Mehrfaches Warten mit kleinen Pausen.
+     * Nützlich für komplexe Animationen oder State-Updates.
+     */
+    fun waitForUiThreadMultiple(iterations: Int = 2): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> {
+                return any(View::class.java)
+            }
+
+            override fun getDescription(): String {
+                return "wait for UI thread multiple times ($iterations iterations)"
+            }
+
+            override fun perform(uiController: UiController, view: View) {
+                repeat(iterations) {
+                    uiController.loopMainThreadUntilIdle()
+                    uiController.loopMainThreadForAtLeast(16) // Eine Frame-Zeit
+                }
+            }
+        }
+    }
+
     // =================================================================================
     // --- Custom ViewAssertions ---
     // =================================================================================
 
-    /**
-     * Eine ViewAssertion, die die Anzahl der Elemente in einem RecyclerView überprüft.
-     */
     class RecyclerViewItemCountAssertion(private val matcher: Matcher<Int>) : ViewAssertion {
         override fun check(view: View?, noViewFoundException: NoMatchingViewException?) {
             if (noViewFoundException != null) {
@@ -96,17 +131,18 @@ object EspressoTestUtils {
     // =================================================================================
 
     /**
-     * Wartet, bis Espresso den UI-Thread als "idle" betrachtet.
-     * ACHTUNG: Die Verwendung von Thread.sleep() sollte vermieden werden, da es Tests
-     * verlangsamt und instabil ("flaky") machen kann. Bevorzugen Sie Idling Resources.
+     * DEPRECATED: Thread.sleep sollte vermieden werden.
+     * Nutze stattdessen waitForUiThreadAnyView() oder waitForUiThreadMultiple().
      */
+    @Deprecated("Use waitForUiThreadAnyView() instead")
     fun waitForUiIdle() {
         Espresso.onIdle()
-        Thread.sleep(100) // Nur als letzter Ausweg verwenden
+        Thread.sleep(100)
     }
 
+    @Deprecated("Use waitForUiThreadAnyView() instead")
     fun waitForUiIdleShort() {
         Espresso.onIdle()
-        Thread.sleep(50) // Nur als letzter Ausweg verwenden
+        Thread.sleep(50)
     }
 }

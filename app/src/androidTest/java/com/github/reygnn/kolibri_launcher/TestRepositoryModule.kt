@@ -253,6 +253,8 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTapToLockEnabledFlow.value = isEnabled }
     override suspend fun setReadabilityMode(mode: String) { readabilityModeFlow.value = mode }
     override suspend fun setOnboardingCompleted() { onboardingCompletedFlow.value = true }
+    fun setReadabilityModeBlocking(mode: String) { readabilityModeFlow.value = mode }
+    fun setSortOrderBlocking(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
     override fun purgeRepository() { sortOrderFlow.value = SortOrder.ALPHABETICAL; doubleTapToLockEnabledFlow.value = false; readabilityModeFlow.value = "smart_contrast"; onboardingCompletedFlow.value = false }
 }
 

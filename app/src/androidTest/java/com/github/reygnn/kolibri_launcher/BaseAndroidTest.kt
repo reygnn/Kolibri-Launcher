@@ -1,7 +1,12 @@
 package com.github.reygnn.kolibri_launcher
 
+import android.os.Bundle
+import androidx.annotation.StyleRes
+import androidx.fragment.app.Fragment
+import androidx.test.core.app.ActivityScenario
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import javax.inject.Inject
@@ -47,9 +52,13 @@ abstract class BaseAndroidTest {
     @Inject
     lateinit var appUpdateSignal: AppUpdateSignal
 
+    // Tracking von ActivityScenarios für proper Cleanup
+    protected var currentScenario: ActivityScenario<*>? = null
 
     @Before
     fun baseSetup() {
+        HomeViewModel.isInTestMode = true   // Test-Mode aktivieren BEVOR Hilt injiziert
+
         hiltRule.inject()
 
         /**
@@ -85,5 +94,37 @@ abstract class BaseAndroidTest {
         (getDrawerAppsUseCase as? Purgeable)?.purgeRepository()
         (screenLockRepository as? Purgeable)?.purgeRepository()
         (getOnboardingAppsUseCase as? Purgeable)?.purgeRepository()
+
+        // Reset TestDataSource
+        TestDataSource.clearCustomNames()
+    }
+
+    // Cleanup nach jedem Test
+    @After
+    fun baseTearDown() {
+        try {
+            // ActivityScenario schließen um Memory Leaks zu vermeiden
+            currentScenario?.close()
+            currentScenario = null
+        } catch (e: Exception) {
+            // Ignore cleanup errors - Test hat bereits Status
+        }
+
+        HomeViewModel.isInTestMode = false   // Test-Mode zurücksetzen
+    }
+
+    // Helper-Methode die automatisch das Scenario tracked
+    protected inline fun <reified T : Fragment> launchAndTrackFragment(
+        fragmentArgs: Bundle? = null,
+        @StyleRes themeResId: Int = R.style.AppTheme,
+        noinline action: Fragment.() -> Unit = {}
+    ): ActivityScenario<HiltTestActivity> {
+        // Schließe vorheriges Scenario falls vorhanden
+        currentScenario?.close()
+
+        // Starte neues Fragment und tracke das Scenario
+        val scenario = launchFragmentInHiltContainer<T>(fragmentArgs, themeResId, action)
+        currentScenario = scenario
+        return scenario
     }
 }

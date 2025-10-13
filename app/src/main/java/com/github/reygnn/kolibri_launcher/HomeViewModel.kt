@@ -79,20 +79,35 @@ class HomeViewModel @Inject constructor(
     private var fallbackToastShown = false
     private var enableLockToastShown = false
 
+    companion object {
+        @Volatile
+        var isInTestMode = false
+    }
+
     init {
         updateTimeAndDate()
         getInitialBatteryState()
 
-        launchSafe {
-            delay(100)
-            observeInstalledApps()
-            listenForAppUpdates()
+        // NUR starten wenn NICHT im Test-Modus
+        if (!isInTestMode) {
+            launchSafe {
+                delay(100)
+                observeInstalledApps()
+                listenForAppUpdates()
 
-            getFavoriteAppsUseCase.favoriteApps.collect { state ->
-                _favoriteAppsState.value = state
-                if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
-                    fallbackToastShown = true
-                    sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
+                getFavoriteAppsUseCase.favoriteApps.collect { state ->
+                    _favoriteAppsState.value = state
+                    if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
+                        fallbackToastShown = true
+                        sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
+                    }
+                }
+            }
+        } else {
+            // Im Test-Modus: NUR Favorites observen
+            launchSafe {
+                getFavoriteAppsUseCase.favoriteApps.collect { state ->
+                    _favoriteAppsState.value = state
                 }
             }
         }
