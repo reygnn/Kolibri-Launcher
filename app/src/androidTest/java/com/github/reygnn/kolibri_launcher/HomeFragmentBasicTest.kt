@@ -79,14 +79,15 @@ class HomeFragmentBasicTest : BaseAndroidTest() {
 
     @Test
     fun singleFavoriteShowsOneButtonWithCorrectText() = testCoroutineRule.runTestAndLaunchUI(mode = TestCoroutineRule.Mode.DIRTY) {
-        launchFragmentInHiltContainer<HomeFragment>()
-
+        // 1. Daten setzen
         val testApp = AppInfo("MyTestApp", "MyTestApp", "com.test", "com.test.Main")
         val fakeUseCase = getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository
         fakeUseCase.favoriteApps.value = UiState.Success(FavoriteAppsResult(listOf(testApp), false))
 
-        EspressoTestUtils.waitForUiIdle()
+        // 2. Fragment launchen
+        launchFragmentInHiltContainer<HomeFragment>()
 
+        // 3. Assertions (kein waitForUiIdle nötig mit UnconfinedTestDispatcher!)
         onView(withId(R.id.favorite_apps_container)).check(matches(hasChildCount(1)))
         onView(withText("MyTestApp")).check(matches(isDisplayed()))
     }

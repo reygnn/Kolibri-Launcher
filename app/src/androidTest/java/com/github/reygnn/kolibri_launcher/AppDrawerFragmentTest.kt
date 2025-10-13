@@ -94,18 +94,26 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     @Test
     fun searchField_filtersCaseInsensitive() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
-        // Arrange & Sync
+        // 1. Arrange
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
+
+        // 2. ERZWUNGENE UI-SYNCHRONISATION (für den initialen Zustand)
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
+        // Dieser Check ist jetzt 100% sicher
         onView(withText("Apple")).check(matches(isDisplayed()))
 
-        // Act
+        // 3. Act
         onView(withId(R.id.search_edit_text)).perform(replaceText("APPLE"))
 
-        // Wait
+        // 4. Coroutine-Logik abwarten
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert
+        // 5. ERZWUNGENE UI-SYNCHRONISATION (für den gefilterten Zustand)
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
+        // 6. Assert
         onView(allOf(withText("Apple"), isDescendantOfA(withId(R.id.apps_recycler_view)))).check(matches(isDisplayed()))
         onView(withText("Alphabet")).check(doesNotExist())
     }

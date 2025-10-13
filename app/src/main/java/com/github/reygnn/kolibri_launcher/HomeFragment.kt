@@ -100,7 +100,7 @@ class HomeFragment : Fragment() {
 
     private fun observeViewModel() {
         // Observer 1: Favoriten-Liste
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+       viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.favoriteAppsState.collect { state ->
