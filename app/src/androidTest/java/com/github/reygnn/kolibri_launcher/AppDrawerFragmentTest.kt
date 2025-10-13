@@ -48,7 +48,10 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
 
-        // Espresso wartet automatisch, bis die UI stabil ist, daher ist ein expliziter Sync hier nicht nötig.
+        // KORREKTUR: Zwingt Espresso, explizit zu warten, bis der RecyclerView die
+        // LiveData-Aktualisierung verarbeitet und sich selbst gezeichnet hat.
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
         onView(withText("Alphabet")).check(matches(isDisplayed()))
         onView(withText("Zebra")).check(matches(isDisplayed()))
         onView(withText("Apple")).check(matches(isDisplayed()))
@@ -60,10 +63,8 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
 
-        // 2. ULTIMATIVE SYNCHRONISATION
+        // 2. ULTIMATIVE SYNCHRONISATION (bereits vorhanden und korrekt)
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
-
-        // Dieser Check sollte jetzt sicher sein, kann aber weggelassen werden
         onView(withText("Alphabet")).check(matches(isDisplayed()))
 
         // 3. Act
@@ -83,7 +84,10 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         // Arrange & Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
+        // KORREKTUR: Explizites Warten hinzugefügt, um Stabilität zu gewährleisten.
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withText("Alphabet")).check(matches(isDisplayed()))
+
 
         // Act
         onView(withText("Alphabet")).perform(longClick())
@@ -100,8 +104,6 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
         // 2. ERZWUNGENE UI-SYNCHRONISATION (für den initialen Zustand)
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
-
-        // Dieser Check ist jetzt 100% sicher
         onView(withText("Apple")).check(matches(isDisplayed()))
 
         // 3. Act
@@ -125,6 +127,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         // Arrange & Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withText(appToHide.displayName)).check(matches(isDisplayed()))
 
         // Act
@@ -144,11 +147,20 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     fun contextMenu_toggleFavoriteAction_addsToFavorites() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         val appToFavorite = testApps.first { it.displayName == "Apple" }
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
+        val fakeFavoriteAppsUseCase = getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository
         fakeFavoritesRepo.favoritesState.value = emptySet()
 
         // Arrange & Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
+        // 1. Setze den initialen Zustand, den das ViewModel lesen wird
+        fakeFavoriteAppsUseCase.favoriteApps.value = UiState.Success(FavoriteAppsResult(apps = emptyList(), isFallback = false))
         setDrawerAppsState(testApps)
+
+        // 2. KORREKTUR: Warte, bis beide Zustände verarbeitet und die UI bereit ist
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
+
+        // Diese Überprüfung stellt nun sicher, dass die UI bereit ist, bevor die Aktion ausgeführt wird
         onView(withText(appToFavorite.displayName)).check(matches(isDisplayed()))
 
         // Act
@@ -172,20 +184,17 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         // 1. Arrange & Initial Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(3))
 
         // 2. Act
         onView(withId(R.id.search_edit_text)).perform(typeText("NotExistingApp"))
 
         // 3. WARTEN (Der Zwei-Schritt-Prozess)
-        // Schritt 3a: Warten auf die ViewModel-Logik (Coroutinen)
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-
-        // Schritt 3b: Warten auf die UI-Logik (RecyclerView Rendering)
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
         // 4. Assert
-        // Diese Überprüfung ist jetzt 100% sicher.
         onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
@@ -193,42 +202,31 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     fun favoriteLimit_preventsAddingMoreFavorites() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         val appToAdd = testApps.first { it.displayName == "Apple" }
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
-        // Hole den Fake UseCase, den wir direkt manipulieren werden
         val fakeFavoriteAppsUseCase = getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository
 
-        // --- SCHRITT 1: STARTE DIE UI IN EINEM SAUBEREN ZUSTAND ---
+        // --- SCHRITT 1: STARTE DIE UI ---
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withText(appToAdd.displayName)).check(matches(isDisplayed()))
 
-        // --- SCHRITT 2: SIMULIERE DEN "VOLLEN" ZUSTAND DIREKT IM USECASE ---
-        // Erstelle die Daten, die das Fragment empfangen soll. In diesem Fall ist die App-Liste
-        // für die Favoriten-UI nicht wichtig, nur die Tatsache, dass das Limit erreicht ist.
-        // Wir simulieren, dass der UseCase eine Liste mit der maximalen Anzahl von Apps liefert.
-        // Wichtig ist, dass die ViewModel-Logik auf die Größe dieser Liste zugreift.
-        // Wenn die Logik die Größe direkt aus dem favoritesRepository nimmt, müssen wir auch das füllen.
 
-        // Fülle den zugrundeliegenden Repository-State, falls das ViewModel ihn direkt prüft
+        // --- SCHRITT 2: SIMULIERE DEN "VOLLEN" ZUSTAND ---
         val maxFavorites = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.fake.app$it" }.toSet()
         fakeFavoritesRepo.favoritesState.value = maxFavorites
-
-        // Pushe den UiState, den das Fragment tatsächlich beobachtet.
-        // Erzeuge eine Dummy-Liste, deren Größe dem Limit entspricht.
         val dummyFullAppList = maxFavorites.map { AppInfo(it, it, it, it) }
         fakeFavoriteAppsUseCase.favoriteApps.value = UiState.Success(FavoriteAppsResult(apps = dummyFullAppList, isFallback = false))
 
-        // --- SCHRITT 3: WARTE AUF DIE VERARBEITUNG DES NEUEN ZUSTANDS ---
-        // Gib dem Fragment Zeit, diesen neuen UiState zu empfangen und zu verarbeiten.
+        // --- SCHRITT 3: KORREKTUR: WARTE AUF DIE VERARBEITUNG DES NEUEN ZUSTANDS ---
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
         // --- SCHRITT 4: FÜHRE DIE AKTION AUS ---
-        // Jetzt ist der Zustand des Fragments garantiert aktuell.
         onView(withText(appToAdd.displayName)).perform(longClick())
         onView(withText(R.string.add_to_favorites)).inRoot(isDialog()).perform(click())
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // --- SCHRITT 5: ÜBERPRÜFE DAS ENDERGEBNIS ---
-        // Die ViewModel-Logik hat jetzt den korrekten Count erhalten.
         assertThat(fakeFavoritesRepo.favorites).doesNotContain(appToAdd.componentName)
         assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FAVORITES_ON_HOME)
     }
@@ -240,7 +238,6 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         setDrawerAppsState(testApps)
 
         // 2. ULTIMATIVE SYNCHRONISATION
-        // Wir zwingen Espresso zu warten, bis der RecyclerView sich gezeichnet hat.
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withId(R.id.apps_recycler_view)).check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(3))
 

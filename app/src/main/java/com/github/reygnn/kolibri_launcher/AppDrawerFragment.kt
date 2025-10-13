@@ -431,14 +431,14 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
     }
 
-    private fun showAppContextMenu(app: AppInfo) {  // ← KEIN Dispatchers.Main
+    private fun showAppContextMenu(app: AppInfo) {
         try {
             currentDialog?.dismissAllowingStateLoss()
             currentDialog = null
 
             longClickedApp = app
 
-            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                 try {
                     val hasUsage = try {
                         appUsageManager.hasUsageDataForPackage(app.packageName)
