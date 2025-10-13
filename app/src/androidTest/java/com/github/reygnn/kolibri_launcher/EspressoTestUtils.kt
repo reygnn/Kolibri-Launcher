@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher // or a shared test utility package
 
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
@@ -8,15 +8,45 @@ import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.ViewAssertion
 import androidx.test.espresso.matcher.ViewMatchers.assertThat
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import com.google.android.material.chip.Chip
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.`is`
 
 object EspressoTestUtils {
 
+    // =================================================================================
+    // --- Custom ViewActions ---
+    // =================================================================================
+
+    /**
+     * Eine benutzerdefinierte ViewAction, die den Klick auf das Schließen-Icon eines
+     * com.google.android.material.chip.Chip simuliert.
+     */
+    fun clickOnChipCloseIcon(): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> {
+                // Stellt sicher, dass diese Aktion nur auf Chip-Widgets angewendet wird.
+                return isAssignableFrom(Chip::class.java)
+            }
+
+            override fun getDescription(): String {
+                return "Click on the close icon of a Chip."
+            }
+
+            override fun perform(uiController: UiController, view: View) {
+                val chip = view as Chip
+                // Ruft die interne Methode auf, die der OnClickListener des Icons auslösen würde.
+                chip.performCloseIconClick()
+            }
+        }
+    }
+
     /**
      * Eine leere Aktion, die Espresso zwingt, auf den UI-Thread zu warten, bis er idle ist.
-     * Das ist extrem nützlich, um auf das Rendern von RecyclerViews zu warten.
+     * Das ist nützlich, um auf das Rendern von RecyclerViews zu warten.
+     * HINWEIS: Oft nicht notwendig, da Espresso dies automatisch tut.
      */
     fun waitForUiThread(): ViewAction {
         return object : ViewAction {
@@ -34,31 +64,13 @@ object EspressoTestUtils {
         }
     }
 
-    /**
-     * Wartet bis die UI vollständig idle ist.
-     * Nützlich nach StateFlow-Updates oder asynchronen UI-Änderungen.
-     *
-     * Diese Methode kombiniert mehrere Wartestrategien:
-     * 1. Espresso.onIdle() - wartet auf Espresso's idle state
-     * 2. Kurzes delay - gibt der UI Zeit für Rendering nach StateFlow-Updates
-     *
-     * Verwende dies in Tests nach dem Setzen von StateFlow-Werten,
-     * wenn die UI darauf reagieren soll.
-     */
-    fun waitForUiIdle() {
-        Espresso.onIdle()
-        Thread.sleep(100) // Fallback für garantierte Propagierung
-    }
+    // =================================================================================
+    // --- Custom ViewAssertions ---
+    // =================================================================================
 
     /**
-     * Wartet eine kürzere Zeit - für schnellere Tests, wenn die UI-Änderung
-     * sehr einfach ist.
+     * Eine ViewAssertion, die die Anzahl der Elemente in einem RecyclerView überprüft.
      */
-    fun waitForUiIdleShort() {
-        Espresso.onIdle()
-        Thread.sleep(50)
-    }
-
     class RecyclerViewItemCountAssertion(private val matcher: Matcher<Int>) : ViewAssertion {
         override fun check(view: View?, noViewFoundException: NoMatchingViewException?) {
             if (noViewFoundException != null) {
@@ -77,5 +89,24 @@ object EspressoTestUtils {
                 return RecyclerViewItemCountAssertion(`is`(expectedCount))
             }
         }
+    }
+
+    // =================================================================================
+    // --- Synchronization / Waiting Helpers ---
+    // =================================================================================
+
+    /**
+     * Wartet, bis Espresso den UI-Thread als "idle" betrachtet.
+     * ACHTUNG: Die Verwendung von Thread.sleep() sollte vermieden werden, da es Tests
+     * verlangsamt und instabil ("flaky") machen kann. Bevorzugen Sie Idling Resources.
+     */
+    fun waitForUiIdle() {
+        Espresso.onIdle()
+        Thread.sleep(100) // Nur als letzter Ausweg verwenden
+    }
+
+    fun waitForUiIdleShort() {
+        Espresso.onIdle()
+        Thread.sleep(50) // Nur als letzter Ausweg verwenden
     }
 }

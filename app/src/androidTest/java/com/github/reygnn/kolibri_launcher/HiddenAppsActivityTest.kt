@@ -79,7 +79,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
 
         // Klicke auf das "Schließen"-Icon des Chips
         onView(allOf(withText("Maps"), isDescendantOfA(withId(R.id.selection_chip_group))))
-            .perform(clickOnChipCloseIcon())
+            .perform(EspressoTestUtils.clickOnChipCloseIcon())
 
         // Chip sollte wieder verschwunden sein
         onView(withId(R.id.chips_scroll_view)).check(matches(not(isDisplayed())))

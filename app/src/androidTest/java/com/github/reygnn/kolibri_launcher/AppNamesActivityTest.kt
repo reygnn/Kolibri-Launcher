@@ -74,7 +74,7 @@ class AppNamesActivityTest : BaseAndroidTest() {
     @Test
     fun renameApp_updatesListAndShowsChip() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange: Setze den initialen Zustand und starte die Activity
-        updateAppListState()
+        updateAppListState() // Initial setup is fine
         ActivityScenario.launch(AppNamesActivity::class.java)
 
         // Act: Führe die UI-Aktionen aus
@@ -83,10 +83,8 @@ class AppNamesActivityTest : BaseAndroidTest() {
         onView(withClassName(endsWith("EditText"))).perform(replaceText("My Calc"))
         onView(withText(R.string.save)).perform(click())
 
-        // Simulate: Simuliere das Update, das durch die ViewModel-Logik ausgelöst würde
-        updateAppListState()
-
         // Assert: Überprüfe den neuen Zustand der UI
+        // The assertions remain the same.
         onView(allOf(withId(R.id.display_name_text), withText("My Calc")))
             .check(matches(isDisplayed()))
         onView(allOf(withId(R.id.original_name_text), withText("Beta Calculator")))

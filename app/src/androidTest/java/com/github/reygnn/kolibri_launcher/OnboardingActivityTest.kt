@@ -72,7 +72,7 @@ class OnboardingActivityTest : BaseAndroidTest() {
             .check(matches(isDisplayed()))
 
         onView(allOf(withText("Maps"), isDescendantOfA(withId(R.id.selection_chip_group))))
-            .perform(clickOnChipCloseIcon())
+            .perform(EspressoTestUtils.clickOnChipCloseIcon())
 
         onView(withId(R.id.chips_scroll_view)).check(matches(not(isDisplayed())))
     }
