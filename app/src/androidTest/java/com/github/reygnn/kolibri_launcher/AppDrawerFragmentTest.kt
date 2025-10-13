@@ -155,7 +155,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     fun emptyAppList_displaysEmptyRecyclerView() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(emptyList())
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(0)))
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
     @Test
@@ -170,49 +170,79 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(0)))
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
     @Test
     fun favoriteLimit_preventsAddingMoreFavorites() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         val appToAdd = testApps.first { it.displayName == "Apple" }
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
-        val maxFavorites = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.fake.app$it" }.toSet()
-        fakeFavoritesRepo.favoritesState.value = maxFavorites
+        // Hole den Fake UseCase, den wir direkt manipulieren werden
+        val fakeFavoriteAppsUseCase = getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository
 
-        // Arrange & Sync
+        // --- SCHRITT 1: STARTE DIE UI IN EINEM SAUBEREN ZUSTAND ---
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
         onView(withText(appToAdd.displayName)).check(matches(isDisplayed()))
 
-        // Act
+        // --- SCHRITT 2: SIMULIERE DEN "VOLLEN" ZUSTAND DIREKT IM USECASE ---
+        // Erstelle die Daten, die das Fragment empfangen soll. In diesem Fall ist die App-Liste
+        // für die Favoriten-UI nicht wichtig, nur die Tatsache, dass das Limit erreicht ist.
+        // Wir simulieren, dass der UseCase eine Liste mit der maximalen Anzahl von Apps liefert.
+        // Wichtig ist, dass die ViewModel-Logik auf die Größe dieser Liste zugreift.
+        // Wenn die Logik die Größe direkt aus dem favoritesRepository nimmt, müssen wir auch das füllen.
+
+        // Fülle den zugrundeliegenden Repository-State, falls das ViewModel ihn direkt prüft
+        val maxFavorites = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.fake.app$it" }.toSet()
+        fakeFavoritesRepo.favoritesState.value = maxFavorites
+
+        // Pushe den UiState, den das Fragment tatsächlich beobachtet.
+        // Erzeuge eine Dummy-Liste, deren Größe dem Limit entspricht.
+        val dummyFullAppList = maxFavorites.map { AppInfo(it, it, it, it) }
+        fakeFavoriteAppsUseCase.favoriteApps.value = UiState.Success(FavoriteAppsResult(apps = dummyFullAppList, isFallback = false))
+
+        // --- SCHRITT 3: WARTE AUF DIE VERARBEITUNG DES NEUEN ZUSTANDS ---
+        // Gib dem Fragment Zeit, diesen neuen UiState zu empfangen und zu verarbeiten.
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // --- SCHRITT 4: FÜHRE DIE AKTION AUS ---
+        // Jetzt ist der Zustand des Fragments garantiert aktuell.
         onView(withText(appToAdd.displayName)).perform(longClick())
         onView(withText(R.string.add_to_favorites)).inRoot(isDialog()).perform(click())
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert
+        // --- SCHRITT 5: ÜBERPRÜFE DAS ENDERGEBNIS ---
+        // Die ViewModel-Logik hat jetzt den korrekten Count erhalten.
         assertThat(fakeFavoritesRepo.favorites).doesNotContain(appToAdd.componentName)
         assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 
     @Test
     fun searchField_clearsAndResetsList() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
-        // Arrange & Sync
+        // 1. Arrange & Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(3)))
+        // Verwende deine Assertion auch hier für die initiale Überprüfung
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
 
-        // Act 1: Filter
+        // 2. Act 1: Filtern
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(1)))
 
-        // Act 2: Clear
-        onView(withId(R.id.search_edit_text)).perform(clearText())
+        // --- HIER IST DIE KORREKTUR ---
+        // Ersetze die unzuverlässige Prüfung durch deine stabile Assertion
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(1))
+
+        // 3. Act 2: Text löschen mit der robusten Methode
+        onView(withId(R.id.search_edit_text)).perform(replaceText(""))
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(3)))
+        // --- UND HIER NOCHMALS ---
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
+
+        // 4. Assert (optional, aber gut zur Sicherheit)
+        // Diese Überprüfungen sind jetzt sicher, da wir wissen, dass die Daten korrekt sind.
         onView(withText("Alphabet")).check(matches(isDisplayed()))
+        onView(withText("Zebra")).check(matches(isDisplayed()))
     }
 }
