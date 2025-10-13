@@ -131,7 +131,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 EspressoIdlingResource.increment()
             }
 
-            viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
                 try {
                     val actions = loadActions()
 
@@ -348,7 +348,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                             return
                         }
                         AppContextMenuAction.ACTION_ID_RESTORE_NAME -> {
-                            viewLifecycleOwner.lifecycleScope.launch {
+                            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
                                 try {
                                     appNamesManager.removeCustomNameForPackage(appInfo.packageName)
                                     dismiss()
@@ -405,7 +405,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                     try {
                         val newName = editText.text.toString().trim()
 
-                        viewLifecycleOwner.lifecycleScope.launch {
+                        viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
                             try {
                                 if (newName.isNotBlank() && newName != appInfo.originalName) {
                                     appNamesManager.setCustomNameForPackage(

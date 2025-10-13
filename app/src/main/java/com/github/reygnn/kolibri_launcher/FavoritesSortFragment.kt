@@ -257,7 +257,7 @@ class FavoritesSortFragment : Fragment() {
             return
         }
 
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
             try {
                 val componentNames = try {
                     favoriteApps.map { it.componentName }

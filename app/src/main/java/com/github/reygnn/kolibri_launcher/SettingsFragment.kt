@@ -84,7 +84,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         try {
             observeSettings()
-            viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                 updateCrashReportSummary()
             }
         } catch (e: Exception) {
@@ -142,7 +142,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 try {
                     if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
 
-                    viewLifecycleOwner.lifecycleScope.launch {
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                         try {
                             showSortFavoritesFragment()
                         } catch (e: CancellationException) {
@@ -305,7 +305,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             findPreference<Preference>("crash_reports")?.setOnPreferenceClickListener {
                 try {
                     // Wir starten eine Coroutine, um die suspend-Funktion aufzurufen
-                    viewLifecycleOwner.lifecycleScope.launch {
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                         // Wir benötigen den Activity-Context, um den Dialog zu zeigen
                         val activityContext = activity ?: return@launch
 
@@ -323,7 +323,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 }
                                 Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT).show()
 
-                                viewLifecycleOwner.lifecycleScope.launch {
+                                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                                     updateCrashReportSummary()
                                 }
                             }
@@ -396,7 +396,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun observeSettings() {
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 // Observer für App-Liste
                 launch {

@@ -1,3 +1,4 @@
+/*
 package com.github.reygnn.kolibri_launcher
 
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,87 @@ class TestCoroutineRule(
             // Wir führen den Test-Block im richtigen Kontext aus
             withContext(originalContext) {
                 block()
+            }
+        }
+    }
+}*/
+
+package com.github.reygnn.kolibri_launcher
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
+
+/*
+@ExperimentalCoroutinesApi
+class TestCoroutineRule(
+    val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()  // ← ÄNDERUNG!
+) : TestWatcher() {
+
+    override fun starting(description: Description) {
+        super.starting(description)
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    override fun finished(description: Description) {
+        super.finished(description)
+        Dispatchers.resetMain()
+    }
+
+    fun runTestAndLaunchUI(block: suspend CoroutineScope.() -> Unit) = runTest(testDispatcher) {
+        block()
+    }
+}*/
+
+@ExperimentalCoroutinesApi
+class TestCoroutineRule(
+    private val mode: Mode = Mode.FAST
+) : TestWatcher() {
+
+    enum class Mode { FAST, SAFE }
+
+    private var _testDispatcher: TestDispatcher? = null
+
+    val testDispatcher: TestDispatcher
+        get() = _testDispatcher ?: throw IllegalStateException("TestDispatcher not initialized")
+
+    override fun starting(description: Description) {
+        super.starting(description)
+        _testDispatcher = when(mode) {
+            Mode.FAST -> UnconfinedTestDispatcher()
+            Mode.SAFE -> StandardTestDispatcher()
+        }
+        Dispatchers.setMain(_testDispatcher!!)
+    }
+
+    override fun finished(description: Description) {
+        super.finished(description)
+        Dispatchers.resetMain()
+        _testDispatcher = null
+    }
+
+    fun runTestAndLaunchUI(
+        testMode: Mode = this.mode,
+        block: suspend CoroutineScope.() -> Unit
+    ) {
+        val dispatcher = when(testMode) {
+            Mode.FAST -> UnconfinedTestDispatcher()
+            Mode.SAFE -> StandardTestDispatcher()
+        }
+
+        runTest(dispatcher) {
+            block()
+            if (testMode == Mode.SAFE) {
+                dispatcher.scheduler.advanceTimeBy(500)
+                dispatcher.scheduler.runCurrent()
             }
         }
     }

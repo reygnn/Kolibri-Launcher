@@ -34,6 +34,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,7 +134,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
 
         // Observer 3: UI-Farben
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.uiColorsState.collect { colors ->
@@ -156,7 +157,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
 
         // Observer 4: Events
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.eventFlow.collect { event ->
@@ -430,14 +431,14 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
     }
 
-    private fun showAppContextMenu(app: AppInfo) {
+    private fun showAppContextMenu(app: AppInfo) {  // ← KEIN Dispatchers.Main
         try {
             currentDialog?.dismissAllowingStateLoss()
             currentDialog = null
 
             longClickedApp = app
 
-            viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
                 try {
                     val hasUsage = try {
                         appUsageManager.hasUsageDataForPackage(app.packageName)

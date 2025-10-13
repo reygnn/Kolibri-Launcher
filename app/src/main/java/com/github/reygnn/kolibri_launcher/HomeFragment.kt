@@ -38,6 +38,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -99,7 +100,7 @@ class HomeFragment : Fragment() {
 
     private fun observeViewModel() {
         // Observer 1: Favoriten-Liste
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.favoriteAppsState.collect { state ->
@@ -138,7 +139,7 @@ class HomeFragment : Fragment() {
         }
 
         // Observer 2: Zeit, Datum, Batterie
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.uiState.collect { state ->
@@ -161,7 +162,7 @@ class HomeFragment : Fragment() {
         }
 
         // Observer 3: UI-Farben
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     viewModel.uiColorsState.collect { colors ->

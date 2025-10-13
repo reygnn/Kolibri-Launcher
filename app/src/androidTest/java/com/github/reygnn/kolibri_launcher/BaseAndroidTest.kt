@@ -14,7 +14,7 @@ abstract class BaseAndroidTest {
     var hiltRule = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
-    val testCoroutineRule = TestCoroutineRule()
+    open val testCoroutineRule = TestCoroutineRule(TestCoroutineRule.Mode.FAST)
 
     @get:Rule(order = 2)
     val disableAnimationsRule = DisableAnimationsRule()
