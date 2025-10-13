@@ -6,19 +6,14 @@ import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.Visibility
-import androidx.test.espresso.matcher.ViewMatchers.hasChildCount
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.CoreMatchers.containsString
 import org.hamcrest.CoreMatchers.not
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,143 +22,184 @@ import org.junit.runner.RunWith
 @HiltAndroidTest
 class HomeFragmentTest : BaseAndroidTest() {
 
-    @Before
-    fun setup() {
-    }
+    private fun setupFragmentWithApps(apps: List<AppInfo>, isFallback: Boolean = false) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    private fun setFavoriteAppsState(apps: List<AppInfo>, isFallback: Boolean = false) {
-        val successState = UiState.Success(FavoriteAppsResult(apps, isFallback))
-        (getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository).favoriteApps.value = successState
-    }
+        instrumentation.runOnMainSync {
+            (settingsRepository as FakeSettingsRepository)
+                .setReadabilityModeBlocking("smart_contrast")
 
-    @Test
-    fun basicTest_displaysFavoriteApps() {
-        testCoroutineRule.runTestAndLaunchUI {
-            val testFavorites = listOf(
-                AppInfo(
-                    "Test Favorite 1",
-                    "Test Favorite 1",
-                    "com.test.fav1",
-                    "com.test.fav1.MainActivity"
-                ),
-                AppInfo(
-                    "Test Favorite 2",
-                    "Test Favorite 2",
-                    "com.test.fav2",
-                    "com.test.fav2.MainActivity"
-                )
-            )
-            setFavoriteAppsState(testFavorites)
-
-            launchFragmentInHiltContainer<HomeFragment>()
-
-            onView(withText("Test Favorite 1")).check(matches(isDisplayed()))
-            onView(withText("Test Favorite 2")).check(matches(isDisplayed()))
+            val successState = UiState.Success(FavoriteAppsResult(apps, isFallback))
+            (getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository)
+                .favoriteApps.value = successState
         }
+
+        launchAndTrackFragment<HomeFragment>()
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.root_layout))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
     }
 
     @Test
-    fun clickOnFavorite_recordsAppLaunch() {
-        testCoroutineRule.runTestAndLaunchUI {
-            val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
-            setFavoriteAppsState(listOf(testApp))
+    fun basicTest_displaysFavoriteApps() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val testFavorites = listOf(
+            AppInfo("Test Favorite 1", "Test Favorite 1", "com.test.fav1", "com.test.fav1.MainActivity"),
+            AppInfo("Test Favorite 2", "Test Favorite 2", "com.test.fav2", "com.test.fav2.MainActivity")
+        )
+        setupFragmentWithApps(testFavorites)
 
-            launchFragmentInHiltContainer<HomeFragment>()
+        onView(withText("Test Favorite 1")).check(matches(isDisplayed()))
+        onView(withText("Test Favorite 2")).check(matches(isDisplayed()))
+    }
 
-            onView(withText("Mail")).perform(click())
+    @Test
+    fun clickOnFavorite_recordsAppLaunch() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
+        setupFragmentWithApps(listOf(testApp))
 
-            val fakeRepo = appUsageRepository as FakeAppUsageRepository
-            assertThat(fakeRepo.launchedPackages).contains("com.mail")
+        onView(withText("Mail")).perform(click())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val fakeRepo = appUsageRepository as FakeAppUsageRepository
+        assertThat(fakeRepo.launchedPackages).contains("com.mail")
+    }
+
+    @Test
+    fun longClickOnFavorite_opensContextMenu() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
+        setupFragmentWithApps(listOf(testApp))
+
+        onView(withText("Mail")).perform(longClick())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Überprüfe, ob der Dialog mit dem App-Namen erscheint
+        onView(withText(testApp.displayName))
+            .inRoot(isDialog())
+            .check(matches(isDisplayed()))
+    }
+
+    @Test
+    fun emptyFavorites_showsEmptyContainer() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        setupFragmentWithApps(emptyList())
+
+        onView(withId(R.id.favorite_apps_container))
+            .check(matches(withEffectiveVisibility(Visibility.VISIBLE)))
+            .check(matches(hasChildCount(0)))
+    }
+
+    @Test
+    fun contextMenu_toggleFavoriteAction() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
+        val fakeFavRepo = favoritesRepository as FakeFavoritesRepository
+
+        instrumentation.runOnMainSync {
+            (settingsRepository as FakeSettingsRepository)
+                .setReadabilityModeBlocking("smart_contrast")
+
+            // Setze initialen Zustand
+            fakeFavRepo.favoritesState.value = setOf(testApp.componentName)
+
+            val successState = UiState.Success(FavoriteAppsResult(listOf(testApp), isFallback = false))
+            (getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository)
+                .favoriteApps.value = successState
         }
+
+        launchAndTrackFragment<HomeFragment>()
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.root_layout))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
+
+        onView(withText("Mail")).perform(longClick())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Klicke auf "Remove from favorites" im Dialog
+        onView(withText(R.string.remove_from_favorites))
+            .inRoot(isDialog())
+            .perform(click())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Überprüfe, ob die Methode im Fake aufgerufen wurde
+        assertThat(fakeFavRepo.favorites).doesNotContain(testApp.componentName)
     }
 
     @Test
-    fun longClickOnFavorite_opensContextMenu() {
-        testCoroutineRule.runTestAndLaunchUI {
-            val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
-            setFavoriteAppsState(listOf(testApp))
+    fun favoriteAppsUpdate_refreshesUI() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val initialFavorites = listOf(
+            AppInfo("App One", "App One", "com.one", "com.one.MainActivity")
+        )
+        setupFragmentWithApps(initialFavorites)
 
-            launchFragmentInHiltContainer<HomeFragment>()
+        onView(withText("App One")).check(matches(isDisplayed()))
 
-            onView(withText("Mail")).perform(longClick())
+        // Simuliere ein Update
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val updatedFavorites = listOf(
+            AppInfo("App Two", "App Two", "com.two", "com.two.MainActivity"),
+            AppInfo("App Three", "App Three", "com.three", "com.three.MainActivity")
+        )
 
-            // Überprüfe, ob der Dialog mit dem App-Namen erscheint
-            onView(withText(testApp.displayName))
-                .inRoot(isDialog())
-                .check(matches(isDisplayed()))
-        }
-    }
-
-    @Test
-    fun emptyFavorites_showsEmptyContainer() {
-        testCoroutineRule.runTestAndLaunchUI {
-            setFavoriteAppsState(emptyList())
-
-            launchFragmentInHiltContainer<HomeFragment>()
-
-            onView(withId(R.id.favorite_apps_container))
-                .check(matches(withEffectiveVisibility(Visibility.VISIBLE)))
-                .check(matches(hasChildCount(0)))
-        }
-    }
-
-    @Test
-    fun contextMenu_toggleFavoriteAction() {
-        testCoroutineRule.runTestAndLaunchUI {
-            val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
-            val fakeFavRepo = favoritesRepository as FakeFavoritesRepository
-            fakeFavRepo.favoritesState.value = setOf(testApp.componentName) // Setze den initialen Zustand
-            setFavoriteAppsState(listOf(testApp))
-
-            launchFragmentInHiltContainer<HomeFragment>()
-
-            onView(withText("Mail")).perform(longClick())
-
-            // Klicke auf "Remove from favorites" im Dialog
-            onView(withText(R.string.remove_from_favorites)).inRoot(isDialog()).perform(click())
-
-            // Überprüfe, ob die Methode im Fake aufgerufen wurde (indirekt über den Zustand)
-            assertThat(fakeFavRepo.favorites).doesNotContain(testApp.componentName)
-        }
-    }
-
-    @Test
-    fun favoriteAppsUpdate_refreshesUI() {
-        testCoroutineRule.runTestAndLaunchUI {
-            val initialFavorites =
-                listOf(AppInfo("App One", "App One", "com.one", "com.one.MainActivity"))
-            val updatedFavorites = listOf(
-                AppInfo("App Two", "App Two", "com.two", "com.two.MainActivity"),
-                AppInfo("App Three", "App Three", "com.three", "com.three.MainActivity")
-            )
+        instrumentation.runOnMainSync {
             val fakeUseCase = getFavoriteAppsUseCase as FakeGetFavoriteAppsUseCaseRepository
-
-            setFavoriteAppsState(initialFavorites)
-            launchFragmentInHiltContainer<HomeFragment>()
-            onView(withText("App One")).check(matches(isDisplayed()))
-
-            // Simuliere ein Update
-            fakeUseCase.favoriteApps.value =
-                UiState.Success(FavoriteAppsResult(updatedFavorites, false))
-
-            onView(withText("App One")).check(doesNotExist())
-            onView(withText("App Two")).check(matches(isDisplayed()))
-            onView(withText("App Three")).check(matches(isDisplayed()))
+            fakeUseCase.favoriteApps.value = UiState.Success(
+                FavoriteAppsResult(updatedFavorites, isFallback = false)
+            )
         }
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.favorite_apps_container))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 3))
+
+        onView(withText("App One")).check(doesNotExist())
+        onView(withText("App Two")).check(matches(isDisplayed()))
+        onView(withText("App Three")).check(matches(isDisplayed()))
     }
 
     @Test
-    fun timeDateAndBattery_areDisplayedOnHomeScreen() {
-        testCoroutineRule.runTestAndLaunchUI {
-            launchFragmentInHiltContainer<HomeFragment>()
+    fun timeDateAndBattery_areDisplayedOnHomeScreen() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-            onView(withId(R.id.time_text)).check(matches(isDisplayed()))
-                .check(matches(withText(not(""))))
-            onView(withId(R.id.date_text)).check(matches(isDisplayed()))
-                .check(matches(withText(not(""))))
-            onView(withId(R.id.battery_text)).check(matches(isDisplayed()))
-                .check(matches(withText(containsString("%"))))
+        instrumentation.runOnMainSync {
+            (settingsRepository as FakeSettingsRepository)
+                .setReadabilityModeBlocking("smart_contrast")
         }
-    }
 
+        launchAndTrackFragment<HomeFragment>()
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.root_layout))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 3))
+
+        onView(withId(R.id.time_text))
+            .check(matches(isDisplayed()))
+            .check(matches(withText(not(""))))
+
+        onView(withId(R.id.date_text))
+            .check(matches(isDisplayed()))
+            .check(matches(withText(not(""))))
+
+        onView(withId(R.id.battery_text))
+            .check(matches(isDisplayed()))
+            .check(matches(withText(containsString("%"))))
+    }
 }
