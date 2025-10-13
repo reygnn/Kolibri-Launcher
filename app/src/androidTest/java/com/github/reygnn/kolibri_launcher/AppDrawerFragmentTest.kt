@@ -1,6 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
+import android.view.View
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.clearText
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
@@ -22,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matchers.allOf
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.hamcrest.Matcher
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -42,6 +46,22 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             (getDrawerAppsUseCase as FakeGetDrawerAppsUseCaseRepository).drawerApps.setValue(apps)
+        }
+    }
+
+    /**
+     * Eine leere Aktion, die Espresso zwingt, auf den UI-Thread zu warten, bis er idle ist.
+     * Das ist extrem nützlich, um auf das Rendern von RecyclerViews zu warten.
+     */
+    fun waitForUiThread() = object : ViewAction {
+        override fun getConstraints(): Matcher<View> {
+            return isDisplayed()
+        }
+        override fun getDescription(): String {
+            return "wait for UI thread to be idle"
+        }
+        override fun perform(uiController: UiController, view: View) {
+            uiController.loopMainThreadUntilIdle()
         }
     }
 
@@ -160,16 +180,23 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     @Test
     fun searchWithNoResults_displaysEmptyList() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
-        // Arrange & Sync
+        // 1. Arrange & Initial Sync
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
-        onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(3)))
+        onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(3))
 
-        // Act
+        // 2. Act
         onView(withId(R.id.search_edit_text)).perform(typeText("NotExistingApp"))
+
+        // 3. WARTEN (Der Zwei-Schritt-Prozess)
+        // Schritt 3a: Warten auf die ViewModel-Logik (Coroutinen)
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert
+        // Schritt 3b: Warten auf die UI-Logik (RecyclerView Rendering)
+        onView(withId(R.id.apps_recycler_view)).perform(waitForUiThread())
+
+        // 4. Assert
+        // Diese Überprüfung ist jetzt 100% sicher.
         onView(withId(R.id.apps_recycler_view)).check(RecyclerViewItemCountAssertion.withItemCount(0))
     }
 
