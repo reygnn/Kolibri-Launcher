@@ -45,14 +45,19 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps StateFlow - initially is empty`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
 
         assertTrue(viewModel.installedApps.value.isEmpty())
     }
 
     @Test
     fun `installedApps StateFlow - emits new app list from repository`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -79,7 +84,9 @@ class SettingsViewModelTest {
             throw IOException("Cannot load apps")
         })
 
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             advanceUntilIdle()
@@ -96,7 +103,9 @@ class SettingsViewModelTest {
             throw RuntimeException("Database corrupted")
         })
 
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             advanceUntilIdle()
@@ -112,7 +121,9 @@ class SettingsViewModelTest {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -126,7 +137,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - rapid flow updates - handles correctly`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -148,7 +161,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - with duplicate apps in flow - forwards them as-is`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -163,7 +178,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - when flow emits null values in list - handles gracefully`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -178,7 +195,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - multiple subscribers - all receive updates`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -200,8 +219,12 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - when created multiple times - each instance has independent state`() = runTest {
-        val viewModel1 = SettingsViewModel(installedAppsRepository)
-        val viewModel2 = SettingsViewModel(installedAppsRepository)
+        val viewModel1 = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
+        val viewModel2 = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel1.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -221,7 +244,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - stateIn operator - maintains last value for new collectors`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         // Set a value
         rawAppsFlow.value = testApps
@@ -237,7 +262,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - collector cancelled - does not affect other collectors`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             awaitItem() // Get initial value
@@ -259,7 +286,9 @@ class SettingsViewModelTest {
             AppInfo("App <XML>", "App <XML>", "com.xml", "class3")
         )
 
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())
@@ -274,7 +303,9 @@ class SettingsViewModelTest {
 
     @Test
     fun `installedApps - empty to large to empty - handles correctly`() = runTest {
-        viewModel = SettingsViewModel(installedAppsRepository)
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         viewModel.installedApps.test {
             assertEquals(emptyList(), awaitItem())

@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertNotNull
@@ -20,6 +21,9 @@ import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class AppNamesViewModelTest {
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeAppNamesRepository: FakeAppNamesRepository
@@ -31,7 +35,11 @@ class AppNamesViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeAppNamesRepository = FakeAppNamesRepository()
         fakeInstalledAppsRepository = FakeInstalledAppsRepository(fakeAppNamesRepository)
-        viewModel = AppNamesViewModel(fakeAppNamesRepository, fakeInstalledAppsRepository)
+        viewModel = AppNamesViewModel(
+            fakeAppNamesRepository,
+            fakeInstalledAppsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
     }
 
     @After
@@ -100,7 +108,10 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(fakeAppNamesRepository, crashingRepository)
+        val vm = AppNamesViewModel(
+            fakeAppNamesRepository,
+            crashingRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         vm.uiState.test {
             val state = awaitItem()
@@ -119,7 +130,10 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(fakeAppNamesRepository, crashingRepository)
+        val vm = AppNamesViewModel(
+            fakeAppNamesRepository,
+            crashingRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         vm.uiState.test {
             val state = awaitItem()
@@ -221,7 +235,10 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(fakeAppNamesRepository, emptyRepository)
+        val vm = AppNamesViewModel(
+            fakeAppNamesRepository,
+            emptyRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
 
         vm.uiState.test {
             val state = awaitItem()

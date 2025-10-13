@@ -17,6 +17,14 @@ annotation class DefaultDispatcher
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
+annotation class IoDispatcher
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class MainDispatcher
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
 @Module
@@ -28,11 +36,19 @@ object DispatcherModule {
     fun provideDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
 
     @Provides
+    @IoDispatcher
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+
+    @Provides
+    @MainDispatcher
+    fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
+
+    @Provides
     @Singleton
     @ApplicationScope
-    fun provideApplicationScope(): CoroutineScope {
-        // SupervisorJob sorgt dafür, dass der Scope nicht stirbt, wenn eine seiner Coroutinen fehlschlägt.
-        // Dispatchers.Default ist ein guter, allgemeiner Dispatcher für Hintergrundarbeit.
-        return CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun provideApplicationScope(
+        @DefaultDispatcher defaultDispatcher: CoroutineDispatcher
+    ): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + defaultDispatcher)
     }
 }

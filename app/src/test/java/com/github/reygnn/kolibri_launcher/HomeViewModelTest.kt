@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher
 
-import android.app.WallpaperColors
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -24,7 +23,6 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -93,7 +91,8 @@ class HomeViewModelTest {
             settingsManager,
             appUsageManager,
             screenLockManager,
-            appVisibilityManager
+            appVisibilityManager,
+            mainDispatcher = mainDispatcherRule.testDispatcher
         )
     }
 

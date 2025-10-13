@@ -9,8 +9,8 @@
 
 package com.github.reygnn.kolibri_launcher
 
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,9 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.coroutines.cancellation.CancellationException
 
 data class SelectableAppInfo(
     val appInfo: AppInfo,
@@ -44,8 +42,9 @@ enum class LaunchMode {
 class OnboardingViewModel @Inject constructor(
     private val onboardingAppsUseCase: GetOnboardingAppsUseCaseRepository,
     private val favoritesRepository: FavoritesRepository,
-    private val settingsRepository: SettingsRepository
-) : BaseViewModel() {
+    private val settingsRepository: SettingsRepository,
+    @MainDispatcher mainDispatcher: CoroutineDispatcher
+) : BaseViewModel(mainDispatcher) {
 
     private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -57,42 +56,48 @@ class OnboardingViewModel @Inject constructor(
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
     private val searchQuery = MutableStateFlow("")
 
+    // Helper function to send OnboardingEvents safely
+    private fun sendOnboardingEvent(event: OnboardingEvent) {
+        launchSafe {
+            _event.emit(event)
+        }
+    }
+
     init {
-        viewModelScope.launch {
-            try {
-                combine(
-                    onboardingAppsUseCase.onboardingAppsFlow,
-                    selectedComponents,
-                    searchQuery
-                ) { allApps, selected, query ->
-                    val filteredApps = if (query.isBlank()) {
-                        allApps
-                    } else {
-                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
-                    }
-
-                    val selectableList = filteredApps.map { app ->
-                        SelectableAppInfo(
-                            appInfo = app,
-                            isSelected = selected.contains(app.componentName)
-                        )
-                    }
-
-                    val selectedAppInfos = allApps
-                        .filter { selected.contains(it.componentName) }
-                        .sortedBy { it.displayName.lowercase() }
-
-                    _uiState.value.copy(
-                        selectableApps = selectableList,
-                        selectedApps = selectedAppInfos
-                    )
-                }.collect { newState ->
-                    _uiState.value = newState
-                }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
+        launchSafe(
+            onError = { e ->
                 TimberWrapper.silentError(e, "Failed to load apps.")
-                _event.emit(OnboardingEvent.ShowError("Could not load apps. Please try again."))
+                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load apps. Please try again."))
+            }
+        ) {
+            combine(
+                onboardingAppsUseCase.onboardingAppsFlow,
+                selectedComponents,
+                searchQuery
+            ) { allApps, selected, query ->
+                val filteredApps = if (query.isBlank()) {
+                    allApps
+                } else {
+                    allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                }
+
+                val selectableList = filteredApps.map { app ->
+                    SelectableAppInfo(
+                        appInfo = app,
+                        isSelected = selected.contains(app.componentName)
+                    )
+                }
+
+                val selectedAppInfos = allApps
+                    .filter { selected.contains(it.componentName) }
+                    .sortedBy { it.displayName.lowercase() }
+
+                _uiState.value.copy(
+                    selectableApps = selectableList,
+                    selectedApps = selectedAppInfos
+                )
+            }.collect { newState ->
+                _uiState.value = newState
             }
         }
     }
@@ -104,19 +109,16 @@ class OnboardingViewModel @Inject constructor(
         val subtitleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
         _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
 
-        viewModelScope.launch {
+        launchSafe(
+            onError = { e ->
+                TimberWrapper.silentError(e, "Error loading initial favorites.")
+                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+            }
+        ) {
             val initialSelection = when (mode) {
                 LaunchMode.INITIAL_SETUP -> emptySet()
                 LaunchMode.EDIT_FAVORITES -> {
-                    try {
-                        favoritesRepository.favoriteComponentsFlow.first()
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error loading initial favorites.")
-                        _event.emit(OnboardingEvent.ShowError("Could not load favorites."))
-                        emptySet()
-                    }
+                    favoritesRepository.favoriteComponentsFlow.first()
                 }
             }
             selectedComponents.value = initialSelection
@@ -128,7 +130,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun onAppToggled(app: AppInfo) {
-        viewModelScope.launch {
+        launchSafe {
             val currentSelection = selectedComponents.value
             val component = app.componentName
 
@@ -145,20 +147,19 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun onDoneClicked() {
-        viewModelScope.launch {
-            try {
-                favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
-
-                if (launchMode == LaunchMode.INITIAL_SETUP) {
-                    settingsRepository.setOnboardingCompleted()
-                }
-
-                _event.emit(OnboardingEvent.NavigateToMain)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
+        launchSafe(
+            onError = { e ->
                 TimberWrapper.silentError(e, "CRITICAL: Failed to save favorites or complete onboarding.")
-                _event.emit(OnboardingEvent.ShowError("Save failed. Please try again."))
+                sendOnboardingEvent(OnboardingEvent.ShowError("Save failed. Please try again."))
             }
+        ) {
+            favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
+
+            if (launchMode == LaunchMode.INITIAL_SETUP) {
+                settingsRepository.setOnboardingCompleted()
+            }
+
+            _event.emit(OnboardingEvent.NavigateToMain)
         }
     }
 }

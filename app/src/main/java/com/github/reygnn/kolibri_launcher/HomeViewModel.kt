@@ -20,6 +20,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,8 +60,9 @@ class HomeViewModel @Inject constructor(
     private val settingsManager: SettingsRepository,
     private val appUsageManager: AppUsageRepository,
     private val screenLockManager: ScreenLockRepository,
-    private val appVisibilityManager: AppVisibilityRepository
-) : BaseViewModel() {
+    private val appVisibilityManager: AppVisibilityRepository,
+    @MainDispatcher mainDispatcher: CoroutineDispatcher
+) : BaseViewModel(mainDispatcher) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -85,13 +87,12 @@ class HomeViewModel @Inject constructor(
             delay(100)
             observeInstalledApps()
             listenForAppUpdates()
-            launch {
-                getFavoriteAppsUseCase.favoriteApps.collect { state ->
-                    _favoriteAppsState.value = state
-                    if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
-                        fallbackToastShown = true
-                        sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
-                    }
+
+            getFavoriteAppsUseCase.favoriteApps.collect { state ->
+                _favoriteAppsState.value = state
+                if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
+                    fallbackToastShown = true
+                    sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
                 }
             }
         }

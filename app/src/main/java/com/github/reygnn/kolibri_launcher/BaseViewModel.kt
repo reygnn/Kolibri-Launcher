@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -12,18 +13,20 @@ import timber.log.Timber
 /**
  * Base ViewModel with built-in error handling and event management.
  */
-abstract class BaseViewModel : ViewModel() {
+abstract class BaseViewModel(
+    private val mainDispatcher: CoroutineDispatcher
+) : ViewModel() {
 
     // Event channel for one-time UI events
     private val _eventChannel = Channel<UiEvent>()
     val eventFlow = _eventChannel.receiveAsFlow()
 
     protected fun sendEvent(event: UiEvent) {
-        viewModelScope.launch {
+        viewModelScope.launch(mainDispatcher) {
             try {
                 _eventChannel.send(event)
             } catch (e: Exception) {
-                Timber.e(e, "Error sending event")   // auch als Toast
+                Timber.e(e, "Error sending event")
             }
         }
     }
@@ -40,11 +43,11 @@ abstract class BaseViewModel : ViewModel() {
         onError: ((Throwable) -> Unit)? = null,
         block: suspend CoroutineScope.() -> Unit
     ) {
-        viewModelScope.launch(coroutineExceptionHandler) {
+        viewModelScope.launch(mainDispatcher + coroutineExceptionHandler) {
             try {
                 block()
             } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e  // WICHTIG: Re-throw, nicht catchen!
+                throw e
             } catch (e: Exception) {
                 onError?.invoke(e) ?: handleError(e, "launchSafe")
             } catch (e: Throwable) {
@@ -52,7 +55,6 @@ abstract class BaseViewModel : ViewModel() {
             }
         }
     }
-
 
     /**
      * Executes a block of code safely, catching all exceptions.
@@ -74,22 +76,16 @@ abstract class BaseViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Central error handling method.
-     * Override this in specific ViewModels for custom error handling.
-     */
     protected open fun handleError(throwable: Throwable, context: String) {
         when (throwable) {
             is OutOfMemoryError -> {
-                Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")   // auch als Toast
+                Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
             }
-
             is kotlinx.coroutines.CancellationException -> {
                 Timber.d("[$context] Coroutine cancelled (normal)")
             }
-
             else -> {
-                Timber.e(throwable, "[$context] Error in ViewModel")   // auch als Toast
+                Timber.e(throwable, "[$context] Error in ViewModel")
             }
         }
     }

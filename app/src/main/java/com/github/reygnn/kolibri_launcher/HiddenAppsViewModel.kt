@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,8 +21,9 @@ import javax.inject.Inject
 @HiltViewModel
 class HiddenAppsViewModel @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
-    private val visibilityRepository: AppVisibilityRepository
-) : BaseViewModel() {
+    private val visibilityRepository: AppVisibilityRepository,
+    @MainDispatcher mainDispatcher: CoroutineDispatcher
+) : BaseViewModel(mainDispatcher) {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()

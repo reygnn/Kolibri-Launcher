@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,8 +19,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val installedAppsRepository: InstalledAppsRepository
-) : BaseViewModel() {
+    private val installedAppsRepository: InstalledAppsRepository,
+    @MainDispatcher mainDispatcher: CoroutineDispatcher
+) : BaseViewModel(mainDispatcher) {
 
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps.asStateFlow()

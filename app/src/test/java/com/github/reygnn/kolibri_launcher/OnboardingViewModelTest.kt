@@ -49,7 +49,11 @@ class OnboardingViewModelTest {
     }
 
     private fun setupViewModel() {
-        viewModel = OnboardingViewModel(onboardingAppsUseCase, favoritesRepository, settingsRepository)
+        viewModel = OnboardingViewModel(
+            onboardingAppsUseCase,
+            favoritesRepository,
+            settingsRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
     }
 
     // ========== EXISTING TESTS ==========

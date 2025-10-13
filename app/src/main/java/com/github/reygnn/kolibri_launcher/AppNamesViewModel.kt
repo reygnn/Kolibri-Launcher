@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +35,9 @@ data class AppNamesUiState(
 @HiltViewModel
 class AppNamesViewModel @Inject constructor(
     private val appNamesManager: AppNamesRepository,
-    private val installedAppsManager: InstalledAppsRepository
-) : BaseViewModel() {
+    private val installedAppsManager: InstalledAppsRepository,
+    @MainDispatcher mainDispatcher: CoroutineDispatcher
+) : BaseViewModel(mainDispatcher) {
 
     private var masterAppList: List<AppInfo> = emptyList()
 

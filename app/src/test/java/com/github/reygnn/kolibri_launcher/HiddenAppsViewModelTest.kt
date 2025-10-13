@@ -45,7 +45,10 @@ class HiddenAppsViewModelTest {
     }
 
     private fun setupViewModel() {
-        viewModel = HiddenAppsViewModel(installedAppsRepository, visibilityRepository)
+        viewModel = HiddenAppsViewModel(
+            installedAppsRepository,
+            visibilityRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher)
     }
 
     // ========== EXISTING TESTS ==========
