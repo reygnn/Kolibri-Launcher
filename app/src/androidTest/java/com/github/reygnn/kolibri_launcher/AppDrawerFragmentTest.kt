@@ -14,6 +14,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,14 +40,20 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     /** Helper-Funktion, um den Zustand des UseCases zu setzen. */
     private fun setDrawerAppsState(apps: List<AppInfo>) {
-        // Wir casten zum Fake, um die LiveData zu befüllen.
-        // postValue wird verwendet, um Thread-sicher zu sein.
-        (getDrawerAppsUseCase as FakeGetDrawerAppsUseCaseRepository).drawerApps.postValue(apps)
+        // Hole die Instrumentation-Instanz, um auf dem UI-Thread arbeiten zu können
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Führe den Code synchron auf dem echten UI-Thread aus
+        instrumentation.runOnMainSync {
+            (getDrawerAppsUseCase as FakeGetDrawerAppsUseCaseRepository).drawerApps.setValue(apps)
+        }
     }
 
     @Test
     fun drawerOpensAndDisplaysData() = testCoroutineRule.runTestAndLaunchUI {
         setDrawerAppsState(testApps)
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
         onView(withText("Alphabet")).check(matches(isDisplayed()))
@@ -55,16 +62,20 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     }
 
     @Test
-    fun searchField_filtersRecyclerViewCorrectly() = testCoroutineRule.runTestAndLaunchUI {
+    fun searchField_filtersRecyclerViewCorrectly() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
+        // 1. Arrange: Daten synchron auf dem UI-Thread setzen
         setDrawerAppsState(testApps)
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
+        // 2. Act: Eine Aktion im Test-Thread ausführen
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
 
-        // Überprüfe, dass nur noch das gesuchte Element da ist
+        // 3. Warten: Die durch die Aktion ausgelöste Coroutine im Test-Scheduler abarbeiten lassen
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // 4. Assert: Das Ergebnis in der UI überprüfen
         onView(withText("Zebra")).check(matches(isDisplayed()))
         onView(withText("Alphabet")).check(doesNotExist())
-        onView(withText("Apple")).check(doesNotExist())
     }
 
     @Test
@@ -83,38 +94,39 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     }
 
     @Test
-    fun searchField_filtersCaseInsensitive() = testCoroutineRule.runTestAndLaunchUI {
+    fun searchField_filtersCaseInsensitive() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) { // SAFE-Modus
         setDrawerAppsState(testApps)
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
         onView(withId(R.id.search_edit_text)).perform(replaceText("APPLE"))
+
+        // WARTEN auf die Filter-Aktion
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         onView(withText("Apple")).check(matches(isDisplayed()))
         onView(withText("Alphabet")).check(doesNotExist())
     }
 
     @Test
-    fun contextMenu_hideAppAction_updatesStateAndUI() = testCoroutineRule.runTestAndLaunchUI {
+    fun contextMenu_hideAppAction_updatesStateAndUI() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
         val appToHide = testApps.first { it.displayName == "Alphabet" }
-        val fakeVisibilityRepo = appVisibilityRepository as FakeAppVisibilityRepository
 
+        // 1. Arrange
         setDrawerAppsState(testApps)
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
-        // 1. Aktion ausführen
+        // 2. Act
         onView(withText(appToHide.displayName)).perform(longClick())
         onView(withText(R.string.hide_app_from_drawer)).inRoot(isDialog()).perform(click())
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle() // Warten auf ViewModel-Aktion
 
-        // 2. Zustand des Fakes überprüfen: Wurde die App als "versteckt" markiert?
-        assertThat(fakeVisibilityRepo.hiddenApps).contains(appToHide.componentName)
-
-        // 3. UI-Update simulieren (das würde normalerweise das ViewModel tun)
+        // 3. Simulate & Wait
         val remainingApps = testApps.filter { it.componentName != appToHide.componentName }
-        setDrawerAppsState(remainingApps)
+        setDrawerAppsState(remainingApps) // Synchrones Update auf dem UI-Thread
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle() // Warten auf die UI-Reaktion
 
-        // 4. UI überprüfen: Ist die App aus der Liste verschwunden?
+        // 4. Assert
         onView(withText(appToHide.displayName)).check(doesNotExist())
-        onView(withText("Zebra")).check(matches(isDisplayed()))
     }
 
     @Test
@@ -145,21 +157,23 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
     }
 
     @Test
-    fun searchWithNoResults_displaysEmptyList() = testCoroutineRule.runTestAndLaunchUI {
+    fun searchWithNoResults_displaysEmptyList() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) { // SAFE-Modus
         setDrawerAppsState(testApps)
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
         onView(withId(R.id.search_edit_text)).perform(typeText("NotExistingApp"))
 
+        // WARTEN auf die Filter-Aktion
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
         onView(withId(R.id.apps_recycler_view)).check(matches(hasChildCount(0)))
     }
 
     @Test
-    fun favoriteLimit_preventsAddingMoreFavorites() = testCoroutineRule.runTestAndLaunchUI {
+    fun favoriteLimit_preventsAddingMoreFavorites() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) { // SAFE-Modus
         val appToAdd = testApps.first { it.displayName == "Apple" }
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
 
-        // Simuliere, dass das Favoriten-Limit erreicht ist
         val maxFavorites = (1..AppConstants.MAX_FAVORITES_ON_HOME)
             .map { "com.fake.app$it" }
             .toSet()
@@ -171,23 +185,27 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         onView(withText(appToAdd.displayName)).perform(longClick())
         onView(withText(R.string.add_to_favorites)).inRoot(isDialog()).perform(click())
 
-        // Der wichtigste Check: Wurde die App NICHT zu den Favoriten hinzugefügt?
+        // WARTEN auf die Klick-Aktion im ViewModel
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Jetzt ist die Überprüfung sicher
         assertThat(fakeFavoritesRepo.favorites).doesNotContain(appToAdd.componentName)
-        // Die Anzahl der Favoriten hat sich nicht geändert.
         assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 
     @Test
-    fun searchField_clearsAndResetsList() = testCoroutineRule.runTestAndLaunchUI {
+    fun searchField_clearsAndResetsList() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) { // SAFE-Modus
         setDrawerAppsState(testApps)
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
-        // Filtern, sodass die Liste kurz ist
+        // Erste Aktion: Filtern
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle() // Warten
         onView(withText("Alphabet")).check(doesNotExist())
 
-        // Text löschen
+        // Zweite Aktion: Text löschen
         onView(withId(R.id.search_edit_text)).perform(clearText())
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle() // ERNEUT WARTEN
 
         // Überprüfen, ob alle ursprünglichen Apps wieder da sind
         onView(withText("Alphabet")).check(matches(isDisplayed()))

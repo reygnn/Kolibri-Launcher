@@ -65,27 +65,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
-/*
-@ExperimentalCoroutinesApi
-class TestCoroutineRule(
-    val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()  // ← ÄNDERUNG!
-) : TestWatcher() {
-
-    override fun starting(description: Description) {
-        super.starting(description)
-        Dispatchers.setMain(testDispatcher)
-    }
-
-    override fun finished(description: Description) {
-        super.finished(description)
-        Dispatchers.resetMain()
-    }
-
-    fun runTestAndLaunchUI(block: suspend CoroutineScope.() -> Unit) = runTest(testDispatcher) {
-        block()
-    }
-}*/
-
 @ExperimentalCoroutinesApi
 class TestCoroutineRule(
     private val mode: Mode = Mode.FAST
@@ -124,9 +103,12 @@ class TestCoroutineRule(
 
         runTest(dispatcher) {
             block()
-            if (testMode == Mode.SAFE) {
+/*            if (testMode == Mode.SAFE) {
                 dispatcher.scheduler.advanceTimeBy(500)
                 dispatcher.scheduler.runCurrent()
+            }*/
+            if (testMode == Mode.SAFE) {
+                dispatcher.scheduler.advanceUntilIdle()  // ← Das war der Trick!
             }
         }
     }
