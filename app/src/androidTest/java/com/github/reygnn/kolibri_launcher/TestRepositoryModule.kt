@@ -272,7 +272,20 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
         private set
     var saveOrderCallCount = 0
         private set
-    override suspend fun saveOrder(componentNames: List<String>): Boolean { savedOrder = componentNames; saveOrderCallCount++; orderState.value = componentNames; return true }
+    // override suspend fun saveOrder(componentNames: List<String>): Boolean { savedOrder = componentNames; saveOrderCallCount++; orderState.value = componentNames; return true }
+    override suspend fun saveOrder(componentNames: List<String>): Boolean {
+        println(">>> FakeFavoritesOrderRepository.saveOrder CALLED")
+        println(">>> Thread: ${Thread.currentThread().name}")
+        println(">>> componentNames = $componentNames")
+        println(">>> saveOrderCallCount BEFORE = $saveOrderCallCount")
+
+        savedOrder = componentNames
+        saveOrderCallCount++
+
+        println(">>> saveOrderCallCount AFTER = $saveOrderCallCount")
+        orderState.value = componentNames
+        return true
+    }
     override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>): List<AppInfo> { if (order.isEmpty()) return favoriteApps.sortedBy { it.displayName }; val appMap = favoriteApps.associateBy { it.componentName }; return order.mapNotNull { appMap[it] } + (favoriteApps - appMap.keys.mapNotNull { appMap[it] }.toSet()) }
     override fun purgeRepository() { orderState.value = emptyList(); savedOrder = null; saveOrderCallCount = 0 }
 }

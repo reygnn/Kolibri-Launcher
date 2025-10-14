@@ -17,6 +17,9 @@ import org.hamcrest.Description
 import org.hamcrest.Matcher
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isEnabled
+import com.google.android.material.snackbar.Snackbar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -103,7 +106,7 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         assertThat(fakeRepo.saveOrderCallCount).isGreaterThan(0)
     }
 
-    @Test
+/*    @Test
     fun clickResetButton_resetsToOriginalOrder_afterSorting() = testCoroutineRule.runTestAndLaunchUI(
         mode = TestCoroutineRule.Mode.SAFE
     ) {
@@ -144,7 +147,84 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         // Beide Calls sollten jetzt passiert sein
         assertThat(fakeRepo.saveOrderCallCount).isAtLeast(2)
         assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
+    }*/
+
+    @Test
+    fun clickResetButton_resetsToOriginalOrder_afterSorting() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
+
+        launchAndTrackFragment<FavoritesSortFragment>(fragmentArgs)
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
+
+        println(">>> BEFORE alphabetical click: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
+        onView(withId(R.id.buttonAlphabetical)).perform(click())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
+
+        // WICHTIG: Warte noch länger, damit post {} garantiert fertig ist
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 10))
+
+        println(">>> AFTER alphabetical: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
+
+        // Finde den Button KOMPLETT NEU
+        println(">>> About to find and click reset button")
+        onView(withId(R.id.buttonReset))
+            .check(matches(isDisplayed()))
+            .check(matches(isEnabled()))
+            .perform(click())
+
+        println(">>> Reset button clicked")
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
+
+        println(">>> AFTER reset: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
+        println(">>> savedOrder = ${fakeRepo.savedOrder}")
+
+        val originalOrderComponents = listOf(
+            "com.zebra/com.zebra.MainActivity",
+            "com.apple/com.apple.MainActivity",
+            "com.banana/com.banana.MainActivity"
+        )
+
+        assertThat(fakeRepo.saveOrderCallCount).isAtLeast(2)
+        assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
     }
+
+    @Test
+    fun clickResetButton_directlyAfterLaunch() = testCoroutineRule.runTestAndLaunchUI(
+        mode = TestCoroutineRule.Mode.SAFE
+    ) {
+        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
+
+        launchAndTrackFragment<FavoritesSortFragment>(fragmentArgs)
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
+
+        println(">>> Clicking reset WITHOUT alphabetical first")
+        onView(withId(R.id.buttonReset)).perform(click())
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+        onView(withId(R.id.recyclerView))
+            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
+
+        println(">>> saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
+
+        // Sollte mindestens 1 sein
+        assertThat(fakeRepo.saveOrderCallCount).isAtLeast(1)
+    }
+
 }
 
 fun withItemTextAtPosition(position: Int, expectedText: String): Matcher<View> {
@@ -159,4 +239,5 @@ fun withItemTextAtPosition(position: Int, expectedText: String): Matcher<View> {
             return textView?.text.toString() == expectedText
         }
     }
+
 }
