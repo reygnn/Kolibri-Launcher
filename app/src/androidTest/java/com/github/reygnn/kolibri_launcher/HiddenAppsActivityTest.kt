@@ -116,6 +116,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
                 )
 
             onView(withId(R.id.done_button)).perform(click())
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
             // Assert: Überprüfe den finalen Zustand des Fakes, anstatt `verify` zu verwenden.
             // Dies ist robuster und klarer.
@@ -129,31 +130,3 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
             assertThat(scenario.state).isEqualTo(Lifecycle.State.DESTROYED)
         }
 }
-
-/**
- * Eine benutzerdefinierte ViewAction, um auf das Schließen-Icon eines Material Chips zu klicken.
- */
-/**
- * Eine benutzerdefinierte ViewAction, um auf das Schließen-Icon eines Material Chips zu klicken,
- * indem die offizielle API-Methode verwendet wird.
- */
-/*
-private fun clickOnChipCloseIcon(): ViewAction {
-    return object : ViewAction {
-        override fun getConstraints(): Matcher<View> {
-            // Die View muss ein Chip sein und angezeigt werden
-            return allOf(isAssignableFrom(Chip::class.java), isDisplayed())
-        }
-
-        override fun getDescription(): String {
-            return "Click on the close icon of a Chip"
-        }
-
-        override fun perform(uiController: UiController, view: View) {
-            val chip = view as Chip
-            // Rufe die offizielle, öffentliche und stabile Methode auf.
-            chip.performCloseIconClick()
-        }
-    }
-}
-*/
