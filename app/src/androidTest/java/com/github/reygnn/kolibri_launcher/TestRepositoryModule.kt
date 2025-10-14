@@ -102,8 +102,6 @@ object TestRepositoryModule {
         )
     }
 
-    // --- Restliche Fake-Provider ---
-
     @Provides
     @Singleton
     fun provideFavoritesRepository(): FavoritesRepository = FakeFavoritesRepository()

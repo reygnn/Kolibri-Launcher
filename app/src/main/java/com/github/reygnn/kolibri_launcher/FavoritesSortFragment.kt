@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBindi
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -39,7 +40,7 @@ class FavoritesSortFragment : Fragment() {
     private val binding get() = _binding!!
 
     @Inject
-    lateinit var favoritesOrderManager: FavoritesOrderManager
+    lateinit var favoritesOrderManager: FavoritesOrderRepository
 
     private lateinit var adapter: FavoritesAdapter
     private lateinit var itemTouchHelper: ItemTouchHelper
@@ -257,7 +258,7 @@ class FavoritesSortFragment : Fragment() {
             return
         }
 
-        viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             try {
                 val componentNames = try {
                     favoriteApps.map { it.componentName }

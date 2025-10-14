@@ -104,9 +104,7 @@ android {
         getByName("androidTest").resources.srcDirs("src/androidTest/resources")
     }
 
-    // KORREKTE PLATZIERUNG: Direkt unter 'android'
     signingConfigs {
-        // Nur erstellen wenn keystore.properties existiert
         if (keystorePropertiesFile.exists()) {
             create("release") {
                 keyAlias = keystoreProperties["keyAlias"] as String

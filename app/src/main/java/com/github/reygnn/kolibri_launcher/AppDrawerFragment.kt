@@ -345,7 +345,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 try {
                     searchJob?.cancel()
 
-                    searchJob = viewLifecycleOwner.lifecycleScope.launch {
+                    searchJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                         try {
                             delay(300)
                             displayFilteredApps()

@@ -3,8 +3,6 @@ package com.github.reygnn.kolibri_launcher
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.core.mutablePreferencesOf
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -61,7 +59,7 @@ class FakeDataStore : DataStore<Preferences> {
         return mutex.withLock {
             // Check AFTER entering the lock to ensure thread-safe flag checking
             when {
-                shouldCancel -> throw CancellationException("FakeDataStore: Simulated cancellation")
+                shouldCancel -> throw kotlinx.coroutines.CancellationException("FakeDataStore: Simulated cancellation")
                 shouldFailEdit -> throw IOException("FakeDataStore: Simulated edit failure")
                 else -> {
                     val currentPreferences = flow.value
