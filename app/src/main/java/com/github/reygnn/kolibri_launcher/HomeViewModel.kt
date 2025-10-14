@@ -115,109 +115,150 @@ class HomeViewModel @Inject constructor(
 
     // --- PUBLIC FUNCTIONS CALLED FROM FRAGMENTS ---
 
-    fun onFlingUp() = sendEvent(UiEvent.ShowAppDrawer)
-    fun onLongPress() = sendEvent(UiEvent.ShowSettings)
-    fun onTimeDoubleClick() = sendEvent(UiEvent.OpenClock)
-    fun onDateDoubleClick() = sendEvent(UiEvent.OpenCalendar)
-    fun onBatteryDoubleClick() = sendEvent(UiEvent.OpenBatterySettings)
-
-    fun onDoubleTapToLock() = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Error during double tap to lock action")
+    fun onFlingUp() {
+        launchSafe {
+            sendEvent(UiEvent.ShowAppDrawer)
         }
-    ) {
-        if (settingsManager.doubleTapToLockEnabledFlow.first()) {
-            if (screenLockManager.isLockingAvailableFlow.value) {
-                screenLockManager.requestLock()
-            } else {
-                sendEvent(UiEvent.ShowAccessibilityDialog)
+    }
+    fun onLongPress() {
+        launchSafe {
+            sendEvent(UiEvent.ShowSettings)
+        }
+    }
+    fun onTimeDoubleClick() {
+        launchSafe {
+            sendEvent(UiEvent.OpenClock)
+        }
+    }
+    fun onDateDoubleClick() {
+        launchSafe {
+            sendEvent(UiEvent.OpenCalendar)
+        }
+    }
+    fun onBatteryDoubleClick() {
+        launchSafe {
+            sendEvent(UiEvent.OpenBatterySettings)
+        }
+    }
+
+    fun onDoubleTapToLock() {
+        launchSafe {
+            try {
+                if (settingsManager.doubleTapToLockEnabledFlow.first()) {
+                    if (screenLockManager.isLockingAvailableFlow.value) {
+                        screenLockManager.requestLock()
+                    } else {
+                        sendEvent(UiEvent.ShowAccessibilityDialog)
+                    }
+                } else {
+                    if (!enableLockToastShown) {
+                        enableLockToastShown = true
+                        sendEvent(UiEvent.ShowToast(R.string.toast_enable_double_tap_to_lock))
+                    }
+                }
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error during double tap to lock action")
             }
-        } else {
-            if (!enableLockToastShown) {
-                enableLockToastShown = true
-                sendEvent(UiEvent.ShowToast(R.string.toast_enable_double_tap_to_lock))
+        }
+    }
+
+    fun onToggleFavorite(app: AppInfo, currentFavoritesCount: Int) {
+        launchSafe {
+            try {
+                if (!favoritesManager.isFavoriteComponent(app.componentName) &&
+                    currentFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME) {
+                    val message = context.getString(
+                        R.string.favorites_limit_reached,
+                        AppConstants.MAX_FAVORITES_ON_HOME
+                    )
+                    sendEvent(UiEvent.ShowToastFromString(message))
+                    return@launchSafe
+                }
+
+                val wasAdded = favoritesManager.toggleFavoriteComponent(app.componentName)
+                val messageResId = if (wasAdded) {
+                    R.string.app_added_to_favorites
+                } else {
+                    R.string.app_removed_from_favorites
+                }
+
+                sendEvent(UiEvent.ShowToastFromString(
+                    context.getString(messageResId, app.displayName)
+                ))
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error toggling favorite")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic))
             }
         }
     }
 
-    fun onToggleFavorite(app: AppInfo, currentFavoritesCount: Int) = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Error toggling favorite")
-            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+    fun onHideApp(app: AppInfo) {
+        launchSafe {
+            try {
+                appVisibilityManager.hideComponent(app.componentName)
+                sendEvent(UiEvent.ShowToastFromString(
+                    context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
+                ))
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error hiding app")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            }
         }
-    ) {
-        if (!favoritesManager.isFavoriteComponent(app.componentName) &&
-            currentFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME) {
-            val message = context.getString(
-                R.string.favorites_limit_reached,
-                AppConstants.MAX_FAVORITES_ON_HOME
-            )
-            sendEvent(UiEvent.ShowToastFromString(message))
-            return@launchSafe
-        }
-
-        val wasAdded = favoritesManager.toggleFavoriteComponent(app.componentName)
-        val messageResId = if (wasAdded) {
-            R.string.app_added_to_favorites
-        } else {
-            R.string.app_removed_from_favorites
-        }
-
-        sendEvent(UiEvent.ShowToastFromString(
-            context.getString(messageResId, app.displayName)
-        ))
     }
 
-    fun onHideApp(app: AppInfo) = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Error hiding app")
-            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+    fun onResetAppUsage(app: AppInfo) {
+        launchSafe {
+            try {
+                resetAppUsage(app)
+                sendEvent(UiEvent.ShowToastFromString(
+                    context.getString(R.string.usage_data_reset_success, app.displayName)
+                ))
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error resetting usage data")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            }
         }
-    ) {
-        appVisibilityManager.hideComponent(app.componentName)
-        sendEvent(UiEvent.ShowToastFromString(
-            context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
-        ))
-    }
-
-    fun onResetAppUsage(app: AppInfo) = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Error resetting usage data")
-            sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
-    ) {
-        resetAppUsage(app)
-        sendEvent(UiEvent.ShowToastFromString(
-            context.getString(R.string.usage_data_reset_success, app.displayName)
-        ))
     }
 
     fun onAppClicked(app: AppInfo) {
-        sendEvent(UiEvent.LaunchApp(app))
-
-        // DANN erst async Operationen
         launchSafe {
-            appUsageManager.recordPackageLaunch(app.packageName)
-            sendEvent(UiEvent.RefreshAppDrawer)
+            try {
+                sendEvent(UiEvent.LaunchApp(app))
+
+                appUsageManager.recordPackageLaunch(app.packageName)
+                sendEvent(UiEvent.RefreshAppDrawer)
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error handling app click for ${app.packageName}")
+                // Optional: Send a toast event if the launch fails for some reason
+                sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
+            }
         }
     }
 
-    fun onShowApp(app: AppInfo) = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Failed to show app")
-            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+    fun onShowApp(app: AppInfo) {
+        launchSafe {
+            try {
+                appVisibilityManager.showComponent(app.componentName)
+                sendEvent(UiEvent.ShowToastFromString(
+                    context.getString(R.string.app_now_visible_in_drawer, app.displayName)
+                ))
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Failed to show app")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            }
         }
-    ) {
-        appVisibilityManager.showComponent(app.componentName)
-        sendEvent(UiEvent.ShowToastFromString(
-            context.getString(R.string.app_now_visible_in_drawer, app.displayName)
-        ))
     }
 
-    fun onAppInfoError() = sendEvent(UiEvent.ShowToast(R.string.error_app_info_open))
+    fun onAppInfoError() {
+        launchSafe {
+            sendEvent(UiEvent.ShowToast(R.string.error_app_info_open))
+        }
+    }
 
     fun onFavoriteAppsError(message: String) {
-        sendEvent(UiEvent.ShowToastFromString(message))
+        launchSafe {
+            sendEvent(UiEvent.ShowToastFromString(message))
+        }
     }
 
     fun toggleSortOrder() = launchSafe {
@@ -358,30 +399,32 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun updateUiColorsFromWallpaper(wallpaperColors: WallpaperColors?) = launchSafe(
-        onError = { e ->
-            TimberWrapper.silentError(e, "Error getting optimal text color.")
-            _uiColorsState.value = UiColorsState()
-        }
-    ) {
-        val readabilityMode = settingsManager.readabilityModeFlow.first()
-        val colorPair = when (readabilityMode) {
-            "smart_contrast" -> {
-                val textColor = if (wallpaperColors != null &&
-                    (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0)
-                    Color.BLACK else Color.WHITE
-                Pair(textColor, if (textColor == Color.WHITE) Color.BLACK else Color.WHITE)
+    fun updateUiColorsFromWallpaper(wallpaperColors: WallpaperColors?) {
+        launchSafe {
+            try {
+                val readabilityMode = settingsManager.readabilityModeFlow.first()
+                val colorPair = when (readabilityMode) {
+                    "smart_contrast" -> {
+                        val textColor = if (wallpaperColors != null &&
+                            (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0)
+                            Color.BLACK else Color.WHITE
+                        Pair(textColor, if (textColor == Color.WHITE) Color.BLACK else Color.WHITE)
+                    }
+                    "adaptive_colors" -> {
+                        val textColor = wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
+                        Pair(textColor, if (Color.luminance(textColor) < 0.5) Color.WHITE else Color.BLACK)
+                    }
+                    else -> Pair(Color.WHITE, Color.BLACK)
+                }
+                _uiColorsState.value = UiColorsState(
+                    textColor = colorPair.first,
+                    shadowColor = colorPair.second
+                )
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error getting optimal text color.")
+                _uiColorsState.value = UiColorsState()
             }
-            "adaptive_colors" -> {
-                val textColor = wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
-                Pair(textColor, if (Color.luminance(textColor) < 0.5) Color.WHITE else Color.BLACK)
-            }
-            else -> Pair(Color.WHITE, Color.BLACK)
         }
-        _uiColorsState.value = UiColorsState(
-            textColor = colorPair.first,
-            shadowColor = colorPair.second
-        )
     }
 
 }

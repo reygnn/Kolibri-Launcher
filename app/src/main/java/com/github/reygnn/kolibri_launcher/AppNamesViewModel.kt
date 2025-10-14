@@ -45,21 +45,21 @@ class AppNamesViewModel @Inject constructor(
     val uiState: StateFlow<AppNamesUiState> = _uiState.asStateFlow()
 
     init {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+
+                installedAppsManager.getInstalledApps().collect { fullyProcessedList ->
+                    try {
+                        masterAppList = fullyProcessedList
+                        updateUiFromMasterList()
+                    } catch (e: Exception) {
+                        TimberWrapper.silentError(e, "Error processing app list")
+                    }
+                }
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error loading apps")
                 _uiState.update { it.copy(isLoading = false) }
-            }
-        ) {
-            _uiState.update { it.copy(isLoading = true) }
-
-            installedAppsManager.getInstalledApps().collect { fullyProcessedList ->
-                try {
-                    masterAppList = fullyProcessedList
-                    updateUiFromMasterList()
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error processing app list")
-                }
             }
         }
     }
@@ -90,13 +90,13 @@ class AppNamesViewModel @Inject constructor(
     }
 
     fun removeCustomName(packageName: String) {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                appNamesManager.removeCustomNameForPackage(packageName)
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error removing custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
             }
-        ) {
-            appNamesManager.removeCustomNameForPackage(packageName)
         }
     }
 

@@ -64,40 +64,40 @@ class OnboardingViewModel @Inject constructor(
     }
 
     init {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                combine(
+                    onboardingAppsUseCase.onboardingAppsFlow,
+                    selectedComponents,
+                    searchQuery
+                ) { allApps, selected, query ->
+                    val filteredApps = if (query.isBlank()) {
+                        allApps
+                    } else {
+                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                    }
+
+                    val selectableList = filteredApps.map { app ->
+                        SelectableAppInfo(
+                            appInfo = app,
+                            isSelected = selected.contains(app.componentName)
+                        )
+                    }
+
+                    val selectedAppInfos = allApps
+                        .filter { selected.contains(it.componentName) }
+                        .sortedBy { it.displayName.lowercase() }
+
+                    _uiState.value.copy(
+                        selectableApps = selectableList,
+                        selectedApps = selectedAppInfos
+                    )
+                }.collect { newState ->
+                    _uiState.value = newState
+                }
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Failed to load apps.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load apps. Please try again."))
-            }
-        ) {
-            combine(
-                onboardingAppsUseCase.onboardingAppsFlow,
-                selectedComponents,
-                searchQuery
-            ) { allApps, selected, query ->
-                val filteredApps = if (query.isBlank()) {
-                    allApps
-                } else {
-                    allApps.filter { it.displayName.contains(query, ignoreCase = true) }
-                }
-
-                val selectableList = filteredApps.map { app ->
-                    SelectableAppInfo(
-                        appInfo = app,
-                        isSelected = selected.contains(app.componentName)
-                    )
-                }
-
-                val selectedAppInfos = allApps
-                    .filter { selected.contains(it.componentName) }
-                    .sortedBy { it.displayName.lowercase() }
-
-                _uiState.value.copy(
-                    selectableApps = selectableList,
-                    selectedApps = selectedAppInfos
-                )
-            }.collect { newState ->
-                _uiState.value = newState
             }
         }
     }
@@ -109,19 +109,19 @@ class OnboardingViewModel @Inject constructor(
         val subtitleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
         _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
 
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                val initialSelection = when (mode) {
+                    LaunchMode.INITIAL_SETUP -> emptySet()
+                    LaunchMode.EDIT_FAVORITES -> {
+                        favoritesRepository.favoriteComponentsFlow.first()
+                    }
+                }
+                selectedComponents.value = initialSelection
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error loading initial favorites.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
             }
-        ) {
-            val initialSelection = when (mode) {
-                LaunchMode.INITIAL_SETUP -> emptySet()
-                LaunchMode.EDIT_FAVORITES -> {
-                    favoritesRepository.favoriteComponentsFlow.first()
-                }
-            }
-            selectedComponents.value = initialSelection
         }
     }
 
@@ -147,19 +147,19 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun onDoneClicked() {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
+
+                if (launchMode == LaunchMode.INITIAL_SETUP) {
+                    settingsRepository.setOnboardingCompleted()
+                }
+
+                sendOnboardingEvent(OnboardingEvent.NavigateToMain)
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "CRITICAL: Failed to save favorites or complete onboarding.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Save failed. Please try again."))
             }
-        ) {
-            favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
-
-            if (launchMode == LaunchMode.INITIAL_SETUP) {
-                settingsRepository.setOnboardingCompleted()
-            }
-
-            _event.emit(OnboardingEvent.NavigateToMain)
         }
     }
 }

@@ -195,7 +195,7 @@
   
 
   
-
+    <string name="error_launching_app">Unable to open app. Please try again.</string>
   
   
     <string name="category_privacy_title">Privacy</string>

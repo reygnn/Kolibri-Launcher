@@ -188,7 +188,7 @@
 
   
 
-  
+    <string name="error_launching_app">App kann nicht geöffnet werden. Bitte versuchen Sie es erneut.</string>
 
     <string name="category_privacy_title">Datenschutz</string>
     <string name="crash_report_setting_title">Crash-Berichte senden</string>

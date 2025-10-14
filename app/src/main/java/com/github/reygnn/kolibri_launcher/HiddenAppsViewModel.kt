@@ -34,65 +34,65 @@ class HiddenAppsViewModel @Inject constructor(
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
 
     init {
-        launchSafe(
-            onError = { e ->
-                TimberWrapper.silentError(e, "Error in combine block")
-            }
-        ) {
-            combine(
-                allAppsMasterList,
-                selectedComponents,
-                searchQuery
-            ) { allApps, selected, query ->
-                val filteredApps = if (query.isBlank()) {
-                    allApps
-                } else {
-                    allApps.filter { it.displayName.contains(query, ignoreCase = true) }
-                }
+        launchSafe {
+            try {
+                combine(
+                    allAppsMasterList,
+                    selectedComponents,
+                    searchQuery
+                ) { allApps, selected, query ->
+                    val filteredApps = if (query.isBlank()) {
+                        allApps
+                    } else {
+                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                    }
 
-                val selectableList = filteredApps.map { app ->
-                    SelectableAppInfo(
-                        appInfo = app,
-                        isSelected = selected.contains(app.componentName)
+                    val selectableList = filteredApps.map { app ->
+                        SelectableAppInfo(
+                            appInfo = app,
+                            isSelected = selected.contains(app.componentName)
+                        )
+                    }
+
+                    val selectedAppInfos = allApps
+                        .filter { selected.contains(it.componentName) }
+                        .sortedBy { it.displayName.lowercase() }
+
+                    _uiState.value.copy(
+                        titleResId = R.string.hidden_apps_title_screen,
+                        subtitleResId = R.string.hidden_apps_subtitle_screen,
+                        selectableApps = selectableList,
+                        selectedApps = selectedAppInfos
                     )
+                }.collect { newState ->
+                    try {
+                        _uiState.value = newState
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        TimberWrapper.silentError(e, "Error updating UI state")
+                    }
                 }
-
-                val selectedAppInfos = allApps
-                    .filter { selected.contains(it.componentName) }
-                    .sortedBy { it.displayName.lowercase() }
-
-                _uiState.value.copy(
-                    titleResId = R.string.hidden_apps_title_screen,
-                    subtitleResId = R.string.hidden_apps_subtitle_screen,
-                    selectableApps = selectableList,
-                    selectedApps = selectedAppInfos
-                )
-            }.collect { newState ->
-                try {
-                    _uiState.value = newState
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error updating UI state")
-                }
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error in combine block")
             }
         }
         initialize()
     }
 
     private fun initialize() {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                val allApps = installedAppsRepository.getInstalledApps().first()
+                    .sortedBy { it.displayName.lowercase() }
+                allAppsMasterList.value = allApps
+
+                initialHiddenComponents = visibilityRepository.hiddenAppsFlow.first()
+                selectedComponents.value = initialHiddenComponents
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error loading hidden apps")
                 sendEvent(UiEvent.ShowToast(R.string.error_loading_hidden_apps))
             }
-        ) {
-            val allApps = installedAppsRepository.getInstalledApps().first()
-                .sortedBy { it.displayName.lowercase() }
-            allAppsMasterList.value = allApps
-
-            initialHiddenComponents = visibilityRepository.hiddenAppsFlow.first()
-            selectedComponents.value = initialHiddenComponents
         }
     }
 
