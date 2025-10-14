@@ -63,6 +63,8 @@ class HiddenAppsViewModelTest {
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
 
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
@@ -77,6 +79,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onAppToggled(app1)
@@ -91,6 +95,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(setOf(app1.componentName)))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onAppToggled(app1)
@@ -105,6 +111,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("B")
@@ -115,31 +123,6 @@ class HiddenAppsViewModelTest {
         assertEquals("App B", uiState.selectableApps[0].appInfo.displayName)
     }
 
-//    @Test
-//    fun `onDoneClicked - correctly hides and shows apps`() = runTest {
-//        val initiallyHidden = setOf(app1.componentName)
-//        whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
-//        whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
-//        setupViewModel()
-//        advanceUntilIdle()
-//
-//        viewModel.onAppToggled(app1)
-//        viewModel.onAppToggled(app3)
-//        advanceUntilIdle()
-//
-//        viewModel.eventFlow.test {
-//            viewModel.onDoneClicked()
-//            advanceUntilIdle()
-//
-//            verify(visibilityRepository).showComponent(app1.componentName)
-//            verify(visibilityRepository).hideComponent(app3.componentName)
-//            verify(visibilityRepository, never()).hideComponent(app1.componentName)
-//            verify(visibilityRepository, never()).showComponent(app3.componentName)
-//
-//            assertEquals(UiEvent.NavigateUp, awaitItem())
-//        }
-//    }
-
     @Test
     fun `onDoneClicked - correctly updates visibilities in a single batch`() = runTest {
         // Arrange
@@ -147,6 +130,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         // Act: App1 wird sichtbar gemacht, App3 wird versteckt
@@ -181,6 +166,7 @@ class HiddenAppsViewModelTest {
         setupViewModel()
 
         viewModel.eventFlow.test {
+            viewModel.initialize()
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -200,6 +186,7 @@ class HiddenAppsViewModelTest {
         setupViewModel()
 
         viewModel.eventFlow.test {
+            viewModel.initialize()
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -219,6 +206,7 @@ class HiddenAppsViewModelTest {
         setupViewModel()
 
         viewModel.eventFlow.test {
+            viewModel.initialize()
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -237,6 +225,8 @@ class HiddenAppsViewModelTest {
             throw IOException("DataStore write failed")
         }
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         // Act
@@ -264,6 +254,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("")
@@ -278,6 +270,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("XYZ_NOT_FOUND")
@@ -292,6 +286,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("app b")
@@ -307,6 +303,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         val mockApp = mock<AppInfo>()
@@ -323,6 +321,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         // Assert
@@ -347,6 +347,8 @@ class HiddenAppsViewModelTest {
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
 
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
@@ -360,6 +362,8 @@ class HiddenAppsViewModelTest {
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(allHidden))
 
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
@@ -371,6 +375,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("A")
@@ -388,6 +394,8 @@ class HiddenAppsViewModelTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onAppToggled(app1)
@@ -416,6 +424,8 @@ class HiddenAppsViewModelTest {
         }
 
         setupViewModel()
+
+        viewModel.initialize()
         advanceUntilIdle()
 
         viewModel.onAppToggled(app1)

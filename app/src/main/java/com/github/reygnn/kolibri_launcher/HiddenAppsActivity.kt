@@ -64,6 +64,8 @@ class HiddenAppsActivity : BaseActivity<HiddenAppsViewModel>() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        viewModel.initialize()
+
         try {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             _binding = ActivityOnboardingBinding.inflate(layoutInflater)

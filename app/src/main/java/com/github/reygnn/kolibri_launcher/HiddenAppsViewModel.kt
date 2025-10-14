@@ -77,10 +77,27 @@ class HiddenAppsViewModel @Inject constructor(
                 TimberWrapper.silentError(e, "Error in combine block")
             }
         }
-        initialize()
+        // initialize()
     }
 
-    private fun initialize() {
+    /**
+     * Kicks off the initial data loading for the ViewModel, fetching the list of all installed
+     * apps and the set of currently hidden apps.
+     *
+     * ARCHITECTURAL NOTE & TESTABILITY:
+     * This method is intentionally NOT called from the ViewModel's `init` block.
+     *
+     * 1.  **The Problem:** Placing data loading in `init` creates a race condition in unit tests.
+     *     The coroutine would start immediately upon ViewModel creation, potentially emitting an
+     *     event (e.g., a loading error) *before* the test framework (like Turbine) has a chance
+     *     to attach a collector to the `eventFlow`. This leads to missed events and flaky tests.
+     *
+     * 2.  **The Solution:** By making this an `internal` method, the responsibility to start the
+     *     data load is shifted to the owner of the ViewModel (the `HiddenAppsActivity`). This
+     *     gives tests full control to create the ViewModel, set up their listeners first, and
+     *     *then* explicitly call `initialize()` to trigger the action in a predictable order.
+     */
+    internal fun initialize() {
         launchSafe {
             try {
                 val allApps = installedAppsRepository.getInstalledApps().first()

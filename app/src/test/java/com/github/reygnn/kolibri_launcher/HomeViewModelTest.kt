@@ -551,19 +551,24 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `onAppClicked - when recordPackageLaunch fails - still launches app`() = runTest {
+    fun `onAppClicked - when recordPackageLaunch fails - still launches app and shows error`() = runTest {
         whenever(appUsageManager.recordPackageLaunch(any())).doAnswer {
             throw IOException("Cannot record")
         }
-
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.eventFlow.test {
             viewModel.onAppClicked(app1)
+            advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is UiEvent.LaunchApp)
+            val launchEvent = awaitItem()
+            assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
+
+            val errorEvent = awaitItem()
+            assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+
+            ensureAllEventsConsumed()
         }
     }
 

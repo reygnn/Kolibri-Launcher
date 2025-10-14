@@ -229,7 +229,6 @@ class HomeViewModel @Inject constructor(
                 sendEvent(UiEvent.RefreshAppDrawer)
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error handling app click for ${app.packageName}")
-                // Optional: Send a toast event if the launch fails for some reason
                 sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
             }
         }
