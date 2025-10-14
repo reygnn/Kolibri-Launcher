@@ -288,6 +288,25 @@ class FavoritesSortFragment : Fragment() {
         }
     }
 
+    /**
+     * Persists the current order of the favorite apps to the data layer.
+     *
+     * This operation is performed asynchronously within a coroutine to avoid blocking the main thread.
+     * The coroutine is launched using `viewLifecycleOwner.lifecycleScope`, ensuring it is automatically
+     * cancelled if the Fragment's view is destroyed, which prevents potential memory leaks.
+     *
+     * ARCHITECTURAL NOTE:
+     * This data-saving logic resides directly in the Fragment instead of a dedicated ViewModel. This is a
+     * deliberate design choice to keep this simple, self-contained screen lightweight and avoid the
+     * boilerplate of a full ViewModel class for a single responsibility.
+     *
+     * Consequently, the `mainDispatcher` is injected directly into this Fragment. This is crucial for
+     * testability, as it allows instrumented tests (via `TestDispatcherModule`) to replace it with a
+     * `TestDispatcher`. This makes the asynchronous save operation behave synchronously and deterministically
+     * during test execution, which is essential for reliable verification.
+     *
+     * @param favoriteApps The new, ordered list of AppInfo objects to be saved.
+     */
     private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
         if (!isAdded || isDetached || !::favoritesOrderManager.isInitialized) {
             Timber.w("Cannot save order - fragment not in valid state")
