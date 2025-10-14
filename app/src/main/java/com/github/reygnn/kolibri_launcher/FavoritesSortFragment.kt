@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
@@ -221,7 +222,7 @@ class FavoritesSortFragment : Fragment() {
         }
     }
 
-/*    private fun sortFavoritesAlphabetically() {
+    private fun sortFavoritesAlphabetically() {
         try {
             val sortedList = try {
                 adapter.currentList.sortedBy { it.displayName.lowercase() }
@@ -237,32 +238,18 @@ class FavoritesSortFragment : Fragment() {
             }
 
             saveFavoritesOrder(sortedList)
-            showSnackbar(getString(R.string.favorites_sorted_alphabetically))
+            showToast(getString(R.string.favorites_sorted_alphabetically))
+
+            // FIX: Setze Click-Listener nach Snackbar neu
+            binding.root.post {
+                setupButtons()
+            }
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in sortFavoritesAlphabetically")
-        }
-    }*/
-
-    private fun sortFavoritesAlphabetically() {
-        println(">>> sortFavoritesAlphabetically called")
-        try {
-            val sortedList = adapter.currentList.sortedBy { it.displayName.lowercase() }
-
-            println(">>> About to submit sorted list")
-            adapter.submitList(sortedList)  // KEIN Callback mehr
-
-            println(">>> About to call saveFavoritesOrder from alphabetical")
-            saveFavoritesOrder(sortedList)
-
-            //println(">>> About to show snackbar")
-            //showSnackbar(getString(R.string.favorites_sorted_alphabetically))
-        } catch (e: Exception) {
-            println(">>> Exception in sortFavoritesAlphabetically: ${e.message}")
             TimberWrapper.silentError(e, "Error in sortFavoritesAlphabetically")
         }
     }
 
-/*    private fun resetToOriginalOrder() {
+    private fun resetToOriginalOrder() {
         try {
             try {
                 adapter.submitList(originalOrder)
@@ -271,162 +258,59 @@ class FavoritesSortFragment : Fragment() {
             }
 
             saveFavoritesOrder(originalOrder)
-            showSnackbar(getString(R.string.favorites_order_reset))
+            showToast(getString(R.string.favorites_order_reset))
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in resetToOriginalOrder")
         }
-    }*/
-
-    private fun resetToOriginalOrder() {
-        println(">>> resetToOriginalOrder START")
-        println(">>> originalOrder = $originalOrder")
-
-        try {
-            println(">>> About to submitList")
-            adapter.submitList(originalOrder) {
-                println(">>> submitList callback in reset")
-            }
-            println(">>> submitList done")
-
-            println(">>> About to call saveFavoritesOrder")
-            saveFavoritesOrder(originalOrder)
-            println(">>> saveFavoritesOrder call done")
-
-            println(">>> About to show snackbar")
-            showSnackbar(getString(R.string.favorites_order_reset))
-            println(">>> snackbar done")
-        } catch (e: Exception) {
-            println(">>> EXCEPTION in resetToOriginalOrder: ${e.message}")
-            e.printStackTrace()
-            TimberWrapper.silentError(e, "Error in resetToOriginalOrder")
-        }
-
-        println(">>> resetToOriginalOrder END")
     }
 
-/*    private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
-        // CRASH-SAFE: Check fragment state
-        if (!isAdded || isDetached) {
+    private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
+        if (!isAdded || isDetached || !::favoritesOrderManager.isInitialized) {
             Timber.w("Cannot save order - fragment not in valid state")
             return
         }
 
-        viewLifecycleOwner.lifecycleScope.launch(mainDispatcher) {
-            try {
-                val componentNames = try {
-                    favoriteApps.map { it.componentName }
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error mapping component names")
-                    emptyList()
-                }
+        try {
+            viewLifecycleOwner.lifecycleScope.launch(mainDispatcher) {
+                try {
+                    val componentNames = favoriteApps.map { it.componentName }
+                    val success = favoritesOrderManager.saveOrder(componentNames)
 
-                val success = try {
-                    favoritesOrderManager.saveOrder(componentNames)
+                    if (success) {
+                        Timber.d("Favorites order saved successfully")
+                        if (isAdded && !isDetached) {
+                            try {
+                                setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
+                            } catch (e: Exception) {
+                                TimberWrapper.silentError(e, "Error setting fragment result")
+                            }
+                        }
+                    } else {
+                        if (isAdded && !isDetached) {
+                            showToast(getString(R.string.error_saving_order))
+                        }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error calling saveOrder")
-                    false
-                }
-
-                if (success) {
-                    Timber.d("Favorites order saved successfully")
-
-                    try {
-                        if (isAdded && !isDetached) {
-                            setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
-                        }
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error setting fragment result")
-                    }
-                } else {
+                    TimberWrapper.silentError(e, "Error in saveFavoritesOrder coroutine")
                     if (isAdded && !isDetached) {
-                        showSnackbar(getString(R.string.error_saving_order))
+                        showToast(getString(R.string.error_saving_order))
                     }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error in saveFavoritesOrder")
-                if (isAdded && !isDetached) {
-                    showSnackbar(getString(R.string.error_saving_order))
                 }
             }
-        }
-    }*/
-
-/*    private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
-        val scope = try {
-            viewLifecycleOwner.lifecycleScope
         } catch (e: Exception) {
-            // Fallback für Tests oder wenn viewLifecycleOwner nicht verfügbar
-            CoroutineScope(mainDispatcher)
-        }
-
-        scope.launch(mainDispatcher) {
-            try {
-                val componentNames = favoriteApps.map { it.componentName }
-                val success = favoritesOrderManager.saveOrder(componentNames)
-
-                if (success) {
-                    Timber.d("Favorites order saved successfully")
-
-                    if (isAdded && !isDetached) {
-                        try {
-                            setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
-                        } catch (e: Exception) {
-                            TimberWrapper.silentError(e, "Error setting fragment result")
-                        }
-                    }
-                } else {
-                    if (isAdded && !isDetached) {
-                        showSnackbar(getString(R.string.error_saving_order))
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error in saveFavoritesOrder")
-                if (isAdded && !isDetached) {
-                    showSnackbar(getString(R.string.error_saving_order))
-                }
-            }
-        }
-    }*/
-
-    private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
-        println(">>> saveFavoritesOrder called with ${favoriteApps.size} apps")
-        println(">>> isAdded=$isAdded, isDetached=$isDetached")
-
-        if (!isAdded || isDetached || !::favoritesOrderManager.isInitialized) {
-            println(">>> EARLY RETURN - fragment not in valid state")
-            Timber.w("Cannot save order - fragment not in valid state")
-            return
-        }
-
-        println(">>> Launching coroutine...")
-        viewLifecycleOwner.lifecycleScope.launch(mainDispatcher) {
-            println(">>> Inside coroutine - about to call saveOrder")
-            val componentNames = favoriteApps.map { it.componentName }
-            val success = favoritesOrderManager.saveOrder(componentNames)
-            println(">>> saveOrder returned: $success")
-
-            if (success) {
-                Timber.d("Favorites order saved successfully")
-                if (isAdded && !isDetached) {
-                    setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
-                }
-            }
+            TimberWrapper.silentError(e, "Error launching coroutine")
         }
     }
 
-    private fun showSnackbar(message: String) {
+    private fun showToast(message: String) {
         try {
-            if (_binding != null) {
-                Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+            if (isAdded && !isDetached) {
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error showing snackbar")
+            TimberWrapper.silentError(e, "Error showing toast")
         }
     }
 
