@@ -106,49 +106,6 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         assertThat(fakeRepo.saveOrderCallCount).isGreaterThan(0)
     }
 
-/*    @Test
-    fun clickResetButton_resetsToOriginalOrder_afterSorting() = testCoroutineRule.runTestAndLaunchUI(
-        mode = TestCoroutineRule.Mode.SAFE
-    ) {
-        val fakeRepo = favoritesOrderRepository as FakeFavoritesOrderRepository
-
-        launchAndTrackFragment<FavoritesSortFragment>(fragmentArgs)
-
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.recyclerView))
-            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
-
-        // Alphabetisch sortieren
-        onView(withId(R.id.buttonAlphabetical)).perform(click())
-
-        // Warte auf erste Coroutine
-        runBlocking { delay(1000) }
-
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.recyclerView))
-            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
-
-        // Reset klicken
-        onView(withId(R.id.buttonReset)).perform(click())
-
-        // Warte auf zweite Coroutine
-        runBlocking { delay(1000) }
-
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.recyclerView))
-            .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
-
-        val originalOrderComponents = listOf(
-            "com.zebra/com.zebra.MainActivity",
-            "com.apple/com.apple.MainActivity",
-            "com.banana/com.banana.MainActivity"
-        )
-
-        // Beide Calls sollten jetzt passiert sein
-        assertThat(fakeRepo.saveOrderCallCount).isAtLeast(2)
-        assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
-    }*/
-
     @Test
     fun clickResetButton_resetsToOriginalOrder_afterSorting() = testCoroutineRule.runTestAndLaunchUI(
         mode = TestCoroutineRule.Mode.SAFE
@@ -161,7 +118,6 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
 
-        println(">>> BEFORE alphabetical click: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
         onView(withId(R.id.buttonAlphabetical)).perform(click())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
@@ -172,23 +128,15 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 10))
 
-        println(">>> AFTER alphabetical: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
-
         // Finde den Button KOMPLETT NEU
-        println(">>> About to find and click reset button")
         onView(withId(R.id.buttonReset))
             .check(matches(isDisplayed()))
             .check(matches(isEnabled()))
             .perform(click())
 
-        println(">>> Reset button clicked")
-
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
-
-        println(">>> AFTER reset: saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
-        println(">>> savedOrder = ${fakeRepo.savedOrder}")
 
         val originalOrderComponents = listOf(
             "com.zebra/com.zebra.MainActivity",
@@ -212,14 +160,11 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
 
-        println(">>> Clicking reset WITHOUT alphabetical first")
         onView(withId(R.id.buttonReset)).perform(click())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
-
-        println(">>> saveOrderCallCount = ${fakeRepo.saveOrderCallCount}")
 
         // Sollte mindestens 1 sein
         assertThat(fakeRepo.saveOrderCallCount).isAtLeast(1)

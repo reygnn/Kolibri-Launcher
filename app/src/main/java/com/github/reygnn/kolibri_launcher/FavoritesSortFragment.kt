@@ -14,16 +14,45 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
-import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * @file FavoritesSortFragment.kt
+ * @description A UI fragment responsible for allowing the user to reorder their favorite applications.
+ *
+ * ARCHITECTURAL DESIGN AND TESTABILITY:
+ * This fragment is designed to be "test-agnostic but test-friendly." It does not contain any logic
+ * specific to testing. Instead, it correctly follows modern Android architecture principles by delegating
+ * asynchronous work and business logic.
+ *
+ * HOW IT INTERACTS WITH THE TEST INFRASTRUCTURE:
+ * 1.  **Dependency Injection**: The fragment requests its dependencies, `FavoritesOrderRepository` and a
+ *     `CoroutineDispatcher`, via Hilt's `@Inject` annotation. It has no knowledge of whether it's
+ *     receiving a real or a fake implementation.
+ *
+ * 2.  **Coroutine Execution**: The `saveFavoritesOrder` function uses the injected `mainDispatcher` to launch
+ *     a coroutine on the main thread via `lifecycleScope.launch(mainDispatcher)`. This is standard,
+ *     production-quality code for performing background tasks tied to the UI lifecycle.
+ *
+ * THE EFFECT OF THE TEST SETUP:
+ * When this fragment runs inside an instrumented test (orchestrated by `BaseAndroidTest`):
+ * - The injected `mainDispatcher` is not the real `Dispatchers.Main`. Instead, it is the `TestDispatcher`
+ *   provided by `TestDispatcherModule`.
+ * - As a result, when `saveFavoritesOrder` is called, the code inside the `launch` block does not execute
+ *   asynchronously. Instead, it is queued on the `TestDispatcher`.
+ * - The `TestCoroutineRule` running the test immediately executes this queued work in a synchronous,
+ *   deterministic manner.
+ *
+ * This design allows for robust testing. A test can simulate a user action (e.g., clicking a button),
+ * which calls `saveFavoritesOrder`, and then immediately, on the very next line, assert that the
+ * `FavoritesOrderRepository` was updated correctly. This eliminates the flakiness and complexity of dealing
+ * with race conditions and manual waits (`Thread.sleep`).
+ */
 
 /**
  * CRASH-SAFE VERSION
