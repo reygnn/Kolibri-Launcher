@@ -44,9 +44,8 @@ abstract class BaseViewModel(
             try {
                 block()
             } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e // CancellationExceptions immer weiterwerfen
+                throw e
             } catch (e: Exception) {
-                // Allgemeine, letzte Instanz der Fehlerbehandlung
                 handleError(e, "launchSafe")
             }
         }

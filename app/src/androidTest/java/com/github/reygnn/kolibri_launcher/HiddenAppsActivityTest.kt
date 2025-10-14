@@ -91,23 +91,27 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
     fun doneButton_updatesRepositoryStateAndFinishesActivity() =
         testCoroutineRule.runTestAndLaunchUI {
             val fakeVisibilityRepo = appVisibilityRepository as FakeAppVisibilityRepository
+            val fakeInstalledAppsRepo = installedAppsRepository as FakeInstalledAppsRepository
 
-            // Arrange: "Clock" ist initial versteckt
-            (installedAppsRepository as FakeInstalledAppsRepository).appsFlow.value = testApps
+            // Arrange
+            fakeInstalledAppsRepo.appsFlow.value = testApps
             fakeVisibilityRepo.hiddenAppsState.value =
                 setOf("com.google.clock/com.google.clock.Main")
 
             // Act
             val scenario = ActivityScenario.launch(HiddenAppsActivity::class.java)
+            scenario.onActivity { activity ->
+                (activity as HiddenAppsActivity).viewModel.initialize()
+            }
+            testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-            // Klicke "Photos" (wird neu versteckt)
+            // Execute
             onView(withId(R.id.all_apps_recycler_view))
                 .perform(
                     actionOnItem<OnboardingAppListAdapter.ViewHolder>(
                         hasDescendant(withText("Photos")), click()
                     )
                 )
-            // Klicke "Clock" (wird wieder sichtbar)
             onView(withId(R.id.all_apps_recycler_view))
                 .perform(
                     actionOnItem<OnboardingAppListAdapter.ViewHolder>(
@@ -117,26 +121,17 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
 
             onView(withId(R.id.done_button)).perform(click())
 
-
-            // 1. Führe alle Coroutinen aus, die JETZT in der Warteschlange sind.
+            // Wait
             testCoroutineRule.testDispatcher.scheduler.runCurrent()
-
-            // 2. Führe alle verbleibenden (durch Schritt 1 evtl. neu erzeugten) Coroutinen aus, bis alles stillsteht.
             testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-
-            // 3. Warte auf den UI-Thread, um die Konsequenzen (den finish()-Aufruf) zu verarbeiten.
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
-
-            // Assert: Überprüfe den finalen Zustand des Fakes, anstatt `verify` zu verwenden.
-            // Dies ist robuster und klarer.
+            // Assert
             val finalHiddenApps = fakeVisibilityRepo.hiddenApps
+            assertThat(finalHiddenApps).contains("com.google.photos/com.google.photos.Main")
+            assertThat(finalHiddenApps).doesNotContain("com.google.clock/com.google.clock.Main")
+            assertThat(finalHiddenApps).doesNotContain("com.google.maps/com.google.maps.Main")
 
-            assertThat(finalHiddenApps).contains("com.google.photos/com.google.photos.Main") // Wurde hinzugefügt
-            assertThat(finalHiddenApps).doesNotContain("com.google.clock/com.google.clock.Main") // Wurde entfernt
-            assertThat(finalHiddenApps).doesNotContain("com.google.maps/com.google.maps.Main") // Wurde nie angefasst
-
-            // Überprüfe, ob die Activity beendet wurde
             assertThat(scenario.state).isEqualTo(Lifecycle.State.DESTROYED)
         }
 }

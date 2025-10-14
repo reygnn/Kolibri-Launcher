@@ -16,7 +16,7 @@ import timber.log.Timber
  */
 abstract class BaseActivity<VM : BaseViewModel> : AppCompatActivity() {
 
-    protected abstract val viewModel: VM
+    internal abstract val viewModel: VM
 
     private var lastErrorToastTime = 0L
     private var lastUiEventToastTime = 0L
