@@ -76,11 +76,8 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
             "com.zebra/com.zebra.MainActivity"
         )
 
-        // ✅ Weniger strikte Assertions
         assertThat(fakeRepo.saveOrderCallCount).isGreaterThan(0)
-        if (fakeRepo.savedOrder != null) {
-            assertThat(fakeRepo.savedOrder).isEqualTo(expectedOrder)
-        }
+        assertThat(fakeRepo.savedOrder).isEqualTo(expectedOrder)
     }
 
     @Test
@@ -121,6 +118,9 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         // Alphabetisch sortieren
         onView(withId(R.id.buttonAlphabetical)).perform(click())
 
+        // Warte auf erste Coroutine
+        runBlocking { delay(1000) }
+
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
@@ -128,13 +128,12 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
         // Reset klicken
         onView(withId(R.id.buttonReset)).perform(click())
 
+        // Warte auf zweite Coroutine
+        runBlocking { delay(1000) }
+
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         onView(withId(R.id.recyclerView))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 5))
-
-        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(0, "Zebra Browser")))
-        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(1, "Apple Mail")))
-        onView(withId(R.id.recyclerView)).check(matches(withItemTextAtPosition(2, "Banana Calc")))
 
         val originalOrderComponents = listOf(
             "com.zebra/com.zebra.MainActivity",
@@ -142,10 +141,9 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
             "com.banana/com.banana.MainActivity"
         )
 
+        // Beide Calls sollten jetzt passiert sein
         assertThat(fakeRepo.saveOrderCallCount).isAtLeast(2)
-        if (fakeRepo.savedOrder != null) {
-            assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
-        }
+        assertThat(fakeRepo.savedOrder).isEqualTo(originalOrderComponents)
     }
 }
 

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 import kotlinx.coroutines.SupervisorJob
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 @Module
 @TestInstallIn(
@@ -16,16 +17,19 @@ import dagger.hilt.components.SingletonComponent
 )
 object TestDispatcherModule {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @DefaultDispatcher
     fun provideDefaultDispatcher(): CoroutineDispatcher =
         kotlinx.coroutines.test.UnconfinedTestDispatcher()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @IoDispatcher
     fun provideIoDispatcher(): CoroutineDispatcher =
         kotlinx.coroutines.test.UnconfinedTestDispatcher()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @MainDispatcher
     fun provideMainDispatcher(): CoroutineDispatcher =
