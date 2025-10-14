@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Singleton
 
 // =================================================================================
@@ -239,6 +240,17 @@ class FakeAppVisibilityRepository : AppVisibilityRepository, Purgeable {
     override suspend fun isComponentHidden(componentName: String?): Boolean = componentName != null && hiddenAppsState.value.contains(componentName)
     override suspend fun hideComponent(componentName: String?): Boolean { if (componentName != null) hiddenAppsState.value = hiddenAppsState.value + componentName; return true }
     override suspend fun showComponent(componentName: String?): Boolean { if (componentName != null) hiddenAppsState.value = hiddenAppsState.value - componentName; return true }
+    override suspend fun updateComponentVisibilities(
+        componentsToHide: Set<String>,
+        componentsToShow: Set<String>
+    ) {
+        hiddenAppsState.update { currentHidden ->
+            val newHidden = currentHidden.toMutableSet()
+            newHidden.addAll(componentsToHide)
+            newHidden.removeAll(componentsToShow)
+            newHidden.toSet()
+        }
+    }
     override fun purgeRepository() { hiddenAppsState.value = emptySet() }
 }
 
@@ -273,17 +285,17 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
     var saveOrderCallCount = 0
         private set
     // override suspend fun saveOrder(componentNames: List<String>): Boolean { savedOrder = componentNames; saveOrderCallCount++; orderState.value = componentNames; return true }
-    override suspend fun saveOrder(componentNames: List<String>): Boolean {
+    override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
         println(">>> FakeFavoritesOrderRepository.saveOrder CALLED")
         println(">>> Thread: ${Thread.currentThread().name}")
-        println(">>> componentNames = $componentNames")
+        println(">>> componentNames = $orderedComponentNames")
         println(">>> saveOrderCallCount BEFORE = $saveOrderCallCount")
 
-        savedOrder = componentNames
+        savedOrder = orderedComponentNames
         saveOrderCallCount++
 
         println(">>> saveOrderCallCount AFTER = $saveOrderCallCount")
-        orderState.value = componentNames
+        orderState.value = orderedComponentNames
         return true
     }
     override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>): List<AppInfo> { if (order.isEmpty()) return favoriteApps.sortedBy { it.displayName }; val appMap = favoriteApps.associateBy { it.componentName }; return order.mapNotNull { appMap[it] } + (favoriteApps - appMap.keys.mapNotNull { appMap[it] }.toSet()) }

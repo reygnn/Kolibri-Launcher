@@ -8,4 +8,5 @@ interface AppVisibilityRepository : Purgeable {
     suspend fun isComponentHidden(componentName: String?): Boolean
     suspend fun hideComponent(componentName: String?): Boolean
     suspend fun showComponent(componentName: String?): Boolean
+    suspend fun updateComponentVisibilities(componentsToHide: Set<String>, componentsToShow: Set<String>)
 }

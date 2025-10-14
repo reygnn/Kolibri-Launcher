@@ -95,7 +95,17 @@ class OnboardingActivityTest : BaseAndroidTest() {
         ))
 
         onView(withId(R.id.done_button)).perform(click())
+
+
+        // 1. Führe alle Coroutinen aus, die JETZT in der Warteschlange sind.
+        testCoroutineRule.testDispatcher.scheduler.runCurrent()
+
+        // 2. Führe alle verbleibenden (durch Schritt 1 evtl. neu erzeugten) Coroutinen aus, bis alles stillsteht.
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // 3. Warte auf den UI-Thread, um die Konsequenzen (den finish()-Aufruf) zu verarbeiten.
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
 
         // Assert
         val expectedFavorites = setOf(

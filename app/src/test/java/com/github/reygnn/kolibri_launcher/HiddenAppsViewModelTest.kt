@@ -29,8 +29,10 @@ class HiddenAppsViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    @Mock private lateinit var installedAppsRepository: InstalledAppsRepository
-    @Mock private lateinit var visibilityRepository: AppVisibilityRepository
+    @Mock
+    private lateinit var installedAppsRepository: InstalledAppsRepository
+    @Mock
+    private lateinit var visibilityRepository: AppVisibilityRepository
 
     private lateinit var viewModel: HiddenAppsViewModel
 
@@ -48,7 +50,8 @@ class HiddenAppsViewModelTest {
         viewModel = HiddenAppsViewModel(
             installedAppsRepository,
             visibilityRepository,
-            mainDispatcher = mainDispatcherRule.testDispatcher)
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
     }
 
     // ========== EXISTING TESTS ==========
@@ -112,26 +115,59 @@ class HiddenAppsViewModelTest {
         assertEquals("App B", uiState.selectableApps[0].appInfo.displayName)
     }
 
+//    @Test
+//    fun `onDoneClicked - correctly hides and shows apps`() = runTest {
+//        val initiallyHidden = setOf(app1.componentName)
+//        whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
+//        whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
+//        setupViewModel()
+//        advanceUntilIdle()
+//
+//        viewModel.onAppToggled(app1)
+//        viewModel.onAppToggled(app3)
+//        advanceUntilIdle()
+//
+//        viewModel.eventFlow.test {
+//            viewModel.onDoneClicked()
+//            advanceUntilIdle()
+//
+//            verify(visibilityRepository).showComponent(app1.componentName)
+//            verify(visibilityRepository).hideComponent(app3.componentName)
+//            verify(visibilityRepository, never()).hideComponent(app1.componentName)
+//            verify(visibilityRepository, never()).showComponent(app3.componentName)
+//
+//            assertEquals(UiEvent.NavigateUp, awaitItem())
+//        }
+//    }
+
     @Test
-    fun `onDoneClicked - correctly hides and shows apps`() = runTest {
+    fun `onDoneClicked - correctly updates visibilities in a single batch`() = runTest {
+        // Arrange
         val initiallyHidden = setOf(app1.componentName)
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
         setupViewModel()
         advanceUntilIdle()
 
+        // Act: App1 wird sichtbar gemacht, App3 wird versteckt
         viewModel.onAppToggled(app1)
         viewModel.onAppToggled(app3)
         advanceUntilIdle()
 
+        // Assert
         viewModel.eventFlow.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            verify(visibilityRepository).showComponent(app1.componentName)
-            verify(visibilityRepository).hideComponent(app3.componentName)
-            verify(visibilityRepository, never()).hideComponent(app1.componentName)
-            verify(visibilityRepository, never()).showComponent(app3.componentName)
+            // Überprüfe den EINEN Aufruf der neuen Methode
+            verify(visibilityRepository).updateComponentVisibilities(
+                componentsToHide = setOf(app3.componentName), // App3 sollte versteckt werden
+                componentsToShow = setOf(app1.componentName)  // App1 sollte sichtbar gemacht werden
+            )
+
+            // Stelle sicher, dass die alten Methoden NIE aufgerufen wurden
+            verify(visibilityRepository, never()).hideComponent(any())
+            verify(visibilityRepository, never()).showComponent(any())
 
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
@@ -190,56 +226,35 @@ class HiddenAppsViewModelTest {
         }
     }
 
+
     @Test
-    fun `onDoneClicked - when hideComponent fails - still continues with other operations`() = runTest {
+    fun `onDoneClicked - when visibility update fails - still navigates up`() = runTest {
+        // Arrange
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
-
-        // First call fails, second succeeds
-        whenever(visibilityRepository.hideComponent(app1.componentName)).thenReturn(false)
-        whenever(visibilityRepository.hideComponent(app2.componentName)).thenReturn(true)
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.onAppToggled(app1)
-        viewModel.onAppToggled(app2)
-        advanceUntilIdle()
-
-        viewModel.eventFlow.test {
-            viewModel.onDoneClicked()
-            advanceUntilIdle()
-
-            verify(visibilityRepository).hideComponent(app1.componentName)
-            verify(visibilityRepository).hideComponent(app2.componentName)
-
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+        // Simuliere, dass der neue Batch-Aufruf eine Exception wirft
+        whenever(visibilityRepository.updateComponentVisibilities(any(), any())).doAnswer {
+            throw IOException("DataStore write failed")
         }
-    }
-
-    @Test
-    fun `onDoneClicked - when showComponent fails - still continues with other operations`() = runTest {
-        val initiallyHidden = setOf(app1.componentName, app2.componentName)
-        whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
-        whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(initiallyHidden))
-
-        whenever(visibilityRepository.showComponent(app1.componentName)).thenReturn(false)
-        whenever(visibilityRepository.showComponent(app2.componentName)).thenReturn(true)
-
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.onAppToggled(app1)
-        viewModel.onAppToggled(app2)
+        // Act
+        viewModel.onAppToggled(app1) // Eine Änderung vornehmen, damit der Aufruf stattfindet
         advanceUntilIdle()
 
+        // Assert
         viewModel.eventFlow.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            verify(visibilityRepository).showComponent(app1.componentName)
-            verify(visibilityRepository).showComponent(app2.componentName)
+            // Überprüfe, dass der Aufruf versucht wurde
+            verify(visibilityRepository).updateComponentVisibilities(
+                componentsToHide = setOf(app1.componentName),
+                componentsToShow = emptySet()
+            )
 
+            // Das ViewModel sollte den Fehler fangen und trotzdem navigieren
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
@@ -304,18 +319,24 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onDoneClicked - with no changes - navigates up without calling repository`() = runTest {
+        // Arrange
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
         advanceUntilIdle()
 
+        // Assert
         viewModel.eventFlow.test {
+            // 1. Lauschen ist aktiv.
+
+            // 2. Aktion auslösen.
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            verify(visibilityRepository, never()).hideComponent(any())
-            verify(visibilityRepository, never()).showComponent(any())
+            // 3. Seiteneffekte überprüfen.
+            verify(visibilityRepository, never()).updateComponentVisibilities(any(), any())
 
+            // 4. Event empfangen.
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
@@ -386,7 +407,11 @@ class HiddenAppsViewModelTest {
     fun `onDoneClicked - when repository throws exception - still navigates up`() = runTest {
         whenever(installedAppsRepository.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(visibilityRepository.hiddenAppsFlow).thenReturn(flowOf(emptySet()))
-        whenever(visibilityRepository.hideComponent(any())).doAnswer {
+        whenever(
+            visibilityRepository.updateComponentVisibilities(
+                any(), any()
+            )
+        ).doAnswer {
             throw IOException("Write failed")
         }
 

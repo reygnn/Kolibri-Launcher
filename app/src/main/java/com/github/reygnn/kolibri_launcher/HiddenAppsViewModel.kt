@@ -115,39 +115,25 @@ class HiddenAppsViewModel @Inject constructor(
     }
 
     fun onDoneClicked() {
-        launchSafe(
-            onError = { e ->
-                sendEvent(UiEvent.ShowToast(R.string.error_saving_hidden_apps))
+        launchSafe {
+            try {
+                val finalHiddenComponents = selectedComponents.value
+
+                val componentsToHide = finalHiddenComponents - initialHiddenComponents
+                val componentsToShow = initialHiddenComponents - finalHiddenComponents
+
+                if (componentsToHide.isNotEmpty() || componentsToShow.isNotEmpty()) {
+                    visibilityRepository.updateComponentVisibilities(
+                        componentsToHide = componentsToHide,
+                        componentsToShow = componentsToShow
+                    )
+                }
+
+                sendEvent(UiEvent.NavigateUp)
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error saving hidden apps")
                 sendEvent(UiEvent.NavigateUp)
             }
-        ) {
-            val finalHiddenComponents = selectedComponents.value
-
-            val componentsToHide = finalHiddenComponents - initialHiddenComponents
-            val componentsToShow = initialHiddenComponents - finalHiddenComponents
-
-            componentsToHide.forEach { component ->
-                try {
-                    visibilityRepository.hideComponent(component)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Failed to hide component: $component")
-                }
-            }
-
-            componentsToShow.forEach { component ->
-                try {
-                    visibilityRepository.showComponent(component)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Failed to show component: $component")
-                }
-            }
-
-            sendEvent(UiEvent.NavigateUp)
         }
     }
 }

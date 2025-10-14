@@ -45,7 +45,6 @@ class AppNamesViewModel @Inject constructor(
     val uiState: StateFlow<AppNamesUiState> = _uiState.asStateFlow()
 
     init {
-        // CHANGED: launchSafe statt viewModelScope.launch
         launchSafe(
             onError = { e ->
                 TimberWrapper.silentError(e, "Error loading apps")
@@ -74,18 +73,18 @@ class AppNamesViewModel @Inject constructor(
 
     // CHANGED: launchSafe mit error handling
     fun setCustomName(packageName: String, customName: String) {
-        launchSafe(
-            onError = { e ->
+        launchSafe {
+            try {
+                val app = masterAppList.find { it.packageName == packageName }
+
+                if (customName.isNotBlank() && customName != app?.originalName) {
+                    appNamesManager.setCustomNameForPackage(packageName, customName)
+                } else {
+                    appNamesManager.removeCustomNameForPackage(packageName)
+                }
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error setting custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
-            }
-        ) {
-            val app = masterAppList.find { it.packageName == packageName }
-
-            if (customName.isNotBlank() && customName != app?.originalName) {
-                appNamesManager.setCustomNameForPackage(packageName, customName)
-            } else {
-                appNamesManager.removeCustomNameForPackage(packageName)
             }
         }
     }

@@ -117,5 +117,28 @@ class AppVisibilityManager @Inject constructor(
         }
     }
 
+    override suspend fun updateComponentVisibilities(
+        componentsToHide: Set<String>,
+        componentsToShow: Set<String>
+    ) {
+        try {
+            dataStore.edit { preferences ->
+                val currentHidden = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
+
+                val newHidden = currentHidden.toMutableSet()
+
+                newHidden.addAll(componentsToHide)
+                newHidden.removeAll(componentsToShow)
+
+                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
+            }
+            Timber.i("Component visibilities updated. Hidden: ${componentsToHide.size}, Shown: ${componentsToShow.size}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error updating component visibilities in batch")
+        }
+    }
+
     override fun purgeRepository() { }
 }

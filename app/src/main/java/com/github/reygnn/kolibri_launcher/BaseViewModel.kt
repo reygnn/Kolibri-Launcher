@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -18,16 +20,14 @@ abstract class BaseViewModel(
 ) : ViewModel() {
 
     // Event channel for one-time UI events
-    private val _eventChannel = Channel<UiEvent>()
-    val eventFlow = _eventChannel.receiveAsFlow()
+    private val _event = MutableSharedFlow<UiEvent>()
+    val eventFlow = _event.asSharedFlow()
 
-    protected fun sendEvent(event: UiEvent) {
-        viewModelScope.launch(mainDispatcher) {
-            try {
-                _eventChannel.send(event)
-            } catch (e: Exception) {
-                Timber.e(e, "Error sending event")
-            }
+    protected suspend fun sendEvent(event: UiEvent) {
+        try {
+            _event.emit(event)
+        } catch (e: Exception) {
+            Timber.e(e, "Error sending event")
         }
     }
 
@@ -39,19 +39,15 @@ abstract class BaseViewModel(
     /**
      * Safe coroutine launcher that catches all exceptions.
      */
-    protected fun launchSafe(
-        onError: ((Throwable) -> Unit)? = null,
-        block: suspend CoroutineScope.() -> Unit
-    ) {
+    protected fun launchSafe(block: suspend CoroutineScope.() -> Unit) {
         viewModelScope.launch(mainDispatcher + coroutineExceptionHandler) {
             try {
                 block()
             } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
+                throw e // CancellationExceptions immer weiterwerfen
             } catch (e: Exception) {
-                onError?.invoke(e) ?: handleError(e, "launchSafe")
-            } catch (e: Throwable) {
-                handleError(e, "launchSafe - Fatal")
+                // Allgemeine, letzte Instanz der Fehlerbehandlung
+                handleError(e, "launchSafe")
             }
         }
     }
