@@ -49,7 +49,7 @@ import timber.log.Timber
  **/
 
 @AndroidEntryPoint
-class OnboardingActivity : BaseActivity<OnboardingViewModel>() {
+class OnboardingActivity : BaseActivity<OnboardingViewModelInterface, OnboardingViewModel>() {
 
     private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
 
@@ -64,7 +64,7 @@ class OnboardingActivity : BaseActivity<OnboardingViewModel>() {
     private var _binding: ActivityOnboardingBinding? = null
     private val binding get() = _binding ?: throw IllegalStateException("Binding accessed after onDestroy")
 
-    override val viewModel: OnboardingViewModel by viewModels()
+    override val viewModel: OnboardingViewModelInterface by viewModels()
     private var allAppsAdapter: OnboardingAppListAdapter? = null
 
     // Search Debouncing
@@ -82,7 +82,8 @@ class OnboardingActivity : BaseActivity<OnboardingViewModel>() {
                 modeName?.let { LaunchMode.valueOf(it) } ?: LaunchMode.INITIAL_SETUP
             }
 
-            viewModel.initialize(launchMode)
+            viewModel.setLaunchMode(launchMode)
+            viewModel.loadInitialData()
 
             WindowCompat.setDecorFitsSystemWindows(window, false)
             _binding = ActivityOnboardingBinding.inflate(layoutInflater)

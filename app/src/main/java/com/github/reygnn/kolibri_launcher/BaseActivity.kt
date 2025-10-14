@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -14,11 +15,12 @@ import timber.log.Timber
  *
  * Both event flows run in CREATED lifecycle to ensure Fragment events are caught early.
  */
-abstract class BaseActivity<VM : BaseViewModel> : AppCompatActivity() {
+abstract class BaseActivity<VM> : AppCompatActivity()
+        where VM : ViewModel, VM : BaseViewModelInterface {
 
     internal abstract val viewModel: VM
 
-    private var lastErrorToastTime = 0L
+     private var lastErrorToastTime = 0L
     private var lastUiEventToastTime = 0L
     private val TOAST_THROTTLE_MS = 2000L
 

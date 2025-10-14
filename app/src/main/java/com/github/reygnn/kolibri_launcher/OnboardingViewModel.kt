@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,22 +45,21 @@ class OnboardingViewModel @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val settingsRepository: SettingsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel(mainDispatcher) {
+) : BaseViewModel<OnboardingEvent>(mainDispatcher),
+    OnboardingViewModelInterface {
 
     private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
     private val _uiState = MutableStateFlow(OnboardingUiState())
-    val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
-
-    private val _event = MutableSharedFlow<OnboardingEvent>()
-    val event = _event.asSharedFlow()
+    override val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
     private val searchQuery = MutableStateFlow("")
+    private var isInitialized = false
 
     // Helper function to send OnboardingEvents safely
-    private fun sendOnboardingEvent(event: OnboardingEvent) {
+    private suspend fun sendOnboardingEvent(event: OnboardingEvent) {
         launchSafe {
-            _event.emit(event)
+            sendEvent(event)
         }
     }
 
@@ -102,16 +102,23 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    fun initialize(mode: LaunchMode) {
+    override fun setLaunchMode(mode: LaunchMode) {
         this.launchMode = mode
 
-        val titleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_title_edit_favorites else R.string.onboarding_title_welcome
-        val subtitleRes = if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
+        val titleRes =
+            if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_title_edit_favorites else R.string.onboarding_title_welcome
+        val subtitleRes =
+            if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
         _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
+    }
+
+    override  fun loadInitialData() {
+        if (isInitialized) return
+        isInitialized = true
 
         launchSafe {
             try {
-                val initialSelection = when (mode) {
+                val initialSelection = when (launchMode) {
                     LaunchMode.INITIAL_SETUP -> emptySet()
                     LaunchMode.EDIT_FAVORITES -> {
                         favoritesRepository.favoriteComponentsFlow.first()
@@ -125,11 +132,11 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    fun onSearchQueryChanged(query: String) {
+    override fun onSearchQueryChanged(query: String) {
         searchQuery.value = query
     }
 
-    fun onAppToggled(app: AppInfo) {
+    override fun onAppToggled(app: AppInfo) {
         launchSafe {
             val currentSelection = selectedComponents.value
             val component = app.componentName
@@ -138,7 +145,7 @@ class OnboardingViewModel @Inject constructor(
                 selectedComponents.value = currentSelection - component
             } else {
                 if (currentSelection.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
-                    _event.emit(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FAVORITES_ON_HOME))
+                    sendOnboardingEvent(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FAVORITES_ON_HOME))
                 } else {
                     selectedComponents.value = currentSelection + component
                 }
@@ -146,7 +153,7 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    fun onDoneClicked() {
+    override fun onDoneClicked() {
         launchSafe {
             try {
                 favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
