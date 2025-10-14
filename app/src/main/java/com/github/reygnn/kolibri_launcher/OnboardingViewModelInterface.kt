@@ -1,11 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 interface OnboardingViewModelInterface {
     val uiState: StateFlow<OnboardingUiState>
-    val event: SharedFlow<OnboardingEvent>
     fun setLaunchMode(mode: LaunchMode)
     fun loadInitialData()
     fun onSearchQueryChanged(query: String)

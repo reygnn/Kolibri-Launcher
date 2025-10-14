@@ -49,7 +49,9 @@ import timber.log.Timber
  **/
 
 @AndroidEntryPoint
-class OnboardingActivity : BaseActivity<OnboardingViewModelInterface, OnboardingViewModel>() {
+class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() {
+
+    override val viewModel: OnboardingViewModel by viewModels()
 
     private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
 
@@ -64,7 +66,6 @@ class OnboardingActivity : BaseActivity<OnboardingViewModelInterface, Onboarding
     private var _binding: ActivityOnboardingBinding? = null
     private val binding get() = _binding ?: throw IllegalStateException("Binding accessed after onDestroy")
 
-    override val viewModel: OnboardingViewModelInterface by viewModels()
     private var allAppsAdapter: OnboardingAppListAdapter? = null
 
     // Search Debouncing
@@ -225,18 +226,6 @@ class OnboardingActivity : BaseActivity<OnboardingViewModelInterface, Onboarding
                         TimberWrapper.silentError(e, "Error observing UI")
                     }
                 }
-
-                launch {
-                    try {
-                        viewModel.event.collect { event ->
-                            handleEvent(event)
-                        }
-                    } catch (e: CancellationException) {
-                        throw e  // Re-throw
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error observing events")
-                    }
-                }
             }
         }
     }
@@ -264,7 +253,7 @@ class OnboardingActivity : BaseActivity<OnboardingViewModelInterface, Onboarding
         }
     }
 
-    private fun handleEvent(event: OnboardingEvent) {
+    override fun handleSpecificEvent(event: OnboardingEvent) {
         try {
             when (event) {
                 is OnboardingEvent.NavigateToMain -> {

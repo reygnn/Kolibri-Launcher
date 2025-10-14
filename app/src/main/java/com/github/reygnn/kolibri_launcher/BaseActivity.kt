@@ -15,8 +15,8 @@ import timber.log.Timber
  *
  * Both event flows run in CREATED lifecycle to ensure Fragment events are caught early.
  */
-abstract class BaseActivity<VM> : AppCompatActivity()
-        where VM : ViewModel, VM : BaseViewModelInterface {
+abstract class BaseActivity<E, VM> : AppCompatActivity()
+        where VM : ViewModel, VM : BaseViewModelInterface<E> {
 
     internal abstract val viewModel: VM
 
@@ -48,28 +48,32 @@ abstract class BaseActivity<VM> : AppCompatActivity()
                     }
                 }
 
-                // Job 2: ViewModel events - in same CREATED block
+                // Job 2: ViewModel events
                 launch {
                     try {
-                        viewModel.eventFlow.collect { event ->
+                        viewModel.eventFlow.collect { event -> // `event` ist hier vom Typ `E`
                             try {
-                                Timber.d("BaseActivity received event: $event") // DEBUG
-                                handleUiEvent(event)
+                                Timber.d("BaseActivity received event: $event")
+                                // Wir versuchen zuerst, das Event als allgemeines UiEvent zu behandeln.
+                                if (event is UiEvent) {
+                                    handleGenericUiEvent(event)
+                                } else {
+                                    // Wenn es kein allgemeines UiEvent ist, geben wir es an die Kindklasse weiter.
+                                    handleSpecificEvent(event)
+                                }
                             } catch (e: Exception) {
-                                Timber.e(e, "Error handling UI event: $event")   // auch als Toast
+                                Timber.e(e, "Error handling UI event: $event")
                             }
                         }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e  // Re-throw
                     } catch (e: Exception) {
-                        Timber.e(e, "Error collecting from ViewModel eventFlow")   // auch als Toast
+                        Timber.e(e, "Error collecting from ViewModel eventFlow")
                     }
                 }
             }
         }
     }
 
-    protected open fun handleUiEvent(event: UiEvent) {
+    protected open fun handleGenericUiEvent(event: UiEvent) {
         if (BuildConfig.DEBUG) {
             Timber.d("handleUiEvent called with: $event")
         }
@@ -116,6 +120,8 @@ abstract class BaseActivity<VM> : AppCompatActivity()
             }
         }
     }
+
+    protected abstract fun handleSpecificEvent(event: E)
 
     private fun handleErrorEvent(event: Event<ErrorData>) {
         event.getContentIfNotHandled()?.let { errorData ->
