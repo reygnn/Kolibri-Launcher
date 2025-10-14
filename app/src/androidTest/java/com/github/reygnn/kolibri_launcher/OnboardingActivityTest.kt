@@ -14,6 +14,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -94,12 +95,14 @@ class OnboardingActivityTest : BaseAndroidTest() {
         ))
 
         onView(withId(R.id.done_button)).perform(click())
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
         // Assert
         val expectedFavorites = setOf(
             "com.google.photos/com.google.photos.Main",
             "com.google.clock/com.google.clock.Main"
         )
+
         assertThat(fakeFavoritesRepo.favorites).containsExactlyElementsIn(expectedFavorites)
         assertThat(scenario.state).isEqualTo(Lifecycle.State.DESTROYED)
     }
