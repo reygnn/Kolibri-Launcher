@@ -239,11 +239,6 @@ class FavoritesSortFragment : Fragment() {
 
             saveFavoritesOrder(sortedList)
             showToast(getString(R.string.favorites_sorted_alphabetically))
-
-            // FIX: Setze Click-Listener nach Snackbar neu
-            binding.root.post {
-                setupButtons()
-            }
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in sortFavoritesAlphabetically")
         }
@@ -307,7 +302,9 @@ class FavoritesSortFragment : Fragment() {
     private fun showToast(message: String) {
         try {
             if (isAdded && !isDetached) {
-                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                context?.let { ctx ->
+                    Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
+                }
             }
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error showing toast")
