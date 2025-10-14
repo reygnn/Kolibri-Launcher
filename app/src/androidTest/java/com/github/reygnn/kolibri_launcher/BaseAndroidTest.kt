@@ -57,7 +57,13 @@ abstract class BaseAndroidTest {
 
     @Before
     fun baseSetup() {
-        HomeViewModel.isInTestMode = true   // Test-Mode aktivieren BEVOR Hilt injiziert
+        // Test-Mode aktivieren BEVOR Hilt injiziert
+        HomeViewModel.isInTestMode = true
+
+        // Dispatcher setzen BEVOR Hilt injiziert
+        TestDispatcherModule.setTestDispatcher(testCoroutineRule.testDispatcher)
+
+        //-----------------------------------------------------------------------------
 
         hiltRule.inject()
 

@@ -2,14 +2,16 @@ package com.github.reygnn.kolibri_launcher
 
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import javax.inject.Singleton
-import kotlinx.coroutines.SupervisorJob
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.test.TestDispatcher
+import javax.inject.Singleton
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Module
 @TestInstallIn(
     components = [SingletonComponent::class],
@@ -17,23 +19,32 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 )
 object TestDispatcherModule {
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    private var testDispatcher: TestDispatcher? = null
+
+    /**
+     * Wird von BaseAndroidTest aufgerufen, um den TestDispatcher zu setzen
+     */
+    fun setTestDispatcher(dispatcher: TestDispatcher) {
+        testDispatcher = dispatcher
+    }
+
     @Provides
     @DefaultDispatcher
-    fun provideDefaultDispatcher(): CoroutineDispatcher =
-        kotlinx.coroutines.test.UnconfinedTestDispatcher()
+    fun provideDefaultDispatcher(): CoroutineDispatcher {
+        return testDispatcher ?: error("TestDispatcher not initialized! Call TestDispatcherModule.setTestDispatcher() in test setup")
+    }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @IoDispatcher
-    fun provideIoDispatcher(): CoroutineDispatcher =
-        kotlinx.coroutines.test.UnconfinedTestDispatcher()
+    fun provideIoDispatcher(): CoroutineDispatcher {
+        return testDispatcher ?: error("TestDispatcher not initialized! Call TestDispatcherModule.setTestDispatcher() in test setup")
+    }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @MainDispatcher
-    fun provideMainDispatcher(): CoroutineDispatcher =
-        kotlinx.coroutines.test.UnconfinedTestDispatcher()
+    fun provideMainDispatcher(): CoroutineDispatcher {
+        return testDispatcher ?: error("TestDispatcher not initialized! Call TestDispatcherModule.setTestDispatcher() in test setup")
+    }
 
     @Provides
     @Singleton
