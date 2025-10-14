@@ -438,7 +438,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
             longClickedApp = app
 
-            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            viewLifecycleOwner.lifecycleScope.launch {   // ← KEIN Dispatchers.Main nötig
                 try {
                     val hasUsage = try {
                         appUsageManager.hasUsageDataForPackage(app.packageName)

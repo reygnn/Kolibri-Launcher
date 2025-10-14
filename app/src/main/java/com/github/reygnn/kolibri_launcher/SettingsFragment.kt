@@ -84,7 +84,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         try {
             observeSettings()
-            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            viewLifecycleOwner.lifecycleScope.launch {
                 updateCrashReportSummary()
             }
         } catch (e: Exception) {
@@ -253,7 +253,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is Boolean) {
-                        lifecycleScope.launch {
+                        viewLifecycleOwner.lifecycleScope.launch {
                             try {
                                 settingsManager.setDoubleTapToLock(newValue)
                             } catch (e: CancellationException) {
@@ -279,7 +279,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             readabilityPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is String) {
-                        lifecycleScope.launch {
+                        viewLifecycleOwner.lifecycleScope.launch {
                             try {
                                 settingsManager.setReadabilityMode(newValue)
                                 setFragmentResult(READABILITY_CHANGED_KEY, bundleOf("changed" to true))
@@ -304,9 +304,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             findPreference<Preference>("crash_reports")?.setOnPreferenceClickListener {
                 try {
-                    // Wir starten eine Coroutine, um die suspend-Funktion aufzurufen
                     viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-                        // Wir benötigen den Activity-Context, um den Dialog zu zeigen
                         val activityContext = activity ?: return@launch
 
                         try {

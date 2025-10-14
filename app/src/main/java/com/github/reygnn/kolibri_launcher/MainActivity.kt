@@ -37,6 +37,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.acra.ACRA
@@ -109,7 +110,7 @@ class MainActivity : BaseActivity<HomeViewModel>() {
 //        // TEMPORÄR: ACRA-Test
 //        ACRA.errorReporter.handleSilentException(Exception("🚀 Acrarium Test"))
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.Main) {
             try {
                 val onboardingCompleted = settingsRepository.onboardingCompletedFlow.first()
                 val backupPresent = dataStoreBackup.isBackupPresent()
