@@ -10,7 +10,9 @@ import androidx.test.espresso.ViewAssertion
 import androidx.test.espresso.matcher.ViewMatchers.assertThat
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.chip.Chip
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.`is`
 import org.hamcrest.Matchers.any
@@ -129,6 +131,23 @@ object EspressoTestUtils {
     // =================================================================================
     // --- Synchronization / Waiting Helpers ---
     // =================================================================================
+
+    /**
+     * Führt eine robuste, dreistufige Synchronisation durch, um sowohl Coroutinen als auch den
+     * Android UI-Thread zu stabilisieren. Dies ist die bevorzugte Methode, um Flakiness in Tests zu
+     * beheben, die auf das Beenden einer Activity oder komplexe asynchrone UI-Updates warten.
+     *
+     * Die Schritte sind:
+     * 1. `runCurrent()`: Führt sofort alle anstehenden Coroutinen aus.
+     * 2. `advanceUntilIdle()`: Stellt sicher, dass auch alle neu geplanten Coroutinen abgeschlossen sind.
+     * 3. `waitForIdleSync()`: Wartet, bis der UI-Thread alle Konsequenzen (z.B. Activity.finish()) verarbeitet hat.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun TestCoroutineRule.awaitAll() {
+        this.testDispatcher.scheduler.runCurrent()
+        this.testDispatcher.scheduler.advanceUntilIdle()
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
 
     /**
      * DEPRECATED: Thread.sleep sollte vermieden werden.

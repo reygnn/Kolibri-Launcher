@@ -15,6 +15,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.EspressoTestUtils.awaitAll
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -86,7 +87,12 @@ class OnboardingActivityTest : BaseAndroidTest() {
 
         // Act
         val scenario = launchActivityWithMode(LaunchMode.EDIT_FAVORITES)
+        scenario.onActivity { activity ->
+            (activity as OnboardingActivity).viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        }
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
+        // Execute
         onView(withId(R.id.all_apps_recycler_view)).perform(actionOnItem<OnboardingAppListAdapter.ViewHolder>(
             hasDescendant(withText("Photos")), click()
         ))
@@ -97,14 +103,7 @@ class OnboardingActivityTest : BaseAndroidTest() {
         onView(withId(R.id.done_button)).perform(click())
 
 
-        // 1. Führe alle Coroutinen aus, die JETZT in der Warteschlange sind.
-        testCoroutineRule.testDispatcher.scheduler.runCurrent()
-
-        // 2. Führe alle verbleibenden (durch Schritt 1 evtl. neu erzeugten) Coroutinen aus, bis alles stillsteht.
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-
-        // 3. Warte auf den UI-Thread, um die Konsequenzen (den finish()-Aufruf) zu verarbeiten.
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        testCoroutineRule.awaitAll()
 
 
         // Assert
@@ -118,24 +117,3 @@ class OnboardingActivityTest : BaseAndroidTest() {
     }
 }
 
-/**
- * Eine benutzerdefinierte ViewAction, um auf das Schließen-Icon eines Material Chips zu klicken,
- * indem die offizielle API-Methode verwendet wird.
- */
-/*
-private fun clickOnChipCloseIcon(): ViewAction {
-    return object : ViewAction {
-        override fun getConstraints(): Matcher<View> {
-            return allOf(isAssignableFrom(Chip::class.java), isDisplayed())
-        }
-
-        override fun getDescription(): String {
-            return "Click on the close icon of a Chip"
-        }
-
-        override fun perform(uiController: UiController, view: View) {
-            val chip = view as Chip
-            chip.performCloseIconClick()
-        }
-    }
-}*/

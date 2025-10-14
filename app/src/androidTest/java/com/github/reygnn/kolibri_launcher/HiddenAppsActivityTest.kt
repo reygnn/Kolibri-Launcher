@@ -14,6 +14,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.EspressoTestUtils.awaitAll
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -122,9 +123,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
             onView(withId(R.id.done_button)).perform(click())
 
             // Wait
-            testCoroutineRule.testDispatcher.scheduler.runCurrent()
-            testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            testCoroutineRule.awaitAll()
 
             // Assert
             val finalHiddenApps = fakeVisibilityRepo.hiddenApps
