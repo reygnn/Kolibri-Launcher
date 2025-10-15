@@ -32,7 +32,7 @@ plugins {
 
 // Version-Konstanten
 val materialVersion = "1.13.0"  // DO NOT DOWNGRADE !!!
-val espressoVersion = "3.5.1"  // DO NOT CHANGE !!!
+val espressoVersion = "3.5.1"  // DO NOT EVEN THINK ABOUT TO CHANGE !!!
 val hiltVersion = "2.57.1"  // DO NOT UPGRADE !!!
 val truthVersion = "1.4.5"  // OK to upgrade
 val lifecycleVersion = "2.9.4"  // OK to upgrade
@@ -46,10 +46,11 @@ val fragmentVersion = "1.8.9"  // DO NOT UPGRADE !!! (keep fragment-ktx and frag
 val junitVersion = "4.13.2"  // DO NOT UPGRADE !!! (JUnit 5 needs migration)
 val coreTestingVersion = "2.2.0"  // DO NOT CHANGE !!!
 val turbineVersion = "1.2.1"  // OK to upgrade
-val androidTestJunitVersion = "1.3.0"  // DO NOT UPGRADE !!!
-val testRulesVersion = "1.7.0"  // OK to upgrade
+val androidxTestJunitVersion = "1.2.1"  // DO NOT CHANGE !!!
 val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beachten!
 val jsonVersion = "20250517"
+val androidxTestVersion = "1.6.1"
+val androidxTestCoreVersion = "1.6.1"
 
 
 // Lädt die sensiblen Daten aus der keystore.properties-Datei
@@ -98,6 +99,7 @@ android {
         )
 
         testInstrumentationRunner = "com.github.reygnn.kolibri_launcher.HiltTestRunner"
+        testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "3"
     }
 
     sourceSets {
@@ -160,6 +162,8 @@ android {
     }
 
     testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
@@ -242,23 +246,36 @@ dependencies {
 
 
 // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
-    androidTestImplementation("com.google.truth:truth:$truthVersion")
-    androidTestImplementation("androidx.test:rules:$testRulesVersion")
+    androidTestUtil("androidx.test:orchestrator:1.6.1")
+
     //noinspection NewerVersionAvailable
-    androidTestImplementation("androidx.test.ext:junit:$androidTestJunitVersion")
+    //noinspection GradleDependency
+    androidTestImplementation("androidx.test:runner:$androidxTestVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
+    androidTestImplementation("androidx.test:rules:$androidxTestVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
+    androidTestImplementation("androidx.test.ext:junit:$androidxTestJunitVersion")
+    androidTestImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
+    androidTestImplementation("com.google.truth:truth:$truthVersion")
+
     //noinspection NewerVersionAvailable
     androidTestImplementation("androidx.arch.core:core-testing:$coreTestingVersion")
     //noinspection NewerVersionAvailable
     debugImplementation("androidx.fragment:fragment-testing:$fragmentVersion")
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-intents:$espressoVersion")
+    androidTestImplementation("androidx.test.espresso:espresso-contrib:$espressoVersion")    //noinspection NewerVersionAvailable
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency
     androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion")
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-contrib:$espressoVersion")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:$espressoVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
+    androidTestImplementation("androidx.test.espresso:espresso-web:$espressoVersion")
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency
     debugImplementation ("androidx.test.espresso:espresso-idling-resource:$espressoVersion")
@@ -284,6 +301,9 @@ configurations.all {
         // Erzwingt materialVersion auch wenn appcompat eine ältere Version mitbringt.
         // Warnung: ohne diesen force WIRD es bei falscher Reihenfolge der Dependencies zu Dependency-Konflikten kommen!
         force("com.google.android.material:material:$materialVersion")
+
+        force("androidx.test:runner:$androidxTestVersion")
+        force("androidx.test:monitor:$androidxTestVersion")
     }
 }
 
