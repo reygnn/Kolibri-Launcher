@@ -20,7 +20,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
 
     internal abstract val viewModel: VM
 
-     private var lastErrorToastTime = 0L
+    private var lastErrorToastTime = 0L
     private var lastUiEventToastTime = 0L
     private val TOAST_THROTTLE_MS = 2000L
 
@@ -53,12 +53,13 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                     try {
                         viewModel.event.collect { event ->
                             try {
-                                Timber.d("BaseActivity received event: $event")
-                                // Wir versuchen zuerst, das Event als allgemeines UiEvent zu behandeln.
-                                if (event is UiEvent) {
+                                val wasHandled = if (event is UiEvent) {
                                     handleGenericUiEvent(event)
                                 } else {
-                                    // Wenn es kein allgemeines UiEvent ist, geben wir es an die Kindklasse weiter.
+                                    false
+                                }
+
+                                if (!wasHandled) {
                                     handleSpecificEvent(event)
                                 }
                             } catch (e: Exception) {
@@ -73,36 +74,37 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         }
     }
 
-    protected open fun handleGenericUiEvent(event: UiEvent) {
+    protected open fun handleGenericUiEvent(event: UiEvent): Boolean {
         if (BuildConfig.DEBUG) {
             Timber.d("handleUiEvent called with: $event")
         }
 
-        when (event) {
+
+        return when (event) {
             is UiEvent.ShowToast -> {
                 val now = System.currentTimeMillis()
-                if (now - lastUiEventToastTime < TOAST_THROTTLE_MS) {
+                if (now - lastUiEventToastTime >= TOAST_THROTTLE_MS) {
+                    lastUiEventToastTime = now
+                    showToastSafe(getString(event.messageResId), Toast.LENGTH_LONG)
+                } else {
                     if (BuildConfig.DEBUG) {
                         Timber.d("UiEvent toast throttled: ${getString(event.messageResId)}")
                     }
-                    return
                 }
-                lastUiEventToastTime = now
-
-                showToastSafe(getString(event.messageResId), Toast.LENGTH_LONG)
+                true
             }
 
             is UiEvent.ShowToastFromString -> {
                 val now = System.currentTimeMillis()
-                if (now - lastUiEventToastTime < TOAST_THROTTLE_MS) {
+                if (now - lastUiEventToastTime >= TOAST_THROTTLE_MS) {
+                    lastUiEventToastTime = now
+                    showToastSafe(event.message, Toast.LENGTH_LONG)
+                } else {
                     if (BuildConfig.DEBUG) {
                         Timber.d("UiEvent toast throttled: ${event.message}")
                     }
-                    return
                 }
-                lastUiEventToastTime = now
-
-                showToastSafe(event.message, Toast.LENGTH_LONG)
+                true
             }
 
             is UiEvent.NavigateUp -> {
@@ -111,12 +113,16 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 } catch (e: Exception) {
                     Timber.e(e, "Error finishing activity")   // auch als Toast
                 }
+                true
             }
 
             else -> {
+                // Dieses Event ist nicht generisch. Gib false zurück,
+                // damit es von handleSpecificEvent behandelt werden kann.
                 if (BuildConfig.DEBUG) {
                     Timber.d("Event not handled in BaseActivity: $event")
                 }
+                false
             }
         }
     }
