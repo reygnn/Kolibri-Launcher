@@ -80,6 +80,11 @@ abstract class BaseViewModel<E>(
             }
             else -> {
                 Timber.e(throwable, "[$context] Error in ViewModel")
+
+                viewModelScope.launch {
+                    @Suppress("UNCHECKED_CAST")
+                    sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
+                }
             }
         }
     }
