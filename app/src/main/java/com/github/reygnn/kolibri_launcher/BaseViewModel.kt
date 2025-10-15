@@ -5,17 +5,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
-
-interface BaseViewModelInterface<E> {
-    val eventFlow: SharedFlow<E>
-}
 
 /**
  * Base ViewModel with built-in error handling and event management.
@@ -26,7 +20,7 @@ abstract class BaseViewModel<E>(
 
     // Event channel for one-time UI events
     private val _event = MutableSharedFlow<E>()
-    override val eventFlow: SharedFlow<E> = _event.asSharedFlow()
+    override val event: SharedFlow<E> = _event.asSharedFlow()
 
     protected suspend fun sendEvent(event: E) {
         try {

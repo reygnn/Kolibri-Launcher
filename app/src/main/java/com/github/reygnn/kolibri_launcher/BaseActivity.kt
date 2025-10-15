@@ -51,7 +51,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 // Job 2: ViewModel events
                 launch {
                     try {
-                        viewModel.eventFlow.collect { event -> // `event` ist hier vom Typ `E`
+                        viewModel.event.collect { event ->
                             try {
                                 Timber.d("BaseActivity received event: $event")
                                 // Wir versuchen zuerst, das Event als allgemeines UiEvent zu behandeln.

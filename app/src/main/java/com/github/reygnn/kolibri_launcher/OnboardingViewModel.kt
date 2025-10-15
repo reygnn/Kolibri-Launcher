@@ -57,7 +57,7 @@ class OnboardingViewModel @Inject constructor(
     private var isInitialized = false
 
     // Helper function to send OnboardingEvents safely
-    private suspend fun sendOnboardingEvent(event: OnboardingEvent) {
+    private fun sendOnboardingEvent(event: OnboardingEvent) {
         launchSafe {
             sendEvent(event)
         }
