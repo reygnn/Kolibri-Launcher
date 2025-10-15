@@ -105,6 +105,7 @@ class AppNamesViewModelTest {
             override fun getInstalledApps() = flow<List<AppInfo>> {
                 throw IOException("Cannot load apps")
             }
+            override suspend fun triggerAppsUpdate() {}
             override fun purgeRepository() {}
         }
 
@@ -127,6 +128,7 @@ class AppNamesViewModelTest {
             override fun getInstalledApps() = flow<List<AppInfo>> {
                 throw RuntimeException("Database corrupted")
             }
+            override suspend fun triggerAppsUpdate() {}
             override fun purgeRepository() {}
         }
 
@@ -232,6 +234,7 @@ class AppNamesViewModelTest {
     fun `init - with empty app list - creates empty state`() = runTest {
         val emptyRepository = object : InstalledAppsRepository {
             override fun getInstalledApps() = flow { emit(emptyList<AppInfo>()) }
+            override suspend fun triggerAppsUpdate() {}
             override fun purgeRepository() {}
         }
 
@@ -324,7 +327,7 @@ class FakeInstalledAppsRepository(
         return appFlow
     }
 
-    suspend fun triggerAppsUpdate() {
+    override suspend fun triggerAppsUpdate() {
         val processedList = rawApps.map { app ->
             val displayName = appNamesRepository.getDisplayNameForPackage(app.packageName, app.originalName)
             app.copy(displayName = displayName)

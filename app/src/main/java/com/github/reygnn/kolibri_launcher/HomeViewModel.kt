@@ -270,7 +270,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshInstalledApps() = launchSafe {
-        (installedAppsManager as? InstalledAppsManager)?.triggerAppsUpdate()
+        installedAppsManager.triggerAppsUpdate()
     }
 
     fun refreshDynamicUiData() {

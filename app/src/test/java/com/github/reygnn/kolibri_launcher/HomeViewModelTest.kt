@@ -200,25 +200,26 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `onAppClicked - emits LaunchApp event and records usage`() = runTest {
+    fun `onAppClicked - emits LaunchApp event, records usage AND refreshes app list directly`() = runTest {
+        // Arrange
         setupViewModel()
         advanceUntilIdle()
 
+        // Act & Assert
         viewModel.event.test {
             viewModel.onAppClicked(app1)
 
-            val launchEvent = awaitItem()
+                val launchEvent = awaitItem()
             assertTrue(launchEvent is UiEvent.LaunchApp)
             assertEquals(app1, (launchEvent as UiEvent.LaunchApp).app)
 
+            expectNoEvents()
+
             advanceUntilIdle()
-
-            // The ViewModel also emits RefreshAppDrawer
-            val refreshEvent = awaitItem()
-            assertTrue(refreshEvent is UiEvent.RefreshAppDrawer)
-
-            verify(appUsageManager).recordPackageLaunch(app1.packageName)
         }
+
+        verify(installedAppsManager).triggerAppsUpdate()
+        verify(appUsageManager).recordPackageLaunch(app1.packageName)
     }
 
     @Test

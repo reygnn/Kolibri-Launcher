@@ -66,7 +66,7 @@ class InstalledAppsManager @Inject constructor(
     /**
      * Löst eine manuelle Aktualisierung der App-Liste aus.
      */
-    suspend fun triggerAppsUpdate() {
+    override suspend fun triggerAppsUpdate() {
         try {
             Timber.d("App update triggered.")
             Timber.d("[DATAFLOW] 2. Update triggered in InstalledAppsManager.")

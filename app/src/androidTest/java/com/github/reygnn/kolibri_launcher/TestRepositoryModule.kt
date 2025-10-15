@@ -173,7 +173,7 @@ data class FavoriteAppsResult(val apps: List<AppInfo>, val isFallback: Boolean)
 class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
     val appsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
     override fun getInstalledApps(): Flow<List<AppInfo>> = appsFlow
-
+    override suspend fun triggerAppsUpdate() {}
     override fun purgeRepository() {
         appsFlow.value = emptyList()
     }
