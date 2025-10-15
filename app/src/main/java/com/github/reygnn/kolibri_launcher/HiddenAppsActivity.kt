@@ -45,7 +45,7 @@ import timber.log.Timber
  * at the business logic layer (Single Responsibility Principle).
  */
 @AndroidEntryPoint
-class HiddenAppsActivity : BaseActivity<HiddenAppsViewModel>() {
+class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
 
     // CRASH-SAFE: Nullable binding mit safe getter
     private var _binding: ActivityOnboardingBinding? = null
@@ -256,5 +256,14 @@ class HiddenAppsActivity : BaseActivity<HiddenAppsViewModel>() {
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error updating selection chips")
         }
+    }
+
+    /**
+     * Implements the abstract method from BaseActivity.
+     * This screen's ViewModel only uses generic UiEvents (like ShowToast), which are already
+     * handled in the BaseActivity. Therefore, this method can remain empty.
+     */
+    override fun handleSpecificEvent(event: UiEvent) {
+        // No app-specific events are sent from AppNamesViewModel, so this is intentionally empty.
     }
 }

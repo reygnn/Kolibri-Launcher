@@ -57,7 +57,7 @@ import javax.inject.Inject
  * - State restoration protection
  */
 @AndroidEntryPoint
-class MainActivity : BaseActivity<HomeViewModel>() {
+class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
     override val viewModel: HomeViewModel by viewModels()
 
@@ -284,13 +284,14 @@ class MainActivity : BaseActivity<HomeViewModel>() {
         }
     }
 
-    override fun handleUiEvent(event: UiEvent) {
+    override fun handleSpecificEvent(event: UiEvent) {
         if (BuildConfig.DEBUG) {
-            Timber.d("[MAIN] handleUiEvent called with: ${event.javaClass.simpleName}")
+            Timber.d("[MAIN] handleSpecificEvent called with: ${event.javaClass.simpleName}")
         }
 
         try {
             when (event) {
+                // --- Die spezifische Logik für MainActivity ---
                 is UiEvent.ShowAppDrawer -> {
                     if (navController?.currentDestination?.id == R.id.homeFragment) {
                         try {
@@ -336,12 +337,14 @@ class MainActivity : BaseActivity<HomeViewModel>() {
 
                 is UiEvent.LaunchApp -> {
                     if (BuildConfig.DEBUG) {
-                        val isInDrawer = navController?.currentDestination?.id == R.id.appDrawerFragment
+                        val isInDrawer =
+                            navController?.currentDestination?.id == R.id.appDrawerFragment
                         Timber.d("[MAIN] Processing LaunchApp for: ${event.app.displayName}, inDrawer: $isInDrawer")
                     }
 
                     try {
-                        val isInDrawer = navController?.currentDestination?.id == R.id.appDrawerFragment
+                        val isInDrawer =
+                            navController?.currentDestination?.id == R.id.appDrawerFragment
 
                         if (isInDrawer) {
                             try {
@@ -364,15 +367,15 @@ class MainActivity : BaseActivity<HomeViewModel>() {
                     showAccessibilityDialog()
                 }
 
-                else -> {
-                    if (BuildConfig.DEBUG) {
-                        Timber.d("[MAIN] Passing event to super: ${event.javaClass.simpleName}")
-                    }
-                    super.handleUiEvent(event)
+                is UiEvent.ShowToast,
+                is UiEvent.ShowToastFromString,
+                is UiEvent.NavigateUp,
+                is UiEvent.RefreshAppDrawer -> {
+                    // Hier ist absichtlich nichts zu tun.
                 }
             }
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "[MAIN] Error in handleUiEvent")
+            TimberWrapper.silentError(e, "[MAIN] Error in handleSpecificEvent")
         }
     }
 

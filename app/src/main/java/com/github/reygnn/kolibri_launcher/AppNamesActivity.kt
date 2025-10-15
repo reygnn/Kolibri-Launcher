@@ -39,7 +39,7 @@ import timber.log.Timber
  * - Safe dialog handling
  */
 @AndroidEntryPoint
-class AppNamesActivity : BaseActivity<AppNamesViewModel>() {
+class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
 
     // CRASH-SAFE: Nullable binding
     private var _binding: ActivityAppNamesBinding? = null
@@ -70,7 +70,7 @@ class AppNamesActivity : BaseActivity<AppNamesViewModel>() {
             setupRecyclerView()
             setupSearchListener()
             setupClickListeners()
-            observeViewModel()
+            observeViewModelState()
 
             // Search Query wiederherstellen
             savedInstanceState?.getString(STATE_SEARCH_QUERY)?.let { query ->
@@ -81,6 +81,10 @@ class AppNamesActivity : BaseActivity<AppNamesViewModel>() {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
         }
+    }
+
+    internal fun initialize() {
+        // Aktuell leer, aber vorhanden für Konsistenz und zukünftige Lade-Logik.
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -183,7 +187,7 @@ class AppNamesActivity : BaseActivity<AppNamesViewModel>() {
         }
     }
 
-    private fun observeViewModel() {
+    private fun observeViewModelState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
@@ -331,5 +335,14 @@ class AppNamesActivity : BaseActivity<AppNamesViewModel>() {
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error showing toast")
         }
+    }
+
+    /**
+     * Implements the abstract method from BaseActivity.
+     * This screen's ViewModel only uses generic UiEvents (like ShowToast), which are already
+     * handled in the BaseActivity. Therefore, this method can remain empty.
+     */
+    override fun handleSpecificEvent(event: UiEvent) {
+        // No app-specific events are sent from AppNamesViewModel, so this is intentionally empty.
     }
 }

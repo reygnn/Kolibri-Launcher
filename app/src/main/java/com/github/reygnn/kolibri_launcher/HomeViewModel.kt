@@ -62,7 +62,7 @@ class HomeViewModel @Inject constructor(
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel(mainDispatcher) {
+) : BaseViewModel<UiEvent>(mainDispatcher) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -226,7 +226,7 @@ class HomeViewModel @Inject constructor(
                 sendEvent(UiEvent.LaunchApp(app))
 
                 appUsageManager.recordPackageLaunch(app.packageName)
-                sendEvent(UiEvent.RefreshAppDrawer)
+                refreshInstalledApps()
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error handling app click for ${app.packageName}")
                 sendEvent(UiEvent.ShowToast(R.string.error_launching_app))

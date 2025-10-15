@@ -125,7 +125,7 @@ class HomeViewModelTest {
 
         setupViewModel()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -139,7 +139,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onFlingUp()
 
             val event = awaitItem()
@@ -152,7 +152,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onLongPress()
 
             val event = awaitItem()
@@ -165,7 +165,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onTimeDoubleClick()
 
             val event = awaitItem()
@@ -178,7 +178,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDateDoubleClick()
 
             val event = awaitItem()
@@ -191,7 +191,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onBatteryDoubleClick()
 
             val event = awaitItem()
@@ -204,7 +204,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onAppClicked(app1)
 
             val launchEvent = awaitItem()
@@ -229,7 +229,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onToggleFavorite(app1, 0)
 
             advanceUntilIdle()
@@ -248,7 +248,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onToggleFavorite(app1, 5)
 
             advanceUntilIdle()
@@ -265,7 +265,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onToggleFavorite(app1, AppConstants.MAX_FAVORITES_ON_HOME)
 
             val event = awaitItem()
@@ -281,7 +281,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onHideApp(app1)
 
             advanceUntilIdle()
@@ -299,7 +299,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onShowApp(app1)
 
             advanceUntilIdle()
@@ -315,7 +315,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onResetAppUsage(app1)
 
             advanceUntilIdle()
@@ -361,7 +361,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDoubleTapToLock()
             advanceUntilIdle()
 
@@ -377,7 +377,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDoubleTapToLock()
             advanceUntilIdle()
 
@@ -558,7 +558,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onAppClicked(app1)
             advanceUntilIdle()
 
@@ -582,7 +582,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onToggleFavorite(app1, 0)
 
             val event = awaitItem()
@@ -599,7 +599,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onHideApp(app1)
 
             val event = awaitItem()
@@ -616,7 +616,7 @@ class HomeViewModelTest {
             throw IOException("Cannot show")
         }
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onShowApp(app1)
 
             val event = awaitItem()
@@ -682,7 +682,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onAppInfoError()
 
             val event = awaitItem()
@@ -696,7 +696,7 @@ class HomeViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onFavoriteAppsError("Test error message")
 
             val event = awaitItem()

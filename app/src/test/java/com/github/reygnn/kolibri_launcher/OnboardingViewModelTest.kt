@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -20,7 +19,6 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -101,7 +99,8 @@ class OnboardingViewModelTest {
     @Test
     fun `onDoneClicked - in INITIAL_SETUP mode - saves components and sets onboarding completed`() = runTest {
         setupViewModel()
-        viewModel.initialize(LaunchMode.INITIAL_SETUP)
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         viewModel.onAppToggled(testApps[0])
@@ -118,7 +117,8 @@ class OnboardingViewModelTest {
     fun `onDoneClicked - in EDIT_FAVORITES mode - only saves components`() = runTest {
         whenever(favoritesRepository.favoriteComponentsFlow).thenReturn(flowOf(emptySet()))
         setupViewModel()
-        viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         viewModel.onAppToggled(testApps[2])
@@ -221,7 +221,8 @@ class OnboardingViewModelTest {
         })
 
         setupViewModel()
-        viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         // Sollte nicht crashen
@@ -256,7 +257,8 @@ class OnboardingViewModelTest {
         }
 
         setupViewModel()
-        viewModel.initialize(LaunchMode.INITIAL_SETUP)
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         viewModel.onAppToggled(testApps[0])
@@ -320,10 +322,12 @@ class OnboardingViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.initialize(LaunchMode.INITIAL_SETUP)
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
-        viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         // Should not crash
@@ -388,7 +392,8 @@ class OnboardingViewModelTest {
         whenever(favoritesRepository.favoriteComponentsFlow).thenReturn(flowOf(existingFavorites))
 
         setupViewModel()
-        viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
@@ -403,7 +408,8 @@ class OnboardingViewModelTest {
         whenever(favoritesRepository.favoriteComponentsFlow).thenReturn(flowOf(existingFavorites))
 
         setupViewModel()
-        viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        viewModel.loadInitialData()
         advanceUntilIdle()
 
         // Remove the only favorite

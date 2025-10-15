@@ -155,30 +155,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 }
             }
         }
-
-        // Observer 4: Events
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                try {
-                    viewModel.eventFlow.collect { event ->
-                        if (_binding == null || !isAdded) return@collect
-
-                        try {
-                            if (event is UiEvent.RefreshAppDrawer) {
-                                Timber.d("Received refresh signal. Reloading apps.")
-                                viewModel.refreshInstalledApps()
-                            }
-                        } catch (e: Exception) {
-                            TimberWrapper.silentError(e, "Error handling event")
-                        }
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error in eventFlow collection")
-                }
-            }
-        }
     }
 
     private fun setupFragmentResultListener() {

@@ -140,7 +140,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         // Assert
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
@@ -165,7 +165,7 @@ class HiddenAppsViewModelTest {
 
         setupViewModel()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.initialize()
             advanceUntilIdle()
 
@@ -185,7 +185,7 @@ class HiddenAppsViewModelTest {
 
         setupViewModel()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.initialize()
             advanceUntilIdle()
 
@@ -205,7 +205,7 @@ class HiddenAppsViewModelTest {
 
         setupViewModel()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.initialize()
             advanceUntilIdle()
 
@@ -234,7 +234,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         // Assert
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
@@ -326,7 +326,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         // Assert
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             // 1. Lauschen ist aktiv.
 
             // 2. Aktion auslösen.
@@ -431,7 +431,7 @@ class HiddenAppsViewModelTest {
         viewModel.onAppToggled(app1)
         advanceUntilIdle()
 
-        viewModel.eventFlow.test {
+        viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 

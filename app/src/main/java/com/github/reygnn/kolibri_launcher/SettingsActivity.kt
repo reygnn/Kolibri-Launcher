@@ -11,7 +11,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
 @AndroidEntryPoint
-class SettingsActivity : BaseActivity<SettingsViewModel>() {
+class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
 
     override val viewModel: SettingsViewModel by viewModels()
 
@@ -34,6 +34,10 @@ class SettingsActivity : BaseActivity<SettingsViewModel>() {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
         }
+    }
+
+    internal fun initialize() {
+        // Aktuell leer, aber vorhanden für Konsistenz und zukünftige Lade-Logik.
     }
 
     override fun onDestroy() {
@@ -133,5 +137,14 @@ class SettingsActivity : BaseActivity<SettingsViewModel>() {
             TimberWrapper.silentError(e, "Error in onOptionsItemSelected")
             false
         }
+    }
+
+    /**
+     * Implements the abstract method from BaseActivity.
+     * This screen's ViewModel only uses generic UiEvents (like ShowToast), which are already
+     * handled in the BaseActivity. Therefore, this method can remain empty.
+     */
+    override fun handleSpecificEvent(event: UiEvent) {
+        // No app-specific events are sent from AppNamesViewModel, so this is intentionally empty.
     }
 }

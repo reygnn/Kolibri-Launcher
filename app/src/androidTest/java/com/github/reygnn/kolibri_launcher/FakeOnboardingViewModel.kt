@@ -2,9 +2,8 @@
 
 package com.github.reygnn.kolibri_launcher
 
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
@@ -12,17 +11,12 @@ import javax.inject.Inject
  * A fake implementation of OnboardingViewModelInterface for instrumented tests.
  * This class provides full control over the state and events to the test.
  */
-class FakeOnboardingViewModel @Inject constructor() : OnboardingViewModelInterface {
-
-    // --- Kontrollierbare Zustände und Events ---
+class FakeOnboardingViewModel @Inject constructor() :
+    BaseViewModel<OnboardingEvent>(Dispatchers.Unconfined),
+    OnboardingViewModelInterface {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     override val uiState: StateFlow<OnboardingUiState> = _uiState
-
-    private val _event = MutableSharedFlow<OnboardingEvent>()
-    override val event: SharedFlow<OnboardingEvent> = _event
-
-    // --- Flags zur Verifikation von Aufrufen ---
 
     var onDoneClickedCallCount = 0
         private set
@@ -35,8 +29,10 @@ class FakeOnboardingViewModel @Inject constructor() : OnboardingViewModelInterfa
     }
 
     /** Von Tests verwendet, um ein Event zu senden. */
-    suspend fun sendEvent(newEvent: OnboardingEvent) {
-        _event.emit(newEvent)
+    fun sendEventForTest(newEvent: OnboardingEvent) {
+        launchSafe {
+            sendEvent(newEvent)
+        }
     }
 
     // --- Implementierung der Interface-Methoden ---
@@ -58,7 +54,7 @@ class FakeOnboardingViewModel @Inject constructor() : OnboardingViewModelInterfa
     }
 
     override fun onDoneClicked() {
-        // Merke dir nur, dass die Methode aufgerufen wurde.
+        // Merke nur, dass die Methode aufgerufen wurde.
         onDoneClickedCallCount++
     }
 }

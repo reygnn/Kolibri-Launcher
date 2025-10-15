@@ -23,7 +23,7 @@ class HiddenAppsViewModel @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
     private val visibilityRepository: AppVisibilityRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel(mainDispatcher) {
+) : BaseViewModel<UiEvent>(mainDispatcher) {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -77,7 +77,6 @@ class HiddenAppsViewModel @Inject constructor(
                 TimberWrapper.silentError(e, "Error in combine block")
             }
         }
-        // initialize()
     }
 
     /**

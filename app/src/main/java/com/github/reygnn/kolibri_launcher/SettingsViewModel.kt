@@ -21,7 +21,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel(mainDispatcher) {
+) : BaseViewModel<UiEvent>(mainDispatcher) {
 
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps.asStateFlow()

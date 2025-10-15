@@ -37,7 +37,7 @@ class AppNamesViewModel @Inject constructor(
     private val appNamesManager: AppNamesRepository,
     private val installedAppsManager: InstalledAppsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel(mainDispatcher) {
+) : BaseViewModel<UiEvent>(mainDispatcher) {
 
     private var masterAppList: List<AppInfo> = emptyList()
 

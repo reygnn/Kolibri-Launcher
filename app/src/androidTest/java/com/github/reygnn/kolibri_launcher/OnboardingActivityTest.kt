@@ -88,7 +88,8 @@ class OnboardingActivityTest : BaseAndroidTest() {
         // Act
         val scenario = launchActivityWithMode(LaunchMode.EDIT_FAVORITES)
         scenario.onActivity { activity ->
-            (activity as OnboardingActivity).viewModel.initialize(LaunchMode.EDIT_FAVORITES)
+            (activity as OnboardingActivity).viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            (activity as OnboardingActivity).viewModel.loadInitialData()
         }
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
