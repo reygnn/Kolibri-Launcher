@@ -52,16 +52,23 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
     @Test
     fun searchField_filtersRecyclerViewCorrectly() = testCoroutineRule.runTestAndLaunchUI(TestCoroutineRule.Mode.SAFE) {
+        // Arrange
         launchFragmentInHiltContainer<AppDrawerFragment>()
         setDrawerAppsState(testApps)
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
         onView(withText("Alphabet")).check(matches(isDisplayed()))
 
+        // Act
         onView(withId(R.id.search_edit_text)).perform(typeText("Zebra"))
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         onView(withId(R.id.apps_recycler_view)).perform(EspressoTestUtils.waitForUiThread())
 
-        onView(allOf(withText("Zebra"), isDescendantOfA(withId(R.id.apps_recycler_view)))).check(matches(isDisplayed()))
+        // Assert
+        onView(withId(R.id.apps_recycler_view))
+            .check(EspressoTestUtils.RecyclerViewItemCountAssertion.withItemCount(1))
+
+        onView(allOf(withText("Zebra"), isDescendantOfA(withId(R.id.apps_recycler_view))))
+            .check(matches(isDisplayed()))
         onView(withText("Alphabet")).check(doesNotExist())
     }
 
