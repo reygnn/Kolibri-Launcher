@@ -42,7 +42,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                                 Timber.e(e, "Error handling error event")   // auch als Toast
                             }
                         }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
+                    } catch (e: CancellationException) {
                         throw e  // Re-throw
                     } catch (e: Exception) {
                         Timber.e(e, "Error collecting from ErrorEventBus")   // auch als Toast
