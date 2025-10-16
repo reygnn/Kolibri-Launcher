@@ -259,6 +259,8 @@ dependencies {
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency
     androidTestImplementation("androidx.test.ext:junit:$androidxTestJunitVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     androidTestImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
     androidTestImplementation("com.google.truth:truth:$truthVersion")
 
