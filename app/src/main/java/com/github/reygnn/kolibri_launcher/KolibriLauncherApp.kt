@@ -217,6 +217,24 @@ class KolibriLauncherApp : Application() {
      * Ein spezialisierter Timber.Tree, dessen EINZIGE Aufgabe es ist,
      * Fehler an ACRA weiterzuleiten. Die gesamte Logik ist hier gekapselt.
      */
+    /**
+     * A specialized Timber.Tree that forwards exceptions to ACRA and includes a
+     * diagnostic tool for improperly handled CancellationExceptions.
+     *
+     * THE PROBLEM:
+     * Kotlin's `CancellationException` is used for control flow and is not a "true" error.
+     * For performance reasons, it is often created WITHOUT a stack trace. This makes it
+     * impossible to find the location of a faulty `catch (e: Exception)` block that
+     * incorrectly logs it as an error.
+     *
+     * THE SOLUTION:
+     * This tree identifies when a `CancellationException` is being logged. It wraps the
+     * original exception inside a custom `UnhandledCancellationException`. Creating a new
+     * exception at this moment FORCES the JVM to generate a fresh stack trace, pointing
+     * directly to the problematic `catch` block.
+     *
+     * This turns a useless report (an exception with no trace) into an actionable one.
+     */
     private class AcraTree : Timber.Tree() {
 
         class UnhandledCancellationException(message: String, cause: Throwable) : RuntimeException(message, cause)
