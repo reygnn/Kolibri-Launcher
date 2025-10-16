@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +96,8 @@ class OnboardingViewModel @Inject constructor(
                 }.collect { newState ->
                     _uiState.value = newState
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Failed to load apps.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load apps. Please try again."))

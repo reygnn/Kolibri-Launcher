@@ -45,6 +45,8 @@ class SettingsViewModel @Inject constructor(
                         TimberWrapper.silentError(e, "Error updating installed apps")
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error observing apps")
                 sendEvent(UiEvent.ShowToast(R.string.error_loading_apps))

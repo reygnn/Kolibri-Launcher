@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,12 +68,14 @@ class HiddenAppsViewModel @Inject constructor(
                 }.collect { newState ->
                     try {
                         _uiState.value = newState
-                    } catch (e: kotlinx.coroutines.CancellationException) {
+                    } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         TimberWrapper.silentError(e, "Error updating UI state")
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error in combine block")
             }

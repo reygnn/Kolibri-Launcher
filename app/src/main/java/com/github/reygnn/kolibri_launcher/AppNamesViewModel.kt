@@ -10,6 +10,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,8 @@ class AppNamesViewModel @Inject constructor(
                         TimberWrapper.silentError(e, "Error processing app list")
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error loading apps")
                 _uiState.update { it.copy(isLoading = false) }
