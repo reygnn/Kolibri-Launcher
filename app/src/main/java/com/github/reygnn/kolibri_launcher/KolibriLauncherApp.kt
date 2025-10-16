@@ -9,7 +9,6 @@
 
 package com.github.reygnn.kolibri_launcher
 
-import android.R.attr.enabled
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -33,6 +32,7 @@ import org.acra.security.TLS
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.system.exitProcess
+
 
 
 
@@ -99,11 +99,11 @@ class KolibriLauncherApp : Application() {
                     return "Kolibri_$className"
                 }
             })
-
             Timber.plant(ToastErrorTree())   // Toasts nur in Debug
-        } else {
-            Timber.plant(ReleaseTree())
         }
+
+        // in DEBUG und RELEASE
+        Timber.plant(AcraTree())
 
         // Setup global exception handler (optional, da ACRA das übernimmt)
         if (BuildConfig.DEBUG) {
@@ -213,20 +213,47 @@ class KolibriLauncherApp : Application() {
         }
     }
 
-    private class ReleaseTree : Timber.Tree() {
+    /**
+     * Ein spezialisierter Timber.Tree, dessen EINZIGE Aufgabe es ist,
+     * Fehler an ACRA weiterzuleiten. Die gesamte Logik ist hier gekapselt.
+     */
+    private class AcraTree : Timber.Tree() {
+
+        class UnhandledCancellationException(message: String, cause: Throwable) : RuntimeException(message, cause)
+
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-            if (priority == Log.DEBUG || priority == Log.VERBOSE || priority == Log.INFO) {
+            // Wir senden nur Warnungen und Fehler mit einer Exception an ACRA
+            if (priority < Log.WARN || t == null) {
                 return
             }
 
-            // ACRA verwenden statt Firebase
-            if (t != null) {
-                // Exception an ACRA melden
-                ACRA.errorReporter.handleSilentException(t)
+            // Wenn es eine CancellationException ist, verpacken wir sie in unsere
+            // eigene, aussagekräftige Exception-Klasse, um einen Stack-Trace zu erzwingen.
+            if (t is java.util.concurrent.CancellationException) {
+                val diagnosticException = UnhandledCancellationException(
+                    "DIAGNOSIS: CancellationException was improperly caught as an error.", t
+                )
+                reportErrorToAcra(priority, tag, message, diagnosticException)
+            } else {
+                // Für alle anderen Fehler das normale Verhalten beibehalten.
+                reportErrorToAcra(priority, tag, message, t)
+            }
+        }
+
+        private fun reportErrorToAcra(priority: Int, tag: String?, message: String, t: Throwable) {
+            try {
+                // Zuerst die benutzerdefinierten Daten setzen
                 ACRA.errorReporter.putCustomData("log_priority", priority.toString())
                 ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
                 ACRA.errorReporter.putCustomData("log_message", message)
+
+                // Danach die Exception zur Verarbeitung übergeben
+                ACRA.errorReporter.handleSilentException(t)
+            } catch (e: Exception) {
+                // Failsafe, falls beim Melden an ACRA etwas schiefgeht
+                Log.e("AcraTree", "Failed to report exception to ACRA", e)
             }
         }
     }
+
 }
