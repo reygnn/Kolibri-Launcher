@@ -473,33 +473,31 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ENDGÜLTIGE VERSION - Basiert auf der einfachen Regel: Dunkel -> Hell / Hell -> Dunkel
     private fun calculateTonalShadowColor(baseColor: Int): Int {
         // Berechnet die wahrgenommene Helligkeit der Farbe (0.0 = schwarz, 1.0 = weiß)
         val luminance = ColorUtils.calculateLuminance(baseColor)
-        val threshold = 0.5f // Unsere klare Trennlinie zwischen "hell" und "dunkel"
+        val threshold = 0.5f // Schwellenwert zwischen hell und dunkel
 
         // IST DIE FARBE DUNKEL?
         return if (luminance < threshold) {
             // --- Ja, die Farbe ist dunkel -> wir brauchen einen HELLEN Schatten ---
             val hsl = FloatArray(3)
             ColorUtils.colorToHSL(baseColor, hsl)
-            // Helligkeit deutlich erhöhen, um einen sichtbaren Kontrast zu schaffen
-            hsl[2] = (hsl[2] + 0.5f).coerceIn(0.0f, 1.0f)
+            // Helligkeit stark erhöhen, mindestens auf 0.7 für besseren Kontrast
+            hsl[2] = (hsl[2] + 0.7f).coerceIn(0.7f, 1.0f) // Mindesthelligkeit 0.7
+            // Optional: Sättigung leicht reduzieren, um den Schatten neutraler zu machen
+            hsl[1] = (hsl[1] * 0.8f).coerceIn(0.0f, 1.0f)
             val lighterColor = ColorUtils.HSLToColor(hsl)
-            // Eine leichte Transparenz hinzufügen, damit es wie ein Schatten wirkt
+            // Höhere Deckkraft für bessere Sichtbarkeit
             Color.argb(
-                128, // 50% Deckkraft
+                192, // 75% Deckkraft
                 Color.red(lighterColor),
                 Color.green(lighterColor),
                 Color.blue(lighterColor)
             )
-        }
-        // IST DIE FARBE HELL?
-        else {
+        } else {
             // --- Nein, die Farbe ist hell -> wir brauchen einen DUNKLEN Schatten ---
-            // Halb-transparentes Schwarz ist hier die robusteste und am besten
-            // sichtbare Lösung für JEDE helle Farbe.
+            // Halb-transparentes Schwarz bleibt robust
             Color.argb(128, 0, 0, 0)
         }
     }
