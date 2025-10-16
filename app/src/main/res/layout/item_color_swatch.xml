@@ -16,15 +16,14 @@
         app:strokeWidth="2dp"
         app:strokeColor="@android:color/transparent">
 
-        <TextView
-            android:id="@+id/auto_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <ImageView
+            android:id="@+id/auto_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:layout_gravity="center"
-            android:text="@string/auto_color_initial"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:visibility="gone" />
+            android:src="@drawable/ic_auto_mode"
+            android:visibility="gone"
+            app:tint="?attr/colorOnSurfaceVariant" />
 
     </com.google.android.material.card.MaterialCardView>
 

@@ -76,16 +76,13 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         colors.distinct().forEach { color ->
             val swatchBinding = ItemColorSwatchBinding.inflate(inflater, binding.colorPaletteContainer, false)
             val cardView = swatchBinding.colorSwatchCard
-            // GEÄNDERT: von autoIcon zu autoText
-            val autoText = swatchBinding.autoText
+            val autoIcon = swatchBinding.autoIcon
 
             if (color == 0) { // Spezialfall "Automatisch"
-                // GEÄNDERT: TextView sichtbar machen
-                autoText.isVisible = true
+                autoIcon.isVisible = true
                 cardView.setCardBackgroundColor(requireContext().getColor(R.color.material_dynamic_neutral90))
             } else {
-                // GEÄNDERT: TextView unsichtbar machen
-                autoText.isVisible = false
+                autoIcon.isVisible = false
                 cardView.setCardBackgroundColor(color)
             }
 

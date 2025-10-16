@@ -208,5 +208,4 @@
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
 
-    <string name="auto_color_initial" translatable="false">A</string>
 </resources>
