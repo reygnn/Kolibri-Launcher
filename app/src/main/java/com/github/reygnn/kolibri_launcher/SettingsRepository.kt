@@ -14,4 +14,10 @@ interface SettingsRepository : Purgeable {
 
     val onboardingCompletedFlow: Flow<Boolean>
     suspend fun setOnboardingCompleted()
+
+    val textShadowEnabledFlow: Flow<Boolean>
+    suspend fun setTextShadowEnabled(isEnabled: Boolean)
+
+    val textColorFlow: Flow<Int>
+    suspend fun setTextColor(color: Int)
 }

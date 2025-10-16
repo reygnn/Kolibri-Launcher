@@ -16,6 +16,7 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.os.BatteryManager
 import android.text.format.DateFormat
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,7 +58,7 @@ class HomeViewModel @Inject constructor(
     private val getDrawerAppsUseCase: GetDrawerAppsUseCaseRepository,
     @param:ApplicationContext private val context: Context,
     private val favoritesManager: FavoritesRepository,
-    private val settingsManager: SettingsRepository,
+    val settingsManager: SettingsRepository,
     private val appUsageManager: AppUsageRepository,
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: AppVisibilityRepository,
@@ -87,6 +88,7 @@ class HomeViewModel @Inject constructor(
     init {
         updateTimeAndDate()
         getInitialBatteryState()
+        updateUiColors()
 
         // NUR starten wenn NICHT im Test-Modus
         if (!isInTestMode) {
@@ -122,7 +124,7 @@ class HomeViewModel @Inject constructor(
     }
     fun onLongPress() {
         launchSafe {
-            sendEvent(UiEvent.ShowSettings)
+            sendEvent(UiEvent.ShowCustomizationOptions)
         }
     }
     fun onTimeDoubleClick() {
@@ -283,6 +285,16 @@ class HomeViewModel @Inject constructor(
         refreshInstalledApps()
     }
 
+    fun onSetTextColor(color: Int) = launchSafe {
+        settingsManager.setTextColor(color)
+        updateUiColors()
+    }
+
+    fun onSetTextShadowEnabled(isEnabled: Boolean) = launchSafe {
+        settingsManager.setTextShadowEnabled(isEnabled)
+        updateUiColors()
+    }
+
     // --- PRIVATE/INTERNAL LOGIC ---
 
     private fun listenForAppUpdates() = launchSafe {
@@ -398,32 +410,59 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun updateUiColorsFromWallpaper(wallpaperColors: WallpaperColors?) {
+    fun updateUiColors(wallpaperColors: WallpaperColors? = null) {
         launchSafe {
             try {
-                val readabilityMode = settingsManager.readabilityModeFlow.first()
-                val colorPair = when (readabilityMode) {
-                    "smart_contrast" -> {
-                        val textColor = if (wallpaperColors != null &&
-                            (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0)
-                            Color.BLACK else Color.WHITE
-                        Pair(textColor, if (textColor == Color.WHITE) Color.BLACK else Color.WHITE)
+                // 1. Gespeicherte User-Einstellungen abrufen
+                val userSelectedColor = settingsManager.textColorFlow.first()
+                val isShadowEnabled = settingsManager.textShadowEnabledFlow.first()
+
+                // 2. Textfarbe bestimmen
+                val finalTextColor = if (userSelectedColor != 0) {
+                    // Der User hat eine feste Farbe gewählt
+                    userSelectedColor
+                } else {
+                    // Automatische Farberkennung (deine alte Logik als Fallback)
+                    val readabilityMode = settingsManager.readabilityModeFlow.first()
+                    when (readabilityMode) {
+                        "smart_contrast" -> {
+                            if (wallpaperColors != null &&
+                                (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0)
+                                Color.BLACK else Color.WHITE
+                        }
+                        "adaptive_colors" -> {
+                            wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
+                        }
+                        else -> Color.WHITE
                     }
-                    "adaptive_colors" -> {
-                        val textColor = wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
-                        Pair(textColor, if (Color.luminance(textColor) < 0.5) Color.WHITE else Color.BLACK)
-                    }
-                    else -> Pair(Color.WHITE, Color.BLACK)
                 }
-                _uiColorsState.value = UiColorsState(
-                    textColor = colorPair.first,
-                    shadowColor = colorPair.second
-                )
+
+                // 3. Schattenfarbe bestimmen
+                val finalShadowColor = if (isShadowEnabled) {
+                    // Material-3-konformer Schatten: Eine dunklere Version der Textfarbe
+                    calculateTonalShadowColor(finalTextColor)
+                } else {
+                    // Schatten ist aus
+                    Color.TRANSPARENT
+                }
+
+                // 4. Den UI-State für das Fragment aktualisieren
+                _uiColorsState.update {
+                    it.copy(textColor = finalTextColor, shadowColor = finalShadowColor)
+                }
             } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error getting optimal text color.")
-                _uiColorsState.value = UiColorsState()
+                TimberWrapper.silentError(e, "Error updating UI colors from settings.")
+                _uiColorsState.value = UiColorsState() // Sicherer Fallback
             }
         }
+    }
+
+    private fun calculateTonalShadowColor(baseColor: Int): Int {
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(baseColor, hsl)
+        // Luminanz (Helligkeit) um 20% reduzieren, aber nicht komplett schwarz machen
+        hsl[2] = (hsl[2] * 0.8f).coerceIn(0.0f, 1.0f)
+        return ColorUtils.HSLToColor(hsl)
     }
 
 }

@@ -15,6 +15,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,8 @@ class SettingsManager @Inject constructor(
         val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
         val READABILITY_MODE = stringPreferencesKey("text_readability_mode")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
+        val TEXT_COLOR = intPreferencesKey("text_color")
     }
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data
@@ -142,6 +145,57 @@ class SettingsManager @Inject constructor(
             throw e
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error setting onboarding completed")
+        }
+    }
+
+    override val textShadowEnabledFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading TextShadowEnabled preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            // Standardmäßig ist der Schatten aktiviert
+            preferences[PreferenceKeys.TEXT_SHADOW_ENABLED] ?: true
+        }
+
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.TEXT_SHADOW_ENABLED] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting text shadow enabled: $isEnabled")
+        }
+    }
+
+    override val textColorFlow: Flow<Int> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading TextColor preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.TEXT_COLOR] ?: 0
+        }
+
+    override suspend fun setTextColor(color: Int) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.TEXT_COLOR] = color
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting text color: $color")
         }
     }
 

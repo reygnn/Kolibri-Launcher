@@ -190,14 +190,15 @@
     &lt;b>For more details, please see our &lt;a href="https://docs.kolibri-launcher.ch/privacy.html">Privacy Policy&lt;/a>.&lt;/b>
 </string>
 
-  
+    <string name="customize_title">Customize</string>
+    <string name="customize_colors_and_shadow">Colors &amp; Shadow</string>
+    <string name="more_settings">More Settings</string>
+    <string name="text_shadow">Text Shadow</string>
+    <string name="text_color">Text Color</string>
+    <string name="color_automatic">Automatic</string>
 
-  
-
-  
     <string name="error_launching_app">Unable to open app. Please try again.</string>
-  
-  
+
     <string name="category_privacy_title">Privacy</string>
     <string name="crash_report_setting_title">Send crash reports</string>
     <string name="crash_report_setting_summary">Anonymized error reports to improve the app</string>
@@ -207,4 +208,5 @@
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
 
+    <string name="auto_color_initial" translatable="false">A</string>
 </resources>

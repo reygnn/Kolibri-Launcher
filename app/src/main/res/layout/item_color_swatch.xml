@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="56dp"
+    android:layout_height="56dp"
+    android:padding="8dp"
+    android:clipToPadding="false">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/color_swatch_card"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="2dp"
+        app:strokeWidth="2dp"
+        app:strokeColor="@android:color/transparent">
+
+        <TextView
+            android:id="@+id/auto_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/auto_color_initial"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

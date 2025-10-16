@@ -18,4 +18,6 @@ sealed class UiEvent {
     object ShowAccessibilityDialog : UiEvent()
     data class LaunchApp(val app: AppInfo) : UiEvent()
     object RefreshAppDrawer : UiEvent()
+    data object ShowCustomizationOptions : UiEvent()
+    data object ShowColorPickerDialog : UiEvent()
 }

@@ -316,6 +316,14 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                     }
                 }
 
+                is UiEvent.ShowCustomizationOptions -> {
+                    showCustomizationOptionsDialog()
+                }
+
+                is UiEvent.ShowColorPickerDialog -> {
+                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                }
+
                 is UiEvent.OpenClock -> {
                     startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
                 }
@@ -433,6 +441,35 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         }
     }
 
+    private fun showCustomizationOptionsDialog() {
+        try {
+            val options = arrayOf(
+                getString(R.string.customize_colors_and_shadow),
+                getString(R.string.more_settings)
+            )
+
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.customize_title))
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                        1 -> {
+                            try {
+                                val intent = Intent(this, SettingsActivity::class.java)
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                TimberWrapper.silentError(e, "[MAIN] Error starting settings")
+                            }
+                        }
+                    }
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error showing customization options dialog")
+        }
+    }
+
     private fun startActivitySafely(intent: Intent, fallbackIntent: Intent? = null) {
         try {
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -455,8 +492,15 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
     }
 
     private fun updateWallpaperColors() {
-        val wallpaperManager = WallpaperManager.getInstance(this)
-        val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-        viewModel.updateUiColorsFromWallpaper(colors)
+        try {
+            val wallpaperManager = WallpaperManager.getInstance(this)
+            val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            // Ruft die neue, universelle Update-Funktion im ViewModel auf
+            viewModel.updateUiColors(colors)
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error updating wallpaper colors")
+            // Fallback, falls etwas schiefgeht
+            viewModel.updateUiColors()
+        }
     }
 }

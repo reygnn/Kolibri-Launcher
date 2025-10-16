@@ -186,7 +186,12 @@
     &lt;b>Weitere Details findest du in unserer &lt;a href="https://docs.kolibri-launcher.ch/datenschutz.html">Datenschutzerklärung&lt;/a>.&lt;/b>
 </string>
 
-  
+    <string name="customize_title">Anpassen</string>
+    <string name="customize_colors_and_shadow">Farben &amp; Schatten</string>
+    <string name="more_settings">Weitere Einstellungen</string>
+    <string name="text_shadow">Textschatten</string>
+    <string name="text_color">Textfarbe</string>
+    <string name="color_automatic">Automatisch</string>
 
     <string name="error_launching_app">App kann nicht geöffnet werden. Bitte versuchen Sie es erneut.</string>
 
