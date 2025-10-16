@@ -122,21 +122,25 @@ class HomeViewModel @Inject constructor(
             sendEvent(UiEvent.ShowAppDrawer)
         }
     }
+
     fun onLongPress() {
         launchSafe {
             sendEvent(UiEvent.ShowCustomizationOptions)
         }
     }
+
     fun onTimeDoubleClick() {
         launchSafe {
             sendEvent(UiEvent.OpenClock)
         }
     }
+
     fun onDateDoubleClick() {
         launchSafe {
             sendEvent(UiEvent.OpenCalendar)
         }
     }
+
     fun onBatteryDoubleClick() {
         launchSafe {
             sendEvent(UiEvent.OpenBatterySettings)
@@ -168,7 +172,8 @@ class HomeViewModel @Inject constructor(
         launchSafe {
             try {
                 if (!favoritesManager.isFavoriteComponent(app.componentName) &&
-                    currentFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME) {
+                    currentFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME
+                ) {
                     val message = context.getString(
                         R.string.favorites_limit_reached,
                         AppConstants.MAX_FAVORITES_ON_HOME
@@ -184,9 +189,11 @@ class HomeViewModel @Inject constructor(
                     R.string.app_removed_from_favorites
                 }
 
-                sendEvent(UiEvent.ShowToastFromString(
-                    context.getString(messageResId, app.displayName)
-                ))
+                sendEvent(
+                    UiEvent.ShowToastFromString(
+                        context.getString(messageResId, app.displayName)
+                    )
+                )
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error toggling favorite")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -198,9 +205,11 @@ class HomeViewModel @Inject constructor(
         launchSafe {
             try {
                 appVisibilityManager.hideComponent(app.componentName)
-                sendEvent(UiEvent.ShowToastFromString(
-                    context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
-                ))
+                sendEvent(
+                    UiEvent.ShowToastFromString(
+                        context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
+                    )
+                )
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error hiding app")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -212,9 +221,11 @@ class HomeViewModel @Inject constructor(
         launchSafe {
             try {
                 resetAppUsage(app)
-                sendEvent(UiEvent.ShowToastFromString(
-                    context.getString(R.string.usage_data_reset_success, app.displayName)
-                ))
+                sendEvent(
+                    UiEvent.ShowToastFromString(
+                        context.getString(R.string.usage_data_reset_success, app.displayName)
+                    )
+                )
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error resetting usage data")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -240,9 +251,11 @@ class HomeViewModel @Inject constructor(
         launchSafe {
             try {
                 appVisibilityManager.showComponent(app.componentName)
-                sendEvent(UiEvent.ShowToastFromString(
-                    context.getString(R.string.app_now_visible_in_drawer, app.displayName)
-                ))
+                sendEvent(
+                    UiEvent.ShowToastFromString(
+                        context.getString(R.string.app_now_visible_in_drawer, app.displayName)
+                    )
+                )
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Failed to show app")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -427,12 +440,15 @@ class HomeViewModel @Inject constructor(
                     when (readabilityMode) {
                         "smart_contrast" -> {
                             if (wallpaperColors != null &&
-                                (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0)
+                                (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+                            )
                                 Color.BLACK else Color.WHITE
                         }
+
                         "adaptive_colors" -> {
                             wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
                         }
+
                         else -> Color.WHITE
                     }
                 }
@@ -457,12 +473,34 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // ENDGÜLTIGE VERSION - Basiert auf der einfachen Regel: Dunkel -> Hell / Hell -> Dunkel
     private fun calculateTonalShadowColor(baseColor: Int): Int {
-        val hsl = FloatArray(3)
-        ColorUtils.colorToHSL(baseColor, hsl)
-        // Luminanz (Helligkeit) um 20% reduzieren, aber nicht komplett schwarz machen
-        hsl[2] = (hsl[2] * 0.8f).coerceIn(0.0f, 1.0f)
-        return ColorUtils.HSLToColor(hsl)
-    }
+        // Berechnet die wahrgenommene Helligkeit der Farbe (0.0 = schwarz, 1.0 = weiß)
+        val luminance = ColorUtils.calculateLuminance(baseColor)
+        val threshold = 0.5f // Unsere klare Trennlinie zwischen "hell" und "dunkel"
 
+        // IST DIE FARBE DUNKEL?
+        return if (luminance < threshold) {
+            // --- Ja, die Farbe ist dunkel -> wir brauchen einen HELLEN Schatten ---
+            val hsl = FloatArray(3)
+            ColorUtils.colorToHSL(baseColor, hsl)
+            // Helligkeit deutlich erhöhen, um einen sichtbaren Kontrast zu schaffen
+            hsl[2] = (hsl[2] + 0.5f).coerceIn(0.0f, 1.0f)
+            val lighterColor = ColorUtils.HSLToColor(hsl)
+            // Eine leichte Transparenz hinzufügen, damit es wie ein Schatten wirkt
+            Color.argb(
+                128, // 50% Deckkraft
+                Color.red(lighterColor),
+                Color.green(lighterColor),
+                Color.blue(lighterColor)
+            )
+        }
+        // IST DIE FARBE HELL?
+        else {
+            // --- Nein, die Farbe ist hell -> wir brauchen einen DUNKLEN Schatten ---
+            // Halb-transparentes Schwarz ist hier die robusteste und am besten
+            // sichtbare Lösung für JEDE helle Farbe.
+            Color.argb(128, 0, 0, 0)
+        }
+    }
 }

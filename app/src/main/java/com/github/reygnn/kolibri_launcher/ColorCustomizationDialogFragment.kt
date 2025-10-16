@@ -39,6 +39,15 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         return binding.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.let { window ->
+            val displayMetrics = resources.displayMetrics
+            val width = (displayMetrics.widthPixels * 0.90).toInt()
+            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupShadowSwitch()
@@ -100,7 +109,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     }
 
     private fun updateSelectedColorUI(selectedColor: Int) {
-        val selectedColorValue = ColorStateList.valueOf(requireContext().getColor(R.color.colorPrimary))
+        val selectedColorValue = ColorStateList.valueOf(requireContext().getColor(R.color.color_primary))
         val deselectedColorValue = ColorStateList.valueOf(Color.TRANSPARENT)
 
         colorSwatchViews.forEach { (color, cardView) ->

@@ -259,13 +259,27 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
     override val doubleTapToLockEnabledFlow = MutableStateFlow(false)
     override val readabilityModeFlow = MutableStateFlow("smart_contrast")
     override val onboardingCompletedFlow = MutableStateFlow(false)
+    override val textShadowEnabledFlow = MutableStateFlow(true)
+    override val textColorFlow = MutableStateFlow(0)
+
     override suspend fun setSortOrder(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTapToLockEnabledFlow.value = isEnabled }
     override suspend fun setReadabilityMode(mode: String) { readabilityModeFlow.value = mode }
     override suspend fun setOnboardingCompleted() { onboardingCompletedFlow.value = true }
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) { textShadowEnabledFlow.value = isEnabled }
+    override suspend fun setTextColor(color: Int) { textColorFlow.value = color }
+
     fun setReadabilityModeBlocking(mode: String) { readabilityModeFlow.value = mode }
     fun setSortOrderBlocking(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
-    override fun purgeRepository() { sortOrderFlow.value = SortOrder.ALPHABETICAL; doubleTapToLockEnabledFlow.value = false; readabilityModeFlow.value = "smart_contrast"; onboardingCompletedFlow.value = false }
+    override fun purgeRepository() {
+        sortOrderFlow.value = SortOrder.ALPHABETICAL
+        doubleTapToLockEnabledFlow.value = false
+        readabilityModeFlow.value = "smart_contrast"
+        onboardingCompletedFlow.value = false
+        textShadowEnabledFlow.value = true
+        textColorFlow.value = 0
+    }
+
 }
 
 class FakeAppUsageRepository : AppUsageRepository, Purgeable {
