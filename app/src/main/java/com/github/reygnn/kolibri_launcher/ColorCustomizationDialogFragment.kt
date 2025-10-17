@@ -1,12 +1,14 @@
 package com.github.reygnn.kolibri_launcher
 
+import android.annotation.SuppressLint
 import android.app.WallpaperManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.view.View
+import android.view.*
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ImageView
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
@@ -42,9 +44,17 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.let { window ->
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)   // nicht dimmen.
+
+            window.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+
             val displayMetrics = resources.displayMetrics
             val width = (displayMetrics.widthPixels * 0.90).toInt()
             window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+            val params = window.attributes
+            params.y = 100
+            window.attributes = params
         }
     }
 
@@ -53,15 +63,45 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         setupShadowSwitch()
         setupColorPalette()
         observeColorChanges()
+        setupDragListener()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupDragListener() {
+        val dragHandle = binding.dragHandle
+        val window = dialog?.window ?: return
+
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+
+        dragHandle.setOnTouchListener { v, event ->
+            val layoutParams = window.attributes
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = layoutParams.x
+                    initialY = layoutParams.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
+                    layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
+                    window.attributes = layoutParams
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupShadowSwitch() {
         viewLifecycleOwner.lifecycleScope.launch {
-            // Den Switch auf den aktuell gespeicherten Wert setzen
             val isEnabled = viewModel.settingsManager.textShadowEnabledFlow.first()
             binding.switchShadow.isChecked = isEnabled
 
-            // Bei Änderungen direkt das ViewModel informieren
             binding.switchShadow.setOnCheckedChangeListener { _, isChecked ->
                 viewModel.onSetTextShadowEnabled(isChecked)
             }

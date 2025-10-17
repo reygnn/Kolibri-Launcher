@@ -4,24 +4,44 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="?attr/colorSurfaceContainer">
+    android:background="?attr/colorSurfaceContainer"
+    android:paddingBottom="24dp">
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switch_shadow"
+    <View
+        android:id="@+id/drag_handle"
+        android:layout_width="48dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="12dp"
+        android:background="?attr/colorOnSurfaceVariant"
+        android:alpha="0.4"
+        android:clickable="true"
+        android:focusable="true"/>
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/text_shadow"
-        android:textSize="16sp" />
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:layout_marginBottom="8dp"
-        android:text="@string/text_color"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="16sp" />
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_shadow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/text_shadow"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/text_color"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp" />
+            
+    </LinearLayout>
 
     <HorizontalScrollView
         android:layout_width="match_parent"
@@ -33,8 +53,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:paddingHorizontal="24dp"
             android:paddingTop="8dp"
-            android:paddingBottom="8dp"/>
+            android:paddingBottom="8dp"
+            android:clipToPadding="false"/>
+            
     </HorizontalScrollView>
 
 </LinearLayout>
