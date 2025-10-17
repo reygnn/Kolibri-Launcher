@@ -473,37 +473,53 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-/*    private fun calculateTonalShadowColor(baseColor: Int): Int {
+    private fun calculateTonalShadowColor(baseColor: Int): Int {
         // Berechnet die wahrgenommene Helligkeit der Farbe (0.0 = schwarz, 1.0 = weiß)
         val luminance = ColorUtils.calculateLuminance(baseColor)
-        val threshold = 0.5f // Unsere klare Trennlinie zwischen "hell" und "dunkel"
 
-        // IST DIE FARBE DUNKEL?
-        return if (luminance < threshold) {
-            // --- Ja, die Farbe ist dunkel -> wir brauchen einen HELLEN Schatten ---
-            val hsl = FloatArray(3)
-            ColorUtils.colorToHSL(baseColor, hsl)
-            // Helligkeit deutlich erhöhen, um einen sichtbaren Kontrast zu schaffen
-            hsl[2] = (hsl[2] + 0.5f).coerceIn(0.0f, 1.0f)
-            val lighterColor = ColorUtils.HSLToColor(hsl)
-            // Eine leichte Transparenz hinzufügen, damit es wie ein Schatten wirkt
-            Color.argb(
-                128, // 50% Deckkraft
-                Color.red(lighterColor),
-                Color.green(lighterColor),
-                Color.blue(lighterColor)
-            )
+        // Helper-Funktion für lineare Interpolation (Lerp), direkt in der Funktion
+        fun lerp(start: Float, stop: Float, fraction: Float): Float {
+            return start + fraction * (stop - start)
         }
-        // IST DIE FARBE HELL?
-        else {
-            // --- Nein, die Farbe ist hell -> wir brauchen einen DUNKLEN Schatten ---
-            // Halb-transparentes Schwarz ist hier die robusteste und am besten
-            // sichtbare Lösung für JEDE helle Farbe.
-            Color.argb(128, 0, 0, 0)
-        }
-    }*/
 
-    private fun calculateTonalShadowColor(baseColor: Int): Int {
+        return when {
+            // --- SEHR DUNKEL (z.B. Schwarz, dunkles Navy) ---
+            // Starker, leuchtender weißer Schatten für maximalen Kontrast.
+            luminance < 0.1f -> {
+                Color.argb(204, 255, 255, 255) // 80% weiß
+            }
+
+            // --- DUNKEL (z.B. dunkles Grau, gedämpfte Farben) ---
+            // Heller Schatten, dessen Deckkraft abnimmt, je heller der Hintergrund wird.
+            luminance < 0.5f -> {
+                // Normalisiert die Luminanz im Bereich [0.1, 0.5] auf einen Wert von [0, 1]
+                val fraction = ((luminance - 0.1f) / (0.4f)).toFloat()
+                // Die Deckkraft ist bei 0.1 Luminanz am höchsten (ca. 75%) und bei 0.5 am niedrigsten (ca. 40%)
+                val alpha = lerp(0.75f, 0.4f, fraction)
+
+                Color.argb((alpha * 255).toInt(), 255, 255, 255)
+            }
+
+            // --- HELL (z.B. helles Grau, Pastellfarben) ---
+            // Dunkler Schatten, dessen Deckkraft zunimmt, je heller der Hintergrund wird.
+            luminance < 0.9f -> {
+                // Normalisiert die Luminanz im Bereich [0.5, 0.9] auf einen Wert von [0, 1]
+                val fraction = ((luminance - 0.5f) / (0.4f)).toFloat()
+                // Die Deckkraft ist bei 0.5 Luminanz am niedrigsten (ca. 30%) und bei 0.9 am höchsten (ca. 60%)
+                val alpha = lerp(0.3f, 0.6f, fraction)
+
+                Color.argb((alpha * 255).toInt(), 0, 0, 0)
+            }
+
+            // --- SEHR HELL (z.B. Weiß, helles Gelb) ---
+            // Klarer, dunkler Schatten für beste Lesbarkeit.
+            else -> {
+                Color.argb(153, 0, 0, 0) // 60% schwarz
+            }
+        }
+    }
+
+/*    private fun calculateTonalShadowColor(baseColor: Int): Int {
         // Berechnet die wahrgenommene Helligkeit der Farbe (0.0 = schwarz, 1.0 = weiß)
         val luminance = ColorUtils.calculateLuminance(baseColor)
         val threshold = 0.5f // Schwellenwert zwischen hell und dunkel
@@ -529,46 +545,6 @@ class HomeViewModel @Inject constructor(
             // --- Nein, die Farbe ist hell -> wir brauchen einen DUNKLEN Schatten ---
             // Halb-transparentes Schwarz bleibt robust
             Color.argb(128, 0, 0, 0)
-        }
-    }
-
-/*    private fun calculateTonalShadowColor(baseColor: Int): Int {
-        // Berechnet die wahrgenommene Helligkeit der Farbe (0.0 = schwarz, 1.0 = weiß)
-        val luminance = ColorUtils.calculateLuminance(baseColor)
-        val threshold = 0.5f // Schwellenwert zwischen hell und dunkel
-        val minContrast = 4.5 // Mindest-Kontrastverhältnis (WCAG-Empfehlung)
-
-        // IST DIE FARBE DUNKEL?
-        if (luminance < threshold) {
-            // --- Ja, die Farbe ist dunkel -> wir brauchen einen HELLEN Schatten ---
-            val hsl = FloatArray(3)
-            ColorUtils.colorToHSL(baseColor, hsl)
-            // Initiale Helligkeit stark erhöhen, mindestens auf 0.7 für besseren Kontrast
-            hsl[2] = (hsl[2] + 0.7f).coerceIn(0.7f, 1.0f)
-            // Sättigung leicht reduzieren, um den Schatten neutraler zu machen
-            hsl[1] = (hsl[1] * 0.8f).coerceIn(0.0f, 1.0f)
-            var lighterColor = ColorUtils.HSLToColor(hsl)
-
-            // Kontrast prüfen
-            var contrast = ColorUtils.calculateContrast(lighterColor, baseColor)
-            // Falls der Kontrast zu niedrig ist, Helligkeit schrittweise erhöhen
-            while (contrast < minContrast && hsl[2] < 1.0f) {
-                hsl[2] = (hsl[2] + 0.05f).coerceIn(0.7f, 1.0f) // Inkrementelle Erhöhung
-                lighterColor = ColorUtils.HSLToColor(hsl)
-                contrast = ColorUtils.calculateContrast(lighterColor, baseColor)
-            }
-
-            // Schatten mit höherer Deckkraft für bessere Sichtbarkeit
-            return Color.argb(
-                192, // 75% Deckkraft
-                Color.red(lighterColor),
-                Color.green(lighterColor),
-                Color.blue(lighterColor)
-            )
-        } else {
-            // --- Nein, die Farbe ist hell -> wir brauchen einen DUNKLEN Schatten ---
-            // Halb-transparentes Schwarz bleibt robust
-            return Color.argb(128, 0, 0, 0)
         }
     }*/
 

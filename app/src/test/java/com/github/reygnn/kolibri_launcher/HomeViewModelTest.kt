@@ -148,7 +148,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `onLongPress - emits ShowSettings event`() = runTest {
+    fun `onLongPress - emits CustomizationOptions event`() = runTest {
         setupViewModel()
         advanceUntilIdle()
 
@@ -156,7 +156,7 @@ class HomeViewModelTest {
             viewModel.onLongPress()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowSettings)
+            assertTrue(event is UiEvent.ShowCustomizationOptions)
         }
     }
 
