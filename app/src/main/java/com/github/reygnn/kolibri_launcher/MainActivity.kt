@@ -36,6 +36,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -428,7 +429,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
     private fun showAccessibilityDialog() {
         try {
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.accessibility_service_title))
                 .setMessage(getString(R.string.accessibility_service_explanation))
                 .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
@@ -448,7 +449,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 getString(R.string.more_settings)
             )
 
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.customize_title))
                 .setItems(options) { _, which ->
                     when (which) {

@@ -2,71 +2,48 @@
 <resources>
     <!-- Base Theme für alle Activities - Android 16 native -->
     <style name="BaseAppTheme" parent="Theme.Material3.DynamicColors.DayNight">
-        <!-- Dynamic Colors + Edge-to-Edge automatisch in Android 16 -->
-        
-        <!-- Action Bar für normale Activities -->
         <item name="windowActionBar">true</item>
         <item name="windowNoTitle">false</item>
-        
-        <!-- Global Dialog Theme -->
         <item name="alertDialogTheme">@style/CustomAlertDialog</item>
     </style>
 
-    <!--
-        ==========================================================================
-        HIER KOMMEN UNSERE ÄNDERUNGEN HIN
-        ==========================================================================
-    -->
-    <!-- MainActivity Theme - Textbasierter Launcher -->
     <style name="AppTheme" parent="BaseAppTheme">
-        <!-- Launcher ohne ActionBar -->
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-
-        <!-- Edge-to-Edge für Android 14+ (bleibt wichtig) -->
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <!-- KORREKTUR: Tippfehler 'transparenat' zu 'transparent' korrigiert -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:enforceStatusBarContrast">false</item>
         
-        <!-- Dieses Attribut wird durch das Kotlin-Pendant in setupWindow() ersetzt/ergänzt -->
         <item name="android:windowAnimationStyle">@null</item>
     </style>
 
-    <!-- Settings Activity Theme -->
     <style name="SettingsTheme" parent="BaseAppTheme">
-        <!-- Standard ActionBar für Settings -->
     </style>
     
-    <!-- Splash Screen Theme -->
     <style name="SplashTheme" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">?attr/colorSurface</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/AppTheme</item>
     </style>
     
-    <!-- Material 3 AlertDialog -->
+    <!-- <item name="android:windowBackground">@drawable/dialog_background</item> -->
     <style name="CustomAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
-        <item name="android:windowBackground">@drawable/dialog_background</item>
         <item name="shapeAppearanceOverlay">@style/DialogShapeAppearance</item>
         <item name="buttonBarButtonStyle">@style/DialogButtonStyle</item>
     </style>
     
-    <!-- Dialog Shape -->
     <style name="DialogShapeAppearance">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">28dp</item>
     </style>
     
-    <!-- Dialog Buttons -->
     <style name="DialogButtonStyle" parent="Widget.Material3.Button.TextButton.Dialog">
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0.0125</item>
     </style>
     
-    <!-- Launcher UI Widgets -->
     <style name="LauncherAppIcon">
         <item name="android:layout_width">48dp</item>
         <item name="android:layout_height">48dp</item>
