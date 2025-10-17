@@ -46,7 +46,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         dialog?.window?.let { window ->
             window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)   // nicht dimmen.
-            window.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+            window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
 
             val displayMetrics = resources.displayMetrics
             val width = (displayMetrics.widthPixels * 0.90).toInt()
