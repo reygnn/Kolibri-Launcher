@@ -1,11 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string-array name="text_readability_entries">
-        <item>Smart Contrast (Recommended)</item>
-        <item>Adaptive Colors</item>
-    </string-array>
-    <string-array name="text_readability_values">
-        <item>smart_contrast</item>
-        <item>adaptive_colors</item>
-    </string-array>
 </resources>

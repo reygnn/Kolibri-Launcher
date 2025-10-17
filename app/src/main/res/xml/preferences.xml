@@ -44,16 +44,6 @@
             android:title="@string/change_wallpaper_title"
             android:summary="@string/change_wallpaper_summary"
             app:iconSpaceReserved="false" />
-
-        <!-- Textlesbarkeit-Einstellung -->
-        <ListPreference
-            android:key="text_readability_mode"
-            android:title="@string/text_readability_title"
-            android:summary="@string/text_readability_summary"
-            android:entries="@array/text_readability_entries"
-            android:entryValues="@array/text_readability_values"
-            android:defaultValue="smart_contrast"
-            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <!-- Gesten-Kategorie -->

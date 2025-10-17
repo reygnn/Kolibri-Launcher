@@ -100,10 +100,7 @@
     <string name="category_display_title">Anzeige</string>
     <string name="change_wallpaper_title">Wallpaper ändern</string>
     <string name="change_wallpaper_summary">System-Wallpaper Auswahl öffnen</string>
-    <string name="text_readability_title">Textlesbarkeit</string>
-    <string name="text_readability_summary">Optimierung für bessere Lesbarkeit auf dem Wallpaper</string>
 
-    <!-- NEU -->
     <string name="category_gestures_title">Gesten</string>
     <string name="double_tap_to_lock_title">Doppeltippen zum Sperren</string>
     <string name="double_tap_to_lock_summary">Sperrt den Bildschirm durch doppeltes Tippen auf einen leeren Bereich</string>

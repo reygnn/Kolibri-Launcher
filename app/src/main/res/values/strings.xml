@@ -102,8 +102,7 @@
     <string name="category_display_title">Display</string>
     <string name="change_wallpaper_title">Change Wallpaper</string>
     <string name="change_wallpaper_summary">Open the system wallpaper picker</string>
-    <string name="text_readability_title">Text Readability</string>
-    <string name="text_readability_summary">Optimize text for better visibility on wallpapers</string>
+
 
     <!-- NEW -->
     <string name="category_gestures_title">Gestures</string>

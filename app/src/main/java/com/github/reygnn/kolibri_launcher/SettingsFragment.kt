@@ -49,10 +49,6 @@ import com.google.android.material.R as MaterialR
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
 
-    companion object {
-        const val READABILITY_CHANGED_KEY = "readability_changed_key"
-    }
-
     private val viewModel: SettingsViewModel by viewModels({ requireActivity() })
 
     @Inject
@@ -69,9 +65,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         try {
             setPreferencesFromResource(R.xml.preferences, rootKey)
-
-            findPreference<ListPreference>("text_readability_mode")?.summaryProvider =
-                ListPreference.SimpleSummaryProvider.getInstance()
 
             setupPreferenceListeners()
         } catch (e: Exception) {
@@ -273,33 +266,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             TimberWrapper.silentError(e, "Error setting double tap listener")
         }
 
-        // Readability Mode
-        try {
-            val readabilityPreference = findPreference<ListPreference>("text_readability_mode")
-            readabilityPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    if (newValue is String) {
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            try {
-                                settingsManager.setReadabilityMode(newValue)
-                                setFragmentResult(READABILITY_CHANGED_KEY, bundleOf("changed" to true))
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error setting readability mode")
-                            }
-                        }
-                    }
-                    true
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error in readability preference change")
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting readability listener")
-        }
-
         // Crash Reports
         try {
             findPreference<Preference>("crash_reports")?.setOnPreferenceClickListener {
@@ -439,25 +405,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Exception) {
                         TimberWrapper.silentError(e, "Error in double tap flow collection")
-                    }
-                }
-
-                // Observer für Readability Setting
-                launch {
-                    try {
-                        settingsManager.readabilityModeFlow.collect { currentMode ->
-                            if (!isAdded || isDetached) return@collect
-
-                            try {
-                                findPreference<ListPreference>("text_readability_mode")?.value = currentMode
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error updating readability preference")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in readability flow collection")
                     }
                 }
             }
