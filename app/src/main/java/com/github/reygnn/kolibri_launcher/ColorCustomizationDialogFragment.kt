@@ -2,13 +2,16 @@ package com.github.reygnn.kolibri_launcher
 
 import android.annotation.SuppressLint
 import android.app.WallpaperManager
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.*
 import android.view.ViewGroup
 import android.view.WindowManager
+import androidx.annotation.AttrRes
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
@@ -158,7 +161,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     }
 
     // Sammelt alle Farben, die wir dem Nutzer anbieten wollen
-    private fun getAvailableColors(): List<Int> {
+/*    private fun getAvailableColors(): List<Int> {
         val wallpaperManager = WallpaperManager.getInstance(requireContext())
         val wallpaperColors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
 
@@ -184,5 +187,58 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         super.onDestroyView()
         _binding = null
         colorSwatchViews.clear()
+    }*/
+
+    private fun getAvailableColors(): List<Int> {
+        val colors = mutableListOf<Int>()
+
+        // 1. Automatisch (Reset-Button)
+        colors.add(0)
+
+        // 2. NEU: Die wichtigsten Material You-Farben aus dem aktuellen App-Theme auslesen
+        val themeColors = listOf(
+            // Primäre Farben (Hauptakzent)
+            R.attr.colorPrimary,
+            R.attr.colorPrimaryContainer,
+            R.attr.colorOnPrimary,
+            R.attr.colorOnPrimaryContainer,
+
+            // Sekundäre Farben
+            R.attr.colorSecondary,
+            R.attr.colorSecondaryContainer,
+            R.attr.colorOnSecondaryContainer,
+
+            // Tertiäre Farben
+            R.attr.colorTertiary,
+            R.attr.colorTertiaryContainer,
+            R.attr.colorOnTertiaryContainer,
+
+            // Oberflächenfarben (Hintergründe, Text)
+            R.attr.colorOnSurface,
+            R.attr.colorOnSurfaceVariant
+        )
+
+        // Jede Farbe aus der Liste der Attribute auflösen
+        themeColors.forEach { colorAttr ->
+            colors.add(getThemeColor(requireContext(), colorAttr))
+        }
+
+        // 3. Standardfarben bleiben als Fallback
+        colors.add(Color.WHITE)
+        colors.add(Color.BLACK)
+
+        // Duplikate entfernen und zurückgeben
+        return colors.distinct()
+    }
+
+    // Hilfsfunktion, um eine Farbe aus einem Theme-Attribut aufzulösen
+    private fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int {
+        val typedValue = TypedValue()
+        // theme.resolveAttribute gibt 'true' zurück, wenn das Attribut gefunden wurde
+        if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
+            return typedValue.data
+        }
+        // Fallback-Farbe, falls das Attribut nicht gefunden wird (sollte nicht passieren)
+        return Color.MAGENTA
     }
 }
