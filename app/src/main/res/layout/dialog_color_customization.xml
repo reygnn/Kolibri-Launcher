@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="?attr/colorSurfaceContainer"
-    android:paddingBottom="24dp">
+    android:background="@drawable/bottom_sheet_background"
 
+    android:paddingBottom="24dp">
     <View
         android:id="@+id/drag_handle"
         android:layout_width="48dp"

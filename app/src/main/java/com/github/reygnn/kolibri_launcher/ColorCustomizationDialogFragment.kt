@@ -9,7 +9,7 @@ import android.view.LayoutInflater
 import android.view.*
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.ImageView
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
@@ -44,8 +44,8 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.let { window ->
+            window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)   // nicht dimmen.
-
             window.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
 
             val displayMetrics = resources.displayMetrics
@@ -110,11 +110,10 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     private fun setupColorPalette() {
         val colors = getAvailableColors()
-        val inflater = LayoutInflater.from(requireContext())
+        val swatchBinding = ItemColorSwatchBinding.inflate(layoutInflater, binding.colorPaletteContainer, false)
 
-        // Für jede Farbe eine "Swatch"-View erstellen und zur Palette hinzufügen
         colors.distinct().forEach { color ->
-            val swatchBinding = ItemColorSwatchBinding.inflate(inflater, binding.colorPaletteContainer, false)
+            val swatchBinding = ItemColorSwatchBinding.inflate(layoutInflater, binding.colorPaletteContainer, false)
             val cardView = swatchBinding.colorSwatchCard
             val autoIcon = swatchBinding.autoIcon
 
