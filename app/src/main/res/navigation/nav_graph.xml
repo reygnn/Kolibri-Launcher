@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <!-- Ziel 1: Das HomeFragment -->
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.github.reygnn.kolibri_launcher.HomeFragment"
+        android:label="HomeFragment"
+        tools:layout="@layout/fragment_home" >
+
+        <!-- Aktion, um vom HomeFragment zum AppDrawerFragment zu navigieren -->
+        <action
+            android:id="@+id/action_homeFragment_to_appDrawerFragment"
+            app:destination="@id/appDrawerFragment"
+            app:enterAnim="@anim/slide_in_up"
+            app:exitAnim="@anim/fade_out"
+            app:popEnterAnim="@anim/fade_in"
+            app:popExitAnim="@anim/slide_out_down"/>
+    </fragment>
+
+    <!-- Ziel 2: Das AppDrawerFragment -->
+    <fragment
+        android:id="@+id/appDrawerFragment"
+        android:name="com.github.reygnn.kolibri_launcher.AppDrawerFragment"
+        android:label="AppDrawerFragment"
+        tools:layout="@layout/fragment_app_drawer" >
+
+        <!-- Aktion, um zurück zum HomeFragment zu navigieren -->
+        <action
+            android:id="@+id/action_appDrawerFragment_to_homeFragment"
+            app:destination="@id/homeFragment"
+            app:popUpTo="@id/homeFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+</navigation>

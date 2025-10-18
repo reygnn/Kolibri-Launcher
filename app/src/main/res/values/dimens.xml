@@ -1,0 +1,31 @@
+<resources>
+    <!-- =============================================================== -->
+    <!-- == GENERAL LAYOUT & SPACING                                  == -->
+    <!-- =============================================================== -->
+    <dimen name="layout_padding">24dp</dimen>
+    <dimen name="spacing_small">4dp</dimen>
+    <dimen name="spacing_medium">8dp</dimen>
+    <dimen name="spacing_large">16dp</dimen> <!-- Renamed fab_margin for general use -->
+    <dimen name="spacing_xlarge">48dp</dimen>
+
+    <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
+    <dimen name="touch_target_padding">6dp</dimen>
+
+
+    <!-- =============================================================== -->
+    <!-- == HOME FRAGMENT                                             == -->
+    <!-- =============================================================== -->
+    <!-- Text sizes -->
+    <dimen name="text_size_time">60sp</dimen>
+    <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
+    <dimen name="text_size_app_button">18sp</dimen>
+
+
+    <!-- =============================================================== -->
+    <!-- == APP DRAWER                                                == -->
+    <!-- =============================================================== -->
+    <dimen name="app_drawer_padding_top">@dimen/spacing_large</dimen>
+    <dimen name="app_drawer_padding_horizontal">@dimen/spacing_large</dimen>
+    <dimen name="app_drawer_padding_bottom">@dimen/spacing_large</dimen>
+
+</resources>

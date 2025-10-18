@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:zAdjustment="normal">
+    
+    <alpha
+        android:fromAlpha="@fraction/anim_alpha_semi_transparent"
+        android:toAlpha="@fraction/anim_alpha_opaque"
+        android:startOffset="@integer/anim_offset_app_close_enter"
+        android:duration="@integer/anim_duration_app_close_enter"
+        android:interpolator="@android:interpolator/fast_out_slow_in" />
+    
+    <scale
+        android:fromXScale="@fraction/anim_scale_launcher_zoom"
+        android:toXScale="@fraction/anim_scale_app_close_from"
+        android:fromYScale="@fraction/anim_scale_launcher_zoom"
+        android:toYScale="@fraction/anim_scale_app_close_from"
+        android:pivotX="@fraction/anim_pivot_center"
+        android:pivotY="@fraction/anim_pivot_center"
+        android:startOffset="@integer/anim_offset_app_close_enter"
+        android:duration="@integer/anim_duration_app_close_enter"
+        android:interpolator="@android:interpolator/fast_out_slow_in" />
+</set>

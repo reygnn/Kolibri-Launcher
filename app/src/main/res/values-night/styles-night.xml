@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- values-night/styles.xml - Minimal überschreibungen für Dark Mode -->
+    
+    <!-- AppTheme Dark Mode - nur System Bars anpassen -->
+    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+        <!-- System Bars für Dark Mode -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- FavoritesSortActivity Dark Mode -->
+    <style name="FavoritesSortTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
+        <!-- System Bars für Dark Mode -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Alle anderen Styles erben automatisch die richtige Dark Mode Behandlung -->
+</resources>

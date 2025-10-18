@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="false">
+
+    <ImageView
+        android:id="@+id/wallpaper_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="@string/wallpaper_background" />
+
+    <RelativeLayout
+        android:id="@+id/root_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="@dimen/layout_padding"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true">
+
+        <LinearLayout
+            android:id="@+id/time_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="@dimen/spacing_xlarge"
+            android:orientation="vertical"
+            android:gravity="start">
+
+            <TextView
+                android:id="@+id/time_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/time_placeholder"
+                android:textSize="@dimen/text_size_time"
+                android:textColor="@color/default_text_color"
+                android:fontFamily="sans-serif-light" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="@dimen/spacing_small">
+
+                <TextView
+                    android:id="@+id/date_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_placeholder"
+                    android:textSize="@dimen/text_size_secondary_info"
+                    android:textColor="@color/default_text_color"
+                    android:padding="@dimen/touch_target_padding" />
+
+                <TextView
+                    android:id="@+id/battery_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:textSize="@dimen/text_size_secondary_info"
+                    android:textColor="@color/default_text_color"
+                    android:padding="@dimen/touch_target_padding"
+                    android:layout_marginStart="@dimen/spacing_medium" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_below="@id/time_container"
+            android:layout_marginTop="@dimen/spacing_xlarge"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/favorite_apps_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="start" />
+        </ScrollView>
+    </RelativeLayout>
+</FrameLayout>

@@ -1,0 +1,28 @@
+Kolibri Launcher is a minimalist, open-source Android launcher designed for focus and speed, built for Android 16 and above.
+
+In a world of distracting, cluttered home screens, Kolibri Launcher offers a breath of fresh air. It provides a clean, beautiful, and distraction-free environment that puts your essential apps front and center.
+
+<b>Features:</b>
+- Minimalist home screen with time, date, battery, and favorite apps
+- Gesture navigation - swipe up for app drawer
+- App drawer with instant search
+- Smart sorting - alphabetical or by usage
+- Dynamic theming - colors adapt to your wallpaper
+- Hide apps you don't use often
+- Long-press for app shortcuts
+- Lightweight and fast
+
+<b>Technical Highlights:</b>
+- Built with 100% Kotlin
+- Modern MVVM architecture
+- Clean Architecture principles
+- Comprehensive test coverage
+- No ads, no tracking, fully open source
+- Requires Android 16+
+- Anonymous crash reporting via ACRA (opt-in, can be disabled)
+
+<b>Privacy:</b>
+Crash reporting is disabled by default. If you choose to enable it, only anonymous technical data (Android version, device model, stack trace) is collected to help improve the app. No personal information is ever collected or shared.
+
+Perfect for users who value simplicity, privacy, and performance on modern Android devices.
+

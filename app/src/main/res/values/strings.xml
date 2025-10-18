@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Kolibri Launcher</string>
+    
+    <!-- Search -->
+    <string name="search_hint">Search apps…</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+
+    <!-- App Actions -->
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="app_added_to_favorites">Added %s to favorites</string>
+    <string name="app_removed_from_favorites">Removed %s from favorites</string>
+
+    <!-- General -->
+    <string name="cancel">Cancel</string>
+
+    <!-- Content Description -->
+    <string name="wallpaper_background">Background wallpaper</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Allows Kolibri-Launcher to lock your screen</string>
+
+    <!-- HomeFragment Error Messages -->
+
+    <!-- Double Tap Actions -->
+    <string name="error_no_calendar_app">No calendar app found</string>
+
+    <!-- App Renaming Strings -->
+    <string name="rename_app">Rename app</string>
+    <string name="restore_original_name">Restore original name</string>
+    <string name="new_app_name_hint">New app name</string>
+
+    <!-- Favorites Sorting Strings -->
+    <string name="sort_favorites_title">Sort favorites</string>
+    <string name="sort_favorites_subtitle">Drag apps to reorder</string>
+    <string name="sort_alphabetically_button">Sort A-Z</string>
+    <string name="reset_order_button">Reset order</string>
+    <string name="favorites_sorted_alphabetically">Favorites sorted alphabetically</string>
+    <string name="favorites_order_reset">Order reset to original</string>
+    <string name="no_favorites_to_sort">No favorites available to sort</string>
+
+    <!-- General Strings for new features -->
+    <string name="done">Done</string>
+    <string name="rename">Rename</string>
+
+    <!-- Error Messages for Settings -->
+    <string name="error_app_info_open">App info could not be opened</string>
+    <string name="error_accessibility_settings_open">Accessibility settings could not be opened</string>
+
+    <!-- Hidden Apps Dialog -->
+    <string name="hidden_apps_title">Hidden Apps</string>
+
+    <!-- App Info -->
+    <string name="app_info">App info</string>
+
+    <!-- Sort Favorites -->
+    <string name="sort_favorites">Sort favorites</string>
+
+    <!-- FavoritesSortFragment Strings -->
+    <string name="favorites_sort_title">Sort favorites</string>
+    <string name="error_saving_order">Error saving order</string>
+
+    <!-- AppDrawerFragment specific error messages -->
+
+    <!-- Rename dialog -->
+    <string name="rename_app_title">Rename %s</string>
+
+    <!-- System Wallpaper Picker -->
+    <string name="wallpaper_picker_title">Choose Wallpaper</string>
+    <string name="wallpaper_settings_fallback">Wallpaper settings opened</string>
+    <string name="error_wallpaper_settings_open">Error opening wallpaper settings</string>
+
+    <!-- For Accessibility Service Dialog in ScreenLockManager -->
+    <string name="accessibility_service_title">Permission Required</string>
+    <string name="accessibility_service_explanation">To lock the screen, Kolibri Launcher needs you to enable its Accessibility Service. This service is used exclusively for the screen lock function and does not collect any data.</string>
+    <string name="go_to_settings">Go to Settings</string>
+
+    <string name="time_placeholder" translatable="false">12:34</string>
+    <string name="date_placeholder">Loading date…</string>
+
+    <string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
+
+    <string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>
+
+    <string name="sort_apps">Sort apps</string>
+
+    <string name="unhide_app_in_drawer">Show in app drawer</string>
+    <string name="hide_app_from_drawer">Hide from app drawer</string>
+    <string name="app_now_hidden_in_drawer">%1$s is now hidden from the app drawer</string>
+    <string name="app_now_visible_in_drawer">%1$s will now be shown in the app drawer</string>
+
+
+    <!-- Preference Titles & Summaries -->
+    <string name="category_apps_title">Apps</string>
+    <string name="sort_favorites_summary">Change the order of your favorite apps</string>
+    <string name="hidden_apps_summary">Manage your hidden applications</string>
+
+    <string name="category_display_title">Display</string>
+    <string name="change_wallpaper_title">Change Wallpaper</string>
+    <string name="change_wallpaper_summary">Open the system wallpaper picker</string>
+
+
+    <!-- NEW -->
+    <string name="category_gestures_title">Gestures</string>
+    <string name="double_tap_to_lock_title">Double Tap to Lock</string>
+    <string name="double_tap_to_lock_summary">Lock the screen by double tapping an empty space</string>
+
+    <string name="category_system_title">System</string>
+    <string name="accessibility_title">Accessibility</string>
+    <string name="accessibility_summary">Open accessibility settings</string>
+    <string name="app_info_title">App Information</string>
+    <string name="app_info_summary">Launcher settings and permissions</string>
+
+    <string name="welcome_toast_fallback_favorites">Welcome! Choose favorites in app drawer. Until then, we\'ll show suggested apps.</string>
+
+    <string name="toast_enable_double_tap_to_lock">Double tap to lock is disabled. Please enable it in settings.</string>
+
+    <string name="action_reset_sorting">Reset sorting</string>
+    <string name="usage_data_reset_success">Sorting for %1$s reset</string>
+
+    <string name="set_default_launcher_title">Set Default Launcher</string>
+    <string name="set_default_launcher_summary">Select this app as your default home app</string>
+    <string name="error_default_launcher_settings_open">Error opening launcher settings.</string>
+    <string name="default_launcher_is_set">This launcher is already set as default</string>
+
+    <string name="onboarding_title_welcome">Welcome!</string>
+    <string name="onboarding_subtitle_welcome">Select your favorite apps for the home screen.</string>
+    <string name="onboarding_title_edit_favorites">Edit Favorites</string>
+    <string name="onboarding_subtitle_edit_favorites">Select the apps you want on your home screen.</string>
+
+    <string name="settings_select_favorites_title">Select Favorites</string>
+    <string name="settings_select_favorites_summary">Quickly select all your favorite apps at once</string>
+
+    <string name="hidden_apps_title_screen">Manage Hidden Apps</string>
+    <string name="hidden_apps_subtitle_screen">Select the apps you want to hide from the app drawer.</string>
+
+    <string name="custom_app_names_title">Custom App Names</string>
+    <string name="custom_app_names_summary">Rename apps or remove custom names</string>
+    <string name="rename_hint">Enter new name</string>
+    <string name="error_name_too_long">Name cannot be longer than %d characters</string>
+
+    <!-- For the AppNamesActivity screen -->
+    <string name="custom_app_names_subtitle">Edit or remove your custom app names here.</string>
+    <string name="rename_dialog_title">Rename \"%s\"</string>
+    <string name="save">Save</string>
+
+    <string name="error_loading_hidden_apps">Error loading hidden apps.</string>
+    <string name="error_saving_hidden_apps">Error saving hidden apps.</string>
+    <!-- Generic string for clock, calendar etc. -->
+
+    <string name="error_activity_not_found">Could not find an app to open this.</string>
+	
+	<string name="error_generic">Something went wrong. Please try again.</string>
+	<string name="error_starting_intent">Error starting intent: %1$s</string>
+    <string name="error_fallback_intent_failed">Fallback intent also failed</string>
+    <string name="error_app_not_available">App is no longer available</string>
+    <string name="error_loading_apps">Failed to load apps</string>
+    <string name="crash_dialog_title">App Crashed</string>
+    <string name="crash_dialog_text">Would you like to send a crash report to help us improve the app?</string>
+    <string name="crash_dialog_send">Send</string>
+    <string name="crash_dialog_cancel">Cancel</string>
+
+    <string name="crash_report_dialog_title">Improve App Stability</string>
+    <string name="crash_report_button_accept">Yes, help</string>
+    <string name="crash_report_button_decline">No, thanks</string>
+    
+    
+    
+<string name="crash_report_dialog_message">
+    Help us make the app better!
+    &lt;br>&lt;br>
+    When the app crashes, we can send anonymized technical data:
+    &lt;br>
+    &#8226; Device model and Android version&lt;br>
+    &#8226; App version&lt;br>
+    &#8226; Error log (stack trace)
+    &lt;br>&lt;br>
+    What we &lt;b>DO NOT&lt;/b> collect:
+    &lt;br>
+    &#8226; No personal data&lt;br>
+    &#8226; No location or usage data
+    &lt;br>&lt;br>
+    The data is encrypted and stored on a server in Germany.
+    &lt;br>&lt;br>
+    &lt;b>For more details, please see our &lt;a href="https://docs.kolibri-launcher.ch/privacy.html">Privacy Policy&lt;/a>.&lt;/b>
+</string>
+
+    <string name="customize_title">Customize</string>
+    <string name="customize_colors_and_shadow">Colors &amp; Shadow</string>
+    <string name="more_settings">More Settings</string>
+    <string name="text_shadow">Text Shadow</string>
+    <string name="text_color">Text Color</string>
+    <string name="color_automatic">Automatic</string>
+
+    <string name="error_launching_app">Unable to open app. Please try again.</string>
+
+    <string name="category_privacy_title">Privacy</string>
+    <string name="crash_report_setting_title">Send crash reports</string>
+    <string name="crash_report_setting_summary">Anonymized error reports to improve the app</string>
+    <string name="crash_report_summary_enabled">Enabled. Thank you for helping improve the app!</string>
+    <string name="crash_report_summary_disabled">Disabled. Tap to change your choice.</string>
+
+    <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
+    <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
+
+</resources>

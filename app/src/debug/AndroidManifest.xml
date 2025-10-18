@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+
+        <!-- für Hilt-Tests -->
+        <activity
+            android:name=".HiltTestActivity"
+            android:exported="true" />
+
+        <!-- für Monkeys Test -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.MONKEY" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

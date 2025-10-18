@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Scale Values -->
+    <fraction name="anim_scale_app_open_from">85%</fraction>
+    <fraction name="anim_scale_app_open_to">100%</fraction>
+    <fraction name="anim_scale_app_close_from">100%</fraction>
+    <fraction name="anim_scale_app_close_to">85%</fraction>
+    <fraction name="anim_scale_launcher_zoom">105%</fraction>
+    
+    <!-- Alpha Values -->
+    <fraction name="anim_alpha_transparent">0%</fraction>
+    <fraction name="anim_alpha_semi_transparent">30%</fraction>
+    <fraction name="anim_alpha_mostly_transparent">80%</fraction>
+    <fraction name="anim_alpha_opaque">100%</fraction>
+    <fraction name="anim_alpha_subtle">95%</fraction>
+    
+    <!-- Pivot Points -->
+    <fraction name="anim_pivot_center">50%</fraction>
+</resources>

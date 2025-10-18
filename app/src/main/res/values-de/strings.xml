@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Kolibri Launcher</string>
+    
+    <!-- Suche -->
+    <string name="search_hint">Apps suchen…</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+
+    <!-- App Actions -->
+    <string name="add_to_favorites">Zu Favoriten hinzufügen</string>
+    <string name="remove_from_favorites">Aus Favoriten entfernen</string>
+    <string name="app_added_to_favorites">%s zu Favoriten hinzugefügt</string>
+    <string name="app_removed_from_favorites">%s aus Favoriten entfernt</string>
+
+    <!-- General -->
+    <string name="cancel">Abbrechen</string>
+
+    <!-- Content Description -->
+    <string name="wallpaper_background">Hintergrundbild</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Ermöglicht Kolibri-Launcher die Bildschirmsperre</string>
+
+    <!-- HomeFragment Error Messages -->
+
+    <!-- Double Tap Actions -->
+    <string name="error_no_calendar_app">Keine Kalender-App gefunden</string>
+
+    <!-- App Renaming Strings -->
+    <string name="rename_app">App umbenennen</string>
+    <string name="restore_original_name">Originalnamen wiederherstellen</string>
+    <string name="new_app_name_hint">Neuer App-Name</string>
+
+    <!-- Favorites Sorting Strings -->
+    <string name="sort_favorites_title">Favoriten sortieren</string>
+    <string name="sort_favorites_subtitle">Apps zum Sortieren ziehen</string>
+    <string name="sort_alphabetically_button">A-Z sortieren</string>
+    <string name="reset_order_button">Reihenfolge zurücksetzen</string>
+    <string name="favorites_sorted_alphabetically">Favoriten alphabetisch sortiert</string>
+    <string name="favorites_order_reset">Reihenfolge auf Original zurückgesetzt</string>
+    <string name="no_favorites_to_sort">Keine Favoriten zum Sortieren vorhanden</string>
+
+    <!-- General Strings for new features -->
+    <string name="done">Fertig</string>
+    <string name="rename">Umbenennen</string>
+
+    <!-- Error Messages for Settings -->
+    <string name="error_app_info_open">App-Info konnte nicht geöffnet werden</string>
+    <string name="error_accessibility_settings_open">Accessibility-Einstellungen konnten nicht geöffnet werden</string>
+
+    <!-- Hidden Apps Dialog -->
+    <string name="hidden_apps_title">Versteckte Apps</string>
+
+    <!-- App Info -->
+    <string name="app_info">App-Info</string>
+
+    <!-- Sort Favorites -->
+    <string name="sort_favorites">Favoriten sortieren</string>
+
+    <!-- FavoritesSortFragment Strings -->
+    <string name="favorites_sort_title">Favoriten sortieren</string>
+    <string name="error_saving_order">Fehler beim Speichern</string>
+
+    <!-- AppDrawerFragment specific error messages -->
+
+    <!-- Rename dialog -->
+    <string name="rename_app_title">%s umbenennen</string>
+
+    <!-- System Wallpaper Picker -->
+    <string name="wallpaper_picker_title">Wallpaper auswählen</string>
+    <string name="wallpaper_settings_fallback">Wallpaper-Einstellungen geöffnet</string>
+    <string name="error_wallpaper_settings_open">Fehler beim Öffnen der Wallpaper-Einstellungen</string>
+
+    <!-- Für den Barrierefreiheits-Dialog im ScreenLockManager -->
+    <string name="accessibility_service_title">Berechtigung erforderlich</string>
+    <string name="accessibility_service_explanation">Um den Bildschirm zu sperren, benötigt der Kolibri Launcher die Aktivierung seines Dienstes für Barrierefreiheit. Dieser Dienst wird ausschließlich für die Bildschirmsperre verwendet und sammelt keine Daten.</string>
+    <string name="go_to_settings">Zu den Einstellungen</string>
+
+    <string name="date_placeholder">Lade Datum…</string>
+
+    <string name="error_app_list_not_loaded">App-Liste ist noch nicht geladen. Bitte versuche es gleich noch einmal.</string>
+
+    <string name="favorites_limit_reached">Limit erreicht (max. %1$d Favoriten)</string>
+
+    <string name="sort_apps">Apps sortieren</string>
+
+    <string name="unhide_app_in_drawer">Im App Drawer anzeigen</string>
+    <string name="hide_app_from_drawer">Im App Drawer ausblenden</string>
+    <string name="app_now_hidden_in_drawer">%1$s wird nun im App Drawer versteckt</string>
+    <string name="app_now_visible_in_drawer">%1$s wird nun im App Drawer angezeigt</string>
+	
+    <!-- Preference Titles & Summaries -->
+    <string name="category_apps_title">Apps</string>
+    <string name="sort_favorites_summary">Reihenfolge der Favoriten ändern</string>
+    <string name="hidden_apps_summary">Versteckte Apps verwalten</string>
+
+    <string name="category_display_title">Anzeige</string>
+    <string name="change_wallpaper_title">Wallpaper ändern</string>
+    <string name="change_wallpaper_summary">System-Wallpaper Auswahl öffnen</string>
+
+    <string name="category_gestures_title">Gesten</string>
+    <string name="double_tap_to_lock_title">Doppeltippen zum Sperren</string>
+    <string name="double_tap_to_lock_summary">Sperrt den Bildschirm durch doppeltes Tippen auf einen leeren Bereich</string>
+
+    <string name="category_system_title">System</string>
+    <string name="accessibility_title">Bedienungshilfen</string>
+    <string name="accessibility_summary">Bedienungshilfen-Einstellungen öffnen</string>
+    <string name="app_info_title">App-Informationen</string>
+    <string name="app_info_summary">Launcher-Einstellungen und Berechtigungen</string>
+
+    <string name="welcome_toast_fallback_favorites">Willkommen! Wählen Sie Ihre Favoriten im App Drawer aus. Bis dahin zeigen wir Ihnen einige Apps zum Start.</string>
+
+    <string name="toast_enable_double_tap_to_lock">Doppeltipp zum Sperren ist deaktiviert. Du kannst die Funktion in den Launcher-Einstellungen aktivieren.</string>
+
+    <string name="action_reset_sorting">Sortierung zurücksetzen</string>
+    <string name="usage_data_reset_success">Sortierung für %1$s zurückgesetzt</string>
+
+    <string name="set_default_launcher_title">Standard-Launcher festlegen</string>
+    <string name="set_default_launcher_summary">Diese App als deine Standard-Start-App auswählen</string>
+    <string name="error_default_launcher_settings_open">Fehler beim Öffnen der Launcher-Einstellungen.</string>
+    <string name="default_launcher_is_set">Dieser Launcher ist bereits als Standard festgelegt</string>
+
+    <string name="onboarding_title_welcome">Willkommen!</string>
+    <string name="onboarding_subtitle_welcome">Wähle deine Lieblings-Apps für den Startbildschirm aus.</string>
+    <string name="onboarding_title_edit_favorites">Favoriten bearbeiten</string>
+    <string name="onboarding_subtitle_edit_favorites">Wähle die Apps aus, die du auf dem Startbildschirm haben möchtest.</string>
+
+    <string name="settings_select_favorites_title">Favoriten auswählen</string>
+    <string name="settings_select_favorites_summary">Alle deine Lieblings-Apps auf einmal auswählen</string>
+
+    <string name="hidden_apps_title_screen">Versteckte Apps verwalten</string>
+    <string name="hidden_apps_subtitle_screen">Wähle die Apps aus, die du in der App-Liste verstecken möchtest.</string>
+
+    <string name="custom_app_names_title">Benutzerdefinierte App-Namen</string>
+    <string name="custom_app_names_summary">Apps umbenennen oder benutzerdefinierte Namen entfernen</string>
+	<string name="rename_hint">Neuen Namen eingeben</string>
+    <string name="error_name_too_long">Der Name darf maximal %d Zeichen lang sein</string>
+
+    <string name="custom_app_names_subtitle">Entferne oder bearbeite hier deine eigenen App-Namen.</string>
+    <string name="rename_dialog_title">\"%s\" umbenennen</string>
+    <string name="save">Speichern</string>
+
+
+    <string name="error_loading_hidden_apps">Fehler beim Laden der versteckten Apps.</string>
+    <string name="error_saving_hidden_apps">Fehler beim Speichern der versteckten Apps.</string>
+
+    <string name="error_activity_not_found">Es konnte keine App zum Öffnen gefunden werden.</string>
+	
+	<string name="error_generic">Ein Fehler ist aufgetreten. Bitte versuche es erneut.</string>
+	<string name="error_starting_intent">Fehler beim Starten des Intents: %1$s</string>
+    <string name="error_fallback_intent_failed">Auch der Fallback-Intent ist fehlgeschlagen</string>
+    <string name="error_app_not_available">App ist nicht mehr verfügbar</string>
+    <string name="error_loading_apps">Apps konnten nicht geladen werden</string>
+
+    <string name="crash_dialog_title">App abgestürzt</string>
+    <string name="crash_dialog_text">Möchten Sie einen Fehlerbericht senden, um uns bei der Verbesserung zu helfen?</string>
+    <string name="crash_dialog_send">Senden</string>
+    <string name="crash_dialog_cancel">Abbrechen</string>
+
+    <string name="crash_report_dialog_title">App-Stabilität verbessern</string>
+    <string name="crash_report_button_accept">Ja, helfen</string>
+    <string name="crash_report_button_decline">Nein, danke</string>
+    
+    <string name="crash_report_dialog_message">
+    Hilf uns, die App besser zu machen!
+    &lt;br>&lt;br>
+    Wenn die App abstürzt, können wir anonymisierte technische Daten senden:
+    &lt;br>
+    &#8226; Gerätemodell und Android-Version&lt;br>
+    &#8226; App-Version&lt;br>
+    &#8226; Fehlerprotokoll (Stack Trace)
+    &lt;br>&lt;br>
+    Was wir &lt;b>NICHT&lt;/b> sammeln:
+    &lt;br>
+    &#8226; Keine persönlichen Daten&lt;br>
+    &#8226; Keine Standort- oder Nutzungsdaten
+    &lt;br>&lt;br>
+    Die Daten werden verschlüsselt auf einem Server in Deutschland gespeichert.
+    &lt;br>&lt;br>
+    &lt;b>Weitere Details findest du in unserer &lt;a href="https://docs.kolibri-launcher.ch/datenschutz.html">Datenschutzerklärung&lt;/a>.&lt;/b>
+</string>
+
+    <string name="customize_title">Anpassen</string>
+    <string name="customize_colors_and_shadow">Farben &amp; Schatten</string>
+    <string name="more_settings">Weitere Einstellungen</string>
+    <string name="text_shadow">Textschatten</string>
+    <string name="text_color">Textfarbe</string>
+    <string name="color_automatic">Automatisch</string>
+
+    <string name="error_launching_app">App kann nicht geöffnet werden. Bitte versuchen Sie es erneut.</string>
+
+    <string name="category_privacy_title">Datenschutz</string>
+    <string name="crash_report_setting_title">Crash-Berichte senden</string>
+    <string name="crash_report_setting_summary">Anonymisierte Fehlerberichte zur Verbesserung der App</string>
+    <string name="crash_report_summary_enabled">Aktiviert. Vielen Dank, dass du hilfst, die App zu verbessern!</string>
+    <string name="crash_report_summary_disabled">Deaktiviert. Tippe, um deine Auswahl zu ändern.</string>
+
+    <string name="toast_crash_reports_enabled">Crash-Berichte wurden aktiviert. Vielen Dank für deine Hilfe!</string>
+    <string name="toast_crash_reports_disabled">Crash-Berichte wurden deaktiviert.</string>
+
+</resources>

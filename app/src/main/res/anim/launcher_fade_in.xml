@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator"
+    android:fromAlpha="@fraction/anim_alpha_transparent" 
+    android:toAlpha="@fraction/anim_alpha_opaque"
+    android:duration="@integer/anim_duration_launcher_fade_in" />

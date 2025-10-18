@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- App-Verwaltung -->
+    <PreferenceCategory
+        android:title="@string/category_apps_title"
+        app:iconSpaceReserved="false">
+        <Preference
+            app:key="edit_favorites"
+            app:title="@string/settings_select_favorites_title"
+            app:summary="@string/settings_select_favorites_summary"
+            app:iconSpaceReserved="false" />
+
+        <!-- Favoriten sortieren -->
+        <Preference
+            android:key="sort_favorites"
+            android:title="@string/sort_favorites_title"
+            android:summary="@string/sort_favorites_summary"
+            app:iconSpaceReserved="false" />
+
+        <!-- Versteckte Apps -->
+        <Preference
+            android:key="hidden_apps"
+            android:title="@string/hidden_apps_title"
+            android:summary="@string/hidden_apps_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="custom_app_names"
+            android:title="@string/custom_app_names_title"
+            android:summary="@string/custom_app_names_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- Anzeige-Kategorie -->
+    <PreferenceCategory
+        android:title="@string/category_display_title"
+        app:iconSpaceReserved="false">
+
+        <!-- System Wallpaper Picker -->
+        <Preference
+            android:key="system_wallpaper"
+            android:title="@string/change_wallpaper_title"
+            android:summary="@string/change_wallpaper_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- Gesten-Kategorie -->
+    <PreferenceCategory
+        android:title="@string/category_gestures_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="double_tap_to_lock_enabled"
+            android:title="@string/double_tap_to_lock_title"
+            android:summary="@string/double_tap_to_lock_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_system_title"
+        app:iconSpaceReserved="false">
+
+     <!-- Standard-Launcher festlegen -->
+        <Preference
+            android:key="set_default_launcher"
+            android:title="@string/set_default_launcher_title"
+            android:summary="@string/set_default_launcher_summary"
+            app:iconSpaceReserved="false" />
+
+        <!-- Accessibility -->
+        <Preference
+            android:key="accessibility"
+            android:title="@string/accessibility_title"
+            android:summary="@string/accessibility_summary"
+            app:iconSpaceReserved="false" />
+
+        <!-- App Info -->
+        <Preference
+            android:key="app_info"
+            android:title="@string/app_info_title"
+            android:summary="@string/app_info_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- Datenschutz-Kategorie -->
+    <PreferenceCategory
+        android:title="@string/category_privacy_title"
+        app:iconSpaceReserved="false">
+
+        <!-- Absturzberichte-Einstellung -->
+        <Preference
+            android:key="crash_reports"
+            android:title="@string/crash_report_setting_title"
+            android:summary="@string/crash_report_setting_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

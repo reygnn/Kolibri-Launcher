@@ -1,0 +1,186 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Kolibri Launcher - Production ProGuard Rules
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────────────────────────
+# 1. DEBUGGING & CRASH REPORTING
+# ───────────────────────────────────────────────────────────────────────────
+# Keep source file names and line numbers for crash reports
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Keep exception info for better crash analysis
+-keepattributes Exceptions,InnerClasses,Signature,Deprecated,EnclosingMethod
+
+# ───────────────────────────────────────────────────────────────────────────
+# 2. KOTLIN & COROUTINES
+# ───────────────────────────────────────────────────────────────────────────
+# Keep all Kotlin metadata for reflection
+-keepattributes *Annotation*,RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations
+
+# Keep Kotlin coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 3. HILT / DAGGER
+# ───────────────────────────────────────────────────────────────────────────
+# Keep Hilt generated classes
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends dagger.hilt.android.lifecycle.HiltViewModel { *; }
+
+# Keep all @Inject constructors
+-keepclasseswithmembers class * {
+    @javax.inject.Inject <init>(...);
+}
+
+# Keep all Hilt modules
+-keep @dagger.hilt.InstallIn class * { *; }
+-keep @dagger.Module class * { *; }
+
+# ───────────────────────────────────────────────────────────────────────────
+# 4. ANDROID COMPONENTS
+# ───────────────────────────────────────────────────────────────────────────
+# Keep all Activities, Services, BroadcastReceivers
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Application
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep public class * extends android.accessibilityservice.AccessibilityService
+
+# Keep Fragments
+-keep public class * extends androidx.fragment.app.Fragment
+-keep public class * extends android.app.Fragment
+
+# ───────────────────────────────────────────────────────────────────────────
+# 5. VIEWMODELS & LIFECYCLE
+# ───────────────────────────────────────────────────────────────────────────
+# Keep all ViewModels and their constructors
+-keep class * extends androidx.lifecycle.ViewModel {
+    <init>(...);
+}
+-keep class * extends com.github.reygnn.kolibri_launcher.BaseViewModel {
+    <init>(...);
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 6. DATA CLASSES & SEALED CLASSES
+# ───────────────────────────────────────────────────────────────────────────
+# Keep all data classes in your package
+-keep @kotlin.Metadata class com.github.reygnn.kolibri_launcher.**
+-keepclassmembers class com.github.reygnn.kolibri_launcher.** {
+    public <init>(...);
+}
+
+# Keep sealed classes (UiEvent, etc.)
+-keep class com.github.reygnn.kolibri_launcher.UiEvent { *; }
+-keep class com.github.reygnn.kolibri_launcher.UiEvent$* { *; }
+-keep class com.github.reygnn.kolibri_launcher.OnboardingEvent { *; }
+-keep class com.github.reygnn.kolibri_launcher.OnboardingEvent$* { *; }
+
+# Keep data classes used in Flows/LiveData
+-keepclassmembers class com.github.reygnn.kolibri_launcher.*UiState {
+    *;
+}
+-keep class com.github.reygnn.kolibri_launcher.AppInfo { *; }
+-keep class com.github.reygnn.kolibri_launcher.SelectableAppInfo { *; }
+-keep class com.github.reygnn.kolibri_launcher.FavoriteAppsResult { *; }
+
+# ───────────────────────────────────────────────────────────────────────────
+# 7. PARCELABLE
+# ───────────────────────────────────────────────────────────────────────────
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 8. SERIALIZATION (if you use kotlinx.serialization)
+# ───────────────────────────────────────────────────────────────────────────
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 9. DATASTORE
+# ───────────────────────────────────────────────────────────────────────────
+-keep class androidx.datastore.*.** { *; }
+
+# ───────────────────────────────────────────────────────────────────────────
+# 10. NAVIGATION
+# ───────────────────────────────────────────────────────────────────────────
+-keep class androidx.navigation.fragment.NavHostFragment { *; }
+-keepnames class androidx.navigation.fragment.FragmentNavigator$Destination
+
+# ───────────────────────────────────────────────────────────────────────────
+# 11. TIMBER (remove logging in release)
+# ───────────────────────────────────────────────────────────────────────────
+# Remove all Timber logging calls (except errors)
+-assumenosideeffects class timber.log.Timber {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+    public static *** w(...);
+}
+
+# Keep error logging for crash reports
+-keep class timber.log.Timber {
+    public static *** e(...);
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 12. REFLECTION (if you use it)
+# ───────────────────────────────────────────────────────────────────────────
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 13. ENUMS
+# ───────────────────────────────────────────────────────────────────────────
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 14. REMOVE LOGGING (optional - aggressive)
+# ───────────────────────────────────────────────────────────────────────────
+# Remove Log.d, Log.v, Log.i calls completely
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}
+
+# ───────────────────────────────────────────────────────────────────────────
+# 15. OPTIMIZATION FLAGS
+# ───────────────────────────────────────────────────────────────────────────
+# Allow aggressive optimization
+-optimizationpasses 5
+-allowaccessmodification
+-dontpreverify
+
+# ───────────────────────────────────────────────────────────────────────────
+# 16. WARNINGS TO IGNORE (optional)
+# ───────────────────────────────────────────────────────────────────────────
+# Suppress warnings about missing classes (if they're not actually used)
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+
+# ───────────────────────────────────────────────────────────────────────────
+# 17. ACRA
+# ───────────────────────────────────────────────────────────────────────────
+-keep class org.acra.** { *; }
+-dontwarn org.acra.**
