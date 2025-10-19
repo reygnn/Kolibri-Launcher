@@ -56,7 +56,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
 
             val params = window.attributes
-            params.y = 100
+            params.y = 200
             window.attributes = params
         }
     }
