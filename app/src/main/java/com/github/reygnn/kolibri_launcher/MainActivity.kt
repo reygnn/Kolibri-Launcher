@@ -1,17 +1,16 @@
 /*
-    * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
-    *
-    * This program is free software: you can redistribute it and/or modify
-    * it under the terms of the GNU General Public License as published by
-    * the Free Software Foundation, either version 3 of the License, or
-    * (at your option) any later version.
-    */
+ * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
 
 package com.github.reygnn.kolibri_launcher
 
 import android.app.Activity
 import android.app.ActivityOptions
-import android.app.AlertDialog
 import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
@@ -35,15 +34,12 @@ import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.acra.ACRA
@@ -51,32 +47,30 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * CRASH-SAFE VERSION
+ * CRASH-SAFE & STABLE VERSION
  *
- * Crash safety through:
- * - Nullable NavController with safe access
- * - Try-catch for all critical operations
- * - Safe BroadcastReceiver registration/unregistration
- * - Defensive null checks throughout
- * - Safe navigation with fallbacks
+ * Stability improvements:
+ * - Idempotent initialization (runs only once)
+ * - No nested repeatOnLifecycle blocks
+ * - Safe state restoration after configuration changes
+ * - Race condition prevention for wallpaper colors
  * - Proper cleanup in lifecycle methods
- * - State restoration protection
  */
 @AndroidEntryPoint
 class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
     override val viewModel: HomeViewModel by viewModels()
 
-    // CRASH-SAFE: Nullable NavController
     private var navController: NavController? = null
     private var isReceiverRegistered = false
 
-    @Inject
-    lateinit var appPackageManager: PackageManager
-    @Inject
-    lateinit var settingsRepository: SettingsRepository
-    @Inject
-    lateinit var dataStoreBackup: DataStoreBackup
+    // Idempotency flags
+    private var isInitialized = false
+    private var onboardingCheckCompleted = false
+
+    @Inject lateinit var appPackageManager: PackageManager
+    @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var dataStoreBackup: DataStoreBackup
 
     private val systemEventReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -97,29 +91,30 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
     }
 
-
-    // Der Launcher, der auf das Ergebnis der OnboardingActivity wartet.
     private val onboardingLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // Onboarding war erfolgreich. Initialisiere jetzt die App.
-            lifecycleScope.launch {
-                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    initializeMainApp()
+        lifecycleScope.launch {
+            try {
+                when (result.resultCode) {
+                    Activity.RESULT_OK -> {
+                        // Onboarding successful - initialize app directly
+                        initializeMainApp()
+                    }
+                    else -> {
+                        // Onboarding aborted - close app
+                        Timber.w("Onboarding aborted, closing app")
+                        finish()
+                    }
                 }
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error handling onboarding result")
+                finish()
             }
-        } else {
-            // Onboarding wurde abgebrochen. App beenden.
-            finish()
         }
     }
 
-    /**
-     * Die neue, stabile onCreate-Methode. Sie dient als Orchestrator.
-     */
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Vorbereitende UI-Schritte, die vor super.onCreate() passieren müssen.
         try {
             installSplashScreen()
             setupWindow()
@@ -129,97 +124,108 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
         super.onCreate(savedInstanceState)
 
-        // PHASE 1: Synchroner UI-Aufbau
-        // Wenn dieser Schritt fehlschlägt, wird die Methode sofort beendet.
         if (!setupMainContent()) {
             return
         }
 
-        // PHASE 2: Asynchrone Logik sicher an den Lebenszyklus koppeln
-        lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Führe die komplexe Logik nur aus, wenn die App sicher im Vordergrund ist.
-                handlePostCreationLogic()
+        // Only run initial setup on first creation (not on config changes)
+        if (savedInstanceState == null) {
+            lifecycleScope.launch {
+                handleInitialSetup()
             }
+        } else {
+            // After config change: restore flags
+            isInitialized = true
+            onboardingCheckCompleted = true
+            Timber.d("Activity recreated, skipping initialization")
         }
     }
 
-    /**
-     * PHASE 1 - HELFER: Kümmert sich um den synchronen Aufbau der Haupt-UI.
-     * @return 'true' bei Erfolg, 'false' bei einem Fehler.
-     */
     private fun setupMainContent(): Boolean {
         return try {
-            // 1. Das Layout aus der XML-Datei laden und zur Ansicht machen.
             setContentView(R.layout.activity_main)
 
-            // 2. Den Container für unsere Fragmente finden.
             val navHostFragment = supportFragmentManager
                 .findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
 
             if (navHostFragment != null) {
-                // 3. Den NavController initialisieren, der für die Navigation zuständig ist.
                 navController = navHostFragment.navController
                 WindowCompat.setDecorFitsSystemWindows(window, false)
-                true // Alles hat geklappt -> Erfolg melden.
+                true
             } else {
-                // Kritischer Fehler: Der Navigations-Container wurde nicht gefunden.
                 TimberWrapper.silentError("NavHostFragment not found")
-                finish() // App sicher beenden.
-                false // Fehler melden.
+                finish()
+                false
             }
         } catch (e: Exception) {
-            // Allgemeiner, kritischer Fehler beim Aufbau der UI.
             TimberWrapper.silentError(e, "Fatal error setting up main content")
-            finish() // App sicher beenden.
-            false // Fehler melden.
+            finish()
+            false
         }
     }
 
     /**
-     * PHASE 2 - HELFER: Entscheidet, ob Onboarding nötig ist oder die App direkt initialisiert wird.
+     * Runs ONLY ONCE on first app start.
+     * Determines if onboarding is needed or proceeds directly to initialization.
      */
-    private suspend fun handlePostCreationLogic() {
+    private suspend fun handleInitialSetup() {
+        if (onboardingCheckCompleted) {
+            Timber.d("Initial setup already completed, skipping")
+            return
+        }
+
         try {
-            // 1. Warte auf die Information, ob der Benutzer das Onboarding schon abgeschlossen hat.
             val onboardingCompleted = settingsRepository.onboardingCompletedFlow.first()
             val backupPresent = dataStoreBackup.isBackupPresent()
 
-            // 2. Die entscheidende Weiche:
+            onboardingCheckCompleted = true
+
             if (!onboardingCompleted && !backupPresent) {
-                // FALL A: Onboarding ist erforderlich.
                 launchOnboardingActivity()
             } else {
-                // FALL B: Onboarding ist bereits abgeschlossen.
                 initializeMainApp()
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in handlePostCreationLogic")
+            TimberWrapper.silentError(e, "Error in handleInitialSetup")
+            // Fallback: Initialize anyway to prevent broken state
+            try {
+                initializeMainApp()
+            } catch (fallbackError: Exception) {
+                TimberWrapper.silentError(fallbackError, "Fallback initialization failed")
+            }
         }
     }
 
-    /**
-     * PHASE 2 - HELFER (FALL A): Startet die OnboardingActivity und wartet auf das Ergebnis.
-     */
     private fun launchOnboardingActivity() {
         try {
             val intent = Intent(this, OnboardingActivity::class.java)
-            // Übergibt die Kontrolle an den onboardingLauncher. MainActivity wartet im Hintergrund.
             onboardingLauncher.launch(intent)
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error launching OnboardingActivity")
+            // Fallback: Initialize without onboarding
+            lifecycleScope.launch {
+                initializeMainApp()
+            }
         }
     }
 
     /**
-     * PHASE 2 - HELFER (FALL B & nach FALL A): Führt die finale App-Initialisierung durch.
+     * Final app initialization. Runs ONLY ONCE thanks to isInitialized flag.
+     * Note: updateWallpaperColors() is intentionally NOT called here to avoid
+     * race conditions with onResume(). Colors are updated in onResume() instead.
      */
     private suspend fun initializeMainApp() {
+        if (isInitialized) {
+            Timber.d("App already initialized, skipping")
+            return
+        }
+
         try {
-             checkAndShowCrashReportConsent()
-            updateWallpaperColors()
+            checkAndShowCrashReportConsent()
+            isInitialized = true
+            Timber.d("Main app initialization completed")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -227,7 +233,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         }
     }
 
-    //----------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
 
     private fun setupWindow() {
         try {
@@ -267,6 +273,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             registerReceiver(systemEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
 
+            // Update wallpaper colors here (runs on every resume)
             updateWallpaperColors()
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error registering system event receiver")
@@ -339,7 +346,6 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
     override fun onDestroy() {
         try {
-            // CRASH-SAFE: Cleanup
             if (isReceiverRegistered) {
                 try {
                     unregisterReceiver(systemEventReceiver)
@@ -363,7 +369,6 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
         try {
             when (event) {
-                // --- Die spezifische Logik für MainActivity ---
                 is UiEvent.ShowAppDrawer -> {
                     if (navController?.currentDestination?.id == R.id.homeFragment) {
                         try {
@@ -451,7 +456,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 is UiEvent.ShowToastFromString,
                 is UiEvent.NavigateUp,
                 is UiEvent.RefreshAppDrawer -> {
-                    // Hier ist absichtlich nichts zu tun.
+                    // Intentionally empty - handled in BaseActivity
                 }
             }
         } catch (e: Exception) {
@@ -567,11 +572,9 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         try {
             val wallpaperManager = WallpaperManager.getInstance(this)
             val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-            // Ruft die neue, universelle Update-Funktion im ViewModel auf
             viewModel.updateUiColors(colors)
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error updating wallpaper colors")
-            // Fallback, falls etwas schiefgeht
             viewModel.updateUiColors()
         }
     }
