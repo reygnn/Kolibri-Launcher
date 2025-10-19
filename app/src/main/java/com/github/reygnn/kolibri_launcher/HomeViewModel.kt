@@ -73,7 +73,7 @@ class HomeViewModel @Inject constructor(
     private val favoritesManager: FavoritesRepository,
     val settingsManager: SettingsRepository,
     private val appUsageManager: AppUsageRepository,
-    private val screenLockManager: ScreenLockManager,
+    private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {

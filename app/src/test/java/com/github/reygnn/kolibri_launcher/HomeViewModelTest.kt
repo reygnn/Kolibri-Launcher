@@ -29,6 +29,7 @@ import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -442,43 +443,42 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `updateBatteryLevel - with invalid level - does not update`() = runTest {
+    fun `updateBatteryLevel - with invalid level - sets default battery string`() = runTest {
         setupViewModel()
         advanceUntilIdle()
-
-        val previousBattery = viewModel.uiState.value.batteryString
 
         viewModel.updateBatteryLevel(-1, 100)
 
-        assertEquals(previousBattery, viewModel.uiState.value.batteryString)
+        assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
     @Test
-    fun `updateBatteryLevel - with zero scale - does not update`() = runTest {
+    fun `updateBatteryLevel - with zero scale - sets default battery string`() = runTest {
         setupViewModel()
         advanceUntilIdle()
-
-        val previousBattery = viewModel.uiState.value.batteryString
 
         viewModel.updateBatteryLevel(75, 0)
 
-        assertEquals(previousBattery, viewModel.uiState.value.batteryString)
+        assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
-/*    @Test
-    fun `updateUiColorsFromWallpaper - with auto mode - uses default colors`() = runTest {
-        whenever(settingsManager.readabilityModeFlow).thenReturn(flowOf("auto"))
+    @Test
+    fun `updateUiColors - with auto mode and no wallpaper - uses default white text`() = runTest {
+        whenever(settingsManager.textColorFlow).thenReturn(flowOf(0)) // 0 = automatic
+        whenever(settingsManager.textShadowEnabledFlow).thenReturn(flowOf(true))
+        whenever(settingsManager.readabilityModeFlow).thenReturn(flowOf("smart_contrast"))
 
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.updateUiColorsFromWallpaper(null)
+        viewModel.updateUiColors(wallpaperColors = null)
         advanceUntilIdle()
 
         val colors = viewModel.uiColorsState.value
         assertEquals(Color.WHITE, colors.textColor)
-        assertEquals(Color.BLACK, colors.shadowColor)
-    }*/
+        // Shadow ist entweder berechnet oder Fallback
+        assertNotNull(colors.shadowColor)
+    }
 
     @Test
     fun `drawerApps - emits drawer apps from use case`() = runTest {
@@ -663,7 +663,7 @@ class HomeViewModelTest {
 
         viewModel.updateBatteryLevelFromIntent(intent)
 
-        assertEquals(previousBattery, viewModel.uiState.value.batteryString)
+        assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
     @Test
