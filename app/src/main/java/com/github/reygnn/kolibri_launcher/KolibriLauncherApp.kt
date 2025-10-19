@@ -9,7 +9,6 @@
 
 package com.github.reygnn.kolibri_launcher
 
-import android.R.attr.enabled
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -58,7 +57,6 @@ class KolibriLauncherApp : Application() {
             initAcra {
                 buildConfigClass = BuildConfig::class.java
                 reportFormat = StringFormat.JSON
-                enabled = false
 
                 httpSender {
                     uri = BuildConfig.ACRA_URL
@@ -77,6 +75,8 @@ class KolibriLauncherApp : Application() {
                     ReportField.STACK_TRACE
                 )
             }
+
+            ACRA.errorReporter.setEnabled(false)
 
             val userHasGivenConsent = runBlocking {
                 CrashReportConsent.hasConsent(base)
