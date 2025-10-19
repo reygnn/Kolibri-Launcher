@@ -40,6 +40,7 @@ import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.acra.ACRA
@@ -47,11 +48,13 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * CRASH-SAFE & STABLE VERSION
+ * ULTRA CRASH-SAFE & STABLE VERSION
  *
- * Stability improvements:
+ * Multi-layer exception handling:
+ * - Throwable catch (handles Exception + Error types)
+ * - CoroutineExceptionHandler for uncaught coroutine exceptions
+ * - CancellationException properly re-thrown
  * - Idempotent initialization (runs only once)
- * - No nested repeatOnLifecycle blocks
  * - Safe state restoration after configuration changes
  * - Race condition prevention for wallpaper colors
  * - Proper cleanup in lifecycle methods
@@ -68,6 +71,15 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
     private var isInitialized = false
     private var onboardingCheckCompleted = false
 
+    // Ultra Paranoia: Exception handler for MainActivity coroutines
+    private val mainActivityExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        try {
+            TimberWrapper.silentError(throwable, "Uncaught exception in MainActivity")
+        } catch (e: Throwable) {
+            // Even logging can fail
+        }
+    }
+
     @Inject lateinit var appPackageManager: PackageManager
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var dataStoreBackup: DataStoreBackup
@@ -81,7 +93,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                     Intent.ACTION_TIMEZONE_CHANGED -> viewModel.updateTimeAndDate()
                     Intent.ACTION_BATTERY_CHANGED -> viewModel.updateBatteryLevelFromIntent(intent)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in systemEventReceiver")
             }
         }
@@ -94,7 +106,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
     private val onboardingLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        lifecycleScope.launch {
+        lifecycleScope.launch(mainActivityExceptionHandler) {
             try {
                 when (result.resultCode) {
                     Activity.RESULT_OK -> {
@@ -107,7 +119,9 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                         finish()
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error handling onboarding result")
                 finish()
             }
@@ -118,7 +132,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         try {
             installSplashScreen()
             setupWindow()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in pre-onCreate setup")
         }
 
@@ -130,7 +144,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
         // Only run initial setup on first creation (not on config changes)
         if (savedInstanceState == null) {
-            lifecycleScope.launch {
+            lifecycleScope.launch(mainActivityExceptionHandler) {
                 handleInitialSetup()
             }
         } else {
@@ -157,7 +171,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 finish()
                 false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error setting up main content")
             finish()
             false
@@ -187,12 +201,12 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in handleInitialSetup")
             // Fallback: Initialize anyway to prevent broken state
             try {
                 initializeMainApp()
-            } catch (fallbackError: Exception) {
+            } catch (fallbackError: Throwable) {
                 TimberWrapper.silentError(fallbackError, "Fallback initialization failed")
             }
         }
@@ -202,10 +216,10 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         try {
             val intent = Intent(this, OnboardingActivity::class.java)
             onboardingLauncher.launch(intent)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error launching OnboardingActivity")
             // Fallback: Initialize without onboarding
-            lifecycleScope.launch {
+            lifecycleScope.launch(mainActivityExceptionHandler) {
                 initializeMainApp()
             }
         }
@@ -228,27 +242,31 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             Timber.d("Main app initialization completed")
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error during main app initialization")
         }
     }
-
-    //----------------------------------------------------------------------------------------------
 
     private fun setupWindow() {
         try {
             window.setWindowAnimations(0)
             window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up window")
         }
     }
 
     private suspend fun checkAndShowCrashReportConsent() {
         CrashReportConsent.showConsentDialog(this) { userGaveConsent ->
-            ACRA.errorReporter.setEnabled(userGaveConsent)
-            Timber.i("User consent for crash reports is set to: $userGaveConsent")
+            lifecycleScope.launch(mainActivityExceptionHandler) {
+                try {
+                    ACRA.errorReporter.setEnabled(userGaveConsent)
+                    Timber.i("User consent for crash reports is set to: $userGaveConsent")
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error setting ACRA consent")
+                }
+            }
         }
     }
 
@@ -256,7 +274,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         super.onStart()
         try {
             viewModel.refreshAllData()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onStart")
         }
     }
@@ -275,7 +293,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
 
             // Update wallpaper colors here (runs on every resume)
             updateWallpaperColors()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error registering system event receiver")
             isReceiverRegistered = false
         }
@@ -288,7 +306,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 unregisterReceiver(systemEventReceiver)
                 isReceiverRegistered = false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error unregistering receiver")
         }
     }
@@ -297,10 +315,12 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         super.onStop()
 
         if (BuildConfig.DEBUG) {
-            lifecycleScope.launch {
+            lifecycleScope.launch(mainActivityExceptionHandler) {
                 try {
                     dataStoreBackup.createBackup()
-                } catch (e: Exception) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating backup")
                 }
             }
@@ -313,7 +333,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             navController?.currentDestination?.id?.let { destinationId ->
                 outState.putInt(STATE_CURRENT_DESTINATION, destinationId)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving navigation state")
         }
     }
@@ -329,17 +349,17 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 currentNav.currentDestination?.id != destinationId) {
                 try {
                     currentNav.navigate(destinationId)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     Timber.w(e, "Failed to restore navigation state")
                     // Fallback to home
                     try {
                         currentNav.popBackStack(R.id.homeFragment, false)
-                    } catch (fallbackError: Exception) {
+                    } catch (fallbackError: Throwable) {
                         TimberWrapper.silentError(fallbackError, "Failed to navigate to home fragment")
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onRestoreInstanceState")
         }
     }
@@ -349,13 +369,13 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             if (isReceiverRegistered) {
                 try {
                     unregisterReceiver(systemEventReceiver)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error unregistering receiver in onDestroy")
                 }
                 isReceiverRegistered = false
             }
             navController = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -376,7 +396,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                             if (BuildConfig.DEBUG) {
                                 Timber.d("[MAIN] Navigated to app drawer")
                             }
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "[MAIN] Error navigating to app drawer")
                         }
                     } else if (BuildConfig.DEBUG) {
@@ -388,7 +408,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                     try {
                         val intent = Intent(this, SettingsActivity::class.java)
                         startActivity(intent)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "[MAIN] Error starting settings")
                     }
                 }
@@ -398,7 +418,11 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 }
 
                 is UiEvent.ShowColorPickerDialog -> {
-                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                    try {
+                        ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "[MAIN] Error showing color picker")
+                    }
                 }
 
                 is UiEvent.OpenClock -> {
@@ -410,7 +434,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                         val builder = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
                         ContentUris.appendId(builder, System.currentTimeMillis())
                         startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
                         Toast.makeText(this, getString(R.string.error_no_calendar_app), Toast.LENGTH_SHORT).show()
                     }
@@ -437,13 +461,13 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                                 if (BuildConfig.DEBUG) {
                                     Timber.d("[MAIN] Drawer closed")
                                 }
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
                             }
                         }
 
                         launchApp(event.app)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "[MAIN] Error handling launch app event")
                     }
                 }
@@ -459,7 +483,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                     // Intentionally empty - handled in BaseActivity
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "[MAIN] Error in handleSpecificEvent")
         }
     }
@@ -497,7 +521,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         } catch (e: SecurityException) {
             TimberWrapper.silentError(e, "[LAUNCH] SecurityException: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "[LAUNCH] Exception: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
         }
@@ -513,7 +537,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 }
                 .setNegativeButton(getString(R.string.cancel), null)
                 .show()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing accessibility dialog")
         }
     }
@@ -529,12 +553,18 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 .setTitle(getString(R.string.customize_title))
                 .setItems(options) { _, which ->
                     when (which) {
-                        0 -> ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                        0 -> {
+                            try {
+                                ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error showing color customization")
+                            }
+                        }
                         1 -> {
                             try {
                                 val intent = Intent(this, SettingsActivity::class.java)
                                 startActivity(intent)
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "[MAIN] Error starting settings")
                             }
                         }
@@ -542,7 +572,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing customization options dialog")
         }
     }
@@ -551,7 +581,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         try {
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             startActivity(intent)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, getString(R.string.error_starting_intent, intent.toString()))
 
             if (fallbackIntent != null) {
@@ -559,7 +589,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
                     fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     startActivity(fallbackIntent)
                     return
-                } catch (fallbackError: Exception) {
+                } catch (fallbackError: Throwable) {
                     TimberWrapper.silentError(fallbackError, getString(R.string.error_fallback_intent_failed))
                 }
             }
@@ -573,7 +603,7 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
             val wallpaperManager = WallpaperManager.getInstance(this)
             val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
             viewModel.updateUiColors(colors)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating wallpaper colors")
             viewModel.updateUiColors()
         }

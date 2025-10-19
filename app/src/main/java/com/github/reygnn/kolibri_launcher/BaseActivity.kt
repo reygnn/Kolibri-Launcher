@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
 package com.github.reygnn.kolibri_launcher
 
 import android.os.Bundle
@@ -8,13 +17,28 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * CRASH-SAFE Base Activity
+ * ULTRA CRASH-SAFE Base Activity
  *
- * Both event flows run in CREATED lifecycle to ensure Fragment events are caught early.
+ * Multi-layer exception handling for maximum stability:
+ * - Layer 1: Handler-level try-catch (catches errors in event handlers)
+ * - Layer 2: Collector-level try-catch (catches errors in Flow collection)
+ * - Layer 3: CoroutineExceptionHandler (catches uncaught coroutine exceptions)
+ * - Layer 4: Global exception handler (in Application class)
+ *
+ * Event flows run in STARTED lifecycle to ensure toasts are only shown
+ * when the Activity is visible to the user. Application-level errors
+ * posted before any Activity exists are buffered via SharedFlow replay
+ * and shown when the first Activity becomes visible.
+ *
+ * Exception handling strategy:
+ * - CancellationException: Always re-thrown (coroutine control flow)
+ * - Throwable: Caught to handle both Exception and Error types
+ * - Prevents launcher crashes from OutOfMemoryError, StackOverflowError, etc.
  */
 abstract class BaseActivity<E, VM> : AppCompatActivity()
         where VM : ViewModel, VM : BaseViewModelInterface<E> {
@@ -25,32 +49,47 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
     private var lastUiEventToastTime = 0L
     private val TOAST_THROTTLE_MS = 2000L
 
+    /**
+     * Backup exception handler for coroutines.
+     * This catches any exceptions that escape the try-catch blocks.
+     */
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        try {
+            Timber.e(throwable, "Uncaught coroutine exception in BaseActivity")
+        } catch (e: Throwable) {
+            // Even logging can fail - silent fallback
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // FIXED: Single lifecycle scope with CREATED state for both flows
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.CREATED) {
+        lifecycleScope.launch(coroutineExceptionHandler) {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
 
                 // Job 1: Global error bus
-                launch {
+                launch(coroutineExceptionHandler) {
                     try {
                         ErrorEventBus.events.collect { event ->
                             try {
                                 handleErrorEvent(event)
-                            } catch (e: Exception) {
-                                Timber.e(e, "Error handling error event")   // auch als Toast
+                            } catch (e: CancellationException) {
+                                throw e  // Coroutine control flow - must re-throw
+                            } catch (e: Throwable) {
+                                // Catches Exception and Error (OutOfMemoryError, etc.)
+                                Timber.e(e, "Error handling error event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e  // Re-throw
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error collecting from ErrorEventBus")   // auch als Toast
+                    } catch (e: Throwable) {
+                        // Catches errors in Flow collection itself
+                        Timber.e(e, "Error collecting from ErrorEventBus")
                     }
                 }
 
                 // Job 2: ViewModel events
-                launch {
+                launch(coroutineExceptionHandler) {
                     try {
                         viewModel.event.collect { event ->
                             try {
@@ -63,13 +102,15 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                                 if (!wasHandled) {
                                     handleSpecificEvent(event)
                                 }
-                            } catch (e: Exception) {
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Throwable) {
                                 Timber.e(e, "Error handling UI event: $event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         Timber.e(e, "Error collecting from ViewModel eventFlow")
                     }
                 }
@@ -77,11 +118,14 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         }
     }
 
+    /**
+     * Handles generic UI events that are common across all activities.
+     * @return true if the event was handled, false if it should be passed to handleSpecificEvent
+     */
     protected open fun handleGenericUiEvent(event: UiEvent): Boolean {
         if (BuildConfig.DEBUG) {
             Timber.d("handleUiEvent called with: $event")
         }
-
 
         return when (event) {
             is UiEvent.ShowToast -> {
@@ -114,14 +158,13 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 try {
                     finish()
                 } catch (e: Exception) {
-                    Timber.e(e, "Error finishing activity")   // auch als Toast
+                    Timber.e(e, "Error finishing activity")
                 }
                 true
             }
 
             else -> {
-                // Dieses Event ist nicht generisch. Gib false zurück,
-                // damit es von handleSpecificEvent behandelt werden kann.
+                // Event is not generic - will be handled by handleSpecificEvent
                 if (BuildConfig.DEBUG) {
                     Timber.d("Event not handled in BaseActivity: $event")
                 }
@@ -130,14 +173,24 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         }
     }
 
+    /**
+     * Override this to handle activity-specific events.
+     * Called when an event is not handled by handleGenericUiEvent.
+     */
     protected abstract fun handleSpecificEvent(event: E)
 
+    /**
+     * Handles error events from the global ErrorEventBus.
+     * Displays developer error toasts in debug builds.
+     */
     private fun handleErrorEvent(event: Event<ErrorData>) {
         event.getContentIfNotHandled()?.let { errorData ->
+            // Skip silent errors
             if (errorData.tag == TimberWrapper.SILENT_LOG_TAG) {
                 return@let
             }
 
+            // Throttle error toasts
             val now = System.currentTimeMillis()
             if (now - lastErrorToastTime < TOAST_THROTTLE_MS) {
                 Timber.d("Error toast throttled: ${errorData.message}")
@@ -150,11 +203,15 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         }
     }
 
+    /**
+     * Shows a toast with additional error handling.
+     * Even Toast.makeText can throw exceptions in rare cases.
+     */
     private fun showToastSafe(message: String, duration: Int) {
         try {
             Toast.makeText(this, message, duration).show()
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error showing toast")   // DIESEN nicht als Toast ;)
+            TimberWrapper.silentError(e, "Error showing toast")
         }
     }
 }

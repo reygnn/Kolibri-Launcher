@@ -1,11 +1,11 @@
 /*
-    * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
-    *
-    * This program is free software: you can redistribute it and/or modify
-    * it under the terms of the GNU General Public License as published by
-    * the Free Software Foundation, either version 3 of the License, or
-    * (at your option) any later version.
-    */
+ * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
 
 package com.github.reygnn.kolibri_launcher
 
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import timber.log.Timber
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -100,7 +100,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
                 favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Timber.w(e, "Sorting failed - using alphabetical fallback")
                 favoriteApps.sortedBy { it.displayName.lowercase() }
             }
@@ -124,7 +124,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // Unerwarteter Fehler in der Verarbeitung
             Timber.e(e, "Error processing apps - returning fallback")
             val fallbackApps = createFallbackApps(rawApps, hiddenApps)
@@ -144,7 +144,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
                 .filter { !hiddenApps.contains(it.componentName) }
                 .sortedBy { it.displayName.lowercase() }
                 .take(AppConstants.MAX_FAVORITES_ON_HOME)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Timber.e(e, "Error creating fallback - using first ${AppConstants.MAX_FAVORITES_ON_HOME} apps")
             rawApps.take(AppConstants.MAX_FAVORITES_ON_HOME)
         }

@@ -74,8 +74,10 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
 
             // Search Query wiederherstellen
             savedInstanceState?.getString(STATE_SEARCH_QUERY)?.let { query ->
-                binding.searchEditText.setText(query)
-                binding.searchEditText.setSelection(query.length)
+                _binding?.let { binding ->
+                    binding.searchEditText.setText(query)
+                    binding.searchEditText.setSelection(query.length)
+                }
             }
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")

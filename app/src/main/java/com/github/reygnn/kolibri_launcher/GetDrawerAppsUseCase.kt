@@ -1,24 +1,23 @@
 /*
-    * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
-    *
-    * This program is free software: you can redistribute it and/or modify
-    * it under the terms of the GNU General Public License as published by
-    * the Free Software Foundation, either version 3 of the License, or
-    * (at your option) any later version.
-    */
+ * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
 
 package com.github.reygnn.kolibri_launcher
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import timber.log.Timber
-import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -89,12 +88,12 @@ class GetDrawerAppsUseCase @Inject constructor(
                 rawApps.filter { app ->
                     try {
                         !hiddenComponents.contains(app.componentName)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error checking visibility for app: ${app.packageName}")
                         true // Im Fehlerfall: App sichtbar lassen
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error filtering visible apps, using all apps")
                 rawApps
             }
@@ -105,7 +104,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                     SortOrder.ALPHABETICAL -> {
                         try {
                             visibleApps.sortedBy { it.displayName.lowercase() }
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in alphabetical sort, returning unsorted")
                             visibleApps
                         }
@@ -115,11 +114,11 @@ class GetDrawerAppsUseCase @Inject constructor(
                             appUsageManager.sortAppsByTimeWeightedUsage(visibleApps)
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in time-weighted sort, falling back to alphabetical")
                             try {
                                 visibleApps.sortedBy { it.displayName.lowercase() }
-                            } catch (e2: Exception) {
+                            } catch (e2: Throwable) {
                                 TimberWrapper.silentError(e2, "Error in fallback sort, returning unsorted")
                                 visibleApps
                             }
@@ -128,7 +127,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Critical error in sorting, returning visible apps unsorted")
                 visibleApps
             }
@@ -138,7 +137,7 @@ class GetDrawerAppsUseCase @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Critical error in combine block, returning empty list")
             emptyList()
         }

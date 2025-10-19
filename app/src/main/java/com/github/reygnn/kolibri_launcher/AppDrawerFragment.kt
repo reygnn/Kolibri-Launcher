@@ -1,11 +1,11 @@
 /*
-    * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
-    *
-    * This program is free software: you can redistribute it and/or modify
-    * it under the terms of the GNU General Public License as published by
-    * the Free Software Foundation, either version 3 of the License, or
-    * (at your option) any later version.
-    */
+ * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
 
 package com.github.reygnn.kolibri_launcher
 
@@ -34,6 +34,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -42,16 +43,17 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * CRASH-SAFE VERSION
+ * ULTRA CRASH-SAFE AppDrawerFragment
  *
- * Crash safety through:
- * - Nullable binding with proper cleanup
- * - Safe RecyclerView handling
- * - Try-catch around all UI operations
- * - Lifecycle-aware coroutines with error handling
- * - Safe dialog management
- * - Safe search functionality
- * - Defensive null checks throughout
+ * Multi-layer exception handling:
+ * - All operations catch Throwable (Exception + Error)
+ * - CoroutineExceptionHandler for all coroutines
+ * - Safe RecyclerView operations with fallbacks
+ * - Protected search with debounce error handling
+ * - Safe dialog management with state checks
+ * - Triple-layer observer protection
+ *
+ * Critical for launcher - without working app drawer, user cannot open apps!
  */
 @AndroidEntryPoint
 class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
@@ -72,6 +74,15 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private var searchJob: Job? = null
     private var shouldScrollToTop = false
 
+    // Ultra Paranoia: Coroutine exception handler
+    private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        try {
+            TimberWrapper.silentError(throwable, "Uncaught exception in AppDrawerFragment")
+        } catch (e: Throwable) {
+            // Even logging can fail
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -91,13 +102,13 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             setupSortFab()
             observeViewModel()
             setupFragmentResultListener()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
     }
 
     private fun observeViewModel() {
-        // Observer 1: App-Liste
+        // Observer 1: App list - Critical for drawer functionality
         try {
             viewModel.drawerApps.observe(viewLifecycleOwner) { sortedApps ->
                 try {
@@ -105,15 +116,18 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                         masterAppList = sortedApps
                         displayFilteredApps()
                     }
-                } catch (e: Exception) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error updating master app list")
+                    // Don't clear masterAppList - keep showing old data
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up drawerApps observer")
         }
 
-        // Observer 2: Sortierreihenfolge
+        // Observer 2: Sort order
         try {
             viewModel.sortOrder.observe(viewLifecycleOwner) { order ->
                 if (_binding == null) return@observe
@@ -125,34 +139,42 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                         null -> return@observe
                     }
                     binding.fabSort.setImageResource(iconRes)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error updating sort icon")
+                    // Keep old icon - not critical
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up sortOrder observer")
         }
 
-        // Observer 3: UI-Farben
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                try {
-                    viewModel.uiColorsState.collect { colors ->
-                        if (_binding == null || !isAdded) return@collect
+        // Observer 3: UI colors
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        viewModel.uiColorsState.collect { colors ->
+                            if (_binding == null || !isAdded) return@collect
 
-                        try {
-                            if (::appDrawerAdapter.isInitialized) {
-                                appDrawerAdapter.setUiColors(colors.textColor, colors.shadowColor)
+                            try {
+                                if (::appDrawerAdapter.isInitialized) {
+                                    appDrawerAdapter.setUiColors(colors.textColor, colors.shadowColor)
+                                }
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating adapter colors")
+                                // Keep old colors - not critical
                             }
-                        } catch (e: Exception) {
-                            TimberWrapper.silentError(e, "Error updating adapter colors")
                         }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in uiColorsState collection")
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error in uiColorsState collection")
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle")
             }
         }
     }
@@ -172,33 +194,25 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
                     val action = try {
                         bundle.getString(AppContextMenuDialogFragment.RESULT_KEY_ACTION)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error getting action from bundle")
                         null
                     }
 
                     when (action) {
-                        "launch_shortcut" -> {
-                            handleShortcutLaunch(bundle)
-                        }
-                        AppContextMenuAction.ACTION_ID_APP_INFO -> {
-                            showAppInfo(app)
-                        }
-                        AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> {
-                            toggleFavorite(app)
-                        }
-                        AppContextMenuAction.ACTION_ID_HIDE_APP -> {
-                            hideApp(app)
-                        }
-                        AppContextMenuAction.ACTION_ID_RESET_USAGE -> {
-                            resetAppUsage(app)
-                        }
+                        "launch_shortcut" -> handleShortcutLaunch(bundle)
+                        AppContextMenuAction.ACTION_ID_APP_INFO -> showAppInfo(app)
+                        AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
+                        AppContextMenuAction.ACTION_ID_HIDE_APP -> hideApp(app)
+                        AppContextMenuAction.ACTION_ID_RESET_USAGE -> resetAppUsage(app)
                     }
-                } catch (e: Exception) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in fragment result listener")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up fragment result listener")
         }
     }
@@ -210,7 +224,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     AppContextMenuDialogFragment.RESULT_KEY_SHORTCUT,
                     ShortcutInfo::class.java
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting shortcut from bundle")
                 null
             }
@@ -231,11 +245,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 }
 
                 launcherApps.startShortcut(shortcut, null, null)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching shortcut")
                 viewModel.onAppInfoError()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
         }
     }
@@ -249,16 +263,16 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 0
             }
             viewModel.onToggleFavorite(app, currentFavoritesCount)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error toggling favorite")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
         }
     }
 
     private fun hideApp(app: AppInfo) {
         try {
             viewModel.onHideApp(app)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error hiding app")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error hiding app ${app.packageName}")
         }
     }
 
@@ -269,8 +283,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             startActivity(intent)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error showing app info")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
             viewModel.onAppInfoError()
         }
     }
@@ -279,8 +293,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             shouldScrollToTop = true
             viewModel.onResetAppUsage(app)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error resetting app usage")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error resetting app usage for ${app.packageName}")
         }
     }
 
@@ -291,15 +305,15 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     try {
                         Timber.d("AppDrawerFragment lambda called for ${app.displayName}")
                         viewModel.onAppClicked(app)
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in app click")
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in app click for ${app.packageName}")
                     }
                 },
                 onAppLongClicked = { app ->
                     try {
                         showAppContextMenu(app)
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in app long click")
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in app long click for ${app.packageName}")
                     }
                 }
             )
@@ -310,8 +324,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 // CRASH-SAFE: Disable animations to prevent IllegalStateException
                 itemAnimator = null
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error setting up RecyclerView")
+            // RecyclerView setup failed - drawer won't work, but app won't crash
         }
     }
 
@@ -321,22 +336,31 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 try {
                     searchJob?.cancel()
 
-                    searchJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    searchJob = viewLifecycleOwner.lifecycleScope.launch(
+                        Dispatchers.Main + fragmentExceptionHandler
+                    ) {
                         try {
                             delay(300)
                             displayFilteredApps()
                         } catch (e: CancellationException) {
                             // Normal cancellation, ignore
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in search delay")
+                            // Show unfiltered list as fallback
+                            try {
+                                displayFilteredApps()
+                            } catch (fallbackError: Throwable) {
+                                TimberWrapper.silentError(fallbackError, "Error in search fallback")
+                            }
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in text changed listener")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up search")
+            // Search won't work, but drawer still shows apps
         }
     }
 
@@ -346,12 +370,13 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 try {
                     shouldScrollToTop = true
                     viewModel.toggleSortOrder()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error toggling sort order")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up sort FAB")
+            // FAB won't work, but apps still displayed
         }
     }
 
@@ -365,7 +390,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             val query = try {
                 currentBinding.searchEditText.text.toString()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting search query")
                 ""
             }
@@ -377,33 +402,40 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     masterAppList.filter { app ->
                         try {
                             app.displayName.contains(query, ignoreCase = true)
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error filtering app: ${app.packageName}")
                             false
                         }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error filtering apps")
-                masterAppList
+                masterAppList  // Show all apps if filter fails
             }
 
             try {
-                appDrawerAdapter.submitList(filteredList.toList()) {
-                    try {
-                        if (shouldScrollToTop && _binding != null && isAdded) {
-                            currentBinding.appsRecyclerView.scrollToPosition(0)
-                            shouldScrollToTop = false
+                if (::appDrawerAdapter.isInitialized) {
+                    appDrawerAdapter.submitList(filteredList.toList()) {
+                        try {
+                            if (shouldScrollToTop && _binding != null && isAdded) {
+                                currentBinding.appsRecyclerView.scrollToPosition(0)
+                                shouldScrollToTop = false
+                            }
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error scrolling to top")
+                            shouldScrollToTop = false  // Reset flag anyway
                         }
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error scrolling to top")
                     }
+                } else {
+                    Timber.w("Adapter not initialized, cannot submit list")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting list to adapter")
+                // List won't update, but old list still visible
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in displayFilteredApps")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error in displayFilteredApps")
+            // Keep showing whatever was displayed before
         }
     }
 
@@ -414,18 +446,21 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
             longClickedApp = app
 
-            viewLifecycleOwner.lifecycleScope.launch {   // ← KEIN Dispatchers.Main nötig
+            viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
                 try {
                     val hasUsage = try {
                         appUsageManager.hasUsageDataForPackage(app.packageName)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error checking usage data")
-                        false
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error checking usage data for ${app.packageName}")
+                        false  // Safe fallback
                     }
 
-                    if (!isAdded || isDetached) return@launch
+                    if (!isAdded || isDetached) {
+                        Timber.d("Fragment not added, skipping dialog show")
+                        return@launch
+                    }
 
                     val dialog = AppContextMenuDialogFragment.newInstance(
                         app,
@@ -436,12 +471,12 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     dialog.show(childFragmentManager, AppContextMenuDialogFragment.TAG)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error showing context menu")
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing context menu for ${app.packageName}")
                 }
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in showAppContextMenu")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in showAppContextMenu for ${app.packageName}")
         }
     }
 
@@ -449,9 +484,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             val fabMargin = try {
                 resources.getDimensionPixelSize(R.dimen.spacing_large)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting fab margin")
-                16 // Fallback value
+                16  // Safe fallback in dp
             }
 
             val initialContentPadding = try {
@@ -461,7 +496,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     binding.contentContainer.paddingRight,
                     binding.contentContainer.paddingBottom
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting initial padding")
                 Rect(0, 0, 0, 0)
             }
@@ -477,7 +512,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                             initialContentPadding.right,
                             initialContentPadding.bottom + systemBars.bottom
                         )
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error setting content padding")
                     }
 
@@ -487,18 +522,19 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                             fabLayoutParams.bottomMargin = systemBars.bottom + fabMargin
                             binding.fabSort.layoutParams = fabLayoutParams
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error setting fab margin")
                     }
 
                     insets
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error applying window insets")
-                    insets
+                    insets  // Return original insets
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up window insets")
+            // Window insets won't work, but drawer still functional
         }
     }
 
@@ -511,14 +547,16 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             currentDialog = null
 
             try {
-                binding.appsRecyclerView.adapter = null
-            } catch (e: Exception) {
+                if (_binding != null) {
+                    binding.appsRecyclerView.adapter = null
+                }
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error clearing adapter")
             }
 
             _binding = null
             longClickedApp = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
             super.onDestroyView()
