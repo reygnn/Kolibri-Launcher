@@ -174,6 +174,19 @@ abstract class BaseViewModel<E>(
     }
 
     /**
+     * Determines if an error toast should be suppressed.
+     * Some errors shouldn't result in user-visible toasts.
+     */
+    private fun shouldSuppressErrorToast(throwable: Throwable): Boolean {
+        return when (throwable) {
+            is CancellationException -> true  // Normal cancellation
+            is OutOfMemoryError -> true       // User can't do anything about this
+            is StackOverflowError -> true     // User can't do anything about this
+            else -> false
+        }
+    }
+
+    /**
      * Override this in child ViewModels where E is NOT UiEvent.
      * Default implementation assumes E extends UiEvent.
      */
