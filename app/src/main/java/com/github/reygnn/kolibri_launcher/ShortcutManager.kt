@@ -27,26 +27,20 @@ class ShortcutManager @Inject constructor(
     private val launcherApps: LauncherApps? by lazy {
         try {
             context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Failed to get LauncherApps service")
             null
         }
     }
 
-    /**
-     * Prüft, ob diese App der aktuelle Default Launcher ist
-     */
     private fun isDefaultLauncher(): Boolean {
         return try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
             }
-            val resolveInfo = context.packageManager.resolveActivity(
-                intent,
-                0
-            )
+            val resolveInfo = context.packageManager.resolveActivity(intent, 0)
             resolveInfo?.activityInfo?.packageName == context.packageName
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Failed to check default launcher status")
             false
         }
@@ -81,8 +75,6 @@ class ShortcutManager @Inject constructor(
             service.getShortcuts(query, Process.myUserHandle()) ?: emptyList()
 
         } catch (e: SecurityException) {
-            // Das ist KEIN Fehler, sondern erwartetes Verhalten wenn nicht Default Launcher
-            // Fallback: Race-Condition zwischen isDefaultLauncher-Check und getShortcuts
             Timber.i("Shortcut access denied for $packageName - launcher status may have changed")
             emptyList()
         } catch (e: IllegalStateException) {
@@ -91,13 +83,11 @@ class ShortcutManager @Inject constructor(
         } catch (e: IllegalArgumentException) {
             TimberWrapper.silentError(e, "Invalid package name: $packageName")
             emptyList()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Unexpected error while retrieving shortcuts for $packageName")
             emptyList()
         }
     }
 
-    override fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
-    }
+    override fun purgeRepository() { }
 }

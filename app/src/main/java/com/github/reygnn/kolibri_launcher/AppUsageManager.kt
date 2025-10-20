@@ -32,6 +32,8 @@ class AppUsageManager @Inject constructor(
 
     companion object {
         private const val LAMBDA = 0.000001 // Zerfallskonstante
+        private const val MAX_TIMESTAMPS_STORED = 100
+        private const val MAX_TIMESTAMP_AGE_MS = 365L * 24 * 60 * 60 * 1000 // 1 Jahr
     }
 
     /**
@@ -41,21 +43,28 @@ class AppUsageManager @Inject constructor(
         if (packageName.isNullOrBlank()) return
 
         val usageKey = stringSetPreferencesKey(packageName)
-        val currentTime = System.currentTimeMillis().toString()
+        val currentTime = System.currentTimeMillis()
 
         try {
             dataStore.edit { preferences ->
                 val currentTimestamps = preferences[usageKey] ?: emptySet()
-                val updatedTimestamps = (currentTimestamps + currentTime)
+
+                // Validierung und Bereinigung alter Timestamps
+                val validTimestamps = currentTimestamps
+                    .mapNotNull { it.toLongOrNull() }
+                    .filter { isValidTimestamp(it, currentTime) }
+
+                val updatedTimestamps = (validTimestamps + currentTime)
                     .sortedDescending()
-                    .take(100)
+                    .take(MAX_TIMESTAMPS_STORED)
+                    .map { it.toString() }
                     .toSet()
 
                 preferences[usageKey] = updatedTimestamps
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error recording launch for package: $packageName")
         }
     }
@@ -82,7 +91,10 @@ class AppUsageManager @Inject constructor(
      * So werden sowohl Häufigkeit als auch Aktualität der Nutzung berücksichtigt:
      * - Häufige, aktuelle Starts → hoher Score
      * - Seltene oder alte Starts → niedriger Score
-     */    override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> {
+     */
+    override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> {
+        if (apps.isEmpty()) return emptyList()
+
         return try {
             val allUsagePreferences = dataStore.data
                 .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -92,13 +104,12 @@ class AppUsageManager @Inject constructor(
 
             apps.map { appInfo ->
                 val key = stringSetPreferencesKey(appInfo.packageName)
-                val timestamps = allUsagePreferences[key]?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+                val timestamps = allUsagePreferences[key]
+                    ?.mapNotNull { it.toLongOrNull() }
+                    ?.filter { isValidTimestamp(it, currentTime) }
+                    ?: emptyList()
 
-                val score = timestamps.sumOf { launchTime ->
-                    val timeDifference = (currentTime - launchTime) / 1000.0
-                    exp(-LAMBDA * timeDifference)
-                }
-
+                val score = calculateTimeWeightedScore(timestamps, currentTime)
                 Pair(appInfo, score)
             }
                 .sortedWith(
@@ -109,9 +120,54 @@ class AppUsageManager @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error sorting by time-weighted usage, falling back to alphabetical sort.")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error sorting by time-weighted usage, falling back to alphabetical sort")
             apps.sortedBy { it.displayName.lowercase() }
+        }
+    }
+
+    /**
+     * Berechnet den zeitgewichteten Score mit Safe-Math-Operations
+     */
+    private fun calculateTimeWeightedScore(timestamps: List<Long>, currentTime: Long): Double {
+        if (timestamps.isEmpty()) return 0.0
+
+        return try {
+            timestamps.sumOf { launchTime ->
+                try {
+                    val timeDifferenceMs = currentTime - launchTime
+                    if (timeDifferenceMs < 0) return@sumOf 0.0 // Zukunfts-Timestamp
+
+                    val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeast(0.0)
+                    val exponent = -LAMBDA * timeDifferenceSec
+
+                    // Overflow-Schutz
+                    when {
+                        exponent < -100.0 -> 0.0
+                        exponent > 100.0 -> 1.0
+                        else -> exp(exponent).coerceIn(0.0, 1.0)
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error calculating score for timestamp: $launchTime")
+                    0.0
+                }
+            }.coerceAtLeast(0.0)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in calculateTimeWeightedScore")
+            0.0
+        }
+    }
+
+    /**
+     * Validiert einen Timestamp auf Plausibilität
+     */
+    private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
+        return try {
+            timestamp > 0 &&
+                    timestamp <= currentTime &&
+                    (currentTime - timestamp) <= MAX_TIMESTAMP_AGE_MS
+        } catch (e: Throwable) {
+            false
         }
     }
 
@@ -128,7 +184,7 @@ class AppUsageManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error removing usage data for package: $packageName")
         }
     }
@@ -142,7 +198,7 @@ class AppUsageManager @Inject constructor(
             preferences[usageKey]?.isNotEmpty() ?: false
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking usage data for package: $packageName")
             false
         }

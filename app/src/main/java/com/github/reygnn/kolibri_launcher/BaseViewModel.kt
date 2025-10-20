@@ -136,18 +136,20 @@ abstract class BaseViewModel<E>(
      * @param throwable The error that occurred
      * @param context Context information about where the error occurred
      */
+
+    /**
+     * Handles errors with triple-fallback logging.
+     * Override shouldShowErrorToast() in child ViewModels if E is not UiEvent.
+     */
     protected open fun handleError(throwable: Throwable, context: String) {
         // Triple-fallback logging
         try {
             when (throwable) {
                 is OutOfMemoryError -> {
                     Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
-                    // Attempt emergency cleanup
                     try {
                         System.gc()
-                    } catch (ignored: Throwable) {
-                        // GC can fail too
-                    }
+                    } catch (ignored: Throwable) { }
                 }
                 is StackOverflowError -> {
                     Timber.e(throwable, "[$context] STACK OVERFLOW - Critical!")
@@ -160,62 +162,38 @@ abstract class BaseViewModel<E>(
                 }
             }
         } catch (loggingError: Throwable) {
-            // Logging failed - try Android Log as fallback
             try {
                 android.util.Log.e("BaseViewModel", "[$context] Error: ${throwable.message}", throwable)
-            } catch (ignored: Throwable) {
-                // Even Android Log can fail - give up
-            }
+            } catch (ignored: Throwable) { }
         }
 
-        // Safe event emission with type check
+        // Show error toast if applicable
         if (!shouldSuppressErrorToast(throwable)) {
-            viewModelScope.launch(coroutineExceptionHandler) {
+            showErrorToastIfSupported()
+        }
+    }
+
+    /**
+     * Override this in child ViewModels where E is NOT UiEvent.
+     * Default implementation assumes E extends UiEvent.
+     */
+    protected open fun showErrorToastIfSupported() {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            try {
+                // This will fail at runtime if E is not UiEvent, but that's okay
+                // Child ViewModels should override this method if needed
+                @Suppress("UNCHECKED_CAST")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ClassCastException) {
+                // E is not UiEvent - that's okay, this ViewModel doesn't support error toasts
+                Timber.d("This ViewModel does not support UiEvent error toasts")
+            } catch (e: Throwable) {
                 try {
-                    // Check if E is UiEvent before attempting cast
-                    if (isUiEventType()) {
-                        @Suppress("UNCHECKED_CAST")
-                        sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    // Event emission failed - log but don't crash
-                    try {
-                        Timber.e(e, "Failed to send error toast event")
-                    } catch (ignored: Throwable) {
-                        // Even this can fail
-                    }
-                }
+                    Timber.e(e, "Failed to send error toast event")
+                } catch (ignored: Throwable) { }
             }
-        }
-    }
-
-    /**
-     * Checks if this ViewModel's event type is UiEvent.
-     * Uses reflection to avoid ClassCastException.
-     */
-    private fun isUiEventType(): Boolean {
-        return try {
-            // Simple heuristic: try to create a test event and see if it compiles
-            // This is checked at runtime, not compile time
-            UiEvent.ShowToast(R.string.error_generic) is Any
-            true
-        } catch (e: Throwable) {
-            false
-        }
-    }
-
-    /**
-     * Determines if an error toast should be suppressed.
-     * Some errors shouldn't result in user-visible toasts.
-     */
-    private fun shouldSuppressErrorToast(throwable: Throwable): Boolean {
-        return when (throwable) {
-            is CancellationException -> true  // Normal cancellation
-            is OutOfMemoryError -> true       // User can't do anything about this
-            is StackOverflowError -> true     // User can't do anything about this
-            else -> false
         }
     }
 

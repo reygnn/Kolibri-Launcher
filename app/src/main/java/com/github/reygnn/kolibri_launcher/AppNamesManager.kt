@@ -264,8 +264,14 @@ class AppNamesManager @Inject constructor(
      * dass sie ihre Daten neu laden sollten.
      */
     override suspend fun triggerCustomNameUpdate() {
-        Timber.d("[DATAFLOW] AppNamesManager is emitting an update event.")
-        appsUpdateTrigger.emit(Unit)
+        try {
+            Timber.d("[DATAFLOW] AppNamesManager is emitting an update event.")
+            appsUpdateTrigger.emit(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error triggering custom name update")
+        }
     }
 
     override fun purgeRepository() { }  // für die androidTests

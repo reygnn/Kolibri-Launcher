@@ -40,7 +40,7 @@ class AppVisibilityManager @Inject constructor(
         get() = dataStore.data
             .catch { e ->
                 if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading hidden components preferences.")
+                    TimberWrapper.silentError(e, "Error reading hidden components preferences")
                     emit(emptyPreferences())
                 } else {
                     throw e
@@ -57,7 +57,7 @@ class AppVisibilityManager @Inject constructor(
             hiddenAppsFlow.first().contains(componentName)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Error checking if component is hidden: $componentName")
             false
         }
@@ -84,7 +84,7 @@ class AppVisibilityManager @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Error hiding component: $componentName")
             false
         }
@@ -111,7 +111,7 @@ class AppVisibilityManager @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Error showing component: $componentName")
             false
         }
@@ -135,7 +135,7 @@ class AppVisibilityManager @Inject constructor(
             Timber.i("Component visibilities updated. Hidden: ${componentsToHide.size}, Shown: ${componentsToShow.size}")
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Error updating component visibilities in batch")
         }
     }

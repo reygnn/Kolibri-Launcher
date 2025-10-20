@@ -75,7 +75,8 @@ class HomeViewModel @Inject constructor(
     private val appUsageManager: AppUsageRepository,
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: AppVisibilityRepository,
-    @MainDispatcher mainDispatcher: CoroutineDispatcher
+    @MainDispatcher mainDispatcher: CoroutineDispatcher,
+    private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -94,10 +95,6 @@ class HomeViewModel @Inject constructor(
     private var enableLockToastShown = false
 
     companion object {
-        @Volatile
-        var isInTestMode = false
-
-        // Safe defaults for critical features
         private const val DEFAULT_TEXT_COLOR = Color.WHITE
         private const val DEFAULT_SHADOW_COLOR = Color.BLACK
         private const val DEFAULT_TIME = "--:--"
@@ -111,8 +108,8 @@ class HomeViewModel @Inject constructor(
         getInitialBatteryState()
         updateUiColors()
 
-        // Only start if NOT in test mode
-        if (!isInTestMode) {
+
+        if (!testMode.isEnabled) {
             launchSafe {
                 try {
                     delay(100)
@@ -611,17 +608,21 @@ class HomeViewModel @Inject constructor(
      * Calculates tonal shadow color with safe math operations.
      * Protected against all math errors with safe fallbacks.
      */
+    /**
+     * Calculates tonal shadow color with safe math operations.
+     * Protected against all math errors with safe fallbacks.
+     */
+    /**
+     * Calculates tonal shadow color with safe math operations.
+     * Only ColorUtils.calculateLuminance() can throw - math operations cannot.
+     */
     private fun calculateTonalShadowColor(baseColor: Int): Int {
         return try {
             val luminance = ColorUtils.calculateLuminance(baseColor).toDouble()
 
-            // Safe lerp function
+            // Simple lerp function - no try-catch needed (math can't throw)
             fun lerp(start: Double, stop: Double, fraction: Double): Double {
-                return try {
-                    (start + fraction * (stop - start)).coerceIn(0.0, 1.0)
-                } catch (e: Throwable) {
-                    0.5  // Safe middle value
-                }
+                return (start + fraction * (stop - start)).coerceIn(0.0, 1.0)
             }
 
             when {
@@ -643,8 +644,8 @@ class HomeViewModel @Inject constructor(
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error in calculateTonalShadowColor")
-            // Safe fallback
+            // Only ColorUtils.calculateLuminance() can throw here
+            TimberWrapper.silentError(e, "Error calculating luminance, using default shadow")
             DEFAULT_SHADOW_COLOR
         }
     }

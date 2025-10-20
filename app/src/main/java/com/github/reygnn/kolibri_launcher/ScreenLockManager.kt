@@ -36,7 +36,7 @@ class ScreenLockManager @Inject constructor() : ScreenLockRepository {
         try {
             _isAvailable.value = isAvailable
             Timber.d("Screen lock service state changed: available=$isAvailable")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting screen lock service state")
             // Nicht kritisch - behalte den alten Zustand
         }
@@ -56,7 +56,7 @@ class ScreenLockManager @Inject constructor() : ScreenLockRepository {
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error requesting screen lock")
             // Nicht kritisch - Lock wird einfach nicht ausgeführt
         }

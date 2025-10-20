@@ -21,47 +21,36 @@ class InstalledAppsStateManager @Inject constructor() : InstalledAppsStateReposi
     private val _rawAppsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
     override val rawAppsFlow: StateFlow<List<AppInfo>> = _rawAppsFlow
 
-    // Cache für Recovery-Mechanismus
+    @Volatile  // Nur das hier von paranoid
     private var lastSuccessfulAppList: List<AppInfo> = emptyList()
 
     override fun updateApps(newApps: List<AppInfo>) {
         try {
             Timber.d("[DATAFLOW] 5. StateManager is being updated. Size: ${newApps.size}")
 
-            // Nur nicht-leere Listen als "erfolgreich" cachen
             if (newApps.isNotEmpty()) {
                 lastSuccessfulAppList = newApps
             }
 
             _rawAppsFlow.value = newApps
 
-        } catch (e: Exception) {
+        } catch (e: Throwable) {  // Throwable statt Exception
             TimberWrapper.silentError(e, "Error updating apps in StateManager, keeping previous state")
-            // Behalte den alten State bei - _rawAppsFlow.value wird nicht verändert
         }
     }
 
     override fun getCurrentApps(): List<AppInfo> {
         return try {
-            val currentApps = _rawAppsFlow.value
-
-            if (currentApps.isNotEmpty()) {
-                currentApps
-            } else {
-                // Fallback auf die letzte erfolgreiche Liste
-                Timber.d("Current app list is empty, returning cached list with ${lastSuccessfulAppList.size} apps")
+            _rawAppsFlow.value.ifEmpty {
+                Timber.d("Returning cached list with ${lastSuccessfulAppList.size} apps")
                 lastSuccessfulAppList
             }
-
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error getting current apps, returning cached list")
-            // Im absoluten Worst-Case: Gib die gecachte Liste zurück
             lastSuccessfulAppList
         }
     }
 
     override fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
-        // In-Memory State wird automatisch beim App-Neustart gelöscht
     }
 }

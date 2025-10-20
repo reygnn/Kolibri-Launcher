@@ -57,6 +57,9 @@ class SettingsManager @Inject constructor(
             } catch (e: IllegalArgumentException) {
                 TimberWrapper.silentError(e, "Invalid sort order value: $sortName, using default")
                 SortOrder.TIME_WEIGHTED_USAGE
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Unexpected error parsing sort order")
+                SortOrder.TIME_WEIGHTED_USAGE
             }
         }
 
@@ -67,9 +70,8 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting sort order: $sortOrder")
-            // Fehler wird geloggt, aber nicht weitergegeben - Setting bleibt unverändert
         }
     }
 
@@ -93,7 +95,7 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting double tap to lock: $isEnabled")
         }
     }
@@ -118,7 +120,7 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting readability mode: $mode")
         }
     }
@@ -143,7 +145,7 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting onboarding completed")
         }
     }
@@ -158,7 +160,6 @@ class SettingsManager @Inject constructor(
             }
         }
         .map { preferences ->
-            // Standardmäßig ist der Schatten aktiviert
             preferences[PreferenceKeys.TEXT_SHADOW_ENABLED] ?: true
         }
 
@@ -169,7 +170,7 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting text shadow enabled: $isEnabled")
         }
     }
@@ -194,12 +195,10 @@ class SettingsManager @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting text color: $color")
         }
     }
 
-    override fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
-    }
+    override fun purgeRepository() { }
 }

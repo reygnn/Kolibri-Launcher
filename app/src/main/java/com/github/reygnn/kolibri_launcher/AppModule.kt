@@ -18,6 +18,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideTestMode(): TestMode {
+        return TestMode(isEnabled = false)  // Production default
+    }
+
+    @Provides
+    @Singleton
     fun providePackageManager(@ApplicationContext context: Context): PackageManager {
         return context.packageManager
     }

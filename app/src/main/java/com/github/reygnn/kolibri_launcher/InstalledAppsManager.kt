@@ -17,10 +17,12 @@ import android.content.pm.ResolveInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -40,18 +42,32 @@ class InstalledAppsManager @Inject constructor(
     private val appsUpdateTrigger: MutableSharedFlow<Unit>
 ) : InstalledAppsRepository {
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val appsStateFlow: StateFlow<List<AppInfo>> = appsUpdateTrigger
         .onStart {
             try {
                 emit(Unit)
-            } catch (e: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error emitting initial trigger")
+                // Trotzdem versuchen weiterzumachen
+                emit(Unit)
             }
         }
         .flatMapLatest {
             loadAppsFromPackageManager()
+        }
+        .catch { e ->
+            try {
+                TimberWrapper.silentError(e, "Error in apps state flow, emitting empty list")
+                emit(emptyList())
+            } catch (catchError: Throwable) {
+                TimberWrapper.silentError(catchError, "CRITICAL: Error in catch block")
+                // Letzte Verteidigungslinie: Leere Liste
+                emit(emptyList())
+            }
         }
         .stateIn(
             scope = scope,
@@ -63,9 +79,6 @@ class InstalledAppsManager @Inject constructor(
         return appsStateFlow
     }
 
-    /**
-     * Löst eine manuelle Aktualisierung der App-Liste aus.
-     */
     override suspend fun triggerAppsUpdate() {
         try {
             Timber.d("App update triggered.")
@@ -73,18 +86,16 @@ class InstalledAppsManager @Inject constructor(
             appsUpdateTrigger.emit(Unit)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error triggering apps update")
+            // Nicht weiteren Error werfen - Update-Fehler sollten nicht crashen
         }
     }
 
-    /**
-     * Eine private Funktion, die den eigentlichen Ladevorgang in einem Flow kapselt.
-     */
     private fun loadAppsFromPackageManager(): Flow<List<AppInfo>> = flow {
-        Timber.d("!!! PROBE: Loading apps from PackageManager... Expensive operation is RUNNING!")
-
         try {
+            Timber.d("!!! PROBE: Loading apps from PackageManager... Expensive operation is RUNNING!")
+
             val intent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
@@ -94,38 +105,66 @@ class InstalledAppsManager @Inject constructor(
                     intent,
                     PackageManager.ResolveInfoFlags.of(0)
                 )
-            } catch (e: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error querying intent activities")
                 emptyList()
             }
 
-            val freshApps = processResolveInfoList(resolveInfoList)
-            Timber.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
+            val freshApps = try {
+                processResolveInfoList(resolveInfoList)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error processing resolve info list")
+                emptyList()
+            }
 
+            Timber.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
             emit(freshApps)
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error loading apps for Flow.")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error loading apps for Flow")
             emit(emptyList())
         }
-    }.flowOn(Dispatchers.IO)
+    }
+        .catch { e ->
+            try {
+                TimberWrapper.silentError(e, "Flow catch: Error in loadAppsFromPackageManager")
+                emit(emptyList())
+            } catch (catchError: Throwable) {
+                TimberWrapper.silentError(catchError, "CRITICAL: Error in flow catch block")
+            }
+        }
+        .flowOn(Dispatchers.IO)
 
-    /**
-     * Verarbeitet die rohe Liste von ResolveInfo in eine saubere Liste von AppInfo-Objekten.
-     */
     internal suspend fun processResolveInfoList(resolveInfoList: List<ResolveInfo>): List<AppInfo> {
         val appList = mutableListOf<AppInfo>()
 
         for (resolveInfo in resolveInfoList) {
             try {
                 resolveInfo.activityInfo?.let { activityInfo ->
+                    // Validierung
+                    if (activityInfo.packageName.isNullOrBlank()) {
+                        Timber.w("Skipping app with blank package name")
+                        return@let
+                    }
+
                     val systemName = try {
-                        resolveInfo.loadLabel(packageManager).toString()
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error loading label for ${activityInfo.packageName}")
-                        activityInfo.packageName // Fallback auf packageName
+                        resolveInfo.loadLabel(packageManager).toString().ifBlank {
+                            activityInfo.packageName
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(
+                            e,
+                            "Error loading label for ${activityInfo.packageName}"
+                        )
+                        activityInfo.packageName
                     }
 
                     val customDisplayName = try {
@@ -135,16 +174,19 @@ class InstalledAppsManager @Inject constructor(
                         )
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error getting custom display name for ${activityInfo.packageName}")
-                        systemName // Fallback auf systemName
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(
+                            e,
+                            "Error getting custom display name for ${activityInfo.packageName}"
+                        )
+                        systemName
                     }
 
                     val appInfo = AppInfo(
                         originalName = systemName,
                         displayName = customDisplayName,
                         packageName = activityInfo.packageName,
-                        className = activityInfo.name,
+                        className = activityInfo.name ?: "",
                         isSystemApp = false,
                         isFavorite = false
                     )
@@ -152,15 +194,18 @@ class InstalledAppsManager @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                Timber.w(e, "Could not process app: ${resolveInfo.activityInfo?.packageName}")
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(
+                    e,
+                    "Could not process app: ${resolveInfo.activityInfo?.packageName}"
+                )
             }
         }
 
         // Sortierung mit Fehlerbehandlung
         val sortedList = try {
             appList.sortedBy { it.displayName.lowercase() }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error sorting app list, returning unsorted")
             appList
         }
@@ -170,6 +215,5 @@ class InstalledAppsManager @Inject constructor(
     }
 
     override fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
     }
 }
