@@ -30,12 +30,12 @@ class GetOnboardingAppsUseCase @Inject constructor(
                         try {
                             app.packageName.isNotBlank() &&
                                     app.displayName.isNotBlank()
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error validating app for onboarding")
                             false
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error filtering onboarding apps, returning all")
                     apps
                 }

@@ -78,7 +78,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                     binding.searchEditText.setSelection(query.length)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish()
         }
@@ -94,7 +94,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
             _binding?.let {
                 outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving instance state")
         }
     }
@@ -108,7 +108,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
             // Cleanup in richtiger Reihenfolge
             adapter = null
             _binding = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -127,7 +127,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                 )
                 WindowInsetsCompat.CONSUMED
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error handling window insets")
         }
     }
@@ -137,7 +137,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
             adapter = AppNamesAdapter { appInfo ->
                 try {
                     showRenameDialog(appInfo)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error showing rename dialog for ${appInfo.packageName}")
                     showError(getString(R.string.error_generic))
                 }
@@ -150,7 +150,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                 // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
                 itemAnimator = null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up RecyclerView")
         }
     }
@@ -170,7 +170,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                             viewModel.onSearchQueryChanged(query)
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in search query changed")
                         }
                     }
@@ -183,7 +183,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
             binding.doneButton.setOnClickListener {
                 finish()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up click listeners")
         }
     }
@@ -196,7 +196,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                         updateUi(state)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error updating UI")
                     }
                 }
@@ -219,7 +219,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
             updateCustomNameChips(state.appsWithCustomNames)
         } catch (e: IllegalStateException) {
             TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating UI")
         }
     }
@@ -239,17 +239,17 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                         setOnCloseIconClickListener {
                             try {
                                 viewModel.removeCustomName(app.packageName)
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error removing custom name for ${app.packageName}")
                             }
                         }
                     }
                     binding.appNameChipGroup.addView(chip)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating custom name chips")
         }
     }
@@ -272,7 +272,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                     try {
                         val newName = editText.text.toString().trim()
                         handleRename(app, newName)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error handling rename")
                         showError(getString(R.string.error_generic))
                     }
@@ -295,14 +295,14 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                     try {
                         val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
                         imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error showing keyboard")
                     }
                 }, 100)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting focus")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating rename dialog")
             showError(getString(R.string.error_generic))
         }
@@ -324,7 +324,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
                     viewModel.setCustomName(app.packageName, newName)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in handleRename")
             showError(getString(R.string.error_generic))
         }
@@ -333,7 +333,7 @@ class AppNamesActivity : BaseActivity<UiEvent, AppNamesViewModel>() {
     private fun showError(message: String) {
         try {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing toast")
         }
     }

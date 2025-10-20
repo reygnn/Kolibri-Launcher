@@ -30,7 +30,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             if (savedInstanceState == null) {
                 loadSettingsFragment()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
         }
@@ -45,7 +45,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             // CRASH-SAFE: Cleanup
             backPressedCallback?.remove()
             backPressedCallback = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -74,7 +74,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                             systemBars.bottom
                         )
                         insets
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error applying window insets")
                         insets
                     }
@@ -82,7 +82,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             } ?: run {
                 Timber.w("Content view not found")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up UI")
         }
     }
@@ -97,14 +97,14 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                         } else {
                             finish()
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error handling back press")
                         finish() // Fallback
                     }
                 }
             }
             onBackPressedDispatcher.addCallback(this, backPressedCallback!!)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up back press handling")
         }
     }
@@ -119,7 +119,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                     AppConstants.FRAGMENT_SETTINGS
                 )
                 .commitAllowingStateLoss()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error loading settings fragment")
             // Nicht finish() aufrufen - Activity kann trotzdem funktionieren
         }
@@ -133,7 +133,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             } else {
                 super.onOptionsItemSelected(item)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onOptionsItemSelected")
             false
         }

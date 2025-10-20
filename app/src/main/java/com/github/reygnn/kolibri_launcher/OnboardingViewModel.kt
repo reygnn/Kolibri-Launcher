@@ -98,7 +98,7 @@ class OnboardingViewModel @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Failed to load apps.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load apps. Please try again."))
             }
@@ -128,7 +128,7 @@ class OnboardingViewModel @Inject constructor(
                     }
                 }
                 selectedComponents.value = initialSelection
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading initial favorites.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
             }
@@ -166,7 +166,7 @@ class OnboardingViewModel @Inject constructor(
                 }
 
                 sendOnboardingEvent(OnboardingEvent.NavigateToMain)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "CRITICAL: Failed to save favorites or complete onboarding.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Save failed. Please try again."))
             }

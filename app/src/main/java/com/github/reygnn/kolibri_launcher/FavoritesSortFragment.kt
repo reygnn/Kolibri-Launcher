@@ -104,13 +104,13 @@ class FavoritesSortFragment : Fragment() {
                     AppConstants.ARG_FAVORITES,
                     AppInfo::class.java
                 ) ?: emptyList()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting favorites from arguments")
                 emptyList()
             }
 
             originalOrder = initialApps.toList()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onCreate")
         }
     }
@@ -133,7 +133,7 @@ class FavoritesSortFragment : Fragment() {
 
             setupRecyclerView()
             setupButtons()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
     }
@@ -143,7 +143,7 @@ class FavoritesSortFragment : Fragment() {
             adapter = FavoritesAdapter { newOrder ->
                 try {
                     saveFavoritesOrder(newOrder)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in adapter callback")
                 }
             }
@@ -153,14 +153,14 @@ class FavoritesSortFragment : Fragment() {
 
             try {
                 adapter.submitList(originalOrder)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting initial list")
             }
 
             val callback = createItemTouchHelperCallback()
             itemTouchHelper = ItemTouchHelper(callback)
             itemTouchHelper.attachToRecyclerView(binding.recyclerView)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up RecyclerView")
         }
     }
@@ -186,7 +186,7 @@ class FavoritesSortFragment : Fragment() {
                         adapter.moveItem(fromPosition, toPosition)
                         true
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in onMove")
                     false
                 }
@@ -205,7 +205,7 @@ class FavoritesSortFragment : Fragment() {
                     if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
                         viewHolder?.itemView?.alpha = 0.7f
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in onSelectedChanged")
                 }
             }
@@ -218,7 +218,7 @@ class FavoritesSortFragment : Fragment() {
                     super.clearView(recyclerView, viewHolder)
                     viewHolder.itemView.alpha = 1.0f
                     adapter.onMoveFinished()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in clearView")
                 }
             }
@@ -230,11 +230,11 @@ class FavoritesSortFragment : Fragment() {
             binding.buttonAlphabetical.setOnClickListener {
                 try {
                     sortFavoritesAlphabetically()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in alphabetical button click")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting alphabetical button listener")
         }
 
@@ -242,11 +242,11 @@ class FavoritesSortFragment : Fragment() {
             binding.buttonReset.setOnClickListener {
                 try {
                     resetToOriginalOrder()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in reset button click")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting reset button listener")
         }
     }
@@ -255,20 +255,20 @@ class FavoritesSortFragment : Fragment() {
         try {
             val sortedList = try {
                 adapter.currentList.sortedBy { it.displayName.lowercase() }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error sorting alphabetically")
                 adapter.currentList
             }
 
             try {
                 adapter.submitList(sortedList)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting sorted list")
             }
 
             saveFavoritesOrder(sortedList)
             showToast(getString(R.string.favorites_sorted_alphabetically))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in sortFavoritesAlphabetically")
         }
     }
@@ -277,13 +277,13 @@ class FavoritesSortFragment : Fragment() {
         try {
             try {
                 adapter.submitList(originalOrder)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting original order")
             }
 
             saveFavoritesOrder(originalOrder)
             showToast(getString(R.string.favorites_order_reset))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in resetToOriginalOrder")
         }
     }
@@ -324,7 +324,7 @@ class FavoritesSortFragment : Fragment() {
                         if (isAdded && !isDetached) {
                             try {
                                 setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error setting fragment result")
                             }
                         }
@@ -335,14 +335,14 @@ class FavoritesSortFragment : Fragment() {
                     }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in saveFavoritesOrder coroutine")
                     if (isAdded && !isDetached) {
                         showToast(getString(R.string.error_saving_order))
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error launching coroutine")
         }
     }
@@ -354,7 +354,7 @@ class FavoritesSortFragment : Fragment() {
                     Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing toast")
         }
     }
@@ -365,7 +365,7 @@ class FavoritesSortFragment : Fragment() {
                 getString(R.string.settings_title)
 
             _binding = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
             super.onDestroyView()

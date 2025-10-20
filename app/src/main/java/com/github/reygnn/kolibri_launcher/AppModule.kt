@@ -24,6 +24,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideContext(@ApplicationContext context: Context): Context {
+        return context
+    }
+
+    @Provides
+    @Singleton
     fun providePackageManager(@ApplicationContext context: Context): PackageManager {
         return context.packageManager
     }

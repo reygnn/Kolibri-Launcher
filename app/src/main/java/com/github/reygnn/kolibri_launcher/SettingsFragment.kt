@@ -67,7 +67,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             setPreferencesFromResource(R.xml.preferences, rootKey)
 
             setupPreferenceListeners()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onCreatePreferences")
         }
     }
@@ -80,7 +80,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             viewLifecycleOwner.lifecycleScope.launch {
                 updateCrashReportSummary()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
     }
@@ -90,7 +90,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         try {
             updateDefaultLauncherStatus()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume")
         }
     }
@@ -102,12 +102,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 try {
                     openSystemWallpaperPicker()
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in wallpaper preference click")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting wallpaper preference listener")
         }
 
@@ -120,12 +120,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                     startActivity(intent)
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error starting edit favorites")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting edit favorites listener")
         }
 
@@ -140,7 +140,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             showSortFavoritesFragment()
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error showing sort favorites")
                             viewModel.onAppListNotLoaded()
                         } finally {
@@ -148,13 +148,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         }
                     }
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in sort favorites click")
                     if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting sort favorites listener")
         }
 
@@ -169,13 +169,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                     if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error starting hidden apps")
                     if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting hidden apps listener")
         }
 
@@ -186,12 +186,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     val intent = Intent(requireActivity(), AppNamesActivity::class.java)
                     startActivity(intent)
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error starting app names activity")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting custom app names listener")
         }
 
@@ -201,12 +201,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 try {
                     openUrlInCustomTab(requireContext(), "https://docs.kolibri-launcher.ch/about.html")
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error opening app info")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting app info listener")
         }
 
@@ -216,12 +216,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 try {
                     openAccessibilitySettings()
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error opening accessibility")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting accessibility listener")
         }
 
@@ -231,12 +231,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 try {
                     openDefaultLauncherSettings()
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error opening default launcher settings")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting default launcher listener")
         }
 
@@ -251,18 +251,18 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 settingsManager.setDoubleTapToLock(newValue)
                             } catch (e: CancellationException) {
                                 throw e
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error setting double tap to lock")
                             }
                         }
                     }
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in double tap preference change")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting double tap listener")
         }
 
@@ -293,17 +293,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             }
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error showing forced consent dialog")
                         }
                     }
                     true
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in crash reports preference click")
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting crash reports listener")
         }
     }
@@ -314,7 +314,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
                 return typedValue.data
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Timber.e(e, "Failed to resolve theme color attribute: $attrRes")
         }
         // Fallback, wenn die Farbe nicht gefunden werden konnte
@@ -331,12 +331,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             val customTabsIntent = builder.build()
             customTabsIntent.launchUrl(context, url.toUri())
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Timber.e(e, "Could not open Custom Tab, falling back to standard browser.")
             try {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 context.startActivity(intent)
-            } catch (fallbackError: Exception) {
+            } catch (fallbackError: Throwable) {
                 Timber.e(fallbackError, "Even the fallback browser intent failed.")
             }
         }
@@ -353,7 +353,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 } else {
                     preference.summary = getString(R.string.crash_report_summary_disabled)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Could not update crash report summary")
             }
         }
@@ -378,13 +378,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                                 sortFavoritesPref?.isEnabled = isAppListReady
                                 hiddenAppsPref?.isEnabled = isAppListReady
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating preference states")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in installed apps collection")
                     }
                 }
@@ -397,13 +397,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                             try {
                                 findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked = isChecked
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating double tap preference")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in double tap flow collection")
                     }
                 }
@@ -421,7 +421,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             val allApps = try {
                 viewModel.installedApps.value
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting installed apps")
                 emptyList()
             }
@@ -435,14 +435,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 favoritesManager.favoriteComponentsFlow.first()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting favorite components")
                 emptySet()
             }
 
             val favoriteApps = try {
                 allApps.filter { favoriteComponents.contains(it.componentName) }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error filtering favorite apps")
                 emptyList()
             }
@@ -456,7 +456,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 favoritesOrderManager.favoriteComponentsOrderFlow.first()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting saved order")
                 emptyList()
             }
@@ -465,7 +465,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error sorting favorites")
                 favoriteApps
             }
@@ -483,13 +483,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     .replace(android.R.id.content, fragment)
                     .addToBackStack(null)
                     .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error committing fragment transaction")
                 viewModel.onAppListNotLoaded()
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in showSortFavoritesFragment")
             viewModel.onAppListNotLoaded()
         }
@@ -499,7 +499,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             val intent = Intent(Intent.ACTION_SET_WALLPAPER)
             startActivity(Intent.createChooser(intent, getString(R.string.wallpaper_picker_title)))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error opening system wallpaper picker")
             openWallpaperSettings()
         }
@@ -509,7 +509,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
             viewModel.onWallpaperSettingsFallback()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             viewModel.onErrorOpeningWallpaperSettings(e)
         }
     }
@@ -517,7 +517,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun openAccessibilitySettings() {
         try {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             viewModel.onErrorOpeningAccessibilitySettings(e)
         }
     }
@@ -532,7 +532,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             val roleManager = try {
                 requireContext().getSystemService(RoleManager::class.java)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting RoleManager")
                 return
             }
@@ -544,7 +544,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             val isDefault = try {
                 roleManager.isRoleHeld(RoleManager.ROLE_HOME)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error checking role")
                 false
             }
@@ -556,7 +556,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 setDefaultLauncherPref.summary = getString(R.string.set_default_launcher_summary)
                 setDefaultLauncherPref.isEnabled = true
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating default launcher status")
         }
     }
@@ -564,7 +564,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun openDefaultLauncherSettings() {
         try {
             startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             viewModel.onErrorOpeningDefaultLauncherSettings(e)
         }
     }

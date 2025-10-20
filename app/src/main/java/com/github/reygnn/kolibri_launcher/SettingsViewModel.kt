@@ -41,13 +41,13 @@ class SettingsViewModel @Inject constructor(
                         _installedApps.value = apps
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error updating installed apps")
                     }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error observing apps")
                 sendEvent(UiEvent.ShowToast(R.string.error_loading_apps))
             }
@@ -75,28 +75,28 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onErrorOpeningWallpaperSettings(e: Exception) {
+    fun onErrorOpeningWallpaperSettings(e: Throwable) {
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_wallpaper_settings_open))
             TimberWrapper.silentError(e, "Error opening wallpaper settings")
         }
     }
 
-    fun onErrorOpeningAppInfo(e: Exception) {
+    fun onErrorOpeningAppInfo(e: Throwable) {
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_app_info_open))
             TimberWrapper.silentError(e, "Error opening app info")
         }
     }
 
-    fun onErrorOpeningAccessibilitySettings(e: Exception) {
+    fun onErrorOpeningAccessibilitySettings(e: Throwable) {
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_accessibility_settings_open))
             TimberWrapper.silentError(e, "Error opening accessibility settings")
         }
     }
 
-    fun onErrorOpeningDefaultLauncherSettings(e: Exception) {
+    fun onErrorOpeningDefaultLauncherSettings(e: Throwable) {
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_default_launcher_settings_open))
             TimberWrapper.silentError(e, "Error opening default launcher settings")

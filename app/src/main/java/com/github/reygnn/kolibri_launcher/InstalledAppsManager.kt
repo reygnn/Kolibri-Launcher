@@ -141,77 +141,63 @@ class InstalledAppsManager @Inject constructor(
         }
         .flowOn(Dispatchers.IO)
 
-    internal suspend fun processResolveInfoList(resolveInfoList: List<ResolveInfo>): List<AppInfo> {
-        val appList = mutableListOf<AppInfo>()
+    suspend fun processResolveInfoList(resolveInfoList: List<ResolveInfo>): List<AppInfo> {
+        val appInfoList = mutableListOf<AppInfo>()
 
-        for (resolveInfo in resolveInfoList) {
+        for (info in resolveInfoList) {
             try {
-                resolveInfo.activityInfo?.let { activityInfo ->
-                    // Validierung
-                    if (activityInfo.packageName.isNullOrBlank()) {
-                        Timber.w("Skipping app with blank package name")
-                        return@let
-                    }
-
-                    val systemName = try {
-                        resolveInfo.loadLabel(packageManager).toString().ifBlank {
-                            activityInfo.packageName
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(
-                            e,
-                            "Error loading label for ${activityInfo.packageName}"
-                        )
-                        activityInfo.packageName
-                    }
-
-                    val customDisplayName = try {
-                        appNamesManager.getDisplayNameForPackage(
-                            activityInfo.packageName,
-                            systemName
-                        )
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(
-                            e,
-                            "Error getting custom display name for ${activityInfo.packageName}"
-                        )
-                        systemName
-                    }
-
-                    val appInfo = AppInfo(
-                        originalName = systemName,
-                        displayName = customDisplayName,
-                        packageName = activityInfo.packageName,
-                        className = activityInfo.name ?: "",
-                        isSystemApp = false,
-                        isFavorite = false
-                    )
-                    appList.add(appInfo)
+                val activityInfo = info.activityInfo
+                if (activityInfo == null) {
+                    TimberWrapper.silentError("ActivityInfo is null for ResolveInfo")
+                    continue
                 }
+
+                val packageName = activityInfo.packageName
+                val className = activityInfo.name
+
+                val originalName = try {
+                    val label = info.loadLabel(packageManager).toString()
+                    label.ifBlank {
+                        packageName  // ✅ Fallback bei leerem Label
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error loading label for $packageName")
+                    packageName
+                }
+
+                val displayName = try {
+                    appNamesManager.getDisplayNameForPackage(packageName, originalName)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error getting display name for $packageName")
+                    originalName
+                }
+
+                appInfoList.add(
+                    AppInfo(
+                        originalName = originalName,
+                        displayName = displayName,
+                        packageName = packageName,
+                        className = className
+                    )
+                )
+
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(
-                    e,
-                    "Could not process app: ${resolveInfo.activityInfo?.packageName}"
-                )
+                TimberWrapper.silentError(e, "Error processing ResolveInfo")
             }
         }
 
-        // Sortierung mit Fehlerbehandlung
-        val sortedList = try {
-            appList.sortedBy { it.displayName.lowercase() }
+        return try {
+            appInfoList.sortedBy { it.displayName.lowercase() }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error sorting app list, returning unsorted")
-            appList
+            TimberWrapper.silentError(e, "Error sorting app list")
+            appInfoList
         }
-
-        Timber.d("${sortedList.size} apps processed and sorted.")
-        return sortedList
     }
 
     override fun purgeRepository() {

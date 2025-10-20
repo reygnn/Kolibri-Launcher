@@ -233,7 +233,9 @@ class InstalledAppsManagerTest {
 
     @Test
     fun `processResolveInfoList - with empty label - uses package name as fallback`() = runTest {
-        whenever(mockAppNamesManager.getDisplayNameForPackage(any(), any())).doAnswer { it.arguments[1] as String }
+        whenever(mockAppNamesManager.getDisplayNameForPackage(any(), any())).doAnswer {
+            it.arguments[1] as String
+        }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("", "com.test", "com.test.MainActivity")
@@ -242,7 +244,10 @@ class InstalledAppsManagerTest {
         val actualAppList = installedAppsManager.processResolveInfoList(fakeResolveInfoList)
 
         assertEquals(1, actualAppList.size)
-        assertEquals("", actualAppList[0].originalName)
+        // ✅ Mit unserem .ifBlank Fallback sollte originalName jetzt "com.test" sein!
+        assertEquals("com.test", actualAppList[0].originalName)
+        // ✅ displayName kommt vom Mock, gibt auch "com.test" zurück (weil originalName = "com.test")
+        assertEquals("com.test", actualAppList[0].displayName)
     }
 
     @Test

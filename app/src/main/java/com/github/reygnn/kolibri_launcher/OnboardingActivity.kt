@@ -101,7 +101,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 binding.searchEditText.setText(query)
                 binding.searchEditText.setSelection(query.length)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
         }
@@ -114,7 +114,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
             }
             outState.putSerializable(STATE_LAUNCH_MODE, launchMode)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving instance state")
         }
     }
@@ -124,7 +124,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             // CRASH-SAFE: Cleanup in richtiger Reihenfolge
             allAppsAdapter = null
             _binding = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -143,7 +143,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 )
                 WindowInsetsCompat.CONSUMED
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error handling window insets")
         }
     }
@@ -153,7 +153,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             allAppsAdapter = OnboardingAppListAdapter { appInfo ->
                 try {
                     viewModel.onAppToggled(appInfo)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error toggling app: ${appInfo.packageName}")
                 }
             }
@@ -165,7 +165,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
                 itemAnimator = null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up RecyclerView")
         }
     }
@@ -185,7 +185,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                             viewModel.onSearchQueryChanged(query)
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in search query changed")
                         }
                     }
@@ -198,7 +198,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             binding.doneButton.setOnClickListener {
                 try {
                     viewModel.onDoneClicked()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in done button click")
                     if (launchMode == LaunchMode.INITIAL_SETUP) {
                         goToMainActivity()
@@ -207,7 +207,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up click listeners")
         }
     }
@@ -222,7 +222,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                         }
                     } catch (e: CancellationException) {
                         throw e  // Re-throw
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error observing UI")
                     }
                 }
@@ -248,7 +248,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             updateSelectionChips(state.selectedApps)
         } catch (e: IllegalStateException) {
             TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating UI")
         }
     }
@@ -270,7 +270,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                             event.message,
                             Toast.LENGTH_LONG
                         ).show()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error showing error toast")
                     }
                 }
@@ -282,12 +282,12 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                             message,
                             Toast.LENGTH_SHORT
                         ).show()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error showing limit toast")
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error handling event")
         }
     }
@@ -307,17 +307,17 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                         setOnCloseIconClickListener {
                             try {
                                 viewModel.onAppToggled(app)
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error toggling app from chip")
                             }
                         }
                     }
                     binding.selectionChipGroup.addView(chip)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating selection chips")
         }
     }
@@ -329,7 +329,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             }
             startActivity(intent)
             finish()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error navigating to MainActivity")
             finish() // Fallback: einfach schließen
         }

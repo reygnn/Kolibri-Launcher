@@ -5,174 +5,112 @@ import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
-import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DataMigrationManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    private val context: Context,
     private val dataStore: DataStore<Preferences>
 ) {
-
     companion object {
         private const val VERSION_PREFS_NAME = "kolibri_data_version"
         private const val KEY_DATA_VERSION = "data_version"
         private const val TARGET_DATA_VERSION = 1
-        private const val MIGRATION_TIMEOUT_MS = 10000L
     }
 
-    /**
-     * Prüft ob dies der erste Start der App ist.
-     * WICHTIG: Bei jedem Fehler wird "true" zurückgegeben (safe default).
-     */
-    fun isFirstLaunch(): Boolean {
-        return try {
-            val prefs = context.getSharedPreferences(VERSION_PREFS_NAME, Context.MODE_PRIVATE)
-            if (prefs == null) {
-                Timber.w("Could not access SharedPreferences, treating as first launch")
-                return true
-            }
-
-            val currentVersion = try {
-                prefs.getInt(KEY_DATA_VERSION, 0)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error reading data version, treating as first launch")
-                0
-            }
-
-            currentVersion < TARGET_DATA_VERSION
-
+    private val versionPrefs: SharedPreferences? by lazy {
+        try {
+            context.getSharedPreferences(VERSION_PREFS_NAME, Context.MODE_PRIVATE)
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error checking first launch status, treating as first launch")
-            true // Safe default
+            TimberWrapper.silentError(e, "Failed to get SharedPreferences for version tracking")
+            null
         }
     }
 
-    /**
-     * Führt Migration durch falls nötig.
-     * KRITISCH: Diese Funktion darf NIEMALS crashen!
-     */
     suspend fun runMigrationIfNeeded() {
         try {
-            val prefs = context.getSharedPreferences(VERSION_PREFS_NAME, Context.MODE_PRIVATE)
-            if (prefs == null) {
-                TimberWrapper.silentError("Failed to access SharedPreferences for migration, skipping")
-                return
-            }
+            val currentVersion = getCurrentVersion()
 
-            val currentVersion = try {
-                prefs.getInt(KEY_DATA_VERSION, 0)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error reading current data version, assuming version 0")
-                0
+            if (currentVersion < TARGET_DATA_VERSION) {
+                Timber.i("Migration needed from version $currentVersion to $TARGET_DATA_VERSION")
+                runMigration(currentVersion)
+            } else {
+                Timber.d("No migration needed. Current version: $currentVersion")
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Critical error during migration check")
+        }
+    }
 
+    private suspend fun runMigration(currentVersion: Int) {
+        try {
             when {
                 currentVersion == 0 -> {
-                    handleFirstInstallation(prefs)
+                    // ✅ Erste Installation: NICHTS clearen, nur Version setzen
+                    Timber.i("First launch detected, setting version without clearing DataStore")
                 }
-
                 currentVersion < TARGET_DATA_VERSION -> {
-                    handleMigration(prefs, currentVersion)
-                }
-
-                else -> {
-                    Timber.d("Data is already up to date (version $currentVersion). No migration necessary.")
-                }
-            }
-
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL error in migration manager! App will continue with existing data.")
-        }
-    }
-
-    /**
-     * Behandelt erste Installation
-     */
-    private fun handleFirstInstallation(prefs: SharedPreferences) {
-        try {
-            Timber.i("First installation detected. Setting data version to $TARGET_DATA_VERSION.")
-
-            // Verwende commit() für sofortiges Feedback
-            val success = try {
-                prefs.edit().putInt(KEY_DATA_VERSION, TARGET_DATA_VERSION).commit()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting initial data version")
-                false
-            }
-
-            if (!success) {
-                Timber.w("Could not set initial version, will retry on next start")
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleFirstInstallation")
-        }
-    }
-
-    /**
-     * Führt die eigentliche Migration durch
-     */
-    private suspend fun handleMigration(prefs: SharedPreferences, currentVersion: Int) {
-        try {
-            Timber.i("Old data version ($currentVersion) detected. Starting migration to version $TARGET_DATA_VERSION.")
-
-            var migrationSuccessful = false
-
-            try {
-                withTimeout(MIGRATION_TIMEOUT_MS) {
-                    dataStore.edit { settings ->
-                        settings.clear()
+                    // ✅ Alte Version: DataStore clearen
+                    Timber.i("Old data version detected: $currentVersion. Clearing DataStore...")
+                    try {
+                        dataStore.edit { it.clear() }
+                        Timber.i("DataStore cleared successfully")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Failed to clear DataStore during migration")
                     }
                 }
-                migrationSuccessful = true
-                Timber.i("Migration completed successfully. DataStore has been cleared.")
-
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error during data migration! Migration will be retried on next start.")
+                else -> {
+                    // ✅ Aktuelle oder neuere Version: Nichts tun
+                    Timber.d("Data version is current or newer: $currentVersion")
+                    return
+                }
             }
 
-            // Version nur hochsetzen, wenn Migration erfolgreich war
-            if (migrationSuccessful) {
-                updateDataVersion(prefs)
-            }
+            // Version setzen
+            updateVersionInPreferences(TARGET_DATA_VERSION)
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleMigration")
+            TimberWrapper.silentError(e, "Error during migration")
         }
     }
 
-    /**
-     * Aktualisiert die Datenversion in SharedPreferences
-     */
-    private fun updateDataVersion(prefs: SharedPreferences) {
-        try {
-            val success = try {
-                prefs.edit().putInt(KEY_DATA_VERSION, TARGET_DATA_VERSION).commit()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating version")
-                false
-            }
-
-            if (success) {
-                Timber.i("Version updated successfully to $TARGET_DATA_VERSION")
-            } else {
-                Timber.w("Migration successful but failed to update version number")
-                // Beim nächsten Start wird die Migration erneut durchgeführt (idempotent, also ok)
-            }
-
+    private fun getCurrentVersion(): Int {
+        return try {
+            versionPrefs?.getInt(KEY_DATA_VERSION, 0) ?: 0
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in updateDataVersion")
+            TimberWrapper.silentError(e, "Error reading data version")
+            0
+        }
+    }
+
+    // ✅ NEU: Helper function zum Version setzen
+    private fun updateVersionInPreferences(version: Int) {
+        try {
+            versionPrefs?.edit()?.apply {
+                putInt(KEY_DATA_VERSION, version)
+                apply()
+            }
+            Timber.i("Data version updated to $version")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to update version in preferences")
+        }
+    }
+
+    fun isFirstLaunch(): Boolean {
+        return try {
+            getCurrentVersion() < TARGET_DATA_VERSION
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error checking first launch status")
+            true
         }
     }
 }

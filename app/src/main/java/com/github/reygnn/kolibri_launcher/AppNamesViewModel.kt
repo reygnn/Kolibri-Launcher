@@ -54,13 +54,13 @@ class AppNamesViewModel @Inject constructor(
                     try {
                         masterAppList = fullyProcessedList
                         updateUiFromMasterList()
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error processing app list")
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading apps")
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -85,7 +85,7 @@ class AppNamesViewModel @Inject constructor(
                 } else {
                     appNamesManager.removeCustomNameForPackage(packageName)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
             }
@@ -96,7 +96,7 @@ class AppNamesViewModel @Inject constructor(
         launchSafe {
             try {
                 appNamesManager.removeCustomNameForPackage(packageName)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error removing custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
             }

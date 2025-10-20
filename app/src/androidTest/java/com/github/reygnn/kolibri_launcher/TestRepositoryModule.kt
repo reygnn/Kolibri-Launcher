@@ -69,18 +69,18 @@ object TestDataSource {
 // --- HILT TEST MODULE: Ersetzt die echten Repositories durch unsere Fakes ---
 // =================================================================================
 
-@Provides
-@Singleton
-fun provideTestMode(): TestMode {
-    return TestMode(isEnabled = true)  // für HomeViewMoel
-}
-
 @Module
 @TestInstallIn(
     components = [SingletonComponent::class],
     replaces = [RepositoryModule::class, AppModule::class]
 )
 object TestRepositoryModule {
+
+    @Provides
+    @Singleton
+    fun provideTestMode(): TestMode {
+        return TestMode(isEnabled = true)  // für HomeViewMoel
+    }
 
     // --- Kern-Repositories für das aktuelle Problem (reaktiv verbunden) ---
 

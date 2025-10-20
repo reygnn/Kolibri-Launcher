@@ -199,7 +199,8 @@ class KolibriLauncherApp : Application() {
                 Timber.e(e, "Error during migration")
                 // Try to record the error in ACRA
                 try {
-                    ACRA.errorReporter.putCustomData("migration_error", "true")
+                    ACRA.errorReporter.putCustomData("migration_error", e.message ?: "unknown")
+                    ACRA.errorReporter.putCustomData("migration_error_type", e::class.simpleName ?: "Throwable")
                 } catch (ignored: Throwable) {
                     // ACRA might not be initialized or might fail
                 }

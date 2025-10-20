@@ -82,7 +82,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                 binding.searchEditText.setText(query)
                 binding.searchEditText.setSelection(query.length)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit bei kritischem Fehler
         }
@@ -94,7 +94,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             _binding?.let {
                 outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving instance state")
         }
     }
@@ -104,7 +104,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             // CRASH-SAFE: Cleanup in richtiger Reihenfolge
             appSelectionAdapter = null
             _binding = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -123,7 +123,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                 )
                 WindowInsetsCompat.CONSUMED
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error handling window insets")
         }
     }
@@ -133,7 +133,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             appSelectionAdapter = OnboardingAppListAdapter { appInfo ->
                 try {
                     viewModel.onAppToggled(appInfo)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error toggling app: ${appInfo.packageName}")
                 }
             }
@@ -145,7 +145,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                 // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
                 itemAnimator = null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up RecyclerView")
         }
     }
@@ -165,7 +165,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                             viewModel.onSearchQueryChanged(query)
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in search query changed")
                         }
                     }
@@ -178,12 +178,12 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             binding.doneButton.setOnClickListener {
                 try {
                     viewModel.onDoneClicked()
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in done button click")
                     finish() // Fallback: einfach schließen
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up click listeners")
         }
     }
@@ -195,8 +195,8 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                     try {
                         updateUi(state)
                     } catch (e: CancellationException) {
-                        throw e  // ✅ HINZUFÜGEN
-                    } catch (e: Exception) {
+                        throw e
+                    } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error updating UI")
                     }
                 }
@@ -223,7 +223,7 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             updateSelectionChips(state.selectedApps)
         } catch (e: IllegalStateException) {
             TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating UI")
         }
     }
@@ -243,17 +243,17 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
                         setOnCloseIconClickListener {
                             try {
                                 viewModel.onAppToggled(app)
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error toggling app from chip")
                             }
                         }
                     }
                     binding.selectionChipGroup.addView(chip)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating selection chips")
         }
     }

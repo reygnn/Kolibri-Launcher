@@ -96,8 +96,6 @@ abstract class BaseAndroidTest {
      */
     @Before
     fun baseSetup() {
-        // Test-Mode aktivieren BEVOR Hilt injiziert
-        HomeViewModel.isInTestMode = true
 
         // Dispatcher setzen BEVOR Hilt injiziert
         TestDispatcherModule.setTestDispatcher(testCoroutineRule.testDispatcher)
@@ -154,8 +152,6 @@ abstract class BaseAndroidTest {
         } catch (e: Exception) {
             // Ignore cleanup errors - Test hat bereits Status
         }
-
-        HomeViewModel.isInTestMode = false   // Test-Mode zurücksetzen
     }
 
     // Helper-Methode die automatisch das Scenario tracked

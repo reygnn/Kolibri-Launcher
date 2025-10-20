@@ -42,17 +42,28 @@ class HomeViewModelTest {
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
 
-    @Mock private lateinit var installedAppsManager: InstalledAppsRepository
-    @Mock private lateinit var appUpdateSignal: AppUpdateSignal
-    @Mock private lateinit var installedAppsStateManager: InstalledAppsStateRepository
-    @Mock private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCaseRepository
-    @Mock private lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCaseRepository
-    @Mock private lateinit var context: Context
-    @Mock private lateinit var favoritesManager: FavoritesRepository
-    @Mock private lateinit var settingsManager: SettingsRepository
-    @Mock private lateinit var appUsageManager: AppUsageRepository
-    @Mock private lateinit var screenLockManager: ScreenLockRepository
-    @Mock private lateinit var appVisibilityManager: AppVisibilityRepository
+    @Mock
+    private lateinit var installedAppsManager: InstalledAppsRepository
+    @Mock
+    private lateinit var appUpdateSignal: AppUpdateSignal
+    @Mock
+    private lateinit var installedAppsStateManager: InstalledAppsStateRepository
+    @Mock
+    private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCaseRepository
+    @Mock
+    private lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCaseRepository
+    @Mock
+    private lateinit var context: Context
+    @Mock
+    private lateinit var favoritesManager: FavoritesRepository
+    @Mock
+    private lateinit var settingsManager: SettingsRepository
+    @Mock
+    private lateinit var appUsageManager: AppUsageRepository
+    @Mock
+    private lateinit var screenLockManager: ScreenLockRepository
+    @Mock
+    private lateinit var appVisibilityManager: AppVisibilityRepository
 
     private lateinit var viewModel: HomeViewModel
 
@@ -67,7 +78,7 @@ class HomeViewModelTest {
         whenever(context.registerReceiver(any(), any(), any())).thenReturn(null)
         whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(flowOf(UiState.Loading))
         whenever(getDrawerAppsUseCase.drawerApps).thenReturn(
-            MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()  // <-- Expliziter Typ
+            MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()
         )
         whenever(installedAppsManager.getInstalledApps()).thenReturn(flowOf(testApps))
         whenever(appUpdateSignal.events).thenReturn(MutableSharedFlow())
@@ -80,7 +91,7 @@ class HomeViewModelTest {
         whenever(context.getString(any(), any())).thenReturn("Test String with args")
     }
 
-    private fun setupViewModel() {
+    private fun setupViewModel(enableTestMode: Boolean = false) {
         viewModel = HomeViewModel(
             installedAppsManager,
             appUpdateSignal,
@@ -93,7 +104,8 @@ class HomeViewModelTest {
             appUsageManager,
             screenLockManager,
             appVisibilityManager,
-            mainDispatcher = mainDispatcherRule.testDispatcher
+            mainDispatcher = mainDispatcherRule.testDispatcher,
+            testMode = TestMode(isEnabled = enableTestMode)
         )
     }
 
@@ -124,14 +136,17 @@ class HomeViewModelTest {
             flowOf(UiState.Success(fallbackApps))
         )
 
-        setupViewModel()
+        setupViewModel(enableTestMode = false)  // ✅ Production Mode statt true
 
         viewModel.event.test {
             advanceUntilIdle()
 
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.welcome_toast_fallback_favorites, (event as UiEvent.ShowToast).messageResId)
+            assertEquals(
+                R.string.welcome_toast_fallback_favorites,
+                (event as UiEvent.ShowToast).messageResId
+            )
         }
     }
 
@@ -201,27 +216,26 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `onAppClicked - emits LaunchApp event, records usage AND refreshes app list directly`() = runTest {
-        // Arrange
-        setupViewModel()
-        advanceUntilIdle()
+    fun `onAppClicked - emits LaunchApp event, records usage AND refreshes app list directly`() =
+        runTest {
+            setupViewModel()
+            advanceUntilIdle()
 
-        // Act & Assert
-        viewModel.event.test {
-            viewModel.onAppClicked(app1)
+            viewModel.event.test {
+                viewModel.onAppClicked(app1)
 
                 val launchEvent = awaitItem()
-            assertTrue(launchEvent is UiEvent.LaunchApp)
-            assertEquals(app1, (launchEvent as UiEvent.LaunchApp).app)
+                assertTrue(launchEvent is UiEvent.LaunchApp)
+                assertEquals(app1, (launchEvent as UiEvent.LaunchApp).app)
 
-            expectNoEvents()
+                expectNoEvents()
 
-            advanceUntilIdle()
+                advanceUntilIdle()
+            }
+
+            verify(installedAppsManager).triggerAppsUpdate()
+            verify(appUsageManager).recordPackageLaunch(app1.packageName)
         }
-
-        verify(installedAppsManager).triggerAppsUpdate()
-        verify(appUsageManager).recordPackageLaunch(app1.packageName)
-    }
 
     @Test
     fun `onToggleFavorite - when not favorite - adds to favorites`() = runTest {
@@ -356,21 +370,22 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() = runTest {
-        whenever(settingsManager.doubleTapToLockEnabledFlow).thenReturn(flowOf(true))
-        whenever(screenLockManager.isLockingAvailableFlow).thenReturn(MutableStateFlow(false))
+    fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() =
+        runTest {
+            whenever(settingsManager.doubleTapToLockEnabledFlow).thenReturn(flowOf(true))
+            whenever(screenLockManager.isLockingAvailableFlow).thenReturn(MutableStateFlow(false))
 
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoubleTapToLock()
+            setupViewModel()
             advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowAccessibilityDialog)
+            viewModel.event.test {
+                viewModel.onDoubleTapToLock()
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event is UiEvent.ShowAccessibilityDialog)
+            }
         }
-    }
 
     @Test
     fun `onDoubleTapToLock - when disabled - shows enable toast once`() = runTest {
@@ -385,7 +400,10 @@ class HomeViewModelTest {
 
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.toast_enable_double_tap_to_lock, (event as UiEvent.ShowToast).messageResId)
+            assertEquals(
+                R.string.toast_enable_double_tap_to_lock,
+                (event as UiEvent.ShowToast).messageResId
+            )
 
             // Second call should not emit event
             viewModel.onDoubleTapToLock()
@@ -476,7 +494,6 @@ class HomeViewModelTest {
 
         val colors = viewModel.uiColorsState.value
         assertEquals(Color.WHITE, colors.textColor)
-        // Shadow ist entweder berechnet oder Fallback
         assertNotNull(colors.shadowColor)
     }
 
@@ -508,7 +525,7 @@ class HomeViewModelTest {
         }
     }
 
-    // ========== CRASH-RESISTANCE TESTS ==========
+    // ========== CRASH-RESISTANCE TESTS - KORRIGIERT ==========
 
     @Test
     fun `init - when getFavoriteAppsUseCase throws IOException - handles gracefully`() = runTest {
@@ -532,7 +549,7 @@ class HomeViewModelTest {
         })
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps)
 
-        setupViewModel()
+        setupViewModel(enableTestMode = false)  // ✅ Production Mode
         advanceUntilIdle()
 
         verify(installedAppsStateManager).updateApps(testApps)
@@ -545,33 +562,34 @@ class HomeViewModelTest {
         })
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(emptyList())
 
-        setupViewModel()
+        setupViewModel(enableTestMode = false)  // ✅ Production Mode
         advanceUntilIdle()
 
         verify(installedAppsStateManager).updateApps(emptyList())
     }
 
     @Test
-    fun `onAppClicked - when recordPackageLaunch fails - still launches app and shows error`() = runTest {
-        whenever(appUsageManager.recordPackageLaunch(any())).doAnswer {
-            throw IOException("Cannot record")
-        }
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onAppClicked(app1)
+    fun `onAppClicked - when recordPackageLaunch fails - still launches app and shows error`() =
+        runTest {
+            whenever(appUsageManager.recordPackageLaunch(any())).doAnswer {
+                throw IOException("Cannot record")
+            }
+            setupViewModel()
             advanceUntilIdle()
 
-            val launchEvent = awaitItem()
-            assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
+            viewModel.event.test {
+                viewModel.onAppClicked(app1)
+                advanceUntilIdle()
 
-            val errorEvent = awaitItem()
-            assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+                val launchEvent = awaitItem()
+                assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
 
-            ensureAllEventsConsumed()
+                val errorEvent = awaitItem()
+                assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+
+                ensureAllEventsConsumed()
+            }
         }
-    }
 
     @Test
     fun `onToggleFavorite - when toggleFavoriteComponent throws - emits error`() = runTest {
@@ -659,8 +677,6 @@ class HomeViewModelTest {
             putExtra(BatteryManager.EXTRA_SCALE, -1)
         }
 
-        val previousBattery = viewModel.uiState.value.batteryString
-
         viewModel.updateBatteryLevelFromIntent(intent)
 
         assertEquals("---%", viewModel.uiState.value.batteryString)
@@ -672,7 +688,7 @@ class HomeViewModelTest {
             throw IOException("Cleanup failed")
         }
 
-        setupViewModel()
+        setupViewModel(enableTestMode = false)  // ✅ Production Mode
         advanceUntilIdle()
 
         verify(installedAppsStateManager).updateApps(testApps)
