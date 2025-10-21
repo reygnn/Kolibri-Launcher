@@ -75,6 +75,11 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
     private val mainActivityExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in MainActivity")
+
+            // In Debug: make crashes loud!
+            if (BuildConfig.DEBUG) {
+                throw throwable
+            }
         } catch (e: Throwable) {
             // Even logging can fail
         }
@@ -245,6 +250,8 @@ class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error during main app initialization")
         }
+
+        // ACRA.errorReporter.handleSilentException(Exception("ACRA Manual Test Report"))
     }
 
     private fun setupWindow() {
