@@ -54,7 +54,7 @@ class FavoritesManager : FavoritesRepository {
         dataStore = dataStore,
         context = context,
         externalScope = externalScope,
-        sharingStrategy = SharingStarted.WhileSubscribed(5000L)
+        sharingStrategy = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )
 
     /**

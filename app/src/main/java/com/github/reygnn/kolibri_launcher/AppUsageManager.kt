@@ -30,12 +30,6 @@ class AppUsageManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : AppUsageRepository {
 
-    companion object {
-        private const val LAMBDA = 0.000001 // Zerfallskonstante
-        private const val MAX_TIMESTAMPS_STORED = 100
-        private const val MAX_TIMESTAMP_AGE_MS = 365L * 24 * 60 * 60 * 1000 // 1 Jahr
-    }
-
     /**
      * Zeichnet einen App-Start mit dem aktuellen Zeitstempel auf.
      */
@@ -56,7 +50,7 @@ class AppUsageManager @Inject constructor(
 
                 val updatedTimestamps = (validTimestamps + currentTime)
                     .sortedDescending()
-                    .take(MAX_TIMESTAMPS_STORED)
+                    .take(AppConstants.MAX_TIMESTAMPS_PER_APP)
                     .map { it.toString() }
                     .toSet()
 
@@ -139,7 +133,7 @@ class AppUsageManager @Inject constructor(
                     if (timeDifferenceMs < 0) return@sumOf 0.0 // Zukunfts-Timestamp
 
                     val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeast(0.0)
-                    val exponent = -LAMBDA * timeDifferenceSec
+                    val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
 
                     // Overflow-Schutz
                     when {
@@ -165,7 +159,7 @@ class AppUsageManager @Inject constructor(
         return try {
             timestamp > 0 &&
                     timestamp <= currentTime &&
-                    (currentTime - timestamp) <= MAX_TIMESTAMP_AGE_MS
+                    (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
         } catch (e: Throwable) {
             false
         }

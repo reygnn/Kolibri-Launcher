@@ -47,7 +47,20 @@ open class FavoritesOrderManager private constructor(
     }
 
     companion object {
-        private const val MAX_ORDER_LIST_SIZE = 50 // Realistisches Limit
+        /**
+         * Maximale Größe der Order-Liste als Sicherheits-Limit.
+         *
+         * Berechnung: MAX_FAVORITES_ON_HOME (8 Packages) × durchschnittlich 6 Komponenten
+         * pro Package ≈ 48 Komponenten, plus kleiner Sicherheits-Puffer.
+         *
+         * Verhindert bei Bugs: übermässigen Storage-Verbrauch, Performance-Probleme
+         * beim JSON-Parsing und Memory-Issues bei versehentlich riesigen Listen.
+         */
+        private const val AVG_COMPONENTS_PER_PACKAGE = 6
+        private const val SAFETY_BUFFER = 2
+        private const val MAX_ORDER_LIST_SIZE =
+            AppConstants.MAX_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
+
 
         @VisibleForTesting
         internal fun createForTesting(
@@ -69,7 +82,7 @@ open class FavoritesOrderManager private constructor(
         dataStore = dataStore,
         context = context,
         externalScope = externalScope,
-        sharingStrategy = SharingStarted.WhileSubscribed(5000L)
+        sharingStrategy = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )
 
     private fun initializeFlow(sharingStrategy: SharingStarted): Flow<List<String>> {

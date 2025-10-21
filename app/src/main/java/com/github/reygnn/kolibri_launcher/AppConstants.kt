@@ -33,4 +33,34 @@ object AppConstants {
     const val MAX_FAVORITES_ON_HOME = 8
 
     const val SETTINGS_DATASTORE_NAME = "kolibri_settings"
+
+    // App Usage Tracking Constants
+    /**
+     * Zerfallskonstante für zeitgewichtete Nutzungsstatistik.
+     * Bestimmt, wie schnell alte App-Starts an Relevanz verlieren.
+     *
+     * Mit LAMBDA = 0.000001:
+     * - Nach 1 Tag: 91.7% Gewicht
+     * - Nach 7 Tagen: 54.8% Gewicht
+     * - Nach 30 Tagen: 10.5% Gewicht
+     */
+    const val USAGE_DECAY_LAMBDA = 0.000001
+
+    /**
+     * Maximale Anzahl gespeicherter Timestamps pro App.
+     * Balanciert zwischen Datenpräzision und Storage-Effizienz.
+     */
+    const val MAX_TIMESTAMPS_PER_APP = 20
+
+    /**
+     * Maximales Alter eines Timestamps in Millisekunden (1 Jahr).
+     * Ältere Daten werden automatisch bereinigt.
+     */
+    const val MAX_TIMESTAMP_AGE_MS = 365L * 24 * 60 * 60 * 1000
+
+    /**
+     * Timeout für Flow-Sharing via WhileSubscribed.
+     * Flow bleibt 5 Sekunden nach letztem Collector aktiv.
+     */
+    const val FLOW_SHARING_TIMEOUT_MS = 5000L
 }
