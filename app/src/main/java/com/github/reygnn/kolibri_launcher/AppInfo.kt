@@ -10,6 +10,7 @@ import kotlinx.parcelize.Parcelize
  *
  * Die Parcelable-Implementierung wird automatisch vom kotlin-parcelize-Plugin generiert.
  */
+
 @Parcelize
 data class AppInfo(
     val originalName: String,   // z.B. "Chrome"
