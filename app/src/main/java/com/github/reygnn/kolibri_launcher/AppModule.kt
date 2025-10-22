@@ -22,11 +22,11 @@ object AppModule {
         return TestMode(isEnabled = false)  // Production default
     }
 
-    @Provides
+/*    @Provides
     @Singleton
     fun provideContext(@ApplicationContext context: Context): Context {
         return context
-    }
+    }*/
 
     @Provides
     @Singleton

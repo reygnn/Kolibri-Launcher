@@ -50,7 +50,7 @@ object AppConstants {
      * Maximale Anzahl gespeicherter Timestamps pro App.
      * Balanciert zwischen Datenpräzision und Storage-Effizienz.
      */
-    const val MAX_TIMESTAMPS_PER_APP = 20
+    const val MAX_TIMESTAMPS_PER_APP = 150
 
     /**
      * Maximales Alter eines Timestamps in Millisekunden (1 Jahr).

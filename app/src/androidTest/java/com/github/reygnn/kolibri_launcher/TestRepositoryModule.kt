@@ -69,20 +69,16 @@ object TestDataSource {
 // --- HILT TEST MODULE: Ersetzt die echten Repositories durch unsere Fakes ---
 // =================================================================================
 
+/**
+ * Test-Modul für Domain-Level Dependencies (Repositories, UseCases).
+ * Ersetzt RepositoryModule in Tests.
+ */
 @Module
 @TestInstallIn(
     components = [SingletonComponent::class],
-    replaces = [RepositoryModule::class, AppModule::class]
+    replaces = [RepositoryModule::class]
 )
 object TestRepositoryModule {
-
-    @Provides
-    @Singleton
-    fun provideTestMode(): TestMode {
-        return TestMode(isEnabled = true)  // für HomeViewMoel
-    }
-
-    // --- Kern-Repositories für das aktuelle Problem (reaktiv verbunden) ---
 
     @Provides
     @Singleton
@@ -304,7 +300,6 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
         private set
     var saveOrderCallCount = 0
         private set
-    // override suspend fun saveOrder(componentNames: List<String>): Boolean { savedOrder = componentNames; saveOrderCallCount++; orderState.value = componentNames; return true }
     override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
         println(">>> FakeFavoritesOrderRepository.saveOrder CALLED")
         println(">>> Thread: ${Thread.currentThread().name}")

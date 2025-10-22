@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import javax.inject.Inject
@@ -12,7 +13,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DataMigrationManager @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val dataStore: DataStore<Preferences>
 ) {
     companion object {
