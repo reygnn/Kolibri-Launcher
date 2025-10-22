@@ -157,6 +157,82 @@ import javax.inject.Singleton
  */
 
 
+kotlin/**
+ * Manager for custom app name overrides with event-driven architecture.
+ *
+ * This singleton allows users to set personalized display names for installed apps,
+ * persisting them in DataStore. Instead of exposing state via a Flow, it uses an
+ * event-based trigger system to notify consumers of changes—a deliberate architectural
+ * decision optimized for this specific use case.
+ *
+ * **Core Functionality:**
+ * - Store/retrieve custom app names keyed by package name
+ * - Remove custom names (reverting to original names)
+ * - Check existence of custom names
+ * - Trigger global update events on changes
+ *
+ * **Architecture: Event-Based Design (Not Flow-Based)**
+ *
+ * Unlike `AppVisibilityManager` which exposes `Flow<Set<String>>`, this manager
+ * uses `MutableSharedFlow<Unit>` as a lightweight event bus. This design choice
+ * is intentional and superior for the following reasons:
+ *
+ * **1. Events vs. State:**
+ * - Visibility management is holistic STATE (entire hidden set needed at once)
+ * - Name management involves granular EVENTS (single name changes)
+ * - Consumers only need a signal to refresh, not the entire name map
+ *
+ * **2. Performance:**
+ * - Flow approach would require reading ALL preferences and building a complete
+ *   Map on every single name change—expensive and wasteful
+ * - Current approach: emit one lightweight `Unit` event, then consumers perform
+ *   fast, targeted on-demand lookups via `getDisplayNameForPackage()`
+ * - Overall: emit(Unit) + N×fast_lookup >> emit(Map) for this use case
+ *
+ * **3. Already Reactive:**
+ * - `appsUpdateTrigger` acts as a decoupled event bus
+ * - Publisher (this manager) emits events without knowing subscribers
+ * - Subscriber (`InstalledAppsManager`) reacts by rebuilding its state
+ * - Achieves reactivity without Flow complexity or performance penalty
+ *
+ * **Why Not Granular Events (emit packageName)?**
+ *
+ * While emitting the specific changed package seems more efficient, it would
+ * actually harm the architecture:
+ *
+ * **The Sorting Problem:**
+ * - App list is sorted alphabetically by display name
+ * - Renaming "Zebra" → "Apple" requires moving the item from end to beginning
+ * - A granular patch would create unsorted list, requiring full re-sort anyway
+ * - Result: added complexity with zero performance gain
+ *
+ * **Single Source of Truth:**
+ * - Modern reactive UI (Compose, ListAdapter) expects immutable state objects
+ * - "Patching" turns manager into fragile stateful cache with race conditions
+ * - "Rebuild from scratch" guarantees atomic correctness and proper sorting
+ *
+ * **UI Layer Optimization:**
+ * - `DiffUtil` is specifically designed to handle new list emissions efficiently
+ * - It calculates minimal UI changes (onItemChanged + onItemMoved)
+ * - We delegate optimization to the UI layer where it belongs
+ *
+ * **Data Flow:**
+ * 1. User changes app name via ViewModel
+ * 2. Manager persists to DataStore
+ * 3. Manager emits Unit event via `appsUpdateTrigger`
+ * 4. `InstalledAppsManager` receives event and rebuilds app list
+ * 5. UI updates via DiffUtil with smooth animations
+ *
+ * **Error Handling:**
+ * All operations return Boolean success indicators and log failures silently.
+ * [CancellationException] is always re-thrown for proper coroutine cancellation.
+ *
+ * @property dataStore Preferences DataStore for persisting custom names
+ * @property appsUpdateTrigger Shared event bus for notifying consumers of changes
+ * @property context Application context for system access
+ *
+ * @see AppVisibilityManager for an example where Flow-based state exposure is correct
+ */
 @Singleton
 class AppNamesManager @Inject constructor(
     private val dataStore: DataStore<Preferences>,

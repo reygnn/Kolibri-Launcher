@@ -32,6 +32,105 @@ import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Manager for custom ordering of favorite apps with JSON persistence and hot Flow.
+ *
+ * This singleton manages the display order of favorited apps on the home screen,
+ * persisting the order as a JSON array in DataStore and exposing it as a hot,
+ * shared Flow. It works in tandem with `FavoritesManager` to provide both the
+ * set of favorites (what) and their order (how).
+ *
+ * **Core Functionality:**
+ * - Save custom order of favorite components
+ * - Sort favorite apps according to saved order
+ * - Remove components from order when unfavorited
+ * - Expose complete order list reactively via hot Flow
+ * - Enforce size limits to prevent storage/performance issues
+ *
+ * **Architecture: Hot Shared Flow with Factory Pattern**
+ *
+ * Similar to `FavoritesManager`, this uses a sophisticated dual-constructor pattern:
+ *
+ * **Production (Primary Constructor via @Inject):**
+ * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
+ * - Single shared subscription to DataStore across collectors
+ * - 5-second replay timeout optimizes repeated accesses
+ * - Multiple UI components observe same order simultaneously
+ *
+ * **Testing (Factory Method):**
+ * - `createForTesting()` accepts custom `SharingStarted` strategy
+ * - Private primary constructor prevents direct instantiation
+ * - Marked `@VisibleForTesting` and uses `internal` visibility
+ * - Tests can use `SharingStarted.Eagerly` for synchronous behavior
+ *
+ * **Why Flow-Based?**
+ * - Order is holistic STATE (complete list needed for sorting)
+ * - Multiple collectors observe same order (HomeScreen, DragDrop UI)
+ * - Natural fit with DataStore's reactive nature
+ * - Consistent with `FavoritesManager` and `AppVisibilityManager` patterns
+ *
+ * **JSON Persistence Strategy:**
+ * Order is stored as a JSON array string for several reasons:
+ * - DataStore Preferences doesn't support List<String> natively
+ * - JSON is compact, human-readable, and well-supported
+ * - Easy to debug in DataStore inspector
+ * - Simple serialization/deserialization with JSONArray
+ *
+ * **Size Limit Protection:**
+ * Enforces `MAX_ORDER_LIST_SIZE` (50 components) calculated as:
+ * ```
+ * MAX_FAVORITES_ON_HOME (8 packages) × 6 avg components per package + 2 buffer = 50
+ * ```
+ * Prevents:
+ * - Excessive storage usage from bugs
+ * - Performance degradation in JSON parsing
+ * - Memory issues from accidentally huge lists
+ * Limits are applied both on save and load for defense-in-depth.
+ *
+ * **Sorting Algorithm:**
+ * `sortAppsWithGivenOrder()` implements a two-phase sort:
+ * 1. **Ordered phase**: Apps in saved order appear first, in specified sequence
+ * 2. **Alphabetical phase**: Remaining apps appended alphabetically
+ *
+ * This ensures:
+ * - User's custom order is preserved for favorited apps
+ * - Newly favorited apps (not yet in order) appear alphabetically at end
+ * - Graceful handling of order list containing unfavorited apps
+ *
+ * **Integration with FavoritesManager:**
+ * - `FavoritesManager` determines WHICH apps are favorites (Set<String>)
+ * - `FavoritesOrderManager` determines HOW they are ordered (List<String>)
+ * - Separation of concerns: membership vs. sequence
+ * - Order list may contain extra entries (cleaned up lazily)
+ *
+ * **Component Identifier Format:**
+ * Components are identified by their full component name string:
+ * `"packageName/activityClassName"` (e.g., "com.google.android.gm/.ConversationListActivity")
+ *
+ * **Data Flow:**
+ * 1. User drags to reorder favorites in UI
+ * 2. UI calls `saveOrder()` with new sequence
+ * 3. Manager persists JSON to DataStore
+ * 4. DataStore emits new list via `favoriteComponentsOrderFlow`
+ * 5. HomeScreen observes and re-sorts displayed favorites
+ * 6. UI updates via DiffUtil with smooth animations
+ *
+ * **Error Handling:**
+ * - JSON parsing errors result in empty list fallback
+ * - Sorting failures cascade to alphabetical fallback, then unsorted fallback
+ * - Save failures return false but don't crash
+ * - IOException from DataStore caught and results in empty list
+ * - [CancellationException] always re-thrown for proper coroutine cancellation
+ * - Multiple fallback layers ensure UI never breaks
+ *
+ * @property dataStore Preferences DataStore for persisting order as JSON
+ * @property context Application context for system access
+ * @property externalScope Application scope for hot Flow sharing (null in tests)
+ * @property favoriteComponentsOrderFlow Hot shared Flow of ordered component identifiers
+ *
+ * @see FavoritesManager for favorite membership management (what is favorited)
+ * @see AppVisibilityManager for similar Flow-based state management pattern
+ */
 @Singleton
 open class FavoritesOrderManager private constructor(
     private val dataStore: DataStore<Preferences>,

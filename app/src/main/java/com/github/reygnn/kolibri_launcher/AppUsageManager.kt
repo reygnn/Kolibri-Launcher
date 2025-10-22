@@ -24,6 +24,51 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.exp
 
+/**
+ * Manager for tracking and analyzing app usage patterns with time-weighted scoring.
+ *
+ * This singleton persists app launch timestamps using DataStore and provides intelligent
+ * sorting based on both frequency and recency of usage. The core algorithm uses exponential
+ * decay to give more weight to recent launches while still considering overall usage patterns.
+ *
+ * **Time-Weighted Scoring Algorithm:**
+ * Each app launch receives a score that decays exponentially over time:
+ * ```
+ * score = e^(-λ × Δt)
+ * ```
+ * Where:
+ * - λ (lambda) = 0.000001 (decay constant)
+ * - Δt = time since launch in seconds
+ * - e = Euler's number (≈2.71828)
+ *
+ * **Score Decay Examples:**
+ * - After 1 day: ~91.7% of original value
+ * - After 7 days: ~54.8%
+ * - After 30 days: ~10.5%
+ *
+ * An app's total score is the sum of all its individual launch scores, balancing
+ * both frequency (number of launches) and recency (how recent the launches were).
+ *
+ * **Data Management:**
+ * - Stores up to [AppConstants.MAX_TIMESTAMPS_PER_APP] timestamps per app
+ * - Automatically validates and cleans invalid/old timestamps
+ * - Filters out timestamps older than [AppConstants.MAX_TIMESTAMP_AGE_MS]
+ * - Uses DataStore for persistent, async storage
+ *
+ * **Sorting Behavior:**
+ * Primary sort: Time-weighted score (descending)
+ * Secondary sort: Display name alphabetically (tie-breaker)
+ *
+ * **Error Handling:**
+ * All operations are protected against failures and return sensible defaults:
+ * - Failed sorting falls back to alphabetical order
+ * - Failed recordings are logged but don't crash
+ * - Invalid data is filtered out during processing
+ * - [CancellationException] is always re-thrown for proper coroutine cancellation
+ *
+ * @property dataStore Preferences DataStore for persisting usage timestamps
+ * @property context Application context for system access
+ */
 @Singleton
 class AppUsageManager @Inject constructor(
     private val dataStore: DataStore<Preferences>,

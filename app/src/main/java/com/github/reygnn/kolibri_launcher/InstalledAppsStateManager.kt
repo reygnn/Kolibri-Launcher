@@ -16,26 +16,53 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Central state manager for installed applications.
+ * Central state manager for installed applications with fail-safe caching.
  *
- * This singleton manages the application list state and provides a fail-safe mechanism
- * to ensure the UI always has access to valid app data, even in error scenarios.
+ * This singleton acts as the **final state holder** in the app loading pipeline,
+ * sitting between `InstalledAppsManager` (data source) and the UI layer (consumers).
+ * It provides a fail-safe mechanism to ensure the UI always has access to valid
+ * app data, even in error scenarios or during transitions.
  *
- * **Key responsibilities:**
- * - Maintains the current list of installed apps via a [StateFlow]
- * - Caches the last successful app list as fallback
+ * **Architectural Role:**
+ * - **Single Source of Truth**: Holds the canonical app list state for the entire app
+ * - **Decoupling Layer**: Separates data loading logic from UI observation
+ * - **Resilience Buffer**: Prevents empty states from reaching UI during transient errors
+ *
+ * **Data Flow Position:**
+ * ```
+ * InstalledAppsManager (loads) → InstalledAppsStateManager (holds) → UI (observes)
+ * ```
+ *
+ * **Key Responsibilities:**
+ * - Maintains the current list of installed apps via [StateFlow]
+ * - Caches the last successful non-empty app list as fallback
  * - Provides thread-safe access to app data
  * - Handles errors gracefully without crashing the app
+ * - Ensures UI never receives empty list unless legitimately no apps exist
  *
- * **Thread-safety:**
- * The manager uses [MutableStateFlow] for reactive updates and a volatile cache variable
- * to ensure visibility across threads. All operations are protected with try-catch blocks.
+ * **Thread-Safety:**
+ * The manager uses [MutableStateFlow] for reactive updates and a `@Volatile`
+ * cache variable to ensure visibility across threads. All operations are
+ * protected with comprehensive try-catch blocks catching [Throwable].
  *
- * **Error handling:**
- * If an error occurs during updates or retrieval, the manager falls back to the last
- * known good state ([lastSuccessfulAppList]) to prevent UI disruptions.
+ * **Error Handling & Fail-Safe Logic:**
+ * If an error occurs during updates or retrieval, the manager falls back to
+ * [lastSuccessfulAppList] to prevent UI disruptions. This ensures:
+ * - UI never shows empty state due to transient errors
+ * - App remains functional even if data loading fails temporarily
+ * - Stale data is preferable to no data for user experience
+ *
+ * **Why Not Combine with InstalledAppsManager?**
+ * Separation provides:
+ * - Clear responsibility boundaries (loading vs. holding)
+ * - Easier testing of state management logic
+ * - Flexibility to swap data sources without affecting state logic
+ * - Fail-safe layer independent of loading complexity
  *
  * @property rawAppsFlow Observable flow of the current app list for reactive UI updates
+ * @property lastSuccessfulAppList Volatile cache of last known good state for error recovery
+ *
+ * @see InstalledAppsManager for the data loading and processing logic
  */
 @Singleton
 class InstalledAppsStateManager @Inject constructor() : InstalledAppsStateRepository {

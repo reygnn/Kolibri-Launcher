@@ -30,6 +30,83 @@ import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Manager for favorite apps with reactive Flow-based architecture and package limits.
+ *
+ * This singleton manages which apps are marked as favorites (pinned to home screen)
+ * by persisting component identifiers in DataStore and exposing them as a hot,
+ * shared Flow. It enforces a package-based limit to prevent home screen overcrowding
+ * while allowing multiple activities from the same package.
+ *
+ * **Core Functionality:**
+ * - Add/remove/toggle favorite apps by component name
+ * - Check if specific app is favorited
+ * - Batch save favorite components
+ * - Cleanup orphaned favorites (from uninstalled apps)
+ * - Enforce package limit for favorites
+ * - Expose complete favorites set reactively via hot Flow
+ *
+ * **Architecture: Hot Shared Flow with Dual Constructor Pattern**
+ *
+ * This manager uses a sophisticated Flow setup optimized for production and testing:
+ *
+ * **Production (Primary Constructor):**
+ * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
+ * - Single shared subscription to DataStore across all collectors
+ * - 5-second replay timeout prevents unnecessary DataStore reads
+ * - Optimized for multiple UI collectors (HomeScreen, BottomSheet, etc.)
+ *
+ * **Testing (Secondary Constructor):**
+ * - Accepts custom `SharingStarted` strategy parameter
+ * - Tests can use `SharingStarted.Eagerly` for synchronous behavior
+ * - Marked `@VisibleForTesting` to signal test-only usage
+ *
+ * **Why Flow-Based (Like AppVisibilityManager)?**
+ * - Favorites are holistic STATE (complete set needed for home screen)
+ * - Multiple UI components observe the same favorites simultaneously
+ * - Set membership checks are O(1) and efficient
+ * - DataStore naturally provides Flow—preserve that reactivity
+ * - Unlike `AppNamesManager` (granular events), this is perfect for Flow
+ *
+ * **Package-Based Limit Enforcement:**
+ * The manager enforces `MAX_FAVORITES_ON_HOME` as a **package limit**, not a
+ * component limit. This design allows:
+ * - Multiple activities from the same package (e.g., Gmail + Gmail Compose)
+ * - Prevents bloat from too many different apps
+ * - `addFavoriteComponent()` checks unique package count before adding new packages
+ *
+ * **Component Identifier Format:**
+ * Components are identified by their full component name string:
+ * `"packageName/activityClassName"` (e.g., "com.android.chrome/.MainActivity")
+ *
+ * **Cleanup Mechanism:**
+ * `cleanupFavoriteComponents()` removes favorites for uninstalled apps by:
+ * - Taking intersection with currently installed components
+ * - Logging removal count for debugging
+ * - Preserving backup in debug builds
+ * - Failing gracefully on errors (keeps current state)
+ *
+ * **Data Flow:**
+ * 1. User toggles favorite via UI
+ * 2. Manager updates DataStore (add/remove from set)
+ * 3. DataStore emits new set via `favoriteComponentsFlow`
+ * 4. All observers receive update simultaneously (hot sharing)
+ * 5. UI updates via DiffUtil
+ *
+ * **Error Handling:**
+ * All operations return Boolean success indicators or use default values on failure.
+ * IOException from DataStore is caught and results in empty set emission.
+ * [CancellationException] is always re-thrown for proper coroutine cancellation.
+ * Cleanup failures preserve current state rather than clearing favorites.
+ *
+ * @property dataStore Preferences DataStore for persisting favorites set
+ * @property context Application context for system access
+ * @property externalScope Application scope for hot Flow sharing (null in tests)
+ * @property favoriteComponentsFlow Hot shared Flow of currently favorited component identifiers
+ *
+ * @see AppVisibilityManager for similar Flow-based state management pattern
+ * @see AppNamesManager for contrast with event-based architecture
+ */
 @Singleton
 class FavoritesManager : FavoritesRepository {
 
