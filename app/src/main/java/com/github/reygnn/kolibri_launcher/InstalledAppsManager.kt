@@ -33,6 +33,41 @@ import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Manager for loading and monitoring installed applications on the device.
+ *
+ * This singleton is responsible for querying the Android PackageManager to retrieve
+ * all launchable applications and providing them as a reactive data stream. It acts
+ * as the primary data source for the app list in the launcher.
+ *
+ * **Data Flow:**
+ * 1. External trigger via [triggerAppsUpdate]
+ * 2. Query PackageManager for LAUNCHER apps
+ * 3. Process and enrich app metadata (names, display names)
+ * 4. Emit sorted list through [StateFlow]
+ *
+ * **Key Features:**
+ * - Reactive updates through [Flow] and [StateFlow]
+ * - Trigger-based refresh mechanism via [MutableSharedFlow]
+ * - Custom app name resolution through [AppNamesRepository]
+ * - Automatic alphabetical sorting by display name
+ * - Deferred subscription with 5-second timeout (WhileSubscribed)
+ *
+ * **Error Handling:**
+ * All operations are wrapped in comprehensive try-catch blocks to prevent crashes.
+ * Errors are logged silently via [TimberWrapper] and result in empty lists or fallback
+ * values. [CancellationException] is always re-thrown to preserve coroutine cancellation.
+ *
+ * **Threading:**
+ * - App loading runs on [Dispatchers.IO]
+ * - Uses [SupervisorJob] to isolate failures
+ * - Flow operations are thread-safe
+ *
+ * @property context Application context for accessing system services
+ * @property packageManager Android PackageManager for querying installed apps
+ * @property appNamesManager Repository for custom app name mappings
+ * @property appsUpdateTrigger Shared flow for triggering refresh operations
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class InstalledAppsManager @Inject constructor(
