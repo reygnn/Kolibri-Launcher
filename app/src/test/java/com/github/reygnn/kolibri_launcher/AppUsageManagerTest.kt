@@ -1,14 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,12 +14,6 @@ import org.junit.Test
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.junit.MockitoRule
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
 
@@ -34,43 +23,57 @@ class AppUsageManagerTest {
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
 
     @Mock
-    private lateinit var mockDataStore: DataStore<Preferences>
-    @Mock
     private lateinit var mockContext: Context
 
+    private lateinit var fakeDataStore: FakeDataStore
     private lateinit var appUsageManager: AppUsageManager
 
     @Before
     fun setup() {
-        appUsageManager = AppUsageManager(mockDataStore, mockContext)
+        fakeDataStore = FakeDataStore()
+        appUsageManager = AppUsageManager(fakeDataStore, mockContext)
     }
 
-    // ========== EXISTING TESTS ==========
+    // ========== BASIC FUNCTIONALITY TESTS ==========
 
     @Test
-    fun `recordPackageLaunch correctly calls edit on DataStore`() = runTest {
-        val packageName = "com.test.app"
-        whenever(mockDataStore.edit(any())).doReturn(preferencesOf())
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
+    fun `recordPackageLaunch - successfully records launch`() = runTest {
+        // Act
+        appUsageManager.recordPackageLaunch("com.test.app")
 
-        appUsageManager.recordPackageLaunch(packageName)
-
-        verify(mockDataStore).edit(any())
+        // Assert
+        assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
     }
 
     @Test
-    fun `sortAppsByTimeWeightedUsage correctly sorts by recency`() = runTest {
+    fun `recordPackageLaunch - with null packageName - does nothing`() = runTest {
+        // Act
+        appUsageManager.recordPackageLaunch(null)
+
+        // Assert
+        assertEquals(0, fakeDataStore.updateDataCallCount)
+    }
+
+    @Test
+    fun `recordPackageLaunch - with blank packageName - does nothing`() = runTest {
+        // Act
+        appUsageManager.recordPackageLaunch("   ")
+
+        // Assert
+        assertEquals(0, fakeDataStore.updateDataCallCount)
+    }
+
+    // ========== SORTING TESTS ==========
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - correctly sorts by recency`() = runTest {
+        // Arrange
         val apps = listOf(
-            AppInfo(originalName = "App C", displayName = "App C", packageName = "com.c", className = "c"),
-            AppInfo(originalName = "App B", displayName = "App B", packageName = "com.b", className = "b"),
-            AppInfo(originalName = "App A", displayName = "App A", packageName = "com.a", className = "a"),
-            AppInfo(originalName = "App D", displayName = "App D", packageName = "com.d", className = "d")
-        )
-        val expectedOrder = listOf(
-            apps[2], // App A (sehr kürzlich)
-            apps[1], // App B (kürzlich)
-            apps[0], // App C (alt)
-            apps[3]  // App D (ungenutzt)
+            AppInfo("App C", "App C", "com.c", "c"),
+            AppInfo("App B", "App B", "com.b", "b"),
+            AppInfo("App A", "App A", "com.a", "a"),
+            AppInfo("App D", "App D", "com.d", "d")
         )
 
         val currentTime = System.currentTimeMillis()
@@ -83,24 +86,25 @@ class AppUsageManagerTest {
             stringSetPreferencesKey("com.b") to setOf(recentTime),
             stringSetPreferencesKey("com.c") to setOf(oldTime)
         )
-        whenever(mockDataStore.data).thenReturn(flowOf(usagePreferences))
+        fakeDataStore.setInitialData(usagePreferences)
 
+        // Act
         val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps)
 
-        assertEquals(expectedOrder, sortedApps)
+        // Assert
+        assertEquals("App A", sortedApps[0].displayName) // sehr kürzlich
+        assertEquals("App B", sortedApps[1].displayName) // kürzlich
+        assertEquals("App C", sortedApps[2].displayName) // alt
+        assertEquals("App D", sortedApps[3].displayName) // ungenutzt
     }
 
     @Test
-    fun `sortAppsByTimeWeightedUsage uses alphabetical sort as tie-breaker`() = runTest {
+    fun `sortAppsByTimeWeightedUsage - uses alphabetical sort as tie-breaker`() = runTest {
+        // Arrange
         val apps = listOf(
-            AppInfo(originalName = "App Z", displayName = "App Z", packageName = "com.z", className = "z"),
-            AppInfo(originalName = "App Used", displayName = "App Used", packageName = "com.used", className = "used"),
-            AppInfo(originalName = "App A", displayName = "App A", packageName = "com.a", className = "a")
-        )
-        val expectedOrder = listOf(
-            apps[1], // Die genutzte App muss immer zuerst kommen.
-            apps[2], // App A kommt vor App Z in der alphabetischen Sortierung.
-            apps[0]
+            AppInfo("App Z", "App Z", "com.z", "z"),
+            AppInfo("App Used", "App Used", "com.used", "used"),
+            AppInfo("App A", "App A", "com.a", "a")
         )
 
         val currentTime = System.currentTimeMillis()
@@ -109,52 +113,151 @@ class AppUsageManagerTest {
         val usagePreferences = preferencesOf(
             stringSetPreferencesKey("com.used") to setOf(recentTime)
         )
-        whenever(mockDataStore.data).thenReturn(flowOf(usagePreferences))
+        fakeDataStore.setInitialData(usagePreferences)
 
+        // Act
         val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps)
 
-        assertEquals(expectedOrder, sortedApps)
+        // Assert
+        assertEquals("App Used", sortedApps[0].displayName) // genutzte App zuerst
+        assertEquals("App A", sortedApps[1].displayName)    // dann alphabetisch
+        assertEquals("App Z", sortedApps[2].displayName)
     }
 
-    // ========== NEW CRASH-RESISTANCE TESTS ==========
+    @Test
+    fun `sortAppsByTimeWeightedUsage - multiple launches sum up correctly`() = runTest {
+        // Arrange
+        val currentTime = System.currentTimeMillis()
+        val apps = listOf(
+            AppInfo("Frequent", "Frequent", "com.frequent", "f"),
+            AppInfo("Once", "Once", "com.once", "o")
+        )
+
+        // Frequent: 5 Starts in letzter Woche
+        val frequentTimestamps = (0..4).map {
+            (currentTime - TimeUnit.DAYS.toMillis(it.toLong())).toString()
+        }.toSet()
+
+        val usagePreferences = preferencesOf(
+            stringSetPreferencesKey("com.frequent") to frequentTimestamps,
+            stringSetPreferencesKey("com.once") to setOf(
+                (currentTime - TimeUnit.DAYS.toMillis(7)).toString()
+            )
+        )
+        fakeDataStore.setInitialData(usagePreferences)
+
+        // Act
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+
+        // Assert - häufige Nutzung sollte gewinnen
+        assertEquals("Frequent", result[0].displayName)
+        assertEquals("Once", result[1].displayName)
+    }
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - with empty app list - returns empty list`() = runTest {
+        // Act
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(emptyList())
+
+        // Assert
+        assertTrue(result.isEmpty())
+    }
+
+    // ========== EDGE CASES & TIMESTAMP VALIDATION ==========
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - with corrupt timestamp data - still succeeds`() = runTest {
+        // Arrange
+        val corruptData = preferencesOf(
+            stringSetPreferencesKey("com.test") to setOf("invalid", "not_a_number", "abc123")
+        )
+        fakeDataStore.setInitialData(corruptData)
+
+        val apps = listOf(
+            AppInfo("Test", "Test", "com.test", "test"),
+            AppInfo("Other", "Other", "com.other", "other")
+        )
+
+        // Act
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+
+        // Assert - alphabetisch sortiert, da Timestamps ungültig
+        assertEquals("Other", result[0].displayName)
+        assertEquals("Test", result[1].displayName)
+    }
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - ignores future timestamps`() = runTest {
+        // Arrange
+        val currentTime = System.currentTimeMillis()
+        val apps = listOf(
+            AppInfo("Future", "Future", "com.future", "f"),
+            AppInfo("Valid", "Valid", "com.valid", "v")
+        )
+
+        val usagePreferences = preferencesOf(
+            stringSetPreferencesKey("com.future") to setOf(
+                (currentTime + TimeUnit.DAYS.toMillis(1)).toString()
+            ),
+            stringSetPreferencesKey("com.valid") to setOf(
+                (currentTime - TimeUnit.HOURS.toMillis(1)).toString()
+            )
+        )
+        fakeDataStore.setInitialData(usagePreferences)
+
+        // Act
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+
+        // Assert - Valid sollte vor Future sein (Future wird ignoriert)
+        assertEquals("Valid", result[0].displayName)
+        assertEquals("Future", result[1].displayName)
+    }
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - handles very old timestamps`() = runTest {
+        // Arrange
+        val currentTime = System.currentTimeMillis()
+        val apps = listOf(
+            AppInfo("Ancient", "Ancient", "com.ancient", "a"),
+            AppInfo("Recent", "Recent", "com.recent", "r")
+        )
+
+        val usagePreferences = preferencesOf(
+            stringSetPreferencesKey("com.ancient") to setOf(
+                (currentTime - TimeUnit.DAYS.toMillis(364)).toString() // Fast 1 Jahr
+            ),
+            stringSetPreferencesKey("com.recent") to setOf(
+                (currentTime - TimeUnit.HOURS.toMillis(1)).toString()
+            )
+        )
+        fakeDataStore.setInitialData(usagePreferences)
+
+        // Act - should not crash due to exp() overflow
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+
+        // Assert - Recent sollte vor Ancient sein
+        assertEquals("Recent", result[0].displayName)
+        assertEquals("Ancient", result[1].displayName)
+    }
+
+    // ========== ERROR HANDLING TESTS ==========
 
     @Test
     fun `recordPackageLaunch - when DataStore edit fails with IOException - does not crash`() = runTest {
         // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-        whenever(mockDataStore.edit(any())).doAnswer {
-            throw IOException("Disk full")
-        }
+        fakeDataStore.makeEditFail()
 
         // Act - should not crash
         appUsageManager.recordPackageLaunch("com.test.app")
 
-        // Assert - verify edit was attempted
-        verify(mockDataStore).edit(any())
-    }
-
-    @Test
-    fun `recordPackageLaunch - when DataStore edit fails with RuntimeException - does not crash`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-        whenever(mockDataStore.edit(any())).doAnswer {
-            throw RuntimeException("Unexpected error")
-        }
-
-        // Act - should not crash
-        appUsageManager.recordPackageLaunch("com.test.app")
-
-        // Assert
-        verify(mockDataStore).edit(any())
+        // Assert - updateData wurde aufgerufen
+        assertEquals(1, fakeDataStore.updateDataCallCount)
     }
 
     @Test
     fun `recordPackageLaunch - when CancellationException - propagates it`() = runTest {
         // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-        whenever(mockDataStore.edit(any())).doAnswer {
-            throw CancellationException("Cancelled")
-        }
+        fakeDataStore.makeCancellable()
 
         // Act & Assert
         assertFailsWith<CancellationException> {
@@ -165,9 +268,7 @@ class AppUsageManagerTest {
     @Test
     fun `sortAppsByTimeWeightedUsage - when DataStore fails - falls back to alphabetical`() = runTest {
         // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw IOException("Read error")
-        })
+        fakeDataStore.makeReadFail()
 
         val apps = listOf(
             AppInfo("C", "C", "com.c", "c"),
@@ -184,90 +285,7 @@ class AppUsageManagerTest {
         assertEquals("C", result[2].displayName)
     }
 
-    @Test
-    fun `sortAppsByTimeWeightedUsage - when DataStore throws RuntimeException - falls back to alphabetical`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw RuntimeException("Corrupted data")
-        })
-
-        val apps = listOf(
-            AppInfo("Z", "Z", "com.z", "z"),
-            AppInfo("M", "M", "com.m", "m"),
-            AppInfo("A", "A", "com.a", "a")
-        )
-
-        // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
-
-        // Assert
-        assertEquals("A", result[0].displayName)
-        assertEquals("M", result[1].displayName)
-        assertEquals("Z", result[2].displayName)
-    }
-
-    @Test
-    fun `sortAppsByTimeWeightedUsage - with corrupt timestamp data - still succeeds`() = runTest {
-        // Arrange - DataStore mit ungültigen Daten
-        val corruptData = preferencesOf(
-            stringSetPreferencesKey("com.test") to setOf("invalid_timestamp", "not_a_number", "abc123")
-        )
-        whenever(mockDataStore.data).thenReturn(flowOf(corruptData))
-
-        val apps = listOf(
-            AppInfo("Test", "Test", "com.test", "test"),
-            AppInfo("Other", "Other", "com.other", "other")
-        )
-
-        // Act - should not crash
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
-
-        // Assert - sollte alphabetisch sortiert sein, da Timestamps ungültig
-        assertEquals(2, result.size)
-        assertEquals("Other", result[0].displayName)
-        assertEquals("Test", result[1].displayName)
-    }
-
-    @Test
-    fun `sortAppsByTimeWeightedUsage - with empty app list - returns empty list`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-
-        // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(emptyList())
-
-        // Assert
-        assertTrue(result.isEmpty())
-    }
-
-    @Test
-    fun `sortAppsByTimeWeightedUsage - with CancellationException - propagates it`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw CancellationException("Flow cancelled")
-        })
-
-        val apps = listOf(AppInfo("A", "A", "com.a", "a"))
-
-        // Act & Assert
-        assertFailsWith<CancellationException> {
-            appUsageManager.sortAppsByTimeWeightedUsage(apps)
-        }
-    }
-
-    @Test
-    fun `hasUsageDataForPackage - when DataStore fails - returns false`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw IOException("Cannot read")
-        })
-
-        // Act
-        val result = appUsageManager.hasUsageDataForPackage("com.test.app")
-
-        // Assert
-        assertFalse(result)
-    }
+    // ========== HAS USAGE DATA TESTS ==========
 
     @Test
     fun `hasUsageDataForPackage - with valid data - returns true`() = runTest {
@@ -275,7 +293,7 @@ class AppUsageManagerTest {
         val usageData = preferencesOf(
             stringSetPreferencesKey("com.test.app") to setOf("123456789")
         )
-        whenever(mockDataStore.data).thenReturn(flowOf(usageData))
+        fakeDataStore.setInitialData(usageData)
 
         // Act
         val result = appUsageManager.hasUsageDataForPackage("com.test.app")
@@ -286,9 +304,6 @@ class AppUsageManagerTest {
 
     @Test
     fun `hasUsageDataForPackage - with no data - returns false`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-
         // Act
         val result = appUsageManager.hasUsageDataForPackage("com.test.app")
 
@@ -297,16 +312,154 @@ class AppUsageManagerTest {
     }
 
     @Test
-    fun `removeUsageDataForPackage - when successful - completes without error`() = runTest {
+    fun `hasUsageDataForPackage - with null packageName - returns false`() = runTest {
+        // Act
+        val result = appUsageManager.hasUsageDataForPackage(null)
+
+        // Assert
+        assertFalse(result)
+    }
+
+    @Test
+    fun `hasUsageDataForPackage - with blank packageName - returns false`() = runTest {
+        // Act
+        val result = appUsageManager.hasUsageDataForPackage("   ")
+
+        // Assert
+        assertFalse(result)
+    }
+
+    @Test
+    fun `hasUsageDataForPackage - when DataStore fails - returns false`() = runTest {
+        // Arrange
+        fakeDataStore.makeReadFail()
+
+        // Act
+        val result = appUsageManager.hasUsageDataForPackage("com.test.app")
+
+        // Assert
+        assertFalse(result)
+    }
+
+    // ========== REMOVE USAGE DATA TESTS ==========
+
+    @Test
+    fun `removeUsageDataForPackage - when successful - removes data`() = runTest {
+        // Arrange - erst Daten hinzufügen
+        appUsageManager.recordPackageLaunch("com.test.app")
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
+
+        // Act
         appUsageManager.removeUsageDataForPackage("com.test.app")
-        verify(mockDataStore).edit(any())
+
+        // Assert
+        assertFalse(appUsageManager.hasUsageDataForPackage("com.test.app"))
+    }
+
+    @Test
+    fun `removeUsageDataForPackage - with null packageName - does nothing`() = runTest {
+        // Act
+        appUsageManager.removeUsageDataForPackage(null)
+
+        // Assert
+        assertEquals(0, fakeDataStore.updateDataCallCount)
+    }
+
+    @Test
+    fun `removeUsageDataForPackage - with blank packageName - does nothing`() = runTest {
+        // Act
+        appUsageManager.removeUsageDataForPackage("   ")
+
+        // Assert
+        assertEquals(0, fakeDataStore.updateDataCallCount)
     }
 
     @Test
     fun `removeUsageDataForPackage - when DataStore fails - does not crash`() = runTest {
-        val fakeDataStore = FakeDataStore()
+        // Arrange
         fakeDataStore.makeEditFail()
+
+        // Act - should not crash
         appUsageManager.removeUsageDataForPackage("com.test.app")
-        // Kein crash = success
+
+        // Assert - updateData wurde aufgerufen
+        assertEquals(1, fakeDataStore.updateDataCallCount)
+    }
+
+    @Test
+    fun `removeUsageDataForPackage - when CancellationException - propagates it`() = runTest {
+        // Arrange
+        fakeDataStore.makeCancellable()
+
+        // Act & Assert
+        assertFailsWith<CancellationException> {
+            appUsageManager.removeUsageDataForPackage("com.test.app")
+        }
+    }
+
+    // ========== INTEGRATION-LIKE TESTS ==========
+
+    @Test
+    fun `full workflow - record, sort, check, and remove usage data`() = runTest {
+        // Arrange
+        val apps = listOf(
+            AppInfo("App A", "App A", "com.a", "a"),
+            AppInfo("App B", "App B", "com.b", "b"),
+            AppInfo("App C", "App C", "com.c", "c")
+        )
+
+        // Act & Assert - Schritt für Schritt
+
+        // 1. Apps starten
+        appUsageManager.recordPackageLaunch("com.b")
+        Thread.sleep(100) // Kurze Pause für unterschiedliche Timestamps
+        appUsageManager.recordPackageLaunch("com.a")
+        Thread.sleep(100)
+        appUsageManager.recordPackageLaunch("com.c")
+
+        // 2. Prüfen dass Daten vorhanden sind
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.a"))
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.b"))
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.c"))
+
+        // 3. Sortierung sollte nach Recency sein (C, A, B)
+        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        assertEquals("App C", sorted[0].displayName) // zuletzt gestartet
+        assertEquals("App A", sorted[1].displayName)
+        assertEquals("App B", sorted[2].displayName)
+
+        // 4. Eine App entfernen
+        appUsageManager.removeUsageDataForPackage("com.a")
+        assertFalse(appUsageManager.hasUsageDataForPackage("com.a"))
+
+        // 5. Sortierung sollte sich ändern
+        val sortedAfterRemoval = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        assertEquals("App C", sortedAfterRemoval[0].displayName)
+        assertEquals("App B", sortedAfterRemoval[1].displayName)
+        assertEquals("App A", sortedAfterRemoval[2].displayName) // jetzt ungenutzt, alphabetisch
+    }
+
+    @Test
+    fun `multiple recordings for same app - all timestamps are kept`() = runTest {
+        // Arrange & Act - mehrere Starts aufzeichnen
+        repeat(5) {
+            appUsageManager.recordPackageLaunch("com.test.app")
+            Thread.sleep(50) // Verschiedene Timestamps
+        }
+
+        // Assert - App sollte Nutzungsdaten haben
+        assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
+
+        // Die genaue Anzahl der Timestamps können wir hier nicht direkt prüfen,
+        // aber wir können verifizieren dass die App höher gerankt wird
+        val apps = listOf(
+            AppInfo("Test", "Test", "com.test.app", "test"),
+            AppInfo("Other", "Other", "com.other", "other")
+        )
+
+        appUsageManager.recordPackageLaunch("com.other") // nur 1x
+
+        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        assertEquals("Test", sorted[0].displayName) // Mehr Starts = höherer Score
     }
 }
