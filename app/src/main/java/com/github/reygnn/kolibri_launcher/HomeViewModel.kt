@@ -101,14 +101,14 @@ class HomeViewModel @Inject constructor(
     private val swipeLeftComponent: StateFlow<String?> =
         swipeActionsRepository.swipeLeftAppFlow.stateIn(
             viewModelScope,
-            SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            SharingStarted.Eagerly,
             null
         )
 
     private val swipeRightComponent: StateFlow<String?> =
         swipeActionsRepository.swipeRightAppFlow.stateIn(
             viewModelScope,
-            SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            SharingStarted.Eagerly,
             null
         )
 
