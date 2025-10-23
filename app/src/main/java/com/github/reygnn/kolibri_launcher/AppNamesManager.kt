@@ -157,7 +157,7 @@ import javax.inject.Singleton
  */
 
 
-kotlin/**
+/**
  * Manager for custom app name overrides with event-driven architecture.
  *
  * This singleton allows users to set personalized display names for installed apps,
