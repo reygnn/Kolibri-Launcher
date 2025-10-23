@@ -207,4 +207,14 @@
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
 
+    <string name="swipe_actions_title_screen">Swipe Actions</string>
+    <string name="swipe_actions_subtitle_screen">Assign apps to left and right swipe</string>
+    <string name="swipe_slot_empty">None</string>
+    <string name="swipe_slot_left_format">Left: %1$s</string>
+    <string name="swipe_slot_right_format">Right: %1$s</string>
+    <string name="error_saving_swipe_actions">Could not save swipe actions</string>
+    
+    <string name="settings_swipe_actions_title">Swipe Actions</string>
+    <string name="settings_swipe_actions_summary">Assign apps to left and right swipe gestures</string>
+    
 </resources>

@@ -12,28 +12,13 @@ package com.github.reygnn.kolibri_launcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
-
-data class SelectableAppInfo(
-    val appInfo: AppInfo,
-    val isSelected: Boolean
-)
-
-data class OnboardingUiState(
-    val titleResId: Int = R.string.onboarding_title_welcome,
-    val subtitleResId: Int = R.string.onboarding_subtitle_welcome,
-    val selectableApps: List<SelectableAppInfo> = emptyList(),
-    val selectedApps: List<AppInfo> = emptyList()
-)
 
 enum class LaunchMode {
     INITIAL_SETUP,

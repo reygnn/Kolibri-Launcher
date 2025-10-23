@@ -266,6 +266,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
             TimberWrapper.silentError(e, "Error setting double tap listener")
         }
 
+        // Swipe Actions
+        try {
+            findPreference<Preference>("swipe_actions")?.setOnPreferenceClickListener {
+                try {
+                    val intent = Intent(requireContext(), SwipeActionsActivity::class.java)
+                    startActivity(intent)
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error starting swipe actions activity")
+                    false
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting swipe actions listener")
+        }
+
         // Crash Reports
         try {
             findPreference<Preference>("crash_reports")?.setOnPreferenceClickListener {

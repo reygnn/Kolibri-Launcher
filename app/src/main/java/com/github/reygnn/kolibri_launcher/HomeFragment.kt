@@ -599,13 +599,34 @@ class HomeFragment : Fragment() {
 
             return try {
                 val diffY = e2.y - e1.y
-                if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
-                    abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD &&
-                    diffY < 0) {
-                    viewModel.onFlingUp()
-                    true
+                val diffX = e2.x - e1.x
+
+                // Prüfe, ob die Geste primär horizontal oder vertikal war
+                if (abs(diffX) > abs(diffY)) {
+                    // HORIZONTALE Geste
+                    if (abs(diffX) > AppConstants.SWIPE_THRESHOLD && abs(vX) > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
+                        if (diffX > 0) {
+                            // Wisch von Links nach Rechts
+                            viewModel.onFlingRight()
+                            true
+                        } else {
+                            // Wisch von Rechts nach Links
+                            viewModel.onFlingLeft()
+                            true
+                        }
+                    } else {
+                        false
+                    }
                 } else {
-                    false
+                    // VERTIKALE Geste
+                    if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
+                        abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD &&
+                        diffY < 0) { // Nur Wisch nach OBEN
+                        viewModel.onFlingUp()
+                        true
+                    } else {
+                        false
+                    }
                 }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in fling")

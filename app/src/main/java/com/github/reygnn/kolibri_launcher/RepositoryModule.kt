@@ -89,5 +89,10 @@ abstract class RepositoryModule {
         impl: GetOnboardingAppsUseCase
     ): GetOnboardingAppsUseCaseRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindSwipeActionsRepository(
+        swipeActionsManager: SwipeActionsManager
+    ): SwipeActionsRepository
 
 }

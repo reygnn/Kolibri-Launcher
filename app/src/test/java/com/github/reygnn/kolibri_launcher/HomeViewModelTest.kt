@@ -64,6 +64,8 @@ class HomeViewModelTest {
     private lateinit var screenLockManager: ScreenLockRepository
     @Mock
     private lateinit var appVisibilityManager: AppVisibilityRepository
+    @Mock
+    private lateinit var swipeActionsRepository: SwipeActionsRepository
 
     private lateinit var viewModel: HomeViewModel
 
@@ -89,6 +91,8 @@ class HomeViewModelTest {
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(emptyList())
         whenever(context.getString(any())).thenReturn("Test String")
         whenever(context.getString(any(), any())).thenReturn("Test String with args")
+        whenever(swipeActionsRepository.swipeLeftAppFlow).thenReturn(flowOf(null))
+        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(null))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -104,6 +108,7 @@ class HomeViewModelTest {
             appUsageManager,
             screenLockManager,
             appVisibilityManager,
+            swipeActionsRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
         )
@@ -731,5 +736,89 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state.timeString.isNotEmpty())
         assertTrue(state.dateString.isNotEmpty())
+    }
+
+    @Test
+    fun `onFlingLeft - when app assigned - calls onAppClicked`() = runTest {
+        // Setup: App1 ist "links" zugewiesen
+        whenever(swipeActionsRepository.swipeLeftAppFlow).thenReturn(flowOf(app1.componentName))
+        // Setup: App1 ist "installiert" (im StateManager)
+        whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingLeft()
+            advanceUntilIdle()
+
+            // Erwarte, dass onAppClicked() ein LaunchApp Event auslöst
+            val event = awaitItem()
+            assertTrue(event is UiEvent.LaunchApp)
+            assertEquals(app1, (event as UiEvent.LaunchApp).app)
+        }
+
+        // Stelle sicher, dass auch die Nutzung getrackt wurde
+        verify(appUsageManager).recordPackageLaunch(app1.packageName)
+    }
+
+    @Test
+    fun `onFlingRight - when app assigned - calls onAppClicked`() = runTest {
+        // Setup: App2 ist "rechts" zugewiesen
+        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(app2.componentName))
+        // Setup: App2 ist "installiert" (im StateManager)
+        whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingRight()
+            advanceUntilIdle()
+
+            // Erwarte, dass onAppClicked() ein LaunchApp Event auslöst
+            val event = awaitItem()
+            assertTrue(event is UiEvent.LaunchApp)
+            assertEquals(app2, (event as UiEvent.LaunchApp).app)
+        }
+
+        // Stelle sicher, dass auch die Nutzung getrackt wurde
+        verify(appUsageManager).recordPackageLaunch(app2.packageName)
+    }
+
+    @Test
+    fun `onFlingLeft - when no app assigned - does nothing`() = runTest {
+        // Standard-Setup (swipeLeftAppFlow gibt null zurück)
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingLeft()
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `onFlingRight - when app assigned but not installed - clears setting`() = runTest {
+        // Setup: Eine "alte" App ist zugewiesen
+        val oldAppComponent = "com.uninstalled/com.uninstalled.Main"
+        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(oldAppComponent))
+        // Setup: Die App ist NICHT im StateManager
+        whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps) // Enthält nur app1, app2
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingRight()
+            advanceUntilIdle()
+
+            // Es darf kein Launch-Event ausgelöst werden
+            expectNoEvents()
+        }
+
+        // Stattdessen sollte die Einstellung gelöscht werden
+        verify(swipeActionsRepository).setSwipeAction(SwipeSlot.RIGHT, null)
     }
 }

@@ -25,11 +25,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retry
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import timber.log.Timber
 import java.io.IOException
@@ -37,6 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
+import androidx.lifecycle.viewModelScope
 
 data class HomeUiState(
     val timeString: String = "",
@@ -75,6 +78,7 @@ class HomeViewModel @Inject constructor(
     private val appUsageManager: AppUsageRepository,
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: AppVisibilityRepository,
+    private val swipeActionsRepository: SwipeActionsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
@@ -93,6 +97,20 @@ class HomeViewModel @Inject constructor(
 
     private var fallbackToastShown = false
     private var enableLockToastShown = false
+
+    private val swipeLeftComponent: StateFlow<String?> =
+        swipeActionsRepository.swipeLeftAppFlow.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            null
+        )
+
+    private val swipeRightComponent: StateFlow<String?> =
+        swipeActionsRepository.swipeRightAppFlow.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            null
+        )
 
     companion object {
         private const val DEFAULT_TEXT_COLOR = Color.WHITE
@@ -155,6 +173,55 @@ class HomeViewModel @Inject constructor(
 
     fun onFlingUp() = launchSafe {
         sendEvent(UiEvent.ShowAppDrawer)
+    }
+
+    fun onFlingLeft() = launchSafe {
+        try {
+            val comp = swipeLeftComponent.value
+            if (comp == null) {
+                Timber.d("No app assigned to swipe left")
+                return@launchSafe
+            }
+
+            // Finde die AppInfo aus dem StateManager
+            val appToLaunch = findAppByComponentName(comp)
+
+            if (appToLaunch != null) {
+                // Verwende die existierende Logik wieder!
+                onAppClicked(appToLaunch)
+            } else {
+                Timber.w("App for swipe left not found: $comp. Clearing setting.")
+                // App ist nicht (mehr) installiert, Einstellung aufräumen
+                swipeActionsRepository.setSwipeAction(SwipeSlot.LEFT, null)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onFlingLeft")
+        }
+    }
+
+    // NEU: Wird bei Rechts-Wisch aufgerufen
+    fun onFlingRight() = launchSafe {
+        try {
+            val comp = swipeRightComponent.value
+            if (comp == null) {
+                Timber.d("No app assigned to swipe right")
+                return@launchSafe
+            }
+
+            // Finde die AppInfo aus dem StateManager
+            val appToLaunch = findAppByComponentName(comp)
+
+            if (appToLaunch != null) {
+                // Verwende die existierende Logik wieder!
+                onAppClicked(appToLaunch)
+            } else {
+                Timber.w("App for swipe right not found: $comp. Clearing setting.")
+                // App ist nicht (mehr) installiert, Einstellung aufräumen
+                swipeActionsRepository.setSwipeAction(SwipeSlot.RIGHT, null)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onFlingRight")
+        }
     }
 
     fun onLongPress() = launchSafe {
@@ -357,6 +424,21 @@ class HomeViewModel @Inject constructor(
     }
 
     // --- PRIVATE/INTERNAL LOGIC ---
+
+    /**
+     * NEU: Helper-Funktion zum Suchen der App im StateManager.
+     * Greift auf die gecachte App-Liste im State Manager zu.
+     */
+    private fun findAppByComponentName(componentName: String): AppInfo? {
+        return try {
+            installedAppsStateManager.getCurrentApps().find {
+                it.componentName == componentName
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error finding app by component name")
+            null
+        }
+    }
 
     private fun listenForAppUpdates() = launchSafe {
         try {

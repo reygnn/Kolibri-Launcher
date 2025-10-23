@@ -57,6 +57,12 @@
             android:summary="@string/double_tap_to_lock_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
+            
+            <Preference
+            android:key="swipe_actions"
+            android:title="@string/settings_swipe_actions_title"
+            android:summary="@string/settings_swipe_actions_summary"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <PreferenceCategory

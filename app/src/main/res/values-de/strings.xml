@@ -200,5 +200,15 @@
 
     <string name="toast_crash_reports_enabled">Crash-Berichte wurden aktiviert. Vielen Dank für deine Hilfe!</string>
     <string name="toast_crash_reports_disabled">Crash-Berichte wurden deaktiviert.</string>
+    
+    <string name="swipe_actions_title_screen">Wisch-Aktionen</string>
+    <string name="swipe_actions_subtitle_screen">Apps für Links- und Rechts-Wischen zuweisen</string>
+    <string name="swipe_slot_empty">Keine</string>
+    <string name="swipe_slot_left_format">Links: %1$s</string>
+    <string name="swipe_slot_right_format">Rechts: %1$s</string>
+    <string name="error_saving_swipe_actions">Wisch-Aktionen konnten nicht gespeichert werden</string>
+    
+    <string name="settings_swipe_actions_title">Wisch-Aktionen</string>
+    <string name="settings_swipe_actions_summary">Apps für Links- oder Rechts-Wischgesten zuweisen</string>
 
 </resources>
