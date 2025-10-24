@@ -154,6 +154,7 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
 
     private fun setupClickListeners() {
         try {
+            // Listener für den "Fertig"-Button
             binding.doneButton.setOnClickListener {
                 try {
                     viewModel.onDoneClicked()
@@ -163,7 +164,7 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
                 }
             }
 
-            // NEU: Listener für die Slot-Auswahl-Chips
+            // Listener für die Slot-Auswahl-Chips (welcher ist aktiv?)
             binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     viewModel.onSlotSelected(SwipeSlot.LEFT)
@@ -173,6 +174,23 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
             binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     viewModel.onSlotSelected(SwipeSlot.RIGHT)
+                }
+            }
+
+            // Listener für das "Löschen"-Icon (X) auf den Chips
+            binding.leftSlotChip.setOnCloseIconClickListener {
+                try {
+                    viewModel.onSlotCleared(SwipeSlot.LEFT)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing left slot")
+                }
+            }
+
+            binding.rightSlotChip.setOnCloseIconClickListener {
+                try {
+                    viewModel.onSlotCleared(SwipeSlot.RIGHT)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing right slot")
                 }
             }
 

@@ -153,6 +153,19 @@ class SwipeActionsViewModel @Inject constructor(
     }
 
     /**
+     * Setzt den angegebenen Slot auf null (keine App zugewiesen).
+     */
+    fun onSlotCleared(slot: SwipeSlot) {
+        executeSafe {
+            when (slot) {
+                SwipeSlot.LEFT -> swipeLeftComponent.value = null
+                SwipeSlot.RIGHT -> swipeRightComponent.value = null
+                SwipeSlot.NONE -> {} // Nichts tun
+            }
+        }
+    }
+
+    /**
      * Speichert die aktuelle Auswahl und schließt den Bildschirm.
      */
     fun onDoneClicked() {

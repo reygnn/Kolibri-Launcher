@@ -7,7 +7,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:colorBackground"
-    tools:context=".SwipeActionsActivity"> <TextView
+    tools:context=".SwipeActionsActivity">
+
+    <TextView
         android:id="@+id/title_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -33,17 +35,28 @@
         app:layout_constraintEnd_toEndOf="@id/title_text"
         tools:text="Assign apps to left/right swipe" />
 
+    <TextView
+        android:id="@+id/slot_selector_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="@string/swipe_actions_selector_label"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        app:layout_constraintTop_toBottomOf="@id/subtitle_text"
+        app:layout_constraintStart_toStartOf="@id/title_text"
+        app:layout_constraintEnd_toEndOf="@id/title_text" />
+
     <com.google.android.material.chip.ChipGroup
         android:id="@+id/slot_selector_chip_group"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         app:chipSpacingHorizontal="8dp"
         app:singleLine="true"
         app:singleSelection="true"
         app:selectionRequired="true"
-        app:layout_constraintTop_toBottomOf="@id/subtitle_text"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/slot_selector_label" app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <com.google.android.material.chip.Chip
@@ -54,7 +67,7 @@
             android:checkable="true"
             android:checked="true"
             app:chipIcon="@drawable/ic_arrow_left"
-            tools:text="Left: None" />
+            app:closeIconVisible="true" tools:text="Left: None" />
 
         <com.google.android.material.chip.Chip
             android:id="@+id/right_slot_chip"
@@ -63,7 +76,7 @@
             android:layout_height="wrap_content"
             android:checkable="true"
             app:chipIcon="@drawable/ic_arrow_right"
-            tools:text="Right: None" />
+            app:closeIconVisible="true" tools:text="Right: None" />
 
     </com.google.android.material.chip.ChipGroup>
     
@@ -74,8 +87,7 @@
         android:layout_marginTop="16dp"
         android:hint="@string/search_hint"
         app:endIconMode="clear_text"
-        app:layout_constraintTop_toBottomOf="@id/slot_selector_chip_group"
-        app:layout_constraintStart_toStartOf="@id/title_text"
+        app:layout_constraintTop_toBottomOf="@id/slot_selector_chip_group" app:layout_constraintStart_toStartOf="@id/title_text"
         app:layout_constraintEnd_toEndOf="@id/title_text">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -99,7 +111,9 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/search_input_layout"
-        tools:listitem="@layout/item_app_selectable_swipe" /> <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        tools:listitem="@layout/item_app_selectable_swipe" />
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/done_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

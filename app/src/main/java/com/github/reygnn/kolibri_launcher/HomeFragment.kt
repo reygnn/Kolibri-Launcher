@@ -607,11 +607,11 @@ class HomeFragment : Fragment() {
                     if (abs(diffX) > AppConstants.SWIPE_THRESHOLD && abs(vX) > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
                         if (diffX > 0) {
                             // Wisch von Links nach Rechts
-                            viewModel.onFlingRight()
+                            viewModel.onFlingLeft()
                             true
                         } else {
                             // Wisch von Rechts nach Links
-                            viewModel.onFlingLeft()
+                            viewModel.onFlingRight()
                             true
                         }
                     } else {

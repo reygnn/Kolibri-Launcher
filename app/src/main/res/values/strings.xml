@@ -216,5 +216,6 @@
     
     <string name="settings_swipe_actions_title">Swipe Actions</string>
     <string name="settings_swipe_actions_summary">Assign apps to left and right swipe gestures</string>
+    <string name="swipe_actions_selector_label">Assign apps to a slot:</string>
     
 </resources>
