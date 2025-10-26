@@ -61,6 +61,9 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
                 binding.searchEditText.setText(query)
                 binding.searchEditText.setSelection(query.length)
             }
+
+            // throw RuntimeException("ACRA Test Crash")
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish()

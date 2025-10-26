@@ -94,6 +94,7 @@ class KolibriLauncherApp : Application() {
                     }
 
                     reportContent = listOf(
+                        ReportField.PACKAGE_NAME,
                         ReportField.ANDROID_VERSION,
                         ReportField.APP_VERSION_CODE,
                         ReportField.APP_VERSION_NAME,
