@@ -30,6 +30,9 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             if (savedInstanceState == null) {
                 loadSettingsFragment()
             }
+
+            // throw RuntimeException("ACRA Test Crash")
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
