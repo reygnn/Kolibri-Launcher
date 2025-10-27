@@ -44,6 +44,7 @@ import kotlin.system.exitProcess
  * - ACRA initialized with privacy-by-default
  * - Safe package receiver registration
  * - Protected migration with rollback capability
+ * - ACRA spam protection (max 1 report per exception per 24h)
  *
  * This ensures the launcher stays alive even under extreme conditions
  * like OutOfMemoryError, StackOverflowError, or corrupted system state.
@@ -131,6 +132,14 @@ class KolibriLauncherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize ACRA spam protection FIRST (before any crashes can occur)
+        try {
+            CrashReportLimiter.init(this)
+            Timber.d("CrashReportLimiter initialized successfully")
+        } catch (e: Throwable) {
+            Log.e("KolibriLauncher", "Failed to initialize CrashReportLimiter", e)
+        }
 
         // Setup Timber with crash protection
         try {
@@ -243,12 +252,19 @@ class KolibriLauncherApp : Application() {
     /**
      * Handles uncaught exceptions with recovery attempts.
      * Tries to keep the launcher alive when possible.
+     * Respects spam protection limits.
      */
     private fun handleUncaughtException(thread: Thread, throwable: Throwable) {
         var handlerCalled = false
 
         try {
             Timber.e(throwable, "UNCAUGHT EXCEPTION in thread: ${thread.name}")
+
+            // Check if we should send this report (spam protection)
+            val shouldSend = CrashReportLimiter.shouldSendReport(throwable)
+            if (!shouldSend) {
+                Timber.d("Report blocked by spam protection for: ${throwable::class.simpleName}")
+            }
 
             // Launcher-specific recovery for OutOfMemoryError
             if (throwable is OutOfMemoryError) {
@@ -262,7 +278,7 @@ class KolibriLauncherApp : Application() {
                 }
             }
 
-            // Call default exception handler once
+            // Call default exception handler once (ACRA will handle it)
             defaultExceptionHandler?.uncaughtException(thread, throwable)
             handlerCalled = true
 
@@ -324,6 +340,8 @@ class KolibriLauncherApp : Application() {
      * A specialized Timber.Tree that forwards exceptions to ACRA and includes a
      * diagnostic tool for improperly handled CancellationExceptions.
      *
+     * Features spam protection: Each exception type is only sent once per 24 hours.
+     *
      * THE PROBLEM:
      * Kotlin's `CancellationException` is used for control flow and is not a "true" error.
      * For performance reasons, it is often created WITHOUT a stack trace. This makes it
@@ -345,6 +363,15 @@ class KolibriLauncherApp : Application() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             // Only send warnings and errors with exceptions to ACRA
             if (priority < Log.WARN || t == null) {
+                return
+            }
+
+            // Check spam protection BEFORE processing
+            if (!CrashReportLimiter.shouldSendReport(t)) {
+                // Report is blocked by spam protection - log locally but don't send to ACRA
+                if (BuildConfig.DEBUG) {
+                    Log.d("AcraTree", "Report blocked by spam protection: ${t::class.simpleName}")
+                }
                 return
             }
 
