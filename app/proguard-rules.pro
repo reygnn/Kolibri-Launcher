@@ -20,25 +20,8 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
-# Keep launcher components
--keep class com.github.reygnn.kolibri_launcher.MainActivity
--keep class com.github.reygnn.kolibri_launcher.AppInfo
--keep class com.github.reygnn.kolibri_launcher.FavoritesManager
--keep class com.github.reygnn.kolibri_launcher.WallpaperManager
--keep class com.github.reygnn.kolibri_launcher.ThemeManager
--keep class com.github.reygnn.kolibri_launcher.AppUsageManager
--keep class com.github.reygnn.kolibri_launcher.AppVisibilityManager
-
-# Keep fragments
--keep class com.github.reygnn.kolibri_launcher.HomeFragment
--keep class com.github.reygnn.kolibri_launcher.AppDrawerFragment
-
-# Keep settings activity if you have one
--keep class com.github.reygnn.kolibri_launcher.SettingsActivity
-
-# Keep accessibility service and related classes
--keep class com.github.reygnn.kolibri_launcher.ScreenLockAccessibilityService { *; }
--keep class com.github.reygnn.kolibri_launcher.ScreenLockManager { *; }
+# Keep ALLE eigenen Klassen mit allen Methoden und Feldern
+-keep class com.github.reygnn.kolibri_launcher.** { *; }
 
 # Keep all accessibility services in general
 -keep class * extends android.accessibilityservice.AccessibilityService { *; }
