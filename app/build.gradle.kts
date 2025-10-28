@@ -364,13 +364,20 @@ tasks.register("uploadProguardMapping") {
 
         if (!mappingFile.exists()) {
             println("⚠️  Mapping file not found: ${mappingFile.absolutePath}")
+            println("This is normal if minifyEnabled = false")
             return@doLast
         }
 
-        println("📤 Running upload_mapping.sh...")
+        val scriptPath = "$projectDir/acra-scripts/upload_mapping.sh"
+        val scriptFile = file(scriptPath)
 
-        // Pfad zum Script (im selben Verzeichnis wie build.gradle.kts)
-        val scriptPath = "$projectDir/acra_scripts/upload_mapping.sh"
+        if (!scriptFile.exists()) {
+            println("⚠️  Script not found: $scriptPath")
+            println("Please add upload_mapping.sh to your app directory")
+            return@doLast
+        }
+
+        println("📤 Uploading ProGuard mapping via script...")
 
         // Script ausführen
         val process = ProcessBuilder(
@@ -386,15 +393,17 @@ tasks.register("uploadProguardMapping") {
 
         val exitCode = process.waitFor()
 
-        if (exitCode != 0) {
-            throw GradleException("Mapping upload failed!")
+        if (exitCode == 0) {
+            println("✅ Upload completed successfully!")
+        } else {
+            throw GradleException("Mapping upload failed with exit code $exitCode")
         }
     }
 }
 
-// Automatisch nach Release Build
+// Automatisch nach Release Build für APK und Bundle
 tasks.configureEach {
-    if (name == "assembleRelease") {
+    if (name in listOf("assembleRelease", "bundleRelease")) {
         finalizedBy("uploadProguardMapping")
     }
 }
