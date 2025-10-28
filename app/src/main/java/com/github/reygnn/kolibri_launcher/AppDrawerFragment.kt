@@ -102,6 +102,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             setupSortFab()
             observeViewModel()
             setupFragmentResultListener()
+
+            // throw RuntimeException("ACRA Test Crash")
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }

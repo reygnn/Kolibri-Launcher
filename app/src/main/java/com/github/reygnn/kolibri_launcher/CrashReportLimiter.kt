@@ -11,6 +11,7 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import timber.log.Timber
 
 /**
@@ -76,9 +77,9 @@ object CrashReportLimiter {
 
                 if (shouldSend) {
                     try {
-                        preferences.edit()
-                            .putLong(reportKey, now)
-                            .apply()
+                        preferences.edit {
+                            putLong(reportKey, now)
+                        }
                         Timber.d("Report allowed for: ${exception::class.simpleName}")
                     } catch (e: Throwable) {
                         Timber.e(e, "Failed to save report timestamp")
@@ -106,8 +107,8 @@ object CrashReportLimiter {
 
             // Find first stack trace element from app package
             val relevantTrace = exception.stackTrace
-                ?.firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
-                ?: exception.stackTrace?.firstOrNull()
+                .firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
+                ?: exception.stackTrace.firstOrNull()
 
             val location = if (relevantTrace != null) {
                 "${relevantTrace.className}.${relevantTrace.methodName}:${relevantTrace.lineNumber}"
@@ -140,24 +141,23 @@ object CrashReportLimiter {
 
                 Timber.d("Performing CrashReportLimiter cleanup...")
 
-                val editor = preferences.edit()
                 val allEntries = preferences.all
                 var removedCount = 0
 
-                for ((key, value) in allEntries) {
-                    if (key == LAST_CLEANUP_KEY) continue
+                preferences.edit {
+                    for ((key, value) in allEntries) {
+                        if (key == LAST_CLEANUP_KEY) continue
 
-                    if (value is Long) {
-                        val age = now - value
-                        if (age > CLEANUP_INTERVAL_MS) {
-                            editor.remove(key)
-                            removedCount++
+                        if (value is Long) {
+                            val age = now - value
+                            if (age > CLEANUP_INTERVAL_MS) {
+                                remove(key)
+                                removedCount++
+                            }
                         }
                     }
+                    putLong(LAST_CLEANUP_KEY, now)
                 }
-
-                editor.putLong(LAST_CLEANUP_KEY, now)
-                editor.apply()
 
                 Timber.d("Cleanup complete - removed $removedCount old entries")
             }
@@ -175,7 +175,7 @@ object CrashReportLimiter {
             val preferences = prefs ?: return
 
             synchronized(lock) {
-                preferences.edit().clear().apply()
+                preferences.edit { clear() }
                 Timber.w("All report limits have been reset")
             }
         } catch (e: Throwable) {
