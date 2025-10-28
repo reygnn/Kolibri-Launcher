@@ -349,3 +349,52 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         include("jacoco/testDebugUnitTest.exec")
     })
 }
+
+
+// app/build.gradle.kts
+
+tasks.register("uploadProguardMapping") {
+    group = "acra"
+    description = "Upload ProGuard mapping using upload_mapping.sh script"
+
+    doLast {
+        val packageName = android.defaultConfig.applicationId
+        val versionCode = android.defaultConfig.versionCode
+        val mappingFile = file("build/outputs/mapping/release/mapping.txt")
+
+        if (!mappingFile.exists()) {
+            println("⚠️  Mapping file not found: ${mappingFile.absolutePath}")
+            return@doLast
+        }
+
+        println("📤 Running upload_mapping.sh...")
+
+        // Pfad zum Script (im selben Verzeichnis wie build.gradle.kts)
+        val scriptPath = "$projectDir/acra_scripts/upload_mapping.sh"
+
+        // Script ausführen
+        val process = ProcessBuilder(
+            "bash",
+            scriptPath,
+            mappingFile.absolutePath,
+            packageName!!,
+            versionCode.toString()
+        )
+            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+
+        val exitCode = process.waitFor()
+
+        if (exitCode != 0) {
+            throw GradleException("Mapping upload failed!")
+        }
+    }
+}
+
+// Automatisch nach Release Build
+tasks.configureEach {
+    if (name == "assembleRelease") {
+        finalizedBy("uploadProguardMapping")
+    }
+}

@@ -81,6 +81,7 @@ lint/tmp/
 # ADB Tombstones
 tombstones/
 
+acra-scripts/
 apk/
 
 mapping/
