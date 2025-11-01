@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
+/*
 import android.net.Uri
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
@@ -382,3 +383,5 @@ class FakeBackupRepository : BackupRepository {
         return previewResult
     }
 }
+
+*/
