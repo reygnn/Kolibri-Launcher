@@ -440,22 +440,6 @@ class HomeViewModelTest {
     }
 
     @Test
-    @Ignore("Requires Robolectric or instrumentation test for Intent support")
-    fun `updateBatteryLevelFromIntent - integration test with real intent`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        val intent = Intent().apply {
-            putExtra(BatteryManager.EXTRA_LEVEL, 75)
-            putExtra(BatteryManager.EXTRA_SCALE, 100)
-        }
-
-        viewModel.updateBatteryLevelFromIntent(intent)
-
-        assertEquals("75%", viewModel.uiState.value.batteryString)
-    }
-
-    @Test
     fun `updateBatteryLevel - with valid data - updates battery percentage`() = runTest {
         setupViewModel()
         advanceUntilIdle()
