@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -34,6 +33,7 @@ class BackupManager @Inject constructor(
     private val favoritesOrderManager: FavoritesOrderRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     private val appNamesManager: AppNamesRepository,
+    private val appDataSourceManager: AppDataSource,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -71,6 +71,8 @@ class BackupManager @Inject constructor(
         }
     }
 
+// In BackupManager.kt
+
     override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
             val backup = json.decodeFromString<BackupData>(jsonString)
@@ -83,7 +85,7 @@ class BackupManager @Inject constructor(
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
-            val installedComponents = getInstalledComponents(context)
+            val installedComponents = appDataSourceManager.getInstalledComponents()
             val installedPackages = installedComponents.map { it.split('/')[0] }.toSet()
 
             var importedCount = 0
@@ -143,7 +145,7 @@ class BackupManager @Inject constructor(
                 Timber.i("Imported hidden apps: ${validHidden.size}")
             }
 
-            // PHASE 4: Import Custom App Names (NEU: Batch-Operation!)
+            // PHASE 4: Import Custom App Names
             if (options.importCustomNames) {
                 // Filtere nur installierte Packages
                 val validNames = backup.settings.customAppNames
@@ -152,7 +154,6 @@ class BackupManager @Inject constructor(
                 val skippedNames = backup.settings.customAppNames.size - validNames.size
 
                 if (validNames.isNotEmpty()) {
-                    // ← NEU: Saubere Batch-Operation über Interface
                     appNamesManager.setCustomNamesInBatch(validNames)
                     Timber.i("Imported custom names: ${validNames.size}, skipped: $skippedNames")
                 }
@@ -238,23 +239,5 @@ class BackupManager @Inject constructor(
 
     private fun isVersionSupported(version: String): Boolean {
         return version == "1.0.0"
-    }
-
-    private fun getInstalledComponents(context: Context): Set<String> {
-        return try {
-            val pm = context.packageManager
-            val mainIntent = Intent(Intent.ACTION_MAIN, null)
-                .addCategory(Intent.CATEGORY_LAUNCHER)
-
-            pm.queryIntentActivities(mainIntent, 0)
-                .map { resolveInfo ->
-                    val activityInfo = resolveInfo.activityInfo
-                    "${activityInfo.packageName}/${activityInfo.name}"
-                }
-                .toSet()
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error getting installed components")
-            emptySet()
-        }
     }
 }

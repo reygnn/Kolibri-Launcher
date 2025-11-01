@@ -52,6 +52,7 @@ val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beac
 val jsonVersion = "20250517"
 val androidxTestVersion = "1.6.1"
 val androidxTestCoreVersion = "1.6.1"
+// val robolectricVersion = "4.16"  // OK to upgrade
 
 
 // Lädt die sensiblen Daten aus der keystore.properties-Datei
@@ -211,6 +212,7 @@ dependencies {
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    // testImplementation("org.robolectric:robolectric:${robolectricVersion}")
 
 // Hilt
     //noinspection NewerVersionAvailable
