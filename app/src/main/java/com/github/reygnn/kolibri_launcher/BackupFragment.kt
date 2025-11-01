@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +11,9 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -36,7 +39,10 @@ class BackupFragment : Fragment() {
     private val importLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { viewModel.importBackup(it) }
+        uri?.let {
+            viewModel.previewBackup(it)
+            showImportOptionsDialog(it)
+        }
     }
 
     override fun onCreateView(
@@ -66,6 +72,49 @@ class BackupFragment : Fragment() {
         binding.buttonImportBackup.setOnClickListener {
             importLauncher.launch(arrayOf("application/json"))
         }
+    }
+
+    private fun showImportOptionsDialog(uri: Uri) {
+        val dialogBinding = DialogImportOptionsBinding.inflate(layoutInflater)
+
+        // Beobachte Preview-Daten
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.backupPreview.collect { preview ->
+                preview?.let {
+                    val date = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                        .format(Date(it.timestamp))
+                    dialogBinding.textBackupInfo.text = getString(
+                        R.string.backup_preview_info,
+                        it.favoriteCount,
+                        date
+                    )
+
+                    // Update Checkbox-Labels mit Counts
+                    dialogBinding.checkboxImportFavorites.text = getString(
+                        R.string.import_option_favorites,
+                        it.favoriteCount
+                    )
+                }
+            }
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.import_options_title)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.import_button) { _, _ ->
+                val options = ImportOptions(
+                    importFavorites = dialogBinding.checkboxImportFavorites.isChecked,
+                    importOrder = dialogBinding.checkboxImportOrder.isChecked
+                )
+
+                if (options.importNothing) {
+                    showError(getString(R.string.import_no_options_selected))
+                } else {
+                    viewModel.importBackup(uri, options)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun observeBackupState() {
@@ -153,8 +202,11 @@ class BackupFragment : Fragment() {
 
     private fun showImportSuccess(message: String, missingApps: Set<String>) {
         val displayMessage = if (missingApps.isNotEmpty()) {
-            val appList = missingApps.joinToString("\n") { it.split("/")[0] }
-            "$message\n\n${getString(R.string.backup_missing_apps)}:\n$appList"
+            val appList = missingApps.take(5).joinToString("\n") { it.split("/")[0] }
+            val moreText = if (missingApps.size > 5) {
+                "\n... ${getString(R.string.backup_and_more, missingApps.size - 5)}"
+            } else ""
+            "$message\n\n${getString(R.string.backup_missing_apps)}:\n$appList$moreText"
         } else {
             message
         }

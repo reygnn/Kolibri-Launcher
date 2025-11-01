@@ -195,6 +195,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
             TimberWrapper.silentError(e, "Error setting custom app names listener")
         }
 
+        // Backup & Restore
+        try {
+            findPreference<Preference>("backup_restore")?.setOnPreferenceClickListener {
+                try {
+                    if (!isAdded || isStateSaved || isDetached) {
+                        Timber.w("Cannot show backup - invalid fragment state")
+                        return@setOnPreferenceClickListener false
+                    }
+
+                    val fragment = BackupFragment()
+
+                    parentFragmentManager.beginTransaction()
+                        .replace(android.R.id.content, fragment)
+                        .addToBackStack(null)
+                        .commitAllowingStateLoss()
+
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing backup fragment")
+                    false
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting backup listener")
+        }
+
         // App Info
         try {
             findPreference<Preference>("app_info")?.setOnPreferenceClickListener {

@@ -6,17 +6,42 @@ import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Backup & Restore Manager für Kolibri Launcher Settings mit selektivem Import.
+ *
+ * # BACKUP/RESTORE LOGIK
+ *
+ * ## EXPORT (Backup erstellen):
+ * 1. Liest aktuelle Daten aus den Repository-Flows
+ * 2. Verpackt in strukturierte BackupData
+ * 3. Serialisiert zu JSON
+ * 4. Schreibt in User-gewählte Datei
+ *
+ * ## IMPORT (Backup wiederherstellen):
+ * 1. Preview: Zeigt Backup-Inhalt vor Import
+ * 2. User wählt Import-Optionen (Favoriten/Order)
+ * 3. Validierung (Version, Installation, Limits)
+ * 4. Selektiver Import basierend auf Optionen
+ * 5. Nur gewählte Daten werden überschrieben
+ *
+ * ## SELEKTIVER IMPORT:
+ * - Import Favorites: Überschreibt favoriteComponents komplett
+ * - Import Order: Filtert Order gegen aktuelle Favorites
+ * - Beide: Standard-Verhalten (alles importieren)
+ * - Keines: Fehler (Import-Dialog sollte dies verhindern)
+ */
 @Singleton
 class BackupManager @Inject constructor(
     private val favoritesManager: FavoritesRepository,
     private val favoritesOrderManager: FavoritesOrderRepository,
-    @param:ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context
 ) : BackupRepository {
 
     private val json = Json {
@@ -45,41 +70,70 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun importFromJson(jsonString: String): ImportResult {
+    override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
             val backup = json.decodeFromString<BackupData>(jsonString)
 
+            // Validierung: Keine Import-Optionen gewählt
+            if (options.importNothing) {
+                return ImportResult.Error("No import options selected")
+            }
+
+            // Version-Check
             if (!isVersionSupported(backup.version)) {
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
             val installedComponents = getInstalledComponents(context)
-            val validFavorites = backup.settings.favoriteComponents
-                .filter { it in installedComponents }
-                .toSet()
+            var importedCount = 0
+            var skippedCount = 0
+            val missingApps = mutableSetOf<String>()
 
-            val skippedCount = backup.settings.favoriteComponents.size - validFavorites.size
+            // PHASE 1: Import Favorites (wenn gewählt)
+            if (options.importFavorites) {
+                val validFavorites = backup.settings.favoriteComponents
+                    .filter { it in installedComponents }
+                    .toSet()
 
-            val uniquePackages = validFavorites.map { it.split('/')[0] }.toSet()
-            if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
-                return ImportResult.LimitExceeded(
-                    packageCount = uniquePackages.size,
-                    limit = AppConstants.MAX_FAVORITES_ON_HOME
-                )
+                skippedCount = backup.settings.favoriteComponents.size - validFavorites.size
+                missingApps.addAll(backup.settings.favoriteComponents - installedComponents)
+
+                // Package-Limit prüfen
+                val uniquePackages = validFavorites.map { it.split('/')[0] }.toSet()
+                if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
+                    return ImportResult.LimitExceeded(
+                        packageCount = uniquePackages.size,
+                        limit = AppConstants.MAX_FAVORITES_ON_HOME
+                    )
+                }
+
+                // Favorites überschreiben
+                favoritesManager.saveFavoriteComponents(validFavorites.toList())
+                importedCount = validFavorites.size
+
+                Timber.i("Imported favorites: $importedCount, skipped: $skippedCount")
             }
 
-            favoritesManager.saveFavoriteComponents(validFavorites.toList())
+            // PHASE 2: Import Order (wenn gewählt)
+            if (options.importOrder) {
+                // Hole aktuelle Favorites (entweder gerade importiert oder bestehend)
+                val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
 
-            val validOrder = backup.settings.favoritesOrder
-                .filter { it in validFavorites }
-            favoritesOrderManager.saveOrder(validOrder)
+                // Filtere Order: Nur Components die (1) Favorites sind UND (2) installiert
+                val validOrder = backup.settings.favoritesOrder
+                    .filter { it in currentFavorites && it in installedComponents }
 
-            Timber.i("Backup imported: ${validFavorites.size} favorites, $skippedCount skipped")
+                favoritesOrderManager.saveOrder(validOrder)
+
+                Timber.i("Imported order: ${validOrder.size} items")
+            }
+
+            Timber.i("Selective import completed: favorites=${options.importFavorites}, order=${options.importOrder}")
 
             ImportResult.Success(
-                importedCount = validFavorites.size,
+                importedCount = importedCount,
                 skippedCount = skippedCount,
-                missingApps = backup.settings.favoriteComponents - validFavorites
+                missingApps = missingApps
             )
 
         } catch (e: CancellationException) {
@@ -95,9 +149,9 @@ class BackupManager @Inject constructor(
 
     override suspend fun saveBackupToFile(uri: Uri): Boolean {
         return try {
-            val json = exportToJson()
+            val jsonString = exportToJson()
             context.contentResolver.openOutputStream(uri)?.use { output ->
-                output.write(json.toByteArray())
+                output.write(jsonString.toByteArray())
             }
             Timber.i("Backup saved to: $uri")
             true
@@ -109,13 +163,14 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun loadBackupFromFile(uri: Uri): ImportResult {
+    override suspend fun loadBackupFromFile(uri: Uri, options: ImportOptions): ImportResult {
         return try {
-            val json = context.contentResolver.openInputStream(uri)?.use { input ->
+            val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return ImportResult.Error("Could not read file")
 
-            importFromJson(json)
+            Timber.i("Loading backup from file: $uri")
+            importFromJson(jsonString, options)
 
         } catch (e: CancellationException) {
             throw e
@@ -125,8 +180,31 @@ class BackupManager @Inject constructor(
         }
     }
 
+    override suspend fun previewBackup(uri: Uri): BackupPreview? {
+        return try {
+            val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader().readText()
+            } ?: return null
+
+            val backup = json.decodeFromString<BackupData>(jsonString)
+
+            BackupPreview(
+                version = backup.version,
+                timestamp = backup.timestamp,
+                favoriteCount = backup.settings.favoriteComponents.size,
+                orderCount = backup.settings.favoritesOrder.size
+            )
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error previewing backup")
+            null
+        }
+    }
+
     private fun isVersionSupported(version: String): Boolean {
-        return version == "1.0.0"
+        return when (version) {
+            "1.0.0" -> true
+            else -> false
+        }
     }
 
     private fun getInstalledComponents(context: Context): Set<String> {

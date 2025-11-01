@@ -17,6 +17,9 @@ class BackupViewModel @Inject constructor(
     private val _backupState = MutableStateFlow<BackupState>(BackupState.Idle)
     val backupState: StateFlow<BackupState> = _backupState.asStateFlow()
 
+    private val _backupPreview = MutableStateFlow<BackupPreview?>(null)
+    val backupPreview: StateFlow<BackupPreview?> = _backupPreview.asStateFlow()
+
     fun exportBackup(uri: Uri) {
         launchSafe {
             try {
@@ -35,12 +38,24 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun importBackup(uri: Uri) {
+    fun previewBackup(uri: Uri) {
+        launchSafe {
+            try {
+                val preview = backupManager.previewBackup(uri)
+                _backupPreview.value = preview
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error previewing backup")
+                _backupPreview.value = null
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri, options: ImportOptions) {
         launchSafe {
             try {
                 _backupState.value = BackupState.Loading
 
-                when (val result = backupManager.loadBackupFromFile(uri)) {
+                when (val result = backupManager.loadBackupFromFile(uri, options)) {
                     is ImportResult.Success -> {
                         _backupState.value = BackupState.ImportSuccess(
                             importedCount = result.importedCount,
@@ -74,6 +89,7 @@ class BackupViewModel @Inject constructor(
     fun resetBackupState() {
         executeSafe {
             _backupState.value = BackupState.Idle
+            _backupPreview.value = null
         }
     }
 }
