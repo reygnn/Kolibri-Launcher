@@ -217,5 +217,17 @@
     <string name="settings_swipe_actions_title">Swipe Actions</string>
     <string name="settings_swipe_actions_summary">Assign apps to left and right swipe gestures</string>
     <string name="swipe_actions_selector_label">Assign apps to a slot:</string>
+
+    <string name="backup_export_success">Backup successfully exported</string>
+    <string name="backup_import_success_simple">%1$d apps imported</string>
+    <string name="backup_import_success_with_skipped">%1$d apps imported\n%2$d apps skipped (not installed)</string>
+    <string name="backup_unsupported_version">Backup version %1$s is not supported</string>
+    <string name="backup_limit_exceeded">Too many apps in backup: %1$d (limit: %2$d packages)</string>
+    <string name="backup_invalid_format">Invalid backup format</string>
+    <string name="backup_missing_apps">Missing apps</string>
+    <string name="backup_title">Backup &amp; Restore</string>
+    <string name="backup_description">Export your favorites and settings or restore them from a backup.</string>
+    <string name="backup_button_export">Export Settings</string>
+    <string name="backup_button_import">Restore Settings</string>
     
 </resources>

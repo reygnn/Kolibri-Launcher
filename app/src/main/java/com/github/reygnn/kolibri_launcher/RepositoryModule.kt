@@ -95,4 +95,10 @@ abstract class RepositoryModule {
         swipeActionsManager: SwipeActionsManager
     ): SwipeActionsRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindBackupRepository(
+        backupManager: BackupManager
+    ): BackupRepository
+
 }

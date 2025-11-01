@@ -28,6 +28,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
     id("jacoco")
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21"
 }
 
 // Version-Konstanten
@@ -78,8 +79,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 36 // DO NOT CHANGE !!!
-        versionCode = 30
-        versionName = "0.99.28.rc1"
+        versionCode = 32
+        versionName = "0.99.30"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
@@ -209,6 +210,7 @@ dependencies {
 // Utilities
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
 // Hilt
     //noinspection NewerVersionAvailable

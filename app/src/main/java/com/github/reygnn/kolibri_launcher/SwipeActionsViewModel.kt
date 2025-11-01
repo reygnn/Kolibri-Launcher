@@ -12,7 +12,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SwipeActionsViewModel @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
-    private val swipeActionsRepository: SwipeActionsRepository, // NEUE Abhängigkeit
+    private val swipeActionsRepository: SwipeActionsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 

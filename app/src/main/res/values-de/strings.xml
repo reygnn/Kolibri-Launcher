@@ -212,4 +212,17 @@
     <string name="settings_swipe_actions_summary">Apps für Links- oder Rechts-Wischgesten zuweisen</string>
     <string name="swipe_actions_selector_label">Apps einem Slot zuweisen:</string>
 
+
+    <string name="backup_export_success">Backup erfolgreich exportiert</string>
+    <string name="backup_import_success_simple">%1$d Apps importiert</string>
+    <string name="backup_import_success_with_skipped">%1$d Apps importiert\n%2$d Apps übersprungen (nicht installiert)</string>
+    <string name="backup_unsupported_version">Backup-Version %1$s wird nicht unterstützt</string>
+    <string name="backup_limit_exceeded">Zu viele Apps im Backup: %1$d (Limit: %2$d Packages)</string>
+    <string name="backup_invalid_format">Ungültiges Backup-Format</string>
+    <string name="backup_missing_apps">Fehlende Apps</string>
+    <string name="backup_title">Backup &amp; Wiederherstellen</string>
+    <string name="backup_description">Exportiere deine Favoriten und Einstellungen oder stelle sie aus einem Backup wieder her.</string>
+    <string name="backup_button_export">Einstellungen exportieren</string>
+    <string name="backup_button_import">Einstellungen wiederherstellen</string>
+
 </resources>
