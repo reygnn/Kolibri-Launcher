@@ -1,22 +1,14 @@
 package com.github.reygnn.kolibri_launcher
 
-
-import android.net.Uri
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], manifest = Config.NONE)
 class BackupViewModelTest {
 
     @get:Rule
@@ -27,11 +19,6 @@ class BackupViewModelTest {
 
     @Before
     fun setUp() {
-        assumeFalse(
-            "BackupViewModelTest requires SDK 36 which is not yet stable on GitHub CI",
-            System.getenv("CI") == "true"
-        )
-
         fakeBackupRepository = FakeBackupRepository()
         viewModel = BackupViewModel(
             fakeBackupRepository,
@@ -41,18 +28,18 @@ class BackupViewModelTest {
 
     // ========== EXPORT TESTS ==========
 
-    // 3. runTest mit dem Dispatcher der Rule ausführen
     @Test
     fun `exportBackup - successful - emits Loading then ExportSuccess`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            // Test-Uri ist jetzt ein einfacher String
+            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.exportSuccess = true
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle) // Startwert
-                viewModel.exportBackup(mockUri) // Aktion (läuft synchron)
+                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                viewModel.exportBackup(mockUriString) // Übergabe als String
 
-                // 4. KORREKTUR: 'Loading' wird übersprungen. Nur das Endergebnis prüfen.
+                // 'Loading' wird übersprungen (korrektes Testverhalten)
                 assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
             }
         }
@@ -60,14 +47,13 @@ class BackupViewModelTest {
     @Test
     fun `exportBackup - failure - emits Loading then Error`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.exportSuccess = false
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.exportBackup(mockUri)
+                viewModel.exportBackup(mockUriString)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val errorState = awaitItem() as BackupState.Error
                 assertThat(errorState.message).isEqualTo("Export failed")
             }
@@ -76,14 +62,13 @@ class BackupViewModelTest {
     @Test
     fun `exportBackup - exception thrown - emits Error`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.shouldThrowOnExport = true
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.exportBackup(mockUri)
+                viewModel.exportBackup(mockUriString)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val errorState = awaitItem() as BackupState.Error
                 assertThat(errorState.message).contains("Simulated")
             }
@@ -94,7 +79,7 @@ class BackupViewModelTest {
     @Test
     fun `importBackup - Success result - emits ImportSuccess`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions()
             fakeBackupRepository.importResult = ImportResult.Success(
                 importedCount = 5,
@@ -104,9 +89,8 @@ class BackupViewModelTest {
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.importBackup(mockUri, options)
+                viewModel.importBackup(mockUriString, options)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val successState = awaitItem() as BackupState.ImportSuccess
                 assertThat(successState.importedCount).isEqualTo(5)
                 assertThat(successState.skippedCount).isEqualTo(2)
@@ -119,15 +103,14 @@ class BackupViewModelTest {
     @Test
     fun `importBackup - UnsupportedVersion result - emits UnsupportedVersion`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions()
             fakeBackupRepository.importResult = ImportResult.UnsupportedVersion("2.0.0")
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.importBackup(mockUri, options)
+                viewModel.importBackup(mockUriString, options)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val versionState = awaitItem() as BackupState.UnsupportedVersion
                 assertThat(versionState.version).isEqualTo("2.0.0")
             }
@@ -136,7 +119,7 @@ class BackupViewModelTest {
     @Test
     fun `importBackup - LimitExceeded result - emits LimitExceeded`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions()
             fakeBackupRepository.importResult = ImportResult.LimitExceeded(
                 packageCount = 10,
@@ -145,9 +128,8 @@ class BackupViewModelTest {
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.importBackup(mockUri, options)
+                viewModel.importBackup(mockUriString, options)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val limitState = awaitItem() as BackupState.LimitExceeded
                 assertThat(limitState.packageCount).isEqualTo(10)
                 assertThat(limitState.limit).isEqualTo(8)
@@ -157,30 +139,28 @@ class BackupViewModelTest {
     @Test
     fun `importBackup - InvalidFormat result - emits InvalidFormat`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions()
             fakeBackupRepository.importResult = ImportResult.InvalidFormat
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.importBackup(mockUri, options)
+                viewModel.importBackup(mockUriString, options)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 assertThat(awaitItem()).isEqualTo(BackupState.InvalidFormat)
             }
         }
 
     @Test
     fun `importBackup - Error result - emits Error`() = runTest(mainDispatcherRule.testDispatcher) {
-        val mockUri = Uri.parse("content://fake/backup.json")
+        val mockUriString = "content://fake/backup.json"
         val options = ImportOptions()
         fakeBackupRepository.importResult = ImportResult.Error("Custom error message")
 
         viewModel.backupState.test {
             assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-            viewModel.importBackup(mockUri, options)
+            viewModel.importBackup(mockUriString, options)
 
-            // KORREKTUR: 'Loading' wird übersprungen
             val errorState = awaitItem() as BackupState.Error
             assertThat(errorState.message).isEqualTo("Custom error message")
         }
@@ -189,15 +169,14 @@ class BackupViewModelTest {
     @Test
     fun `importBackup - exception thrown - emits Error`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions()
             fakeBackupRepository.shouldThrowOnImport = true
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
-                viewModel.importBackup(mockUri, options)
+                viewModel.importBackup(mockUriString, options)
 
-                // KORREKTUR: 'Loading' wird übersprungen
                 val errorState = awaitItem() as BackupState.Error
                 assertThat(errorState.message).contains("Simulated")
             }
@@ -208,7 +187,7 @@ class BackupViewModelTest {
     @Test
     fun `previewBackup - successful - emits preview data`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val expectedPreview = BackupPreview(
                 version = "1.0.0",
                 timestamp = 1234567890L,
@@ -221,7 +200,7 @@ class BackupViewModelTest {
 
             viewModel.backupPreview.test {
                 assertThat(awaitItem()).isNull() // Startwert
-                viewModel.previewBackup(mockUri) // Aktion
+                viewModel.previewBackup(mockUriString) // Aktion
                 val preview = awaitItem() // Endergebnis
                 assertThat(preview).isNotNull()
                 assertThat(preview?.favoriteCount).isEqualTo(5)
@@ -230,12 +209,12 @@ class BackupViewModelTest {
 
     @Test
     fun `previewBackup - failure - emits null`() = runTest(mainDispatcherRule.testDispatcher) {
-        val mockUri = Uri.parse("content://fake/backup.json")
+        val mockUriString = "content://fake/backup.json"
         fakeBackupRepository.previewResult = null
 
         viewModel.backupPreview.test {
             assertThat(awaitItem()).isNull()
-            viewModel.previewBackup(mockUri)
+            viewModel.previewBackup(mockUriString)
             expectNoEvents() // Bleibt null
         }
     }
@@ -243,44 +222,37 @@ class BackupViewModelTest {
     @Test
     fun `previewBackup - exception thrown - emits null`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.shouldThrowOnPreview = true
 
             viewModel.backupPreview.test {
                 assertThat(awaitItem()).isNull()
-                viewModel.previewBackup(mockUri)
+                viewModel.previewBackup(mockUriString)
                 expectNoEvents() // Bleibt null
             }
         }
 
     // ========== RESET STATE TESTS ==========
 
-// In BackupViewModelTest.kt
-
     @Test
     fun `resetBackupState - resets state to Idle`() = runTest(mainDispatcherRule.testDispatcher) {
-        val mockUri = Uri.parse("content://fake/backup.json")
+        val mockUriString = "content://fake/backup.json"
         fakeBackupRepository.exportSuccess = true
 
         // Arrange: Setze den State auf einen Nicht-Idle-Wert
-        viewModel.exportBackup(mockUri)
+        viewModel.exportBackup(mockUriString)
 
         // Act & Assert
         viewModel.backupState.test {
-            // 1. Prüfe den Startwert (vor dem Reset)
             assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
-
-            // 2. Führe die Aktion aus
             viewModel.resetBackupState()
-
-            // 3. Prüfe den Endwert (nach dem Reset)
             assertThat(awaitItem()).isEqualTo(BackupState.Idle)
         }
     }
 
     @Test
     fun `resetBackupState - clears preview`() = runTest(mainDispatcherRule.testDispatcher) {
-        val mockUri = Uri.parse("content://fake/backup.json")
+        val mockUriString = "content://fake/backup.json"
 
         // Arrange: Setze den Preview auf einen Nicht-Null-Wert
         val preview = BackupPreview(
@@ -288,17 +260,12 @@ class BackupViewModelTest {
             orderCount = 1, hiddenCount = 1, customNamesCount = 1
         )
         fakeBackupRepository.previewResult = preview
-        viewModel.previewBackup(mockUri)
+        viewModel.previewBackup(mockUriString)
 
         // Act & Assert
         viewModel.backupPreview.test {
-            // 1. Prüfe den Startwert (vor dem Reset)
             assertThat(awaitItem()).isEqualTo(preview)
-
-            // 2. Führe die Aktion aus
             viewModel.resetBackupState()
-
-            // 3. Prüfe den Endwert (nach dem Reset)
             assertThat(awaitItem()).isNull()
         }
     }
@@ -308,14 +275,14 @@ class BackupViewModelTest {
     @Test
     fun `multiple operations - maintains correct state sequence`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.exportSuccess = true
 
             viewModel.backupState.test {
                 assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 // Export
-                viewModel.exportBackup(mockUri)
-                assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess) // 'Loading' übersprungen
+                viewModel.exportBackup(mockUriString)
+                assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
 
                 // Reset
                 viewModel.resetBackupState()
@@ -323,15 +290,15 @@ class BackupViewModelTest {
 
                 // Import
                 fakeBackupRepository.importResult = ImportResult.Success(1, 0, emptySet())
-                viewModel.importBackup(mockUri, ImportOptions())
-                assertThat(awaitItem()).isInstanceOf(BackupState.ImportSuccess::class.java) // 'Loading' übersprungen
+                viewModel.importBackup(mockUriString, ImportOptions())
+                assertThat(awaitItem()).isInstanceOf(BackupState.ImportSuccess::class.java)
             }
         }
 
     @Test
     fun `selective import options - passes options correctly`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUri = Uri.parse("content://fake/backup.json")
+            val mockUriString = "content://fake/backup.json"
             val options = ImportOptions(
                 importFavorites = true,
                 importOrder = false,
@@ -340,7 +307,7 @@ class BackupViewModelTest {
             )
             fakeBackupRepository.importResult = ImportResult.Success(1, 0, emptySet())
 
-            viewModel.importBackup(mockUri, options)
+            viewModel.importBackup(mockUriString, options)
 
             // Verify options were passed to repository
             assertThat(fakeBackupRepository.lastOptions).isNotNull()
@@ -351,7 +318,7 @@ class BackupViewModelTest {
         }
 }
 
-// ========== FAKE REPOSITORY (Unverändert) ==========
+// ========== FAKE REPOSITORY (Angepasst an String-Interface) ==========
 
 class FakeBackupRepository : BackupRepository {
     var exportSuccess = true
@@ -378,14 +345,16 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    override suspend fun saveBackupToFile(uri: Uri): Boolean {
+    // Nimmt jetzt String
+    override suspend fun saveBackupToFile(uriString: String): Boolean {
         if (shouldThrowOnExport) {
             throw Exception("Simulated export exception")
         }
         return exportSuccess
     }
 
-    override suspend fun loadBackupFromFile(uri: Uri, options: ImportOptions): ImportResult {
+    // Nimmt jetzt String
+    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
         lastOptions = options
         if (shouldThrowOnImport) {
             throw Exception("Simulated import exception")
@@ -393,7 +362,8 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    override suspend fun previewBackup(uri: Uri): BackupPreview? {
+    // Nimmt jetzt String
+    override suspend fun previewBackup(uriString: String): BackupPreview? {
         if (shouldThrowOnPreview) {
             throw Exception("Simulated preview exception")
         }

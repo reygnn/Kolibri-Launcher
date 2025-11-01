@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
-import android.net.Uri
+import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
@@ -159,11 +159,13 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            Timber.i("Selective import completed: " +
-                    "favorites=${options.importFavorites}, " +
-                    "order=${options.importOrder}, " +
-                    "hidden=${options.importHiddenApps}, " +
-                    "names=${options.importCustomNames}")
+            Timber.i(
+                "Selective import completed: favorites=%b, order=%b, hidden=%b, names=%b",
+                options.importFavorites,
+                options.importOrder,
+                options.importHiddenApps,
+                options.importCustomNames
+            )
 
             ImportResult.Success(
                 importedCount = importedCount,
@@ -182,9 +184,11 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun saveBackupToFile(uri: Uri): Boolean {
+    override suspend fun saveBackupToFile(uriString: String): Boolean {
         return try {
+            val uri = uriString.toUri()
             val jsonString = exportToJson()
+
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 output.write(jsonString.toByteArray())
             }
@@ -192,14 +196,16 @@ class BackupManager @Inject constructor(
             true
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Exception) { // Fängt auch IllegalArgumentException von Uri.parse()
             TimberWrapper.silentError(e, "Error saving backup to file")
             false
         }
     }
 
-    override suspend fun loadBackupFromFile(uri: Uri, options: ImportOptions): ImportResult {
+    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
         return try {
+            val uri = uriString.toUri()
+
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return ImportResult.Error("Could not read file")
@@ -215,8 +221,10 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun previewBackup(uri: Uri): BackupPreview? {
+    override suspend fun previewBackup(uriString: String): BackupPreview? {
         return try {
+            val uri = uriString.toUri()
+
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return null

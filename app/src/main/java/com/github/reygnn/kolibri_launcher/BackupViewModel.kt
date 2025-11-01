@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher
 
-import android.net.Uri
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +19,12 @@ class BackupViewModel @Inject constructor(
     private val _backupPreview = MutableStateFlow<BackupPreview?>(null)
     val backupPreview: StateFlow<BackupPreview?> = _backupPreview.asStateFlow()
 
-    fun exportBackup(uri: Uri) {
+    fun exportBackup(uriString: String) {
         launchSafe {
             try {
                 _backupState.value = BackupState.Loading
-                val success = backupManager.saveBackupToFile(uri)
+
+                val success = backupManager.saveBackupToFile(uriString)
 
                 _backupState.value = if (success) {
                     BackupState.ExportSuccess
@@ -38,24 +38,12 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun previewBackup(uri: Uri) {
-        launchSafe {
-            try {
-                val preview = backupManager.previewBackup(uri)
-                _backupPreview.value = preview
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error previewing backup")
-                _backupPreview.value = null
-            }
-        }
-    }
-
-    fun importBackup(uri: Uri, options: ImportOptions) {
+    fun importBackup(uriString: String, options: ImportOptions) {
         launchSafe {
             try {
                 _backupState.value = BackupState.Loading
 
-                when (val result = backupManager.loadBackupFromFile(uri, options)) {
+                when (val result = backupManager.loadBackupFromFile(uriString, options)) {
                     is ImportResult.Success -> {
                         _backupState.value = BackupState.ImportSuccess(
                             importedCount = result.importedCount,
@@ -82,6 +70,18 @@ class BackupViewModel @Inject constructor(
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error importing backup")
                 _backupState.value = BackupState.Error(e.message ?: "Import failed")
+            }
+        }
+    }
+
+    fun previewBackup(uriString: String) {
+        launchSafe {
+            try {
+                val preview = backupManager.previewBackup(uriString)
+                _backupPreview.value = preview
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error previewing backup")
+                _backupPreview.value = null
             }
         }
     }

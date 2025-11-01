@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher
 
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -53,7 +52,7 @@ class BackupFragment : Fragment() {
     ) { uri ->
         uri?.let {
             try {
-                viewModel.exportBackup(it)
+                viewModel.exportBackup(it.toString())
             } catch (e: Exception) {
                 Timber.e(e, "Export failed")
                 showError(getString(R.string.backup_export_failed))
@@ -66,8 +65,8 @@ class BackupFragment : Fragment() {
     ) { uri ->
         uri?.let {
             try {
-                viewModel.previewBackup(it)
-                showImportOptionsDialog(it)
+                viewModel.previewBackup(it.toString())
+                showImportOptionsDialog(it.toString())
             } catch (e: Exception) {
                 Timber.e(e, "Import preview failed")
                 showError(getString(R.string.error_generic))
@@ -104,8 +103,7 @@ class BackupFragment : Fragment() {
         }
     }
 
-    private fun showImportOptionsDialog(uri: Uri) {
-        // Fragment-State prüfen bevor Dialog angezeigt wird
+    private fun showImportOptionsDialog(uriString: String) {
         if (!isAdded || isStateSaved || isDetached) {
             Timber.w("Cannot show import dialog - invalid fragment state")
             return
@@ -171,7 +169,7 @@ class BackupFragment : Fragment() {
                 if (options.importNothing) {
                     showError(getString(R.string.import_no_options_selected))
                 } else {
-                    viewModel.importBackup(uri, options)
+                    viewModel.importBackup(uriString, options)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
