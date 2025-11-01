@@ -6,7 +6,6 @@ import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 import java.util.concurrent.CancellationException
@@ -35,7 +34,7 @@ class BackupManager @Inject constructor(
     private val favoritesOrderManager: FavoritesOrderRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     private val appNamesManager: AppNamesRepository,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
     private val json = Json {

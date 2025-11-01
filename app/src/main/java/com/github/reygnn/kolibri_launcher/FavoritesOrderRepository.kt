@@ -14,7 +14,7 @@ interface FavoritesOrderRepository : Purgeable {
     val favoriteComponentsOrderFlow: Flow<List<String>>
 
     /**
-     * Sortiert eine gegebene Liste von favorisierten App-Einträgen gemäß der gespeicherten Reihenfolge.
+     * Sortiert eine gegebene Liste von favorisierten App-Einträgen gemäss der gespeicherten Reihenfolge.
      */
     suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>): List<AppInfo>
     suspend fun saveOrder(orderedComponentNames : List<String>): Boolean
