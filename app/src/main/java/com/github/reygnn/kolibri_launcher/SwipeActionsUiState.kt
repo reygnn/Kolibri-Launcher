@@ -15,8 +15,8 @@ import androidx.annotation.StringRes
  * diesem Slot zugewiesen.
  */
 data class SwipeActionsUiState(
-    @StringRes val titleResId: Int = R.string.swipe_actions_title_screen,
-    @StringRes val subtitleResId: Int = R.string.swipe_actions_subtitle_screen,
+    @param:StringRes val titleResId: Int = R.string.swipe_actions_title_screen,
+    @param:StringRes val subtitleResId: Int = R.string.swipe_actions_subtitle_screen,
     val selectableApps: List<SwipeActionSelectableApp> = emptyList(),
     val appForLeft: AppInfo? = null,
     val appForRight: AppInfo? = null,

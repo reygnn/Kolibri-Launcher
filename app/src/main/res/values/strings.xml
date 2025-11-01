@@ -235,6 +235,7 @@
 <string name="backup_button_import">Restore Settings</string>
 <string name="backup_loading">Loading backup…</string>
 <string name="backup_export_failed">Backup export failed</string>
+<string name="backup_preview_date_unknown">Date unknown</string>
 
 <!-- Import Options Dialog -->
 <string name="import_options_title">Import Options</string>

@@ -120,13 +120,19 @@ class BackupFragment : Fragment() {
                 if (_binding == null || !isAdded) return@collect
 
                 preview?.let {
-                    val date = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-                        .format(Date(it.timestamp))
+                    // --- BEGINN ÄNDERUNG ---
+                    // Prüfe, ob ein gültiger Zeitstempel vorhanden ist (nicht 0L)
+                    val dateText: String
+                    if (it.timestamp > 0L) {
+                        dateText = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                            .format(Date(it.timestamp))
+                    } else {
+                        dateText = getString(R.string.backup_preview_date_unknown)
+                    }
 
-                    // Dialog-Inhalte aktualisieren
                     dialogBinding.textBackupInfo.text = getString(
                         R.string.backup_preview_date,
-                        date
+                        dateText
                     )
 
                     dialogBinding.checkboxImportFavorites.text = getString(

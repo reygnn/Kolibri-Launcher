@@ -229,6 +229,7 @@
 <string name="backup_button_import">Einstellungen wiederherstellen</string>
 <string name="backup_loading">Lade Backup…</string>
 <string name="backup_export_failed">Backup-Export fehlgeschlagen</string>
+<string name="backup_preview_date_unknown">Datum unbekannt</string>
 
 <!-- Import Options Dialog -->
 <string name="import_options_title">Import-Optionen</string>

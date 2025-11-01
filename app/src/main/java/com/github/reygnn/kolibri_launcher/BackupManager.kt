@@ -57,7 +57,10 @@ class BackupManager @Inject constructor(
                 customAppNames = customAppNames
             )
 
-            val backup = BackupData(settings = settings)
+            val backup = BackupData(
+                settings = settings,
+                timestamp = System.currentTimeMillis()
+            )
             json.encodeToString(backup)
 
         } catch (e: CancellationException) {

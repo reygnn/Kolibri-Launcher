@@ -97,7 +97,7 @@ class AppNamesViewModelTest {
         }
     }
 
-    // ========== NEW CRASH-RESISTANCE TESTS ==========
+    // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
     fun `init - when installedApps flow throws IOException - handles gracefully`() = runTest {
@@ -268,14 +268,119 @@ class AppNamesViewModelTest {
             assertThat(state.appsWithCustomNames.first().displayName).isEqualTo(longName)
         }
     }
+
+    // ========== NEW TESTS FOR BATCH OPERATIONS ==========
+
+    @Test
+    fun `getAllCustomNames - returns empty map when no names set`() = runTest {
+        val result = fakeAppNamesRepository.getAllCustomNames()
+
+        assertThat(result).isEmpty()
+    }
+
+    @Test
+    fun `getAllCustomNames - returns all custom names`() = runTest {
+        fakeAppNamesRepository.setCustomNameForPackage("com.android.clock", "My Clock")
+        fakeAppNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
+
+        val result = fakeAppNamesRepository.getAllCustomNames()
+
+        assertThat(result).hasSize(2)
+        assertThat(result).containsEntry("com.android.clock", "My Clock")
+        assertThat(result).containsEntry("com.android.camera", "My Camera")
+    }
+
+    @Test
+    fun `setCustomNamesInBatch - sets multiple names at once`() = runTest {
+        val names = mapOf(
+            "com.android.clock" to "World Clock",
+            "com.android.camera" to "Pro Camera",
+            "com.android.calculator" to "Math Tool"
+        )
+
+        val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
+
+        assertThat(success).isTrue()
+        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock")).isTrue()
+        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.camera")).isTrue()
+        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.calculator")).isTrue()
+    }
+
+    @Test
+    fun `setCustomNamesInBatch - triggers update only once`() = runTest {
+        var triggerCount = 0
+        fakeAppNamesRepository.onUpdateTrigger = {
+            triggerCount++
+        }
+
+        val names = mapOf(
+            "com.android.clock" to "Name1",
+            "com.android.camera" to "Name2",
+            "com.android.calculator" to "Name3"
+        )
+
+        fakeAppNamesRepository.setCustomNamesInBatch(names)
+
+        // Should trigger only once, not 3 times
+        assertThat(triggerCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `setCustomNamesInBatch - with empty map - returns true and triggers once`() = runTest {
+        var triggerCount = 0
+        fakeAppNamesRepository.onUpdateTrigger = {
+            triggerCount++
+        }
+
+        val success = fakeAppNamesRepository.setCustomNamesInBatch(emptyMap())
+
+        assertThat(success).isTrue()
+        assertThat(triggerCount).isEqualTo(0) // Empty batch should not trigger
+    }
+
+    @Test
+    fun `setCustomNamesInBatch - overwrites existing names`() = runTest {
+        fakeAppNamesRepository.setCustomNameForPackage("com.android.clock", "Old Name")
+
+        val names = mapOf("com.android.clock" to "New Name")
+        fakeAppNamesRepository.setCustomNamesInBatch(names)
+
+        val displayName = fakeAppNamesRepository.getDisplayNameForPackage("com.android.clock", "Clock")
+        assertThat(displayName).isEqualTo("New Name")
+    }
+
+    @Test
+    fun `setCustomNamesInBatch - when fails - returns false`() = runTest {
+        fakeAppNamesRepository.shouldFailOnBatch = true
+
+        val names = mapOf("com.android.clock" to "Name")
+        val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
+
+        assertThat(success).isFalse()
+    }
+
+    @Test
+    fun `getAllCustomNames - after batch set - returns all names`() = runTest {
+        val names = mapOf(
+            "com.package1" to "App 1",
+            "com.package2" to "App 2",
+            "com.package3" to "App 3"
+        )
+
+        fakeAppNamesRepository.setCustomNamesInBatch(names)
+
+        val result = fakeAppNamesRepository.getAllCustomNames()
+        assertThat(result).isEqualTo(names)
+    }
 }
 
-// ========== FAKE REPOSITORIES ==========
+// ========== FAKE REPOSITORIES (UPDATED) ==========
 
 class FakeAppNamesRepository : AppNamesRepository {
     private val customNames = mutableMapOf<String, String>()
     var onUpdateTrigger: (suspend () -> Unit)? = null
     var shouldFailOnSet = false
+    var shouldFailOnBatch = false  // NEU
 
     override suspend fun getDisplayNameForPackage(packageName: String, originalName: String): String {
         return customNames.getOrDefault(packageName, originalName)
@@ -306,9 +411,31 @@ class FakeAppNamesRepository : AppNamesRepository {
         onUpdateTrigger?.invoke()
     }
 
+    // NEU: Für Backup/Restore
+    override suspend fun getAllCustomNames(): Map<String, String> {
+        return customNames.toMap()
+    }
+
+    // NEU: Batch-Operation
+    override suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean {
+        if (shouldFailOnBatch) {
+            return false
+        }
+
+        if (names.isEmpty()) {
+            return true // Empty batch is success, but no trigger
+        }
+
+        customNames.putAll(names)
+        triggerCustomNameUpdate()
+        return true
+    }
+
     override fun purgeRepository() {
         customNames.clear()
         onUpdateTrigger = null
+        shouldFailOnSet = false
+        shouldFailOnBatch = false
     }
 }
 

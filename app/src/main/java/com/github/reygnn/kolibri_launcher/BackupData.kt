@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class BackupData(
     val version: String = "1.0.0",
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = 0L,
     val appVersion: String = BuildConfig.VERSION_NAME,
     val settings: LauncherSettings
 )
