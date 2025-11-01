@@ -350,5 +350,64 @@ class AppNamesManager @Inject constructor(
         }
     }
 
+    /**
+     * Gibt alle benutzerdefinierten App-Namen als Map zurück.
+     * Für Backup/Export-Zwecke.
+     */
+    override suspend fun getAllCustomNames(): Map<String, String> {
+        return runCatching {
+            val preferences = dataStore.data.first()
+            val customNames = mutableMapOf<String, String>()
+
+            preferences.asMap().forEach { (key, value) ->
+                val keyName = key.name
+                if (keyName.startsWith(AppConstants.KEY_NAME_PREFIX) && value is String) {
+                    // Extrahiere packageName aus "name_com.example.app"
+                    val packageName = keyName.removePrefix(AppConstants.KEY_NAME_PREFIX)
+                    customNames[packageName] = value
+                }
+            }
+
+            Timber.d("Retrieved ${customNames.size} custom app names")
+            customNames
+
+        }.getOrElse { e ->
+            if (e is CancellationException) throw e
+            TimberWrapper.silentError(e, "Error getting all custom names")
+            emptyMap()
+        }
+    }
+
+    /**
+     * Setzt mehrere benutzerdefinierte Namen gleichzeitig (Batch-Operation).
+     * Optimiert für Backup-Import - triggert nur einmal am Ende statt nach jedem Namen.
+     */
+    override suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean {
+        if (names.isEmpty()) return true
+
+        return runCatching {
+            // Alle Namen in einer DataStore-Transaction setzen
+            dataStore.edit { preferences ->
+                names.forEach { (packageName, customName) ->
+                    val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
+                    if (customName.isNotBlank()) {
+                        preferences[nameKey] = customName.trim()
+                    }
+                }
+            }
+
+            Timber.i("Batch set ${names.size} custom app names")
+
+            // Trigger nur einmal am Ende
+            triggerCustomNameUpdate()
+            true
+
+        }.getOrElse { e ->
+            if (e is CancellationException) throw e
+            TimberWrapper.silentError(e, "Error setting custom names in batch")
+            false
+        }
+    }
+
     override fun purgeRepository() { }  // für die androidTests
 }

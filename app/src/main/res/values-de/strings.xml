@@ -237,6 +237,7 @@
 <string name="import_option_order">Reihenfolge</string>
 <string name="import_option_hidden_apps">Versteckte Apps (%1$d Apps)</string>
 <string name="import_option_custom_names">Custom Namen (%1$d Apps)</string>
+<string name="backup_preview_date">Backup vom %1$s</string>
 <string name="import_button">Importieren</string>
 <string name="import_no_options_selected">Bitte wähle mindestens eine Import-Option</string>
 

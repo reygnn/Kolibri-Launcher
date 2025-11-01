@@ -3,9 +3,6 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
@@ -19,10 +16,16 @@ import javax.inject.Singleton
 /**
  * Backup & Restore Manager für Kolibri Launcher Settings.
  *
+ * CLEAN ARCHITECTURE - 100% Interface-basiert:
+ * - Kein direkter DataStore-Zugriff
+ * - Nutzt nur Repository-Interfaces
+ * - Alle Manager-Flows triggern automatisch
+ * - UI updated sich reaktiv
+ *
  * Exportiert/Importiert:
  * - Favoriten (Component Names + Order)
  * - Versteckte Apps (Component Names)
- * - Custom App Names (Package Name -> Custom Name)
+ * - Custom App Names (Package Name → Custom Name)
  *
  * Selektiver Import erlaubt User, einzelne Kategorien zu wählen.
  */
@@ -32,7 +35,6 @@ class BackupManager @Inject constructor(
     private val favoritesOrderManager: FavoritesOrderRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     private val appNamesManager: AppNamesRepository,
-    private val dataStore: DataStore<Preferences>,
     @ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -43,15 +45,11 @@ class BackupManager @Inject constructor(
 
     override suspend fun exportToJson(): String {
         return try {
-            // Favoriten
+            // Alle Daten über Interfaces holen - 100% sauber!
             val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
-
-            // Versteckte Apps
             val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
-
-            // Custom App Names (manuell aus DataStore lesen)
-            val customAppNames = extractCustomAppNamesFromDataStore()
+            val customAppNames = appNamesManager.getAllCustomNames()  // ← NEU: Saubere Interface-Methode
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
@@ -68,35 +66,6 @@ class BackupManager @Inject constructor(
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error exporting backup")
             throw BackupException("Export failed", e)
-        }
-    }
-
-    /**
-     * Extrahiert alle Custom App Names aus dem DataStore.
-     * Sucht nach allen Keys mit Prefix "name_" (KEY_NAME_PREFIX).
-     */
-    private suspend fun extractCustomAppNamesFromDataStore(): Map<String, String> {
-        return try {
-            val preferences = dataStore.data.first()
-            val customNames = mutableMapOf<String, String>()
-
-            preferences.asMap().forEach { (key, value) ->
-                val keyName = key.name
-                if (keyName.startsWith(AppConstants.KEY_NAME_PREFIX) && value is String) {
-                    // Extrahiere packageName aus "name_com.example.app"
-                    val packageName = keyName.removePrefix(AppConstants.KEY_NAME_PREFIX)
-                    customNames[packageName] = value
-                }
-            }
-
-            Timber.d("Extracted ${customNames.size} custom app names")
-            customNames
-
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error extracting custom app names")
-            emptyMap()
         }
     }
 
@@ -172,27 +141,19 @@ class BackupManager @Inject constructor(
                 Timber.i("Imported hidden apps: ${validHidden.size}")
             }
 
-            // PHASE 4: Import Custom App Names
+            // PHASE 4: Import Custom App Names (NEU: Batch-Operation!)
             if (options.importCustomNames) {
-                var namesImported = 0
-                var namesSkipped = 0
+                // Filtere nur installierte Packages
+                val validNames = backup.settings.customAppNames
+                    .filterKeys { it in installedPackages }
 
-                backup.settings.customAppNames.forEach { (packageName, customName) ->
-                    // Prüfe ob Package installiert ist
-                    if (packageName in installedPackages) {
-                        appNamesManager.setCustomNameForPackage(packageName, customName)
-                        namesImported++
-                    } else {
-                        namesSkipped++
-                    }
+                val skippedNames = backup.settings.customAppNames.size - validNames.size
+
+                if (validNames.isNotEmpty()) {
+                    // ← NEU: Saubere Batch-Operation über Interface
+                    appNamesManager.setCustomNamesInBatch(validNames)
+                    Timber.i("Imported custom names: ${validNames.size}, skipped: $skippedNames")
                 }
-
-                if (namesImported > 0) {
-                    // Trigger Update damit UI sich aktualisiert
-                    appNamesManager.triggerCustomNameUpdate()
-                }
-
-                Timber.i("Imported custom names: $namesImported, skipped: $namesSkipped")
             }
 
             Timber.i("Selective import completed: " +
