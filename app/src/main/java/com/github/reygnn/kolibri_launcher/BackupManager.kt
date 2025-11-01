@@ -3,13 +3,9 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 import java.util.concurrent.CancellationException
@@ -20,12 +16,13 @@ import javax.inject.Singleton
 class BackupManager @Inject constructor(
     private val favoritesManager: FavoritesRepository,
     private val favoritesOrderManager: FavoritesOrderRepository,
-    @ApplicationContext private val context: Context,
-    private val json: Json = Json {
+    @param:ApplicationContext private val context: Context
+) : BackupRepository {
+
+    private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
-) : BackupRepository {
 
     override suspend fun exportToJson(): String {
         return try {
