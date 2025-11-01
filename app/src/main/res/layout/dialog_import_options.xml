@@ -35,4 +35,18 @@
         android:text="@string/import_option_order"
         android:checked="true" />
 
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportHiddenApps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_hidden_apps"
+        android:checked="true" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportCustomNames"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_custom_names"
+        android:checked="true" />
+
 </LinearLayout>

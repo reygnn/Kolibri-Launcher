@@ -218,6 +218,9 @@
     <string name="settings_swipe_actions_summary">Assign apps to left and right swipe gestures</string>
     <string name="swipe_actions_selector_label">Assign apps to a slot:</string>
 
+    <string name="backup_summary">Export and restore your settings</string>
+
+<!-- Backup & Restore -->
 <string name="backup_export_success">Backup successfully exported</string>
 <string name="backup_import_success_simple">%1$d apps imported</string>
 <string name="backup_import_success_with_skipped">%1$d apps imported\n%2$d apps skipped (not installed)</string>
@@ -231,14 +234,17 @@
 <string name="backup_button_export">Export Settings</string>
 <string name="backup_button_import">Restore Settings</string>
 <string name="backup_loading">Loading backup…</string>
+<string name="backup_export_failed">Backup export failed</string>
 
+<!-- Import Options Dialog -->
 <string name="import_options_title">Import Options</string>
 <string name="import_options_description">Choose what you want to import:</string>
-<string name="import_option_favorites">Import favorites (%1$d apps)</string>
-<string name="import_option_order">Import order</string>
-<string name="backup_preview_info">%1$d apps · %2$s</string>
+<string name="import_option_favorites">Favorites (%1$d apps)</string>
+<string name="import_option_order">Order</string>
+<string name="import_option_hidden_apps">Hidden apps (%1$d apps)</string>
+<string name="import_option_custom_names">Custom names (%1$d apps)</string>
+<string name="backup_preview_date">Backup from %1$s</string>
 <string name="import_button">Import</string>
 <string name="import_no_options_selected">Please select at least one import option</string>
-<string name="backup_summary">Export and restore your settings</string>
     
 </resources>

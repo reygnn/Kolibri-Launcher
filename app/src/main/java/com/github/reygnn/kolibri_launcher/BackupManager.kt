@@ -3,6 +3,9 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
@@ -14,33 +17,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Backup & Restore Manager für Kolibri Launcher Settings mit selektivem Import.
+ * Backup & Restore Manager für Kolibri Launcher Settings.
  *
- * # BACKUP/RESTORE LOGIK
+ * Exportiert/Importiert:
+ * - Favoriten (Component Names + Order)
+ * - Versteckte Apps (Component Names)
+ * - Custom App Names (Package Name -> Custom Name)
  *
- * ## EXPORT (Backup erstellen):
- * 1. Liest aktuelle Daten aus den Repository-Flows
- * 2. Verpackt in strukturierte BackupData
- * 3. Serialisiert zu JSON
- * 4. Schreibt in User-gewählte Datei
- *
- * ## IMPORT (Backup wiederherstellen):
- * 1. Preview: Zeigt Backup-Inhalt vor Import
- * 2. User wählt Import-Optionen (Favoriten/Order)
- * 3. Validierung (Version, Installation, Limits)
- * 4. Selektiver Import basierend auf Optionen
- * 5. Nur gewählte Daten werden überschrieben
- *
- * ## SELEKTIVER IMPORT:
- * - Import Favorites: Überschreibt favoriteComponents komplett
- * - Import Order: Filtert Order gegen aktuelle Favorites
- * - Beide: Standard-Verhalten (alles importieren)
- * - Keines: Fehler (Import-Dialog sollte dies verhindern)
+ * Selektiver Import erlaubt User, einzelne Kategorien zu wählen.
  */
 @Singleton
 class BackupManager @Inject constructor(
     private val favoritesManager: FavoritesRepository,
     private val favoritesOrderManager: FavoritesOrderRepository,
+    private val appVisibilityManager: AppVisibilityRepository,
+    private val appNamesManager: AppNamesRepository,
+    private val dataStore: DataStore<Preferences>,
     @ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -51,12 +43,21 @@ class BackupManager @Inject constructor(
 
     override suspend fun exportToJson(): String {
         return try {
+            // Favoriten
             val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
 
+            // Versteckte Apps
+            val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
+
+            // Custom App Names (manuell aus DataStore lesen)
+            val customAppNames = extractCustomAppNamesFromDataStore()
+
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
-                favoritesOrder = favoritesOrder
+                favoritesOrder = favoritesOrder,
+                hiddenComponents = hiddenComponents,
+                customAppNames = customAppNames
             )
 
             val backup = BackupData(settings = settings)
@@ -70,35 +71,63 @@ class BackupManager @Inject constructor(
         }
     }
 
+    /**
+     * Extrahiert alle Custom App Names aus dem DataStore.
+     * Sucht nach allen Keys mit Prefix "name_" (KEY_NAME_PREFIX).
+     */
+    private suspend fun extractCustomAppNamesFromDataStore(): Map<String, String> {
+        return try {
+            val preferences = dataStore.data.first()
+            val customNames = mutableMapOf<String, String>()
+
+            preferences.asMap().forEach { (key, value) ->
+                val keyName = key.name
+                if (keyName.startsWith(AppConstants.KEY_NAME_PREFIX) && value is String) {
+                    // Extrahiere packageName aus "name_com.example.app"
+                    val packageName = keyName.removePrefix(AppConstants.KEY_NAME_PREFIX)
+                    customNames[packageName] = value
+                }
+            }
+
+            Timber.d("Extracted ${customNames.size} custom app names")
+            customNames
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error extracting custom app names")
+            emptyMap()
+        }
+    }
+
     override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
             val backup = json.decodeFromString<BackupData>(jsonString)
 
-            // Validierung: Keine Import-Optionen gewählt
             if (options.importNothing) {
                 return ImportResult.Error("No import options selected")
             }
 
-            // Version-Check
             if (!isVersionSupported(backup.version)) {
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
             val installedComponents = getInstalledComponents(context)
+            val installedPackages = installedComponents.map { it.split('/')[0] }.toSet()
+
             var importedCount = 0
             var skippedCount = 0
             val missingApps = mutableSetOf<String>()
 
-            // PHASE 1: Import Favorites (wenn gewählt)
+            // PHASE 1: Import Favorites
             if (options.importFavorites) {
                 val validFavorites = backup.settings.favoriteComponents
                     .filter { it in installedComponents }
                     .toSet()
 
-                skippedCount = backup.settings.favoriteComponents.size - validFavorites.size
+                skippedCount += backup.settings.favoriteComponents.size - validFavorites.size
                 missingApps.addAll(backup.settings.favoriteComponents - installedComponents)
 
-                // Package-Limit prüfen
                 val uniquePackages = validFavorites.map { it.split('/')[0] }.toSet()
                 if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
                     return ImportResult.LimitExceeded(
@@ -107,28 +136,70 @@ class BackupManager @Inject constructor(
                     )
                 }
 
-                // Favorites überschreiben
                 favoritesManager.saveFavoriteComponents(validFavorites.toList())
-                importedCount = validFavorites.size
+                importedCount += validFavorites.size
 
-                Timber.i("Imported favorites: $importedCount, skipped: $skippedCount")
+                Timber.i("Imported favorites: $importedCount")
             }
 
-            // PHASE 2: Import Order (wenn gewählt)
+            // PHASE 2: Import Order
             if (options.importOrder) {
-                // Hole aktuelle Favorites (entweder gerade importiert oder bestehend)
                 val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
-
-                // Filtere Order: Nur Components die (1) Favorites sind UND (2) installiert
                 val validOrder = backup.settings.favoritesOrder
                     .filter { it in currentFavorites && it in installedComponents }
 
                 favoritesOrderManager.saveOrder(validOrder)
-
                 Timber.i("Imported order: ${validOrder.size} items")
             }
 
-            Timber.i("Selective import completed: favorites=${options.importFavorites}, order=${options.importOrder}")
+            // PHASE 3: Import Hidden Apps
+            if (options.importHiddenApps) {
+                val validHidden = backup.settings.hiddenComponents
+                    .filter { it in installedComponents }
+                    .toSet()
+
+                val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
+                if (skippedHidden > 0) {
+                    Timber.i("Skipped $skippedHidden non-installed hidden apps")
+                }
+
+                // Batch-Update: Alle importierten Apps verstecken
+                appVisibilityManager.updateComponentVisibilities(
+                    componentsToHide = validHidden,
+                    componentsToShow = emptySet()
+                )
+
+                Timber.i("Imported hidden apps: ${validHidden.size}")
+            }
+
+            // PHASE 4: Import Custom App Names
+            if (options.importCustomNames) {
+                var namesImported = 0
+                var namesSkipped = 0
+
+                backup.settings.customAppNames.forEach { (packageName, customName) ->
+                    // Prüfe ob Package installiert ist
+                    if (packageName in installedPackages) {
+                        appNamesManager.setCustomNameForPackage(packageName, customName)
+                        namesImported++
+                    } else {
+                        namesSkipped++
+                    }
+                }
+
+                if (namesImported > 0) {
+                    // Trigger Update damit UI sich aktualisiert
+                    appNamesManager.triggerCustomNameUpdate()
+                }
+
+                Timber.i("Imported custom names: $namesImported, skipped: $namesSkipped")
+            }
+
+            Timber.i("Selective import completed: " +
+                    "favorites=${options.importFavorites}, " +
+                    "order=${options.importOrder}, " +
+                    "hidden=${options.importHiddenApps}, " +
+                    "names=${options.importCustomNames}")
 
             ImportResult.Success(
                 importedCount = importedCount,
@@ -192,7 +263,9 @@ class BackupManager @Inject constructor(
                 version = backup.version,
                 timestamp = backup.timestamp,
                 favoriteCount = backup.settings.favoriteComponents.size,
-                orderCount = backup.settings.favoritesOrder.size
+                orderCount = backup.settings.favoritesOrder.size,
+                hiddenCount = backup.settings.hiddenComponents.size,
+                customNamesCount = backup.settings.customAppNames.size
             )
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error previewing backup")
@@ -201,10 +274,7 @@ class BackupManager @Inject constructor(
     }
 
     private fun isVersionSupported(version: String): Boolean {
-        return when (version) {
-            "1.0.0" -> true
-            else -> false
-        }
+        return version == "1.0.0"
     }
 
     private fun getInstalledComponents(context: Context): Set<String> {

@@ -16,12 +16,22 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Fragment für Backup und Restore von App-Einstellungen.
+ *
+ * Crash-Schutz:
+ * - CoroutineExceptionHandler für async Operationen
+ * - Fragment-State-Checks vor Dialog-Anzeige
+ * - Try-catch für I/O-Operationen (File-System-Zugriff)
+ * - Null-Checks für View-Binding
+ */
 @AndroidEntryPoint
 class BackupFragment : Fragment() {
 
@@ -30,18 +40,38 @@ class BackupFragment : Fragment() {
 
     private val viewModel: BackupViewModel by viewModels()
 
+    // Exception Handler für alle Coroutines in diesem Fragment
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Timber.e(throwable, "Uncaught coroutine exception in BackupFragment")
+        view?.let {
+            showError(getString(R.string.error_generic))
+        }
+    }
+
     private val exportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        uri?.let { viewModel.exportBackup(it) }
+        uri?.let {
+            try {
+                viewModel.exportBackup(it)
+            } catch (e: Exception) {
+                Timber.e(e, "Export failed")
+                showError(getString(R.string.backup_export_failed))
+            }
+        }
     }
 
     private val importLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            viewModel.previewBackup(it)
-            showImportOptionsDialog(it)
+            try {
+                viewModel.previewBackup(it)
+                showImportOptionsDialog(it)
+            } catch (e: Exception) {
+                Timber.e(e, "Import preview failed")
+                showError(getString(R.string.error_generic))
+            }
         }
     }
 
@@ -75,24 +105,47 @@ class BackupFragment : Fragment() {
     }
 
     private fun showImportOptionsDialog(uri: Uri) {
+        // Fragment-State prüfen bevor Dialog angezeigt wird
+        if (!isAdded || isStateSaved || isDetached) {
+            Timber.w("Cannot show import dialog - invalid fragment state")
+            return
+        }
+
         val dialogBinding = DialogImportOptionsBinding.inflate(layoutInflater)
 
-        // Beobachte Preview-Daten
-        viewLifecycleOwner.lifecycleScope.launch {
+        // Preview-Daten beobachten und Dialog aktualisieren
+        viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             viewModel.backupPreview.collect { preview ->
+                // Null-Check für Binding und Fragment-State
+                if (_binding == null || !isAdded) return@collect
+
                 preview?.let {
                     val date = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
                         .format(Date(it.timestamp))
+
+                    // Dialog-Inhalte aktualisieren
                     dialogBinding.textBackupInfo.text = getString(
-                        R.string.backup_preview_info,
-                        it.favoriteCount,
+                        R.string.backup_preview_date,
                         date
                     )
 
-                    // Update Checkbox-Labels mit Counts
                     dialogBinding.checkboxImportFavorites.text = getString(
                         R.string.import_option_favorites,
                         it.favoriteCount
+                    )
+
+                    dialogBinding.checkboxImportOrder.text = getString(
+                        R.string.import_option_order
+                    )
+
+                    dialogBinding.checkboxImportHiddenApps.text = getString(
+                        R.string.import_option_hidden_apps,
+                        it.hiddenCount
+                    )
+
+                    dialogBinding.checkboxImportCustomNames.text = getString(
+                        R.string.import_option_custom_names,
+                        it.customNamesCount
                     )
                 }
             }
@@ -104,7 +157,9 @@ class BackupFragment : Fragment() {
             .setPositiveButton(R.string.import_button) { _, _ ->
                 val options = ImportOptions(
                     importFavorites = dialogBinding.checkboxImportFavorites.isChecked,
-                    importOrder = dialogBinding.checkboxImportOrder.isChecked
+                    importOrder = dialogBinding.checkboxImportOrder.isChecked,
+                    importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
+                    importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked
                 )
 
                 if (options.importNothing) {
@@ -118,9 +173,12 @@ class BackupFragment : Fragment() {
     }
 
     private fun observeBackupState() {
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.backupState.collect { state ->
+                    // Null-Check für Binding
+                    if (_binding == null || !isAdded) return@collect
+
                     handleBackupState(state)
                 }
             }
@@ -184,40 +242,54 @@ class BackupFragment : Fragment() {
     }
 
     private fun showLoading() {
-        binding.progressBar.visibility = View.VISIBLE
-        binding.buttonExportBackup.isEnabled = false
-        binding.buttonImportBackup.isEnabled = false
+        _binding?.let {
+            it.progressBar.visibility = View.VISIBLE
+            it.buttonExportBackup.isEnabled = false
+            it.buttonImportBackup.isEnabled = false
+        }
     }
 
     private fun hideLoading() {
-        binding.progressBar.visibility = View.GONE
-        binding.buttonExportBackup.isEnabled = true
-        binding.buttonImportBackup.isEnabled = true
+        _binding?.let {
+            it.progressBar.visibility = View.GONE
+            it.buttonExportBackup.isEnabled = true
+            it.buttonImportBackup.isEnabled = true
+        }
     }
 
     private fun showSuccess(message: String) {
-        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-        Timber.i(message)
+        _binding?.let {
+            Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
+            Timber.i(message)
+        }
     }
 
     private fun showImportSuccess(message: String, missingApps: Set<String>) {
-        val displayMessage = if (missingApps.isNotEmpty()) {
-            val appList = missingApps.take(5).joinToString("\n") { it.split("/")[0] }
-            val moreText = if (missingApps.size > 5) {
-                "\n... ${getString(R.string.backup_and_more, missingApps.size - 5)}"
-            } else ""
-            "$message\n\n${getString(R.string.backup_missing_apps)}:\n$appList$moreText"
-        } else {
-            message
-        }
+        _binding?.let {
+            val displayMessage = if (missingApps.isNotEmpty()) {
+                val appList = missingApps.take(5).joinToString("\n") { app ->
+                    app.split("/")[0]
+                }
+                val moreText = if (missingApps.size > 5) {
+                    "\n... ${getString(R.string.backup_and_more, missingApps.size - 5)}"
+                } else {
+                    ""
+                }
+                "$message\n\n${getString(R.string.backup_missing_apps)}:\n$appList$moreText"
+            } else {
+                message
+            }
 
-        Snackbar.make(binding.root, displayMessage, Snackbar.LENGTH_LONG).show()
-        Timber.i("Import success: $message, missing: ${missingApps.size}")
+            Snackbar.make(it.root, displayMessage, Snackbar.LENGTH_LONG).show()
+            Timber.i("Import success: $message, missing: ${missingApps.size}")
+        }
     }
 
     private fun showError(message: String) {
-        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-        Timber.e("Backup error: $message")
+        _binding?.let {
+            Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
+            Timber.e("Backup error: $message")
+        }
     }
 
     override fun onDestroyView() {
