@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/textBackupInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:layout_marginBottom="24dp"
+        android:text="@string/backup_loading" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_options_description"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:layout_marginBottom="16dp" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportFavorites"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_favorites"
+        android:checked="true" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportOrder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_order"
+        android:checked="true" />
+
+</LinearLayout>
