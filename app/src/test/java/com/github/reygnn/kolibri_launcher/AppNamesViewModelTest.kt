@@ -27,14 +27,14 @@ class AppNamesViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeAppNamesRepository: FakeAppNamesRepository
-    private lateinit var fakeInstalledAppsRepository: FakeInstalledAppsRepository
+    private lateinit var fakeInstalledAppsRepository: DependencyFakeInstalledAppsRepository
     private lateinit var viewModel: AppNamesViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeAppNamesRepository = FakeAppNamesRepository()
-        fakeInstalledAppsRepository = FakeInstalledAppsRepository(fakeAppNamesRepository)
+        fakeInstalledAppsRepository = DependencyFakeInstalledAppsRepository(fakeAppNamesRepository)
         viewModel = AppNamesViewModel(
             fakeAppNamesRepository,
             fakeInstalledAppsRepository,
@@ -374,9 +374,9 @@ class AppNamesViewModelTest {
     }
 }
 
-// ========== FAKE REPOSITORIES (UPDATED) ==========
+// ========== FAKE REPOSITORIES ==========
 
-class FakeInstalledAppsRepository(
+class DependencyFakeInstalledAppsRepository(
     private val appNamesRepository: AppNamesRepository
 ) : InstalledAppsRepository {
 

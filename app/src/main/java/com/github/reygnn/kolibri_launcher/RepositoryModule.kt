@@ -101,10 +101,4 @@ abstract class RepositoryModule {
         backupManager: BackupManager
     ): BackupRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindAppDataSource(
-        impl: AppDataSourceImpl
-    ): AppDataSource
-
 }

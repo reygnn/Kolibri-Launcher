@@ -13,10 +13,10 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class AppInfo(
-    val originalName: String,   // z.B. "Chrome"
-    val displayName: String,    // Der Name, der tatsächlich angezeigt wird. Kann der benutzerdefinierte Name sein.
-    val packageName: String,    // z.B. "com.android.chrome"
-    val className: String,      // z.B. "com.google.android.apps.chrome.Main"
+    val originalName: String,
+    val displayName: String,
+    val packageName: String,
+    val className: String,
     val isSystemApp: Boolean = false,
     val isFavorite: Boolean = false
 ) : Parcelable {
@@ -25,7 +25,19 @@ data class AppInfo(
      * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
      * (z.B. "Google" und "Voice Search").
      *
+     * Normalisiert automatisch Kurzform (/.Activity) zu Langform (package.Activity)
+     * für konsistenten Vergleich, da Android beide Schreibweisen zulässt.
+     *
      * z.B. "com.android.chrome/com.google.android.apps.chrome.Main"
      */
-    val componentName: String get() = "$packageName/$className"
+    val componentName: String
+        get() {
+            // Normalisiere className: Wenn es mit "." beginnt, ist es Kurzform
+            val normalizedClassName = if (className.startsWith(".")) {
+                "$packageName$className"
+            } else {
+                className
+            }
+            return "$packageName/$normalizedClassName"
+        }
 }

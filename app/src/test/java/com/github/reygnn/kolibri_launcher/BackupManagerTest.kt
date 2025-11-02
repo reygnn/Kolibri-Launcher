@@ -3,7 +3,9 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Before
@@ -30,8 +32,8 @@ class BackupManagerTest {
     private lateinit var fakeFavoritesOrderRepo: FakeFavoritesOrderRepository
     private lateinit var fakeVisibilityRepo: FakeAppVisibilityRepository
     private lateinit var fakeNamesRepo: FakeAppNamesRepository
-    private lateinit var fakeAppDataSource: FakeAppDataSource
-    private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository  // NEU
+    private lateinit var fakeInstalledAppsRepo: SimpleFakeInstalledAppsRepository
+    private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var backupManager: BackupManager
 
     private val json = Json {
@@ -42,20 +44,20 @@ class BackupManagerTest {
     @Before
     fun setUp() {
         mockContext = mock(Context::class.java)
-        fakeAppDataSource = FakeAppDataSource()
+        fakeInstalledAppsRepo = SimpleFakeInstalledAppsRepository()
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
         fakeVisibilityRepo = FakeAppVisibilityRepository()
         fakeNamesRepo = FakeAppNamesRepository()
-        fakeSwipeActionsRepo = FakeSwipeActionsRepository()  // NEU
+        fakeSwipeActionsRepo = FakeSwipeActionsRepository()
 
         backupManager = BackupManager(
             fakeFavoritesRepo,
             fakeFavoritesOrderRepo,
             fakeVisibilityRepo,
             fakeNamesRepo,
-            fakeAppDataSource,
-            fakeSwipeActionsRepo,  // NEU
+            fakeInstalledAppsRepo,  // GEÄNDERT
+            fakeSwipeActionsRepo,
             mockContext
         )
     }
@@ -74,15 +76,15 @@ class BackupManagerTest {
         assertThat(backup.settings.favoritesOrder).isEmpty()
         assertThat(backup.settings.hiddenComponents).isEmpty()
         assertThat(backup.settings.customAppNames).isEmpty()
-        assertThat(backup.settings.swipeLeftApp).isNull()  // NEU
-        assertThat(backup.settings.swipeRightApp).isNull()  // NEU
+        assertThat(backup.settings.swipeLeftApp).isNull()
+        assertThat(backup.settings.swipeRightApp).isNull()
     }
 
     @Test
     fun `exportToJson - with favorites - includes favorites in backup`() = runTest {
         fakeFavoritesRepo.favorites = setOf(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+            "com.app1/com.app1.MainActivity",
+            "com.app2/com.app2.MainActivity"
         )
 
         val jsonString = backupManager.exportToJson()
@@ -90,32 +92,32 @@ class BackupManagerTest {
 
         assertThat(backup.settings.favoriteComponents).hasSize(2)
         assertThat(backup.settings.favoriteComponents).containsExactly(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+            "com.app1/com.app1.MainActivity",
+            "com.app2/com.app2.MainActivity"
         )
     }
 
     @Test
     fun `exportToJson - with order - includes order in backup`() = runTest {
         fakeFavoritesOrderRepo.order = listOf(
-            "com.app2/.MainActivity",
-            "com.app1/.MainActivity"
+            "com.app2/com.app2.MainActivity",
+            "com.app1/com.app1.MainActivity"
         )
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
         assertThat(backup.settings.favoritesOrder).containsExactly(
-            "com.app2/.MainActivity",
-            "com.app1/.MainActivity"
+            "com.app2/com.app2.MainActivity",
+            "com.app1/com.app1.MainActivity"
         ).inOrder()
     }
 
     @Test
     fun `exportToJson - with hidden apps - includes hidden in backup`() = runTest {
         fakeVisibilityRepo.hiddenApps = setOf(
-            "com.app3/.MainActivity",
-            "com.app4/.MainActivity"
+            "com.app3/com.app3.MainActivity",
+            "com.app4/com.app4.MainActivity"
         )
 
         val jsonString = backupManager.exportToJson()
@@ -123,8 +125,8 @@ class BackupManagerTest {
 
         assertThat(backup.settings.hiddenComponents).hasSize(2)
         assertThat(backup.settings.hiddenComponents).containsExactly(
-            "com.app3/.MainActivity",
-            "com.app4/.MainActivity"
+            "com.app3/com.app3.MainActivity",
+            "com.app4/com.app4.MainActivity"
         )
     }
 
@@ -143,51 +145,50 @@ class BackupManagerTest {
         assertThat(backup.settings.customAppNames).containsEntry("com.app2", "Custom App 2")
     }
 
-    // NEU: Swipe Actions Export Tests
     @Test
     fun `exportToJson - with swipe left only - includes left swipe in backup`() = runTest {
-        fakeSwipeActionsRepo.swipeLeftApp = "com.app1/.MainActivity"
+        fakeSwipeActionsRepo.swipeLeftApp = "com.app1/com.app1.MainActivity"
         fakeSwipeActionsRepo.swipeRightApp = null
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/.MainActivity")
+        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
         assertThat(backup.settings.swipeRightApp).isNull()
     }
 
     @Test
     fun `exportToJson - with swipe right only - includes right swipe in backup`() = runTest {
         fakeSwipeActionsRepo.swipeLeftApp = null
-        fakeSwipeActionsRepo.swipeRightApp = "com.app2/.MainActivity"
+        fakeSwipeActionsRepo.swipeRightApp = "com.app2/com.app2.MainActivity"
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
         assertThat(backup.settings.swipeLeftApp).isNull()
-        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/.MainActivity")
+        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
     fun `exportToJson - with both swipe actions - includes both in backup`() = runTest {
-        fakeSwipeActionsRepo.swipeLeftApp = "com.app1/.MainActivity"
-        fakeSwipeActionsRepo.swipeRightApp = "com.app2/.MainActivity"
+        fakeSwipeActionsRepo.swipeLeftApp = "com.app1/com.app1.MainActivity"
+        fakeSwipeActionsRepo.swipeRightApp = "com.app2/com.app2.MainActivity"
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/.MainActivity")
-        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/.MainActivity")
+        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
+        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
     fun `exportToJson - with all data - creates complete backup`() = runTest {
-        fakeFavoritesRepo.favorites = setOf("com.app1/.MainActivity")
-        fakeFavoritesOrderRepo.order = listOf("com.app1/.MainActivity")
-        fakeVisibilityRepo.hiddenApps = setOf("com.app2/.MainActivity")
+        fakeFavoritesRepo.favorites = setOf("com.app1/com.app1.MainActivity")
+        fakeFavoritesOrderRepo.order = listOf("com.app1/com.app1.MainActivity")
+        fakeVisibilityRepo.hiddenApps = setOf("com.app2/com.app2.MainActivity")
         fakeNamesRepo.setCustomNamesInBatch(mapOf("com.app1" to "My App"))
-        fakeSwipeActionsRepo.swipeLeftApp = "com.app3/.MainActivity"  // NEU
-        fakeSwipeActionsRepo.swipeRightApp = "com.app4/.MainActivity"  // NEU
+        fakeSwipeActionsRepo.swipeLeftApp = "com.app3/com.app3.MainActivity"
+        fakeSwipeActionsRepo.swipeRightApp = "com.app4/com.app4.MainActivity"
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -196,8 +197,8 @@ class BackupManagerTest {
         assertThat(backup.settings.favoritesOrder).hasSize(1)
         assertThat(backup.settings.hiddenComponents).hasSize(1)
         assertThat(backup.settings.customAppNames).hasSize(1)
-        assertThat(backup.settings.swipeLeftApp).isNotNull()  // NEU
-        assertThat(backup.settings.swipeRightApp).isNotNull()  // NEU
+        assertThat(backup.settings.swipeLeftApp).isNotNull()
+        assertThat(backup.settings.swipeRightApp).isNotNull()
     }
 
     @Test
@@ -218,7 +219,7 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - with importNothing option - returns error`() = runTest {
-        fakeAppDataSource.installed = emptySet()
+        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup()
         val jsonString = json.encodeToString(backup)
@@ -228,7 +229,7 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -238,18 +239,18 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - only favorites - imports only favorites`() = runTest {
-        fakeAppDataSource.installed = setOf(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity"),
+            createAppInfo("com.app2", "com.app2.MainActivity")
         )
 
         val backup = createTestBackup(
-            favorites = setOf("com.app1/.MainActivity"),
-            order = listOf("com.app1/.MainActivity"),
-            hidden = setOf("com.app2/.MainActivity"),
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            order = listOf("com.app1/com.app1.MainActivity"),
+            hidden = setOf("com.app2/com.app2.MainActivity"),
             names = mapOf("com.app1" to "Name"),
-            swipeLeft = "com.app1/.MainActivity",  // NEU
-            swipeRight = "com.app2/.MainActivity"  // NEU
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
 
@@ -258,7 +259,7 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -268,18 +269,20 @@ class BackupManagerTest {
         assertThat(fakeFavoritesOrderRepo.order).isEmpty()
         assertThat(fakeVisibilityRepo.hiddenApps).isEmpty()
         assertThat(fakeNamesRepo.getAllCustomNames()).isEmpty()
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()  // NEU
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()  // NEU
+        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
+        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
     }
 
     @Test
     fun `importFromJson - only order - imports only order`() = runTest {
-        fakeFavoritesRepo.favorites = setOf("com.app1/.MainActivity")
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeFavoritesRepo.favorites = setOf("com.app1/com.app1.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
-            favorites = setOf("com.app1/.MainActivity"),
-            order = listOf("com.app1/.MainActivity")
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            order = listOf("com.app1/com.app1.MainActivity")
         )
         val jsonString = json.encodeToString(backup)
 
@@ -288,7 +291,7 @@ class BackupManagerTest {
             importOrder = true,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -299,10 +302,12 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - only hidden apps - imports only hidden`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
-            hidden = setOf("com.app1/.MainActivity")
+            hidden = setOf("com.app1/com.app1.MainActivity")
         )
         val jsonString = json.encodeToString(backup)
         val options = ImportOptions(
@@ -310,7 +315,7 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = true,
             importCustomNames = false,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -321,7 +326,9 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - only custom names - imports only names`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
             names = mapOf("com.app1" to "Custom")
@@ -332,7 +339,7 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = true,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -342,18 +349,17 @@ class BackupManagerTest {
         assertThat(fakeNamesRepo.batchSetCalled).isTrue()
     }
 
-    // NEU: Swipe Actions Import Tests
     @Test
     fun `importFromJson - only swipe actions - imports only swipes`() = runTest {
-        fakeAppDataSource.installed = setOf(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity"),
+            createAppInfo("com.app2", "com.app2.MainActivity")
         )
 
         val backup = createTestBackup(
-            favorites = setOf("com.app1/.MainActivity"),
-            swipeLeft = "com.app1/.MainActivity",
-            swipeRight = "com.app2/.MainActivity"
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
 
@@ -369,17 +375,19 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeFavoritesRepo.favorites).isEmpty()
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/.MainActivity")
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/.MainActivity")
+        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
+        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
     fun `importFromJson - swipe actions - filters non-installed left app`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app2/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app2", "com.app2.MainActivity")
+        )
 
         val backup = createTestBackup(
-            swipeLeft = "com.nonexistent/.MainActivity",
-            swipeRight = "com.app2/.MainActivity"
+            swipeLeft = "com.nonexistent/com.nonexistent.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
         val options = ImportOptions(importSwipeActions = true)
@@ -389,17 +397,19 @@ class BackupManagerTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/.MainActivity")
-        assertThat(success.missingApps).contains("com.nonexistent/.MainActivity")
+        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
+        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
     }
 
     @Test
     fun `importFromJson - swipe actions - filters non-installed right app`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
-            swipeLeft = "com.app1/.MainActivity",
-            swipeRight = "com.nonexistent/.MainActivity"
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.nonexistent/com.nonexistent.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
         val options = ImportOptions(importSwipeActions = true)
@@ -408,18 +418,18 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/.MainActivity")
+        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
-        assertThat(success.missingApps).contains("com.nonexistent/.MainActivity")
+        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
     }
 
     @Test
     fun `importFromJson - swipe actions - filters both non-installed apps`() = runTest {
-        fakeAppDataSource.installed = emptySet()
+        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup(
-            swipeLeft = "com.app1/.MainActivity",
-            swipeRight = "com.app2/.MainActivity"
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
         val options = ImportOptions(importSwipeActions = true)
@@ -435,18 +445,18 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - all options - imports everything`() = runTest {
-        fakeAppDataSource.installed = setOf(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity"),
+            createAppInfo("com.app2", "com.app2.MainActivity")
         )
 
         val backup = createTestBackup(
-            favorites = setOf("com.app1/.MainActivity"),
-            order = listOf("com.app1/.MainActivity"),
-            hidden = setOf("com.app2/.MainActivity"),
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            order = listOf("com.app1/com.app1.MainActivity"),
+            hidden = setOf("com.app2/com.app2.MainActivity"),
             names = mapOf("com.app1" to "Name"),
-            swipeLeft = "com.app1/.MainActivity",  // NEU
-            swipeRight = "com.app2/.MainActivity"  // NEU
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
 
@@ -455,7 +465,7 @@ class BackupManagerTest {
             importOrder = true,
             importHiddenApps = true,
             importCustomNames = true,
-            importSwipeActions = true  // NEU
+            importSwipeActions = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -465,8 +475,8 @@ class BackupManagerTest {
         assertThat(fakeFavoritesOrderRepo.order).hasSize(1)
         assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
         assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()  // NEU
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()  // NEU
+        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
+        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
     }
 
     // ========== VALIDATION TESTS ==========
@@ -495,9 +505,10 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - exceeds package limit - returns LimitExceeded`() = runTest {
-        val appNames = (1..10).map { "com.app$it/.MainActivity" }.toSet()
-        fakeAppDataSource.installed = appNames
+        val appInfos = (1..10).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
+        fakeInstalledAppsRepo.installedApps = appInfos
 
+        val appNames = appInfos.map { it.componentName }.toSet()
         val backup = createTestBackup(favorites = appNames)
         val jsonString = json.encodeToString(backup)
 
@@ -513,12 +524,14 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - filters non-installed apps`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
             favorites = setOf(
-                "com.app1/.MainActivity",
-                "com.nonexistent/.MainActivity"
+                "com.app1/com.app1.MainActivity",
+                "com.nonexistent/com.nonexistent.MainActivity"
             )
         )
         val jsonString = json.encodeToString(backup)
@@ -530,23 +543,23 @@ class BackupManagerTest {
         val success = result as ImportResult.Success
         assertThat(success.importedCount).isEqualTo(1)
         assertThat(success.skippedCount).isEqualTo(1)
-        assertThat(success.missingApps).contains("com.nonexistent/.MainActivity")
+        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
         assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-        assertThat(fakeFavoritesRepo.favorites).contains("com.app1/.MainActivity")
+        assertThat(fakeFavoritesRepo.favorites).contains("com.app1/com.app1.MainActivity")
     }
 
     @Test
     fun `importFromJson - filters order by current favorites`() = runTest {
-        fakeFavoritesRepo.favorites = setOf("com.app1/.MainActivity")
-        fakeAppDataSource.installed = setOf(
-            "com.app1/.MainActivity",
-            "com.app2/.MainActivity"
+        fakeFavoritesRepo.favorites = setOf("com.app1/com.app1.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity"),
+            createAppInfo("com.app2", "com.app2.MainActivity")
         )
 
         val backup = createTestBackup(
             order = listOf(
-                "com.app1/.MainActivity",
-                "com.app2/.MainActivity"
+                "com.app1/com.app1.MainActivity",
+                "com.app2/com.app2.MainActivity"
             )
         )
         val jsonString = json.encodeToString(backup)
@@ -555,23 +568,25 @@ class BackupManagerTest {
             importOrder = true,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false  // NEU
+            importSwipeActions = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesOrderRepo.order).containsExactly("com.app1/.MainActivity")
+        assertThat(fakeFavoritesOrderRepo.order).containsExactly("com.app1/com.app1.MainActivity")
     }
 
     @Test
     fun `importFromJson - filters hidden apps by installed`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
             hidden = setOf(
-                "com.app1/.MainActivity",
-                "com.nonexistent/.MainActivity"
+                "com.app1/com.app1.MainActivity",
+                "com.nonexistent/com.nonexistent.MainActivity"
             )
         )
         val jsonString = json.encodeToString(backup)
@@ -581,12 +596,14 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
-        assertThat(fakeVisibilityRepo.hiddenApps).contains("com.app1/.MainActivity")
+        assertThat(fakeVisibilityRepo.hiddenApps).contains("com.app1/com.app1.MainActivity")
     }
 
     @Test
     fun `importFromJson - filters custom names by installed packages`() = runTest {
-        fakeAppDataSource.installed = setOf("com.app1/.MainActivity")
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
 
         val backup = createTestBackup(
             names = mapOf(
@@ -609,7 +626,7 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - empty backup - succeeds`() = runTest {
-        fakeAppDataSource.installed = emptySet()
+        fakeInstalledAppsRepo.installedApps = emptyList()
         val backup = createTestBackup()
         val jsonString = json.encodeToString(backup)
 
@@ -624,7 +641,7 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - custom names with empty map - succeeds without trigger`() = runTest {
-        fakeAppDataSource.installed = emptySet()
+        fakeInstalledAppsRepo.installedApps = emptyList()
         val backup = createTestBackup(names = emptyMap())
         val jsonString = json.encodeToString(backup)
 
@@ -637,17 +654,17 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - multiple components from same package - within limit`() = runTest {
-        fakeAppDataSource.installed = setOf(
-            "com.app1/.MainActivity",
-            "com.app1/.SecondActivity",
-            "com.app1/.ThirdActivity"
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity"),
+            createAppInfo("com.app1", "com.app1.SecondActivity"),
+            createAppInfo("com.app1", "com.app1.ThirdActivity")
         )
 
         val backup = createTestBackup(
             favorites = setOf(
-                "com.app1/.MainActivity",
-                "com.app1/.SecondActivity",
-                "com.app1/.ThirdActivity"
+                "com.app1/com.app1.MainActivity",
+                "com.app1/com.app1.SecondActivity",
+                "com.app1/com.app1.ThirdActivity"
             )
         )
         val jsonString = json.encodeToString(backup)
@@ -662,14 +679,14 @@ class BackupManagerTest {
     @Test
     fun `importFromJson - performance test with large dataset`() = runTest {
         // Simuliere 100 installierte Apps
-        val installedApps = (1..100).map { "com.app$it/.MainActivity" }.toSet()
-        fakeAppDataSource.installed = installedApps
+        val installedApps = (1..100).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
+        fakeInstalledAppsRepo.installedApps = installedApps
 
         // Backup mit 8 Favoriten (8 verschiedene Packages - Maximum erlaubt)
-        val favorites = (1..8).map { "com.app$it/.MainActivity" }.toSet()
+        val favorites = (1..8).map { "com.app$it/com.app$it.MainActivity" }.toSet()
 
         // 50 versteckte Apps
-        val hidden = (20..69).map { "com.app$it/.MainActivity" }.toSet()
+        val hidden = (20..69).map { "com.app$it/com.app$it.MainActivity" }.toSet()
 
         // 60 Custom Names
         val names = (1..60).associate { "com.app$it" to "Custom $it" }
@@ -678,8 +695,8 @@ class BackupManagerTest {
             favorites = favorites,
             hidden = hidden,
             names = names,
-            swipeLeft = "com.app1/.MainActivity",  // NEU
-            swipeRight = "com.app2/.MainActivity"  // NEU
+            swipeLeft = "com.app1/com.app1.MainActivity",
+            swipeRight = "com.app2/com.app2.MainActivity"
         )
         val jsonString = json.encodeToString(backup)
 
@@ -694,11 +711,20 @@ class BackupManagerTest {
         assertThat(fakeFavoritesRepo.favorites).hasSize(8)  // 8 Favoriten
         assertThat(fakeVisibilityRepo.hiddenApps).hasSize(50)  // 50 hidden
         assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)  // 60 names
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()  // NEU
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()  // NEU
+        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
+        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
     }
 
     // ========== HELPER METHODS ==========
+
+    private fun createAppInfo(packageName: String, className: String): AppInfo {
+        return AppInfo(
+            originalName = packageName,
+            displayName = packageName,
+            packageName = packageName,
+            className = className
+        )
+    }
 
     private fun createTestBackup(
         version: String = "1.0.0",
@@ -707,8 +733,8 @@ class BackupManagerTest {
         order: List<String> = emptyList(),
         hidden: Set<String> = emptySet(),
         names: Map<String, String> = emptyMap(),
-        swipeLeft: String? = null,  // NEU
-        swipeRight: String? = null  // NEU
+        swipeLeft: String? = null,
+        swipeRight: String? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -719,8 +745,8 @@ class BackupManagerTest {
                 favoritesOrder = order,
                 hiddenComponents = hidden,
                 customAppNames = names,
-                swipeLeftApp = swipeLeft,   // NEU
-                swipeRightApp = swipeRight  // NEU
+                swipeLeftApp = swipeLeft,
+                swipeRightApp = swipeRight
             )
         )
     }
@@ -798,15 +824,23 @@ class FakeAppVisibilityRepository : AppVisibilityRepository {
     }
 }
 
-class FakeAppDataSource : AppDataSource {
-    var installed = setOf<String>()
+class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
+    var installedApps = listOf<AppInfo>()
 
-    override suspend fun getInstalledComponents(): Set<String> {
-        return installed
+    override fun getInstalledApps(): Flow<List<AppInfo>> {
+        return flowOf(installedApps)
+    }
+
+    override suspend fun triggerAppsUpdate() {
+        // Nichts tun im Test
+    }
+
+    override fun purgeRepository() {
+        // Nichts tun im Test
     }
 }
 
-// NEU: Fake SwipeActionsRepository
+// Fake SwipeActionsRepository
 class FakeSwipeActionsRepository : SwipeActionsRepository {
     private val leftFlow = MutableStateFlow<String?>(null)
     private val rightFlow = MutableStateFlow<String?>(null)

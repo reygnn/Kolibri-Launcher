@@ -34,8 +34,8 @@ class BackupManager @Inject constructor(
     private val favoritesOrderManager: FavoritesOrderRepository,
     private val appVisibilityManager: AppVisibilityRepository,
     private val appNamesManager: AppNamesRepository,
-    private val appDataSourceManager: AppDataSource,
-    private val swipeActionsManager: SwipeActionsRepository,  // NEU
+    private val installedAppsManager: InstalledAppsRepository,
+    private val swipeActionsManager: SwipeActionsRepository,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -51,6 +51,8 @@ class BackupManager @Inject constructor(
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
             val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
             val customAppNames = appNamesManager.getAllCustomNames()
+
+            // Swipe Actions exportieren
             val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
 
@@ -93,7 +95,8 @@ class BackupManager @Inject constructor(
             }
 
             // 4. Hole installierte Apps (einmalig)
-            val installedComponents = appDataSourceManager.getInstalledComponents()
+            val installedApps = installedAppsManager.getInstalledApps().first()
+            val installedComponents = installedApps.map { it.componentName }.toSet()
 
             // PERFORMANCE-OPTIMIERUNG: Convert zu HashSet für O(1) Lookups
             val installedComponentsSet = installedComponents.toHashSet()
@@ -180,7 +183,7 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // ===== PHASE 5: Import Swipe Actions ===== (NEU)
+            // ===== PHASE 5: Import Swipe Actions =====
             if (options.importSwipeActions) {
                 var swipeImportedCount = 0
                 var swipeSkippedCount = 0
