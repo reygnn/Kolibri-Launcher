@@ -24,6 +24,7 @@ import javax.inject.Singleton
  * - Favoriten (Component Names + Order)
  * - Versteckte Apps (Component Names)
  * - Custom App Names (Package Name → Custom Name)
+ * - Swipe Actions (Left/Right Component Names)
  *
  * Selektiver Import erlaubt User, einzelne Kategorien zu wählen.
  */
@@ -34,6 +35,7 @@ class BackupManager @Inject constructor(
     private val appVisibilityManager: AppVisibilityRepository,
     private val appNamesManager: AppNamesRepository,
     private val appDataSourceManager: AppDataSource,
+    private val swipeActionsManager: SwipeActionsRepository,  // NEU
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -48,13 +50,17 @@ class BackupManager @Inject constructor(
             val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
             val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
-            val customAppNames = appNamesManager.getAllCustomNames()  // ← NEU: Saubere Interface-Methode
+            val customAppNames = appNamesManager.getAllCustomNames()
+            val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
+            val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
                 favoritesOrder = favoritesOrder,
                 hiddenComponents = hiddenComponents,
-                customAppNames = customAppNames
+                customAppNames = customAppNames,
+                swipeLeftApp = swipeLeftApp,
+                swipeRightApp = swipeRightApp
             )
 
             val backup = BackupData(
@@ -174,13 +180,54 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // ===== PHASE 5: Import Swipe Actions ===== (NEU)
+            if (options.importSwipeActions) {
+                var swipeImportedCount = 0
+                var swipeSkippedCount = 0
+
+                // Import Left Swipe
+                val leftApp = backup.settings.swipeLeftApp
+                if (leftApp != null) {
+                    if (leftApp in installedComponentsSet) {
+                        swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, leftApp)
+                        swipeImportedCount++
+                        Timber.i("Imported swipe left: $leftApp")
+                    } else {
+                        swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
+                        swipeSkippedCount++
+                        missingApps.add(leftApp)
+                        Timber.i("Skipped swipe left (not installed): $leftApp")
+                    }
+                }
+
+                // Import Right Swipe
+                val rightApp = backup.settings.swipeRightApp
+                if (rightApp != null) {
+                    if (rightApp in installedComponentsSet) {
+                        swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, rightApp)
+                        swipeImportedCount++
+                        Timber.i("Imported swipe right: $rightApp")
+                    } else {
+                        swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
+                        swipeSkippedCount++
+                        missingApps.add(rightApp)
+                        Timber.i("Skipped swipe right (not installed): $rightApp")
+                    }
+                }
+
+                if (swipeImportedCount > 0 || swipeSkippedCount > 0) {
+                    Timber.i("Imported swipe actions: $swipeImportedCount, skipped: $swipeSkippedCount")
+                }
+            }
+
             Timber.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b",
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
                 options.importHiddenApps,
-                options.importCustomNames
+                options.importCustomNames,
+                options.importSwipeActions
             )
 
             ImportResult.Success(
@@ -202,19 +249,59 @@ class BackupManager @Inject constructor(
 
     override suspend fun saveBackupToFile(uriString: String): Boolean {
         return try {
-            val uri = uriString.toUri()
+            // 1. Validiere URI-String
+            if (uriString.isBlank()) {
+                Timber.e("Empty URI string provided")
+                throw BackupException("Invalid file location")
+            }
+
+            // 2. Parse URI mit expliziter Exception-Behandlung
+            val uri = try {
+                uriString.toUri()
+            } catch (e: IllegalArgumentException) {
+                Timber.e(e, "Invalid URI format: $uriString")
+                throw BackupException("Invalid file location format", e)
+            }
+
+            // 3. Prüfe URI-Scheme
+            val scheme = uri.scheme
+            if (scheme == null || scheme !in listOf("content", "file")) {
+                Timber.e("Unsupported URI scheme: $scheme")
+                throw BackupException("Unsupported file location type")
+            }
+
+            // 4. Exportiere Backup-Daten
             val jsonString = exportToJson()
 
+            // 5. Prüfe Backup-Größe (optional, aber empfohlen)
+            val backupSizeBytes = jsonString.toByteArray().size
+            if (backupSizeBytes > 10 * 1024 * 1024) { // 10 MB Limit
+                Timber.w("Backup size is very large: ${backupSizeBytes / 1024 / 1024} MB")
+            }
+
+            // 6. Schreibe zu File
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 output.write(jsonString.toByteArray())
+                Timber.i("Backup saved successfully to: $uri (${backupSizeBytes / 1024} KB)")
+                true
+            } ?: run {
+                Timber.e("Failed to open output stream for URI: $uri")
+                throw BackupException("Cannot write to selected location")
             }
-            Timber.i("Backup saved to: $uri")
-            true
+
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) { // Fängt auch IllegalArgumentException von Uri.parse()
-            TimberWrapper.silentError(e, "Error saving backup to file")
-            false
+        } catch (e: BackupException) {
+            throw e
+        } catch (e: SecurityException) {
+            Timber.e(e, "Permission denied for URI")
+            throw BackupException("No permission to write to this location", e)
+        } catch (e: java.io.IOException) {
+            Timber.e(e, "I/O error while saving backup")
+            throw BackupException("Failed to write file (storage full or unavailable?)", e)
+        } catch (e: Exception) {
+            Timber.e(e, "Unexpected error saving backup")
+            throw BackupException("Failed to save backup: ${e.message}", e)
         }
     }
 
@@ -235,8 +322,9 @@ class BackupManager @Inject constructor(
             }
 
             // 3. Prüfe URI-Scheme
-            if (uri.scheme !in listOf("content", "file")) {
-                Timber.e("Unsupported URI scheme: ${uri.scheme}")
+            val scheme = uri.scheme
+            if (scheme == null || scheme !in listOf("content", "file")) {
+                Timber.e("Unsupported URI scheme: $scheme")
                 return ImportResult.Error("Unsupported file location type")
             }
 
@@ -296,8 +384,9 @@ class BackupManager @Inject constructor(
             }
 
             // 3. Prüfe URI-Scheme
-            if (uri.scheme !in listOf("content", "file")) {
-                Timber.e("Unsupported URI scheme for preview: ${uri.scheme}")
+            val scheme = uri.scheme
+            if (scheme == null || scheme !in listOf("content", "file")) {
+                Timber.e("Unsupported URI scheme for preview: $scheme")
                 return null
             }
 
@@ -340,10 +429,12 @@ class BackupManager @Inject constructor(
                 favoriteCount = backup.settings.favoriteComponents.size,
                 orderCount = backup.settings.favoritesOrder.size,
                 hiddenCount = backup.settings.hiddenComponents.size,
-                customNamesCount = backup.settings.customAppNames.size
+                customNamesCount = backup.settings.customAppNames.size,
+                hasSwipeLeft = backup.settings.swipeLeftApp != null,
+                hasSwipeRight = backup.settings.swipeRightApp != null
             )
 
-            Timber.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}")
+            Timber.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}")
             preview
 
         } catch (e: SecurityException) {

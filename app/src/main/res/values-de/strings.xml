@@ -241,5 +241,6 @@
 <string name="backup_preview_date">Backup vom %1$s</string>
 <string name="import_button">Importieren</string>
 <string name="import_no_options_selected">Bitte wähle mindestens eine Import-Option</string>
+<string name="import_option_swipe_actions">Swipe-Gesten (%d)</string>
 
 </resources>

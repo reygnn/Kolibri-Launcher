@@ -162,6 +162,9 @@ class BackupFragment : Fragment() {
                         R.string.import_option_custom_names,
                         preview.customNamesCount
                     )
+
+                    // NEU: Swipe Actions Checkbox
+                    checkboxImportSwipeActions.text = buildSwipeActionsText(preview)
                 }
 
                 // 4. Dialog anzeigen
@@ -173,7 +176,8 @@ class BackupFragment : Fragment() {
                             importFavorites = dialogBinding.checkboxImportFavorites.isChecked,
                             importOrder = dialogBinding.checkboxImportOrder.isChecked,
                             importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
-                            importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked
+                            importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked,
+                            importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked  // NEU
                         )
 
                         if (options.importNothing) {
@@ -191,6 +195,14 @@ class BackupFragment : Fragment() {
                 showError(getString(R.string.error_generic))
             }
         }
+    }
+
+    /**
+     * NEU: Baut den Text für die Swipe Actions Checkbox basierend auf Preview-Daten.
+     */
+    private fun buildSwipeActionsText(preview: BackupPreview): String {
+        val swipeCount = listOf(preview.hasSwipeLeft, preview.hasSwipeRight).count { it }
+        return getString(R.string.import_option_swipe_actions, swipeCount)
     }
 
     private fun observeBackupState() {

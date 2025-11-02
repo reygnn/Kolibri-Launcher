@@ -184,6 +184,7 @@ class BackupViewModelTest {
 
     // ========== PREVIEW TESTS ==========
 
+
     @Test
     fun `previewBackup - successful - emits preview data`() =
         runTest(mainDispatcherRule.testDispatcher) {
@@ -194,7 +195,9 @@ class BackupViewModelTest {
                 favoriteCount = 5,
                 orderCount = 5,
                 hiddenCount = 2,
-                customNamesCount = 3
+                customNamesCount = 3,
+                hasSwipeLeft = true,   // NEU
+                hasSwipeRight = false  // NEU
             )
             fakeBackupRepository.previewResult = expectedPreview
 
@@ -204,6 +207,8 @@ class BackupViewModelTest {
                 val preview = awaitItem() // Endergebnis
                 assertThat(preview).isNotNull()
                 assertThat(preview?.favoriteCount).isEqualTo(5)
+                assertThat(preview?.hasSwipeLeft).isTrue()   // NEU
+                assertThat(preview?.hasSwipeRight).isFalse() // NEU
             }
         }
 
@@ -256,8 +261,14 @@ class BackupViewModelTest {
 
         // Arrange: Setze den Preview auf einen Nicht-Null-Wert
         val preview = BackupPreview(
-            version = "1.0.0", timestamp = 1L, favoriteCount = 1,
-            orderCount = 1, hiddenCount = 1, customNamesCount = 1
+            version = "1.0.0",
+            timestamp = 1L,
+            favoriteCount = 1,
+            orderCount = 1,
+            hiddenCount = 1,
+            customNamesCount = 1,
+            hasSwipeLeft = false,  // NEU
+            hasSwipeRight = false  // NEU
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)
