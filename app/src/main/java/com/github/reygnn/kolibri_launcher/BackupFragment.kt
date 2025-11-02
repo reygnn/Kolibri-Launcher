@@ -153,12 +153,14 @@ class BackupFragment : Fragment() {
                     checkboxImportFavorites.isVisible = favoritesVisible
                     checkboxImportFavorites.isChecked = favoritesVisible
 
+
                     val orderVisible = preview.orderCount > 0
                     checkboxImportOrder.text = getString(
                         R.string.import_option_order
                     )
                     checkboxImportOrder.isVisible = orderVisible
                     checkboxImportOrder.isChecked = orderVisible
+
 
                     val hiddenVisible = preview.hiddenCount > 0
                     checkboxImportHiddenApps.text = getString(
@@ -168,19 +170,22 @@ class BackupFragment : Fragment() {
                     checkboxImportHiddenApps.isVisible = hiddenVisible
                     checkboxImportHiddenApps.isChecked = hiddenVisible
 
+
                     val namesVisible = preview.customNamesCount > 0
                     checkboxImportCustomNames.text = getString(
                         R.string.import_option_custom_names,
                         preview.customNamesCount
                     )
-                    checkboxImportHiddenApps.isVisible = namesVisible
-                    checkboxImportHiddenApps.isChecked = namesVisible
+                    checkboxImportCustomNames.isVisible = namesVisible
+                    checkboxImportCustomNames.isChecked = namesVisible
+
 
                     val swipeCount = listOf(preview.hasSwipeLeft, preview.hasSwipeRight).count { it }
                     val swipeActionsVisible = swipeCount > 0
                     checkboxImportSwipeActions.text = buildSwipeActionsText(preview)
                     checkboxImportSwipeActions.isVisible = swipeActionsVisible
                     checkboxImportSwipeActions.isChecked = swipeActionsVisible
+
 
                     val themeVisible = preview.hasThemeSettings
                     checkboxImportThemeSettings.text = getString(R.string.import_option_theme)
