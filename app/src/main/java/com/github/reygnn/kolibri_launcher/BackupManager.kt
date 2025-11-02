@@ -71,37 +71,46 @@ class BackupManager @Inject constructor(
         }
     }
 
-// In BackupManager.kt
-
     override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
+            // 1. Parse JSON
             val backup = json.decodeFromString<BackupData>(jsonString)
 
+            // 2. Validiere Options
             if (options.importNothing) {
                 return ImportResult.Error("No import options selected")
             }
 
+            // 3. Validiere Version
             if (!isVersionSupported(backup.version)) {
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
+            // 4. Hole installierte Apps (einmalig)
             val installedComponents = appDataSourceManager.getInstalledComponents()
-            val installedPackages = installedComponents.map { it.split('/')[0] }.toSet()
+
+            // PERFORMANCE-OPTIMIERUNG: Convert zu HashSet für O(1) Lookups
+            val installedComponentsSet = installedComponents.toHashSet()
+            val installedPackagesSet = installedComponents
+                .mapTo(HashSet()) { it.split('/')[0] }
 
             var importedCount = 0
             var skippedCount = 0
             val missingApps = mutableSetOf<String>()
 
-            // PHASE 1: Import Favorites
+            // ===== PHASE 1: Import Favorites =====
             if (options.importFavorites) {
+                // OPTIMIERT: Nutze HashSet für schnelle Lookups
                 val validFavorites = backup.settings.favoriteComponents
-                    .filter { it in installedComponents }
-                    .toSet()
+                    .filterTo(HashSet()) { it in installedComponentsSet }
 
                 skippedCount += backup.settings.favoriteComponents.size - validFavorites.size
-                missingApps.addAll(backup.settings.favoriteComponents - installedComponents)
+                missingApps.addAll(backup.settings.favoriteComponents - installedComponentsSet)
 
-                val uniquePackages = validFavorites.map { it.split('/')[0] }.toSet()
+                // Prüfe Package-Limit (nicht Component-Limit!)
+                val uniquePackages = validFavorites
+                    .mapTo(HashSet()) { it.split('/')[0] }
+
                 if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
                     return ImportResult.LimitExceeded(
                         packageCount = uniquePackages.size,
@@ -112,24 +121,28 @@ class BackupManager @Inject constructor(
                 favoritesManager.saveFavoriteComponents(validFavorites.toList())
                 importedCount += validFavorites.size
 
-                Timber.i("Imported favorites: $importedCount")
+                Timber.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
             }
 
-            // PHASE 2: Import Order
+            // ===== PHASE 2: Import Order =====
             if (options.importOrder) {
                 val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
+
+                // OPTIMIERT: HashSet für Lookup
+                val currentFavoritesSet = currentFavorites.toHashSet()
+
                 val validOrder = backup.settings.favoritesOrder
-                    .filter { it in currentFavorites && it in installedComponents }
+                    .filter { it in currentFavoritesSet && it in installedComponentsSet }
 
                 favoritesOrderManager.saveOrder(validOrder)
                 Timber.i("Imported order: ${validOrder.size} items")
             }
 
-            // PHASE 3: Import Hidden Apps
+            // ===== PHASE 3: Import Hidden Apps =====
             if (options.importHiddenApps) {
+                // OPTIMIERT: filterTo mit HashSet
                 val validHidden = backup.settings.hiddenComponents
-                    .filter { it in installedComponents }
-                    .toSet()
+                    .filterTo(HashSet()) { it in installedComponentsSet }
 
                 val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
                 if (skippedHidden > 0) {
@@ -145,23 +158,26 @@ class BackupManager @Inject constructor(
                 Timber.i("Imported hidden apps: ${validHidden.size}")
             }
 
-            // PHASE 4: Import Custom App Names
+            // ===== PHASE 4: Import Custom App Names =====
             if (options.importCustomNames) {
-                // Filtere nur installierte Packages
+                // OPTIMIERT: filterKeys nutzt jetzt HashSet (O(1) statt O(n))
                 val validNames = backup.settings.customAppNames
-                    .filterKeys { it in installedPackages }
+                    .filterKeys { it in installedPackagesSet }
 
                 val skippedNames = backup.settings.customAppNames.size - validNames.size
 
                 if (validNames.isNotEmpty()) {
                     appNamesManager.setCustomNamesInBatch(validNames)
                     Timber.i("Imported custom names: ${validNames.size}, skipped: $skippedNames")
+                } else {
+                    Timber.i("No custom names to import")
                 }
             }
 
             Timber.i(
-                "Selective import completed: favorites=%b, order=%b, hidden=%b, names=%b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b",
                 options.importFavorites,
+                importedCount,
                 options.importOrder,
                 options.importHiddenApps,
                 options.importCustomNames
@@ -204,34 +220,121 @@ class BackupManager @Inject constructor(
 
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
         return try {
-            val uri = uriString.toUri()
+            // 1. Validiere URI-String
+            if (uriString.isBlank()) {
+                Timber.e("Empty URI string provided")
+                return ImportResult.Error("Invalid file location")
+            }
 
+            // 2. Parse URI mit expliziter Exception-Behandlung
+            val uri = try {
+                uriString.toUri()
+            } catch (e: IllegalArgumentException) {
+                Timber.e(e, "Invalid URI format: $uriString")
+                return ImportResult.Error("Invalid file location format")
+            }
+
+            // 3. Prüfe URI-Scheme
+            if (uri.scheme !in listOf("content", "file")) {
+                Timber.e("Unsupported URI scheme: ${uri.scheme}")
+                return ImportResult.Error("Unsupported file location type")
+            }
+
+            // 4. Lese File
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
-            } ?: return ImportResult.Error("Could not read file")
+            } ?: run {
+                Timber.e("Failed to open input stream for URI: $uri")
+                return ImportResult.Error("Cannot read from selected location")
+            }
 
-            Timber.i("Loading backup from file: $uri")
+            // 5. Validiere File-Größe
+            if (jsonString.length > 10 * 1024 * 1024) { // 10 MB
+                Timber.e("Backup file too large: ${jsonString.length / 1024 / 1024} MB")
+                return ImportResult.Error("Backup file is too large")
+            }
+
+            // 6. Validiere JSON-Format (basic check)
+            if (!jsonString.trim().startsWith("{")) {
+                Timber.e("File does not appear to be valid JSON")
+                return ImportResult.InvalidFormat
+            }
+
+            Timber.i("Loading backup from file: $uri (${jsonString.length / 1024} KB)")
+
+            // 7. Import durchführen
             importFromJson(jsonString, options)
 
         } catch (e: CancellationException) {
             throw e
+        } catch (e: SecurityException) {
+            Timber.e(e, "Permission denied for URI")
+            ImportResult.Error("No permission to read from this location")
+        } catch (e: java.io.IOException) {
+            Timber.e(e, "I/O error while loading backup")
+            ImportResult.Error("Failed to read file (file corrupted or unavailable?)")
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error loading backup from file")
-            ImportResult.Error(e.message ?: "Unknown error")
+            Timber.e(e, "Unexpected error loading backup")
+            ImportResult.Error("Failed to load backup: ${e.message ?: "Unknown error"}")
         }
     }
 
     override suspend fun previewBackup(uriString: String): BackupPreview? {
         return try {
-            val uri = uriString.toUri()
+            // 1. Validiere URI-String
+            if (uriString.isBlank()) {
+                Timber.e("Empty URI string provided for preview")
+                return null
+            }
 
+            // 2. Parse URI
+            val uri = try {
+                uriString.toUri()
+            } catch (e: IllegalArgumentException) {
+                Timber.e(e, "Invalid URI format for preview: $uriString")
+                return null
+            }
+
+            // 3. Prüfe URI-Scheme
+            if (uri.scheme !in listOf("content", "file")) {
+                Timber.e("Unsupported URI scheme for preview: ${uri.scheme}")
+                return null
+            }
+
+            // 4. Lese File
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().readText()
-            } ?: return null
+                // Limitiere Preview auf erste 1 MB (für Performance)
+                val maxPreviewSize = 1024 * 1024
+                val buffer = ByteArray(maxPreviewSize)
+                val bytesRead = input.read(buffer)
 
-            val backup = json.decodeFromString<BackupData>(jsonString)
+                if (bytesRead < 0) {
+                    Timber.e("Empty file for preview")
+                    return null
+                }
 
-            BackupPreview(
+                String(buffer, 0, bytesRead)
+            } ?: run {
+                Timber.e("Failed to open input stream for preview")
+                return null
+            }
+
+            // 5. Validiere JSON-Format (basic)
+            if (!jsonString.trim().startsWith("{")) {
+                Timber.e("File does not appear to be valid JSON")
+                return null
+            }
+
+            // 6. Parse Backup
+            val backup = try {
+                json.decodeFromString<BackupData>(jsonString)
+            } catch (e: SerializationException) {
+                Timber.e(e, "Failed to parse backup file for preview")
+                return null
+            }
+
+            // 7. Erstelle Preview
+            val preview = BackupPreview(
                 version = backup.version,
                 timestamp = backup.timestamp,
                 favoriteCount = backup.settings.favoriteComponents.size,
@@ -239,8 +342,15 @@ class BackupManager @Inject constructor(
                 hiddenCount = backup.settings.hiddenComponents.size,
                 customNamesCount = backup.settings.customAppNames.size
             )
+
+            Timber.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}")
+            preview
+
+        } catch (e: SecurityException) {
+            Timber.e(e, "Permission denied for preview")
+            null
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error previewing backup")
+            Timber.e(e, "Unexpected error while creating preview")
             null
         }
     }

@@ -21,6 +21,7 @@ import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.first
 
 /**
  * Fragment für Backup und Restore von App-Einstellungen.
@@ -104,85 +105,98 @@ class BackupFragment : Fragment() {
     }
 
     private fun showImportOptionsDialog(uriString: String) {
+        // Fragment-State-Check
         if (!isAdded || isStateSaved || isDetached) {
             Timber.w("Cannot show import dialog - invalid fragment state")
             return
         }
 
-        val dialogBinding = DialogImportOptionsBinding.inflate(layoutInflater)
+        // Zeige Loading während Preview geladen wird
+        showLoading()
 
-        // Preview-Daten beobachten und Dialog aktualisieren
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
-            viewModel.backupPreview.collect { preview ->
-                // Null-Check für Binding und Fragment-State
-                if (_binding == null || !isAdded) return@collect
+            try {
+                // 1. ERST Preview laden (blockierend warten)
+                val preview = viewModel.backupPreview.first { it != null }!!
 
-                preview?.let {
-                    // --- BEGINN ÄNDERUNG ---
-                    // Prüfe, ob ein gültiger Zeitstempel vorhanden ist (nicht 0L)
-                    val dateText: String
-                    if (it.timestamp > 0L) {
-                        dateText = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-                            .format(Date(it.timestamp))
-                    } else {
-                        dateText = getString(R.string.backup_preview_date_unknown)
-                    }
+                // 2. Fragment-State nochmal prüfen (könnte sich geändert haben)
+                if (!isAdded || _binding == null) {
+                    Timber.w("Fragment detached while loading preview")
+                    return@launch
+                }
 
-                    dialogBinding.textBackupInfo.text = getString(
+                hideLoading()
+
+                // 3. DANN Dialog erstellen mit bereits geladenen Daten
+                val dialogBinding = DialogImportOptionsBinding.inflate(layoutInflater)
+
+                // Preview-Daten sofort setzen (nicht asynchron!)
+                val dateText = if (preview.timestamp > 0L) {
+                    SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                        .format(Date(preview.timestamp))
+                } else {
+                    getString(R.string.backup_preview_date_unknown)
+                }
+
+                dialogBinding.apply {
+                    textBackupInfo.text = getString(
                         R.string.backup_preview_date,
                         dateText
                     )
 
-                    dialogBinding.checkboxImportFavorites.text = getString(
+                    checkboxImportFavorites.text = getString(
                         R.string.import_option_favorites,
-                        it.favoriteCount
+                        preview.favoriteCount
                     )
 
-                    dialogBinding.checkboxImportOrder.text = getString(
+                    checkboxImportOrder.text = getString(
                         R.string.import_option_order
                     )
 
-                    dialogBinding.checkboxImportHiddenApps.text = getString(
+                    checkboxImportHiddenApps.text = getString(
                         R.string.import_option_hidden_apps,
-                        it.hiddenCount
+                        preview.hiddenCount
                     )
 
-                    dialogBinding.checkboxImportCustomNames.text = getString(
+                    checkboxImportCustomNames.text = getString(
                         R.string.import_option_custom_names,
-                        it.customNamesCount
+                        preview.customNamesCount
                     )
                 }
+
+                // 4. Dialog anzeigen
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.import_options_title)
+                    .setView(dialogBinding.root)
+                    .setPositiveButton(R.string.import_button) { _, _ ->
+                        val options = ImportOptions(
+                            importFavorites = dialogBinding.checkboxImportFavorites.isChecked,
+                            importOrder = dialogBinding.checkboxImportOrder.isChecked,
+                            importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
+                            importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked
+                        )
+
+                        if (options.importNothing) {
+                            showError(getString(R.string.import_no_options_selected))
+                        } else {
+                            viewModel.importBackup(uriString, options)
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading backup preview")
+                hideLoading()
+                showError(getString(R.string.error_generic))
             }
         }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.import_options_title)
-            .setView(dialogBinding.root)
-            .setPositiveButton(R.string.import_button) { _, _ ->
-                val options = ImportOptions(
-                    importFavorites = dialogBinding.checkboxImportFavorites.isChecked,
-                    importOrder = dialogBinding.checkboxImportOrder.isChecked,
-                    importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
-                    importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked
-                )
-
-                if (options.importNothing) {
-                    showError(getString(R.string.import_no_options_selected))
-                } else {
-                    viewModel.importBackup(uriString, options)
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun observeBackupState() {
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.backupState.collect { state ->
-                    // Null-Check für Binding
-                    if (_binding == null || !isAdded) return@collect
-
                     handleBackupState(state)
                 }
             }
