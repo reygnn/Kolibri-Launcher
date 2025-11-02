@@ -207,8 +207,8 @@ class BackupViewModelTest {
                 val preview = awaitItem() // Endergebnis
                 assertThat(preview).isNotNull()
                 assertThat(preview?.favoriteCount).isEqualTo(5)
-                assertThat(preview?.hasSwipeLeft).isTrue()   // NEU
-                assertThat(preview?.hasSwipeRight).isFalse() // NEU
+                assertThat(preview?.hasSwipeLeft).isTrue()
+                assertThat(preview?.hasSwipeRight).isFalse()
             }
         }
 
