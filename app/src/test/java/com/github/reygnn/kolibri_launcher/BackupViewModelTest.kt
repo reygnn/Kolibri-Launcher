@@ -196,8 +196,9 @@ class BackupViewModelTest {
                 orderCount = 5,
                 hiddenCount = 2,
                 customNamesCount = 3,
-                hasSwipeLeft = true,   // NEU
-                hasSwipeRight = false  // NEU
+                hasSwipeLeft = true,
+                hasSwipeRight = false,
+                hasThemeSettings = true
             )
             fakeBackupRepository.previewResult = expectedPreview
 
@@ -268,7 +269,8 @@ class BackupViewModelTest {
             hiddenCount = 1,
             customNamesCount = 1,
             hasSwipeLeft = false,
-            hasSwipeRight = false
+            hasSwipeRight = false,
+            hasThemeSettings = true
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)

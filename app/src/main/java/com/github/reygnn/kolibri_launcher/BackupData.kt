@@ -16,9 +16,10 @@ data class LauncherSettings(
     val favoritesOrder: List<String> = emptyList(),
     val hiddenComponents: Set<String> = emptySet(),
     val customAppNames: Map<String, String> = emptyMap(),
-    // NEU: Swipe Actions
     val swipeLeftApp: String? = null,
-    val swipeRightApp: String? = null
+    val swipeRightApp: String? = null,
+    val textColor: Int? = null,
+    val textShadowEnabled: Boolean? = null
 )
 
 data class ImportOptions(
@@ -26,10 +27,16 @@ data class ImportOptions(
     val importOrder: Boolean = true,
     val importHiddenApps: Boolean = true,
     val importCustomNames: Boolean = true,
-    val importSwipeActions: Boolean = true  // NEU
+    val importSwipeActions: Boolean = true,
+    val importThemeSettings: Boolean = true
 ) {
     val importNothing: Boolean
-        get() = !importFavorites && !importOrder && !importHiddenApps && !importCustomNames && !importSwipeActions
+        get() = !importFavorites &&
+                !importOrder &&
+                !importHiddenApps &&
+                !importCustomNames &&
+                !importSwipeActions &&
+                !importThemeSettings
 }
 
 data class BackupPreview(
@@ -39,8 +46,9 @@ data class BackupPreview(
     val orderCount: Int,
     val hiddenCount: Int,
     val customNamesCount: Int,
-    val hasSwipeLeft: Boolean,   // NEU
-    val hasSwipeRight: Boolean   // NEU
+    val hasSwipeLeft: Boolean,
+    val hasSwipeRight: Boolean,
+    val hasThemeSettings: Boolean
 )
 
 sealed class ImportResult {

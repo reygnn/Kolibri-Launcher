@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
+import android.graphics.Color
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +35,8 @@ class BackupManagerTest {
     private lateinit var fakeNamesRepo: FakeAppNamesRepository
     private lateinit var fakeInstalledAppsRepo: SimpleFakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
+    private lateinit var fakeSettingsRepo: FakeSettingsRepository
+
     private lateinit var backupManager: BackupManager
 
     private val json = Json {
@@ -50,14 +53,16 @@ class BackupManagerTest {
         fakeVisibilityRepo = FakeAppVisibilityRepository()
         fakeNamesRepo = FakeAppNamesRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
+        fakeSettingsRepo = FakeSettingsRepository()
 
         backupManager = BackupManager(
             fakeFavoritesRepo,
             fakeFavoritesOrderRepo,
             fakeVisibilityRepo,
             fakeNamesRepo,
-            fakeInstalledAppsRepo,  // GEÄNDERT
+            fakeInstalledAppsRepo,
             fakeSwipeActionsRepo,
+            fakeSettingsRepo,
             mockContext
         )
     }
@@ -78,6 +83,8 @@ class BackupManagerTest {
         assertThat(backup.settings.customAppNames).isEmpty()
         assertThat(backup.settings.swipeLeftApp).isNull()
         assertThat(backup.settings.swipeRightApp).isNull()
+        assertThat(backup.settings.textColor).isEqualTo(0)
+        assertThat(backup.settings.textShadowEnabled).isTrue()
     }
 
     @Test
@@ -189,6 +196,8 @@ class BackupManagerTest {
         fakeNamesRepo.setCustomNamesInBatch(mapOf("com.app1" to "My App"))
         fakeSwipeActionsRepo.swipeLeftApp = "com.app3/com.app3.MainActivity"
         fakeSwipeActionsRepo.swipeRightApp = "com.app4/com.app4.MainActivity"
+        fakeSettingsRepo.color = Color.RED
+        fakeSettingsRepo.shadow = false
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -199,6 +208,8 @@ class BackupManagerTest {
         assertThat(backup.settings.customAppNames).hasSize(1)
         assertThat(backup.settings.swipeLeftApp).isNotNull()
         assertThat(backup.settings.swipeRightApp).isNotNull()
+        assertThat(backup.settings.textColor).isEqualTo(Color.RED)
+        assertThat(backup.settings.textShadowEnabled).isFalse()
     }
 
     @Test
@@ -229,7 +240,8 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false
+            importSwipeActions = false,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -243,6 +255,7 @@ class BackupManagerTest {
             createAppInfo("com.app1", "com.app1.MainActivity"),
             createAppInfo("com.app2", "com.app2.MainActivity")
         )
+        fakeSettingsRepo.color = Color.BLACK
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
@@ -250,7 +263,8 @@ class BackupManagerTest {
             hidden = setOf("com.app2/com.app2.MainActivity"),
             names = mapOf("com.app1" to "Name"),
             swipeLeft = "com.app1/com.app1.MainActivity",
-            swipeRight = "com.app2/com.app2.MainActivity"
+            swipeRight = "com.app2/com.app2.MainActivity",
+            textColor = Color.RED
         )
         val jsonString = json.encodeToString(backup)
 
@@ -259,7 +273,8 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false
+            importSwipeActions = false,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -271,6 +286,7 @@ class BackupManagerTest {
         assertThat(fakeNamesRepo.getAllCustomNames()).isEmpty()
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
     }
 
     @Test
@@ -291,7 +307,8 @@ class BackupManagerTest {
             importOrder = true,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = false
+            importSwipeActions = false,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -315,7 +332,8 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = true,
             importCustomNames = false,
-            importSwipeActions = false
+            importSwipeActions = false,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -339,7 +357,8 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = true,
-            importSwipeActions = false
+            importSwipeActions = false,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -368,7 +387,8 @@ class BackupManagerTest {
             importOrder = false,
             importHiddenApps = false,
             importCustomNames = false,
-            importSwipeActions = true
+            importSwipeActions = true,
+            importThemeSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -377,6 +397,38 @@ class BackupManagerTest {
         assertThat(fakeFavoritesRepo.favorites).isEmpty()
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
+    }
+
+    @Test
+    fun `importFromJson - only theme settings - imports only theme`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.shadow = true
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.GREEN,
+            textShadowEnabled = false
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = false,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = true
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        assertThat(fakeSettingsRepo.shadow).isFalse()
+
+        assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
 
     @Test
@@ -449,6 +501,8 @@ class BackupManagerTest {
             createAppInfo("com.app1", "com.app1.MainActivity"),
             createAppInfo("com.app2", "com.app2.MainActivity")
         )
+        fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.shadow = true
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
@@ -456,7 +510,9 @@ class BackupManagerTest {
             hidden = setOf("com.app2/com.app2.MainActivity"),
             names = mapOf("com.app1" to "Name"),
             swipeLeft = "com.app1/com.app1.MainActivity",
-            swipeRight = "com.app2/com.app2.MainActivity"
+            swipeRight = "com.app2/com.app2.MainActivity",
+            textColor = Color.BLUE,
+            textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
 
@@ -465,7 +521,8 @@ class BackupManagerTest {
             importOrder = true,
             importHiddenApps = true,
             importCustomNames = true,
-            importSwipeActions = true
+            importSwipeActions = true,
+            importThemeSettings = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -477,6 +534,8 @@ class BackupManagerTest {
         assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
+        assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
     // ========== VALIDATION TESTS ==========
@@ -646,6 +705,7 @@ class BackupManagerTest {
         val jsonString = json.encodeToString(backup)
 
         val options = ImportOptions(importCustomNames = true)
+
         val result = backupManager.importFromJson(jsonString, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
@@ -696,7 +756,9 @@ class BackupManagerTest {
             hidden = hidden,
             names = names,
             swipeLeft = "com.app1/com.app1.MainActivity",
-            swipeRight = "com.app2/com.app2.MainActivity"
+            swipeRight = "com.app2/com.app2.MainActivity",
+            textColor = Color.YELLOW,
+            textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
 
@@ -713,6 +775,38 @@ class BackupManagerTest {
         assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)  // 60 names
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
+        assertThat(fakeSettingsRepo.shadow).isFalse()
+    }
+
+    @Test
+    fun `importFromJson - old backup without theme keys - does not change theme`() = runTest {
+        // Setze initiale Werte, die *nicht* geändert werden dürfen
+        fakeSettingsRepo.color = Color.CYAN
+        fakeSettingsRepo.shadow = false
+
+        // Ein JSON-String, der die Keys 'textColor' und 'textShadowEnabled' *nicht* enthält
+        // (kotlinx.serialization lässt 'null'-Werte beim Encoding weg)
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = null,
+            textShadowEnabled = null
+        )
+        val oldBackupJson = json.encodeToString(backup)
+
+        // Sicherstellen, dass die Keys wirklich fehlen
+        assertThat(oldBackupJson).doesNotContain("textColor")
+        assertThat(oldBackupJson).doesNotContain("textShadowEnabled")
+
+        val options = ImportOptions(importThemeSettings = true)
+
+        val result = backupManager.importFromJson(oldBackupJson, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Prüfen: Theme-Werte sind unverändert, da im Backup null (nicht vorhanden)
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
+        assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
     // ========== HELPER METHODS ==========
@@ -734,7 +828,9 @@ class BackupManagerTest {
         hidden: Set<String> = emptySet(),
         names: Map<String, String> = emptyMap(),
         swipeLeft: String? = null,
-        swipeRight: String? = null
+        swipeRight: String? = null,
+        textColor: Int? = null,
+        textShadowEnabled: Boolean? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -746,7 +842,9 @@ class BackupManagerTest {
                 hiddenComponents = hidden,
                 customAppNames = names,
                 swipeLeftApp = swipeLeft,
-                swipeRightApp = swipeRight
+                swipeRightApp = swipeRight,
+                textColor = textColor,
+                textShadowEnabled = textShadowEnabled
             )
         )
     }
@@ -864,7 +962,48 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
         when (slot) {
             SwipeSlot.LEFT -> swipeLeftApp = componentName
             SwipeSlot.RIGHT -> swipeRightApp = componentName
-            SwipeSlot.NONE -> {} // Ignorieren
+            SwipeSlot.NONE -> {}
         }
     }
+}
+
+// NEU: Fake für SettingsRepository
+class FakeSettingsRepository : SettingsRepository {
+
+    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
+    private val shadowFlow = MutableStateFlow(true) // Default: true
+
+    var color: Int
+        get() = colorFlow.value
+        set(value) { colorFlow.value = value }
+
+    var shadow: Boolean
+        get() = shadowFlow.value
+        set(value) { shadowFlow.value = value }
+
+
+    override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
+    override val textColorFlow: Flow<Int> = colorFlow
+
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
+        shadow = isEnabled
+    }
+
+    override suspend fun setTextColor(color: Int) {
+        this.color = color
+    }
+
+    override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
+    override suspend fun setSortOrder(sortOrder: SortOrder) {}
+
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = flowOf(true)
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {}
+
+    override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
+    override suspend fun setReadabilityMode(mode: String) {}
+
+    override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
+    override suspend fun setOnboardingCompleted() {}
+
+    override fun purgeRepository() {}
 }

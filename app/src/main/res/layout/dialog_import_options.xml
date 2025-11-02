@@ -26,34 +26,47 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_option_favorites"
-        android:checked="true" />
+        android:checked="true"
+        android:visibility="gone" />
 
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/checkboxImportOrder"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_option_order"
-        android:checked="true" />
+        android:checked="true"
+        android:visibility="gone" />
 
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/checkboxImportHiddenApps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_option_hidden_apps"
-        android:checked="true" />
+        android:checked="true"
+        android:visibility="gone" />
 
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/checkboxImportCustomNames"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_option_custom_names"
-        android:checked="true" />
+        android:checked="true"
+        android:visibility="gone" />
 
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/checkboxImportSwipeActions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_option_swipe_actions"
-        android:checked="true" />
+        android:checked="true"
+        android:visibility="gone" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportThemeSettings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_theme"
+        android:checked="true"
+        android:visibility="gone" />
 
 </LinearLayout>

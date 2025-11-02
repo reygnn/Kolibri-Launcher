@@ -242,5 +242,6 @@
 <string name="import_button">Importieren</string>
 <string name="import_no_options_selected">Bitte wähle mindestens eine Import-Option</string>
 <string name="import_option_swipe_actions">Swipe-Gesten (%d)</string>
+<string name="import_option_theme">Theme &amp; Farben</string>
 
 </resources>

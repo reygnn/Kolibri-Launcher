@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -144,27 +145,47 @@ class BackupFragment : Fragment() {
                         dateText
                     )
 
+                    val favoritesVisible = preview.favoriteCount > 0
                     checkboxImportFavorites.text = getString(
                         R.string.import_option_favorites,
                         preview.favoriteCount
                     )
+                    checkboxImportFavorites.isVisible = favoritesVisible
+                    checkboxImportFavorites.isChecked = favoritesVisible
 
+                    val orderVisible = preview.orderCount > 0
                     checkboxImportOrder.text = getString(
                         R.string.import_option_order
                     )
+                    checkboxImportOrder.isVisible = orderVisible
+                    checkboxImportOrder.isChecked = orderVisible
 
+                    val hiddenVisible = preview.hiddenCount > 0
                     checkboxImportHiddenApps.text = getString(
                         R.string.import_option_hidden_apps,
                         preview.hiddenCount
                     )
+                    checkboxImportHiddenApps.isVisible = hiddenVisible
+                    checkboxImportHiddenApps.isChecked = hiddenVisible
 
+                    val namesVisible = preview.customNamesCount > 0
                     checkboxImportCustomNames.text = getString(
                         R.string.import_option_custom_names,
                         preview.customNamesCount
                     )
+                    checkboxImportHiddenApps.isVisible = namesVisible
+                    checkboxImportHiddenApps.isChecked = namesVisible
 
-                    // NEU: Swipe Actions Checkbox
+                    val swipeCount = listOf(preview.hasSwipeLeft, preview.hasSwipeRight).count { it }
+                    val swipeActionsVisible = swipeCount > 0
                     checkboxImportSwipeActions.text = buildSwipeActionsText(preview)
+                    checkboxImportSwipeActions.isVisible = swipeActionsVisible
+                    checkboxImportSwipeActions.isChecked = swipeActionsVisible
+
+                    val themeVisible = preview.hasThemeSettings
+                    checkboxImportThemeSettings.text = getString(R.string.import_option_theme)
+                    checkboxImportThemeSettings.isVisible = themeVisible
+                    checkboxImportThemeSettings.isChecked = themeVisible
                 }
 
                 // 4. Dialog anzeigen
@@ -177,7 +198,8 @@ class BackupFragment : Fragment() {
                             importOrder = dialogBinding.checkboxImportOrder.isChecked,
                             importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
                             importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked,
-                            importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked  // NEU
+                            importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked,
+                            importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked
                         )
 
                         if (options.importNothing) {

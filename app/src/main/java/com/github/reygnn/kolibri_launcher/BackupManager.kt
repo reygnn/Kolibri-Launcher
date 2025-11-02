@@ -36,6 +36,7 @@ class BackupManager @Inject constructor(
     private val appNamesManager: AppNamesRepository,
     private val installedAppsManager: InstalledAppsRepository,
     private val swipeActionsManager: SwipeActionsRepository,
+    private val settingsManager: SettingsRepository,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -55,6 +56,8 @@ class BackupManager @Inject constructor(
             // Swipe Actions exportieren
             val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
+            val textColor = settingsManager.textColorFlow.first()
+            val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
@@ -62,7 +65,9 @@ class BackupManager @Inject constructor(
                 hiddenComponents = hiddenComponents,
                 customAppNames = customAppNames,
                 swipeLeftApp = swipeLeftApp,
-                swipeRightApp = swipeRightApp
+                swipeRightApp = swipeRightApp,
+                textColor = textColor,
+                textShadowEnabled = textShadowEnabled
             )
 
             val backup = BackupData(
@@ -220,6 +225,27 @@ class BackupManager @Inject constructor(
 
                 if (swipeImportedCount > 0 || swipeSkippedCount > 0) {
                     Timber.i("Imported swipe actions: $swipeImportedCount, skipped: $swipeSkippedCount")
+                }
+            }
+
+            // ===== PHASE 6: Import Theme Settings =====
+            if (options.importThemeSettings) {
+                var themeImported = false
+
+                // Importiere Textfarbe (nur wenn im Backup vorhanden)
+                backup.settings.textColor?.let {
+                    settingsManager.setTextColor(it)
+                    themeImported = true
+                }
+
+                // Importiere Textschatten (nur wenn im Backup vorhanden)
+                backup.settings.textShadowEnabled?.let {
+                    settingsManager.setTextShadowEnabled(it)
+                    themeImported = true
+                }
+
+                if (themeImported) {
+                    Timber.i("Imported theme settings.")
                 }
             }
 
@@ -434,7 +460,8 @@ class BackupManager @Inject constructor(
                 hiddenCount = backup.settings.hiddenComponents.size,
                 customNamesCount = backup.settings.customAppNames.size,
                 hasSwipeLeft = backup.settings.swipeLeftApp != null,
-                hasSwipeRight = backup.settings.swipeRightApp != null
+                hasSwipeRight = backup.settings.swipeRightApp != null,
+                hasThemeSettings = backup.settings.textColor != null || backup.settings.textShadowEnabled != null
             )
 
             Timber.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}")
