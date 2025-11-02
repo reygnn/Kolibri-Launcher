@@ -267,8 +267,8 @@ class BackupViewModelTest {
             orderCount = 1,
             hiddenCount = 1,
             customNamesCount = 1,
-            hasSwipeLeft = false,  // NEU
-            hasSwipeRight = false  // NEU
+            hasSwipeLeft = false,
+            hasSwipeRight = false
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)
@@ -356,7 +356,6 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    // Nimmt jetzt String
     override suspend fun saveBackupToFile(uriString: String): Boolean {
         if (shouldThrowOnExport) {
             throw Exception("Simulated export exception")
@@ -364,7 +363,6 @@ class FakeBackupRepository : BackupRepository {
         return exportSuccess
     }
 
-    // Nimmt jetzt String
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
         lastOptions = options
         if (shouldThrowOnImport) {
@@ -373,7 +371,6 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    // Nimmt jetzt String
     override suspend fun previewBackup(uriString: String): BackupPreview? {
         if (shouldThrowOnPreview) {
             throw Exception("Simulated preview exception")
