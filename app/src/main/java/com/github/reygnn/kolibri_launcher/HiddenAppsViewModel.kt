@@ -9,6 +9,9 @@
 
 package com.github.reygnn.kolibri_launcher
 
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.ui.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,7 +25,7 @@ import javax.inject.Inject
 @HiltViewModel
 class HiddenAppsViewModel @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
-    private val visibilityRepository: AppVisibilityRepository,
+    private val visibilityRepository: HiddenAppsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 

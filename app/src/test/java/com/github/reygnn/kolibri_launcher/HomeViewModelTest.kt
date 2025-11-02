@@ -8,6 +8,15 @@ import androidx.lifecycle.asLiveData
 import app.cash.turbine.test
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.asFlow
+import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
+import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.ui.HomeViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +25,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
@@ -29,7 +37,6 @@ import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -63,7 +70,7 @@ class HomeViewModelTest {
     @Mock
     private lateinit var screenLockManager: ScreenLockRepository
     @Mock
-    private lateinit var appVisibilityManager: AppVisibilityRepository
+    private lateinit var appVisibilityManager: HiddenAppsRepository
     @Mock
     private lateinit var swipeActionsRepository: SwipeActionsRepository
 

@@ -11,6 +11,10 @@ package com.github.reygnn.kolibri_launcher
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
+import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -67,7 +71,7 @@ import javax.inject.Singleton
 class GetDrawerAppsUseCase @Inject constructor(
     private val appUsageManager: AppUsageRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val appVisibilityManager: AppVisibilityRepository,
+    private val appVisibilityManager: HiddenAppsRepository,
     private val settingsManager: SettingsRepository,
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) : GetDrawerAppsUseCaseRepository {

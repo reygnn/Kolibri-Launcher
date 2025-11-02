@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
@@ -35,7 +36,7 @@ class AppNamesManagerTest {
 
     @Mock
     private lateinit var mockDataStore: DataStore<Preferences>
-    private lateinit var appNamesManager: AppNamesManager
+    private lateinit var appNamesManager: CustomNamesManager
     @Mock
     private lateinit var mockAppsUpdateTrigger: MutableSharedFlow<Unit>
     @Mock
@@ -43,7 +44,7 @@ class AppNamesManagerTest {
 
     @Before
     fun setup() {
-        appNamesManager = AppNamesManager(mockDataStore, mockAppsUpdateTrigger, mockContext)
+        appNamesManager = CustomNamesManager(mockDataStore, mockAppsUpdateTrigger, mockContext)
     }
 
     // ========== EXISTING TESTS ==========

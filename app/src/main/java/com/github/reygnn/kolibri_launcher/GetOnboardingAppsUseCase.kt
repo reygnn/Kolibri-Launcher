@@ -9,6 +9,7 @@
 
 package com.github.reygnn.kolibri_launcher
 
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map

@@ -1,8 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import java.io.IOException
 
-class FakeAppNamesRepository : AppNamesRepository {
+class FakeAppNamesRepository : CustomNamesRepository {
     private val customNames = mutableMapOf<String, String>()
 
     // Für AppNamesViewModelTest

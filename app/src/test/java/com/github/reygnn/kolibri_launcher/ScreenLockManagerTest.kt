@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.data.ScreenLockManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before

@@ -1,6 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.ui.CustomNamesViewModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,14 +31,14 @@ class AppNamesViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeAppNamesRepository: FakeAppNamesRepository
     private lateinit var fakeInstalledAppsRepository: DependencyFakeInstalledAppsRepository
-    private lateinit var viewModel: AppNamesViewModel
+    private lateinit var viewModel: CustomNamesViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeAppNamesRepository = FakeAppNamesRepository()
         fakeInstalledAppsRepository = DependencyFakeInstalledAppsRepository(fakeAppNamesRepository)
-        viewModel = AppNamesViewModel(
+        viewModel = CustomNamesViewModel(
             fakeAppNamesRepository,
             fakeInstalledAppsRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
@@ -109,10 +112,11 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(
+        val vm = CustomNamesViewModel(
             fakeAppNamesRepository,
             crashingRepository,
-            mainDispatcher = mainDispatcherRule.testDispatcher)
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
 
         vm.uiState.test {
             val state = awaitItem()
@@ -132,10 +136,11 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(
+        val vm = CustomNamesViewModel(
             fakeAppNamesRepository,
             crashingRepository,
-            mainDispatcher = mainDispatcherRule.testDispatcher)
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
 
         vm.uiState.test {
             val state = awaitItem()
@@ -238,10 +243,11 @@ class AppNamesViewModelTest {
             override fun purgeRepository() {}
         }
 
-        val vm = AppNamesViewModel(
+        val vm = CustomNamesViewModel(
             fakeAppNamesRepository,
             emptyRepository,
-            mainDispatcher = mainDispatcherRule.testDispatcher)
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
 
         vm.uiState.test {
             val state = awaitItem()
@@ -377,7 +383,7 @@ class AppNamesViewModelTest {
 // ========== FAKE REPOSITORIES ==========
 
 class DependencyFakeInstalledAppsRepository(
-    private val appNamesRepository: AppNamesRepository
+    private val appNamesRepository: CustomNamesRepository
 ) : InstalledAppsRepository {
 
     private val rawApps = listOf(

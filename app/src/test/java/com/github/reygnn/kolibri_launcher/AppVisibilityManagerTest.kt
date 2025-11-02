@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -36,13 +37,13 @@ class AppVisibilityManagerTest {
     @Mock
     private lateinit var mockContext: Context
 
-    private lateinit var appVisibilityManager: AppVisibilityManager
+    private lateinit var appVisibilityManager: HiddenAppsManager
 
     private val hiddenComponentsKey = stringSetPreferencesKey("hidden_components_set")
 
     @Before
     fun setup() {
-        appVisibilityManager = AppVisibilityManager(mockDataStore, mockContext)
+        appVisibilityManager = HiddenAppsManager(mockDataStore, mockContext)
     }
 
     // ========== EXISTING TESTS ==========

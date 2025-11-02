@@ -9,6 +9,10 @@
 
 package com.github.reygnn.kolibri_launcher
 
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -23,7 +27,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val favoritesManager: FavoritesRepository,
     private val favoritesOrderManager: FavoritesOrderRepository,
-    private val appVisibilityManager: AppVisibilityRepository
+    private val appVisibilityManager: HiddenAppsRepository
 ) : GetFavoriteAppsUseCaseRepository {
 
     override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = flow {

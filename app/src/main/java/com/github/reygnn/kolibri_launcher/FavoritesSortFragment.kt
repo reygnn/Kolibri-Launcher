@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

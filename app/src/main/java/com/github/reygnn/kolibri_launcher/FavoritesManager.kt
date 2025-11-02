@@ -16,6 +16,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -104,8 +105,8 @@ import javax.inject.Singleton
  * @property externalScope Application scope for hot Flow sharing (null in tests)
  * @property favoriteComponentsFlow Hot shared Flow of currently favorited component identifiers
  *
- * @see AppVisibilityManager for similar Flow-based state management pattern
- * @see AppNamesManager for contrast with event-based architecture
+ * @see com.github.reygnn.kolibri_launcher.data.HiddenAppsManager for similar Flow-based state management pattern
+ * @see com.github.reygnn.kolibri_launcher.data.CustomNamesManager for contrast with event-based architecture
  */
 @Singleton
 class FavoritesManager : FavoritesRepository {

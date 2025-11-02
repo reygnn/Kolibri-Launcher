@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
@@ -30,7 +32,7 @@ class InstalledAppsManagerTest {
     @Mock
     private lateinit var mockPackageManager: PackageManager
     @Mock
-    private lateinit var mockAppNamesManager: AppNamesRepository
+    private lateinit var mockAppNamesManager: CustomNamesRepository
     @Mock
     private lateinit var mockAppsUpdateTrigger: MutableSharedFlow<Unit>
 
@@ -73,7 +75,12 @@ class InstalledAppsManagerTest {
 
     @Before
     fun setup() {
-        installedAppsManager = InstalledAppsManager(mockContext, mockPackageManager, mockAppNamesManager, mockAppsUpdateTrigger)
+        installedAppsManager = InstalledAppsManager(
+            mockContext,
+            mockPackageManager,
+            mockAppNamesManager,
+            mockAppsUpdateTrigger
+        )
     }
 
     // ========== EXISTING TESTS ==========

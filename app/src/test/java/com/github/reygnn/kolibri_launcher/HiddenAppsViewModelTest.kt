@@ -1,6 +1,8 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -32,7 +34,7 @@ class HiddenAppsViewModelTest {
     @Mock
     private lateinit var installedAppsRepository: InstalledAppsRepository
     @Mock
-    private lateinit var visibilityRepository: AppVisibilityRepository
+    private lateinit var visibilityRepository: HiddenAppsRepository
 
     private lateinit var viewModel: HiddenAppsViewModel
 

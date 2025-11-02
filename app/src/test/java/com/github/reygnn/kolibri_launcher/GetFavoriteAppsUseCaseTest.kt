@@ -1,7 +1,9 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
-import kotlinx.coroutines.CancellationException
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -16,7 +18,6 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -27,7 +28,7 @@ class GetFavoriteAppsUseCaseTest {
     @Mock private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
     @Mock private lateinit var favoritesManager: FavoritesRepository
     @Mock private lateinit var favoritesOrderManager: FavoritesOrderManager
-    @Mock private lateinit var appVisibilityManager: AppVisibilityRepository
+    @Mock private lateinit var appVisibilityManager: HiddenAppsRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var favoritesFlow: MutableStateFlow<Set<String>>

@@ -16,6 +16,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -129,7 +130,7 @@ import javax.inject.Singleton
  * @property favoriteComponentsOrderFlow Hot shared Flow of ordered component identifiers
  *
  * @see FavoritesManager for favorite membership management (what is favorited)
- * @see AppVisibilityManager for similar Flow-based state management pattern
+ * @see com.github.reygnn.kolibri_launcher.data.HiddenAppsManager for similar Flow-based state management pattern
  */
 @Singleton
 open class FavoritesOrderManager private constructor(

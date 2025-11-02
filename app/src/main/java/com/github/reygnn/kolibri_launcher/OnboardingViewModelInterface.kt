@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
+import com.github.reygnn.kolibri_launcher.ui.LaunchMode
 import kotlinx.coroutines.flow.StateFlow
 
 interface OnboardingViewModelInterface {

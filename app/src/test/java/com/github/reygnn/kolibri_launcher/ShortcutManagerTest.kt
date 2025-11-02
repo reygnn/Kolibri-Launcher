@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
+import com.github.reygnn.kolibri_launcher.data.ShortcutManager
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule

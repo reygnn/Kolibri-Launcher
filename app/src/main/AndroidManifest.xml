@@ -38,7 +38,7 @@
 
         <!-- MainActivity mit Splash Screen Support und DayNight -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:theme="@style/SplashTheme"
             android:launchMode="singleTask"
@@ -62,36 +62,36 @@
         </activity>
 
         <activity
-            android:name=".OnboardingActivity"
+            android:name=".ui.OnboardingActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
 
         <activity
-            android:name=".HiddenAppsActivity"
+            android:name=".ui.HiddenAppsActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
 
         <activity
-            android:name=".AppNamesActivity"
+            android:name=".ui.CustomNamesActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
 
         <activity
-            android:name=".SwipeActionsActivity"
+            android:name=".ui.SwipeActionsActivity"
             android:exported="false" />
 
         <!-- SettingsActivity mit DayNight Theme Support -->
         <activity
-            android:name=".SettingsActivity"
+            android:name=".ui.SettingsActivity"
             android:exported="false"
-            android:parentActivityName=".MainActivity"
+            android:parentActivityName=".ui.MainActivity"
             android:theme="@style/SettingsTheme"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
 
             <!-- Navigation Support -->
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
-                android:value=".MainActivity" />
+                android:value=".ui.MainActivity" />
 
         </activity>
 
