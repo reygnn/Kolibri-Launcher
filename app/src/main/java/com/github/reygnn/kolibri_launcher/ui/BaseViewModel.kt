@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.ui
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.reygnn.kolibri_launcher.ui.BaseViewModelInterface
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.UiEvent
 import kotlinx.coroutines.CancellationException

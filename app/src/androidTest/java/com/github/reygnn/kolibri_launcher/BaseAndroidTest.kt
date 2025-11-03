@@ -4,14 +4,25 @@ import android.os.Bundle
 import androidx.annotation.StyleRes
 import androidx.fragment.app.Fragment
 import androidx.test.core.app.ActivityScenario
+import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.Purgeable
+import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import javax.inject.Inject
-import com.github.reygnn.kolibri_launcher.data.*
-import com.github.reygnn.kolibri_launcher.domain.*
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltAndroidTest

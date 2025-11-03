@@ -3,8 +3,8 @@ package com.github.reygnn.kolibri_launcher
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi

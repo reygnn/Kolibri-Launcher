@@ -2,6 +2,9 @@ package com.github.reygnn.kolibri_launcher
 
 import com.github.reygnn.kolibri_launcher.di.ApplicationScope
 import com.github.reygnn.kolibri_launcher.di.DefaultDispatcher
+import com.github.reygnn.kolibri_launcher.di.DispatcherModule
+import com.github.reygnn.kolibri_launcher.di.IoDispatcher
+import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
@@ -12,9 +15,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.TestDispatcher
 import javax.inject.Singleton
-import com.github.reygnn.kolibri_launcher.di.DispatcherModule
-import com.github.reygnn.kolibri_launcher.di.IoDispatcher
-import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 
 /**
  * @file TestDispatcherModule.kt

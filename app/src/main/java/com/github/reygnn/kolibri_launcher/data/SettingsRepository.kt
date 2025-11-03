@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.data.Purgeable
 import com.github.reygnn.kolibri_launcher.SortOrder
 import kotlinx.coroutines.flow.Flow
 

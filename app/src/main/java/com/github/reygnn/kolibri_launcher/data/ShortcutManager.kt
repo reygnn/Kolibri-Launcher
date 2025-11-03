@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.os.Process
-import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber

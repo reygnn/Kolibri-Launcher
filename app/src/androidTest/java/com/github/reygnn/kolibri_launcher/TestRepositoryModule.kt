@@ -2,6 +2,24 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.pm.ShortcutInfo
 import androidx.lifecycle.MutableLiveData
+import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.BackupRepository
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.Purgeable
+import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
+import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
+import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.di.RepositoryModule
+import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
@@ -12,11 +30,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Singleton
-import com.github.reygnn.kolibri_launcher.di.RepositoryModule
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.data.*
-import com.github.reygnn.kolibri_launcher.domain.*
-import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 
 // =================================================================================
 // --- TEST DATA SOURCE: Die zentrale Wahrheit für unsere Tests ---

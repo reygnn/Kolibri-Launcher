@@ -26,11 +26,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.acra.ACRA
 import org.acra.ReportField
-import org.acra.data.StringFormat
 import org.acra.config.httpSender
-import org.acra.sender.HttpSender
+import org.acra.data.StringFormat
 import org.acra.ktx.initAcra
 import org.acra.security.TLS
+import org.acra.sender.HttpSender
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.system.exitProcess

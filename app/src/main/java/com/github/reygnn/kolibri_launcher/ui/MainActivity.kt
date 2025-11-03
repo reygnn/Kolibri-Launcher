@@ -31,12 +31,10 @@ import com.github.reygnn.kolibri_launcher.AppInfo
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.DataStoreBackup
-import com.github.reygnn.kolibri_launcher.ui.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.ui.SettingsActivity
-import com.github.reygnn.kolibri_launcher.data.SettingsRepository
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

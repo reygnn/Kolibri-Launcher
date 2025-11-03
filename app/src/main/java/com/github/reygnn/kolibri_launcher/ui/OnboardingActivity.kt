@@ -15,7 +15,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.ui.OnboardingAppListAdapter
 import com.github.reygnn.kolibri_launcher.OnboardingEvent
 import com.github.reygnn.kolibri_launcher.OnboardingUiState
 import com.github.reygnn.kolibri_launcher.R

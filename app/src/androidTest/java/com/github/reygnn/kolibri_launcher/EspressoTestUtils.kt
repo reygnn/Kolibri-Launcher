@@ -14,8 +14,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matcher
-import org.hamcrest.Matchers.`is`
 import org.hamcrest.Matchers.any
+import org.hamcrest.Matchers.`is`
 
 object EspressoTestUtils {
 

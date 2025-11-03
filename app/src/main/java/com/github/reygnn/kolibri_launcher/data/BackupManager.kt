@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.BackupData
 import com.github.reygnn.kolibri_launcher.BackupException
 import com.github.reygnn.kolibri_launcher.BackupPreview
@@ -10,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.ImportOptions
 import com.github.reygnn.kolibri_launcher.ImportResult
 import com.github.reygnn.kolibri_launcher.LauncherSettings
 import com.github.reygnn.kolibri_launcher.SwipeSlot
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first

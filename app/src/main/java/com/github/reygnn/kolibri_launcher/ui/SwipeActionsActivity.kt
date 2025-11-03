@@ -12,12 +12,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.ui.SwipeActionsAppListAdapter
 import com.github.reygnn.kolibri_launcher.SwipeActionsUiState
-import com.github.reygnn.kolibri_launcher.ui.SwipeActionsViewModel
 import com.github.reygnn.kolibri_launcher.SwipeSlot
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivitySwipeActionsBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

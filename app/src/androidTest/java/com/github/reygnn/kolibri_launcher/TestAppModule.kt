@@ -2,13 +2,13 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
 import android.content.pm.PackageManager
+import com.github.reygnn.kolibri_launcher.di.AppModule
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import javax.inject.Singleton
-import com.github.reygnn.kolibri_launcher.di.AppModule
 
 /**
  * Test-Modul für System-Level Dependencies.
