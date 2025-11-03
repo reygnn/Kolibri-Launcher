@@ -17,9 +17,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.AppNamesAdapter
+import com.github.reygnn.kolibri_launcher.ui.AppNamesAdapter
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
 import com.github.reygnn.kolibri_launcher.databinding.ActivityAppNamesBinding
 import com.google.android.material.chip.Chip

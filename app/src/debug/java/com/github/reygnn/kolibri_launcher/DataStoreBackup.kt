@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

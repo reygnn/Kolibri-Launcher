@@ -6,10 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import com.github.reygnn.kolibri_launcher.AppConstants
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.catch
@@ -45,9 +45,9 @@ import kotlin.math.exp
  * both frequency (number of launches) and recency (how recent the launches were).
  *
  * **Data Management:**
- * - Stores up to [com.github.reygnn.kolibri_launcher.AppConstants.MAX_TIMESTAMPS_PER_APP] timestamps per app
+ * - Stores up to [AppConstants.MAX_TIMESTAMPS_PER_APP] timestamps per app
  * - Automatically validates and cleans invalid/old timestamps
- * - Filters out timestamps older than [com.github.reygnn.kolibri_launcher.AppConstants.MAX_TIMESTAMP_AGE_MS]
+ * - Filters out timestamps older than [AppConstants.MAX_TIMESTAMP_AGE_MS]
  * - Uses DataStore for persistent, async storage
  *
  * **Sorting Behavior:**

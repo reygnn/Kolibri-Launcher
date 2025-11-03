@@ -11,7 +11,7 @@ import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.AppContextMenuAction
-import com.github.reygnn.kolibri_launcher.AppContextMenuAdapter
+import com.github.reygnn.kolibri_launcher.ui.AppContextMenuAdapter
 import com.github.reygnn.kolibri_launcher.AppInfo
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
@@ -19,10 +19,10 @@ import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.MenuContext
+import com.github.reygnn.kolibri_launcher.data.MenuContext
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.BottomSheetAppContextMenuBinding
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint

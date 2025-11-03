@@ -12,7 +12,7 @@ import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ErrorData
 import com.github.reygnn.kolibri_launcher.ErrorEventBus
 import com.github.reygnn.kolibri_launcher.Event
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler

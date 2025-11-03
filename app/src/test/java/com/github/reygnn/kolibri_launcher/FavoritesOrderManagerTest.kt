@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted

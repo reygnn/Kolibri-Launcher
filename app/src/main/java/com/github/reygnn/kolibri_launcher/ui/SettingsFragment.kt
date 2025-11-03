@@ -23,10 +23,9 @@ import androidx.preference.SwitchPreferenceCompat
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
-import com.github.reygnn.kolibri_launcher.FavoritesSortFragment
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository

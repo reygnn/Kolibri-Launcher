@@ -23,13 +23,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.AppContextMenuAction
-import com.github.reygnn.kolibri_launcher.AppDrawerAdapter
+import com.github.reygnn.kolibri_launcher.ui.AppDrawerAdapter
 import com.github.reygnn.kolibri_launcher.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.MenuContext
+import com.github.reygnn.kolibri_launcher.data.MenuContext
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.SortOrder
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiState
 import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import dagger.hilt.android.AndroidEntryPoint

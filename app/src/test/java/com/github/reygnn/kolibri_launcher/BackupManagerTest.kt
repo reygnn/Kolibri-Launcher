@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
 import android.graphics.Color
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.BackupManager
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository

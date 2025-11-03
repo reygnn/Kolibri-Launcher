@@ -13,10 +13,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.HiddenAppsViewModel
-import com.github.reygnn.kolibri_launcher.OnboardingAppListAdapter
+import com.github.reygnn.kolibri_launcher.ui.HiddenAppsViewModel
+import com.github.reygnn.kolibri_launcher.ui.OnboardingAppListAdapter
 import com.github.reygnn.kolibri_launcher.OnboardingUiState
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
 import com.github.reygnn.kolibri_launcher.databinding.ActivityOnboardingBinding
 import com.google.android.material.chip.Chip

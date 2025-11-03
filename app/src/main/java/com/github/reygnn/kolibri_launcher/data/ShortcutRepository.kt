@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.pm.ShortcutInfo
-import com.github.reygnn.kolibri_launcher.Purgeable
+import com.github.reygnn.kolibri_launcher.data.Purgeable
 
 /**
  * Ein Interface, das die Logik zum Abrufen von App-Verknüpfungen (Shortcuts) abstrahiert.

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.di
 
-import com.github.reygnn.kolibri_launcher.OnboardingViewModelInterface
+import com.github.reygnn.kolibri_launcher.ui.OnboardingViewModelInterface
 import com.github.reygnn.kolibri_launcher.ui.OnboardingViewModel
 import dagger.Binds
 import dagger.Module

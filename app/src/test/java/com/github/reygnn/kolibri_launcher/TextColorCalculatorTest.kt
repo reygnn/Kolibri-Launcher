@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import com.github.reygnn.kolibri_launcher.core.TextColorCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.kotlin.doAnswer

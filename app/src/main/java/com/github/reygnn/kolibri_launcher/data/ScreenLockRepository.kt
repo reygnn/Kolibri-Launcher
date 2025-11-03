@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.Purgeable
+import com.github.reygnn.kolibri_launcher.data.Purgeable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 

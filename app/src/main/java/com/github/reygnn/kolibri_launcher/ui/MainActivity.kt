@@ -35,7 +35,7 @@ import com.github.reygnn.kolibri_launcher.ui.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.ui.SettingsActivity
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint

@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +48,7 @@ import javax.inject.Singleton
  *
  * **Error Handling:**
  * All operations are wrapped in comprehensive try-catch blocks to prevent crashes.
- * Errors are logged silently via [com.github.reygnn.kolibri_launcher.TimberWrapper] and result in empty lists or fallback
+ * Errors are logged silently via [TimberWrapper] and result in empty lists or fallback
  * values. [java.util.concurrent.CancellationException] is always re-thrown to preserve coroutine cancellation.
  *
  * **Threading:**

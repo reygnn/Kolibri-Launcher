@@ -1,13 +1,13 @@
 package com.github.reygnn.kolibri_launcher.di
 
-import com.github.reygnn.kolibri_launcher.FavoritesManager
-import com.github.reygnn.kolibri_launcher.FavoritesOrderManager
-import com.github.reygnn.kolibri_launcher.GetDrawerAppsUseCase
-import com.github.reygnn.kolibri_launcher.GetDrawerAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.GetFavoriteAppsUseCase
-import com.github.reygnn.kolibri_launcher.GetFavoriteAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.GetOnboardingAppsUseCase
-import com.github.reygnn.kolibri_launcher.GetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.data.FavoritesManager
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
+import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsManager
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.ShortcutManager

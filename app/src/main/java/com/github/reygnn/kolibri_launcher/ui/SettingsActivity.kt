@@ -7,11 +7,11 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.github.reygnn.kolibri_launcher.AppConstants
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.ui.SettingsFragment
 import com.github.reygnn.kolibri_launcher.ui.SettingsViewModel
-import com.github.reygnn.kolibri_launcher.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.UiEvent
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
