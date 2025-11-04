@@ -20,16 +20,10 @@ import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.SortOrder
-import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
-import com.github.reygnn.kolibri_launcher.ui.util.TestMode
-import com.github.reygnn.kolibri_launcher.ui.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.UiState
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
@@ -42,6 +36,9 @@ import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.SortOrder
+import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException

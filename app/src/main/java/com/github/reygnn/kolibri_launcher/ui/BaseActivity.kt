@@ -8,10 +8,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorData
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorEventBus
 import com.github.reygnn.kolibri_launcher.ui.util.Event
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch

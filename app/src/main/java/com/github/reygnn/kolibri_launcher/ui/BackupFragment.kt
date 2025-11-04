@@ -11,9 +11,9 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.BackupPreview
 import com.github.reygnn.kolibri_launcher.data.ImportOptions
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder

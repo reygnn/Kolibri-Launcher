@@ -2,9 +2,8 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
-import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.SortOrder
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository

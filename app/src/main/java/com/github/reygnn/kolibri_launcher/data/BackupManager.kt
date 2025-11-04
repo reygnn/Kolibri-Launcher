@@ -2,9 +2,9 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException

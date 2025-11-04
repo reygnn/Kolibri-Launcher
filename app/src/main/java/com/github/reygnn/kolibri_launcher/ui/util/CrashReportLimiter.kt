@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import timber.log.Timber
-import kotlin.collections.iterator
 
 /**
  * ACRA Report Spam Protection
