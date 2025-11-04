@@ -52,7 +52,7 @@ abstract class BaseAndroidTest {
     @Inject
     lateinit var installedAppsRepository: InstalledAppsRepository
     @Inject
-    lateinit var appNamesRepository: CustomNamesRepository
+    lateinit var customNamesRepository: CustomNamesRepository
     @Inject
     lateinit var installedAppsStateRepository: InstalledAppsStateRepository
     @Inject
@@ -145,7 +145,7 @@ abstract class BaseAndroidTest {
         (appUsageRepository as? Purgeable)?.purgeRepository()
         (favoritesOrderRepository as? Purgeable)?.purgeRepository()
         (installedAppsRepository as? Purgeable)?.purgeRepository()
-        (appNamesRepository as? Purgeable)?.purgeRepository()
+        (customNamesRepository as? Purgeable)?.purgeRepository()
         (installedAppsStateRepository as? Purgeable)?.purgeRepository()
         (getFavoriteAppsUseCase as? Purgeable)?.purgeRepository()
         (getDrawerAppsUseCase as? Purgeable)?.purgeRepository()

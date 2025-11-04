@@ -132,7 +132,7 @@ object TestRepositoryModule {
     ): CustomNamesRepository {
         // Erstellt das AppNamesRepository und gibt ihm die Fähigkeit, das
         // InstalledAppsRepository zu aktualisieren, wenn sich ein Name ändert.
-        return FakeAppNamesRepository(
+        return FakeCustomNamesRepository(
             onNameChanged = {
                 val newList = TestDataSource.getProcessedList()
                 (installedAppsRepo as FakeInstalledAppsRepository).appsFlow.value = newList
@@ -229,7 +229,7 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
  * Verwaltet die Namensänderungen. Es aktualisiert die zentrale `TestDataSource`
  * und ruft dann den `onNameChanged`-Callback auf, um die reaktive Kette auszulösen.
  */
-class FakeAppNamesRepository (
+class FakeCustomNamesRepository (
     private val onNameChanged: () -> Unit
 ) : CustomNamesRepository, Purgeable {
 

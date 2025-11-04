@@ -121,7 +121,7 @@ class AppContextMenuDialogFragmentTest : BaseAndroidTest() {
 
     @Test
     fun showsRestoreNameAction_whenAppHasCustomName() = testCoroutineRule.runTestAndLaunchUI {
-        (appNamesRepository as FakeAppNamesRepository).setCustomNameForPackage(testApp.packageName, "My Cool App")
+        (customNamesRepository as FakeCustomNamesRepository).setCustomNameForPackage(testApp.packageName, "My Cool App")
         launchDialog(testApp, MenuContext.APP_DRAWER, false)
 
         onView(withText(R.string.restore_original_name)).inRoot(isDialog()).check(matches(isDisplayed()))
