@@ -11,12 +11,13 @@ import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.data.Purgeable
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After

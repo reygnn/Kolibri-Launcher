@@ -9,6 +9,7 @@ import androidx.lifecycle.asFlow
 import androidx.lifecycle.asLiveData
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
@@ -20,7 +21,13 @@ import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.SortOrder
 import com.github.reygnn.kolibri_launcher.ui.HomeViewModel
+import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
+import com.github.reygnn.kolibri_launcher.ui.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.UiState
+import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow

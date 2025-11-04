@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.CustomNamesViewModel
@@ -389,7 +390,13 @@ class DependencyFakeInstalledAppsRepository(
     private val rawApps = listOf(
         AppInfo("Clock", "Clock", "com.android.clock", "com.android.clock.Clock", true),
         AppInfo("Camera", "Camera", "com.android.camera", "com.android.camera.Camera", true),
-        AppInfo("Calculator", "Calculator", "com.android.calculator", "com.android.calculator.Calculator", true)
+        AppInfo(
+            "Calculator",
+            "Calculator",
+            "com.android.calculator",
+            "com.android.calculator.Calculator",
+            true
+        )
     )
     private val appFlow = MutableStateFlow<List<AppInfo>>(emptyList())
 

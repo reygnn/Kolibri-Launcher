@@ -1,4 +1,6 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
+
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 
 /**
  * Repräsentiert eine App in der "Swipe Actions"-Auswahlliste.

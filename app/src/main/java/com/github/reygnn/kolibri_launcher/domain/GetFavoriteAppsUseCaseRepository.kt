@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.UiState
+import com.github.reygnn.kolibri_launcher.ui.UiState
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
-import com.github.reygnn.kolibri_launcher.data.Purgeable
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import kotlinx.coroutines.flow.Flow
 
 /**

@@ -10,8 +10,8 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.github.reygnn.kolibri_launcher.AppContextMenuAction
-import com.github.reygnn.kolibri_launcher.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.AppContextMenuAction
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R

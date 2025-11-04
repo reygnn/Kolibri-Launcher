@@ -2,11 +2,13 @@ package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.ui.UiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -40,9 +42,24 @@ class GetFavoriteAppsUseCaseTest {
 
     private lateinit var useCase: GetFavoriteAppsUseCase
 
-    private val app1 = AppInfo(originalName = "App A", displayName = "App A", packageName = "com.a", className = "MainActivity")
-    private val app2 = AppInfo(originalName = "App C", displayName = "App C", packageName = "com.c", className = "MainActivity")
-    private val app3 = AppInfo(originalName = "App B", displayName = "App B", packageName = "com.b", className = "MainActivity")
+    private val app1 = AppInfo(
+        originalName = "App A",
+        displayName = "App A",
+        packageName = "com.a",
+        className = "MainActivity"
+    )
+    private val app2 = AppInfo(
+        originalName = "App C",
+        displayName = "App C",
+        packageName = "com.c",
+        className = "MainActivity"
+    )
+    private val app3 = AppInfo(
+        originalName = "App B",
+        displayName = "App B",
+        packageName = "com.b",
+        className = "MainActivity"
+    )
     private val allApps = listOf(app1, app2, app3)
 
     @Before

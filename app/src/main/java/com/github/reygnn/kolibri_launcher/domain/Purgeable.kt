@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.kolibri_launcher.domain
 
 /**
  * Ein Interface für androidTest Repositories, deren Zustand in Tests zurückgesetzt werden kann.

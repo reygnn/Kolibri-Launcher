@@ -15,7 +15,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Process
 import android.util.Log
+import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
+import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope

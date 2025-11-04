@@ -1,6 +1,8 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import androidx.annotation.StringRes
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 
 /**
  * Definiert den gesamten UI-Zustand für den SwipeActionsActivity-Bildschirm.

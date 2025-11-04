@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 /**
  * Definiert die beiden Slots für die Wischgesten sowie einen neutralen Zustand,

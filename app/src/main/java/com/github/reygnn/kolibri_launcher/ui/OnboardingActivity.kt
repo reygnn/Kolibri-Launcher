@@ -14,9 +14,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.OnboardingEvent
-import com.github.reygnn.kolibri_launcher.OnboardingUiState
+import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.OnboardingEvent
+import com.github.reygnn.kolibri_launcher.ui.OnboardingUiState
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivityOnboardingBinding

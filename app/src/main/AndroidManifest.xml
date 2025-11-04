@@ -97,7 +97,7 @@
 
         <!-- Accessibility Service für Screen Lock -->
         <service
-            android:name=".ScreenLockAccessibilityService"
+            android:name=".ui.util.ScreenLockAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false"
             android:enabled="true">

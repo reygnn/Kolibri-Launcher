@@ -9,9 +9,9 @@
 
 package com.github.reygnn.kolibri_launcher.ui
 
-import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.OnboardingEvent
-import com.github.reygnn.kolibri_launcher.OnboardingUiState
+import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.OnboardingEvent
+import com.github.reygnn.kolibri_launcher.ui.OnboardingUiState
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
-import com.github.reygnn.kolibri_launcher.AppInfo
-import com.github.reygnn.kolibri_launcher.OnboardingUiState
+import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.OnboardingUiState
 import kotlinx.coroutines.flow.StateFlow
 
 interface OnboardingViewModelInterface {

@@ -1,18 +1,10 @@
-/*
- * Copyright (C) 2025 reygnn (Ulrich Kaufmann)
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- */
-
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui.util
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import timber.log.Timber
+import kotlin.collections.iterator
 
 /**
  * ACRA Report Spam Protection
@@ -50,7 +42,7 @@ object CrashReportLimiter {
                 }
             }
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to initialize CrashReportLimiter")
+            Timber.Forest.e(e, "Failed to initialize CrashReportLimiter")
         }
     }
 
@@ -64,7 +56,7 @@ object CrashReportLimiter {
         return try {
             val preferences = prefs
             if (preferences == null) {
-                Timber.w("CrashReportLimiter not initialized - allowing report")
+                Timber.Forest.w("CrashReportLimiter not initialized - allowing report")
                 return true
             }
 
@@ -80,19 +72,19 @@ object CrashReportLimiter {
                         preferences.edit {
                             putLong(reportKey, now)
                         }
-                        Timber.d("Report allowed for: ${exception::class.simpleName}")
+                        Timber.Forest.d("Report allowed for: ${exception::class.simpleName}")
                     } catch (e: Throwable) {
-                        Timber.e(e, "Failed to save report timestamp")
+                        Timber.Forest.e(e, "Failed to save report timestamp")
                     }
                 } else {
                     val hoursRemaining = ((REPORT_COOLDOWN_MS - (now - lastSent)) / (60 * 60 * 1000)).toInt()
-                    Timber.d("Report blocked (cooldown active): ${exception::class.simpleName} - $hoursRemaining hours remaining")
+                    Timber.Forest.d("Report blocked (cooldown active): ${exception::class.simpleName} - $hoursRemaining hours remaining")
                 }
 
                 shouldSend
             }
         } catch (e: Throwable) {
-            Timber.e(e, "Error in shouldSendReport - allowing report by default")
+            Timber.Forest.e(e, "Error in shouldSendReport - allowing report by default")
             true // Fail-open: allow report if limiter fails
         }
     }
@@ -139,7 +131,7 @@ object CrashReportLimiter {
                     return // Cleanup not needed yet
                 }
 
-                Timber.d("Performing CrashReportLimiter cleanup...")
+                Timber.Forest.d("Performing CrashReportLimiter cleanup...")
 
                 val allEntries = preferences.all
                 var removedCount = 0
@@ -159,10 +151,10 @@ object CrashReportLimiter {
                     putLong(LAST_CLEANUP_KEY, now)
                 }
 
-                Timber.d("Cleanup complete - removed $removedCount old entries")
+                Timber.Forest.d("Cleanup complete - removed $removedCount old entries")
             }
         } catch (e: Throwable) {
-            Timber.e(e, "Error during cleanup")
+            Timber.Forest.e(e, "Error during cleanup")
         }
     }
 
@@ -176,10 +168,10 @@ object CrashReportLimiter {
 
             synchronized(lock) {
                 preferences.edit { clear() }
-                Timber.w("All report limits have been reset")
+                Timber.Forest.w("All report limits have been reset")
             }
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to reset limits")
+            Timber.Forest.e(e, "Failed to reset limits")
         }
     }
 

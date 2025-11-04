@@ -14,8 +14,10 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.ui.HomeFragment
+import com.github.reygnn.kolibri_launcher.ui.UiState
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,8 +55,18 @@ class HomeFragmentTest : BaseAndroidTest() {
         mode = TestCoroutineRule.Mode.SAFE
     ) {
         val testFavorites = listOf(
-            AppInfo("Test Favorite 1", "Test Favorite 1", "com.test.fav1", "com.test.fav1.MainActivity"),
-            AppInfo("Test Favorite 2", "Test Favorite 2", "com.test.fav2", "com.test.fav2.MainActivity")
+            AppInfo(
+                "Test Favorite 1",
+                "Test Favorite 1",
+                "com.test.fav1",
+                "com.test.fav1.MainActivity"
+            ),
+            AppInfo(
+                "Test Favorite 2",
+                "Test Favorite 2",
+                "com.test.fav2",
+                "com.test.fav2.MainActivity"
+            )
         )
         setupFragmentWithApps(testFavorites)
 

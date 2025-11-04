@@ -1,9 +1,9 @@
 package com.github.reygnn.kolibri_launcher.ui
 
-import com.github.reygnn.kolibri_launcher.AppInfo
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.UiEvent
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher

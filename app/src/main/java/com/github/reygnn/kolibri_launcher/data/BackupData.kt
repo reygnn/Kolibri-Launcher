@@ -1,5 +1,6 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.BuildConfig
 import kotlinx.serialization.Serializable
 
 @Serializable

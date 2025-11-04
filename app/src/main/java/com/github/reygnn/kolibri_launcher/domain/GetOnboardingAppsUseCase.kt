@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.AppInfo
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import kotlinx.coroutines.flow.Flow

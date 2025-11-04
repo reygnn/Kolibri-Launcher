@@ -21,7 +21,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import com.github.reygnn.kolibri_launcher.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper

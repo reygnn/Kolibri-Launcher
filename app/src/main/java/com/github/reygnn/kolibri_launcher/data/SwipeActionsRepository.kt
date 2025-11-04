@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.SwipeSlot
+import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -22,7 +22,7 @@ interface SwipeActionsRepository {
     val swipeRightAppFlow: Flow<String?>
 
     /**
-     * Speichert die Zuweisung für einen bestimmten [com.github.reygnn.kolibri_launcher.SwipeSlot].
+     * Speichert die Zuweisung für einen bestimmten [SwipeSlot].
      *
      * @param slot Der Slot, der aktualisiert wird (muss LEFT oder RIGHT sein).
      * @param componentName Der ComponentName der App (z.B. "com.app/com.app.MainActivity")

@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
+
 // Das ist der Vertrag. Jede Klasse, die diesen Vertrag erfüllt,
 // kann dem InstalledAppsManager als Helfer dienen.
 interface CustomNamesRepository : Purgeable {

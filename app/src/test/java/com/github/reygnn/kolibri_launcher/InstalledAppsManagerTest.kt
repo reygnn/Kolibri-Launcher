@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsManager
 import kotlinx.coroutines.CancellationException
@@ -104,8 +105,18 @@ class InstalledAppsManagerTest {
         )
 
         val expectedAppList = listOf(
-            AppInfo(originalName = "App A", displayName = "App A", packageName = "com.a", className = "com.a.MainActivity"),
-            AppInfo(originalName = "App B", displayName = "App B", packageName = "com.b", className = "com.b.MainActivity")
+            AppInfo(
+                originalName = "App A",
+                displayName = "App A",
+                packageName = "com.a",
+                className = "com.a.MainActivity"
+            ),
+            AppInfo(
+                originalName = "App B",
+                displayName = "App B",
+                packageName = "com.b",
+                className = "com.b.MainActivity"
+            )
         )
 
         val actualAppList = installedAppsManager.processResolveInfoList(fakeResolveInfoList)
@@ -126,8 +137,18 @@ class InstalledAppsManagerTest {
         )
 
         val expectedAppList = listOf(
-            AppInfo(originalName = "App B", displayName = "App B", packageName = "com.b", className = "com.b.MainActivity"),
-            AppInfo(originalName = "App A", displayName = customName, packageName = "com.a", className = "com.a.MainActivity")
+            AppInfo(
+                originalName = "App B",
+                displayName = "App B",
+                packageName = "com.b",
+                className = "com.b.MainActivity"
+            ),
+            AppInfo(
+                originalName = "App A",
+                displayName = customName,
+                packageName = "com.a",
+                className = "com.a.MainActivity"
+            )
         )
 
         val actualAppList = installedAppsManager.processResolveInfoList(fakeResolveInfoList)

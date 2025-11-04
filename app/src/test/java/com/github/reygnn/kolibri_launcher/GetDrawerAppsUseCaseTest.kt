@@ -2,11 +2,13 @@ package com.github.reygnn.kolibri_launcher
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.SortOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -48,9 +50,24 @@ class GetDrawerAppsUseCaseTest {
 
     private lateinit var useCase: GetDrawerAppsUseCase
 
-    private val app1 = AppInfo(originalName = "App A", displayName = "App A", packageName = "com.a", className = "MainActivity")
-    private val app2 = AppInfo(originalName = "App C", displayName = "App C", packageName = "com.c", className = "MainActivity")
-    private val app3 = AppInfo(originalName = "App B", displayName = "App B", packageName = "com.b", className = "MainActivity")
+    private val app1 = AppInfo(
+        originalName = "App A",
+        displayName = "App A",
+        packageName = "com.a",
+        className = "MainActivity"
+    )
+    private val app2 = AppInfo(
+        originalName = "App C",
+        displayName = "App C",
+        packageName = "com.c",
+        className = "MainActivity"
+    )
+    private val app3 = AppInfo(
+        originalName = "App B",
+        displayName = "App B",
+        packageName = "com.b",
+        className = "MainActivity"
+    )
     private val allApps = listOf(app1, app2, app3)
 
     @Before

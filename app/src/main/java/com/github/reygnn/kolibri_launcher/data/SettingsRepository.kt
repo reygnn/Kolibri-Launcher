@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.SortOrder
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
+import com.github.reygnn.kolibri_launcher.domain.SortOrder
 import kotlinx.coroutines.flow.Flow
 
 // Das ist der Vertrag. Er sagt nur, WAS getan werden kann, nicht WIE.

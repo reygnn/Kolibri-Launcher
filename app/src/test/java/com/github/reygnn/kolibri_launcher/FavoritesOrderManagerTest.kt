@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,9 +42,24 @@ class FavoritesOrderManagerTest {
         )
 
         val unsortedApps = listOf(
-            AppInfo(originalName = "A", displayName = "App A", packageName = "com.a", className = "a"),
-            AppInfo(originalName = "B", displayName = "App B", packageName = "com.b", className = "b"),
-            AppInfo(originalName = "C", displayName = "App C", packageName = "com.c", className = "c")
+            AppInfo(
+                originalName = "A",
+                displayName = "App A",
+                packageName = "com.a",
+                className = "a"
+            ),
+            AppInfo(
+                originalName = "B",
+                displayName = "App B",
+                packageName = "com.b",
+                className = "b"
+            ),
+            AppInfo(
+                originalName = "C",
+                displayName = "App C",
+                packageName = "com.c",
+                className = "c"
+            )
         )
         val savedOrder = listOf("com.c/c", "com.a/a", "com.b/b")
         val expectedSortedApps = listOf(
@@ -67,9 +83,24 @@ class FavoritesOrderManagerTest {
         )
 
         val unsortedApps = listOf(
-            AppInfo(originalName = "C", displayName = "Zeppelin", packageName = "com.c", className = "c"),
-            AppInfo(originalName = "A", displayName = "Apple", packageName = "com.a", className = "a"),
-            AppInfo(originalName = "B", displayName = "Banana", packageName = "com.b", className = "b")
+            AppInfo(
+                originalName = "C",
+                displayName = "Zeppelin",
+                packageName = "com.c",
+                className = "c"
+            ),
+            AppInfo(
+                originalName = "A",
+                displayName = "Apple",
+                packageName = "com.a",
+                className = "a"
+            ),
+            AppInfo(
+                originalName = "B",
+                displayName = "Banana",
+                packageName = "com.b",
+                className = "b"
+            )
         )
         val expectedSortedApps = listOf(
             unsortedApps[1], // Apple
@@ -92,8 +123,18 @@ class FavoritesOrderManagerTest {
         )
 
         val installedApps = listOf(
-            AppInfo(originalName = "A", displayName = "App A", packageName = "com.a", className = "a"),
-            AppInfo(originalName = "C", displayName = "App C", packageName = "com.c", className = "c")
+            AppInfo(
+                originalName = "A",
+                displayName = "App A",
+                packageName = "com.a",
+                className = "a"
+            ),
+            AppInfo(
+                originalName = "C",
+                displayName = "App C",
+                packageName = "com.c",
+                className = "c"
+            )
         )
         // B wurde deinstalliert, ist aber in der alten Reihenfolge noch vorhanden
         val savedOrder = listOf("com.c/c", "com.b/b", "com.a/a")
@@ -117,10 +158,30 @@ class FavoritesOrderManagerTest {
         )
 
         val apps = listOf(
-            AppInfo(originalName = "D", displayName = "Delta", packageName = "com.d", className = "d"),
-            AppInfo(originalName = "A", displayName = "Alpha", packageName = "com.a", className = "a"),
-            AppInfo(originalName = "B", displayName = "Bravo", packageName = "com.b", className = "b"),
-            AppInfo(originalName = "C", displayName = "Charlie", packageName = "com.c", className = "c")
+            AppInfo(
+                originalName = "D",
+                displayName = "Delta",
+                packageName = "com.d",
+                className = "d"
+            ),
+            AppInfo(
+                originalName = "A",
+                displayName = "Alpha",
+                packageName = "com.a",
+                className = "a"
+            ),
+            AppInfo(
+                originalName = "B",
+                displayName = "Bravo",
+                packageName = "com.b",
+                className = "b"
+            ),
+            AppInfo(
+                originalName = "C",
+                displayName = "Charlie",
+                packageName = "com.c",
+                className = "c"
+            )
         )
         val savedOrder = listOf("com.b/b", "com.a/a")
         val expectedSortedApps = listOf(

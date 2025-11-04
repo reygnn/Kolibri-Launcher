@@ -1,9 +1,11 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.HiddenAppsViewModel
+import com.github.reygnn.kolibri_launcher.ui.UiEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf

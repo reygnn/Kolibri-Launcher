@@ -27,12 +27,12 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
-import com.github.reygnn.kolibri_launcher.AppInfo
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import com.github.reygnn.kolibri_launcher.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.DataStoreBackup
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.UiEvent
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder

@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.AppInfo
+import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 
 /**
  * Der Vertrag für die Verwaltung von App-Nutzungsdaten.

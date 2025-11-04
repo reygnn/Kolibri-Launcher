@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import androidx.preference.PreferenceManager
-import com.github.reygnn.kolibri_launcher.TestMode
+import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

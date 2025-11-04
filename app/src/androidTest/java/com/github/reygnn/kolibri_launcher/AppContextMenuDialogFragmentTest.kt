@@ -10,6 +10,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.MenuContext
 import com.github.reygnn.kolibri_launcher.ui.AppContextMenuDialogFragment
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -30,7 +31,8 @@ class AppContextMenuDialogFragmentTest : BaseAndroidTest() {
     //@get:Rule
     // override val testCoroutineRule = TestCoroutineRule(TestCoroutineRule.Mode.FAST)
 
-    private val testApp = AppInfo("Test App", "Test App", "com.test.app", "com.test.app.MainActivity")
+    private val testApp =
+        AppInfo("Test App", "Test App", "com.test.app", "com.test.app.MainActivity")
 
     @Before
     fun setup() {

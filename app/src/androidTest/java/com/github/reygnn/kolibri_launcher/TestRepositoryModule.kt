@@ -2,16 +2,20 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.pm.ShortcutInfo
 import androidx.lifecycle.MutableLiveData
+import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.BackupPreview
 import com.github.reygnn.kolibri_launcher.data.BackupRepository
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.data.ImportOptions
+import com.github.reygnn.kolibri_launcher.data.ImportResult
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.data.Purgeable
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
@@ -20,6 +24,10 @@ import com.github.reygnn.kolibri_launcher.di.RepositoryModule
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.SortOrder
+import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
+import com.github.reygnn.kolibri_launcher.ui.UiState
+import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
@@ -44,7 +52,12 @@ object TestDataSource {
     // Die unveränderliche Liste der "installierten" Apps
     private val rawApps = listOf(
         AppInfo("Alpha Browser", "Alpha Browser", "com.alpha.browser", "com.alpha.browser.Main"),
-        AppInfo("Beta Calculator", "Beta Calculator", "com.beta.calculator", "com.beta.calculator.Main"),
+        AppInfo(
+            "Beta Calculator",
+            "Beta Calculator",
+            "com.beta.calculator",
+            "com.beta.calculator.Main"
+        ),
         AppInfo("Zeta Clock", "Zeta Clock", "com.zeta.clock", "com.zeta.clock.Main")
     )
 
