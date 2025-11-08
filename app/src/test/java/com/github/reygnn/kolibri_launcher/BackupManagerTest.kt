@@ -982,11 +982,11 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
     }
 }
 
-// NEU: Fake für SettingsRepository
 class FakeSettingsRepository : SettingsRepository {
 
     private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val shadowFlow = MutableStateFlow(true) // Default: true
+    private val calendarFlow = MutableStateFlow(false)
 
     var color: Int
         get() = colorFlow.value
@@ -995,6 +995,10 @@ class FakeSettingsRepository : SettingsRepository {
     var shadow: Boolean
         get() = shadowFlow.value
         set(value) { shadowFlow.value = value }
+
+    var showCalendar: Boolean
+        get() = calendarFlow.value
+        set(value) { calendarFlow.value = value }
 
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
@@ -1019,6 +1023,12 @@ class FakeSettingsRepository : SettingsRepository {
 
     override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
     override suspend fun setOnboardingCompleted() {}
+
+    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
+
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
+        showCalendar = isEnabled
+    }
 
     override fun purgeRepository() {}
 }

@@ -25,6 +25,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.CalendarRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
@@ -63,7 +64,8 @@ import javax.inject.Inject
 data class HomeUiState(
     val timeString: String = "",
     val dateString: String = "",
-    val batteryString: String = ""
+    val batteryString: String = "",
+    val nextEventString: String = ""
 )
 
 data class UiColorsState(
@@ -97,7 +99,8 @@ class HomeViewModel @Inject constructor(
     private val appUsageManager: AppUsageRepository,
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: HiddenAppsRepository,
-    private val swipeActionsRepository: SwipeActionsRepository,
+    private val swipeActionsManager: SwipeActionsRepository,
+    private val calendarManager: CalendarRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
@@ -118,14 +121,14 @@ class HomeViewModel @Inject constructor(
     private var enableLockToastShown = false
 
     private val swipeLeftComponent: StateFlow<String?> =
-        swipeActionsRepository.swipeLeftAppFlow.stateIn(
+        swipeActionsManager.swipeLeftAppFlow.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
             null
         )
 
     private val swipeRightComponent: StateFlow<String?> =
-        swipeActionsRepository.swipeRightAppFlow.stateIn(
+        swipeActionsManager.swipeRightAppFlow.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
             null
@@ -144,6 +147,7 @@ class HomeViewModel @Inject constructor(
         updateTimeAndDate()
         getInitialBatteryState()
         updateUiColors()
+        updateCalendarEvent()
 
 
         if (!testMode.isEnabled) {
@@ -211,7 +215,7 @@ class HomeViewModel @Inject constructor(
             } else {
                 Timber.w("App for swipe left not found: $comp. Clearing setting.")
                 // App ist nicht (mehr) installiert, Einstellung aufräumen
-                swipeActionsRepository.setSwipeAction(SwipeSlot.LEFT, null)
+                swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onFlingLeft")
@@ -236,7 +240,7 @@ class HomeViewModel @Inject constructor(
             } else {
                 Timber.w("App for swipe right not found: $comp. Clearing setting.")
                 // App ist nicht (mehr) installiert, Einstellung aufräumen
-                swipeActionsRepository.setSwipeAction(SwipeSlot.RIGHT, null)
+                swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onFlingRight")
@@ -411,6 +415,7 @@ class HomeViewModel @Inject constructor(
     fun refreshDynamicUiData() {
         updateTimeAndDate()
         getInitialBatteryState()
+        updateCalendarEvent()
     }
 
     fun refreshAllData() {
@@ -748,6 +753,44 @@ class HomeViewModel @Inject constructor(
             // Only ColorUtils.calculateLuminance() can throw here
             TimberWrapper.silentError(e, "Error calculating luminance, using default shadow")
             DEFAULT_SHADOW_COLOR
+        }
+    }
+
+    /**
+     * Prüft, ob die Funktion aktiviert ist, und lädt den nächsten Kalendertermin.
+     */
+    fun updateCalendarEvent() = launchSafe {
+        try {
+            // 1. Prüfen, ob die Funktion in den Einstellungen überhaupt aktiviert ist
+            val isEnabled = settingsManager.showCalendarEventFlow.first()
+            if (!isEnabled) {
+                _uiState.update { it.copy(nextEventString = "") }
+                return@launchSafe
+            }
+
+            // 2. Nächsten Termin vom Repository abfragen
+            val event = calendarManager.getNextUpcomingEvent()
+            if (event == null) {
+                // Kein Termin gefunden (oder Berechtigung fehlt)
+                _uiState.update { it.copy(nextEventString = "") }
+                return@launchSafe
+            }
+
+            // 3. Event-String formatieren (z.B. "17:00 Team-Meeting")
+            val is24Hour = DateFormat.is24HourFormat(context)
+            val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+            val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+
+            val eventTime = timeFormat.format(java.util.Date(event.startTimeMillis))
+
+            val eventString = "$eventTime ${event.title}"
+            _uiState.update { it.copy(nextEventString = eventString) }
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to update calendar event")
+            _uiState.update { it.copy(nextEventString = "") }
         }
     }
 }

@@ -177,6 +177,17 @@ class HomeFragment : Fragment() {
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating battery text")
                             }
+
+                            try {
+                                if (state.nextEventString.isNotEmpty()) {
+                                    binding.calendarEventText.text = state.nextEventString
+                                    binding.calendarEventText.visibility = View.VISIBLE
+                                } else {
+                                    binding.calendarEventText.visibility = View.GONE
+                                }
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating calendar event text")
+                            }
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -363,6 +374,19 @@ class HomeFragment : Fragment() {
             )
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating battery text color")
+        }
+
+        // Update calendar text
+        try {
+            binding.calendarEventText.setTextColor(textColor)
+            binding.calendarEventText.setShadowLayer(
+                AppConstants.SHADOW_RADIUS_DATE,
+                AppConstants.SHADOW_DX_SMALL,
+                AppConstants.SHADOW_DY_SMALL,
+                shadowColor
+            )
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating calendar text color")
         }
 
         updateFavoriteAppsColors(textColor, shadowColor)
@@ -675,6 +699,21 @@ class HomeFragment : Fragment() {
             })
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting battery click listener")
+        }
+
+        // Doppelklick auf den Termin, um den Kalender zu öffnen.
+        try {
+            binding.calendarEventText.setOnClickListener(object : DoubleClickListener() {
+                override fun onDoubleClick() {
+                    try {
+                        viewModel.onDateDoubleClick() // Dieselbe Aktion wie beim Datum
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in calendar event double click")
+                    }
+                }
+            })
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting calendar event click listener")
         }
     }
 

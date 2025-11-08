@@ -319,6 +319,8 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
     override val onboardingCompletedFlow = MutableStateFlow(false)
     override val textShadowEnabledFlow = MutableStateFlow(true)
     override val textColorFlow = MutableStateFlow(0)
+    override val showCalendarEventFlow = MutableStateFlow(false)
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) { showCalendarEventFlow.value = isEnabled }
 
     override suspend fun setSortOrder(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTapToLockEnabledFlow.value = isEnabled }
@@ -336,6 +338,7 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
         onboardingCompletedFlow.value = false
         textShadowEnabledFlow.value = true
         textColorFlow.value = 0
+        showCalendarEventFlow.value = false
     }
 
 }

@@ -244,4 +244,10 @@
 <string name="import_option_swipe_actions">Swipe-Gesten (%d)</string>
 <string name="import_option_theme">Theme &amp; Farben</string>
 
+<string name="show_calendar_event_title">Nächsten Kalendertermin anzeigen</string>
+<string name="show_calendar_event_summary">Zeigt den nächsten Termin auf dem Startbildschirm an. Erfordert Kalenderberechtigung.</string>
+<string name="calendar_permission_title">Kalenderberechtigung erforderlich</string>
+<string name="calendar_permission_rationale">Um Ihren nächsten Termin auf dem Startbildschirm anzuzeigen, benötigt Kolibri Lesezugriff auf Ihren Kalender. Ihre Daten werden lokal verarbeitet und nicht geteilt.</string>
+<string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert. Das Widget kann nicht angezeigt werden.</string>
+
 </resources>

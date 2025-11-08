@@ -32,6 +32,7 @@ class SettingsManager @Inject constructor(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
         val TEXT_COLOR = intPreferencesKey("text_color")
+        val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data
@@ -190,6 +191,31 @@ class SettingsManager @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting text color: $color")
+        }
+    }
+
+    override val showCalendarEventFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading ShowCalendarEvent preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.SHOW_CALENDAR_EVENT] ?: false
+        }
+
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.SHOW_CALENDAR_EVENT] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting show calendar event: $isEnabled")
         }
     }
 

@@ -40,18 +40,14 @@ import org.acra.ACRA
 import timber.log.Timber
 import javax.inject.Inject
 import com.google.android.material.R as MaterialR
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * CRASH-SAFE VERSION
- *
- * Crash safety through:
- * - Try-catch around all lifecycleScope.launch blocks
- * - Safe preference access with null checks
- * - commitAllowingStateLoss for fragment transactions
- * - Safe suspend function calls with error handling
- * - Lifecycle-aware coroutines with proper error handling
- * - Safe Intent handling
- * - Defensive checks for Fragment state
+ * (Inklusive Kalender-Berechtigungslogik)
  */
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -60,14 +56,48 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject
     lateinit var appVisibilityManager: HiddenAppsRepository
+
     @Inject
     lateinit var favoritesManager: FavoritesRepository
+
     @Inject
     lateinit var favoritesOrderManager: FavoritesOrderRepository
+
     @Inject
     lateinit var settingsManager: SettingsRepository
+
     @Inject
     lateinit var screenLockManager: ScreenLockRepository
+
+    // --- KORREKTUREN HIER HINZUGEFÜGT ---
+
+    // 1. Deklaration für die Preference
+    private var calendarSwitchPreference: SwitchPreferenceCompat? = null
+
+    // 2. Companion Object für den Berechtigungs-String
+    companion object {
+        private const val CALENDAR_PERMISSION = Manifest.permission.READ_CALENDAR
+    }
+
+    // 3. ActivityResultLauncher für die Berechtigungsanfrage
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                // Nutzer hat zugestimmt! Jetzt die Einstellung speichern.
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setShowCalendarEvent(true)
+                }
+            } else {
+                // Nutzer hat abgelehnt. Zeige Feedback.
+                Toast.makeText(
+                    requireContext(),
+                    R.string.calendar_permission_denied_toast,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    // --- ENDE DER KORREKTUREN ---
+
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         try {
@@ -83,6 +113,36 @@ class SettingsFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
+            // --- KORREKTUR HIER HINZUGEFÜGT ---
+            // 4. Initialisierung der Preference-Variable
+            calendarSwitchPreference = findPreference("show_calendar_event")
+
+            // Listener für Kalender-Schalter (MUSS hier sein, nicht in setupPreferenceListeners!)
+            calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: false
+
+                    if (shouldEnable) {
+                        // User möchte Feature aktivieren -> Berechtigung prüfen
+                        handleCalendarPermissionRequest()
+                        // Rückgabe 'false' verhindert das automatische Toggle.
+                        // Der Switch wird erst auf 'true' gesetzt, wenn die
+                        // Berechtigung erteilt wurde (siehe observeSettings).
+                        false
+                    } else {
+                        // User möchte Feature deaktivieren -> direkt speichern
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            settingsManager.setShowCalendarEvent(false)
+                        }
+                        true // Erlaube das Toggle auf 'false'
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in calendar change listener")
+                    false
+                }
+            }
+            // --- ENDE DER KORREKTUR ---
+
             observeSettings()
             viewLifecycleOwner.lifecycleScope.launch {
                 updateCrashReportSummary()
@@ -123,7 +183,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
             findPreference<Preference>("edit_favorites")?.setOnPreferenceClickListener {
                 try {
                     val intent = Intent(requireActivity(), OnboardingActivity::class.java).apply {
-                        putExtra(OnboardingActivity.EXTRA_LAUNCH_MODE, LaunchMode.EDIT_FAVORITES.name)
+                        putExtra(
+                            OnboardingActivity.EXTRA_LAUNCH_MODE,
+                            LaunchMode.EDIT_FAVORITES.name
+                        )
                     }
                     startActivity(intent)
                     true
@@ -232,7 +295,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             findPreference<Preference>("app_info")?.setOnPreferenceClickListener {
                 try {
-                    openUrlInCustomTab(requireContext(), "https://docs.kolibri-launcher.ch/about.html")
+                    openUrlInCustomTab(
+                        requireContext(),
+                        "https://docs.kolibri-launcher.ch/about.html"
+                    )
                     true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error opening app info")
@@ -275,7 +341,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Double Tap to Lock
         try {
-            val doubleTapPreference = findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")
+            val doubleTapPreference =
+                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")
             doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is Boolean) {
@@ -334,7 +401,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 } else {
                                     getString(R.string.toast_crash_reports_disabled)
                                 }
-                                Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT)
+                                    .show()
 
                                 viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                                     updateCrashReportSummary()
@@ -445,7 +513,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             if (!isAdded || isDetached) return@collect
 
                             try {
-                                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked = isChecked
+                                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked =
+                                    isChecked
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating double tap preference")
                             }
@@ -454,6 +523,27 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in double tap flow collection")
+                    }
+                }
+
+                // Observer für Kalender-Einstellung
+                // (Dieser Code war bereits vorhanden und funktioniert jetzt)
+                launch {
+                    try {
+                        settingsManager.showCalendarEventFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                // Aktualisiert den Schalter basierend auf dem
+                                // gespeicherten Wert im DataStore
+                                calendarSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating calendar switch preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in calendar flow collection")
                     }
                 }
             }
@@ -526,7 +616,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
 
             try {
-                val fragment = FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
+                val fragment =
+                    FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
 
                 parentFragmentManager.beginTransaction()
                     .replace(android.R.id.content, fragment)
@@ -607,6 +698,44 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating default launcher status")
+        }
+    }
+
+    // Die Berechtigungs-Logik
+    // (Diese Funktion war bereits vorhanden und funktioniert jetzt)
+    private fun handleCalendarPermissionRequest() {
+        if (!isAdded) return
+
+        try {
+            when {
+                ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    CALENDAR_PERMISSION
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Berechtigung bereits vorhanden.
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setShowCalendarEvent(true)
+                    }
+                }
+
+                shouldShowRequestPermissionRationale(CALENDAR_PERMISSION) -> {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.calendar_permission_title)
+                        .setMessage(R.string.calendar_permission_rationale)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            requestPermissionLauncher.launch(CALENDAR_PERMISSION)
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
+
+                else -> {
+                    // Berechtigung direkt anfordern
+                    requestPermissionLauncher.launch(CALENDAR_PERMISSION)
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error handling calendar permission request")
         }
     }
 

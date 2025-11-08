@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.BatteryManager
+import android.text.format.DateFormat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.asLiveData
@@ -11,6 +12,8 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.CalendarEvent
+import com.github.reygnn.kolibri_launcher.data.CalendarRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
@@ -83,7 +86,9 @@ class HomeViewModelTest {
     @Mock
     private lateinit var appVisibilityManager: HiddenAppsRepository
     @Mock
-    private lateinit var swipeActionsRepository: SwipeActionsRepository
+    private lateinit var swipeActionsManager: SwipeActionsRepository
+    @Mock
+    private lateinit var calendarManager: CalendarRepository
 
     private lateinit var viewModel: HomeViewModel
 
@@ -109,8 +114,10 @@ class HomeViewModelTest {
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(emptyList())
         whenever(context.getString(any())).thenReturn("Test String")
         whenever(context.getString(any(), any())).thenReturn("Test String with args")
-        whenever(swipeActionsRepository.swipeLeftAppFlow).thenReturn(flowOf(null))
-        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(null))
+        whenever(swipeActionsManager.swipeLeftAppFlow).thenReturn(flowOf(null))
+        whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(null))
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
+        runTest { whenever(calendarManager.getNextUpcomingEvent()).thenReturn(null) }
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -126,7 +133,8 @@ class HomeViewModelTest {
             appUsageManager,
             screenLockManager,
             appVisibilityManager,
-            swipeActionsRepository,
+            swipeActionsManager,
+            calendarManager,
             mainDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
         )
@@ -743,7 +751,7 @@ class HomeViewModelTest {
     @Test
     fun `onFlingLeft - when app assigned - calls onAppClicked`() = runTest {
         // Setup: App1 ist "links" zugewiesen
-        whenever(swipeActionsRepository.swipeLeftAppFlow).thenReturn(flowOf(app1.componentName))
+        whenever(swipeActionsManager.swipeLeftAppFlow).thenReturn(flowOf(app1.componentName))
         // Setup: App1 ist "installiert" (im StateManager)
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps)
 
@@ -767,7 +775,7 @@ class HomeViewModelTest {
     @Test
     fun `onFlingRight - when app assigned - calls onAppClicked`() = runTest {
         // Setup: App2 ist "rechts" zugewiesen
-        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(app2.componentName))
+        whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(app2.componentName))
         // Setup: App2 ist "installiert" (im StateManager)
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps)
 
@@ -805,7 +813,7 @@ class HomeViewModelTest {
     fun `onFlingRight - when app assigned but not installed - clears setting`() = runTest {
         // Setup: Eine "alte" App ist zugewiesen
         val oldAppComponent = "com.uninstalled/com.uninstalled.Main"
-        whenever(swipeActionsRepository.swipeRightAppFlow).thenReturn(flowOf(oldAppComponent))
+        whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(oldAppComponent))
         // Setup: Die App ist NICHT im StateManager
         whenever(installedAppsStateManager.getCurrentApps()).thenReturn(testApps) // Enthält nur app1, app2
 
@@ -821,6 +829,41 @@ class HomeViewModelTest {
         }
 
         // Stattdessen sollte die Einstellung gelöscht werden
-        verify(swipeActionsRepository).setSwipeAction(SwipeSlot.RIGHT, null)
+        verify(swipeActionsManager).setSwipeAction(SwipeSlot.RIGHT, null)
+    }
+
+    @Test
+    fun `init - when calendar enabled - updates calendar event`() = runTest {
+        // Setup: Funktion ist AN
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
+        // Setup: Ein Termin existiert
+        val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
+        whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
+        // Setup: 24-Stunden-Format für vorhersagbare Zeit
+        whenever(DateFormat.is24HourFormat(context)).thenReturn(true)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Überprüfen, ob der State den formatierten String enthält
+        val state = viewModel.uiState.value
+        assertTrue(state.nextEventString.endsWith(" Test Meeting"))
+    }
+
+    @Test
+    fun `init - when calendar disabled - event string is empty`() = runTest {
+        // Setup: Funktion ist AUS (das ist der Standard in setup())
+        // Setup: Ein Termin existiert (wird aber ignoriert)
+        val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
+        whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Überprüfen, ob der State leer ist
+        val state = viewModel.uiState.value
+        assertEquals("", state.nextEventString)
+        // Wichtig: Das Repository darf gar nicht erst abgefragt werden
+        verify(calendarManager, never()).getNextUpcomingEvent()
     }
 }

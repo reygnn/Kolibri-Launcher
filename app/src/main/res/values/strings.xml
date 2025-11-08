@@ -249,5 +249,11 @@
 <string name="import_no_options_selected">Please select at least one import option</string>
 <string name="import_option_swipe_actions">Swipe actions (%d)</string>
 <string name="import_option_theme">Theme &amp; Colors</string>
-    
+
+<string name="show_calendar_event_title">Show next calendar event</string>
+<string name="show_calendar_event_summary">Displays the next event on the home screen. Requires calendar permission.</string>
+
+<string name="calendar_permission_title">Calendar permission required</string>
+<string name="calendar_permission_rationale">To show your next event on the home screen, Kolibri needs access to read your calendar. Your data is processed locally and will not be shared.</string>
+<string name="calendar_permission_denied_toast">Calendar permission denied. The widget cannot be displayed.</string>
 </resources>

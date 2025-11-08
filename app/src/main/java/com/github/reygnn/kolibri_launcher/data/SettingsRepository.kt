@@ -22,4 +22,7 @@ interface SettingsRepository : Purgeable {
 
     val textColorFlow: Flow<Int>
     suspend fun setTextColor(color: Int)
+
+    val showCalendarEventFlow: Flow<Boolean>
+    suspend fun setShowCalendarEvent(isEnabled: Boolean)
 }

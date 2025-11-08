@@ -67,6 +67,17 @@
                     android:padding="@dimen/touch_target_padding"
                     android:layout_marginStart="@dimen/spacing_medium" />
             </LinearLayout>
+
+            <TextView
+                    android:id="@+id/calendar_event_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_small"
+                    android:textSize="@dimen/text_size_secondary_info"
+                    android:textColor="@color/default_text_color"
+                    android:fontFamily="sans-serif"
+                    android:padding="@dimen/touch_target_padding"
+                    android:visibility="gone" />
         </LinearLayout>
 
         <ScrollView
