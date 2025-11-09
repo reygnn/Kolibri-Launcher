@@ -249,5 +249,6 @@
 <string name="calendar_permission_title">Kalenderberechtigung erforderlich</string>
 <string name="calendar_permission_rationale">Um Ihren nächsten Termin auf dem Startbildschirm anzuzeigen, benötigt Kolibri Lesezugriff auf Ihren Kalender. Ihre Daten werden lokal verarbeitet und nicht geteilt.</string>
 <string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert. Das Widget kann nicht angezeigt werden.</string>
+<string name="chip_background_color">Termin-Hintergrund</string>
 
 </resources>

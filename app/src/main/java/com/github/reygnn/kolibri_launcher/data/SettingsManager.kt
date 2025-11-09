@@ -33,6 +33,7 @@ class SettingsManager @Inject constructor(
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
         val TEXT_COLOR = intPreferencesKey("text_color")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
+        val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
     }
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data
@@ -206,6 +207,32 @@ class SettingsManager @Inject constructor(
         .map { preferences ->
             preferences[PreferenceKeys.SHOW_CALENDAR_EVENT] ?: false
         }
+
+    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading ChipBackgroundColor preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            // 0 = Auto (was dem alten halb-transparenten Look entspricht)
+            preferences[PreferenceKeys.CHIP_BACKGROUND_COLOR] ?: 0
+        }
+
+    override suspend fun setChipBackgroundColor(color: Int) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.CHIP_BACKGROUND_COLOR] = color
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting chip background color: $color")
+        }
+    }
 
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         try {

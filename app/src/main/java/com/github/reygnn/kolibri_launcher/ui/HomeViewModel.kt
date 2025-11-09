@@ -71,7 +71,8 @@ data class HomeUiState(
 
 data class UiColorsState(
     val textColor: Int = Color.WHITE,
-    val shadowColor: Int = Color.BLACK
+    val shadowColor: Int = Color.BLACK,
+    val chipBackgroundColor: Int = 0
 )
 
 /**
@@ -138,6 +139,7 @@ class HomeViewModel @Inject constructor(
     companion object {
         private const val DEFAULT_TEXT_COLOR = Color.WHITE
         private const val DEFAULT_SHADOW_COLOR = Color.BLACK
+        private const val DEFAULT_CHIP_BG_COLOR = 0
         private const val DEFAULT_TIME = "--:--"
         private const val DEFAULT_DATE = "---"
         private const val DEFAULT_BATTERY = "---%"
@@ -448,6 +450,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onSetChipBackgroundColor(color: Int) = launchSafe {
+        try {
+            settingsManager.setChipBackgroundColor(color)
+            updateUiColors()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting chip background color")
+            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+        }
+    }
+
     // --- PRIVATE/INTERNAL LOGIC ---
 
     /**
@@ -658,6 +672,7 @@ class HomeViewModel @Inject constructor(
             // 1. Retrieve user settings
             val userSelectedColor = settingsManager.textColorFlow.first()
             val isShadowEnabled = settingsManager.textShadowEnabledFlow.first()
+            val userSelectedChipColor = settingsManager.chipBackgroundColorFlow.first()
 
             // 2. Determine text color
             val finalTextColor = if (userSelectedColor != 0) {
@@ -697,7 +712,11 @@ class HomeViewModel @Inject constructor(
 
             // 4. Update UI state
             _uiColorsState.update {
-                it.copy(textColor = finalTextColor, shadowColor = finalShadowColor)
+                it.copy(
+                    textColor = finalTextColor,
+                    shadowColor = finalShadowColor,
+                    chipBackgroundColor = userSelectedChipColor
+                )
             }
         } catch (e: CancellationException) {
             throw e
@@ -706,7 +725,8 @@ class HomeViewModel @Inject constructor(
             // Safe fallback
             _uiColorsState.value = UiColorsState(
                 textColor = DEFAULT_TEXT_COLOR,
-                shadowColor = DEFAULT_SHADOW_COLOR
+                shadowColor = DEFAULT_SHADOW_COLOR,
+                chipBackgroundColor = DEFAULT_CHIP_BG_COLOR
             )
         }
     }

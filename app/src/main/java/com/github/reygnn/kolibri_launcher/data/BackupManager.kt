@@ -62,6 +62,7 @@ class BackupManager @Inject constructor(
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
             val textColor = settingsManager.textColorFlow.first()
             val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
+            val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
@@ -71,6 +72,7 @@ class BackupManager @Inject constructor(
                 swipeLeftApp = swipeLeftApp,
                 swipeRightApp = swipeRightApp,
                 textColor = textColor,
+                chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled
             )
 
@@ -242,11 +244,18 @@ class BackupManager @Inject constructor(
                     themeImported = true
                 }
 
+                // Importiere Chip-Hintergrundfarbe (nur wenn im Backup vorhanden)
+                backup.settings.chipBackgroundColor?.let {
+                    settingsManager.setChipBackgroundColor(it)
+                    themeImported = true
+                }
+
                 // Importiere Textschatten (nur wenn im Backup vorhanden)
                 backup.settings.textShadowEnabled?.let {
                     settingsManager.setTextShadowEnabled(it)
                     themeImported = true
                 }
+
 
                 if (themeImported) {
                     Timber.Forest.i("Imported theme settings.")
@@ -465,7 +474,9 @@ class BackupManager @Inject constructor(
                 customNamesCount = backup.settings.customAppNames.size,
                 hasSwipeLeft = backup.settings.swipeLeftApp != null,
                 hasSwipeRight = backup.settings.swipeRightApp != null,
-                hasThemeSettings = backup.settings.textColor != null || backup.settings.textShadowEnabled != null
+                hasThemeSettings = backup.settings.textColor != null ||
+                        backup.settings.chipBackgroundColor != null ||
+                        backup.settings.textShadowEnabled != null
             )
 
             Timber.Forest.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}")

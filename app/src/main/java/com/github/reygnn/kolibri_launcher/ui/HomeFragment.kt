@@ -216,7 +216,8 @@ class HomeFragment : Fragment() {
                             if (_binding == null) return@collect
 
                             try {
-                                updateTextColors(colors.textColor, colors.shadowColor)
+                                // --- ÄNDERUNG (1/5): Aufruf der umbenannten Funktion ---
+                                updateAllColors(colors)
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating colors")
                                 // Keep old colors
@@ -256,7 +257,7 @@ class HomeFragment : Fragment() {
                 return
             }
 
-            val colors = viewModel.uiColorsState.value
+            val colors = viewModel.uiColorsState.value // Holt den _gesamten_ UiColorsState
             val is24Hour = DateFormat.is24HourFormat(ctx)
             val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
             val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
@@ -273,6 +274,7 @@ class HomeFragment : Fragment() {
 
             for (event in events) {
                 try {
+                    // Übergebe das ganze colors-Objekt
                     val chip = createCalendarChip(ctx, event, timeFormat, colors, chipMaxWidth)
                     if (chip != null) {
                         binding.calendarChipsContainer.addView(chip)
@@ -291,7 +293,7 @@ class HomeFragment : Fragment() {
         context: Context,
         event: CalendarEvent,
         timeFormat: SimpleDateFormat,
-        colors: UiColorsState,
+        colors: UiColorsState, // Nimmt jetzt das ganze Objekt entgegen
         calculatedMaxWidth: Int
     ): Chip? {
         return try {
@@ -315,12 +317,18 @@ class HomeFragment : Fragment() {
 
                 // Styling
                 try {
-                    // Transparenter Hintergrund für minimalistischen Look
-                    chipBackgroundColor = ColorStateList.valueOf(
+                    // --- ÄNDERUNG (2/5): Neue Logik für Hintergrundfarbe ---
+                    val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                        // "Auto"-Modus: Leite Farbe von Textfarbe ab (alter Standard)
                         Color.argb(40, Color.red(colors.textColor),
                             Color.green(colors.textColor),
                             Color.blue(colors.textColor))
-                    )
+                    } else {
+                        // Vom Nutzer gewählte Farbe
+                        colors.chipBackgroundColor
+                    }
+                    chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+                    // --- ENDE ---
 
                     // Text-Farbe
                     setTextColor(colors.textColor)
@@ -331,7 +339,7 @@ class HomeFragment : Fragment() {
                     // Kein Checkable
                     isCheckable = false
 
-                    // Thin border (optional)
+                    // Thin border (optional) - bleibt an Textfarbe gekoppelt
                     chipStrokeWidth = 1f
                     chipStrokeColor = ColorStateList.valueOf(colors.textColor)
 
@@ -483,8 +491,13 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun updateTextColors(textColor: Int, shadowColor: Int) {
+    // --- ÄNDERUNG (3/5): Umbenannt und Signatur geändert ---
+    private fun updateAllColors(colors: UiColorsState) {
         if (_binding == null) return
+
+        // Variablen aus dem State-Objekt extrahieren
+        val textColor = colors.textColor
+        val shadowColor = colors.shadowColor
 
         // Update time text - individual try-catch for independence
         try {
@@ -525,30 +538,41 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error updating battery text color")
         }
 
-        updateCalendarChipsColors(textColor, shadowColor)
+        // --- ÄNDERUNG (4/5): Übergibt das ganze Objekt ---
+        updateCalendarChipsColors(colors)
 
         updateFavoriteAppsColors(textColor, shadowColor)
     }
 
-    private fun updateCalendarChipsColors(textColor: Int, shadowColor: Int) {
+    // --- ÄNDERUNG (5/5): Signatur und Logik angepasst ---
+    private fun updateCalendarChipsColors(colors: UiColorsState) {
         if (_binding == null) return
 
         try {
+            // Variablen extrahieren
+            val textColor = colors.textColor
+            val shadowColor = colors.shadowColor
+
             for (i in 0 until binding.calendarChipsContainer.childCount) {
                 try {
                     val view = binding.calendarChipsContainer.getChildAt(i)
                     if (view is Chip) {
                         view.setTextColor(textColor)
 
-                        view.chipBackgroundColor = ColorStateList.valueOf(
+                        // Neue Logik für Hintergrundfarbe
+                        val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
                             Color.argb(40, Color.red(textColor),
                                 Color.green(textColor),
                                 Color.blue(textColor))
-                        )
+                        } else {
+                            colors.chipBackgroundColor
+                        }
+                        view.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
 
+                        // Stroke bleibt an Textfarbe gekoppelt
                         view.chipStrokeColor = ColorStateList.valueOf(textColor)
 
-                        // Optional: Schatten wie bei anderen Texten
+                        // Schattenlogik bleibt gleich
                         if (shadowColor != Color.TRANSPARENT) {
                             view.setShadowLayer(
                                 AppConstants.SHADOW_RADIUS_APPS,

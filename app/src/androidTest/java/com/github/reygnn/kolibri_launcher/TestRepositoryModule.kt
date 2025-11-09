@@ -320,14 +320,17 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
     override val textShadowEnabledFlow = MutableStateFlow(true)
     override val textColorFlow = MutableStateFlow(0)
     override val showCalendarEventFlow = MutableStateFlow(false)
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) { showCalendarEventFlow.value = isEnabled }
+    override val chipBackgroundColorFlow = MutableStateFlow(0)
 
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) { showCalendarEventFlow.value = isEnabled }
     override suspend fun setSortOrder(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTapToLockEnabledFlow.value = isEnabled }
     override suspend fun setReadabilityMode(mode: String) { readabilityModeFlow.value = mode }
     override suspend fun setOnboardingCompleted() { onboardingCompletedFlow.value = true }
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) { textShadowEnabledFlow.value = isEnabled }
     override suspend fun setTextColor(color: Int) { textColorFlow.value = color }
+    override suspend fun setChipBackgroundColor(color: Int) { chipBackgroundColorFlow.value = color }
+
 
     fun setReadabilityModeBlocking(mode: String) { readabilityModeFlow.value = mode }
     fun setSortOrderBlocking(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
@@ -338,9 +341,9 @@ class FakeSettingsRepository : SettingsRepository, Purgeable {
         onboardingCompletedFlow.value = false
         textShadowEnabledFlow.value = true
         textColorFlow.value = 0
+        chipBackgroundColorFlow.value = 0
         showCalendarEventFlow.value = false
     }
-
 }
 
 class FakeAppUsageRepository : AppUsageRepository, Purgeable {

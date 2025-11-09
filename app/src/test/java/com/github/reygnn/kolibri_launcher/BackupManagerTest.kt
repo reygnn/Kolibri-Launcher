@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
+
 import android.content.Context
 import android.graphics.Color
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -29,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito.mock
 
+
 /**
  * Unit-Test für den BackupManager.
  *
@@ -36,6 +38,7 @@ import org.mockito.Mockito.mock
  * File I/O Tests (saveBackupToFile, loadBackupFromFile, previewBackup)
  * sollten als Instrumented Tests mit echtem Android-Framework getestet werden.
  */
+
 @ExperimentalCoroutinesApi
 class BackupManagerTest {
 
@@ -99,6 +102,7 @@ class BackupManagerTest {
         assertThat(backup.settings.swipeLeftApp).isNull()
         assertThat(backup.settings.swipeRightApp).isNull()
         assertThat(backup.settings.textColor).isEqualTo(0)
+        assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
         assertThat(backup.settings.textShadowEnabled).isTrue()
     }
 
@@ -212,6 +216,7 @@ class BackupManagerTest {
         fakeSwipeActionsRepo.swipeLeftApp = "com.app3/com.app3.MainActivity"
         fakeSwipeActionsRepo.swipeRightApp = "com.app4/com.app4.MainActivity"
         fakeSettingsRepo.color = Color.RED
+        fakeSettingsRepo.chipBgColor = Color.GREEN
         fakeSettingsRepo.shadow = false
 
         val jsonString = backupManager.exportToJson()
@@ -224,6 +229,7 @@ class BackupManagerTest {
         assertThat(backup.settings.swipeLeftApp).isNotNull()
         assertThat(backup.settings.swipeRightApp).isNotNull()
         assertThat(backup.settings.textColor).isEqualTo(Color.RED)
+        assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
         assertThat(backup.settings.textShadowEnabled).isFalse()
     }
 
@@ -418,11 +424,13 @@ class BackupManagerTest {
     fun `importFromJson - only theme settings - imports only theme`() = runTest {
         fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = Color.GREEN,
+            chipBackgroundColor = Color.MAGENTA,
             textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
@@ -441,6 +449,7 @@ class BackupManagerTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
         assertThat(fakeSettingsRepo.shadow).isFalse()
 
         assertThat(fakeFavoritesRepo.favorites).isEmpty()
@@ -517,6 +526,7 @@ class BackupManagerTest {
             createAppInfo("com.app2", "com.app2.MainActivity")
         )
         fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
 
         val backup = createTestBackup(
@@ -527,6 +537,7 @@ class BackupManagerTest {
             swipeLeft = "com.app1/com.app1.MainActivity",
             swipeRight = "com.app2/com.app2.MainActivity",
             textColor = Color.BLUE,
+            chipBackgroundColor = Color.CYAN,
             textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
@@ -550,6 +561,7 @@ class BackupManagerTest {
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
+        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
         assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
@@ -773,6 +785,7 @@ class BackupManagerTest {
             swipeLeft = "com.app1/com.app1.MainActivity",
             swipeRight = "com.app2/com.app2.MainActivity",
             textColor = Color.YELLOW,
+            chipBackgroundColor = Color.RED,
             textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
@@ -791,6 +804,7 @@ class BackupManagerTest {
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
+        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
         assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
@@ -798,20 +812,23 @@ class BackupManagerTest {
     fun `importFromJson - old backup without theme keys - does not change theme`() = runTest {
         // Setze initiale Werte, die *nicht* geändert werden dürfen
         fakeSettingsRepo.color = Color.CYAN
+        fakeSettingsRepo.chipBgColor = Color.BLUE
         fakeSettingsRepo.shadow = false
 
-        // Ein JSON-String, der die Keys 'textColor' und 'textShadowEnabled' *nicht* enthält
-        // (kotlinx.serialization lässt 'null'-Werte beim Encoding weg)
+        // Ein JSON-String, der die Keys 'textColor', 'textShadowEnabled'
+        // und 'chipBackgroundColor' *nicht* enthält
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = null,
+            chipBackgroundColor = null,
             textShadowEnabled = null
         )
         val oldBackupJson = json.encodeToString(backup)
 
         // Sicherstellen, dass die Keys wirklich fehlen
-        assertThat(oldBackupJson).doesNotContain("textColor")
-        assertThat(oldBackupJson).doesNotContain("textShadowEnabled")
+        assertThat(oldBackupJson).doesNotContain("text_color")
+        assertThat(oldBackupJson).doesNotContain("chip_bg_color")
+        assertThat(oldBackupJson).doesNotContain("text_shadow_enabled")
 
         val options = ImportOptions(importThemeSettings = true)
 
@@ -821,6 +838,7 @@ class BackupManagerTest {
 
         // Prüfen: Theme-Werte sind unverändert, da im Backup null (nicht vorhanden)
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
+        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
         assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
@@ -845,6 +863,7 @@ class BackupManagerTest {
         swipeLeft: String? = null,
         swipeRight: String? = null,
         textColor: Int? = null,
+        chipBackgroundColor: Int? = null,
         textShadowEnabled: Boolean? = null
     ): BackupData {
         return BackupData(
@@ -859,6 +878,7 @@ class BackupManagerTest {
                 swipeLeftApp = swipeLeft,
                 swipeRightApp = swipeRight,
                 textColor = textColor,
+                chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled
             )
         )
@@ -986,11 +1006,16 @@ class FakeSettingsRepository : SettingsRepository {
 
     private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val shadowFlow = MutableStateFlow(true) // Default: true
+    private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val calendarFlow = MutableStateFlow(false)
 
     var color: Int
         get() = colorFlow.value
         set(value) { colorFlow.value = value }
+
+    var chipBgColor: Int
+        get() = chipBgColorFlow.value
+        set(value) { chipBgColorFlow.value = value }
 
     var shadow: Boolean
         get() = shadowFlow.value
@@ -1003,6 +1028,7 @@ class FakeSettingsRepository : SettingsRepository {
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
+    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
 
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
         shadow = isEnabled
@@ -1010,6 +1036,10 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setTextColor(color: Int) {
         this.color = color
+    }
+
+    override suspend fun setChipBackgroundColor(color: Int) {
+        this.chipBgColor = color
     }
 
     override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)

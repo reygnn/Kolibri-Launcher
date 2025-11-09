@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.BuildConfig
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -17,9 +18,20 @@ data class LauncherSettings(
     val favoritesOrder: List<String> = emptyList(),
     val hiddenComponents: Set<String> = emptySet(),
     val customAppNames: Map<String, String> = emptyMap(),
+    @SerialName("swipe_left_app")
     val swipeLeftApp: String? = null,
+
+    @SerialName("swipe_right_app")
     val swipeRightApp: String? = null,
+
+    @SerialName("text_color")
     val textColor: Int? = null,
+
+    @SerialName("chip_bg_color")
+    val chipBackgroundColor: Int? = null,
+
+
+    @SerialName("text_shadow_enabled")
     val textShadowEnabled: Boolean? = null
 )
 

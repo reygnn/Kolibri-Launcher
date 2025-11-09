@@ -256,4 +256,6 @@
 <string name="calendar_permission_title">Calendar permission required</string>
 <string name="calendar_permission_rationale">To show your next event on the home screen, Kolibri needs access to read your calendar. Your data is processed locally and will not be shared.</string>
 <string name="calendar_permission_denied_toast">Calendar permission denied. The widget cannot be displayed.</string>
+<string name="chip_background_color">Event Background</string>
+
 </resources>

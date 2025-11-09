@@ -29,13 +29,13 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class ColorCustomizationDialogFragment : DialogFragment() {
 
-    // Wir teilen uns das ViewModel mit der MainActivity und dem HomeFragment
     private val viewModel: HomeViewModel by activityViewModels()
     private var _binding: DialogColorCustomizationBinding? = null
     private val binding get() = _binding!!
 
-    // Hält eine Referenz auf alle Farbkarten, um den "selektiert"-Zustand zu verwalten
-    private val colorSwatchViews = mutableMapOf<Int, MaterialCardView>()
+    // Zwei separate Listen für die UI-Zustände der Paletten
+    private val textSwatchViews = mutableMapOf<Int, MaterialCardView>()
+    private val chipBgSwatchViews = mutableMapOf<Int, MaterialCardView>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,7 +50,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         super.onStart()
         dialog?.window?.let { window ->
             window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)   // nicht dimmen.
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
 
             val displayMetrics = resources.displayMetrics
@@ -65,9 +65,11 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Logik zusammengefasst
         setupShadowSwitch()
-        setupColorPalette()
-        observeColorChanges()
+        setupPalettes()
+        observeChanges()
         setupDragListener()
     }
 
@@ -113,50 +115,92 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         }
     }
 
-    private fun setupColorPalette() {
+    /**
+     * Setzt beide Farbpaletten auf (Textfarbe und Chip-Hintergrund).
+     */
+    private fun setupPalettes() {
+        // 1. Palette für Textfarbe füllen
+        populatePalette(
+            container = binding.colorPaletteContainer,
+            swatchMap = textSwatchViews,
+            onColorSelected = { color ->
+                viewModel.onSetTextColor(color)
+            }
+        )
+
+        // 2. Palette für Chip-Hintergrund füllen
+        populatePalette(
+            container = binding.chipBgPaletteContainer,
+            swatchMap = chipBgSwatchViews,
+            onColorSelected = { color ->
+                viewModel.onSetChipBackgroundColor(color)
+            }
+        )
+    }
+
+    /**
+     * Hilfsfunktion: Füllt einen beliebigen Container mit den verfügbaren Farbfeldern.
+     */
+    private fun populatePalette(
+        container: ViewGroup,
+        swatchMap: MutableMap<Int, MaterialCardView>,
+        onColorSelected: (Int) -> Unit
+    ) {
         val colors = getAvailableColors()
 
         colors.distinct().forEach { color ->
-            val swatchBinding = ItemColorSwatchBinding.inflate(layoutInflater, binding.colorPaletteContainer, false)
+            val swatchBinding = ItemColorSwatchBinding.inflate(layoutInflater, container, false)
             val cardView = swatchBinding.colorSwatchCard
             val autoIcon = swatchBinding.autoIcon
 
-            if (color == 0) {
+            if (color == 0) { // "Auto"-Knopf
                 autoIcon.isVisible = true
-
                 val backgroundColor = requireContext().getColor(R.color.material_dynamic_neutral90)
                 cardView.setCardBackgroundColor(backgroundColor)
-
                 val iconTintColor = getContrastingColor(backgroundColor)
                 autoIcon.imageTintList = ColorStateList.valueOf(iconTintColor)
-
-            } else {
+            } else { // Echter Farbknopf
                 autoIcon.isVisible = false
                 cardView.setCardBackgroundColor(color)
             }
 
             cardView.setOnClickListener {
-                viewModel.onSetTextColor(color)
+                onColorSelected(color)
             }
 
-            binding.colorPaletteContainer.addView(swatchBinding.root)
-            colorSwatchViews[color] = cardView
+            container.addView(swatchBinding.root)
+            swatchMap[color] = cardView
         }
     }
 
-    private fun observeColorChanges() {
+    /**
+     * Startet die Beobachtung beider Farb-Flows.
+     */
+    private fun observeChanges() {
+        // 1. Textfarbe beobachten
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.settingsManager.textColorFlow.collect { selectedColor ->
-                updateSelectedColorUI(selectedColor)
+                updateSelectedSwatchUI(selectedColor, textSwatchViews)
+            }
+        }
+
+        // 2. Chip-Hintergrundfarbe beobachten
+        viewLifecycleOwner.lifecycleScope.launch {
+            // (Setzt voraus, dass chipBackgroundColorFlow im SettingsManager existiert)
+            viewModel.settingsManager.chipBackgroundColorFlow.collect { selectedColor ->
+                updateSelectedSwatchUI(selectedColor, chipBgSwatchViews)
             }
         }
     }
 
-    private fun updateSelectedColorUI(selectedColor: Int) {
+    /**
+     * Hilfsfunktion: Hebt die ausgewählte Farbe in einer beliebigen Palette hervor.
+     */
+    private fun updateSelectedSwatchUI(selectedColor: Int, swatchMap: Map<Int, MaterialCardView>) {
         val selectedColorValue = ColorStateList.valueOf(requireContext().getColor(R.color.color_primary))
         val deselectedColorValue = ColorStateList.valueOf(Color.TRANSPARENT)
 
-        colorSwatchViews.forEach { (color, cardView) ->
+        swatchMap.forEach { (color, cardView) ->
             if (color == selectedColor) {
                 cardView.strokeColor = selectedColorValue.defaultColor
             } else {
@@ -167,41 +211,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     private fun getContrastingColor(backgroundColor: Int): Int {
         val luminance = Color.luminance(backgroundColor)
-
-        return if (luminance > 0.5) {
-            Color.BLACK
-        } else {
-            Color.WHITE
-        }
-    }
-
-    // Sammelt alle Farben, die wir dem Nutzer anbieten wollen
-/*    private fun getAvailableColors(): List<Int> {
-        val wallpaperManager = WallpaperManager.getInstance(requireContext())
-        val wallpaperColors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-
-        val colors = mutableListOf<Int>()
-        // 1. Automatisch (Reset-Button)
-        colors.add(0)
-
-        // 2. Material You Farben (falls vorhanden)
-        wallpaperColors?.let {
-            colors.add(it.primaryColor.toArgb())
-            it.secondaryColor?.let { c -> colors.add(c.toArgb()) }
-            it.tertiaryColor?.let { c -> colors.add(c.toArgb()) }
-        }
-
-        // 3. Standardfarben
-        colors.add(Color.WHITE)
-        colors.add(Color.BLACK)
-
-        return colors
-    }*/
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
-        colorSwatchViews.clear()
+        return if (luminance > 0.5) Color.BLACK else Color.WHITE
     }
 
     private fun getAvailableColors(): List<Int> {
@@ -210,50 +220,37 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         // 1. Automatisch (Reset-Button)
         colors.add(0)
 
-        // 2. NEU: Die wichtigsten Material You-Farben aus dem aktuellen App-Theme auslesen
+        // 2. Material You-Farben aus dem App-Theme
         val themeColors = listOf(
-            // Primäre Farben (Hauptakzent)
-            R.attr.colorPrimary,
-            R.attr.colorPrimaryContainer,
-            R.attr.colorOnPrimary,
-            R.attr.colorOnPrimaryContainer,
-
-            // Sekundäre Farben
-            R.attr.colorSecondary,
-            R.attr.colorSecondaryContainer,
-            R.attr.colorOnSecondaryContainer,
-
-            // Tertiäre Farben
-            R.attr.colorTertiary,
-            R.attr.colorTertiaryContainer,
-            R.attr.colorOnTertiaryContainer,
-
-            // Oberflächenfarben (Hintergründe, Text)
-            R.attr.colorOnSurface,
-            R.attr.colorOnSurfaceVariant
+            R.attr.colorPrimary, R.attr.colorPrimaryContainer, R.attr.colorOnPrimary,
+            R.attr.colorOnPrimaryContainer, R.attr.colorSecondary, R.attr.colorSecondaryContainer,
+            R.attr.colorOnSecondaryContainer, R.attr.colorTertiary, R.attr.colorTertiaryContainer,
+            R.attr.colorOnTertiaryContainer, R.attr.colorOnSurface, R.attr.colorOnSurfaceVariant
         )
 
-        // Jede Farbe aus der Liste der Attribute auflösen
         themeColors.forEach { colorAttr ->
             colors.add(getThemeColor(requireContext(), colorAttr))
         }
 
-        // 3. Standardfarben bleiben als Fallback
+        // 3. Standardfarben
         colors.add(Color.WHITE)
         colors.add(Color.BLACK)
 
-        // Duplikate entfernen und zurückgeben
         return colors.distinct()
     }
 
-    // Hilfsfunktion, um eine Farbe aus einem Theme-Attribut aufzulösen
     private fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int {
         val typedValue = TypedValue()
-        // theme.resolveAttribute gibt 'true' zurück, wenn das Attribut gefunden wurde
         if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
             return typedValue.data
         }
-        // Fallback-Farbe, falls das Attribut nicht gefunden wird (sollte nicht passieren)
-        return Color.MAGENTA
+        return Color.MAGENTA // Fallback
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+        textSwatchViews.clear()
+        chipBgSwatchViews.clear()
     }
 }

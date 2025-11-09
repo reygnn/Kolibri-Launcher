@@ -119,7 +119,9 @@ class HomeViewModelTest {
         whenever(swipeActionsManager.swipeLeftAppFlow).thenReturn(flowOf(null))
         whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(null))
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
-        runTest { whenever(calendarManager.getNextUpcomingEvent()).thenReturn(null) }
+        runTest {
+            whenever(calendarManager.getUpcomingEvents(any())).thenReturn(emptyList())
+        }
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -511,6 +513,7 @@ class HomeViewModelTest {
 
         val colors = viewModel.uiColorsState.value
         assertEquals(Color.WHITE, colors.textColor)
+        assertEquals(0, colors.chipBackgroundColor)
         assertNotNull(colors.shadowColor)
     }
 
@@ -834,21 +837,14 @@ class HomeViewModelTest {
         verify(swipeActionsManager).setSwipeAction(SwipeSlot.RIGHT, null)
     }
 
-/*    @Test
+    @Test
     fun `init - when calendar enabled - updates calendar event`() = runTest {
-        // Erstelle den Mock für die statische Klasse
-        val mockedDateFormat: MockedStatic<DateFormat> = mockStatic(DateFormat::class.java)
-
         try {
-            // Setup: 24-Stunden-Format für vorhersagbare Zeit
-            mockedDateFormat.`when`<Boolean> { DateFormat.is24HourFormat(context) }.thenReturn(true)
-
-            // Setup: Funktion ist AN
             whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
 
-            // Setup: Ein Termin existiert
             val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
-            whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
+            val testEventList = listOf(testEvent)
+            whenever(calendarManager.getUpcomingEvents(5)).thenReturn(testEventList)
 
             // ViewModel starten (Act)
             setupViewModel()
@@ -856,27 +852,30 @@ class HomeViewModelTest {
 
             // Überprüfen (Assert)
             val state = viewModel.uiState.value
-            assertTrue(state.nextEventString.endsWith(" Test Meeting"))
+            // --- GEÄNDERT --- (State-Prüfung)
+            assertEquals(1, state.calendarEvents.size)
+            assertEquals("Test Meeting", state.calendarEvents.first().title)
 
         } finally {
-            mockedDateFormat.close()
         }
-    }*/
+    }
 
-/*    @Test
+    @Test
     fun `init - when calendar disabled - event string is empty`() = runTest {
         // Setup: Funktion ist AUS (das ist der Standard in setup())
         // Setup: Ein Termin existiert (wird aber ignoriert)
         val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
-        whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
+        // --- GEÄNDERT --- (Neue API)
+        whenever(calendarManager.getUpcomingEvents(5)).thenReturn(listOf(testEvent))
 
         setupViewModel()
         advanceUntilIdle()
 
         // Überprüfen, ob der State leer ist
         val state = viewModel.uiState.value
-        assertEquals("", state.nextEventString)
+        assertTrue(state.calendarEvents.isEmpty())
+
         // Wichtig: Das Repository darf gar nicht erst abgefragt werden
-        verify(calendarManager, never()).getNextUpcomingEvent()
-    }*/
+        verify(calendarManager, never()).getUpcomingEvents(any())
+    }
 }
