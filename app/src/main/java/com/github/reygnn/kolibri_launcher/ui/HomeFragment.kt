@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -28,10 +30,12 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.data.CalendarEvent
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.MenuContext
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
+import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -40,6 +44,11 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.abs
+import android.text.format.DateFormat
+import androidx.core.net.toUri
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * ULTRA CRASH-SAFE HomeFragment
@@ -180,15 +189,9 @@ class HomeFragment : Fragment() {
                             }
 
                             try {
-                                if (state.nextEventString.isNotEmpty()) {
-                                    binding.calendarEventText.text = state.nextEventString
-                                    binding.calendarEventText.visibility = View.VISIBLE
-                                } else {
-                                    binding.calendarEventText.text = ""
-                                    binding.calendarEventText.visibility = View.INVISIBLE
-                                }
+                                updateCalendarChips(state.calendarEvents)
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating calendar event text")
+                                TimberWrapper.silentError(e, "Error updating calendar chips")
                             }
                         }
                     } catch (e: CancellationException) {
@@ -230,6 +233,139 @@ class HomeFragment : Fragment() {
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
             }
+        }
+    }
+
+    private fun updateCalendarChips(events: List<CalendarEvent>) {
+        if (_binding == null) return
+
+        try {
+            // Leere Container
+            binding.calendarChipsContainer.removeAllViews()
+
+            if (events.isEmpty()) {
+                binding.calendarEventsScroll.visibility = View.GONE
+                return
+            }
+
+            binding.calendarEventsScroll.visibility = View.VISIBLE
+
+            val ctx = context
+            if (ctx == null) {
+                Timber.w("Context is null, cannot create calendar chips")
+                return
+            }
+
+            val colors = viewModel.uiColorsState.value
+            val is24Hour = DateFormat.is24HourFormat(ctx)
+            val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+            val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+
+            for (event in events) {
+                try {
+                    val chip = createCalendarChip(ctx, event, timeFormat, colors)
+                    if (chip != null) {
+                        binding.calendarChipsContainer.addView(chip)
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
+                    // Weiter mit nächstem Event
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating calendar chips")
+        }
+    }
+
+    private fun createCalendarChip(
+        context: Context,
+        event: CalendarEvent,
+        timeFormat: SimpleDateFormat,
+        colors: UiColorsState
+    ): Chip? {
+        return try {
+            Chip(context).apply {
+                try {
+                    val eventTime = timeFormat.format(Date(event.startTimeMillis))
+                    text = "$eventTime ${event.title}"
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error formatting chip text")
+                    text = event.title
+                }
+
+                // Text-Ellipsize konfigurieren
+                try {
+                    ellipsize = TextUtils.TruncateAt.END
+                    maxWidth = (resources.displayMetrics.widthPixels * 0.7).toInt() // 70% der Bildschirmbreite
+                    isSingleLine = true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error setting ellipsize")
+                }
+
+                // Styling
+                try {
+                    // Transparenter Hintergrund für minimalistischen Look
+                    chipBackgroundColor = ColorStateList.valueOf(
+                        Color.argb(40, Color.red(colors.textColor),
+                            Color.green(colors.textColor),
+                            Color.blue(colors.textColor))
+                    )
+
+                    // Text-Farbe
+                    setTextColor(colors.textColor)
+
+                    // Kein Close-Icon
+                    isCloseIconVisible = false
+
+                    // Kein Checkable
+                    isCheckable = false
+
+                    // Thin border (optional)
+                    chipStrokeWidth = 1f
+                    chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+
+                    // Text-Größe
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+
+                    // Padding
+                    chipMinHeight = resources.getDimension(R.dimen.chip_min_height)
+
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error styling chip")
+                }
+
+                // Click-Handler: Öffne Kalender-App
+                setOnClickListener {
+                    try {
+                        openCalendarAtTime(event.startTimeMillis)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error opening calendar")
+                        // Fallback: Öffne nur Kalender-App
+                        try {
+                            viewModel.onDateDoubleClick()
+                        } catch (fallbackError: Throwable) {
+                            TimberWrapper.silentError(fallbackError, "Fallback calendar open failed")
+                        }
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
+            null
+        }
+    }
+
+    private fun openCalendarAtTime(startTimeMillis: Long) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = "content://com.android.calendar/time/$startTimeMillis".toUri()
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Throwable) {
+            // Fallback: Öffne einfach Kalender-App
+            TimberWrapper.silentError(e, "Could not open calendar at specific time")
+            viewModel.onDateDoubleClick()
         }
     }
 
@@ -378,20 +514,48 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error updating battery text color")
         }
 
-        // Update calendar text
-        try {
-            binding.calendarEventText.setTextColor(textColor)
-            binding.calendarEventText.setShadowLayer(
-                AppConstants.SHADOW_RADIUS_DATE,
-                AppConstants.SHADOW_DX_SMALL,
-                AppConstants.SHADOW_DY_SMALL,
-                shadowColor
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating calendar text color")
-        }
+        updateCalendarChipsColors(textColor, shadowColor)
 
         updateFavoriteAppsColors(textColor, shadowColor)
+    }
+
+    private fun updateCalendarChipsColors(textColor: Int, shadowColor: Int) {
+        if (_binding == null) return
+
+        try {
+            for (i in 0 until binding.calendarChipsContainer.childCount) {
+                try {
+                    val view = binding.calendarChipsContainer.getChildAt(i)
+                    if (view is Chip) {
+                        view.setTextColor(textColor)
+
+                        view.chipBackgroundColor = ColorStateList.valueOf(
+                            Color.argb(40, Color.red(textColor),
+                                Color.green(textColor),
+                                Color.blue(textColor))
+                        )
+
+                        view.chipStrokeColor = ColorStateList.valueOf(textColor)
+
+                        // Optional: Schatten wie bei anderen Texten
+                        if (shadowColor != Color.TRANSPARENT) {
+                            view.setShadowLayer(
+                                AppConstants.SHADOW_RADIUS_APPS,
+                                AppConstants.SHADOW_DX,
+                                AppConstants.SHADOW_DY,
+                                shadowColor
+                            )
+                        } else {
+                            view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                        }
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error updating color for chip at index $i")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating calendar chips colors")
+        }
     }
 
     private fun updateFavoriteAppsColors(textColor: Int, shadowColor: Int) {
@@ -476,7 +640,7 @@ class HomeFragment : Fragment() {
                     text = app.displayName
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting button text")
-                    text = "App"  // Fallback
+                    text = "App"  // FallbackF
                 }
 
                 try {
@@ -709,21 +873,6 @@ class HomeFragment : Fragment() {
             })
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting battery click listener")
-        }
-
-        // Doppelklick auf den Termin, um den Kalender zu öffnen.
-        try {
-            binding.calendarEventText.setOnClickListener(object : DoubleClickListener() {
-                override fun onDoubleClick() {
-                    try {
-                        viewModel.onDateDoubleClick() // Dieselbe Aktion wie beim Datum
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in calendar event double click")
-                    }
-                }
-            })
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting calendar event click listener")
         }
     }
 

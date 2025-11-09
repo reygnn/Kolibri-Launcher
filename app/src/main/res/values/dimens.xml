@@ -5,7 +5,7 @@
     <dimen name="layout_padding">24dp</dimen>
     <dimen name="spacing_small">4dp</dimen>
     <dimen name="spacing_medium">8dp</dimen>
-    <dimen name="spacing_large">16dp</dimen> <!-- Renamed fab_margin for general use -->
+    <dimen name="spacing_large">16dp</dimen>
     <dimen name="spacing_xlarge">48dp</dimen>
 
     <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
@@ -28,4 +28,5 @@
     <dimen name="app_drawer_padding_horizontal">@dimen/spacing_large</dimen>
     <dimen name="app_drawer_padding_bottom">@dimen/spacing_large</dimen>
 
+    <dimen name="chip_min_height">32dp</dimen>
 </resources>

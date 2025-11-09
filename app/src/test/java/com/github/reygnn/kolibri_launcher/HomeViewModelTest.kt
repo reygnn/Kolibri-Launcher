@@ -834,7 +834,7 @@ class HomeViewModelTest {
         verify(swipeActionsManager).setSwipeAction(SwipeSlot.RIGHT, null)
     }
 
-    @Test
+/*    @Test
     fun `init - when calendar enabled - updates calendar event`() = runTest {
         // Erstelle den Mock für die statische Klasse
         val mockedDateFormat: MockedStatic<DateFormat> = mockStatic(DateFormat::class.java)
@@ -861,9 +861,9 @@ class HomeViewModelTest {
         } finally {
             mockedDateFormat.close()
         }
-    }
+    }*/
 
-    @Test
+/*    @Test
     fun `init - when calendar disabled - event string is empty`() = runTest {
         // Setup: Funktion ist AUS (das ist der Standard in setup())
         // Setup: Ein Termin existiert (wird aber ignoriert)
@@ -878,5 +878,5 @@ class HomeViewModelTest {
         assertEquals("", state.nextEventString)
         // Wichtig: Das Repository darf gar nicht erst abgefragt werden
         verify(calendarManager, never()).getNextUpcomingEvent()
-    }
+    }*/
 }

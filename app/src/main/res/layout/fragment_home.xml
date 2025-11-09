@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout 
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -70,20 +70,24 @@
                     android:layout_marginStart="@dimen/spacing_medium" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/calendar_event_text"
+            </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/calendar_events_scroll"
+            android:layout_width="0dp"  android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_small"
+            android:scrollbars="none"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/time_container"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"> <com.google.android.material.chip.ChipGroup
+                android:id="@+id/calendar_chips_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/spacing_small"
-                android:textSize="@dimen/text_size_secondary_info"
-                android:textColor="@color/default_text_color"
-                android:fontFamily="sans-serif"
-                android:padding="@dimen/touch_target_padding"
-                android:textStyle="italic"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:visibility="invisible" />
-        </LinearLayout>
+                app:singleLine="true"
+                app:chipSpacing="@dimen/spacing_small" />
+        </HorizontalScrollView>
+
 
         <ScrollView
             android:id="@+id/favorites_scroll_view"
@@ -91,7 +95,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_medium"
             android:fillViewport="true"
-            app:layout_constraintTop_toBottomOf="@id/time_container"
+            app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 

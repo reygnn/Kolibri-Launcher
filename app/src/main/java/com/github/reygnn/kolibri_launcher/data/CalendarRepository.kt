@@ -13,4 +13,5 @@ interface CalendarRepository {
      * oder 'null', wenn kein Termin ansteht oder die Berechtigung fehlt.
      */
     suspend fun getNextUpcomingEvent(): CalendarEvent?
+    suspend fun getUpcomingEvents(maxCount: Int = 5): List<CalendarEvent>
 }

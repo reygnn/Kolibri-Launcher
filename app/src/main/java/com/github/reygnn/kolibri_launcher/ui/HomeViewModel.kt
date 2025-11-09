@@ -25,6 +25,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.data.CalendarEvent
 import com.github.reygnn.kolibri_launcher.data.CalendarRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
@@ -65,7 +66,7 @@ data class HomeUiState(
     val timeString: String = "",
     val dateString: String = "",
     val batteryString: String = "",
-    val nextEventString: String = ""
+    val calendarEvents: List<CalendarEvent> = emptyList()
 )
 
 data class UiColorsState(
@@ -761,36 +762,21 @@ class HomeViewModel @Inject constructor(
      */
     fun updateCalendarEvent() = launchSafe {
         try {
-            // 1. Prüfen, ob die Funktion in den Einstellungen überhaupt aktiviert ist
             val isEnabled = settingsManager.showCalendarEventFlow.first()
             if (!isEnabled) {
-                _uiState.update { it.copy(nextEventString = "") }
+                _uiState.update { it.copy(calendarEvents = emptyList()) }
                 return@launchSafe
             }
 
-            // 2. Nächsten Termin vom Repository abfragen
-            val event = calendarManager.getNextUpcomingEvent()
-            if (event == null) {
-                // Kein Termin gefunden (oder Berechtigung fehlt)
-                _uiState.update { it.copy(nextEventString = "") }
-                return@launchSafe
-            }
-
-            // 3. Event-String formatieren (z.B. "17:00 Team-Meeting")
-            val is24Hour = DateFormat.is24HourFormat(context)
-            val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-            val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-
-            val eventTime = timeFormat.format(java.util.Date(event.startTimeMillis))
-
-            val eventString = "$eventTime ${event.title}"
-            _uiState.update { it.copy(nextEventString = eventString) }
+            // Hole bis zu 5 Events
+            val events = calendarManager.getUpcomingEvents(maxCount = 5)
+            _uiState.update { it.copy(calendarEvents = events) }
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to update calendar event")
-            _uiState.update { it.copy(nextEventString = "") }
+            TimberWrapper.silentError(e, "Failed to update calendar events")
+            _uiState.update { it.copy(calendarEvents = emptyList()) }
         }
     }
 }

@@ -21,28 +21,29 @@ import javax.inject.Singleton
  */
 @Singleton
 class CalendarManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : CalendarRepository {
 
     companion object {
-        // Wie weit in die Zukunft soll gesucht werden? 12 Stunden sind
-        // ein guter Wert für eine "At-a-Glance"-Anzeige.
         private val QUERY_DURATION = DateUtils.HOUR_IN_MILLIS * 12
+        private const val MAX_EVENTS_DEFAULT = 5
     }
 
     override suspend fun getNextUpcomingEvent(): CalendarEvent? {
-        // 1. Berechtigungsprüfung: Absolut sicherstellen, dass wir die
-        // Berechtigung haben. Wenn nicht, sofort 'null' zurückgeben.
+        return getUpcomingEvents(maxCount = 1).firstOrNull()
+    }
+
+    override suspend fun getUpcomingEvents(maxCount: Int): List<CalendarEvent> {
+        // Berechtigungsprüfung
         if (ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.READ_CALENDAR
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            TimberWrapper.silentError("Fehlende READ_CALENDAR Berechtigung. Kann keine Termine abfragen.")
-            return null
+            TimberWrapper.silentError("Fehlende READ_CALENDAR Berechtigung")
+            return emptyList()
         }
 
-        // 2. Abfrage-Parameter definieren
         val projection = arrayOf(
             CalendarContract.Instances.TITLE,
             CalendarContract.Instances.BEGIN,
@@ -52,22 +53,15 @@ class CalendarManager @Inject constructor(
         val now = System.currentTimeMillis()
         val endOfQueryRange = now + QUERY_DURATION
 
-        // 3. URI für die 'Instances'-Tabelle erstellen.
-        // WICHTIG: 'Instances' verwenden, nicht 'Events'. 'Instances'
-        // löst auch wiederkehrende Termine korrekt auf.
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
             .also {
                 ContentUris.appendId(it, now)
                 ContentUris.appendId(it, endOfQueryRange)
             }.build()
 
-        // 4. Nur Termine, die nicht "ganztägig" sind
         val selection = "${CalendarContract.Instances.ALL_DAY} = 0"
-
-        // 5. Nach dem Startdatum sortieren, um den *nächsten* Termin zu erhalten
         val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
 
-        // 6. Die Abfrage sicher auf dem I/O-Thread ausführen
         return try {
             withContext(Dispatchers.IO) {
                 context.contentResolver.query(
@@ -76,34 +70,36 @@ class CalendarManager @Inject constructor(
                     selection,
                     null,
                     sortOrder
-                )?.use { cursor -> // 'use' stellt sicher, dass der Cursor geschlossen wird
+                )?.use { cursor ->
+                    val events = mutableListOf<CalendarEvent>()
 
-                    if (cursor.moveToFirst()) {
-                        // Spalten-Indizes sicher abrufen
-                        val titleIdx =
-                            cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
-                        val beginIdx =
-                            cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
-                        val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                    val titleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
+                    val beginIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
+                    val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
 
-                        // Das Event-Objekt erstellen und zurückgeben
-                        CalendarEvent(
-                            title = cursor.getString(titleIdx),
-                            startTimeMillis = cursor.getLong(beginIdx),
-                            endTimeMillis = cursor.getLong(endIdx)
-                        )
-                    } else {
-                        // Kein Termin im Zeitfenster gefunden
-                        null
+                    while (cursor.moveToNext() && events.size < maxCount) {
+                        try {
+                            events.add(
+                                CalendarEvent(
+                                    title = cursor.getString(titleIdx) ?: "Unbekannt",
+                                    startTimeMillis = cursor.getLong(beginIdx),
+                                    endTimeMillis = cursor.getLong(endIdx)
+                                )
+                            )
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Fehler beim Parsen eines Events")
+                            // Überspringe diesen Termin, mache mit dem nächsten weiter
+                        }
                     }
-                }
+
+                    events
+                } ?: emptyList()
             }
         } catch (e: CancellationException) {
-            throw e // Coroutine-Abbrüche müssen weitergeleitet werden
+            throw e
         } catch (e: Throwable) {
-            // Alle anderen Fehler (SecurityException, IllegalStateException, etc.) abfangen
             TimberWrapper.silentError(e, "Fehler beim Abfragen der Kalender-Instanzen")
-            null // Bei Fehler 'null' zurückgeben
+            emptyList()
         }
     }
 }
