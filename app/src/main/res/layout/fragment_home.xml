@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="false">
@@ -12,7 +14,7 @@
         android:visibility="gone"
         android:contentDescription="@string/wallpaper_background" />
 
-    <RelativeLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/root_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -26,11 +28,11 @@
             android:id="@+id/time_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentStart="true"
             android:layout_marginTop="@dimen/spacing_xlarge"
             android:orientation="vertical"
-            android:gravity="start">
+            android:gravity="start"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
 
             <TextView
                 android:id="@+id/time_text"
@@ -69,27 +71,29 @@
             </LinearLayout>
 
             <TextView
-                    android:id="@+id/calendar_event_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/spacing_small"
-                    android:textSize="@dimen/text_size_secondary_info"
-                    android:textColor="@color/default_text_color"
-                    android:fontFamily="sans-serif"
-                    android:padding="@dimen/touch_target_padding"
-                    android:textStyle="italic"
-                    android:maxLines="1" 
-                    android:ellipsize="end"
-                    android:visibility="invisible" />
+                android:id="@+id/calendar_event_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_small"
+                android:textSize="@dimen/text_size_secondary_info"
+                android:textColor="@color/default_text_color"
+                android:fontFamily="sans-serif"
+                android:padding="@dimen/touch_target_padding"
+                android:textStyle="italic"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="invisible" />
         </LinearLayout>
 
         <ScrollView
-            android:layout_width="match_parent"
+            android:id="@+id/favorites_scroll_view"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_below="@id/time_container"
             android:layout_marginTop="@dimen/spacing_medium"
-            android:fillViewport="true">
+            android:fillViewport="true"
+            app:layout_constraintTop_toBottomOf="@id/time_container"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
             <LinearLayout
                 android:id="@+id/favorite_apps_container"
@@ -98,5 +102,6 @@
                 android:orientation="vertical"
                 android:gravity="start" />
         </ScrollView>
-    </RelativeLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>
