@@ -302,7 +302,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
         if (_binding == null) return
 
         try {
-            binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.GONE else View.VISIBLE
+            binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.INVISIBLE else View.VISIBLE
             binding.selectionChipGroup.removeAllViews()
 
             for (app in selectedApps) {

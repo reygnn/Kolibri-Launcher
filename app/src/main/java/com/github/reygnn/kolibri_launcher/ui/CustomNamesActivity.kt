@@ -237,7 +237,7 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
         if (_binding == null) return
 
         try {
-            binding.chipsScrollView.visibility = if (appsWithCustomNames.isEmpty()) View.GONE else View.VISIBLE
+            binding.chipsScrollView.visibility = if (appsWithCustomNames.isEmpty()) View.INVISIBLE else View.VISIBLE
             binding.appNameChipGroup.removeAllViews()
 
             for (app in appsWithCustomNames) {
