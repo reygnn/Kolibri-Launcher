@@ -157,7 +157,7 @@ class HomeViewModelTest {
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            assertEquals(2, (state as UiState.Success).data.apps.size)
+            assertEquals(2, state.data.apps.size)
             assertFalse(state.data.isFallback)
         }
     }
@@ -178,7 +178,7 @@ class HomeViewModelTest {
             assertTrue(event is UiEvent.ShowToast)
             assertEquals(
                 R.string.welcome_toast_fallback_favorites,
-                (event as UiEvent.ShowToast).messageResId
+                event.messageResId
             )
         }
     }
@@ -259,7 +259,7 @@ class HomeViewModelTest {
 
                 val launchEvent = awaitItem()
                 assertTrue(launchEvent is UiEvent.LaunchApp)
-                assertEquals(app1, (launchEvent as UiEvent.LaunchApp).app)
+                assertEquals(app1, launchEvent.app)
 
                 expectNoEvents()
 
@@ -435,7 +435,7 @@ class HomeViewModelTest {
             assertTrue(event is UiEvent.ShowToast)
             assertEquals(
                 R.string.toast_enable_double_tap_to_lock,
-                (event as UiEvent.ShowToast).messageResId
+                event.messageResId
             )
 
             // Second call should not emit event
@@ -721,7 +721,7 @@ class HomeViewModelTest {
 
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.error_app_info_open, (event as UiEvent.ShowToast).messageResId)
+            assertEquals(R.string.error_app_info_open, event.messageResId)
         }
     }
 
@@ -767,7 +767,7 @@ class HomeViewModelTest {
             // Erwarte, dass onAppClicked() ein LaunchApp Event auslöst
             val event = awaitItem()
             assertTrue(event is UiEvent.LaunchApp)
-            assertEquals(app1, (event as UiEvent.LaunchApp).app)
+            assertEquals(app1, event.app)
         }
 
         // Stelle sicher, dass auch die Nutzung getrackt wurde
@@ -791,7 +791,7 @@ class HomeViewModelTest {
             // Erwarte, dass onAppClicked() ein LaunchApp Event auslöst
             val event = awaitItem()
             assertTrue(event is UiEvent.LaunchApp)
-            assertEquals(app2, (event as UiEvent.LaunchApp).app)
+            assertEquals(app2, event.app)
         }
 
         // Stelle sicher, dass auch die Nutzung getrackt wurde
