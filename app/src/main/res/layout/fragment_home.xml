@@ -77,7 +77,10 @@
                     android:textColor="@color/default_text_color"
                     android:fontFamily="sans-serif"
                     android:padding="@dimen/touch_target_padding"
-                    android:visibility="gone" />
+                    android:textStyle="italic"
+                    android:maxLines="1" 
+                    android:ellipsize="end"
+                    android:visibility="invisible" />
         </LinearLayout>
 
         <ScrollView
@@ -85,7 +88,7 @@
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:layout_below="@id/time_container"
-            android:layout_marginTop="@dimen/spacing_xlarge"
+            android:layout_marginTop="@dimen/spacing_medium"
             android:fillViewport="true">
 
             <LinearLayout

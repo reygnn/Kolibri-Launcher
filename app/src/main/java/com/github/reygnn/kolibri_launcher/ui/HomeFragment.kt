@@ -8,6 +8,7 @@ import android.content.pm.ShortcutInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
@@ -183,7 +184,8 @@ class HomeFragment : Fragment() {
                                     binding.calendarEventText.text = state.nextEventString
                                     binding.calendarEventText.visibility = View.VISIBLE
                                 } else {
-                                    binding.calendarEventText.visibility = View.GONE
+                                    binding.calendarEventText.text = ""
+                                    binding.calendarEventText.visibility = View.INVISIBLE
                                 }
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating calendar event text")
@@ -506,6 +508,13 @@ class HomeFragment : Fragment() {
                     setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting text size")
+                }
+
+                try {
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error setting ellipsize/maxlines")
                 }
 
                 try {

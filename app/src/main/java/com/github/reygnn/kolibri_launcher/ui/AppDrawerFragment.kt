@@ -57,7 +57,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private val viewModel: HomeViewModel by activityViewModels()
 
-    // CRASH-SAFE: Nullable binding
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
 

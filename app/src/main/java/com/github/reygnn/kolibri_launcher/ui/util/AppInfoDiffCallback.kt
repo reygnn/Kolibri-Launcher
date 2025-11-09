@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.util
 
 import androidx.recyclerview.widget.DiffUtil
 import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.AppDrawerAdapter
 
 /**
  * Standard DiffUtil.ItemCallback für AppInfo.
@@ -15,5 +16,12 @@ class AppInfoDiffCallback : DiffUtil.ItemCallback<AppInfo>() {
 
     override fun areContentsTheSame(oldItem: AppInfo, newItem: AppInfo): Boolean {
         return oldItem == newItem
+    }
+
+    override fun getChangePayload(oldItem: AppInfo, newItem: AppInfo): Any? {
+        if (oldItem.displayName != newItem.displayName) {
+            return AppDrawerAdapter.PAYLOAD_NAME_CHANGE
+        }
+        return null
     }
 }

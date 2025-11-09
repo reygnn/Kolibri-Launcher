@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import android.graphics.Color
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -27,8 +28,8 @@ class AppDrawerAdapter(
     private var shadowColor: Int = Color.BLACK
 
     companion object {
-        internal const val PAYLOAD_COLOR_CHANGE = "color_change"
-        internal const val PAYLOAD_NAME_CHANGE = "name_change"
+        const val PAYLOAD_COLOR_CHANGE = "color_change"
+        const val PAYLOAD_NAME_CHANGE = "name_change"
     }
 
     /**
@@ -250,6 +251,8 @@ class AppDrawerAdapter(
         fun updateName(name: String) {
             try {
                 appName?.text = name
+                appName?.maxLines = 1
+                appName?.ellipsize = TextUtils.TruncateAt.END
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Error updating name: $name")
             }
