@@ -486,7 +486,8 @@ class HomeFragment : Fragment() {
                 }
 
                 try {
-                    setPadding(0, 12, 0, 12)
+                    val paddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+                    setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting padding")
                 }
