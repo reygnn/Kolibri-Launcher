@@ -261,9 +261,19 @@ class HomeFragment : Fragment() {
             val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
             val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
 
+            val layoutPadding = try {
+                resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error getting layout_padding")
+                0 // Fallback
+            }
+
+            val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
+            val chipMaxWidth = (availableWidth * 0.80).toInt()
+
             for (event in events) {
                 try {
-                    val chip = createCalendarChip(ctx, event, timeFormat, colors)
+                    val chip = createCalendarChip(ctx, event, timeFormat, colors, chipMaxWidth)
                     if (chip != null) {
                         binding.calendarChipsContainer.addView(chip)
                     }
@@ -281,7 +291,8 @@ class HomeFragment : Fragment() {
         context: Context,
         event: CalendarEvent,
         timeFormat: SimpleDateFormat,
-        colors: UiColorsState
+        colors: UiColorsState,
+        calculatedMaxWidth: Int
     ): Chip? {
         return try {
             Chip(context).apply {
@@ -296,7 +307,7 @@ class HomeFragment : Fragment() {
                 // Text-Ellipsize konfigurieren
                 try {
                     ellipsize = TextUtils.TruncateAt.END
-                    maxWidth = (resources.displayMetrics.widthPixels * 0.7).toInt() // 70% der Bildschirmbreite
+                    maxWidth = calculatedMaxWidth
                     isSingleLine = true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting ellipsize")
