@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.databinding.ActivityAppNamesBinding
+import com.github.reygnn.kolibri_launcher.databinding.ActivityCustomNamesBinding
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -45,7 +45,7 @@ import timber.log.Timber
 class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
     // CRASH-SAFE: Nullable binding
-    private var _binding: ActivityAppNamesBinding? = null
+    private var _binding: ActivityCustomNamesBinding? = null
     private val binding get() = _binding ?: throw IllegalStateException("Binding accessed after onDestroy")
 
     override val viewModel: CustomNamesViewModel by viewModels()
@@ -66,7 +66,7 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
         try {
             WindowCompat.setDecorFitsSystemWindows(window, false)
-            _binding = ActivityAppNamesBinding.inflate(layoutInflater)
+            _binding = ActivityCustomNamesBinding.inflate(layoutInflater)
             setContentView(binding.root)
 
             handleWindowInsets()
