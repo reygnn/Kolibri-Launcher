@@ -42,6 +42,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.MockedStatic
+import org.mockito.Mockito.mockStatic
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
@@ -834,20 +836,31 @@ class HomeViewModelTest {
 
     @Test
     fun `init - when calendar enabled - updates calendar event`() = runTest {
-        // Setup: Funktion ist AN
-        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
-        // Setup: Ein Termin existiert
-        val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
-        whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
-        // Setup: 24-Stunden-Format für vorhersagbare Zeit
-        whenever(DateFormat.is24HourFormat(context)).thenReturn(true)
+        // Erstelle den Mock für die statische Klasse
+        val mockedDateFormat: MockedStatic<DateFormat> = mockStatic(DateFormat::class.java)
 
-        setupViewModel()
-        advanceUntilIdle()
+        try {
+            // Setup: 24-Stunden-Format für vorhersagbare Zeit
+            mockedDateFormat.`when`<Boolean> { DateFormat.is24HourFormat(context) }.thenReturn(true)
 
-        // Überprüfen, ob der State den formatierten String enthält
-        val state = viewModel.uiState.value
-        assertTrue(state.nextEventString.endsWith(" Test Meeting"))
+            // Setup: Funktion ist AN
+            whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
+
+            // Setup: Ein Termin existiert
+            val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
+            whenever(calendarManager.getNextUpcomingEvent()).thenReturn(testEvent)
+
+            // ViewModel starten (Act)
+            setupViewModel()
+            advanceUntilIdle()
+
+            // Überprüfen (Assert)
+            val state = viewModel.uiState.value
+            assertTrue(state.nextEventString.endsWith(" Test Meeting"))
+
+        } finally {
+            mockedDateFormat.close()
+        }
     }
 
     @Test
