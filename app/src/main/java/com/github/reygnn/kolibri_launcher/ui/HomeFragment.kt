@@ -45,8 +45,14 @@ import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.abs
 import android.text.format.DateFormat
+import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
+import com.github.reygnn.kolibri_launcher.domain.EventType
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -187,12 +193,6 @@ class HomeFragment : Fragment() {
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating battery text")
                             }
-
-                            try {
-                                updateCalendarChips(state.calendarEvents)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating calendar chips")
-                            }
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -207,7 +207,37 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 3: UI colors
+        // Observer 3: Nur für TimeBasedEvents mit distinctUntilChanged
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        viewModel.uiState
+                            .map { it.timeBasedEvents }
+                            .distinctUntilChanged()
+                            .collect { events ->
+                                if (_binding == null) return@collect
+
+                                try {
+                                    updateTimeBasedChips(events)
+                                } catch (e: Throwable) {
+                                    TimberWrapper.silentError(e, "Error updating time-based chips")
+                                }
+                            }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error collecting timeBasedEvents")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for timeBasedEvents")
+            }
+        }
+
+        // Observer 4: UI colors
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -235,13 +265,14 @@ class HomeFragment : Fragment() {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
             }
         }
+
+
     }
 
-    private fun updateCalendarChips(events: List<CalendarEvent>) {
+    private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
         if (_binding == null) return
 
         try {
-            // Leere Container
             binding.calendarChipsContainer.removeAllViews()
 
             if (events.isEmpty()) {
@@ -251,16 +282,8 @@ class HomeFragment : Fragment() {
 
             binding.calendarEventsScroll.visibility = View.VISIBLE
 
-            val ctx = context
-            if (ctx == null) {
-                Timber.w("Context is null, cannot create calendar chips")
-                return
-            }
-
-            val colors = viewModel.uiColorsState.value // Holt den _gesamten_ UiColorsState
-            val is24Hour = DateFormat.is24HourFormat(ctx)
-            val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-            val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+            val ctx = context ?: return
+            val colors = viewModel.uiColorsState.value
 
             val layoutPadding = try {
                 resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
@@ -274,42 +297,119 @@ class HomeFragment : Fragment() {
 
             for (event in events) {
                 try {
-                    // Übergebe das ganze colors-Objekt
-                    val chip = createCalendarChip(ctx, event, timeFormat, colors, chipMaxWidth)
+                    val chip = when (event.type) {
+                        EventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
+                        EventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
+                    }
+
                     if (chip != null) {
                         binding.calendarChipsContainer.addView(chip)
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
-                    // Weiter mit nächstem Event
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating calendar chips")
+            TimberWrapper.silentError(e, "Error updating time-based chips")
+        }
+    }
+
+    private fun createAlarmChip(
+        context: Context,
+        event: TimeBasedEvent,
+        colors: UiColorsState,
+        chipMaxWidth: Int
+    ): Chip? {
+        return try {
+            Chip(context).apply {
+                try {
+                    val is24Hour = DateFormat.is24HourFormat(context)
+                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+
+                    // ← FIX: Runde AUF zur nächsten vollen Minute
+                    // Nutzer setzen Alarme immer auf volle Minuten (06:00)
+                    // System gibt interne Trigger-Zeit zurück (05:59:22)
+                    val calendar = Calendar.getInstance()
+                    calendar.timeInMillis = event.triggerTimeMillis
+
+                    // Wenn irgendwelche Sekunden vorhanden sind, runde auf nächste Minute
+                    if (calendar.get(Calendar.SECOND) > 0 || calendar.get(Calendar.MILLISECOND) > 0) {
+                        calendar.add(Calendar.MINUTE, 1)
+                    }
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+
+                    val displayTime = calendar.timeInMillis
+                    val alarmTime = timeFormat.format(Date(displayTime))
+
+                    text = "$alarmTime ${event.title}"
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error formatting alarm chip text")
+                    text = event.title
+                }
+
+
+                // Styling (ähnlich wie Calendar, aber mit visuellem Unterschied)
+                try {
+                    ellipsize = TextUtils.TruncateAt.END
+                    maxWidth = chipMaxWidth
+                    isSingleLine = true
+
+                    // Leicht rötlicher Ton für Alarme
+                    val alarmTextColor = ColorUtils.blendARGB(colors.textColor, Color.RED, 0.15f)
+                    setTextColor(alarmTextColor)
+
+                    val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                        Color.argb(40, Color.red(alarmTextColor),
+                            Color.green(alarmTextColor),
+                            Color.blue(alarmTextColor))
+                    } else {
+                        colors.chipBackgroundColor
+                    }
+                    chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+
+                    isCloseIconVisible = false
+                    isCheckable = false
+                    chipStrokeWidth = 1f
+                    chipStrokeColor = ColorStateList.valueOf(alarmTextColor)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    chipMinHeight = resources.getDimension(R.dimen.chip_min_height)
+
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error styling alarm chip")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error creating alarm chip")
+            null
         }
     }
 
     private fun createCalendarChip(
         context: Context,
-        event: CalendarEvent,
-        timeFormat: SimpleDateFormat,
-        colors: UiColorsState, // Nimmt jetzt das ganze Objekt entgegen
-        calculatedMaxWidth: Int
+        event: TimeBasedEvent,
+        colors: UiColorsState,
+        chipMaxWidth: Int
     ): Chip? {
         return try {
             Chip(context).apply {
                 try {
-                    val eventTime = timeFormat.format(Date(event.startTimeMillis))
+                    val is24Hour = DateFormat.is24HourFormat(context)
+                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+                    val eventTime = timeFormat.format(Date(event.triggerTimeMillis))
+
                     text = "$eventTime ${event.title}"
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting chip text")
+                    TimberWrapper.silentError(e, "Error formatting calendar chip text")
                     text = event.title
                 }
 
                 // Text-Ellipsize konfigurieren
                 try {
                     ellipsize = TextUtils.TruncateAt.END
-                    maxWidth = calculatedMaxWidth
+                    maxWidth = chipMaxWidth
                     isSingleLine = true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting ellipsize")
@@ -317,7 +417,6 @@ class HomeFragment : Fragment() {
 
                 // Styling
                 try {
-                    // --- ÄNDERUNG (2/5): Neue Logik für Hintergrundfarbe ---
                     val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
                         // "Auto"-Modus: Leite Farbe von Textfarbe ab (alter Standard)
                         Color.argb(40, Color.red(colors.textColor),
@@ -352,41 +451,12 @@ class HomeFragment : Fragment() {
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error styling chip")
                 }
-
-                // Click-Handler: Öffne Kalender-App
-//                setOnClickListener {
-//                    try {
-//                        openCalendarAtTime(event.startTimeMillis)
-//                    } catch (e: Throwable) {
-//                        TimberWrapper.silentError(e, "Error opening calendar")
-//                        // Fallback: Öffne nur Kalender-App
-//                        try {
-//                            viewModel.onDateDoubleClick()
-//                        } catch (fallbackError: Throwable) {
-//                            TimberWrapper.silentError(fallbackError, "Fallback calendar open failed")
-//                        }
-//                    }
-//                }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
             null
         }
     }
-
-//    private fun openCalendarAtTime(startTimeMillis: Long) {
-//        try {
-//            val intent = Intent(Intent.ACTION_VIEW).apply {
-//                data = "content://com.android.calendar/time/$startTimeMillis".toUri()
-//                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-//            }
-//            startActivity(intent)
-//        } catch (e: Throwable) {
-//            // Fallback: Öffne einfach Kalender-App
-//            TimberWrapper.silentError(e, "Could not open calendar at specific time")
-//            viewModel.onDateDoubleClick()
-//        }
-//    }
 
     private fun setupFragmentResultListener() {
         try {
@@ -544,53 +614,15 @@ class HomeFragment : Fragment() {
         updateFavoriteAppsColors(textColor, shadowColor)
     }
 
-    // --- ÄNDERUNG (5/5): Signatur und Logik angepasst ---
     private fun updateCalendarChipsColors(colors: UiColorsState) {
-        if (_binding == null) return
+        // Jetzt müssen wir ALARM und CALENDAR Chips unterschiedlich behandeln
+        // Die TimeBasedEvent Info haben wir nicht mehr im Chip gespeichert
+        // → Einfachste Lösung: beim Color-Update die Chips neu erstellen
+        // Alternative: Tag am Chip setzen mit event.type
 
-        try {
-            // Variablen extrahieren
-            val textColor = colors.textColor
-            val shadowColor = colors.shadowColor
-
-            for (i in 0 until binding.calendarChipsContainer.childCount) {
-                try {
-                    val view = binding.calendarChipsContainer.getChildAt(i)
-                    if (view is Chip) {
-                        view.setTextColor(textColor)
-
-                        // Neue Logik für Hintergrundfarbe
-                        val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                            Color.argb(40, Color.red(textColor),
-                                Color.green(textColor),
-                                Color.blue(textColor))
-                        } else {
-                            colors.chipBackgroundColor
-                        }
-                        view.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-
-                        // Stroke bleibt an Textfarbe gekoppelt
-                        view.chipStrokeColor = ColorStateList.valueOf(textColor)
-
-                        // Schattenlogik bleibt gleich
-                        if (shadowColor != Color.TRANSPARENT) {
-                            view.setShadowLayer(
-                                AppConstants.SHADOW_RADIUS_APPS,
-                                AppConstants.SHADOW_DX,
-                                AppConstants.SHADOW_DY,
-                                shadowColor
-                            )
-                        } else {
-                            view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
-                        }
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating color for chip at index $i")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating calendar chips colors")
-        }
+        // Quick-Hack: Nutze einfach die Events aus dem State neu
+        val events = viewModel.uiState.value.timeBasedEvents
+        updateTimeBasedChips(events)
     }
 
     private fun updateFavoriteAppsColors(textColor: Int, shadowColor: Int) {

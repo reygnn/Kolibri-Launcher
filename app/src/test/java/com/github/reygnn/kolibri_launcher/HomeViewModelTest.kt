@@ -21,6 +21,8 @@ import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.domain.EventType
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.SortOrder
@@ -117,7 +119,7 @@ class HomeViewModelTest {
         whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(null))
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
         runTest {
-            whenever(calendarManager.getUpcomingEvents(any())).thenReturn(emptyList())
+            whenever(calendarManager.getUpcomingTimeBasedEvents(any())).thenReturn(emptyList())
         }
     }
 
@@ -839,19 +841,22 @@ class HomeViewModelTest {
         try {
             whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
 
-            val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
+            val testEvent = TimeBasedEvent(
+                triggerTimeMillis = System.currentTimeMillis() + 10000,
+                title = "Test Meeting",
+                type = EventType.CALENDAR
+            )
             val testEventList = listOf(testEvent)
-            whenever(calendarManager.getUpcomingEvents(5)).thenReturn(testEventList)
 
-            // ViewModel starten (Act)
+            whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(testEventList)
+
             setupViewModel()
             advanceUntilIdle()
 
-            // Überprüfen (Assert)
             val state = viewModel.uiState.value
-            // --- GEÄNDERT --- (State-Prüfung)
-            assertEquals(1, state.calendarEvents.size)
-            assertEquals("Test Meeting", state.calendarEvents.first().title)
+            assertEquals(1, state.timeBasedEvents.size)
+            assertEquals("Test Meeting", state.timeBasedEvents.first().title)
+            assertEquals(EventType.CALENDAR, state.timeBasedEvents.first().type)
 
         } finally {
         }
@@ -859,20 +864,48 @@ class HomeViewModelTest {
 
     @Test
     fun `init - when calendar disabled - event string is empty`() = runTest {
-        // Setup: Funktion ist AUS (das ist der Standard in setup())
-        // Setup: Ein Termin existiert (wird aber ignoriert)
-        val testEvent = CalendarEvent("Test Meeting", System.currentTimeMillis() + 10000, 0L)
-        // --- GEÄNDERT --- (Neue API)
-        whenever(calendarManager.getUpcomingEvents(5)).thenReturn(listOf(testEvent))
+        val testEvent = TimeBasedEvent(
+            triggerTimeMillis = System.currentTimeMillis() + 10000,
+            title = "Test Meeting",
+            type = EventType.CALENDAR
+        )
+
+        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(testEvent))
 
         setupViewModel()
         advanceUntilIdle()
 
-        // Überprüfen, ob der State leer ist
         val state = viewModel.uiState.value
-        assertTrue(state.calendarEvents.isEmpty())
+        assertTrue(state.timeBasedEvents.isEmpty())
 
-        // Wichtig: Das Repository darf gar nicht erst abgefragt werden
-        verify(calendarManager, never()).getUpcomingEvents(any())
+        verify(calendarManager, never()).getUpcomingTimeBasedEvents(any())
+    }
+
+    @Test
+    fun `init - when calendar enabled with alarm - shows alarm first chronologically`() = runTest {
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
+
+        val now = System.currentTimeMillis()
+        val alarm = TimeBasedEvent(
+            triggerTimeMillis = now + 3600000, // in 1 Stunde
+            title = "Alarm",
+            type = EventType.ALARM
+        )
+        val meeting = TimeBasedEvent(
+            triggerTimeMillis = now + 7200000, // in 2 Stunden
+            title = "Meeting",
+            type = EventType.CALENDAR
+        )
+
+        // Chronologisch sortiert: Alarm kommt vor Meeting
+        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm, meeting))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.timeBasedEvents.size)
+        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
+        assertEquals(EventType.CALENDAR, state.timeBasedEvents[1].type)
     }
 }

@@ -39,6 +39,7 @@ import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.SortOrder
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -66,7 +67,7 @@ data class HomeUiState(
     val timeString: String = "",
     val dateString: String = "",
     val batteryString: String = "",
-    val calendarEvents: List<CalendarEvent> = emptyList()
+    val timeBasedEvents: List<TimeBasedEvent> = emptyList()
 )
 
 data class UiColorsState(
@@ -777,26 +778,23 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Prüft, ob die Funktion aktiviert ist, und lädt den nächsten Kalendertermin.
-     */
     fun updateCalendarEvent() = launchSafe {
         try {
             val isEnabled = settingsManager.showCalendarEventFlow.first()
             if (!isEnabled) {
-                _uiState.update { it.copy(calendarEvents = emptyList()) }
+                _uiState.update { it.copy(timeBasedEvents = emptyList()) }
                 return@launchSafe
             }
 
-            // Hole bis zu 5 Events
-            val events = calendarManager.getUpcomingEvents(maxCount = 5)
-            _uiState.update { it.copy(calendarEvents = events) }
+            // ← Neue Methode nutzen
+            val events = calendarManager.getUpcomingTimeBasedEvents(maxCount = 5)
+            _uiState.update { it.copy(timeBasedEvents = events) }
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to update calendar events")
-            _uiState.update { it.copy(calendarEvents = emptyList()) }
+            TimberWrapper.silentError(e, "Failed to update time-based events")
+            _uiState.update { it.copy(timeBasedEvents = emptyList()) }
         }
     }
 }

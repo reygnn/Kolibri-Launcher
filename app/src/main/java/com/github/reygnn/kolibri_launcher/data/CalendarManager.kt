@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import android.app.AlarmManager
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
@@ -8,10 +9,14 @@ import android.provider.CalendarContract
 import android.text.format.DateUtils
 import androidx.core.content.ContextCompat
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.EventType
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CancellationException as JavaCancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -99,6 +104,80 @@ class CalendarManager @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Fehler beim Abfragen der Kalender-Instanzen")
+            emptyList()
+        }
+    }
+
+    override suspend fun getNextAlarm(): TimeBasedEvent? {
+        return runCatching {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+
+            if (alarmManager == null) {
+                TimberWrapper.silentError("AlarmManager service is null")
+                return@runCatching null
+            }
+
+            val nextAlarm = alarmManager.nextAlarmClock
+
+            if (nextAlarm == null) {
+                // Kein Alarm gesetzt - das ist normal, kein Error
+                return@runCatching null
+            }
+
+            TimeBasedEvent(
+                triggerTimeMillis = nextAlarm.triggerTime,
+                title = "Alarm", // System gibt uns keinen Alarm-Namen
+                type = EventType.ALARM
+            )
+
+        }.getOrElse { e ->
+            if (e is CancellationException || e is JavaCancellationException) throw e
+            TimberWrapper.silentError(e, "Error getting next alarm")
+            null
+        }
+    }
+
+    override suspend fun getUpcomingTimeBasedEvents(maxCount: Int): List<TimeBasedEvent> {
+        return runCatching {
+            val events = mutableListOf<TimeBasedEvent>()
+
+            // 1. Alarm hinzufügen (falls vorhanden)
+            try {
+                getNextAlarm()?.let { alarm ->
+                    events.add(alarm)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error adding alarm to events")
+                // Weiter mit Kalenderterminen
+            }
+
+            // 2. Kalendertermine hinzufügen
+            try {
+                val calendarEvents = getUpcomingEvents(maxCount)
+                calendarEvents.forEach { calEvent ->
+                    events.add(
+                        TimeBasedEvent(
+                            triggerTimeMillis = calEvent.startTimeMillis,
+                            title = calEvent.title,
+                            type = EventType.CALENDAR
+                        )
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error adding calendar events")
+                // Weiter - vielleicht haben wir ja den Alarm
+            }
+
+            // 3. Chronologisch sortieren und limitieren
+            events.sortedBy { it.triggerTimeMillis }.take(maxCount)
+
+        }.getOrElse { e ->
+            if (e is CancellationException || e is JavaCancellationException) throw e
+            TimberWrapper.silentError(e, "Error getting time-based events")
             emptyList()
         }
     }

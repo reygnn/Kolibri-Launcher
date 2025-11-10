@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
+
 /**
  * Interface für das Repository, das Kalenderdaten abruft.
  * Das ViewModel wird gegen dieses Interface programmieren.
@@ -14,4 +16,7 @@ interface CalendarRepository {
      */
     suspend fun getNextUpcomingEvent(): CalendarEvent?
     suspend fun getUpcomingEvents(maxCount: Int = 5): List<CalendarEvent>
+
+    suspend fun getNextAlarm(): TimeBasedEvent?
+    suspend fun getUpcomingTimeBasedEvents(maxCount: Int = 5): List<TimeBasedEvent>
 }
