@@ -498,7 +498,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private var appLoadRetryCount = 0
-    private val MAX_APP_LOAD_RETRIES = 3
+    private val maxAppLoadRetries = 3
 
     /**
      * Observes installed apps with triple-layer error protection:
@@ -509,11 +509,11 @@ class HomeViewModel @Inject constructor(
     private fun observeInstalledApps() = launchSafe {
         try {
             installedAppsManager.getInstalledApps()
-                .retry(MAX_APP_LOAD_RETRIES.toLong()) { cause ->
+                .retry(maxAppLoadRetries.toLong()) { cause ->
                     try {
                         if (cause is IOException) {
                             appLoadRetryCount++
-                            Timber.w("App loading failed, retry ${appLoadRetryCount}/${MAX_APP_LOAD_RETRIES}")
+                            Timber.w("App loading failed, retry ${appLoadRetryCount}/${maxAppLoadRetries}")
                             delay(1000L * appLoadRetryCount)
                             true
                         } else {

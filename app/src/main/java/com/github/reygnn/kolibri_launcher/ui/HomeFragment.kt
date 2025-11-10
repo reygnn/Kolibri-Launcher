@@ -354,19 +354,19 @@ class HomeFragment : Fragment() {
                 }
 
                 // Click-Handler: Öffne Kalender-App
-                setOnClickListener {
-                    try {
-                        openCalendarAtTime(event.startTimeMillis)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error opening calendar")
-                        // Fallback: Öffne nur Kalender-App
-                        try {
-                            viewModel.onDateDoubleClick()
-                        } catch (fallbackError: Throwable) {
-                            TimberWrapper.silentError(fallbackError, "Fallback calendar open failed")
-                        }
-                    }
-                }
+//                setOnClickListener {
+//                    try {
+//                        openCalendarAtTime(event.startTimeMillis)
+//                    } catch (e: Throwable) {
+//                        TimberWrapper.silentError(e, "Error opening calendar")
+//                        // Fallback: Öffne nur Kalender-App
+//                        try {
+//                            viewModel.onDateDoubleClick()
+//                        } catch (fallbackError: Throwable) {
+//                            TimberWrapper.silentError(fallbackError, "Fallback calendar open failed")
+//                        }
+//                    }
+//                }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
@@ -374,19 +374,19 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun openCalendarAtTime(startTimeMillis: Long) {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                data = "content://com.android.calendar/time/$startTimeMillis".toUri()
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(intent)
-        } catch (e: Throwable) {
-            // Fallback: Öffne einfach Kalender-App
-            TimberWrapper.silentError(e, "Could not open calendar at specific time")
-            viewModel.onDateDoubleClick()
-        }
-    }
+//    private fun openCalendarAtTime(startTimeMillis: Long) {
+//        try {
+//            val intent = Intent(Intent.ACTION_VIEW).apply {
+//                data = "content://com.android.calendar/time/$startTimeMillis".toUri()
+//                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+//            }
+//            startActivity(intent)
+//        } catch (e: Throwable) {
+//            // Fallback: Öffne einfach Kalender-App
+//            TimberWrapper.silentError(e, "Could not open calendar at specific time")
+//            viewModel.onDateDoubleClick()
+//        }
+//    }
 
     private fun setupFragmentResultListener() {
         try {
