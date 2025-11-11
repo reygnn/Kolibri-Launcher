@@ -1008,6 +1008,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val shadowFlow = MutableStateFlow(true) // Default: true
     private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val calendarFlow = MutableStateFlow(false)
+    private val alarmFlow = MutableStateFlow(true) // NEW: Default: true
 
     var color: Int
         get() = colorFlow.value
@@ -1025,6 +1026,9 @@ class FakeSettingsRepository : SettingsRepository {
         get() = calendarFlow.value
         set(value) { calendarFlow.value = value }
 
+    var showAlarm: Boolean
+        get() = alarmFlow.value
+        set(value) { alarmFlow.value = value }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -1055,9 +1059,14 @@ class FakeSettingsRepository : SettingsRepository {
     override suspend fun setOnboardingCompleted() {}
 
     override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
-
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         showCalendar = isEnabled
+    }
+
+    // NEW: showAlarm implementation
+    override val showAlarmFlow: Flow<Boolean> = alarmFlow
+    override suspend fun setShowAlarm(isEnabled: Boolean) {
+        showAlarm = isEnabled
     }
 
     override fun purgeRepository() {}

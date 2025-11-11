@@ -35,6 +35,8 @@ class SettingsManagerTest {
     private val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
     private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     private val READABILITY_MODE_KEY = stringPreferencesKey("text_readability_mode")
+    private val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
+    private val SHOW_ALARM = booleanPreferencesKey("show_alarm")
 
     @Before
     fun setup() {
@@ -108,7 +110,7 @@ class SettingsManagerTest {
         }
     }
 
-    // ========== NEW CRASH-RESISTANCE TESTS ==========
+    // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
     fun `setSortOrder - when DataStore edit fails - does not crash`() = runTest {
@@ -288,5 +290,136 @@ class SettingsManagerTest {
         // Explicitly don't set any value
 
         assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    // ========== SHOW ALARM TESTS ==========
+
+    @Test
+    fun `showAlarmFlow - when no value is set - returns default true`() = runTest {
+        val result = settingsManager.showAlarmFlow.first()
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun `showAlarmFlow - when value is set to false - returns false`() = runTest {
+        fakeDataStore.edit { it[SHOW_ALARM] = false }
+
+        val result = settingsManager.showAlarmFlow.first()
+
+        assertFalse(result)
+    }
+
+    @Test
+    fun `showAlarmFlow - when value is set to true - returns true`() = runTest {
+        fakeDataStore.edit { it[SHOW_ALARM] = true }
+
+        val result = settingsManager.showAlarmFlow.first()
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun `setShowAlarm - correctly saves false`() = runTest {
+        settingsManager.setShowAlarm(false)
+
+        val savedValue = fakeDataStore.data.first()[SHOW_ALARM]
+        assertFalse(savedValue ?: true)
+    }
+
+    @Test
+    fun `setShowAlarm - correctly saves true`() = runTest {
+        settingsManager.setShowAlarm(true)
+
+        val savedValue = fakeDataStore.data.first()[SHOW_ALARM]
+        assertTrue(savedValue ?: false)
+    }
+
+    @Test
+    fun `setShowAlarm - when DataStore edit fails - does not crash`() = runTest {
+        fakeDataStore.makeEditFail()
+
+        // Should not crash
+        settingsManager.setShowAlarm(false)
+
+        // Should maintain default value (true)
+        assertTrue(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `setShowAlarm - when CancellationException - propagates it`() = runTest {
+        fakeDataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> {
+            settingsManager.setShowAlarm(false)
+        }
+    }
+
+    @Test
+    fun `showAlarmFlow - when DataStore read fails - returns default true`() = runTest {
+        fakeDataStore.makeReadFail()
+
+        val result = settingsManager.showAlarmFlow.first()
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun `showAlarmFlow - emits new values when changed`() = runTest {
+        settingsManager.showAlarmFlow.test {
+            assertEquals(true, awaitItem())
+
+            settingsManager.setShowAlarm(false)
+            assertEquals(false, awaitItem())
+
+            settingsManager.setShowAlarm(true)
+            assertEquals(true, awaitItem())
+        }
+    }
+
+    @Test
+    fun `setShowAlarm - toggling multiple times - works correctly`() = runTest {
+        settingsManager.showAlarmFlow.test {
+            assertEquals(true, awaitItem())
+
+            settingsManager.setShowAlarm(false)
+            assertEquals(false, awaitItem())
+
+            settingsManager.setShowAlarm(true)
+            assertEquals(true, awaitItem())
+
+            settingsManager.setShowAlarm(false)
+            assertEquals(false, awaitItem())
+        }
+    }
+
+    @Test
+    fun `showAlarmFlow - independent from showCalendarEventFlow`() = runTest {
+        // Set calendar to true
+        settingsManager.setShowCalendarEvent(true)
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+
+        // Alarm should still be default true
+        assertTrue(settingsManager.showAlarmFlow.first())
+
+        // Change alarm to false
+        settingsManager.setShowAlarm(false)
+        assertFalse(settingsManager.showAlarmFlow.first())
+
+        // Calendar should still be true
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+    }
+
+    @Test
+    fun `multiple settings - showAlarm works with other settings`() = runTest {
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        settingsManager.setDoubleTapToLock(false)
+        settingsManager.setShowCalendarEvent(true)
+        settingsManager.setShowAlarm(false)
+
+        assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertFalse(settingsManager.showAlarmFlow.first())
     }
 }

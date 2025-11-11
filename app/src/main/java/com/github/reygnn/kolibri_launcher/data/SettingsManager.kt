@@ -33,6 +33,7 @@ class SettingsManager @Inject constructor(
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
         val TEXT_COLOR = intPreferencesKey("text_color")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
+        val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
     }
 
@@ -234,6 +235,32 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val showAlarmFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading ShowAlarm preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.SHOW_ALARM] ?: true
+        }
+
+    override suspend fun setShowAlarm(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.SHOW_ALARM] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting show alarm: $isEnabled")
+        }
+    }
+
+
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         try {
             dataStore.edit { settings ->
@@ -245,6 +272,7 @@ class SettingsManager @Inject constructor(
             TimberWrapper.silentError(e, "Error setting show calendar event: $isEnabled")
         }
     }
+
 
     override fun purgeRepository() { }
 }

@@ -28,4 +28,7 @@ interface SettingsRepository : Purgeable {
 
     val showCalendarEventFlow: Flow<Boolean>
     suspend fun setShowCalendarEvent(isEnabled: Boolean)
+
+    val showAlarmFlow: Flow<Boolean>
+    suspend fun setShowAlarm(isEnabled: Boolean)
 }

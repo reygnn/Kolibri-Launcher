@@ -13,6 +13,7 @@ import com.github.reygnn.kolibri_launcher.domain.EventType
 import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CancellationException as JavaCancellationException
@@ -25,7 +26,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class TimeBasedEventsManager @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val settingsManager: SettingsRepository
 ) : TimeBasedEventsRepository {
 
     companion object {
@@ -37,35 +39,55 @@ class TimeBasedEventsManager @Inject constructor(
         return runCatching {
             val events = mutableListOf<TimeBasedEvent>()
 
-            // 1. Alarm hinzufügen (falls vorhanden)
-            try {
-                getNextAlarm()?.let { alarm ->
-                    events.add(alarm)
-                }
-            } catch (e: CancellationException) {
-                throw e
+            // Prüfe Einstellungen
+            val showAlarm = try {
+                settingsManager.showAlarmFlow.first()
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error adding alarm to events")
-                // Weiter mit Kalenderterminen
+                TimberWrapper.silentError(e, "Error reading showAlarm setting, defaulting to true")
+                true
             }
 
-            // 2. Kalendertermine hinzufügen
-            try {
-                val calendarEvents = getCalendarEvents(maxCount)
-                calendarEvents.forEach { calEvent ->
-                    events.add(
-                        TimeBasedEvent(
-                            triggerTimeMillis = calEvent.startTimeMillis,
-                            title = calEvent.title,
-                            type = EventType.CALENDAR
-                        )
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
+            val showCalendarEvents = try {
+                settingsManager.showCalendarEventFlow.first()
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error adding calendar events")
-                // Weiter - vielleicht haben wir ja den Alarm
+                TimberWrapper.silentError(e, "Error reading showCalendarEvent setting, defaulting to false")
+                false
+            }
+
+            // 1. Alarm hinzufügen (falls aktiviert und vorhanden)
+            if (showAlarm) {
+                try {
+                    getNextAlarm()?.let { alarm ->
+                        events.add(alarm)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error adding alarm to events")
+                    // Weiter mit Kalenderterminen
+                }
+            }
+
+
+            // 2. Kalendertermine hinzufügen (falls aktiviert)
+            if (showCalendarEvents) {
+                try {
+                    val calendarEvents = getCalendarEvents(maxCount)
+                    calendarEvents.forEach { calEvent ->
+                        events.add(
+                            TimeBasedEvent(
+                                triggerTimeMillis = calEvent.startTimeMillis,
+                                title = calEvent.title,
+                                type = EventType.CALENDAR
+                            )
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error adding calendar events")
+                    // Weiter - vielleicht haben wir ja den Alarm
+                }
             }
 
             // 3. Chronologisch sortieren und limitieren

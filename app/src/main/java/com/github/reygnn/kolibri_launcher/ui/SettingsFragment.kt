@@ -69,10 +69,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject
     lateinit var screenLockManager: ScreenLockRepository
 
-    // --- KORREKTUREN HIER HINZUGEFÜGT ---
-
     // 1. Deklaration für die Preference
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
+    private var alarmSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -113,17 +112,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
-            // --- KORREKTUR HIER HINZUGEFÜGT ---
-            // 4. Initialisierung der Preference-Variable
             calendarSwitchPreference = findPreference("show_calendar_event")
 
-            // Listener für Kalender-Schalter (MUSS hier sein, nicht in setupPreferenceListeners!)
             calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     val shouldEnable = newValue as? Boolean ?: false
 
                     if (shouldEnable) {
-                        // User möchte Feature aktivieren -> Berechtigung prüfen
                         handleCalendarPermissionRequest()
                         // Rückgabe 'false' verhindert das automatische Toggle.
                         // Der Switch wird erst auf 'true' gesetzt, wenn die
@@ -141,7 +136,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     false
                 }
             }
-            // --- ENDE DER KORREKTUR ---
+
+            alarmSwitchPreference = findPreference("show_alarm")
+            alarmSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: true
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setShowAlarm(shouldEnable)
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in alarm change listener")
+                    false
+                }
+            }
 
             observeSettings()
             viewLifecycleOwner.lifecycleScope.launch {
@@ -527,7 +535,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
 
                 // Observer für Kalender-Einstellung
-                // (Dieser Code war bereits vorhanden und funktioniert jetzt)
                 launch {
                     try {
                         settingsManager.showCalendarEventFlow.collect { isEnabled ->
@@ -546,6 +553,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         TimberWrapper.silentError(e, "Error in calendar flow collection")
                     }
                 }
+
+                // Observer für Alarm-Einstellung
+                launch {
+                    try {
+                        settingsManager.showAlarmFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                alarmSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating alarm switch preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in alarm flow collection")
+                    }
+                }
+
             }
         }
     }
