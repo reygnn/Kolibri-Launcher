@@ -30,7 +30,6 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.data.CalendarEvent
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.MenuContext
@@ -45,8 +44,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.abs
 import android.text.format.DateFormat
-import androidx.core.graphics.ColorUtils
-import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.EventType
 import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -273,14 +270,12 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         try {
+            binding.calendarEventsScroll.visibility = View.GONE
             binding.calendarChipsContainer.removeAllViews()
 
             if (events.isEmpty()) {
-                binding.calendarEventsScroll.visibility = View.GONE
                 return
             }
-
-            binding.calendarEventsScroll.visibility = View.VISIBLE
 
             val ctx = context ?: return
             val colors = viewModel.uiColorsState.value
@@ -309,8 +304,91 @@ class HomeFragment : Fragment() {
                     TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
                 }
             }
+
+            binding.calendarEventsScroll.visibility = View.VISIBLE
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating time-based chips")
+        }
+    }
+
+    /**
+     * Internal helper: Konfiguriert die gemeinsamen Styling-Eigenschaften für Alarm- und Kalender-Chips
+     */
+    private fun configureChip(
+        chip: Chip,
+        colors: UiColorsState,
+        chipMaxWidth: Int
+    ) {
+        try {
+            // Text-Ellipsize und Größe
+            chip.ellipsize = TextUtils.TruncateAt.END
+            chip.maxWidth = chipMaxWidth
+            chip.isSingleLine = true
+
+            // Hintergrundfarbe
+            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                // "Auto"-Modus: Leite Farbe von Textfarbe ab
+                Color.argb(
+                    40,
+                    Color.red(colors.textColor),
+                    Color.green(colors.textColor),
+                    Color.blue(colors.textColor)
+                )
+            } else {
+                // Vom Nutzer gewählte Farbe
+                colors.chipBackgroundColor
+            }
+            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+
+            // Textfarbe
+            chip.setTextColor(colors.textColor)
+
+            // Kein Close-Icon und nicht checkable
+            chip.isCloseIconVisible = false
+            chip.isCheckable = false
+
+            // Border
+            chip.chipStrokeWidth = 1f
+            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+
+            // Textgröße und Höhe
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error configuring chip")
+        }
+    }
+
+    /**
+     * Internal helper: Aktualisiert AUSSCHLIESSLICH die Farb-Eigenschaften
+     * eines bestehenden Chips.
+     */
+    private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
+        try {
+            // 1. Hintergrundfarbe (mit der "Auto"-Logik)
+            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                // "Auto"-Modus: Leite Farbe von Textfarbe ab
+                Color.argb(
+                    40,
+                    Color.red(colors.textColor),
+                    Color.green(colors.textColor),
+                    Color.blue(colors.textColor)
+                )
+            } else {
+                // Vom Nutzer gewählte Farbe
+                colors.chipBackgroundColor
+            }
+            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+
+            // 2. Textfarbe
+            chip.setTextColor(colors.textColor)
+
+            // 3. Border (Stroke) Farbe
+            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying colors to chip")
         }
     }
 
@@ -327,7 +405,7 @@ class HomeFragment : Fragment() {
                     val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
                     val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
 
-                    // ← FIX: Runde AUF zur nächsten vollen Minute
+                    // FIX: Runde AUF zur nächsten vollen Minute
                     // Nutzer setzen Alarme immer auf volle Minuten (06:00)
                     // System gibt interne Trigger-Zeit zurück (05:59:22)
                     val calendar = Calendar.getInstance()
@@ -349,36 +427,7 @@ class HomeFragment : Fragment() {
                     text = event.title
                 }
 
-
-                // Styling (ähnlich wie Calendar, aber mit visuellem Unterschied)
-                try {
-                    ellipsize = TextUtils.TruncateAt.END
-                    maxWidth = chipMaxWidth
-                    isSingleLine = true
-
-                    // Leicht rötlicher Ton für Alarme
-                    val alarmTextColor = ColorUtils.blendARGB(colors.textColor, Color.RED, 0.15f)
-                    setTextColor(alarmTextColor)
-
-                    val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                        Color.argb(40, Color.red(alarmTextColor),
-                            Color.green(alarmTextColor),
-                            Color.blue(alarmTextColor))
-                    } else {
-                        colors.chipBackgroundColor
-                    }
-                    chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-
-                    isCloseIconVisible = false
-                    isCheckable = false
-                    chipStrokeWidth = 1f
-                    chipStrokeColor = ColorStateList.valueOf(alarmTextColor)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                    chipMinHeight = resources.getDimension(R.dimen.chip_min_height)
-
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error styling alarm chip")
-                }
+                configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error creating alarm chip")
@@ -406,51 +455,7 @@ class HomeFragment : Fragment() {
                     text = event.title
                 }
 
-                // Text-Ellipsize konfigurieren
-                try {
-                    ellipsize = TextUtils.TruncateAt.END
-                    maxWidth = chipMaxWidth
-                    isSingleLine = true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting ellipsize")
-                }
-
-                // Styling
-                try {
-                    val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                        // "Auto"-Modus: Leite Farbe von Textfarbe ab (alter Standard)
-                        Color.argb(40, Color.red(colors.textColor),
-                            Color.green(colors.textColor),
-                            Color.blue(colors.textColor))
-                    } else {
-                        // Vom Nutzer gewählte Farbe
-                        colors.chipBackgroundColor
-                    }
-                    chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-                    // --- ENDE ---
-
-                    // Text-Farbe
-                    setTextColor(colors.textColor)
-
-                    // Kein Close-Icon
-                    isCloseIconVisible = false
-
-                    // Kein Checkable
-                    isCheckable = false
-
-                    // Thin border (optional) - bleibt an Textfarbe gekoppelt
-                    chipStrokeWidth = 1f
-                    chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-
-                    // Text-Größe
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-
-                    // Padding
-                    chipMinHeight = resources.getDimension(R.dimen.chip_min_height)
-
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error styling chip")
-                }
+                configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
@@ -608,21 +613,28 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error updating battery text color")
         }
 
-        // --- ÄNDERUNG (4/5): Übergibt das ganze Objekt ---
         updateCalendarChipsColors(colors)
 
         updateFavoriteAppsColors(textColor, shadowColor)
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
-        // Jetzt müssen wir ALARM und CALENDAR Chips unterschiedlich behandeln
-        // Die TimeBasedEvent Info haben wir nicht mehr im Chip gespeichert
-        // → Einfachste Lösung: beim Color-Update die Chips neu erstellen
-        // Alternative: Tag am Chip setzen mit event.type
+        if (_binding == null) return
 
-        // Quick-Hack: Nutze einfach die Events aus dem State neu
-        val events = viewModel.uiState.value.timeBasedEvents
-        updateTimeBasedChips(events)
+        try {
+            for (i in 0 until binding.calendarChipsContainer.childCount) {
+                try {
+                    val view = binding.calendarChipsContainer.getChildAt(i)
+                    if (view is Chip) {
+                        configureChipColorOnly(view, colors)
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error updating chip color at index $i")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in updateCalendarChipsColors")
+        }
     }
 
     private fun updateFavoriteAppsColors(textColor: Int, shadowColor: Int) {
