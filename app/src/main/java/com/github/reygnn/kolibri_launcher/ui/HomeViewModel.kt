@@ -25,8 +25,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.data.CalendarEvent
-import com.github.reygnn.kolibri_launcher.data.CalendarRepository
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.data.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
@@ -103,7 +102,7 @@ class HomeViewModel @Inject constructor(
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: HiddenAppsRepository,
     private val swipeActionsManager: SwipeActionsRepository,
-    private val calendarManager: CalendarRepository,
+    private val calendarManager: TimeBasedEventsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {

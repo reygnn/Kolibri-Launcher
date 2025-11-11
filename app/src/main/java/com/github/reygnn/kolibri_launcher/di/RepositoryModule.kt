@@ -4,8 +4,8 @@ import com.github.reygnn.kolibri_launcher.data.AppUsageManager
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.BackupManager
 import com.github.reygnn.kolibri_launcher.data.BackupRepository
-import com.github.reygnn.kolibri_launcher.data.CalendarManager
-import com.github.reygnn.kolibri_launcher.data.CalendarRepository
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesManager
@@ -135,7 +135,7 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCalendarRepository(
-        impl: CalendarManager
-    ): CalendarRepository
+        impl: TimeBasedEventsManager
+    ): TimeBasedEventsRepository
 
 }
