@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.stateIn
@@ -102,7 +103,7 @@ class HomeViewModel @Inject constructor(
     private val screenLockManager: ScreenLockRepository,
     private val appVisibilityManager: HiddenAppsRepository,
     private val swipeActionsManager: SwipeActionsRepository,
-    private val calendarManager: TimeBasedEventsRepository,
+    private val timeBasedEventsManager: TimeBasedEventsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
@@ -151,6 +152,7 @@ class HomeViewModel @Inject constructor(
         getInitialBatteryState()
         updateUiColors()
         updateCalendarEvent()
+        observeEventSettings()
 
 
         if (!testMode.isEnabled) {
@@ -584,6 +586,25 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun observeEventSettings() = launchSafe {
+        try {
+            combine(
+                settingsManager.showAlarmFlow,
+                settingsManager.showCalendarEventFlow
+            ) { showAlarm, showCalendar ->
+                Pair(showAlarm, showCalendar)
+            }.collect { (showAlarm, showCalendar) ->
+                try {
+                    updateCalendarEvent()
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error updating events after settings change")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error observing event settings")
+        }
+    }
+
     private fun resetAppUsage(app: AppInfo) = launchSafe {
         try {
             appUsageManager.removeUsageDataForPackage(app.packageName)
@@ -779,14 +800,17 @@ class HomeViewModel @Inject constructor(
 
     fun updateCalendarEvent() = launchSafe {
         try {
-            val isEnabled = settingsManager.showCalendarEventFlow.first()
-            if (!isEnabled) {
+            val showAlarm = settingsManager.showAlarmFlow.first()
+            val showCalendar = settingsManager.showCalendarEventFlow.first()
+
+            // Wenn beides deaktiviert ist, leere Liste zurückgeben
+            if (!showAlarm && !showCalendar) {
                 _uiState.update { it.copy(timeBasedEvents = emptyList()) }
                 return@launchSafe
             }
 
-            // ← Neue Methode nutzen
-            val events = calendarManager.getUpcomingTimeBasedEvents(maxCount = 5)
+            // Ansonsten lade Events - TimeBasedEventsManager prüft intern welche aktiviert sind
+            val events = timeBasedEventsManager.getUpcomingTimeBasedEvents(maxCount = 5)
             _uiState.update { it.copy(timeBasedEvents = events) }
 
         } catch (e: CancellationException) {

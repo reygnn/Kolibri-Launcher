@@ -117,6 +117,7 @@ class HomeViewModelTest {
         whenever(swipeActionsManager.swipeLeftAppFlow).thenReturn(flowOf(null))
         whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(null))
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(true))
         runTest {
             whenever(calendarManager.getUpcomingTimeBasedEvents(any())).thenReturn(emptyList())
         }
@@ -839,6 +840,7 @@ class HomeViewModelTest {
     fun `init - when calendar enabled - updates calendar event`() = runTest {
         try {
             whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
+            whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(false))
 
             val testEvent = TimeBasedEvent(
                 triggerTimeMillis = System.currentTimeMillis() + 10000,
@@ -863,6 +865,9 @@ class HomeViewModelTest {
 
     @Test
     fun `init - when calendar disabled - event string is empty`() = runTest {
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(false))
+
         val testEvent = TimeBasedEvent(
             triggerTimeMillis = System.currentTimeMillis() + 10000,
             title = "Test Meeting",
@@ -883,6 +888,7 @@ class HomeViewModelTest {
     @Test
     fun `init - when calendar enabled with alarm - shows alarm first chronologically`() = runTest {
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(true))
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(true))
 
         val now = System.currentTimeMillis()
         val alarm = TimeBasedEvent(
@@ -906,5 +912,41 @@ class HomeViewModelTest {
         assertEquals(2, state.timeBasedEvents.size)
         assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
         assertEquals(EventType.CALENDAR, state.timeBasedEvents[1].type)
+    }
+
+    @Test
+    fun `init - when only alarm enabled - shows only alarm`() = runTest {
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(true))
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
+
+        val alarm = TimeBasedEvent(
+            triggerTimeMillis = System.currentTimeMillis() + 3600000,
+            title = "Alarm",
+            type = EventType.ALARM
+        )
+
+        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.timeBasedEvents.size)
+        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
+    }
+
+    @Test
+    fun `init - when both disabled - shows no events`() = runTest {
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(false))
+        whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.timeBasedEvents.isEmpty())
+
+        // Manager sollte gar nicht erst aufgerufen werden
+        verify(calendarManager, never()).getUpcomingTimeBasedEvents(any())
     }
 }
