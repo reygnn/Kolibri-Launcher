@@ -117,7 +117,7 @@ class HomeViewModelTest {
         whenever(swipeActionsManager.swipeLeftAppFlow).thenReturn(flowOf(null))
         whenever(swipeActionsManager.swipeRightAppFlow).thenReturn(flowOf(null))
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
-        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(true))
+        whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(false))
         runTest {
             whenever(calendarManager.getUpcomingTimeBasedEvents(any())).thenReturn(emptyList())
         }

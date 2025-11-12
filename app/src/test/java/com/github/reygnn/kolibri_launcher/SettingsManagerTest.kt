@@ -295,10 +295,10 @@ class SettingsManagerTest {
     // ========== SHOW ALARM TESTS ==========
 
     @Test
-    fun `showAlarmFlow - when no value is set - returns default true`() = runTest {
+    fun `showAlarmFlow - when no value is set - returns default false`() = runTest {
         val result = settingsManager.showAlarmFlow.first()
 
-        assertTrue(result)
+        assertFalse(result)
     }
 
     @Test
@@ -338,12 +338,8 @@ class SettingsManagerTest {
     @Test
     fun `setShowAlarm - when DataStore edit fails - does not crash`() = runTest {
         fakeDataStore.makeEditFail()
-
-        // Should not crash
-        settingsManager.setShowAlarm(false)
-
-        // Should maintain default value (true)
-        assertTrue(settingsManager.showAlarmFlow.first())
+        settingsManager.setShowAlarm(true)   // ✓ Versuche ÄNDERN zu true
+        assertFalse(settingsManager.showAlarmFlow.first())  // ✓ Bleibt beim Default false
     }
 
     @Test
@@ -361,35 +357,35 @@ class SettingsManagerTest {
 
         val result = settingsManager.showAlarmFlow.first()
 
-        assertTrue(result)
+        assertFalse(result)
     }
 
     @Test
     fun `showAlarmFlow - emits new values when changed`() = runTest {
         settingsManager.showAlarmFlow.test {
+            assertEquals(false, awaitItem())  // Default
+
+            settingsManager.setShowAlarm(true)   // ✓ Ändere zu true
             assertEquals(true, awaitItem())
 
-            settingsManager.setShowAlarm(false)
+            settingsManager.setShowAlarm(false)  // ✓ Zurück zu false
             assertEquals(false, awaitItem())
-
-            settingsManager.setShowAlarm(true)
-            assertEquals(true, awaitItem())
         }
     }
 
     @Test
     fun `setShowAlarm - toggling multiple times - works correctly`() = runTest {
         settingsManager.showAlarmFlow.test {
+            assertEquals(false, awaitItem())  // Default
+
+            settingsManager.setShowAlarm(true)   // ✓ Toggle zu true
             assertEquals(true, awaitItem())
 
-            settingsManager.setShowAlarm(false)
+            settingsManager.setShowAlarm(false)  // ✓ Toggle zu false
             assertEquals(false, awaitItem())
 
-            settingsManager.setShowAlarm(true)
+            settingsManager.setShowAlarm(true)   // ✓ Toggle zu true
             assertEquals(true, awaitItem())
-
-            settingsManager.setShowAlarm(false)
-            assertEquals(false, awaitItem())
         }
     }
 
@@ -400,11 +396,11 @@ class SettingsManagerTest {
         assertTrue(settingsManager.showCalendarEventFlow.first())
 
         // Alarm should still be default true
-        assertTrue(settingsManager.showAlarmFlow.first())
-
-        // Change alarm to false
-        settingsManager.setShowAlarm(false)
         assertFalse(settingsManager.showAlarmFlow.first())
+
+        // Change alarm to true
+        settingsManager.setShowAlarm(true)
+        assertTrue(settingsManager.showAlarmFlow.first())
 
         // Calendar should still be true
         assertTrue(settingsManager.showCalendarEventFlow.first())

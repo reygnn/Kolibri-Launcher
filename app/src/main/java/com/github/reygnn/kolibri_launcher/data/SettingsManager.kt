@@ -245,7 +245,7 @@ class SettingsManager @Inject constructor(
             }
         }
         .map { preferences ->
-            preferences[PreferenceKeys.SHOW_ALARM] ?: true
+            preferences[PreferenceKeys.SHOW_ALARM] ?: false
         }
 
     override suspend fun setShowAlarm(isEnabled: Boolean) {
