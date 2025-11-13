@@ -5,15 +5,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 interface ScreenLockRepository : Purgeable {
-    // Bleibt gleich: Stellt den aktuellen Zustand reaktiv bereit
+    // Stellt den aktuellen Zustand reaktiv bereit
     val isLockingAvailableFlow: StateFlow<Boolean>
 
-    // NEU: Ein Flow, auf den der Service lauschen kann, um zu wissen, wann er sperren soll
+    // Flow für Sperranfragen
     val lockRequestFlow: Flow<Unit>
 
-    // NEU: Eine Funktion, mit der der Service seinen Zustand melden kann
+    // Flow für Benachrichtigungs-Anfragen
+    val openNotificationsRequestFlow: Flow<Unit>
+
+    // Meldet den Service-Status
     fun setServiceState(isAvailable: Boolean)
 
-    // NEU: Die Funktion zum Auslösen des Sperrvorgangs
+    // Löst Sperre aus
     suspend fun requestLock()
+
+    // Löst das Öffnen der Benachrichtigungen aus
+    suspend fun requestOpenNotifications()
 }

@@ -76,7 +76,7 @@
 
     <!-- For Accessibility Service Dialog in ScreenLockManager -->
     <string name="accessibility_service_title">Permission Required</string>
-    <string name="accessibility_service_explanation">To lock the screen, Kolibri Launcher needs you to enable its Accessibility Service. This service is used exclusively for the screen lock function and does not collect any data.</string>
+<string name="accessibility_service_explanation">Kolibri Launcher needs the Accessibility Service to enable the following features:\n\n• Lock screen with double tap\n• Open notification panel with swipe down\n\nThis service is used exclusively for these functions and does not collect any data.</string>
     <string name="go_to_settings">Go to Settings</string>
 
     <string name="time_placeholder" translatable="false">12:34</string>

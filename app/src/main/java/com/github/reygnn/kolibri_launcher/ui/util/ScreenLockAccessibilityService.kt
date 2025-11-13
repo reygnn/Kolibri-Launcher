@@ -18,13 +18,10 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ScreenLockAccessibilityService : AccessibilityService() {
-
     @Inject
     lateinit var screenLockRepository: ScreenLockRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-
-    // Flag um zu tracken ob der Service verbunden ist
     private var isConnected = false
 
     override fun onServiceConnected() {
@@ -76,6 +73,37 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                     throw e
                 } catch (e: Exception) {
                     TimberWrapper.silentError(e, "Critical error in lock request coroutine")
+                }
+            }
+
+            serviceScope.launch {
+                try {
+                    screenLockRepository.openNotificationsRequestFlow
+                        .catch { e ->
+                            TimberWrapper.silentError(e, "Error in openNotificationsRequestFlow, stopping collection")
+                        }
+                        .collect { request ->
+                            try {
+                                Timber.Forest.d("Open notifications request received, performing global action.")
+                                val success = try {
+                                    performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                } catch (e: Exception) {
+                                    TimberWrapper.silentError(e, "Error performing open notifications action")
+                                    false
+                                }
+
+                                if (!success) {
+                                    Timber.Forest.w("Failed to open notifications - action not successful")
+                                }
+                            } catch (e: Exception) {
+                                TimberWrapper.silentError(e, "Error processing open notifications request")
+                            }
+                        }
+                } catch (e: CancellationException) {
+                    Timber.Forest.d("Open notifications request collection cancelled")
+                    throw e
+                } catch (e: Exception) {
+                    TimberWrapper.silentError(e, "Critical error in open notifications request coroutine")
                 }
             }
 

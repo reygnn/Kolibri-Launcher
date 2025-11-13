@@ -896,10 +896,17 @@ class HomeFragment : Fragment() {
                 } else {
                     // VERTIKALE Geste
                     if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
-                        abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD &&
-                        diffY < 0) { // Nur Wisch nach OBEN
-                        viewModel.onFlingUp()
-                        true
+                        abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
+                    ) {
+                        if (diffY < 0) {
+                            viewModel.onFlingUp()
+                            true
+                        } else if (diffY > 0) {
+                            viewModel.onFlingDown()
+                            true
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }

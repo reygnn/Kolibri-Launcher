@@ -76,7 +76,7 @@
 
     <!-- Für den Barrierefreiheits-Dialog im ScreenLockManager -->
     <string name="accessibility_service_title">Berechtigung erforderlich</string>
-    <string name="accessibility_service_explanation">Um den Bildschirm zu sperren, benötigt der Kolibri Launcher die Aktivierung seines Dienstes für Barrierefreiheit. Dieser Dienst wird ausschließlich für die Bildschirmsperre verwendet und sammelt keine Daten.</string>
+<string name="accessibility_service_explanation">Kolibri Launcher benötigt den Eingabehilfendienst für folgende Funktionen:\n\n• Bildschirm mit Doppeltipp sperren\n• Benachrichtigungsfeld mit Wischen öffnen\n\nDieser Dienst wird ausschließlich für diese Funktionen verwendet und sammelt keine Daten.</string>
     <string name="go_to_settings">Zu den Einstellungen</string>
 
     <string name="date_placeholder">Lade Datum…</string>

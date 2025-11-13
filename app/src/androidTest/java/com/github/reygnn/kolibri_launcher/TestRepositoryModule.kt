@@ -406,12 +406,21 @@ class FakeInstalledAppsStateRepository : InstalledAppsStateRepository, Purgeable
 }
 
 class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
+
     override val isLockingAvailableFlow = MutableStateFlow(true)
     private val lockRequest = MutableSharedFlow<Unit>()
     override val lockRequestFlow: Flow<Unit> = lockRequest
-    override fun setServiceState(isAvailable: Boolean) { isLockingAvailableFlow.value = isAvailable }
     override suspend fun requestLock() { lockRequest.emit(Unit) }
-    override fun purgeRepository() { isLockingAvailableFlow.value = true }
+    private val openNotificationsRequest = MutableSharedFlow<Unit>()
+    override val openNotificationsRequestFlow: Flow<Unit> = openNotificationsRequest
+    override suspend fun requestOpenNotifications() { openNotificationsRequest.emit(Unit) }
+    override fun setServiceState(isAvailable: Boolean) {
+        isLockingAvailableFlow.value = isAvailable
+    }
+
+    override fun purgeRepository() {
+        isLockingAvailableFlow.value = true
+    }
 }
 
 class FakeShortcutRepository : ShortcutRepository, Purgeable {

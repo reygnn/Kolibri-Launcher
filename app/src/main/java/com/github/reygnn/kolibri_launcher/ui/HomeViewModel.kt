@@ -203,6 +203,19 @@ class HomeViewModel @Inject constructor(
         sendEvent(UiEvent.ShowAppDrawer)
     }
 
+    fun onFlingDown() = launchSafe {
+        try {
+            if (screenLockManager.isLockingAvailableFlow.value) {
+                screenLockManager.requestOpenNotifications()
+            } else {
+                sendEvent(UiEvent.ShowAccessibilityDialog)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error requesting notification panel")
+            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+        }
+    }
+
     fun onFlingLeft() = launchSafe {
         try {
             val comp = swipeLeftComponent.value
