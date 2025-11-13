@@ -28,6 +28,7 @@ class SettingsManager @Inject constructor(
     private object PreferenceKeys {
         val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
         val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
+        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey("swipe_down_to_notifications_enabled")
         val READABILITY_MODE = stringPreferencesKey("text_readability_mode")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
@@ -81,7 +82,7 @@ class SettingsManager @Inject constructor(
             }
         }
         .map { preferences ->
-            preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] ?: true
+            preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] ?: false
         }
 
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
@@ -93,6 +94,31 @@ class SettingsManager @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting double tap to lock: $isEnabled")
+        }
+    }
+
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading SwipeDownToNotifications preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] ?: false
+        }
+
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting swipe down to notifications: $isEnabled")
         }
     }
 

@@ -122,6 +122,7 @@ class HomeViewModel @Inject constructor(
 
     private var fallbackToastShown = false
     private var enableLockToastShown = false
+    private var enableSwipeDownToastShown = false
 
     private val swipeLeftComponent: StateFlow<String?> =
         swipeActionsManager.swipeLeftAppFlow.stateIn(
@@ -205,10 +206,17 @@ class HomeViewModel @Inject constructor(
 
     fun onFlingDown() = launchSafe {
         try {
-            if (screenLockManager.isLockingAvailableFlow.value) {
-                screenLockManager.requestOpenNotifications()
+            if (settingsManager.swipeDownToNotificationsEnabledFlow.first()) {
+                if (screenLockManager.isLockingAvailableFlow.value) {
+                    screenLockManager.requestOpenNotifications()
+                } else {
+                    sendEvent(UiEvent.ShowAccessibilityDialog)
+                }
             } else {
-                sendEvent(UiEvent.ShowAccessibilityDialog)
+                if (!enableSwipeDownToastShown) {
+                    enableSwipeDownToastShown = true
+                    sendEvent(UiEvent.ShowToast(R.string.toast_enable_swipe_down_to_notifications))
+                }
             }
         } catch (e: CancellationException) {
             throw e

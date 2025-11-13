@@ -374,6 +374,36 @@ class SettingsFragment : PreferenceFragmentCompat() {
             TimberWrapper.silentError(e, "Error setting double tap listener")
         }
 
+        // Swipe Down for Notifications
+        try {
+            val swipeDownPreference =
+                findPreference<SwitchPreferenceCompat>("swipe_down_to_notifications_enabled")
+            swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    if (newValue is Boolean) {
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            try {
+                                settingsManager.setSwipeDownToNotifications(newValue)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error setting swipe down to notifications"
+                                )
+                            }
+                        }
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in swipe down preference change")
+                    false
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting swipe down listener")
+        }
+
         // Swipe Actions
         try {
             findPreference<Preference>("swipe_actions")?.setOnPreferenceClickListener {

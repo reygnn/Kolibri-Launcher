@@ -1004,11 +1004,18 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
 
 class FakeSettingsRepository : SettingsRepository {
 
-    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val shadowFlow = MutableStateFlow(true) // Default: true
+    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
     private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
-    private val calendarFlow = MutableStateFlow(false)
-    private val alarmFlow = MutableStateFlow(true) // NEW: Default: true
+    private val calendarFlow = MutableStateFlow(false) // Default false
+    private val alarmFlow = MutableStateFlow(false) // Default: false
+    private val doubleTapFlow = MutableStateFlow(false) // Default false
+    private val swipeDownFlow = MutableStateFlow(false) // Default false
+
+
+    var shadow: Boolean
+        get() = shadowFlow.value
+        set(value) { shadowFlow.value = value }
 
     var color: Int
         get() = colorFlow.value
@@ -1018,10 +1025,6 @@ class FakeSettingsRepository : SettingsRepository {
         get() = chipBgColorFlow.value
         set(value) { chipBgColorFlow.value = value }
 
-    var shadow: Boolean
-        get() = shadowFlow.value
-        set(value) { shadowFlow.value = value }
-
     var showCalendar: Boolean
         get() = calendarFlow.value
         set(value) { calendarFlow.value = value }
@@ -1029,6 +1032,16 @@ class FakeSettingsRepository : SettingsRepository {
     var showAlarm: Boolean
         get() = alarmFlow.value
         set(value) { alarmFlow.value = value }
+
+    var doubleTap: Boolean
+        get() = doubleTapFlow.value
+        set(value) {
+            doubleTapFlow.value = value
+        }
+
+    var swipeDown: Boolean
+        get() = swipeDownFlow.value
+        set(value) { swipeDownFlow.value = value }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -1049,8 +1062,11 @@ class FakeSettingsRepository : SettingsRepository {
     override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
     override suspend fun setSortOrder(sortOrder: SortOrder) {}
 
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = flowOf(true)
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {}
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTap = isEnabled }
+
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) { swipeDown = isEnabled }
 
     override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
     override suspend fun setReadabilityMode(mode: String) {}
@@ -1063,11 +1079,18 @@ class FakeSettingsRepository : SettingsRepository {
         showCalendar = isEnabled
     }
 
-    // NEW: showAlarm implementation
     override val showAlarmFlow: Flow<Boolean> = alarmFlow
     override suspend fun setShowAlarm(isEnabled: Boolean) {
         showAlarm = isEnabled
     }
 
-    override fun purgeRepository() {}
+    override fun purgeRepository() {
+        color = 0
+        shadow = true
+        chipBgColor = 0
+        showCalendar = false
+        showAlarm = false
+        doubleTap = false
+        swipeDown = false
+    }
 }

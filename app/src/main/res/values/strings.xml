@@ -259,5 +259,10 @@
 <string name="chip_background_color">Event Background</string>
     <string name="show_alarm_title">Show alarms</string>
     <string name="show_alarm_summary">Display next alarm on home screen</string>
+    
+    <string name="swipe_down_to_notifications_title">Swipe down for notifications</string>
+    <string name="swipe_down_to_notifications_summary">Open the notification panel with a downward swipe</string>
+    
+    <string name="toast_enable_swipe_down_to_notifications">Swipe gesture is disabled. Enable it in Settings.</string>
 
 </resources>

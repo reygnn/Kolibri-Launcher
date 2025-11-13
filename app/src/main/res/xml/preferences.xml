@@ -61,7 +61,7 @@
             android:key="show_alarm"
             android:title="@string/show_alarm_title"
             android:summary="@string/show_alarm_summary"
-            android:defaultValue="true"
+            android:defaultValue="false"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
@@ -77,6 +77,13 @@
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
             
+        <SwitchPreferenceCompat
+            android:key="swipe_down_to_notifications_enabled"
+            android:title="@string/swipe_down_to_notifications_title"
+            android:summary="@string/swipe_down_to_notifications_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
             <Preference
             android:key="swipe_actions"
             android:title="@string/settings_swipe_actions_title"
