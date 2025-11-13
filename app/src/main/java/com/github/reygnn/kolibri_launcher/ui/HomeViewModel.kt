@@ -210,6 +210,8 @@ class HomeViewModel @Inject constructor(
             } else {
                 sendEvent(UiEvent.ShowAccessibilityDialog)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error requesting notification panel")
             sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -235,6 +237,8 @@ class HomeViewModel @Inject constructor(
                 // App ist nicht (mehr) installiert, Einstellung aufräumen
                 swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onFlingLeft")
         }
@@ -260,6 +264,8 @@ class HomeViewModel @Inject constructor(
                 // App ist nicht (mehr) installiert, Einstellung aufräumen
                 swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onFlingRight")
         }
@@ -557,7 +563,10 @@ class HomeViewModel @Inject constructor(
                         try {
                             installedAppsStateManager.updateApps(emptyList())
                         } catch (lastResort: Throwable) {
-                            TimberWrapper.silentError(lastResort, "CRITICAL: Cannot update apps state")
+                            TimberWrapper.silentError(
+                                lastResort,
+                                "CRITICAL: Cannot update apps state"
+                            )
                         }
                     }
                 }
@@ -584,9 +593,11 @@ class HomeViewModel @Inject constructor(
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error processing collected apps")
-                        // Try to update anyway with what we have
+
                         try {
                             installedAppsStateManager.updateApps(realApps)
+                        } catch (updateError: CancellationException) {
+                            throw updateError
                         } catch (updateError: Throwable) {
                             TimberWrapper.silentError(updateError, "CRITICAL: Cannot update apps")
                         }
@@ -609,10 +620,14 @@ class HomeViewModel @Inject constructor(
             }.collect { (showAlarm, showCalendar) ->
                 try {
                     updateCalendarEvent()
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error updating events after settings change")
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error observing event settings")
         }
@@ -721,9 +736,11 @@ class HomeViewModel @Inject constructor(
                                 (wallpaperColors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
                             ) Color.BLACK else Color.WHITE
                         }
+
                         "adaptive_colors" -> {
                             wallpaperColors?.secondaryColor?.toArgb() ?: Color.WHITE
                         }
+
                         else -> Color.WHITE
                     }
                 } catch (e: Throwable) {
@@ -790,16 +807,19 @@ class HomeViewModel @Inject constructor(
                 luminance < 0.1 -> {
                     Color.argb(204, 255, 255, 255) // 80% white
                 }
+
                 luminance < 0.5 -> {
                     val fraction = ((luminance - 0.1) / 0.4).coerceIn(0.0, 1.0)
                     val alpha = lerp(0.75, 0.4, fraction)
                     Color.argb((alpha * 255).toInt().coerceIn(0, 255), 255, 255, 255)
                 }
+
                 luminance < 0.9 -> {
                     val fraction = ((luminance - 0.5) / 0.4).coerceIn(0.0, 1.0)
                     val alpha = lerp(0.3, 0.6, fraction)
                     Color.argb((alpha * 255).toInt().coerceIn(0, 255), 0, 0, 0)
                 }
+
                 else -> {
                     Color.argb(153, 0, 0, 0) // 60% black
                 }
