@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.app.AlarmManager
 import android.Manifest
+import android.app.AlarmManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
@@ -16,9 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.CancellationException
-import java.util.concurrent.CancellationException as JavaCancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.concurrent.CancellationException as JavaCancellationException
 
 /**
  * Implementierung des [TimeBasedEventsRepository].

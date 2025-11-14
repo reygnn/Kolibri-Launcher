@@ -1,9 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui
 
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import android.graphics.Rect
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -11,10 +7,12 @@ import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
+import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
@@ -24,6 +22,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -38,24 +39,23 @@ import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.MenuContext
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
+import com.github.reygnn.kolibri_launcher.domain.EventType
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import timber.log.Timber
-import javax.inject.Inject
-import kotlin.math.abs
-import android.text.format.DateFormat
-import com.github.reygnn.kolibri_launcher.domain.EventType
-import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import javax.inject.Inject
+import kotlin.math.abs
 
 /**
  * ULTRA CRASH-SAFE HomeFragment

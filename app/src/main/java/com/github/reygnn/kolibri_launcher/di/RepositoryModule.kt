@@ -4,8 +4,6 @@ import com.github.reygnn.kolibri_launcher.data.AppUsageManager
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.BackupManager
 import com.github.reygnn.kolibri_launcher.data.BackupRepository
-import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
-import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesManager
@@ -26,6 +24,8 @@ import com.github.reygnn.kolibri_launcher.data.ShortcutManager
 import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
