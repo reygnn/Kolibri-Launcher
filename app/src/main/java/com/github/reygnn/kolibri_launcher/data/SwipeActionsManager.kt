@@ -165,5 +165,16 @@ open class SwipeActionsManager private constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
+                preferences.remove(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge SwipeActionsManager repository")
+        }
+    }
 }

@@ -206,5 +206,15 @@ class HiddenAppsManager @Inject constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = emptySet()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge HiddenAppsManager repository")
+        }
+    }
 }

@@ -23,6 +23,7 @@ object AppConstants {
     const val SHADOW_DY_SMALL = 1f         // Y-Offset für Datum und Batterie
 
     const val KEY_NAME_PREFIX = "name_"
+    const val KEY_USAGE_PREFIX = "usage_"
 
     // Fragment Tags
     const val FRAGMENT_SETTINGS = "settings"

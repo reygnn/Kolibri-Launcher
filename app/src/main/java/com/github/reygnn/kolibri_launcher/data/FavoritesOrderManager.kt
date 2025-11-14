@@ -306,5 +306,15 @@ open class FavoritesOrderManager private constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                preferences.remove(PreferencesKeys.ORDER_LIST)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge FavoritesOrderManager repository")
+        }
+    }
 }

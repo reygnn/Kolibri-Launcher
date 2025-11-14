@@ -74,7 +74,7 @@ class AppUsageManager @Inject constructor(
     override suspend fun recordPackageLaunch(packageName: String?) {
         if (packageName.isNullOrBlank()) return
 
-        val usageKey = stringSetPreferencesKey(packageName)
+        val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
         val currentTime = System.currentTimeMillis()
 
         try {
@@ -135,7 +135,7 @@ class AppUsageManager @Inject constructor(
             val currentTime = System.currentTimeMillis()
 
             apps.map { appInfo ->
-                val key = stringSetPreferencesKey(appInfo.packageName)
+                val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + appInfo.packageName)
                 val timestamps = allUsagePreferences[key]
                     ?.mapNotNull { it.toLongOrNull() }
                     ?.filter { isValidTimestamp(it, currentTime) }
@@ -209,7 +209,7 @@ class AppUsageManager @Inject constructor(
     override suspend fun removeUsageDataForPackage(packageName: String?) {
         if (packageName.isNullOrBlank()) return
 
-        val usageKey = stringSetPreferencesKey(packageName)
+        val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
         try {
             dataStore.edit { preferences ->
                 preferences.remove(usageKey)
@@ -225,7 +225,7 @@ class AppUsageManager @Inject constructor(
         if (packageName.isNullOrBlank()) return false
 
         return try {
-            val usageKey = stringSetPreferencesKey(packageName)
+            val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
             val preferences = dataStore.data.first()
             preferences[usageKey]?.isNotEmpty() ?: false
         } catch (e: CancellationException) {
@@ -236,5 +236,22 @@ class AppUsageManager @Inject constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                val keysToRemove = preferences.asMap().keys
+                    .filter { key ->
+                        key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)
+                    }
+
+                keysToRemove.forEach { key ->
+                    preferences.remove(key)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge AppUsageManager repository")
+        }
+    }
 }

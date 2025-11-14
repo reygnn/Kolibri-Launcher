@@ -13,20 +13,20 @@ import javax.inject.Singleton
 @Singleton
 class ResetManager @Inject constructor(
     // User-Data Repositories
-    private val favoritesRepository: FavoritesRepository,
-    private val hiddenAppsRepository: HiddenAppsRepository,
-    private val customNamesRepository: CustomNamesRepository,
-    private val appUsageRepository: AppUsageRepository,
-    private val favoritesOrderRepository: FavoritesOrderRepository,
+    private val favoritesRepository: FavoritesRepository, // mit purgeRepository
+    private val hiddenAppsRepository: HiddenAppsRepository, // mit purgeRepository
+    private val customNamesRepository: CustomNamesRepository, // mit purgeRepository
+    private val appUsageRepository: AppUsageRepository, // mit purgeRepository
+    private val favoritesOrderRepository: FavoritesOrderRepository, // mit purgeRepository
 
     // Settings Repository
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository, // mit purgeRepository
 
     // Weitere Repositories falls vorhanden
     private val screenLockRepository: ScreenLockRepository,
-    private val swipeActionsRepository: SwipeActionsRepository,
+    private val swipeActionsRepository: SwipeActionsRepository, // mit purgeRepository
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val timeBasedEventsRepository: TimeBasedEventsRepository
+    private val timeBasedEventsRepository: TimeBasedEventsRepository // kein purgeRepository nötig
 ) : ResetRepository {
 
     override suspend fun resetAllData(): Boolean {

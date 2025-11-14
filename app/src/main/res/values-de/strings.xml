@@ -260,5 +260,7 @@
 <string name="toast_enable_swipe_down_to_notifications">Wisch-Geste ist deaktiviert. In den Einstellungen aktivieren.</string>
 <string name="import_option_time_events">Zeitbasierte Events (Kalender &amp; Wecker)</string>
 <string name="backup_import_success_settings_only">Einstellungen erfolgreich importiert</string>
+<string name="reset_success">Zurücksetzen erfolgreich</string>
+<string name="reset_failed">Zurücksetzen fehlgeschlagen</string>
 
 </resources>

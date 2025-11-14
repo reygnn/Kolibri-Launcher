@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Central state manager for installed applications with fail-safe caching.
@@ -93,5 +94,14 @@ class InstalledAppsStateManager @Inject constructor() : InstalledAppsStateReposi
     }
 
     override suspend fun purgeRepository() {
+        try {
+            _rawAppsFlow.value = emptyList()
+            lastSuccessfulAppList = emptyList()
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge InstalledAppsStateManager repository")
+        }
     }
 }

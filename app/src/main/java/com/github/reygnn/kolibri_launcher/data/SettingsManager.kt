@@ -300,5 +300,33 @@ class SettingsManager @Inject constructor(
     }
 
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                // App Drawer
+                preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+
+                // Gestures
+                preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
+                preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
+
+                // Onboarding nicht resetten.
+                // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)
+
+                // Theme / Appearance
+                preferences.remove(PreferenceKeys.READABILITY_MODE)
+                preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
+                preferences.remove(PreferenceKeys.TEXT_COLOR)
+                preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
+
+                // Home Screen Events
+                preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
+                preferences.remove(PreferenceKeys.SHOW_ALARM)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge SettingsManager repository")
+        }
+    }
 }

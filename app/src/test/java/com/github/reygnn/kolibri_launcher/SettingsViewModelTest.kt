@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.data.ResetRepository
 import com.github.reygnn.kolibri_launcher.ui.SettingsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,7 @@ class SettingsViewModelTest {
 
     @Mock
     private lateinit var installedAppsRepository: InstalledAppsRepository
+    private lateinit var resetManager: ResetRepository
 
     private lateinit var viewModel: SettingsViewModel
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
@@ -50,6 +52,7 @@ class SettingsViewModelTest {
     fun `installedApps StateFlow - initially is empty`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -60,6 +63,7 @@ class SettingsViewModelTest {
     fun `installedApps StateFlow - emits new app list from repository`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -90,6 +94,7 @@ class SettingsViewModelTest {
 
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -110,6 +115,7 @@ class SettingsViewModelTest {
 
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -129,6 +135,7 @@ class SettingsViewModelTest {
 
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -146,6 +153,7 @@ class SettingsViewModelTest {
     fun `installedApps - rapid flow updates - handles correctly`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -171,6 +179,7 @@ class SettingsViewModelTest {
     fun `installedApps - with duplicate apps in flow - forwards them as-is`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -189,6 +198,7 @@ class SettingsViewModelTest {
     fun `installedApps - when flow emits null values in list - handles gracefully`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -207,6 +217,7 @@ class SettingsViewModelTest {
     fun `installedApps - multiple subscribers - all receive updates`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -232,10 +243,12 @@ class SettingsViewModelTest {
     fun `installedApps - when created multiple times - each instance has independent state`() = runTest {
         val viewModel1 = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
         val viewModel2 = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -259,6 +272,7 @@ class SettingsViewModelTest {
     fun `installedApps - stateIn operator - maintains last value for new collectors`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -278,6 +292,7 @@ class SettingsViewModelTest {
     fun `installedApps - collector cancelled - does not affect other collectors`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -303,6 +318,7 @@ class SettingsViewModelTest {
 
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -321,6 +337,7 @@ class SettingsViewModelTest {
     fun `installedApps - empty to large to empty - handles correctly`() = runTest {
         viewModel = SettingsViewModel(
             installedAppsRepository,
+            resetManager,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 

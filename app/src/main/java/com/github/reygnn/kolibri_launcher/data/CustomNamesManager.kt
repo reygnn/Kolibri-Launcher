@@ -400,5 +400,22 @@ class CustomNamesManager @Inject constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }  // für die androidTests
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                val keysToRemove = preferences.asMap().keys
+                    .filter { key ->
+                        key.name.startsWith(AppConstants.KEY_NAME_PREFIX)
+                    }
+                keysToRemove.forEach { key ->
+                    preferences.remove(key)
+                }
+            }
+            triggerCustomNameUpdate()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge CustomNamesManager repository")
+        }
+    }
 }
