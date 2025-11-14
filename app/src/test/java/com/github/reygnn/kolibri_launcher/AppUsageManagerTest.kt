@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher
 import android.content.Context
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageManager
 import kotlinx.coroutines.CancellationException
@@ -84,9 +85,9 @@ class AppUsageManagerTest {
         val oldTime = (currentTime - TimeUnit.DAYS.toMillis(1)).toString()
 
         val usagePreferences = preferencesOf(
-            stringSetPreferencesKey("com.a") to setOf(veryRecentTime),
-            stringSetPreferencesKey("com.b") to setOf(recentTime),
-            stringSetPreferencesKey("com.c") to setOf(oldTime)
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.a") to setOf(veryRecentTime),
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.b") to setOf(recentTime),
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.c") to setOf(oldTime)
         )
         fakeDataStore.setInitialData(usagePreferences)
 
@@ -113,7 +114,7 @@ class AppUsageManagerTest {
         val recentTime = (currentTime - TimeUnit.SECONDS.toMillis(10)).toString()
 
         val usagePreferences = preferencesOf(
-            stringSetPreferencesKey("com.used") to setOf(recentTime)
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.used") to setOf(recentTime)
         )
         fakeDataStore.setInitialData(usagePreferences)
 
@@ -141,8 +142,8 @@ class AppUsageManagerTest {
         }.toSet()
 
         val usagePreferences = preferencesOf(
-            stringSetPreferencesKey("com.frequent") to frequentTimestamps,
-            stringSetPreferencesKey("com.once") to setOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.frequent") to frequentTimestamps,
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.once") to setOf(
                 (currentTime - TimeUnit.DAYS.toMillis(7)).toString()
             )
         )
@@ -171,7 +172,7 @@ class AppUsageManagerTest {
     fun `sortAppsByTimeWeightedUsage - with corrupt timestamp data - still succeeds`() = runTest {
         // Arrange
         val corruptData = preferencesOf(
-            stringSetPreferencesKey("com.test") to setOf("invalid", "not_a_number", "abc123")
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test") to setOf("invalid", "not_a_number", "abc123")
         )
         fakeDataStore.setInitialData(corruptData)
 
@@ -198,10 +199,10 @@ class AppUsageManagerTest {
         )
 
         val usagePreferences = preferencesOf(
-            stringSetPreferencesKey("com.future") to setOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.future") to setOf(
                 (currentTime + TimeUnit.DAYS.toMillis(1)).toString()
             ),
-            stringSetPreferencesKey("com.valid") to setOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.valid") to setOf(
                 (currentTime - TimeUnit.HOURS.toMillis(1)).toString()
             )
         )
@@ -225,10 +226,10 @@ class AppUsageManagerTest {
         )
 
         val usagePreferences = preferencesOf(
-            stringSetPreferencesKey("com.ancient") to setOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.ancient") to setOf(
                 (currentTime - TimeUnit.DAYS.toMillis(364)).toString() // Fast 1 Jahr
             ),
-            stringSetPreferencesKey("com.recent") to setOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.recent") to setOf(
                 (currentTime - TimeUnit.HOURS.toMillis(1)).toString()
             )
         )
@@ -293,7 +294,7 @@ class AppUsageManagerTest {
     fun `hasUsageDataForPackage - with valid data - returns true`() = runTest {
         // Arrange
         val usageData = preferencesOf(
-            stringSetPreferencesKey("com.test.app") to setOf("123456789")
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test.app") to setOf("123456789")
         )
         fakeDataStore.setInitialData(usageData)
 

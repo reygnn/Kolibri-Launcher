@@ -29,6 +29,7 @@ class SettingsViewModelTest {
 
     @Mock
     private lateinit var installedAppsRepository: InstalledAppsRepository
+    @Mock
     private lateinit var resetManager: ResetRepository
 
     private lateinit var viewModel: SettingsViewModel
