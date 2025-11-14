@@ -1,12 +1,13 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 
 /**
  * Interface für das Repository, das Kalenderdaten abruft.
  * Das ViewModel wird gegen dieses Interface programmieren.
  */
-interface TimeBasedEventsRepository {
+interface TimeBasedEventsRepository : Purgeable {
     /**
      * Kombiniert Alarme und Kalendertermine zu einer chronologisch sortierten Liste.
      *

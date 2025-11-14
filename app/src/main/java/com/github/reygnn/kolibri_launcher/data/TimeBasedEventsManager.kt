@@ -204,4 +204,7 @@ class TimeBasedEventsManager @Inject constructor(
             emptyList()
         }
     }
+
+    override fun purgeRepository() {
+    }
 }

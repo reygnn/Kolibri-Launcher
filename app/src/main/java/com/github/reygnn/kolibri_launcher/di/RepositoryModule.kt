@@ -16,6 +16,8 @@ import com.github.reygnn.kolibri_launcher.data.InstalledAppsManager
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateManager
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.ResetManager
+import com.github.reygnn.kolibri_launcher.data.ResetRepository
 import com.github.reygnn.kolibri_launcher.data.ScreenLockManager
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsManager
@@ -137,5 +139,11 @@ abstract class RepositoryModule {
     abstract fun bindCalendarRepository(
         impl: TimeBasedEventsManager
     ): TimeBasedEventsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindResetRepository(
+        resetManager: ResetManager
+    ): ResetRepository
 
 }

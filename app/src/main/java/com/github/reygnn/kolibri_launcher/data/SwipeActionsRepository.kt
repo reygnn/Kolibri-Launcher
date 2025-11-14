@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import kotlinx.coroutines.flow.Flow
 
@@ -7,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * Ein Interface, das den Vertrag für das Speichern und Abrufen von
  * App-Zuweisungen für Wischgesten (Swipe Actions) definiert.
  */
-interface SwipeActionsRepository {
+interface SwipeActionsRepository : Purgeable {
 
     /**
      * Ein Flow, der den ComponentName der App für "Swipe Left" bereitstellt.

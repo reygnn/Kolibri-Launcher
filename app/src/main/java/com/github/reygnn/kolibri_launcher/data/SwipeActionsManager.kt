@@ -164,4 +164,7 @@ open class SwipeActionsManager private constructor(
             throw e
         }
     }
+
+    override fun purgeRepository() {
+    }
 }
