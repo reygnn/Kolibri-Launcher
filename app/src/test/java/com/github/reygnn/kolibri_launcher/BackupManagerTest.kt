@@ -341,6 +341,7 @@ class BackupManagerTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
+            importTimeBasedEvents = false,
             importGestureSettings = false
         )
 
