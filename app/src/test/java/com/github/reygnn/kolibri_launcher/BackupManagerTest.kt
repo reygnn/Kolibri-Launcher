@@ -101,11 +101,11 @@ class BackupManagerTest {
         assertThat(backup.settings.customAppNames).isEmpty()
         assertThat(backup.settings.swipeLeftApp).isNull()
         assertThat(backup.settings.swipeRightApp).isNull()
-        assertThat(backup.settings.textColor).isEqualTo(0)
-        assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
-        assertThat(backup.settings.textShadowEnabled).isTrue()
-        assertThat(backup.settings.doubleTapToLockEnabled).isFalse()
-        assertThat(backup.settings.swipeDownToNotificationsEnabled).isFalse()
+        assertThat(backup.settings.textColor).isNull()
+        assertThat(backup.settings.chipBackgroundColor).isNull()
+        assertThat(backup.settings.textShadowEnabled).isNull()  // Default=true → null
+        assertThat(backup.settings.doubleTapToLockEnabled).isNull()  // Default=false → null
+        assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull() // Default=false → null
     }
 
     @Test
