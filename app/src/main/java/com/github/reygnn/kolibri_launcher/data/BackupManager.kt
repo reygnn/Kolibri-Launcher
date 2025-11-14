@@ -74,11 +74,11 @@ class BackupManager @Inject constructor(
                 customAppNames = customAppNames,
                 swipeLeftApp = swipeLeftApp,
                 swipeRightApp = swipeRightApp,
-                textColor = textColor,
-                chipBackgroundColor = chipBackgroundColor,
-                textShadowEnabled = textShadowEnabled,
-                doubleTapToLockEnabled = doubleTapToLockEnabled,
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled
+                textColor = textColor.takeIf { it != 0 },
+                chipBackgroundColor = chipBackgroundColor.takeIf { it != 0 },
+                textShadowEnabled = textShadowEnabled.takeIf { !it },
+                doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it }
             )
 
             val backup = BackupData(
@@ -509,7 +509,11 @@ class BackupManager @Inject constructor(
                         backup.settings.swipeDownToNotificationsEnabled != null
             )
 
-            Timber.Forest.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}")
+            Timber.Forest.i(
+                "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, " +
+                        "swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}, " +
+                        "theme=${preview.hasThemeSettings}, gestures=${preview.hasGestureSettings}"
+            )
             preview
 
         } catch (e: SecurityException) {

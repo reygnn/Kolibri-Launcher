@@ -194,6 +194,11 @@ class BackupFragment : Fragment() {
                     checkboxImportThemeSettings.text = getString(R.string.import_option_theme)
                     checkboxImportThemeSettings.isVisible = themeVisible
                     checkboxImportThemeSettings.isChecked = themeVisible
+
+                    val gestureVisible = preview.hasGestureSettings
+                    checkboxImportGestureSettings.text = getString(R.string.import_option_gestures)
+                    checkboxImportGestureSettings.isVisible = gestureVisible
+                    checkboxImportGestureSettings.isChecked = gestureVisible
                 }
 
                 // 4. Dialog anzeigen
@@ -207,7 +212,8 @@ class BackupFragment : Fragment() {
                             importHiddenApps = dialogBinding.checkboxImportHiddenApps.isChecked,
                             importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked,
                             importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked,
-                            importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked
+                            importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked,
+                            importGestureSettings = dialogBinding.checkboxImportGestureSettings.isChecked
                         )
 
                         if (options.importNothing) {
