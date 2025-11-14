@@ -300,5 +300,5 @@ class SettingsManager @Inject constructor(
     }
 
 
-    override fun purgeRepository() { }
+    override suspend fun purgeRepository() { }
 }

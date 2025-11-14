@@ -165,6 +165,5 @@ open class SwipeActionsManager private constructor(
         }
     }
 
-    override fun purgeRepository() {
-    }
+    override suspend fun purgeRepository() { }
 }

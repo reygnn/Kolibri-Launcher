@@ -62,7 +62,7 @@ class FakeAppNamesRepository : CustomNamesRepository {
         return true
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         customNames.clear()
         onUpdateTrigger = null
         shouldFailOnSet = false

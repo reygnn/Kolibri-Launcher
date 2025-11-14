@@ -92,6 +92,6 @@ class InstalledAppsStateManager @Inject constructor() : InstalledAppsStateReposi
         }
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
     }
 }

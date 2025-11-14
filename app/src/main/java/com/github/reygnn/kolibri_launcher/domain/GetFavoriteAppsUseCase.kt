@@ -155,7 +155,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         }
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         // Für Tests
     }
 }

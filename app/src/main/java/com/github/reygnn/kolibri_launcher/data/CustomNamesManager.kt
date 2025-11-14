@@ -400,5 +400,5 @@ class CustomNamesManager @Inject constructor(
         }
     }
 
-    override fun purgeRepository() { }  // für die androidTests
+    override suspend fun purgeRepository() { }  // für die androidTests
 }

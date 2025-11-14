@@ -20,6 +20,7 @@ import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseReposit
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -139,18 +140,20 @@ abstract class BaseAndroidTest {
          * This has been tested: the explicit version works, optimized versions fail.
          * Leave this code as-is unless you're willing to debug complex Hilt timing issues.
          */
-        (favoritesRepository as? Purgeable)?.purgeRepository()
-        (appVisibilityRepository as? Purgeable)?.purgeRepository()
-        (settingsRepository as? Purgeable)?.purgeRepository()
-        (appUsageRepository as? Purgeable)?.purgeRepository()
-        (favoritesOrderRepository as? Purgeable)?.purgeRepository()
-        (installedAppsRepository as? Purgeable)?.purgeRepository()
-        (customNamesRepository as? Purgeable)?.purgeRepository()
-        (installedAppsStateRepository as? Purgeable)?.purgeRepository()
-        (getFavoriteAppsUseCase as? Purgeable)?.purgeRepository()
-        (getDrawerAppsUseCase as? Purgeable)?.purgeRepository()
-        (screenLockRepository as? Purgeable)?.purgeRepository()
-        (getOnboardingAppsUseCase as? Purgeable)?.purgeRepository()
+        runBlocking {
+            (favoritesRepository as? Purgeable)?.purgeRepository()
+            (appVisibilityRepository as? Purgeable)?.purgeRepository()
+            (settingsRepository as? Purgeable)?.purgeRepository()
+            (appUsageRepository as? Purgeable)?.purgeRepository()
+            (favoritesOrderRepository as? Purgeable)?.purgeRepository()
+            (installedAppsRepository as? Purgeable)?.purgeRepository()
+            (customNamesRepository as? Purgeable)?.purgeRepository()
+            (installedAppsStateRepository as? Purgeable)?.purgeRepository()
+            (getFavoriteAppsUseCase as? Purgeable)?.purgeRepository()
+            (getDrawerAppsUseCase as? Purgeable)?.purgeRepository()
+            (screenLockRepository as? Purgeable)?.purgeRepository()
+            (getOnboardingAppsUseCase as? Purgeable)?.purgeRepository()
+        }
 
         // Reset TestDataSource
         TestDataSource.clearCustomNames()

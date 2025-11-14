@@ -306,5 +306,5 @@ open class FavoritesOrderManager private constructor(
         }
     }
 
-    override fun purgeRepository() { }
+    override suspend fun purgeRepository() { }
 }

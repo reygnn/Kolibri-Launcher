@@ -69,7 +69,7 @@ class ScreenLockManager @Inject constructor() : ScreenLockRepository {
     }
     // --- ENDE NEU ---
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         // Für Tests - keine Implementierung nötig in Production
     }
 }

@@ -38,7 +38,7 @@ class GetOnboardingAppsUseCase @Inject constructor(
                 emit(emptyList())
             }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         // Für Tests - keine Implementierung nötig in Production
     }
 }

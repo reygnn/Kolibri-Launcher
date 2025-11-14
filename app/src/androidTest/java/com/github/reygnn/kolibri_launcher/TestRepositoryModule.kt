@@ -20,11 +20,13 @@ import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.di.RepositoryModule
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.SortOrder
+import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.UiState
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
@@ -38,6 +40,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.runBlocking
+import javax.inject.Inject
 import javax.inject.Singleton
 
 // =================================================================================
@@ -201,17 +205,16 @@ object TestRepositoryModule {
     @Provides
     @Singleton
     fun provideBackupRepository(): BackupRepository = FakeBackupRepository()
+
+    @Provides
+    @Singleton
+    fun provideTimeBasedEventsRepository(): TimeBasedEventsRepository = FakeTimeBasedEventsRepository()
 }
 
 
 // =================================================================================
 // --- FAKE IMPLEMENTATIONS ---
 // =================================================================================
-
-// Diese data class ist hier, weil sie in GetFavoriteAppsUseCase.kt definiert ist.
-// data class FavoriteAppsResult(val apps: List<AppInfo>, val isFallback: Boolean)
-
-// --- ANGEPASSTE FAKES FÜR DIE REAKTIVE LÖSUNG ---
 
 /**
  * Hält den Flow der installierten Apps. Wird jetzt reaktiv vom FakeAppNamesRepository
@@ -221,9 +224,7 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
     val appsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
     override fun getInstalledApps(): Flow<List<AppInfo>> = appsFlow
     override suspend fun triggerAppsUpdate() {}
-    override fun purgeRepository() {
-        appsFlow.value = emptyList()
-    }
+    override suspend fun purgeRepository() { appsFlow.value = emptyList() }
 }
 
 /**
@@ -273,7 +274,7 @@ class FakeCustomNamesRepository(
         onNameChanged()
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         TestDataSource.clearCustomNames()
         onNameChanged()
     }
@@ -313,9 +314,7 @@ class FakeFavoritesRepository : FavoritesRepository, Purgeable {
         favoritesState.value = componentNames.toSet()
     }
 
-    override fun purgeRepository() {
-        favoritesState.value = emptySet()
-    }
+    override suspend fun purgeRepository() { favoritesState.value = emptySet() }
 }
 
 class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
@@ -347,9 +346,7 @@ class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
         }
     }
 
-    override fun purgeRepository() {
-        hiddenAppsState.value = emptySet()
-    }
+    override suspend fun purgeRepository() { hiddenAppsState.value = emptySet() }
 }
 
 class FakeSettingsRepository : SettingsRepository {
@@ -467,7 +464,7 @@ class FakeSettingsRepository : SettingsRepository {
         sortOrderFlowState.value = sortOrder
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         color = 0
         shadow = true
         chipBgColor = 0
@@ -495,9 +492,7 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
     override suspend fun hasUsageDataForPackage(packageName: String?): Boolean =
         launchedPackages.contains(packageName)
 
-    override fun purgeRepository() {
-        launchedPackages.clear()
-    }
+    override suspend fun purgeRepository() { launchedPackages.clear() }
 }
 
 class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
@@ -532,16 +527,12 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
             .toSet())
     }
 
-    override fun purgeRepository() {
-        orderState.value = emptyList(); savedOrder = null; saveOrderCallCount = 0
-    }
+    override suspend fun purgeRepository() { orderState.value = emptyList(); savedOrder = null; saveOrderCallCount = 0 }
 }
 
 class FakeGetDrawerAppsUseCaseRepository : GetDrawerAppsUseCaseRepository, Purgeable {
     override val drawerApps = MutableLiveData<List<AppInfo>>()
-    override fun purgeRepository() {
-        drawerApps.postValue(emptyList())
-    }
+    override suspend fun purgeRepository() { drawerApps.postValue(emptyList()) }
 }
 
 class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, Purgeable {
@@ -549,9 +540,7 @@ class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, P
         MutableStateFlow(UiState.Loading)
     override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = favoriteAppsState
 
-    override fun purgeRepository() {
-        favoriteAppsState.value = UiState.Loading
-    }
+    override suspend fun purgeRepository() { favoriteAppsState.value = UiState.Loading }
 }
 
 class FakeInstalledAppsStateRepository : InstalledAppsStateRepository, Purgeable {
@@ -572,9 +561,7 @@ class FakeInstalledAppsStateRepository : InstalledAppsStateRepository, Purgeable
         }
     }
 
-    override fun purgeRepository() {
-        stateFlow.value = emptyList(); lastSuccessfulAppList = emptyList()
-    }
+    override suspend fun purgeRepository() { stateFlow.value = emptyList(); lastSuccessfulAppList = emptyList() }
 }
 
 class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
@@ -596,14 +583,12 @@ class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
         isLockingAvailableFlow.value = isAvailable
     }
 
-    override fun purgeRepository() {
-        isLockingAvailableFlow.value = true
-    }
+    override suspend fun purgeRepository() { isLockingAvailableFlow.value = true }
 }
 
 class FakeShortcutRepository : ShortcutRepository, Purgeable {
     override fun getShortcutsForPackage(packageName: String): List<ShortcutInfo> = emptyList()
-    override fun purgeRepository() {}
+    override suspend fun purgeRepository() {}
 }
 
 class FakeGetOnboardingAppsUseCaseRepository : GetOnboardingAppsUseCaseRepository {
@@ -611,7 +596,7 @@ class FakeGetOnboardingAppsUseCaseRepository : GetOnboardingAppsUseCaseRepositor
     override val onboardingAppsFlow: Flow<List<AppInfo>>
         get() = mutableOnboardingAppsFlow
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         mutableOnboardingAppsFlow.value = emptyList()
     }
 }
@@ -621,10 +606,10 @@ open class FakeAppUpdateSignal : AppUpdateSignal(), Purgeable {
         private set
 
     fun reset() {
-        purgeRepository()
+        runBlocking { purgeRepository() }
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         signalSentCount = 0
     }
 
@@ -650,7 +635,7 @@ class FakeSwipeActionsRepository : SwipeActionsRepository, Purgeable {
         }
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         swipeLeftState.value = null
         swipeRightState.value = null
     }
@@ -732,9 +717,36 @@ class FakeBackupRepository : BackupRepository, Purgeable {
         )
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         lastExportedJson = null
         lastImportedJson = null
         lastImportOptions = null
+    }
+}
+
+@Singleton
+class FakeTimeBasedEventsRepository @Inject constructor() : TimeBasedEventsRepository, Purgeable {
+    private var events = emptyList<TimeBasedEvent>()
+
+    /**
+     * Gibt die gespeicherten Events zurück, sortiert und limitiert,
+     * genau wie die echte Implementierung es tun würde.
+     */
+    override suspend fun getUpcomingTimeBasedEvents(maxCount: Int): List<TimeBasedEvent> {
+        return events.sortedBy { it.triggerTimeMillis }.take(maxCount)
+    }
+
+    /**
+     * Setzt den Zustand des Fakes für den nächsten Test zurück.
+     */
+    override suspend fun purgeRepository() {
+        events = emptyList()
+    }
+
+    /**
+     * Eine Helferfunktion, um den Zustand des Fakes vorzubereiten.
+     */
+    fun setEvents(events: List<TimeBasedEvent>) {
+        this.events = events
     }
 }

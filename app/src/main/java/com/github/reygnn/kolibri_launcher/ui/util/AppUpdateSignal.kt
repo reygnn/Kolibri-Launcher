@@ -23,5 +23,5 @@ open class AppUpdateSignal @Inject constructor() : Purgeable {
     }
 
     // Der Fake im Test-Code wird diese dann mit der echten Reset-Logik überschreiben.
-    override fun purgeRepository() { }
+    override suspend fun purgeRepository() { }
 }

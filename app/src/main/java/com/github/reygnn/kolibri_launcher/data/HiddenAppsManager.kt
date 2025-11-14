@@ -206,5 +206,5 @@ class HiddenAppsManager @Inject constructor(
         }
     }
 
-    override fun purgeRepository() { }
+    override suspend fun purgeRepository() { }
 }

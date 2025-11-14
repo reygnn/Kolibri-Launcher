@@ -1027,12 +1027,8 @@ class FakeFavoritesRepository : FavoritesRepository {
     override suspend fun toggleFavoriteComponent(componentName: String) = true
     override suspend fun addFavoriteComponent(componentName: String) = true
     override suspend fun removeFavoriteComponent(componentName: String) = true
-    override suspend fun saveFavoriteComponents(componentNames: List<String>) {
-        favorites = componentNames.toSet()
-    }
-    override fun purgeRepository() {
-        favorites = emptySet()
-    }
+    override suspend fun saveFavoriteComponents(componentNames: List<String>) { favorites = componentNames.toSet() }
+    override suspend fun purgeRepository() { favorites = emptySet() }
 }
 
 class FakeFavoritesOrderRepository : FavoritesOrderRepository {
@@ -1051,9 +1047,7 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository {
         order = orderedComponentNames
         return true
     }
-    override fun purgeRepository() {
-        order = emptyList()
-    }
+    override suspend fun purgeRepository() { order = emptyList() }
 }
 
 class FakeAppVisibilityRepository : HiddenAppsRepository {
@@ -1076,9 +1070,7 @@ class FakeAppVisibilityRepository : HiddenAppsRepository {
     ) {
         hiddenApps = (hiddenApps + componentsToHide) - componentsToShow
     }
-    override fun purgeRepository() {
-        hiddenApps = emptySet()
-    }
+    override suspend fun purgeRepository() { hiddenApps = emptySet() }
 }
 
 class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
@@ -1092,7 +1084,7 @@ class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
         // Nichts tun im Test
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         // Nichts tun im Test
     }
 }
@@ -1123,6 +1115,11 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
             SwipeSlot.RIGHT -> swipeRightApp = componentName
             SwipeSlot.NONE -> {}
         }
+    }
+
+    override suspend fun purgeRepository() {
+        swipeLeftApp = null
+        swipeRightApp = null
     }
 }
 
@@ -1208,7 +1205,7 @@ class FakeSettingsRepository : SettingsRepository {
         showAlarm = isEnabled
     }
 
-    override fun purgeRepository() {
+    override suspend fun purgeRepository() {
         color = 0
         shadow = true
         chipBgColor = 0

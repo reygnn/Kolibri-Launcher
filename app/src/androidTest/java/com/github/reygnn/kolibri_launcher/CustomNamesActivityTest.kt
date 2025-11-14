@@ -18,6 +18,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.reygnn.kolibri_launcher.ui.CustomNamesActivity
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestDispatcher
 import org.hamcrest.CoreMatchers.endsWith
 import org.hamcrest.Matchers.allOf
@@ -33,7 +34,7 @@ class CustomNamesActivityTest : BaseAndroidTest() {
 
     @Before
     fun setup() {
-        (customNamesRepository as FakeCustomNamesRepository).purgeRepository()
+        runBlocking { (customNamesRepository as FakeCustomNamesRepository).purgeRepository() }
     }
 
     @Test
