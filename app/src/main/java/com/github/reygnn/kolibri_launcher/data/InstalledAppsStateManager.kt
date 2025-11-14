@@ -94,14 +94,11 @@ class InstalledAppsStateManager @Inject constructor() : InstalledAppsStateReposi
     }
 
     override suspend fun purgeRepository() {
-        try {
-            _rawAppsFlow.value = emptyList()
-            lastSuccessfulAppList = emptyList()
+        // NICHTS TUN!
+        // Der StateManager hält nur den aktuellen State der installierten Apps.
+        // Diese Daten kommen vom System-PackageManager und sollten nicht geleert werden.
+        // Ein Reload wird über InstalledAppsRepository.triggerAppsUpdate() ausgelöst.
 
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to purge InstalledAppsStateManager repository")
-        }
+        Timber.Forest.d("InstalledAppsStateManager: purge requested, but state manager does not purge system data")
     }
 }

@@ -81,5 +81,11 @@ class ShortcutManager @Inject constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        // NICHTS TUN!
+        // Der ShortcutManager liest Shortcuts direkt vom Android LauncherApps Service.
+        // Diese System-Daten (App Shortcuts) werden von den installierten Apps bereitgestellt
+        // und können/sollten nicht durch einen Factory Reset geleert werden.
+        // Shortcuts sind keine User-Einstellungen, sondern App-Metadaten.
+    }
 }

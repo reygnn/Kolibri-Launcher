@@ -205,5 +205,14 @@ class TimeBasedEventsManager @Inject constructor(
         }
     }
 
-    override suspend fun purgeRepository() { }
+    override suspend fun purgeRepository() {
+        // NICHTS TUN!
+        // Der TimeBasedEventsManager liest Daten direkt vom System (AlarmManager, CalendarProvider).
+        // Diese System-Daten können und sollten nicht geleert werden.
+        // Alarme und Kalendertermine sind keine App-Einstellungen, sondern Systemdaten.
+        // Ein Neuladen erfolgt automatisch bei jedem Aufruf von getUpcomingTimeBasedEvents().
+
+        // Für Tests: Diese Methode existiert nur für das Purgeable-Interface,
+        // hat aber keine Auswirkung, da keine persistierten Daten vorhanden sind.
+    }
 }

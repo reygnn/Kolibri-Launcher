@@ -67,9 +67,14 @@ class ScreenLockManager @Inject constructor() : ScreenLockRepository {
             TimberWrapper.silentError(e, "Error requesting open notifications")
         }
     }
-    // --- ENDE NEU ---
 
     override suspend fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
+        // NICHTS TUN!
+        // Der ScreenLockManager hält nur flüchtigen Runtime-State:
+        // - isLockingAvailableFlow: Ob der Accessibility Service verbunden ist
+        // - lockRequestFlow/openNotificationsRequestFlow: Event-Streams für Anfragen
+        //
+        // Es werden keine User-Einstellungen oder persistierte Daten gespeichert.
+        // Der Service-State wird bei jedem App-Start neu ermittelt.
     }
 }

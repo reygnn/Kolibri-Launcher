@@ -228,5 +228,13 @@ class InstalledAppsManager @Inject constructor(
     }
 
     override suspend fun purgeRepository() {
+        // NICHTS TUN!
+        // Der InstalledAppsManager liest die App-Liste direkt vom Android PackageManager.
+        // Diese System-Daten können und sollten nicht geleert werden.
+        // Installierte Apps sind System-Informationen, keine User-Einstellungen.
+        // Ein Neuladen der App-Liste erfolgt über triggerAppsUpdate().
+
+        // Für Tests: Diese Methode existiert nur für das Purgeable-Interface,
+        // hat aber keine Auswirkung, da keine persistierten Daten vorhanden sind.
     }
 }
