@@ -74,16 +74,16 @@ class SettingsManagerTest {
     }
 
     @Test
-    fun `doubleTapToLockEnabledFlow - when no value is set - returns default true`() = runTest {
-        assertTrue(settingsManager.doubleTapToLockEnabledFlow.first())
+    fun `doubleTapToLockEnabledFlow - when no value is set - returns default false`() = runTest {
+        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
     }
 
     @Test
-    fun `setDoubleTapToLock - correctly saves false`() = runTest {
-        settingsManager.setDoubleTapToLock(false)
+    fun `setDoubleTapToLock - correctly saves true`() = runTest {
+        settingsManager.setDoubleTapToLock(true)
 
         val savedValue = fakeDataStore.data.first()[DOUBLE_TAP_TO_LOCK_ENABLED]
-        assertFalse(savedValue ?: true)
+        assertTrue(savedValue ?: false)
     }
 
     @Test
@@ -137,10 +137,9 @@ class SettingsManagerTest {
     fun `setDoubleTapToLock - when DataStore edit fails - does not crash`() = runTest {
         fakeDataStore.makeEditFail()
 
-        settingsManager.setDoubleTapToLock(false)
+        settingsManager.setDoubleTapToLock(true)
 
-        // Should maintain default value
-        assertTrue(settingsManager.doubleTapToLockEnabledFlow.first())
+        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
     }
 
     @Test
@@ -181,12 +180,12 @@ class SettingsManagerTest {
     }
 
     @Test
-    fun `doubleTapToLockEnabledFlow - when DataStore read fails - returns default true`() = runTest {
+    fun `doubleTapToLockEnabledFlow - when DataStore read fails - returns default false`() = runTest {
         fakeDataStore.makeReadFail()
 
         val result = settingsManager.doubleTapToLockEnabledFlow.first()
 
-        assertTrue(result)
+        assertFalse(result)
     }
 
     @Test
@@ -214,9 +213,6 @@ class SettingsManagerTest {
     @Test
     fun `setDoubleTapToLock - toggling multiple times - works correctly`() = runTest {
         settingsManager.doubleTapToLockEnabledFlow.test {
-            assertEquals(true, awaitItem())
-
-            settingsManager.setDoubleTapToLock(false)
             assertEquals(false, awaitItem())
 
             settingsManager.setDoubleTapToLock(true)
@@ -224,6 +220,9 @@ class SettingsManagerTest {
 
             settingsManager.setDoubleTapToLock(false)
             assertEquals(false, awaitItem())
+
+            settingsManager.setDoubleTapToLock(true)
+            assertEquals(true, awaitItem())
         }
     }
 

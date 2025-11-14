@@ -104,6 +104,80 @@ class BackupManagerTest {
         assertThat(backup.settings.textColor).isEqualTo(0)
         assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
         assertThat(backup.settings.textShadowEnabled).isTrue()
+        assertThat(backup.settings.doubleTapToLockEnabled).isFalse()
+        assertThat(backup.settings.swipeDownToNotificationsEnabled).isFalse()
+    }
+
+    @Test
+    fun `importFromJson - only gesture settings - imports only gestures`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.doubleTap = false
+        fakeSettingsRepo.swipeDown = false
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.RED,
+            doubleTapToLockEnabled = true,
+            swipeDownToNotificationsEnabled = true
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = false,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = false,
+            importGestureSettings = true
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+    }
+
+    @Test
+    fun `importFromJson - only theme settings - imports only theme not gestures`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.chipBgColor = Color.BLACK
+        fakeSettingsRepo.shadow = true
+        fakeSettingsRepo.doubleTap = false
+        fakeSettingsRepo.swipeDown = false
+
+        val backup = createTestBackup(
+            textColor = Color.GREEN,
+            chipBackgroundColor = Color.MAGENTA,
+            textShadowEnabled = false,
+            doubleTapToLockEnabled = true,
+            swipeDownToNotificationsEnabled = true
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = false,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = true,
+            importGestureSettings = false  // Explizit false
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
+        assertThat(fakeSettingsRepo.shadow).isFalse()
+        assertThat(fakeSettingsRepo.doubleTap).isFalse()
+        assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
     @Test
@@ -218,6 +292,8 @@ class BackupManagerTest {
         fakeSettingsRepo.color = Color.RED
         fakeSettingsRepo.chipBgColor = Color.GREEN
         fakeSettingsRepo.shadow = false
+        fakeSettingsRepo.doubleTap = true
+        fakeSettingsRepo.swipeDown = true
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -231,6 +307,8 @@ class BackupManagerTest {
         assertThat(backup.settings.textColor).isEqualTo(Color.RED)
         assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
         assertThat(backup.settings.textShadowEnabled).isFalse()
+        assertThat(backup.settings.doubleTapToLockEnabled).isTrue()
+        assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
     }
 
     @Test
@@ -262,7 +340,8 @@ class BackupManagerTest {
             importHiddenApps = false,
             importCustomNames = false,
             importSwipeActions = false,
-            importThemeSettings = false
+            importThemeSettings = false,
+            importGestureSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -528,6 +607,8 @@ class BackupManagerTest {
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
+        fakeSettingsRepo.doubleTap = false
+        fakeSettingsRepo.swipeDown = false
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
@@ -538,7 +619,9 @@ class BackupManagerTest {
             swipeRight = "com.app2/com.app2.MainActivity",
             textColor = Color.BLUE,
             chipBackgroundColor = Color.CYAN,
-            textShadowEnabled = false
+            textShadowEnabled = false,
+            doubleTapToLockEnabled = true,
+            swipeDownToNotificationsEnabled = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -548,7 +631,8 @@ class BackupManagerTest {
             importHiddenApps = true,
             importCustomNames = true,
             importSwipeActions = true,
-            importThemeSettings = true
+            importThemeSettings = true,
+            importGestureSettings = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -563,6 +647,8 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
         assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
         assertThat(fakeSettingsRepo.shadow).isFalse()
+        assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        assertThat(fakeSettingsRepo.swipeDown).isTrue()
     }
 
     // ========== VALIDATION TESTS ==========
@@ -786,7 +872,9 @@ class BackupManagerTest {
             swipeRight = "com.app2/com.app2.MainActivity",
             textColor = Color.YELLOW,
             chipBackgroundColor = Color.RED,
-            textShadowEnabled = false
+            textShadowEnabled = false,
+            doubleTapToLockEnabled = true,
+            swipeDownToNotificationsEnabled = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -806,6 +894,8 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
         assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
         assertThat(fakeSettingsRepo.shadow).isFalse()
+        assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        assertThat(fakeSettingsRepo.swipeDown).isTrue()
     }
 
     @Test
@@ -842,6 +932,35 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
+    @Test
+    fun `importFromJson - old backup without gesture keys - does not change gestures`() = runTest {
+        // Setze initiale Werte, die *nicht* geändert werden dürfen
+        fakeSettingsRepo.doubleTap = true
+        fakeSettingsRepo.swipeDown = false
+
+        // Ein JSON-String, der die Keys nicht enthält
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            doubleTapToLockEnabled = null,
+            swipeDownToNotificationsEnabled = null
+        )
+        val oldBackupJson = json.encodeToString(backup)
+
+        // Sicherstellen, dass die Keys wirklich fehlen
+        assertThat(oldBackupJson).doesNotContain("double_tap_to_lock_enabled")
+        assertThat(oldBackupJson).doesNotContain("swipe_down_to_notifications_enabled")
+
+        val options = ImportOptions(importGestureSettings = true)
+
+        val result = backupManager.importFromJson(oldBackupJson, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Prüfen: Gesture-Werte sind unverändert, da im Backup null (nicht vorhanden)
+        assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        assertThat(fakeSettingsRepo.swipeDown).isFalse()
+    }
+
     // ========== HELPER METHODS ==========
 
     private fun createAppInfo(packageName: String, className: String): AppInfo {
@@ -864,7 +983,9 @@ class BackupManagerTest {
         swipeRight: String? = null,
         textColor: Int? = null,
         chipBackgroundColor: Int? = null,
-        textShadowEnabled: Boolean? = null
+        textShadowEnabled: Boolean? = null,
+        doubleTapToLockEnabled: Boolean? = null,
+        swipeDownToNotificationsEnabled: Boolean? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -879,7 +1000,9 @@ class BackupManagerTest {
                 swipeRightApp = swipeRight,
                 textColor = textColor,
                 chipBackgroundColor = chipBackgroundColor,
-                textShadowEnabled = textShadowEnabled
+                textShadowEnabled = textShadowEnabled,
+                doubleTapToLockEnabled = doubleTapToLockEnabled,
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled
             )
         )
     }

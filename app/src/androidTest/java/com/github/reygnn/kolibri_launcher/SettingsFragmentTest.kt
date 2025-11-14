@@ -75,7 +75,7 @@ class SettingsFragmentTest : BaseAndroidTest() {
     fun doubleTapToLockSwitch_updatesRepositoryState() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange
         val fakeSettingsRepo = settingsRepository as FakeSettingsRepository
-        fakeSettingsRepo.doubleTapToLockEnabledFlow.value = false // Setze den Anfangszustand
+        fakeSettingsRepo.doubleTap = false // KORRIGIERT: Verwende die Property, nicht den Flow
 
         // Act
         launchFragmentInHiltContainer<SettingsFragment>()
@@ -85,7 +85,24 @@ class SettingsFragmentTest : BaseAndroidTest() {
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert: Überprüfe den Zustand des Fakes
-        assertThat(fakeSettingsRepo.doubleTapToLockEnabledFlow.value).isTrue()
+        assertThat(fakeSettingsRepo.doubleTap).isTrue() // KORRIGIERT: Verwende die Property
+    }
+
+    @Test
+    fun swipeDownToNotificationsSwitch_updatesRepositoryState() = testCoroutineRule.runTestAndLaunchUI {
+        // Arrange
+        val fakeSettingsRepo = settingsRepository as FakeSettingsRepository
+        fakeSettingsRepo.swipeDown = false
+
+        // Act
+        launchFragmentInHiltContainer<SettingsFragment>()
+        onView(withText(R.string.swipe_down_to_notifications_title)).perform(click())
+
+        // Synchronisation
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: Überprüfe den Zustand des Fakes
+        assertThat(fakeSettingsRepo.swipeDown).isTrue()
     }
 
     @Test

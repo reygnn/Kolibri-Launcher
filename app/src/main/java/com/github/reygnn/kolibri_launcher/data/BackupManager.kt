@@ -63,6 +63,9 @@ class BackupManager @Inject constructor(
             val textColor = settingsManager.textColorFlow.first()
             val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
             val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
+            val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
+            val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
+
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
@@ -73,7 +76,9 @@ class BackupManager @Inject constructor(
                 swipeRightApp = swipeRightApp,
                 textColor = textColor,
                 chipBackgroundColor = chipBackgroundColor,
-                textShadowEnabled = textShadowEnabled
+                textShadowEnabled = textShadowEnabled,
+                doubleTapToLockEnabled = doubleTapToLockEnabled,
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled
             )
 
             val backup = BackupData(
@@ -234,7 +239,28 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // ===== PHASE 6: Import Theme Settings =====
+            // ===== PHASE 6: Import Gesture Settings =====
+            if (options.importGestureSettings) {
+                var gestureImported = false
+
+                // Importiere Double Tap to Lock (nur wenn im Backup vorhanden)
+                backup.settings.doubleTapToLockEnabled?.let {
+                    settingsManager.setDoubleTapToLock(it)
+                    gestureImported = true
+                }
+
+                // Importiere Swipe Down to Notifications (nur wenn im Backup vorhanden)
+                backup.settings.swipeDownToNotificationsEnabled?.let {
+                    settingsManager.setSwipeDownToNotifications(it)
+                    gestureImported = true
+                }
+
+                if (gestureImported) {
+                    Timber.Forest.i("Imported gesture settings.")
+                }
+            }
+
+            // ===== PHASE 7: Import Theme Settings =====
             if (options.importThemeSettings) {
                 var themeImported = false
 
@@ -263,13 +289,15 @@ class BackupManager @Inject constructor(
             }
 
             Timber.Forest.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b",
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
                 options.importHiddenApps,
                 options.importCustomNames,
-                options.importSwipeActions
+                options.importSwipeActions,
+                options.importThemeSettings,
+                options.importGestureSettings
             )
 
             ImportResult.Success(
@@ -476,7 +504,9 @@ class BackupManager @Inject constructor(
                 hasSwipeRight = backup.settings.swipeRightApp != null,
                 hasThemeSettings = backup.settings.textColor != null ||
                         backup.settings.chipBackgroundColor != null ||
-                        backup.settings.textShadowEnabled != null
+                        backup.settings.textShadowEnabled != null,
+                hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
+                        backup.settings.swipeDownToNotificationsEnabled != null
             )
 
             Timber.Forest.i("Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}")

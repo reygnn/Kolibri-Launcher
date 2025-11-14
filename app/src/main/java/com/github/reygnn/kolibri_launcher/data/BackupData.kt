@@ -20,19 +20,18 @@ data class LauncherSettings(
     val customAppNames: Map<String, String> = emptyMap(),
     @SerialName("swipe_left_app")
     val swipeLeftApp: String? = null,
-
     @SerialName("swipe_right_app")
     val swipeRightApp: String? = null,
-
     @SerialName("text_color")
     val textColor: Int? = null,
-
     @SerialName("chip_bg_color")
     val chipBackgroundColor: Int? = null,
-
-
     @SerialName("text_shadow_enabled")
-    val textShadowEnabled: Boolean? = null
+    val textShadowEnabled: Boolean? = null,
+    @SerialName("double_tap_to_lock_enabled")
+    val doubleTapToLockEnabled: Boolean? = null,
+    @SerialName("swipe_down_to_notifications_enabled")
+    val swipeDownToNotificationsEnabled: Boolean? = null
 )
 
 data class ImportOptions(
@@ -41,7 +40,8 @@ data class ImportOptions(
     val importHiddenApps: Boolean = true,
     val importCustomNames: Boolean = true,
     val importSwipeActions: Boolean = true,
-    val importThemeSettings: Boolean = true
+    val importThemeSettings: Boolean = true,
+    val importGestureSettings: Boolean = true
 ) {
     val importNothing: Boolean
         get() = !importFavorites &&
@@ -49,7 +49,8 @@ data class ImportOptions(
                 !importHiddenApps &&
                 !importCustomNames &&
                 !importSwipeActions &&
-                !importThemeSettings
+                !importThemeSettings &&
+                !importGestureSettings
 }
 
 data class BackupPreview(
@@ -61,7 +62,8 @@ data class BackupPreview(
     val customNamesCount: Int,
     val hasSwipeLeft: Boolean,
     val hasSwipeRight: Boolean,
-    val hasThemeSettings: Boolean
+    val hasThemeSettings: Boolean,
+    val hasGestureSettings: Boolean
 )
 
 sealed class ImportResult {

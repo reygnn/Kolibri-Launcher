@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import javax.inject.Singleton
 
@@ -312,40 +313,118 @@ class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
     override fun purgeRepository() { hiddenAppsState.value = emptySet() }
 }
 
-class FakeSettingsRepository : SettingsRepository, Purgeable {
-    override val sortOrderFlow = MutableStateFlow(SortOrder.ALPHABETICAL)
-    override val doubleTapToLockEnabledFlow = MutableStateFlow(false)
-    override val readabilityModeFlow = MutableStateFlow("smart_contrast")
-    override val onboardingCompletedFlow = MutableStateFlow(false)
-    override val textShadowEnabledFlow = MutableStateFlow(true)
-    override val textColorFlow = MutableStateFlow(0)
-    override val showCalendarEventFlow = MutableStateFlow(false)
-    override val showAlarmFlow = MutableStateFlow(false)
-    override val chipBackgroundColorFlow = MutableStateFlow(0)
+class FakeSettingsRepository : SettingsRepository {
 
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) { showCalendarEventFlow.value = isEnabled }
-    override suspend fun setShowAlarm(isEnabled: Boolean) { showAlarmFlow.value = isEnabled }
-    override suspend fun setSortOrder(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTapToLockEnabledFlow.value = isEnabled }
-    override suspend fun setReadabilityMode(mode: String) { readabilityModeFlow.value = mode }
-    override suspend fun setOnboardingCompleted() { onboardingCompletedFlow.value = true }
-    override suspend fun setTextShadowEnabled(isEnabled: Boolean) { textShadowEnabledFlow.value = isEnabled }
-    override suspend fun setTextColor(color: Int) { textColorFlow.value = color }
-    override suspend fun setChipBackgroundColor(color: Int) { chipBackgroundColorFlow.value = color }
+    private val shadowFlow = MutableStateFlow(true) // Default: true
+    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
+    private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
+    private val calendarFlow = MutableStateFlow(false) // Default false
+    private val alarmFlow = MutableStateFlow(false) // Default: false
+    private val doubleTapFlow = MutableStateFlow(false) // Default false
+    private val swipeDownFlow = MutableStateFlow(false) // Default false
+    private val sortOrderFlowState = MutableStateFlow(SortOrder.ALPHABETICAL)  // NEU
+    private val readabilityModeFlowState = MutableStateFlow("smart_contrast")  // NEU
+    private val onboardingFlowState = MutableStateFlow(false)  // NEU
 
+    var shadow: Boolean
+        get() = shadowFlow.value
+        set(value) { shadowFlow.value = value }
 
-    fun setReadabilityModeBlocking(mode: String) { readabilityModeFlow.value = mode }
-    fun setSortOrderBlocking(sortOrder: SortOrder) { sortOrderFlow.value = sortOrder }
+    var color: Int
+        get() = colorFlow.value
+        set(value) { colorFlow.value = value }
+
+    var chipBgColor: Int
+        get() = chipBgColorFlow.value
+        set(value) { chipBgColorFlow.value = value }
+
+    var showCalendar: Boolean
+        get() = calendarFlow.value
+        set(value) { calendarFlow.value = value }
+
+    var showAlarm: Boolean
+        get() = alarmFlow.value
+        set(value) { alarmFlow.value = value }
+
+    var doubleTap: Boolean
+        get() = doubleTapFlow.value
+        set(value) { doubleTapFlow.value = value }
+
+    var swipeDown: Boolean
+        get() = swipeDownFlow.value
+        set(value) { swipeDownFlow.value = value }
+
+    override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
+    override val textColorFlow: Flow<Int> = colorFlow
+    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
+
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
+        shadow = isEnabled
+    }
+
+    override suspend fun setTextColor(color: Int) {
+        this.color = color
+    }
+
+    override suspend fun setChipBackgroundColor(color: Int) {
+        this.chipBgColor = color
+    }
+
+    override val sortOrderFlow: Flow<SortOrder> = sortOrderFlowState
+    override suspend fun setSortOrder(sortOrder: SortOrder) {
+        sortOrderFlowState.value = sortOrder
+    }
+
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
+        doubleTap = isEnabled
+    }
+
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
+        swipeDown = isEnabled
+    }
+
+    override val readabilityModeFlow: Flow<String> = readabilityModeFlowState
+    override suspend fun setReadabilityMode(mode: String) {
+        readabilityModeFlowState.value = mode
+    }
+
+    override val onboardingCompletedFlow: Flow<Boolean> = onboardingFlowState
+    override suspend fun setOnboardingCompleted() {
+        onboardingFlowState.value = true
+    }
+
+    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
+        showCalendar = isEnabled
+    }
+
+    override val showAlarmFlow: Flow<Boolean> = alarmFlow
+    override suspend fun setShowAlarm(isEnabled: Boolean) {
+        showAlarm = isEnabled
+    }
+
+    // ===== HELPER METHODS FÜR TESTS (BLOCKING) =====
+    fun setReadabilityModeBlocking(mode: String) {
+        readabilityModeFlowState.value = mode
+    }
+
+    fun setSortOrderBlocking(sortOrder: SortOrder) {
+        sortOrderFlowState.value = sortOrder
+    }
+
     override fun purgeRepository() {
-        sortOrderFlow.value = SortOrder.ALPHABETICAL
-        doubleTapToLockEnabledFlow.value = false
-        readabilityModeFlow.value = "smart_contrast"
-        onboardingCompletedFlow.value = false
-        textShadowEnabledFlow.value = true
-        textColorFlow.value = 0
-        chipBackgroundColorFlow.value = 0
-        showCalendarEventFlow.value = false
-        showAlarmFlow.value = false
+        color = 0
+        shadow = true
+        chipBgColor = 0
+        showCalendar = false
+        showAlarm = false
+        doubleTap = false
+        swipeDown = false
+        sortOrderFlowState.value = SortOrder.ALPHABETICAL
+        readabilityModeFlowState.value = "smart_contrast"
+        onboardingFlowState.value = false
     }
 }
 
@@ -468,13 +547,13 @@ class FakeSwipeActionsRepository : SwipeActionsRepository, Purgeable {
 
 class FakeBackupRepository : BackupRepository, Purgeable {
     var lastExportedJson: String? = null
-        private set
+    private set
     var lastImportedJson: String? = null
-        private set
+    private set
     var lastImportOptions: ImportOptions? = null
-        private set
+    private set
 
-    override suspend fun exportToJson(): String {
+            override suspend fun exportToJson(): String {
         val json = """
         {
             "version": "1.0.0",
@@ -484,10 +563,13 @@ class FakeBackupRepository : BackupRepository, Purgeable {
                 "favoritesOrder": [],
                 "hiddenComponents": [],
                 "customAppNames": {},
-                "swipeLeftApp": null,
-                "swipeRightApp": null,
-                "textColor": 0,
-                "textShadowEnabled": true
+                "swipe_left_app": null,
+                "swipe_right_app": null,
+                "text_color": 0,
+                "chip_bg_color": 0,
+                "text_shadow_enabled": true,
+                "double_tap_to_lock_enabled": false,
+                "swipe_down_to_notifications_enabled": false
             }
         }
         """.trimIndent()
@@ -528,7 +610,8 @@ class FakeBackupRepository : BackupRepository, Purgeable {
             customNamesCount = 0,
             hasSwipeLeft = false,
             hasSwipeRight = false,
-            hasThemeSettings = false
+            hasThemeSettings = false,
+            hasGestureSettings = false
         )
     }
 

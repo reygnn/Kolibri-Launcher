@@ -204,18 +204,21 @@ class BackupViewModelTest {
                 customNamesCount = 3,
                 hasSwipeLeft = true,
                 hasSwipeRight = false,
-                hasThemeSettings = true
+                hasThemeSettings = true,
+                hasGestureSettings = true
             )
             fakeBackupRepository.previewResult = expectedPreview
 
             viewModel.backupPreview.test {
-                assertThat(awaitItem()).isNull() // Startwert
-                viewModel.previewBackup(mockUriString) // Aktion
-                val preview = awaitItem() // Endergebnis
+                assertThat(awaitItem()).isNull()
+                viewModel.previewBackup(mockUriString)
+                val preview = awaitItem()
                 assertThat(preview).isNotNull()
                 assertThat(preview?.favoriteCount).isEqualTo(5)
                 assertThat(preview?.hasSwipeLeft).isTrue()
                 assertThat(preview?.hasSwipeRight).isFalse()
+                assertThat(preview?.hasThemeSettings).isTrue()
+                assertThat(preview?.hasGestureSettings).isTrue()
             }
         }
 
@@ -276,7 +279,8 @@ class BackupViewModelTest {
             customNamesCount = 1,
             hasSwipeLeft = false,
             hasSwipeRight = false,
-            hasThemeSettings = true
+            hasThemeSettings = true,
+            hasGestureSettings = false
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)
