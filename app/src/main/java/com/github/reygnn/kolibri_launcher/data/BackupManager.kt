@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.core.net.toUri
+import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
@@ -63,6 +64,8 @@ class BackupManager @Inject constructor(
             val textColor = settingsManager.textColorFlow.first()
             val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
             val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
+            val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
+            val showAlarm = settingsManager.showAlarmFlow.first()
             val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
             val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
 
@@ -77,13 +80,17 @@ class BackupManager @Inject constructor(
                 textColor = textColor.takeIf { it != 0 },
                 chipBackgroundColor = chipBackgroundColor.takeIf { it != 0 },
                 textShadowEnabled = textShadowEnabled.takeIf { !it },
+                showCalendarEvent = showCalendarEvent.takeIf { it },
+                showAlarm = showAlarm.takeIf { it },
                 doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it }
             )
 
             val backup = BackupData(
-                settings = settings,
-                timestamp = System.currentTimeMillis()
+                version = "1.0.0",
+                timestamp = System.currentTimeMillis(),
+                appVersion = BuildConfig.VERSION_NAME,
+                settings = settings
             )
             json.encodeToString(backup)
 
@@ -288,8 +295,29 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // ===== PHASE 8: Import Time-Based Events =====
+            if (options.importTimeBasedEvents) {
+                var timeEventsImported = false
+
+                // Importiere Show Calendar Event (nur wenn im Backup vorhanden)
+                backup.settings.showCalendarEvent?.let {
+                    settingsManager.setShowCalendarEvent(it)
+                    timeEventsImported = true
+                }
+
+                // Importiere Show Alarm (nur wenn im Backup vorhanden)
+                backup.settings.showAlarm?.let {
+                    settingsManager.setShowAlarm(it)
+                    timeEventsImported = true
+                }
+
+                if (timeEventsImported) {
+                    Timber.Forest.i("Imported time-based event settings.")
+                }
+            }
+
             Timber.Forest.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b",
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
@@ -297,7 +325,8 @@ class BackupManager @Inject constructor(
                 options.importCustomNames,
                 options.importSwipeActions,
                 options.importThemeSettings,
-                options.importGestureSettings
+                options.importGestureSettings,
+                options.importTimeBasedEvents
             )
 
             ImportResult.Success(
@@ -505,6 +534,8 @@ class BackupManager @Inject constructor(
                 hasThemeSettings = backup.settings.textColor != null ||
                         backup.settings.chipBackgroundColor != null ||
                         backup.settings.textShadowEnabled != null,
+                hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
+                        backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
                         backup.settings.swipeDownToNotificationsEnabled != null
             )
@@ -512,7 +543,8 @@ class BackupManager @Inject constructor(
             Timber.Forest.i(
                 "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, " +
                         "swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}, " +
-                        "theme=${preview.hasThemeSettings}, gestures=${preview.hasGestureSettings}"
+                        "theme=${preview.hasThemeSettings}, gestures=${preview.hasGestureSettings}, " +
+                        "timeEvents=${preview.hasTimeBasedEvents}"
             )
             preview
 

@@ -230,11 +230,14 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
  * Verwaltet die Namensänderungen. Es aktualisiert die zentrale `TestDataSource`
  * und ruft dann den `onNameChanged`-Callback auf, um die reaktive Kette auszulösen.
  */
-class FakeCustomNamesRepository (
+class FakeCustomNamesRepository(
     private val onNameChanged: () -> Unit
 ) : CustomNamesRepository, Purgeable {
 
-    override suspend fun getDisplayNameForPackage(packageName: String, originalName: String): String {
+    override suspend fun getDisplayNameForPackage(
+        packageName: String,
+        originalName: String
+    ): String {
         return TestDataSource.getDisplayName(packageName, originalName)
     }
 
@@ -283,22 +286,55 @@ class FakeFavoritesRepository : FavoritesRepository, Purgeable {
     val favoritesState: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet())
     override val favoriteComponentsFlow: Flow<Set<String>> = favoritesState
     val favorites: Set<String> get() = favoritesState.value
-    override suspend fun isFavoriteComponent(componentName: String?): Boolean = componentName != null && favoritesState.value.contains(componentName)
-    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) { favoritesState.value = favoritesState.value.intersect(installedComponentNames.toSet()) }
-    override suspend fun toggleFavoriteComponent(componentName: String): Boolean { val isFavorite = favoritesState.value.contains(componentName); if (isFavorite) { removeFavoriteComponent(componentName) } else { addFavoriteComponent(componentName) }; return !isFavorite }
-    override suspend fun addFavoriteComponent(componentName: String): Boolean { favoritesState.value = favoritesState.value + componentName; return true }
-    override suspend fun removeFavoriteComponent(componentName: String): Boolean { favoritesState.value = favoritesState.value - componentName; return true }
-    override suspend fun saveFavoriteComponents(componentNames: List<String>) { favoritesState.value = componentNames.toSet() }
-    override fun purgeRepository() { favoritesState.value = emptySet() }
+    override suspend fun isFavoriteComponent(componentName: String?): Boolean =
+        componentName != null && favoritesState.value.contains(componentName)
+
+    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
+        favoritesState.value = favoritesState.value.intersect(installedComponentNames.toSet())
+    }
+
+    override suspend fun toggleFavoriteComponent(componentName: String): Boolean {
+        val isFavorite = favoritesState.value.contains(componentName); if (isFavorite) {
+            removeFavoriteComponent(componentName)
+        } else {
+            addFavoriteComponent(componentName)
+        }; return !isFavorite
+    }
+
+    override suspend fun addFavoriteComponent(componentName: String): Boolean {
+        favoritesState.value = favoritesState.value + componentName; return true
+    }
+
+    override suspend fun removeFavoriteComponent(componentName: String): Boolean {
+        favoritesState.value = favoritesState.value - componentName; return true
+    }
+
+    override suspend fun saveFavoriteComponents(componentNames: List<String>) {
+        favoritesState.value = componentNames.toSet()
+    }
+
+    override fun purgeRepository() {
+        favoritesState.value = emptySet()
+    }
 }
 
 class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
     val hiddenAppsState: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet())
     override val hiddenAppsFlow: Flow<Set<String>> = hiddenAppsState
     val hiddenApps: Set<String> get() = hiddenAppsState.value
-    override suspend fun isComponentHidden(componentName: String?): Boolean = componentName != null && hiddenAppsState.value.contains(componentName)
-    override suspend fun hideComponent(componentName: String?): Boolean { if (componentName != null) hiddenAppsState.value = hiddenAppsState.value + componentName; return true }
-    override suspend fun showComponent(componentName: String?): Boolean { if (componentName != null) hiddenAppsState.value = hiddenAppsState.value - componentName; return true }
+    override suspend fun isComponentHidden(componentName: String?): Boolean =
+        componentName != null && hiddenAppsState.value.contains(componentName)
+
+    override suspend fun hideComponent(componentName: String?): Boolean {
+        if (componentName != null) hiddenAppsState.value =
+            hiddenAppsState.value + componentName; return true
+    }
+
+    override suspend fun showComponent(componentName: String?): Boolean {
+        if (componentName != null) hiddenAppsState.value =
+            hiddenAppsState.value - componentName; return true
+    }
+
     override suspend fun updateComponentVisibilities(
         componentsToHide: Set<String>,
         componentsToShow: Set<String>
@@ -310,7 +346,10 @@ class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
             newHidden.toSet()
         }
     }
-    override fun purgeRepository() { hiddenAppsState.value = emptySet() }
+
+    override fun purgeRepository() {
+        hiddenAppsState.value = emptySet()
+    }
 }
 
 class FakeSettingsRepository : SettingsRepository {
@@ -328,31 +367,45 @@ class FakeSettingsRepository : SettingsRepository {
 
     var shadow: Boolean
         get() = shadowFlow.value
-        set(value) { shadowFlow.value = value }
+        set(value) {
+            shadowFlow.value = value
+        }
 
     var color: Int
         get() = colorFlow.value
-        set(value) { colorFlow.value = value }
+        set(value) {
+            colorFlow.value = value
+        }
 
     var chipBgColor: Int
         get() = chipBgColorFlow.value
-        set(value) { chipBgColorFlow.value = value }
+        set(value) {
+            chipBgColorFlow.value = value
+        }
 
     var showCalendar: Boolean
         get() = calendarFlow.value
-        set(value) { calendarFlow.value = value }
+        set(value) {
+            calendarFlow.value = value
+        }
 
     var showAlarm: Boolean
         get() = alarmFlow.value
-        set(value) { alarmFlow.value = value }
+        set(value) {
+            alarmFlow.value = value
+        }
 
     var doubleTap: Boolean
         get() = doubleTapFlow.value
-        set(value) { doubleTapFlow.value = value }
+        set(value) {
+            doubleTapFlow.value = value
+        }
 
     var swipeDown: Boolean
         get() = swipeDownFlow.value
-        set(value) { swipeDownFlow.value = value }
+        set(value) {
+            swipeDownFlow.value = value
+        }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -430,11 +483,21 @@ class FakeSettingsRepository : SettingsRepository {
 
 class FakeAppUsageRepository : AppUsageRepository, Purgeable {
     val launchedPackages = mutableListOf<String>()
-    override suspend fun recordPackageLaunch(packageName: String?) { packageName?.let { launchedPackages.add(it) } }
+    override suspend fun recordPackageLaunch(packageName: String?) {
+        packageName?.let { launchedPackages.add(it) }
+    }
+
     override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> = apps
-    override suspend fun removeUsageDataForPackage(packageName: String?) { launchedPackages.removeAll { it == packageName } }
-    override suspend fun hasUsageDataForPackage(packageName: String?): Boolean = launchedPackages.contains(packageName)
-    override fun purgeRepository() { launchedPackages.clear() }
+    override suspend fun removeUsageDataForPackage(packageName: String?) {
+        launchedPackages.removeAll { it == packageName }
+    }
+
+    override suspend fun hasUsageDataForPackage(packageName: String?): Boolean =
+        launchedPackages.contains(packageName)
+
+    override fun purgeRepository() {
+        launchedPackages.clear()
+    }
 }
 
 class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
@@ -444,6 +507,7 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
         private set
     var saveOrderCallCount = 0
         private set
+
     override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
         println(">>> FakeFavoritesOrderRepository.saveOrder CALLED")
         println(">>> Thread: ${Thread.currentThread().name}")
@@ -457,17 +521,32 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository, Purgeable {
         orderState.value = orderedComponentNames
         return true
     }
-    override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>): List<AppInfo> { if (order.isEmpty()) return favoriteApps.sortedBy { it.displayName }; val appMap = favoriteApps.associateBy { it.componentName }; return order.mapNotNull { appMap[it] } + (favoriteApps - appMap.keys.mapNotNull { appMap[it] }.toSet()) }
-    override fun purgeRepository() { orderState.value = emptyList(); savedOrder = null; saveOrderCallCount = 0 }
+
+    override suspend fun sortFavoriteComponents(
+        favoriteApps: List<AppInfo>,
+        order: List<String>
+    ): List<AppInfo> {
+        if (order.isEmpty()) return favoriteApps.sortedBy { it.displayName };
+        val appMap =
+            favoriteApps.associateBy { it.componentName }; return order.mapNotNull { appMap[it] } + (favoriteApps - appMap.keys.mapNotNull { appMap[it] }
+            .toSet())
+    }
+
+    override fun purgeRepository() {
+        orderState.value = emptyList(); savedOrder = null; saveOrderCallCount = 0
+    }
 }
 
 class FakeGetDrawerAppsUseCaseRepository : GetDrawerAppsUseCaseRepository, Purgeable {
     override val drawerApps = MutableLiveData<List<AppInfo>>()
-    override fun purgeRepository() { drawerApps.postValue(emptyList()) }
+    override fun purgeRepository() {
+        drawerApps.postValue(emptyList())
+    }
 }
 
 class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, Purgeable {
-    val favoriteAppsState: MutableStateFlow<UiState<FavoriteAppsResult>> = MutableStateFlow(UiState.Loading)
+    val favoriteAppsState: MutableStateFlow<UiState<FavoriteAppsResult>> =
+        MutableStateFlow(UiState.Loading)
     override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = favoriteAppsState
 
     override fun purgeRepository() {
@@ -479,9 +558,23 @@ class FakeInstalledAppsStateRepository : InstalledAppsStateRepository, Purgeable
     private val stateFlow = MutableStateFlow<List<AppInfo>>(emptyList())
     private var lastSuccessfulAppList: List<AppInfo> = emptyList()
     override val rawAppsFlow: StateFlow<List<AppInfo>> = stateFlow
-    override fun updateApps(newApps: List<AppInfo>) { if (newApps.isNotEmpty()) { lastSuccessfulAppList = newApps }; stateFlow.value = newApps }
-    override fun getCurrentApps(): List<AppInfo> { val currentApps = stateFlow.value; return if (currentApps.isNotEmpty()) { currentApps } else { lastSuccessfulAppList } }
-    override fun purgeRepository() { stateFlow.value = emptyList(); lastSuccessfulAppList = emptyList() }
+    override fun updateApps(newApps: List<AppInfo>) {
+        if (newApps.isNotEmpty()) {
+            lastSuccessfulAppList = newApps
+        }; stateFlow.value = newApps
+    }
+
+    override fun getCurrentApps(): List<AppInfo> {
+        val currentApps = stateFlow.value; return if (currentApps.isNotEmpty()) {
+            currentApps
+        } else {
+            lastSuccessfulAppList
+        }
+    }
+
+    override fun purgeRepository() {
+        stateFlow.value = emptyList(); lastSuccessfulAppList = emptyList()
+    }
 }
 
 class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
@@ -489,10 +582,16 @@ class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
     override val isLockingAvailableFlow = MutableStateFlow(true)
     private val lockRequest = MutableSharedFlow<Unit>()
     override val lockRequestFlow: Flow<Unit> = lockRequest
-    override suspend fun requestLock() { lockRequest.emit(Unit) }
+    override suspend fun requestLock() {
+        lockRequest.emit(Unit)
+    }
+
     private val openNotificationsRequest = MutableSharedFlow<Unit>()
     override val openNotificationsRequestFlow: Flow<Unit> = openNotificationsRequest
-    override suspend fun requestOpenNotifications() { openNotificationsRequest.emit(Unit) }
+    override suspend fun requestOpenNotifications() {
+        openNotificationsRequest.emit(Unit)
+    }
+
     override fun setServiceState(isAvailable: Boolean) {
         isLockingAvailableFlow.value = isAvailable
     }
@@ -504,22 +603,34 @@ class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
 
 class FakeShortcutRepository : ShortcutRepository, Purgeable {
     override fun getShortcutsForPackage(packageName: String): List<ShortcutInfo> = emptyList()
-    override fun purgeRepository() { }
+    override fun purgeRepository() {}
 }
 
 class FakeGetOnboardingAppsUseCaseRepository : GetOnboardingAppsUseCaseRepository {
     val mutableOnboardingAppsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
     override val onboardingAppsFlow: Flow<List<AppInfo>>
         get() = mutableOnboardingAppsFlow
-    override fun purgeRepository() { mutableOnboardingAppsFlow.value = emptyList() }
+
+    override fun purgeRepository() {
+        mutableOnboardingAppsFlow.value = emptyList()
+    }
 }
 
 open class FakeAppUpdateSignal : AppUpdateSignal(), Purgeable {
     var signalSentCount = 0
         private set
-    fun reset() { purgeRepository() }
-    override fun purgeRepository() { signalSentCount = 0 }
-    override suspend fun sendUpdateSignal() { signalSentCount++; super.sendUpdateSignal() }
+
+    fun reset() {
+        purgeRepository()
+    }
+
+    override fun purgeRepository() {
+        signalSentCount = 0
+    }
+
+    override suspend fun sendUpdateSignal() {
+        signalSentCount++; super.sendUpdateSignal()
+    }
 }
 
 class FakeSwipeActionsRepository : SwipeActionsRepository, Purgeable {
@@ -547,13 +658,13 @@ class FakeSwipeActionsRepository : SwipeActionsRepository, Purgeable {
 
 class FakeBackupRepository : BackupRepository, Purgeable {
     var lastExportedJson: String? = null
-    private set
+        private set
     var lastImportedJson: String? = null
-    private set
+        private set
     var lastImportOptions: ImportOptions? = null
-    private set
+        private set
 
-            override suspend fun exportToJson(): String {
+    override suspend fun exportToJson(): String {
         val json = """
         {
             "version": "1.0.0",
@@ -569,7 +680,9 @@ class FakeBackupRepository : BackupRepository, Purgeable {
                 "chip_bg_color": 0,
                 "text_shadow_enabled": true,
                 "double_tap_to_lock_enabled": false,
-                "swipe_down_to_notifications_enabled": false
+                "swipe_down_to_notifications_enabled": false,
+                "show_calendar_event": false,
+                "show_alarm": false
             }
         }
         """.trimIndent()
@@ -591,7 +704,10 @@ class FakeBackupRepository : BackupRepository, Purgeable {
         return true
     }
 
-    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
+    override suspend fun loadBackupFromFile(
+        uriString: String,
+        options: ImportOptions
+    ): ImportResult {
         lastImportOptions = options
         return ImportResult.Success(
             importedCount = 0,
@@ -611,6 +727,7 @@ class FakeBackupRepository : BackupRepository, Purgeable {
             hasSwipeLeft = false,
             hasSwipeRight = false,
             hasThemeSettings = false,
+            hasTimeBasedEvents = false,
             hasGestureSettings = false
         )
     }

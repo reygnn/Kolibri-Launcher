@@ -544,26 +544,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
-                // Observer für Double Tap Setting
-                launch {
-                    try {
-                        settingsManager.doubleTapToLockEnabledFlow.collect { isChecked ->
-                            if (!isAdded || isDetached) return@collect
-
-                            try {
-                                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked =
-                                    isChecked
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating double tap preference")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in double tap flow collection")
-                    }
-                }
-
                 // Observer für Kalender-Einstellung
                 launch {
                     try {
@@ -599,6 +579,46 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in alarm flow collection")
+                    }
+                }
+
+                // Observer für Double Tap Setting
+                launch {
+                    try {
+                        settingsManager.doubleTapToLockEnabledFlow.collect { isChecked ->
+                            if (!isAdded || isDetached) return@collect
+
+                            try {
+                                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked =
+                                    isChecked
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating double tap preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in double tap flow collection")
+                    }
+                }
+
+                // Observer für Swipe Down to Notifications Setting
+                launch {
+                    try {
+                        settingsManager.swipeDownToNotificationsEnabledFlow.collect { isChecked ->
+                            if (!isAdded || isDetached) return@collect
+
+                            try {
+                                findPreference<SwitchPreferenceCompat>("swipe_down_to_notifications_enabled")?.isChecked =
+                                    isChecked
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating swipe down preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in swipe down flow collection")
                     }
                 }
 

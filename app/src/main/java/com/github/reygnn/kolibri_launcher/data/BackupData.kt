@@ -28,6 +28,10 @@ data class LauncherSettings(
     val chipBackgroundColor: Int? = null,
     @SerialName("text_shadow_enabled")
     val textShadowEnabled: Boolean? = null,
+    @SerialName("show_calendar_event")
+    val showCalendarEvent: Boolean? = null,
+    @SerialName("show_alarm")
+    val showAlarm: Boolean? = null,
     @SerialName("double_tap_to_lock_enabled")
     val doubleTapToLockEnabled: Boolean? = null,
     @SerialName("swipe_down_to_notifications_enabled")
@@ -41,7 +45,8 @@ data class ImportOptions(
     val importCustomNames: Boolean = true,
     val importSwipeActions: Boolean = true,
     val importThemeSettings: Boolean = true,
-    val importGestureSettings: Boolean = true
+    val importGestureSettings: Boolean = true,
+    val importTimeBasedEvents: Boolean = true
 ) {
     val importNothing: Boolean
         get() = !importFavorites &&
@@ -50,7 +55,8 @@ data class ImportOptions(
                 !importCustomNames &&
                 !importSwipeActions &&
                 !importThemeSettings &&
-                !importGestureSettings
+                !importGestureSettings &&
+                !importTimeBasedEvents
 }
 
 data class BackupPreview(
@@ -63,7 +69,8 @@ data class BackupPreview(
     val hasSwipeLeft: Boolean,
     val hasSwipeRight: Boolean,
     val hasThemeSettings: Boolean,
-    val hasGestureSettings: Boolean
+    val hasGestureSettings: Boolean,
+    val hasTimeBasedEvents: Boolean
 )
 
 sealed class ImportResult {

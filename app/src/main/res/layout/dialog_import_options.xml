@@ -70,6 +70,14 @@
         android:visibility="gone" />
         
     <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkboxImportTimeBasedEvents"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_time_events"
+        android:checked="true"
+        android:visibility="gone" />
+        
+    <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/checkboxImportGestureSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

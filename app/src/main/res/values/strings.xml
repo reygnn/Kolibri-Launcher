@@ -265,5 +265,7 @@
     <string name="swipe_down_to_notifications_summary">Open the notification panel with a downward swipe</string>
     
     <string name="toast_enable_swipe_down_to_notifications">Swipe gesture is disabled. Enable it in Settings.</string>
+    <string name="import_option_time_events">Time-Based Events (Calendar &amp; Alarm)</string>
+    <string name="backup_import_success_settings_only">Settings successfully imported</string>
 
 </resources>

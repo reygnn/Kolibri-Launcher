@@ -199,6 +199,11 @@ class BackupFragment : Fragment() {
                     checkboxImportGestureSettings.text = getString(R.string.import_option_gestures)
                     checkboxImportGestureSettings.isVisible = gestureVisible
                     checkboxImportGestureSettings.isChecked = gestureVisible
+
+                    val timeEventsVisible = preview.hasTimeBasedEvents
+                    checkboxImportTimeBasedEvents.text = getString(R.string.import_option_time_events)
+                    checkboxImportTimeBasedEvents.isVisible = timeEventsVisible
+                    checkboxImportTimeBasedEvents.isChecked = timeEventsVisible
                 }
 
                 // 4. Dialog anzeigen
@@ -213,7 +218,8 @@ class BackupFragment : Fragment() {
                             importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked,
                             importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked,
                             importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked,
-                            importGestureSettings = dialogBinding.checkboxImportGestureSettings.isChecked
+                            importGestureSettings = dialogBinding.checkboxImportGestureSettings.isChecked,
+                            importTimeBasedEvents = dialogBinding.checkboxImportTimeBasedEvents.isChecked
                         )
 
                         if (options.importNothing) {
@@ -266,15 +272,24 @@ class BackupFragment : Fragment() {
             }
             is BackupState.ImportSuccess -> {
                 hideLoading()
-                val message = if (state.skippedCount > 0) {
-                    getString(
-                        R.string.backup_import_success_with_skipped,
-                        state.importedCount,
-                        state.skippedCount
-                    )
+
+                // Unterscheide zwischen App-Import und Settings-Import
+                val message = if (state.importedCount > 0) {
+                    // Apps wurden importiert
+                    if (state.skippedCount > 0) {
+                        getString(
+                            R.string.backup_import_success_with_skipped,
+                            state.importedCount,
+                            state.skippedCount
+                        )
+                    } else {
+                        getString(R.string.backup_import_success_simple, state.importedCount)
+                    }
                 } else {
-                    getString(R.string.backup_import_success_simple, state.importedCount)
+                    // Nur Settings importiert (Gestures/TimeEvents/Theme/SwipeActions)
+                    getString(R.string.backup_import_success_settings_only)
                 }
+
                 showImportSuccess(message, state.missingApps)
                 viewModel.resetBackupState()
             }

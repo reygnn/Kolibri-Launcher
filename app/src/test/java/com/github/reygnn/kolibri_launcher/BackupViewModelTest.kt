@@ -205,7 +205,8 @@ class BackupViewModelTest {
                 hasSwipeLeft = true,
                 hasSwipeRight = false,
                 hasThemeSettings = true,
-                hasGestureSettings = true
+                hasGestureSettings = true,
+                hasTimeBasedEvents = false
             )
             fakeBackupRepository.previewResult = expectedPreview
 
@@ -280,6 +281,7 @@ class BackupViewModelTest {
             hasSwipeLeft = false,
             hasSwipeRight = false,
             hasThemeSettings = true,
+            hasTimeBasedEvents = false,
             hasGestureSettings = false
         )
         fakeBackupRepository.previewResult = preview
