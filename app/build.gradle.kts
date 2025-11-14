@@ -37,7 +37,7 @@ val espressoVersion = "3.5.1"  // DO NOT EVEN THINK ABOUT TO CHANGE !!!
 val hiltVersion = "2.57.1"  // DO NOT UPGRADE !!!
 val truthVersion = "1.4.5"  // OK to upgrade
 val lifecycleVersion = "2.9.4"  // OK to upgrade
-val navigationVersion = "2.9.5"  // OK to upgrade
+val navigationVersion = "2.9.6"  // OK to upgrade
 val coroutinesVersion = "1.10.2"  // OK to upgrade
 val mockitoKotlinVersion = "5.3.1"  // DO NOT CHANGE !!!
 val mockitoCoreVersion = "5.2.0"   // DO NOT CHANGE !!!
@@ -189,8 +189,8 @@ dependencies {
 
 // Core Android
     implementation("androidx.core:core-ktx:1.17.0")
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'Material' mit
+    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'MaterialYou' mit
     implementation("androidx.activity:activity:1.11.0")
     //noinspection NewerVersionAvailable
     implementation("androidx.fragment:fragment-ktx:$fragmentVersion")
