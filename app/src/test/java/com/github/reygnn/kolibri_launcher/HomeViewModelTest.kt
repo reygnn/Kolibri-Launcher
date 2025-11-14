@@ -273,6 +273,7 @@ class HomeViewModelTest {
 
     @Test
     fun `onToggleFavorite - when not favorite - adds to favorites`() = runTest {
+        whenever(favoritesManager.favoriteComponentsFlow).thenReturn(flowOf(emptySet()))
         whenever(favoritesManager.isFavoriteComponent(app1.componentName)).thenReturn(false)
         whenever(favoritesManager.toggleFavoriteComponent(app1.componentName)).thenReturn(true)
 
@@ -280,7 +281,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onToggleFavorite(app1, 0)
+            viewModel.onToggleFavorite(app1)
 
             advanceUntilIdle()
 
@@ -292,6 +293,7 @@ class HomeViewModelTest {
 
     @Test
     fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
+        whenever(favoritesManager.favoriteComponentsFlow).thenReturn(flowOf(setOf(app1.componentName)))
         whenever(favoritesManager.isFavoriteComponent(app1.componentName)).thenReturn(true)
         whenever(favoritesManager.toggleFavoriteComponent(app1.componentName)).thenReturn(false)
 
@@ -299,7 +301,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onToggleFavorite(app1, 5)
+            viewModel.onToggleFavorite(app1)
 
             advanceUntilIdle()
 
@@ -310,13 +312,18 @@ class HomeViewModelTest {
 
     @Test
     fun `onToggleFavorite - when limit reached - shows limit message`() = runTest {
+        val maxFavorites = (1..AppConstants.MAX_FAVORITES_ON_HOME).map {
+            "com.app$it/MainActivity"
+        }.toSet()
+
+        whenever(favoritesManager.favoriteComponentsFlow).thenReturn(flowOf(maxFavorites))
         whenever(favoritesManager.isFavoriteComponent(app1.componentName)).thenReturn(false)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onToggleFavorite(app1, AppConstants.MAX_FAVORITES_ON_HOME)
+            viewModel.onToggleFavorite(app1)
 
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToastFromString)
@@ -612,6 +619,7 @@ class HomeViewModelTest {
 
     @Test
     fun `onToggleFavorite - when toggleFavoriteComponent throws - emits error`() = runTest {
+        whenever(favoritesManager.favoriteComponentsFlow).thenReturn(flowOf(emptySet()))
         whenever(favoritesManager.isFavoriteComponent(any())).thenReturn(false)
         whenever(favoritesManager.toggleFavoriteComponent(any())).doAnswer {
             throw IOException("Cannot toggle")
@@ -621,7 +629,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onToggleFavorite(app1, 0)
+            viewModel.onToggleFavorite(app1)
 
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToast)

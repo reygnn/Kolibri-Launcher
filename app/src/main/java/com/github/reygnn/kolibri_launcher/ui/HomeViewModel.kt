@@ -316,10 +316,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onToggleFavorite(app: AppInfo, currentFavoritesCount: Int) = launchSafe {
+    fun onToggleFavorite(app: AppInfo) = launchSafe {
         try {
+            // Zähle die ECHTEN Favorites aus dem FavoritesManager (Source of Truth!)
+            val realFavoritesCount = favoritesManager.favoriteComponentsFlow.first().size
+
             if (!favoritesManager.isFavoriteComponent(app.componentName) &&
-                currentFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME
+                realFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME
             ) {
                 val message = context.getString(
                     R.string.favorites_limit_reached,

@@ -256,13 +256,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private fun toggleFavorite(app: AppInfo) {
         try {
-            val state = viewModel.favoriteAppsState.value
-            val currentFavoritesCount = if (state is UiState.Success) {
-                state.data.apps.size
-            } else {
-                0
-            }
-            viewModel.onToggleFavorite(app, currentFavoritesCount)
+            viewModel.onToggleFavorite(app)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
         }

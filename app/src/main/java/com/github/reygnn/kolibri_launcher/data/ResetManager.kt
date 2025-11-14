@@ -18,13 +18,13 @@ class ResetManager @Inject constructor(
     private val customNamesRepository: CustomNamesRepository, // mit purgeRepository
     private val appUsageRepository: AppUsageRepository, // mit purgeRepository
     private val favoritesOrderRepository: FavoritesOrderRepository, // mit purgeRepository
+    private val swipeActionsRepository: SwipeActionsRepository, // mit purgeRepository
 
     // Settings Repository
     private val settingsRepository: SettingsRepository, // mit purgeRepository
 
     // Weitere Repositories falls vorhanden
     private val screenLockRepository: ScreenLockRepository,
-    private val swipeActionsRepository: SwipeActionsRepository, // mit purgeRepository
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val timeBasedEventsRepository: TimeBasedEventsRepository // kein purgeRepository nötig
 ) : ResetRepository {

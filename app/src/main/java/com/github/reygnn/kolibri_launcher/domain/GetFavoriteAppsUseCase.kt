@@ -12,7 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,59 +24,33 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private val appVisibilityManager: HiddenAppsRepository
 ) : GetFavoriteAppsUseCaseRepository {
 
-    override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = flow {
-        // Emit Loading initial state
-        emit(UiState.Loading)
-
-        combine(
-            // Critical Flow: Crash sollte zu Error führen
-            installedAppsStateRepository.rawAppsFlow,
-
-            // Non-critical Flows: Crash → Fallback-Wert
-            favoritesManager.favoriteComponentsFlow.catch { e ->
-                Timber.Forest.w(e, "favoriteComponentsFlow error - using empty set fallback")
-                emit(emptySet())
-            },
-            appVisibilityManager.hiddenAppsFlow.catch { e ->
-                Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
-                emit(emptySet())
-            },
-            favoritesOrderManager.favoriteComponentsOrderFlow.catch { e ->
-                Timber.Forest.w(e, "favoriteComponentsOrderFlow error - using empty order")
-                emit(emptyList())
-            }
-        ) { rawApps, favorites, hiddenApps, savedOrder ->
-            CombineResult(rawApps, favorites, hiddenApps, savedOrder)
+    override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
+        installedAppsStateRepository.rawAppsFlow,
+        favoritesManager.favoriteComponentsFlow.catch { e ->
+            Timber.Forest.w(e, "favoriteComponentsFlow error - using empty set fallback")
+            emit(emptySet())
+        },
+        appVisibilityManager.hiddenAppsFlow.catch { e ->
+            Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
+            emit(emptySet())
+        },
+        favoritesOrderManager.favoriteComponentsOrderFlow.catch { e ->
+            Timber.Forest.w(e, "favoriteComponentsOrderFlow error - using empty order")
+            emit(emptyList())
         }
-            .collect { result ->
-                Timber.Forest.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${result.rawApps.size}, favorites: ${result.favorites.size}")
+    ) { rawApps, favorites, hiddenApps, savedOrder ->
+        Timber.Forest.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
-                // Leere App-Liste → skip emission
-                if (result.rawApps.isEmpty()) {
-                    return@collect
-                }
+        // Leere App-Liste → Loading state
+        if (rawApps.isEmpty()) {
+            return@combine UiState.Loading
+        }
 
-                val state = processApps(
-                    result.rawApps,
-                    result.favorites,
-                    result.hiddenApps,
-                    result.savedOrder
-                )
-
-                emit(state)
-            }
+        processApps(rawApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
-        // Nur critical Errors landen hier (rawAppsFlow)
         Timber.Forest.e(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }
-
-    private data class CombineResult(
-        val rawApps: List<AppInfo>,
-        val favorites: Set<String>,
-        val hiddenApps: Set<String>,
-        val savedOrder: List<String>
-    )
 
     private suspend fun processApps(
         rawApps: List<AppInfo>,
