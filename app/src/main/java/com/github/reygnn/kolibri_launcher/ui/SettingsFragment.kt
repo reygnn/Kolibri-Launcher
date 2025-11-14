@@ -295,6 +295,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     false
                 }
             }
+
+            try {
+                findPreference<Preference>("factory_reset")?.setOnPreferenceClickListener {
+                    try {
+                        showFactoryResetDialog()
+                        true
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing factory reset dialog")
+                        false
+                    }
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error setting factory reset listener")
+            }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting backup listener")
         }
@@ -820,6 +834,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
             startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
         } catch (e: Throwable) {
             viewModel.onErrorOpeningDefaultLauncherSettings(e)
+        }
+    }
+
+    /**
+     * Zeigt den Bestätigungsdialog für das Zurücksetzen auf Werkseinstellungen an.
+     * Bei Bestätigung wird die Logik im ViewModel aufgerufen.
+     */
+    private fun showFactoryResetDialog() {
+        try {
+            // Sicherheitscheck, ob das Fragment noch aktiv ist
+            if (!isAdded) return
+
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.factory_reset_dialog_title)
+                .setMessage(R.string.factory_reset_dialog_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.reset) { _, _ ->
+                    viewModel.onFactoryResetConfirmed()
+                }
+                .show()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Cannot show factory reset dialog")
         }
     }
 }

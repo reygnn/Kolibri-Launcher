@@ -267,7 +267,13 @@
     <string name="toast_enable_swipe_down_to_notifications">Swipe gesture is disabled. Enable it in Settings.</string>
     <string name="import_option_time_events">Time-Based Events (Calendar &amp; Alarm)</string>
     <string name="backup_import_success_settings_only">Settings successfully imported</string>
-    <string name="reset_success">Reset successful</string>
-    <string name="reset_failed">Reset failed</string>
+    
+    <string name="factory_reset_title">Factory Reset</string>
+<string name="factory_reset_summary">Reset all settings and favorites to their defaults</string>
+<string name="factory_reset_dialog_title">Reset app?</string>
+<string name="factory_reset_dialog_message">All your personal settings, favorites, and customizations will be permanently deleted.</string>
+<string name="reset">Reset</string>
+<string name="reset_success">Reset successful</string>
+<string name="reset_failed">Reset failed</string>
 
 </resources>
