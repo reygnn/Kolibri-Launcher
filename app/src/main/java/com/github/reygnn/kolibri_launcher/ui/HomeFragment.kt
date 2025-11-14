@@ -1,5 +1,9 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import android.graphics.Rect
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -111,6 +115,7 @@ class HomeFragment : Fragment() {
             setupDoubleTapActions()
             observeViewModel()
             setupFragmentResultListener()
+            setupHomeWindowInsets()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
@@ -262,8 +267,6 @@ class HomeFragment : Fragment() {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
             }
         }
-
-
     }
 
     private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
@@ -566,7 +569,6 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // --- ÄNDERUNG (3/5): Umbenannt und Signatur geändert ---
     private fun updateAllColors(colors: UiColorsState) {
         if (_binding == null) return
 
@@ -982,6 +984,99 @@ class HomeFragment : Fragment() {
         }
 
         abstract fun onDoubleClick()
+    }
+
+    private fun setupHomeWindowInsets() {
+        try {
+            // Speichere die ursprünglichen Abstände aus dem XML
+            val initialRootPadding = Rect(
+                binding.rootLayout.paddingLeft,
+                binding.rootLayout.paddingTop,
+                binding.rootLayout.paddingRight,
+                binding.rootLayout.paddingBottom
+            )
+
+            // Sicherstellen, dass die LayoutParams MarginLayoutParams sind
+            val timeContainerParams = binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
+            if (timeContainerParams == null) {
+                TimberWrapper.silentError("TimeContainer LayoutParams sind keine MarginLayoutParams")
+                // Fallback: Nutze das Root-Padding für alles
+                ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
+                    val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                    v.setPadding(
+                        initialRootPadding.left + systemBars.left,
+                        initialRootPadding.top + systemBars.top, // Fallback
+                        initialRootPadding.right + systemBars.right,
+                        initialRootPadding.bottom + systemBars.bottom
+                    )
+                    insets
+                }
+                return
+            }
+
+            val initialTimeMarginTop = timeContainerParams.topMargin
+
+            ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+                // 1. Root-Layout für Gesten-Navigation (unten) und Ränder (links/rechts) padden
+                v.setPadding(
+                    initialRootPadding.left + systemBars.left,
+                    initialRootPadding.top, // Top-Padding des Roots bleibt statisch (von XML)
+                    initialRootPadding.right + systemBars.right,
+                    initialRootPadding.bottom + systemBars.bottom // Wichtig für Gesten-Navigationsleiste
+                )
+
+                // 2. Den Zeit-Container dynamisch positionieren:
+                // (initialMargin + systemBars.top)
+                timeContainerParams.topMargin = initialTimeMarginTop + systemBars.top
+                binding.timeContainer.layoutParams = timeContainerParams
+
+                // Wichtig: Insets nicht konsumieren, nur darauf reagieren
+                insets
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying window insets to HomeFragment")
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        try {
+            // Wenn HomeFragment sichtbar wird -> Statusleiste ausblenden
+            hideStatusBar()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onResume hiding status bar")
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            // Wenn HomeFragment verlassen wird -> Statusleiste wieder einblenden
+            // Wichtig, damit andere Apps und dein AppDrawer sie anzeigen.
+            showStatusBar()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onPause showing status bar")
+        }
+    }
+
+    private fun getInsetsController(): WindowInsetsControllerCompat? {
+        val window = activity?.window ?: return null
+        return WindowInsetsControllerCompat(window, window.decorView)
+    }
+
+    private fun hideStatusBar() {
+        val controller = getInsetsController() ?: return
+        // Icons der Statusleiste verstecken
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        // Verhalten festlegen: Leiste erscheint kurz bei Wisch von oben
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun showStatusBar() {
+        // Icons der Statusleiste wieder anzeigen
+        getInsetsController()?.show(WindowInsetsCompat.Type.statusBars())
     }
 
     override fun onDestroyView() {

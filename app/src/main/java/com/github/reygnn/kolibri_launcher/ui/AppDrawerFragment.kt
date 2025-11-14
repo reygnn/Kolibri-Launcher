@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
@@ -538,6 +539,22 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             TimberWrapper.silentError(e, "Error setting up window insets")
             // Window insets won't work, but drawer still functional
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        try {
+            // Wenn AppDrawer sichtbar wird -> Statusleiste explizit einblenden
+            showStatusBar()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onResume showing status bar")
+        }
+    }
+
+    private fun showStatusBar() {
+        val window = activity?.window ?: return
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.show(WindowInsetsCompat.Type.statusBars())
     }
 
     override fun onDestroyView() {
