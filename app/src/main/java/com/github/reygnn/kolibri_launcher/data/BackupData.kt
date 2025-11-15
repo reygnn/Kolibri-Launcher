@@ -35,7 +35,9 @@ data class LauncherSettings(
     @SerialName("double_tap_to_lock_enabled")
     val doubleTapToLockEnabled: Boolean? = null,
     @SerialName("swipe_down_to_notifications_enabled")
-    val swipeDownToNotificationsEnabled: Boolean? = null
+    val swipeDownToNotificationsEnabled: Boolean? = null,
+    @SerialName("auto_show_keyboard")
+    val autoShowKeyboard: Boolean? = null
 )
 
 data class ImportOptions(
@@ -46,7 +48,8 @@ data class ImportOptions(
     val importSwipeActions: Boolean = true,
     val importThemeSettings: Boolean = true,
     val importGestureSettings: Boolean = true,
-    val importTimeBasedEvents: Boolean = true
+    val importTimeBasedEvents: Boolean = true,
+    val importQualityOfLife: Boolean = true
 ) {
     val importNothing: Boolean
         get() = !importFavorites &&
@@ -56,7 +59,8 @@ data class ImportOptions(
                 !importSwipeActions &&
                 !importThemeSettings &&
                 !importGestureSettings &&
-                !importTimeBasedEvents
+                !importTimeBasedEvents &&
+                !importQualityOfLife
 }
 
 data class BackupPreview(
@@ -70,7 +74,8 @@ data class BackupPreview(
     val hasSwipeRight: Boolean,
     val hasThemeSettings: Boolean,
     val hasGestureSettings: Boolean,
-    val hasTimeBasedEvents: Boolean
+    val hasTimeBasedEvents: Boolean,
+    val hasQualityOfLife: Boolean
 )
 
 sealed class ImportResult {

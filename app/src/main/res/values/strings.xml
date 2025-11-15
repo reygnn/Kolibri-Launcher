@@ -276,5 +276,7 @@
 <string name="reset_success">Reset successful</string>
 <string name="reset_failed">Reset failed</string>
 <string name="factory_reset_include_usage_data">Also delete app usage history</string>
+<string name="auto_show_keyboard_title">Auto-show keyboard</string>
+<string name="auto_show_keyboard_summary">Automatically show the keyboard when opening the app drawer</string>
 
 </resources>

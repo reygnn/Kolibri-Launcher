@@ -33,6 +33,7 @@ class SettingsManager @Inject constructor(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
         val TEXT_COLOR = intPreferencesKey("text_color")
+        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
@@ -286,7 +287,6 @@ class SettingsManager @Inject constructor(
         }
     }
 
-
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         try {
             dataStore.edit { settings ->
@@ -299,12 +299,38 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val autoShowKeyboardFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading AutoShowKeyboard preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.AUTO_SHOW_KEYBOARD] ?: false // Standardwert
+        }
+
+    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.AUTO_SHOW_KEYBOARD] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting auto show keyboard: $isEnabled")
+        }
+    }
+
 
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->
                 // App Drawer
                 preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+                preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
 
                 // Gestures
                 preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)

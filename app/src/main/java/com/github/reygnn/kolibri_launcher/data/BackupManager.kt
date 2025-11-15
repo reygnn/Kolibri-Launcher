@@ -68,6 +68,7 @@ class BackupManager @Inject constructor(
             val showAlarm = settingsManager.showAlarmFlow.first()
             val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
             val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
+            val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
 
 
             val settings = LauncherSettings(
@@ -83,7 +84,8 @@ class BackupManager @Inject constructor(
                 showCalendarEvent = showCalendarEvent.takeIf { it },
                 showAlarm = showAlarm.takeIf { it },
                 doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it }
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it },
+                autoShowKeyboard = autoShowKeyboard.takeIf { it }
             )
 
             val backup = BackupData(
@@ -316,8 +318,25 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // ===== PHASE 9: Import Quality-of-Life Settings =====
+            if (options.importQualityOfLife) {
+                var qolImported = false
+
+                // Importiere Auto Show Keyboard (nur wenn im Backup vorhanden)
+                backup.settings.autoShowKeyboard?.let {
+                    settingsManager.setAutoShowKeyboard(it)
+                    qolImported = true
+                }
+
+                if (qolImported) {
+                    Timber.Forest.i("Imported quality-of-life settings.")
+                }
+            }
+
+
             Timber.Forest.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b, QoL: %b",
+                //                                                                                                                              ^^^^^^^^^ HINZUFÜGEN
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
@@ -326,7 +345,8 @@ class BackupManager @Inject constructor(
                 options.importSwipeActions,
                 options.importThemeSettings,
                 options.importGestureSettings,
-                options.importTimeBasedEvents
+                options.importTimeBasedEvents,
+                options.importQualityOfLife
             )
 
             ImportResult.Success(
@@ -537,7 +557,8 @@ class BackupManager @Inject constructor(
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
-                        backup.settings.swipeDownToNotificationsEnabled != null
+                        backup.settings.swipeDownToNotificationsEnabled != null,
+                hasQualityOfLife = backup.settings.autoShowKeyboard != null
             )
 
             Timber.Forest.i(

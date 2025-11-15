@@ -106,6 +106,7 @@ class BackupManagerTest {
         assertThat(backup.settings.textShadowEnabled).isNull()  // Default=true → null
         assertThat(backup.settings.doubleTapToLockEnabled).isNull()  // Default=false → null
         assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull() // Default=false → null
+        assertThat(backup.settings.autoShowKeyboard).isNull()
     }
 
     @Test
@@ -232,10 +233,12 @@ class BackupManagerTest {
 
     @Test
     fun `exportToJson - with custom names - includes names in backup`() = runTest {
-        fakeNamesRepo.setCustomNamesInBatch(mapOf(
-            "com.app1" to "Custom App 1",
-            "com.app2" to "Custom App 2"
-        ))
+        fakeNamesRepo.setCustomNamesInBatch(
+            mapOf(
+                "com.app1" to "Custom App 1",
+                "com.app2" to "Custom App 2"
+            )
+        )
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -342,7 +345,8 @@ class BackupManagerTest {
             importSwipeActions = false,
             importThemeSettings = false,
             importTimeBasedEvents = false,
-            importGestureSettings = false
+            importGestureSettings = false,
+            importQualityOfLife = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -622,7 +626,8 @@ class BackupManagerTest {
             chipBackgroundColor = Color.CYAN,
             textShadowEnabled = false,
             doubleTapToLockEnabled = true,
-            swipeDownToNotificationsEnabled = true
+            swipeDownToNotificationsEnabled = true,
+            autoShowKeyboard = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -633,7 +638,8 @@ class BackupManagerTest {
             importCustomNames = true,
             importSwipeActions = true,
             importThemeSettings = true,
-            importGestureSettings = true
+            importGestureSettings = true,
+            importQualityOfLife = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -650,6 +656,7 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.shadow).isFalse()
         assertThat(fakeSettingsRepo.doubleTap).isTrue()
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
     }
 
     // ========== VALIDATION TESTS ==========
@@ -875,7 +882,8 @@ class BackupManagerTest {
             chipBackgroundColor = Color.RED,
             textShadowEnabled = false,
             doubleTapToLockEnabled = true,
-            swipeDownToNotificationsEnabled = true
+            swipeDownToNotificationsEnabled = true,
+            autoShowKeyboard = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -897,6 +905,7 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.shadow).isFalse()
         assertThat(fakeSettingsRepo.doubleTap).isTrue()
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
     }
 
     @Test
@@ -962,6 +971,130 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
+    // ========== EXPORT TESTS - AUTO SHOW KEYBOARD ==========
+
+    @Test
+    fun `exportToJson - with autoShowKeyboard enabled - includes in backup`() = runTest {
+        fakeSettingsRepo.autoShowKeyboard = true
+
+        val jsonString = backupManager.exportToJson()
+        val backup = json.decodeFromString<BackupData>(jsonString)
+
+        assertThat(backup.settings.autoShowKeyboard).isTrue()
+    }
+
+    @Test
+    fun `exportToJson - with autoShowKeyboard disabled default - returns null`() = runTest {
+        fakeSettingsRepo.autoShowKeyboard = false
+
+        val jsonString = backupManager.exportToJson()
+        val backup = json.decodeFromString<BackupData>(jsonString)
+
+        // Default (false) wird als null exportiert (takeIf { it })
+        assertThat(backup.settings.autoShowKeyboard).isNull()
+    }
+
+    // ========== IMPORT TESTS - QUALITY OF LIFE SETTINGS ==========
+
+    @Test
+    fun `importFromJson - only quality of life settings - imports only QoL`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.autoShowKeyboard = false
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.RED,
+            autoShowKeyboard = true
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = false,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = false,
+            importGestureSettings = false,
+            importTimeBasedEvents = false,
+            importQualityOfLife = true
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+    }
+
+    @Test
+    fun `importFromJson - quality of life disabled - does not import autoShowKeyboard`() = runTest {
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
+        fakeSettingsRepo.autoShowKeyboard = false
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.RED,
+            autoShowKeyboard = true
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = true,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = false,  // Explizit false
+            importGestureSettings = false,
+            importTimeBasedEvents = false,
+            importQualityOfLife = false  // Explizit false
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // autoShowKeyboard darf NICHT importiert worden sein
+        assertThat(fakeSettingsRepo.autoShowKeyboard).isFalse()
+
+        // Aber Favorites WURDEN importiert
+        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+
+        // Theme wurde NICHT importiert
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+    }
+
+    @Test
+    fun `importFromJson - old backup without QoL keys - does not change QoL settings`() = runTest {
+        // Setze initialen Wert, der *nicht* geändert werden darf
+        fakeSettingsRepo.autoShowKeyboard = true
+
+        // Ein JSON-String, der den Key 'autoShowKeyboard' *nicht* enthält
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            autoShowKeyboard = null
+        )
+        val oldBackupJson = json.encodeToString(backup)
+
+        // Sicherstellen, dass der Key wirklich fehlt
+        assertThat(oldBackupJson).doesNotContain("auto_show_keyboard")
+
+        val options = ImportOptions(importQualityOfLife = true)
+
+        val result = backupManager.importFromJson(oldBackupJson, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Prüfen: QoL-Wert ist unverändert, da im Backup null (nicht vorhanden)
+        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+    }
+
     // ========== HELPER METHODS ==========
 
     private fun createAppInfo(packageName: String, className: String): AppInfo {
@@ -986,7 +1119,8 @@ class BackupManagerTest {
         chipBackgroundColor: Int? = null,
         textShadowEnabled: Boolean? = null,
         doubleTapToLockEnabled: Boolean? = null,
-        swipeDownToNotificationsEnabled: Boolean? = null
+        swipeDownToNotificationsEnabled: Boolean? = null,
+        autoShowKeyboard: Boolean? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -1003,7 +1137,8 @@ class BackupManagerTest {
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
+                autoShowKeyboard = autoShowKeyboard
             )
         )
     }
@@ -1027,8 +1162,13 @@ class FakeFavoritesRepository : FavoritesRepository {
     override suspend fun toggleFavoriteComponent(componentName: String) = true
     override suspend fun addFavoriteComponent(componentName: String) = true
     override suspend fun removeFavoriteComponent(componentName: String) = true
-    override suspend fun saveFavoriteComponents(componentNames: List<String>) { favorites = componentNames.toSet() }
-    override suspend fun purgeRepository() { favorites = emptySet() }
+    override suspend fun saveFavoriteComponents(componentNames: List<String>) {
+        favorites = componentNames.toSet()
+    }
+
+    override suspend fun purgeRepository() {
+        favorites = emptySet()
+    }
 }
 
 class FakeFavoritesOrderRepository : FavoritesOrderRepository {
@@ -1042,12 +1182,17 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository {
 
     override val favoriteComponentsOrderFlow = flow
 
-    override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>) = favoriteApps
+    override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>) =
+        favoriteApps
+
     override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
         order = orderedComponentNames
         return true
     }
-    override suspend fun purgeRepository() { order = emptyList() }
+
+    override suspend fun purgeRepository() {
+        order = emptyList()
+    }
 }
 
 class FakeAppVisibilityRepository : HiddenAppsRepository {
@@ -1070,7 +1215,10 @@ class FakeAppVisibilityRepository : HiddenAppsRepository {
     ) {
         hiddenApps = (hiddenApps + componentsToHide) - componentsToShow
     }
-    override suspend fun purgeRepository() { hiddenApps = emptySet() }
+
+    override suspend fun purgeRepository() {
+        hiddenApps = emptySet()
+    }
 }
 
 class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
@@ -1132,27 +1280,38 @@ class FakeSettingsRepository : SettingsRepository {
     private val alarmFlow = MutableStateFlow(false) // Default: false
     private val doubleTapFlow = MutableStateFlow(false) // Default false
     private val swipeDownFlow = MutableStateFlow(false) // Default false
+    private val autoShowKeyboardFlowState = MutableStateFlow(false)
 
 
     var shadow: Boolean
         get() = shadowFlow.value
-        set(value) { shadowFlow.value = value }
+        set(value) {
+            shadowFlow.value = value
+        }
 
     var color: Int
         get() = colorFlow.value
-        set(value) { colorFlow.value = value }
+        set(value) {
+            colorFlow.value = value
+        }
 
     var chipBgColor: Int
         get() = chipBgColorFlow.value
-        set(value) { chipBgColorFlow.value = value }
+        set(value) {
+            chipBgColorFlow.value = value
+        }
 
     var showCalendar: Boolean
         get() = calendarFlow.value
-        set(value) { calendarFlow.value = value }
+        set(value) {
+            calendarFlow.value = value
+        }
 
     var showAlarm: Boolean
         get() = alarmFlow.value
-        set(value) { alarmFlow.value = value }
+        set(value) {
+            alarmFlow.value = value
+        }
 
     var doubleTap: Boolean
         get() = doubleTapFlow.value
@@ -1162,7 +1321,15 @@ class FakeSettingsRepository : SettingsRepository {
 
     var swipeDown: Boolean
         get() = swipeDownFlow.value
-        set(value) { swipeDownFlow.value = value }
+        set(value) {
+            swipeDownFlow.value = value
+        }
+
+    var autoShowKeyboard: Boolean
+        get() = autoShowKeyboardFlowState.value
+        set(value) {
+            autoShowKeyboardFlowState.value = value
+        }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -1184,10 +1351,14 @@ class FakeSettingsRepository : SettingsRepository {
     override suspend fun setSortOrder(sortOrder: SortOrder) {}
 
     override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) { doubleTap = isEnabled }
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
+        doubleTap = isEnabled
+    }
 
     override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
-    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) { swipeDown = isEnabled }
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
+        swipeDown = isEnabled
+    }
 
     override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
     override suspend fun setReadabilityMode(mode: String) {}
@@ -1205,6 +1376,11 @@ class FakeSettingsRepository : SettingsRepository {
         showAlarm = isEnabled
     }
 
+    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
+    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
+        autoShowKeyboard = isEnabled
+    }
+
     override suspend fun purgeRepository() {
         color = 0
         shadow = true
@@ -1213,5 +1389,6 @@ class FakeSettingsRepository : SettingsRepository {
         showAlarm = false
         doubleTap = false
         swipeDown = false
+        autoShowKeyboard = false
     }
 }

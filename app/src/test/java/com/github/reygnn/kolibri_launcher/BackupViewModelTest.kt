@@ -206,7 +206,8 @@ class BackupViewModelTest {
                 hasSwipeRight = false,
                 hasThemeSettings = true,
                 hasGestureSettings = true,
-                hasTimeBasedEvents = false
+                hasTimeBasedEvents = false,
+                hasQualityOfLife = true
             )
             fakeBackupRepository.previewResult = expectedPreview
 
@@ -220,6 +221,7 @@ class BackupViewModelTest {
                 assertThat(preview?.hasSwipeRight).isFalse()
                 assertThat(preview?.hasThemeSettings).isTrue()
                 assertThat(preview?.hasGestureSettings).isTrue()
+                assertThat(preview?.hasQualityOfLife).isTrue()
             }
         }
 
@@ -282,7 +284,8 @@ class BackupViewModelTest {
             hasSwipeRight = false,
             hasThemeSettings = true,
             hasTimeBasedEvents = false,
-            hasGestureSettings = false
+            hasGestureSettings = false,
+            hasQualityOfLife = false
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)

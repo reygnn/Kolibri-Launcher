@@ -269,5 +269,7 @@
 <string name="reset_success">Zurücksetzen erfolgreich</string>
 <string name="reset_failed">Zurücksetzen fehlgeschlagen</string>
 <string name="factory_reset_include_usage_data">Auch App-Nutzungsverlauf löschen</string>
+<string name="auto_show_keyboard_title">Tastatur automatisch anzeigen</string>
+<string name="auto_show_keyboard_summary">Zeigt die Tastatur automatisch an, wenn der App-Drawer geöffnet wird</string>
 
 </resources>

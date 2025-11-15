@@ -56,6 +56,13 @@
             android:title="@string/change_wallpaper_title"
             android:summary="@string/change_wallpaper_summary"
             app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_show_keyboard_drawer"
+            android:title="@string/auto_show_keyboard_title"
+            android:summary="@string/auto_show_keyboard_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
             
         <SwitchPreferenceCompat
             android:key="show_calendar_event"

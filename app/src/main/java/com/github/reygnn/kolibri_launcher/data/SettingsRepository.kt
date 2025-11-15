@@ -28,6 +28,9 @@ interface SettingsRepository : Purgeable {
     val chipBackgroundColorFlow: Flow<Int>
     suspend fun setChipBackgroundColor(color: Int)
 
+    val autoShowKeyboardFlow: Flow<Boolean>
+    suspend fun setAutoShowKeyboard(isEnabled: Boolean)
+
     val showCalendarEventFlow: Flow<Boolean>
     suspend fun setShowCalendarEvent(isEnabled: Boolean)
 

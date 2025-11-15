@@ -370,9 +370,10 @@ class FakeSettingsRepository : SettingsRepository {
     private val alarmFlow = MutableStateFlow(false) // Default: false
     private val doubleTapFlow = MutableStateFlow(false) // Default false
     private val swipeDownFlow = MutableStateFlow(false) // Default false
-    private val sortOrderFlowState = MutableStateFlow(SortOrder.ALPHABETICAL)  // NEU
-    private val readabilityModeFlowState = MutableStateFlow("smart_contrast")  // NEU
-    private val onboardingFlowState = MutableStateFlow(false)  // NEU
+    private val sortOrderFlowState = MutableStateFlow(SortOrder.ALPHABETICAL)
+    private val readabilityModeFlowState = MutableStateFlow("smart_contrast")
+    private val onboardingFlowState = MutableStateFlow(false)
+    private val autoShowKeyboardFlowState = MutableStateFlow(false)
 
     var shadow: Boolean
         get() = shadowFlow.value
@@ -414,6 +415,12 @@ class FakeSettingsRepository : SettingsRepository {
         get() = swipeDownFlow.value
         set(value) {
             swipeDownFlow.value = value
+        }
+
+    var autoShowKeyboard: Boolean
+        get() = autoShowKeyboardFlowState.value
+        set(value) {
+            autoShowKeyboardFlowState.value = value
         }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
@@ -467,6 +474,11 @@ class FakeSettingsRepository : SettingsRepository {
         showAlarm = isEnabled
     }
 
+    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
+    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
+        autoShowKeyboard = isEnabled
+    }
+
     // ===== HELPER METHODS FÜR TESTS (BLOCKING) =====
     fun setReadabilityModeBlocking(mode: String) {
         readabilityModeFlowState.value = mode
@@ -487,6 +499,7 @@ class FakeSettingsRepository : SettingsRepository {
         sortOrderFlowState.value = SortOrder.ALPHABETICAL
         readabilityModeFlowState.value = "smart_contrast"
         onboardingFlowState.value = false
+        autoShowKeyboardFlowState.value = false
     }
 }
 

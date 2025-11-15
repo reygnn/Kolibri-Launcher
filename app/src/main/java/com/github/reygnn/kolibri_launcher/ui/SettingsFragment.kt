@@ -73,6 +73,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     // 1. Deklaration für die Preference
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
+    private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -148,6 +149,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in alarm change listener")
+                    false
+                }
+            }
+
+            autoKeyboardSwitchPreference = findPreference("auto_show_keyboard_drawer")
+            autoKeyboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setAutoShowKeyboard(shouldEnable)
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
                     false
                 }
             }
@@ -634,6 +649,24 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in swipe down flow collection")
+                    }
+                }
+
+                // Observer für show Keyboard Setting
+                launch {
+                    try {
+                        settingsManager.autoShowKeyboardFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                autoKeyboardSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating autoKeyboard switch preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in autoKeyboard flow collection")
                     }
                 }
 

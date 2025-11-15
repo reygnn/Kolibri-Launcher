@@ -28,6 +28,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.MenuContext
+import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import com.github.reygnn.kolibri_launcher.domain.SortOrder
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,9 +37,11 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import android.view.inputmethod.InputMethodManager
 
 /**
  * ULTRA CRASH-SAFE AppDrawerFragment
@@ -63,6 +66,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     @Inject
     lateinit var appUsageManager: AppUsageRepository
+    @Inject
+    lateinit var settingsManager: SettingsRepository
 
     private lateinit var appDrawerAdapter: AppDrawerAdapter
     private var masterAppList: List<AppInfo> = emptyList()
@@ -410,6 +415,18 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 masterAppList  // Show all apps if filter fails
             }
 
+            if (query.isNotEmpty() && filteredList.size == 1) {
+                try {
+                    // App direkt starten
+                    viewModel.onAppClicked(filteredList.first())
+                    hideKeyboard()
+                    return
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error auto-launching app")
+                    // Fallback: App normal anzeigen
+                }
+            }
+
             try {
                 if (::appDrawerAdapter.isInitialized) {
                     appDrawerAdapter.submitList(filteredList.toList()) {
@@ -540,8 +557,30 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             // Wenn AppDrawer sichtbar wird -> Statusleiste explizit einblenden
             showStatusBar()
+
+            viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
+                try {
+                    val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
+                    if (autoShowKeyboard) {
+                        showKeyboard()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error checking autoShowKeyboard setting")
+                }
+            }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume showing status bar")
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            hideKeyboard()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onPause hiding keyboard")
         }
     }
 
@@ -549,6 +588,41 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         val window = activity?.window ?: return
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.show(WindowInsetsCompat.Type.statusBars())
+    }
+
+    private fun showKeyboard() {
+        // Wir nutzen post(), um sicherzustellen, dass die View
+        // (und ihr Window-Token) verfügbar ist, bevor wir die Tastatur anfordern.
+        binding.searchEditText.post {
+            try {
+                if (!isAdded) return@post
+
+                val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+
+                // Setze den Fokus auf das Suchfeld
+                if (binding.searchEditText.requestFocus()) {
+                    // Zeige die Tastatur an
+                    imm?.showSoftInput(binding.searchEditText, InputMethodManager.SHOW_IMPLICIT)
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error showing keyboard")
+            }
+        }
+    }
+
+    private fun hideKeyboard() {
+        try {
+            if (!isAdded) return
+
+            val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            val view = view // Zwischenspeichern, da view null werden kann
+
+            if (view != null) {
+                imm?.hideSoftInputFromWindow(view.windowToken, 0)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error hiding keyboard")
+        }
     }
 
     override fun onDestroyView() {
