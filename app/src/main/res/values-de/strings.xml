@@ -271,5 +271,6 @@
 <string name="factory_reset_include_usage_data">Auch App-Nutzungsverlauf löschen</string>
 <string name="auto_show_keyboard_title">Tastatur automatisch anzeigen</string>
 <string name="auto_show_keyboard_summary">Zeigt die Tastatur automatisch an, wenn der App-Drawer geöffnet wird</string>
+<string name="import_option_qol">Import Quality-of-Life settings</string>
 
 </resources>

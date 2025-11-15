@@ -84,5 +84,11 @@
         android:text="@string/import_option_gestures"
         android:checked="true"
         android:visibility="gone" />
+        
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkbox_import_quality_of_life"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/import_option_qol" />
 
 </LinearLayout>
