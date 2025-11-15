@@ -95,6 +95,8 @@ class GetFavoriteAppsUseCaseTest {
             assertEquals(UiState.Loading, awaitItem())
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+            assertEquals(UiState.Loading, awaitItem())
+
             rawAppsFlow.value = allApps
 
             val successState = awaitItem()
@@ -155,6 +157,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
             rawAppsFlow.value = allApps
+            assertEquals(UiState.Loading, awaitItem())
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -179,6 +182,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app3.componentName)
             rawAppsFlow.value = allApps
+            assertEquals(UiState.Loading, awaitItem())
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -240,6 +244,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app1.componentName)
             rawAppsFlow.value = allApps
+            assertEquals(UiState.Loading, awaitItem())
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -292,6 +297,7 @@ class GetFavoriteAppsUseCaseTest {
             // Favorites contains valid and invalid entries
             favoritesFlow.value = setOf(app1.componentName, "", "invalid", app2.componentName)
             rawAppsFlow.value = allApps
+            assertEquals(UiState.Loading, awaitItem())
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -314,6 +320,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = largeFavoritesList.map { it.componentName }.toSet()
             rawAppsFlow.value = largeFavoritesList
+            assertEquals(UiState.Loading, awaitItem())
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -390,7 +397,9 @@ class GetFavoriteAppsUseCaseTest {
             assertEquals(UiState.Loading, awaitItem())
 
             favoritesFlow.value = setOf(app1.componentName)
-            // rawAppsFlow stays empty
+
+            // skipItems(1)
+            assertEquals(UiState.Loading, awaitItem())
 
             expectNoEvents()
         }
