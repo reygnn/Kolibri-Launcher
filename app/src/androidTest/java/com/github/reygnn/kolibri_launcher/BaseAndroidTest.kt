@@ -11,9 +11,11 @@ import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.Purgeable
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
@@ -62,6 +64,10 @@ abstract class BaseAndroidTest {
     lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCaseRepository
     @Inject
     lateinit var screenLockRepository: ScreenLockRepository
+    @Inject
+    lateinit var timeBasedEventsRepository: TimeBasedEventsRepository
+    @Inject
+    lateinit var resetRepository: ResetRepository
     @Inject
     lateinit var getOnboardingAppsUseCase: GetOnboardingAppsUseCaseRepository
     @Inject
@@ -141,10 +147,10 @@ abstract class BaseAndroidTest {
          * Leave this code as-is unless you're willing to debug complex Hilt timing issues.
          */
         runBlocking {
+            (appUsageRepository as? Purgeable)?.purgeRepository()
             (favoritesRepository as? Purgeable)?.purgeRepository()
             (appVisibilityRepository as? Purgeable)?.purgeRepository()
             (settingsRepository as? Purgeable)?.purgeRepository()
-            (appUsageRepository as? Purgeable)?.purgeRepository()
             (favoritesOrderRepository as? Purgeable)?.purgeRepository()
             (installedAppsRepository as? Purgeable)?.purgeRepository()
             (customNamesRepository as? Purgeable)?.purgeRepository()
@@ -153,6 +159,8 @@ abstract class BaseAndroidTest {
             (getDrawerAppsUseCase as? Purgeable)?.purgeRepository()
             (screenLockRepository as? Purgeable)?.purgeRepository()
             (getOnboardingAppsUseCase as? Purgeable)?.purgeRepository()
+            (timeBasedEventsRepository as? Purgeable)?.purgeRepository()
+            (resetRepository as? Purgeable)?.purgeRepository()
         }
 
         // Reset TestDataSource

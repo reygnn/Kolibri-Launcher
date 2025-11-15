@@ -1,12 +1,16 @@
 package com.github.reygnn.kolibri_launcher
 
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra
+import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.reygnn.kolibri_launcher.ui.HiddenAppsActivity
@@ -96,12 +100,17 @@ class SettingsFragmentTest : BaseAndroidTest() {
 
         // Act
         launchFragmentInHiltContainer<SettingsFragment>()
+        onView(withId(androidx.preference.R.id.recycler_view))
+            .perform(
+                RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
+                hasDescendant(withText(R.string.swipe_down_to_notifications_title))
+            ))
         onView(withText(R.string.swipe_down_to_notifications_title)).perform(click())
 
         // Synchronisation
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert: Überprüfe den Zustand des Fakes
+        // Assert
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
     }
 

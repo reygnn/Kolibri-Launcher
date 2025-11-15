@@ -268,4 +268,6 @@
 <string name="reset">Zurücksetzen</string>
 <string name="reset_success">Zurücksetzen erfolgreich</string>
 <string name="reset_failed">Zurücksetzen fehlgeschlagen</string>
+<string name="factory_reset_include_usage_data">Auch App-Nutzungsverlauf löschen</string>
+
 </resources>

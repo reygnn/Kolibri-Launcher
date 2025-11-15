@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.data.ResetRepository
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
@@ -88,7 +89,7 @@ class HomeViewModelTest {
     @Mock
     private lateinit var swipeActionsManager: SwipeActionsRepository
     @Mock
-    private lateinit var calendarManager: TimeBasedEventsRepository
+    private lateinit var timeBasedEventsManager: TimeBasedEventsRepository
 
     private lateinit var viewModel: HomeViewModel
 
@@ -119,7 +120,7 @@ class HomeViewModelTest {
         whenever(settingsManager.showCalendarEventFlow).thenReturn(flowOf(false))
         whenever(settingsManager.showAlarmFlow).thenReturn(flowOf(false))
         runTest {
-            whenever(calendarManager.getUpcomingTimeBasedEvents(any())).thenReturn(emptyList())
+            whenever(timeBasedEventsManager.getUpcomingTimeBasedEvents(any())).thenReturn(emptyList())
         }
     }
 
@@ -137,7 +138,7 @@ class HomeViewModelTest {
             screenLockManager,
             appVisibilityManager,
             swipeActionsManager,
-            calendarManager,
+            timeBasedEventsManager,
             mainDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
         )
@@ -857,7 +858,7 @@ class HomeViewModelTest {
             )
             val testEventList = listOf(testEvent)
 
-            whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(testEventList)
+            whenever(timeBasedEventsManager.getUpcomingTimeBasedEvents(5)).thenReturn(testEventList)
 
             setupViewModel()
             advanceUntilIdle()
@@ -882,7 +883,7 @@ class HomeViewModelTest {
             type = EventType.CALENDAR
         )
 
-        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(testEvent))
+        whenever(timeBasedEventsManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(testEvent))
 
         setupViewModel()
         advanceUntilIdle()
@@ -890,7 +891,7 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state.timeBasedEvents.isEmpty())
 
-        verify(calendarManager, never()).getUpcomingTimeBasedEvents(any())
+        verify(timeBasedEventsManager, never()).getUpcomingTimeBasedEvents(any())
     }
 
     @Test
@@ -911,7 +912,7 @@ class HomeViewModelTest {
         )
 
         // Chronologisch sortiert: Alarm kommt vor Meeting
-        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm, meeting))
+        whenever(timeBasedEventsManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm, meeting))
 
         setupViewModel()
         advanceUntilIdle()
@@ -933,7 +934,7 @@ class HomeViewModelTest {
             type = EventType.ALARM
         )
 
-        whenever(calendarManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm))
+        whenever(timeBasedEventsManager.getUpcomingTimeBasedEvents(5)).thenReturn(listOf(alarm))
 
         setupViewModel()
         advanceUntilIdle()
@@ -955,6 +956,6 @@ class HomeViewModelTest {
         assertTrue(state.timeBasedEvents.isEmpty())
 
         // Manager sollte gar nicht erst aufgerufen werden
-        verify(calendarManager, never()).getUpcomingTimeBasedEvents(any())
+        verify(timeBasedEventsManager, never()).getUpcomingTimeBasedEvents(any())
     }
 }

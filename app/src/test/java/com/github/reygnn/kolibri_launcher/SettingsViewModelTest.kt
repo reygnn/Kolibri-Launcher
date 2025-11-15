@@ -15,6 +15,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
@@ -352,5 +354,52 @@ class SettingsViewModelTest {
             rawAppsFlow.value = emptyList()
             assertEquals(0, awaitItem().size)
         }
+    }
+
+    @Test
+    fun `onFactoryResetConfirmed - with usage data - calls all repos`() = runTest {
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            resetManager,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        // Arrange
+        whenever(resetManager.resetSettings()).thenReturn(true)
+        whenever(resetManager.resetUserData()).thenReturn(true)
+        whenever(resetManager.resetAppUsageData()).thenReturn(true)
+
+        // Act
+        viewModel.onFactoryResetConfirmed(includeUsageData = true)
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert
+        verify(resetManager).resetSettings()
+        verify(resetManager).resetUserData()
+        verify(resetManager).resetAppUsageData()
+        verify(installedAppsRepository).triggerAppsUpdate()
+    }
+
+    @Test
+    fun `onFactoryResetConfirmed - without usage data - skips app usage repo`() = runTest {
+        viewModel = SettingsViewModel(
+            installedAppsRepository,
+            resetManager,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        // Arrange
+        whenever(resetManager.resetSettings()).thenReturn(true)
+        whenever(resetManager.resetUserData()).thenReturn(true)
+
+        // Act
+        viewModel.onFactoryResetConfirmed(includeUsageData = false)
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert
+        verify(resetManager).resetSettings()
+        verify(resetManager).resetUserData()
+        verify(resetManager, never()).resetAppUsageData()
+        verify(installedAppsRepository).triggerAppsUpdate()
     }
 }

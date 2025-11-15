@@ -105,29 +105,32 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Führt einen kompletten "Factory Reset" der App-Daten durch.
-     * WICHTIG: Dies ist ein zweistufiger Prozess:
-     * 1. Alle Daten-Caches und Einstellungen über den ResetManager löschen.
-     * 2. Ein Neuladen der App-Liste vom System erzwingen.
+     * @param includeUsageData Ob auch die App-Nutzungsdaten (Sortierung)
+     * gelöscht werden sollen.
      */
-    fun onFactoryResetConfirmed() {
+    fun onFactoryResetConfirmed(includeUsageData: Boolean) {
         launchSafe {
             try {
-                // SCHRITT 1: ALLES LÖSCHEN
-                // (Ich nehme an, du hast 'resetManager' statt 'resetRepository' injiziert,
-                // beides ist in Ordnung, solange der Typ 'ResetRepository' ist)
-                val success = resetManager.resetAllData() // 'resetRepository' oder 'resetManager'
+                // SCHRITT 1: Lösche Einstellungen & Benutzerdaten (Favoriten, etc.)
+                val settingsSuccess = resetManager.resetSettings()
+                val userDataSuccess = resetManager.resetUserData()
 
-                if (success) {
-                    // SCHRITT 2: NEU LADEN
-                    // Triggert das Neuladen der App-Liste vom PackageManager
+                // SCHRITT 2: (Optional) Lösche App-Nutzungsdaten
+                var usageSuccess = true
+                if (includeUsageData) {
+                    usageSuccess = resetManager.resetAppUsageData()
+                }
+
+                val allSuccess = settingsSuccess && userDataSuccess && usageSuccess
+
+                if (allSuccess) {
                     installedAppsRepository.triggerAppsUpdate()
-
-                    // Optional: Erfolgsmeldung senden
                     sendEvent(UiEvent.ShowToast(R.string.reset_success))
                 } else {
                     sendEvent(UiEvent.ShowToast(R.string.reset_failed))
                 }
-            } catch (e: CancellationException) { // <-- Die '}' vom 'try'-Block hat hier gefehlt
+
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error during factory reset")

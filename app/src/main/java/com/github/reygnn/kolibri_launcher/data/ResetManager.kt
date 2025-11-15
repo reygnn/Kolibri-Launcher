@@ -39,7 +39,10 @@ class ResetManager @Inject constructor(
             // Settings zurücksetzen
             val settingsSuccess = resetSettings()
 
-            val success = userDataSuccess && settingsSuccess
+            // AppUsage-Daten zurücksetzen
+            val appUsageSuccess = resetAppUsageData()
+
+            val success = userDataSuccess && settingsSuccess && appUsageSuccess
 
             if (success) {
                 Timber.d("Complete data reset successful")
@@ -106,16 +109,7 @@ class ResetManager @Inject constructor(
                 allSuccessful = false
             }
 
-            // App Usage
-            try {
-                appUsageRepository.purgeRepository()
-                Timber.d("App usage purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging app usage")
-                allSuccessful = false
-            }
+            // Das appUsageRepository.purgeRepository() hier NICHT purgen !!!
 
             // Swipe Actions
             try {
@@ -188,6 +182,20 @@ class ResetManager @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error during settings reset")
+            false
+        }
+    }
+
+    override suspend fun resetAppUsageData(): Boolean {
+        return try {
+            Timber.d("Starting App Usage data reset")
+            appUsageRepository.purgeRepository()
+            Timber.d("App usage purged successfully")
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error purging app usage")
             false
         }
     }

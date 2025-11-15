@@ -275,5 +275,6 @@
 <string name="reset">Reset</string>
 <string name="reset_success">Reset successful</string>
 <string name="reset_failed">Reset failed</string>
+<string name="factory_reset_include_usage_data">Also delete app usage history</string>
 
 </resources>

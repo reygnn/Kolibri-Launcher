@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -843,15 +844,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
      */
     private fun showFactoryResetDialog() {
         try {
-            // Sicherheitscheck, ob das Fragment noch aktiv ist
             if (!isAdded) return
+
+            // 1. Inflate das neue Layout
+            val dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_factory_reset, null)
+
+            // 2. Finde die Checkbox
+            val checkBox = dialogView.findViewById<com.google.android.material.checkbox.MaterialCheckBox>(
+                R.id.checkbox_include_usage_data
+            )
 
             MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.factory_reset_dialog_title)
-                .setMessage(R.string.factory_reset_dialog_message)
+                // 3. Setze das View statt einer Message
+                .setView(dialogView)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.reset) { _, _ ->
-                    viewModel.onFactoryResetConfirmed()
+                    // 4. Lese den Wert der Checkbox aus
+                    val includeUsageData = checkBox.isChecked
+
+                    // 5. Übergebe den Wert an das ViewModel
+                    viewModel.onFactoryResetConfirmed(includeUsageData)
                 }
                 .show()
         } catch (e: Throwable) {

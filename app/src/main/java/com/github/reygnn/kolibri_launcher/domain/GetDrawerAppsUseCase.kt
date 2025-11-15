@@ -31,9 +31,18 @@ class GetDrawerAppsUseCase @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     override val drawerApps: LiveData<List<AppInfo>> = combine(
+        // Critical Flow: rawApps darf nicht crashen (kein .catch())
         installedAppsStateRepository.rawAppsFlow,
-        settingsManager.sortOrderFlow,
-        appVisibilityManager.hiddenAppsFlow
+
+        // Non-critical Flows: Mit individuellen Fallbacks
+        settingsManager.sortOrderFlow.catch { e ->
+            Timber.Forest.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
+            emit(SortOrder.ALPHABETICAL)
+        },
+        appVisibilityManager.hiddenAppsFlow.catch { e ->
+            Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
+            emit(emptySet())
+        }
     ) { rawApps, sortOrder, hiddenComponents ->
 
         try {
@@ -115,6 +124,7 @@ class GetDrawerAppsUseCase @Inject constructor(
         }
     }
         .catch { e ->
+            // Nur critical Errors landen hier (rawAppsFlow)
             TimberWrapper.silentError(e, "Critical error in drawerApps flow, emitting empty list")
             emit(emptyList())
         }
