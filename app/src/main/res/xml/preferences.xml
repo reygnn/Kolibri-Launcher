@@ -56,13 +56,6 @@
             android:title="@string/change_wallpaper_title"
             android:summary="@string/change_wallpaper_summary"
             app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="auto_show_keyboard_drawer"
-            android:title="@string/auto_show_keyboard_title"
-            android:summary="@string/auto_show_keyboard_summary"
-            android:defaultValue="false"
-            app:iconSpaceReserved="false" />
             
         <SwitchPreferenceCompat
             android:key="show_calendar_event"
@@ -78,7 +71,6 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
-    <!-- Gesten-Kategorie -->
     <PreferenceCategory
         android:title="@string/category_gestures_title"
         app:iconSpaceReserved="false">
@@ -101,6 +93,26 @@
             android:key="swipe_actions"
             android:title="@string/settings_swipe_actions_title"
             android:summary="@string/settings_swipe_actions_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    
+    <PreferenceCategory
+        android:key="category_qol"
+        android:title="@string/category_qol_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="auto_show_keyboard_drawer"
+            android:title="@string/auto_show_keyboard_title"
+            android:summary="@string/auto_show_keyboard_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_launch_app"
+            android:title="@string/auto_launch_app_title"
+            android:summary="@string/auto_launch_app_summary"
+            android:defaultValue="false"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 

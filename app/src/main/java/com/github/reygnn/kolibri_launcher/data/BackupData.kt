@@ -37,7 +37,10 @@ data class LauncherSettings(
     @SerialName("swipe_down_to_notifications_enabled")
     val swipeDownToNotificationsEnabled: Boolean? = null,
     @SerialName("auto_show_keyboard")
-    val autoShowKeyboard: Boolean? = null
+    val autoShowKeyboard: Boolean? = null,
+    @SerialName("auto_launch_app")
+    val autoLaunchApp: Boolean? = null
+
 )
 
 data class ImportOptions(

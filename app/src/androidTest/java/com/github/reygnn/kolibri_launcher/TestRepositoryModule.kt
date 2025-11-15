@@ -374,6 +374,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val readabilityModeFlowState = MutableStateFlow("smart_contrast")
     private val onboardingFlowState = MutableStateFlow(false)
     private val autoShowKeyboardFlowState = MutableStateFlow(false)
+    private val autoLaunchAppFlowState = MutableStateFlow(false)
 
     var shadow: Boolean
         get() = shadowFlow.value
@@ -422,6 +423,10 @@ class FakeSettingsRepository : SettingsRepository {
         set(value) {
             autoShowKeyboardFlowState.value = value
         }
+
+    var autoLaunchApp: Boolean
+        get() = autoLaunchAppFlowState.value
+        set(value) { autoLaunchAppFlowState.value = value }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -479,6 +484,11 @@ class FakeSettingsRepository : SettingsRepository {
         autoShowKeyboard = isEnabled
     }
 
+    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
+    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
+        autoLaunchApp = isEnabled
+    }
+
     // ===== HELPER METHODS FÜR TESTS (BLOCKING) =====
     fun setReadabilityModeBlocking(mode: String) {
         readabilityModeFlowState.value = mode
@@ -500,6 +510,7 @@ class FakeSettingsRepository : SettingsRepository {
         readabilityModeFlowState.value = "smart_contrast"
         onboardingFlowState.value = false
         autoShowKeyboardFlowState.value = false
+        autoLaunchAppFlowState.value = false
     }
 }
 

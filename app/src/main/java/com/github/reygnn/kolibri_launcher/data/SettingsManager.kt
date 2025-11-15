@@ -33,10 +33,11 @@ class SettingsManager @Inject constructor(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
         val TEXT_COLOR = intPreferencesKey("text_color")
-        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
+        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
+        val AUTO_LAUNCH_APP = booleanPreferencesKey("auto_launch_app")
     }
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data
@@ -324,13 +325,37 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val autoLaunchAppFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading AutoLaunchApp preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.AUTO_LAUNCH_APP] ?: false // Standardwert false
+        }
+
+    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
+        try {
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.AUTO_LAUNCH_APP] = isEnabled
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting auto launch app: $isEnabled")
+        }
+    }
+
 
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->
                 // App Drawer
                 preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
-                preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
 
                 // Gestures
                 preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
@@ -348,6 +373,9 @@ class SettingsManager @Inject constructor(
                 // Home Screen Events
                 preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
                 preferences.remove(PreferenceKeys.SHOW_ALARM)
+
+                preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
+                preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
             }
         } catch (e: CancellationException) {
             throw e

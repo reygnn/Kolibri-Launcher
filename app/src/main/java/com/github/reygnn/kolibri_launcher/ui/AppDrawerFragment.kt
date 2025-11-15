@@ -412,44 +412,59 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error filtering apps")
-                masterAppList  // Show all apps if filter fails
+                masterAppList
             }
 
             if (query.isNotEmpty() && filteredList.size == 1) {
-                try {
-                    // App direkt starten
-                    viewModel.onAppClicked(filteredList.first())
-                    hideKeyboard()
-                    return
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error auto-launching app")
-                    // Fallback: App normal anzeigen
-                }
-            }
 
-            try {
-                if (::appDrawerAdapter.isInitialized) {
-                    appDrawerAdapter.submitList(filteredList.toList()) {
-                        try {
-                            if (shouldScrollToTop && _binding != null && isAdded) {
-                                currentBinding.appsRecyclerView.scrollToPosition(0)
-                                shouldScrollToTop = false
-                            }
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error scrolling to top")
-                            shouldScrollToTop = false  // Reset flag anyway
+                viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
+                    try {
+                        val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
+
+                        if (autoLaunchApp) {
+                            viewModel.onAppClicked(filteredList.first())
+                            hideKeyboard()
+                        } else {
+                            submitListToAdapter(filteredList)
                         }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error checking auto-launch setting")
+                        submitListToAdapter(filteredList) // Fallback
                     }
-                } else {
-                    Timber.Forest.w("Adapter not initialized, cannot submit list")
                 }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error submitting list to adapter")
-                // List won't update, but old list still visible
+                return
             }
+                 submitListToAdapter(filteredList)
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error in displayFilteredApps")
-            // Keep showing whatever was displayed before
+        }
+    }
+
+    /**
+     * Extrahiert, um Codeduplizierung zu vermeiden. Sendet die Liste sicher an den Adapter.
+     */
+    private fun submitListToAdapter(list: List<AppInfo>) {
+        try {
+            if (::appDrawerAdapter.isInitialized && _binding != null && isAdded) {
+                appDrawerAdapter.submitList(list.toList()) {
+                    try {
+                        if (shouldScrollToTop && _binding != null && isAdded) {
+                            binding.appsRecyclerView.scrollToPosition(0)
+                            shouldScrollToTop = false
+                        }
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error scrolling to top")
+                        shouldScrollToTop = false
+                    }
+                }
+            } else {
+                Timber.Forest.w("Adapter not initialized or fragment not added, cannot submit list")
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error submitting list to adapter")
         }
     }
 

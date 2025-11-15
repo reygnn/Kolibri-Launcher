@@ -74,6 +74,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
+    private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -163,6 +164,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
+                    false
+                }
+            }
+
+            autoLaunchAppSwitchPreference = findPreference("auto_launch_app")
+            autoLaunchAppSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setAutoLaunchApp(shouldEnable)
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
                     false
                 }
             }
@@ -667,6 +682,23 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in autoKeyboard flow collection")
+                    }
+                }
+
+                launch {
+                    try {
+                        settingsManager.autoLaunchAppFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                autoLaunchAppSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating autoLaunchApp switch preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in autoLaunchApp flow collection")
                     }
                 }
 

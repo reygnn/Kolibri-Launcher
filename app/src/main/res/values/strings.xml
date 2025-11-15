@@ -279,5 +279,8 @@
 <string name="auto_show_keyboard_title">Auto-show keyboard</string>
 <string name="auto_show_keyboard_summary">Automatically show the keyboard when opening the app drawer</string>
 <string name="import_option_qol">Import Quality-of-Life settings</string>
+<string name="category_qol_title">Quality-of-Life</string>
+<string name="auto_launch_app_title">Auto-launch single result</string>
+<string name="auto_launch_app_summary">Automatically launch an app when it\'s the only search result</string>
 
 </resources>

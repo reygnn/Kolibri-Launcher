@@ -107,6 +107,7 @@ class BackupManagerTest {
         assertThat(backup.settings.doubleTapToLockEnabled).isNull()  // Default=false → null
         assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull() // Default=false → null
         assertThat(backup.settings.autoShowKeyboard).isNull()
+        assertThat(backup.settings.autoLaunchApp).isNull()
     }
 
     @Test
@@ -297,6 +298,8 @@ class BackupManagerTest {
         fakeSettingsRepo.shadow = false
         fakeSettingsRepo.doubleTap = true
         fakeSettingsRepo.swipeDown = true
+        fakeSettingsRepo.autoShowKeyboard = true
+        fakeSettingsRepo.autoLaunchApp = true
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -312,6 +315,8 @@ class BackupManagerTest {
         assertThat(backup.settings.textShadowEnabled).isFalse()
         assertThat(backup.settings.doubleTapToLockEnabled).isTrue()
         assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
+        assertThat(backup.settings.autoShowKeyboard).isTrue()
+        assertThat(backup.settings.autoLaunchApp).isTrue()
     }
 
     @Test
@@ -614,6 +619,8 @@ class BackupManagerTest {
         fakeSettingsRepo.shadow = true
         fakeSettingsRepo.doubleTap = false
         fakeSettingsRepo.swipeDown = false
+        fakeSettingsRepo.autoShowKeyboard = false
+        fakeSettingsRepo.autoLaunchApp = false
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
@@ -627,7 +634,8 @@ class BackupManagerTest {
             textShadowEnabled = false,
             doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
-            autoShowKeyboard = true
+            autoShowKeyboard = true,
+            autoLaunchApp = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -657,6 +665,7 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.doubleTap).isTrue()
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
 
     // ========== VALIDATION TESTS ==========
@@ -883,7 +892,8 @@ class BackupManagerTest {
             textShadowEnabled = false,
             doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
-            autoShowKeyboard = true
+            autoShowKeyboard = true,
+            autoLaunchApp = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -906,6 +916,7 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.doubleTap).isTrue()
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
 
     @Test
@@ -1005,7 +1016,8 @@ class BackupManagerTest {
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = Color.RED,
-            autoShowKeyboard = true
+            autoShowKeyboard = true,
+            autoLaunchApp = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1025,6 +1037,7 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
         assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
@@ -1035,12 +1048,14 @@ class BackupManagerTest {
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
         fakeSettingsRepo.autoShowKeyboard = false
+        fakeSettingsRepo.autoLaunchApp = false
         fakeSettingsRepo.color = Color.BLACK
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = Color.RED,
-            autoShowKeyboard = true
+            autoShowKeyboard = true,
+            autoLaunchApp = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1060,8 +1075,9 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        // autoShowKeyboard darf NICHT importiert worden sein
+        // importQualityOfLife Settings dürfen NICHT importiert worden sein
         assertThat(fakeSettingsRepo.autoShowKeyboard).isFalse()
+        assertThat(fakeSettingsRepo.autoLaunchApp).isFalse()
 
         // Aber Favorites WURDEN importiert
         assertThat(fakeFavoritesRepo.favorites).hasSize(1)
@@ -1074,16 +1090,19 @@ class BackupManagerTest {
     fun `importFromJson - old backup without QoL keys - does not change QoL settings`() = runTest {
         // Setze initialen Wert, der *nicht* geändert werden darf
         fakeSettingsRepo.autoShowKeyboard = true
+        fakeSettingsRepo.autoLaunchApp = true
 
         // Ein JSON-String, der den Key 'autoShowKeyboard' *nicht* enthält
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
-            autoShowKeyboard = null
+            autoShowKeyboard = null,
+            autoLaunchApp = null
         )
         val oldBackupJson = json.encodeToString(backup)
 
-        // Sicherstellen, dass der Key wirklich fehlt
+        // Sicherstellen, dass die Keys wirklich fehlen
         assertThat(oldBackupJson).doesNotContain("auto_show_keyboard")
+        assertThat(oldBackupJson).doesNotContain("auto_launch_app")
 
         val options = ImportOptions(importQualityOfLife = true)
 
@@ -1091,8 +1110,9 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        // Prüfen: QoL-Wert ist unverändert, da im Backup null (nicht vorhanden)
+        // Prüfen: QoL-Werte sind unverändert, da im Backup null (nicht vorhanden)
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
 
     // ========== HELPER METHODS ==========
@@ -1120,7 +1140,8 @@ class BackupManagerTest {
         textShadowEnabled: Boolean? = null,
         doubleTapToLockEnabled: Boolean? = null,
         swipeDownToNotificationsEnabled: Boolean? = null,
-        autoShowKeyboard: Boolean? = null
+        autoShowKeyboard: Boolean? = null,
+        autoLaunchApp: Boolean? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -1138,7 +1159,8 @@ class BackupManagerTest {
                 textShadowEnabled = textShadowEnabled,
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
-                autoShowKeyboard = autoShowKeyboard
+                autoShowKeyboard = autoShowKeyboard,
+                autoLaunchApp = autoLaunchApp
             )
         )
     }
@@ -1281,6 +1303,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val doubleTapFlow = MutableStateFlow(false) // Default false
     private val swipeDownFlow = MutableStateFlow(false) // Default false
     private val autoShowKeyboardFlowState = MutableStateFlow(false)
+    private val autoLaunchAppFlowState = MutableStateFlow(false)
 
 
     var shadow: Boolean
@@ -1330,6 +1353,10 @@ class FakeSettingsRepository : SettingsRepository {
         set(value) {
             autoShowKeyboardFlowState.value = value
         }
+
+    var autoLaunchApp: Boolean
+        get() = autoLaunchAppFlowState.value
+        set(value) { autoLaunchAppFlowState.value = value }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -1381,6 +1408,11 @@ class FakeSettingsRepository : SettingsRepository {
         autoShowKeyboard = isEnabled
     }
 
+    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
+    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
+        autoLaunchApp = isEnabled
+    }
+
     override suspend fun purgeRepository() {
         color = 0
         shadow = true
@@ -1390,5 +1422,6 @@ class FakeSettingsRepository : SettingsRepository {
         doubleTap = false
         swipeDown = false
         autoShowKeyboard = false
+        autoLaunchApp = false
     }
 }

@@ -52,13 +52,11 @@ class BackupManager @Inject constructor(
 
     override suspend fun exportToJson(): String {
         return try {
-            // Alle Daten über Interfaces holen - 100% sauber!
             val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
             val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
             val customAppNames = appNamesManager.getAllCustomNames()
 
-            // Swipe Actions exportieren
             val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
             val textColor = settingsManager.textColorFlow.first()
@@ -69,6 +67,7 @@ class BackupManager @Inject constructor(
             val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
             val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
             val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
+            val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
 
 
             val settings = LauncherSettings(
@@ -85,7 +84,8 @@ class BackupManager @Inject constructor(
                 showAlarm = showAlarm.takeIf { it },
                 doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it },
-                autoShowKeyboard = autoShowKeyboard.takeIf { it }
+                autoShowKeyboard = autoShowKeyboard.takeIf { it },
+                autoLaunchApp = autoLaunchApp.takeIf { it }
             )
 
             val backup = BackupData(
@@ -328,6 +328,11 @@ class BackupManager @Inject constructor(
                     qolImported = true
                 }
 
+                backup.settings.autoLaunchApp?.let {
+                    settingsManager.setAutoLaunchApp(it)
+                    qolImported = true
+                }
+
                 if (qolImported) {
                     Timber.Forest.i("Imported quality-of-life settings.")
                 }
@@ -336,7 +341,6 @@ class BackupManager @Inject constructor(
 
             Timber.Forest.i(
                 "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b, QoL: %b",
-                //                                                                                                                              ^^^^^^^^^ HINZUFÜGEN
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
@@ -558,7 +562,8 @@ class BackupManager @Inject constructor(
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
                         backup.settings.swipeDownToNotificationsEnabled != null,
-                hasQualityOfLife = backup.settings.autoShowKeyboard != null
+                hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
+                        backup.settings.autoLaunchApp != null
             )
 
             Timber.Forest.i(
