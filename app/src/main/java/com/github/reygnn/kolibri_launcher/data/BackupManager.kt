@@ -48,6 +48,7 @@ class BackupManager @Inject constructor(
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
     override suspend fun exportToJson(): String {

@@ -94,7 +94,7 @@ class HomeViewModel @Inject constructor(
     private val installedAppsManager: InstalledAppsRepository,
     private val appUpdateSignal: AppUpdateSignal,
     private val installedAppsStateManager: InstalledAppsStateRepository,
-    getFavoriteAppsUseCase: GetFavoriteAppsUseCaseRepository,
+    private val getFavoriteAppsUseCase: GetFavoriteAppsUseCaseRepository,
     private val getDrawerAppsUseCase: GetDrawerAppsUseCaseRepository,
     @param:ApplicationContext private val context: Context,
     private val favoritesManager: FavoritesRepository,
@@ -113,6 +113,9 @@ class HomeViewModel @Inject constructor(
 
     private val _uiColorsState = MutableStateFlow(UiColorsState())
     val uiColorsState: StateFlow<UiColorsState> = _uiColorsState.asStateFlow()
+
+    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FAVORITES_ON_HOME)
+    val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
 
     private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
     val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
@@ -321,12 +324,15 @@ class HomeViewModel @Inject constructor(
             // Zähle die ECHTEN Favorites aus dem FavoritesManager (Source of Truth!)
             val realFavoritesCount = favoritesManager.favoriteComponentsFlow.first().size
 
+            // HOL DEN DYNAMISCHEN WERT (statt AppConstants.MAX_FAVORITES_ON_HOME)
+            val currentMax = maxFavoritesOnHome.value
+
             if (!favoritesManager.isFavoriteComponent(app.componentName) &&
-                realFavoritesCount >= AppConstants.MAX_FAVORITES_ON_HOME
+                realFavoritesCount >= currentMax // PRÜFE GEGEN DAS DYNAMISCHE LIMIT
             ) {
                 val message = context.getString(
                     R.string.favorites_limit_reached,
-                    AppConstants.MAX_FAVORITES_ON_HOME
+                    currentMax // ZEIGE DAS KORREKTE LIMIT IN DER NACHRICHT
                 )
                 sendEvent(UiEvent.ShowToastFromString(message))
                 return@launchSafe
@@ -862,6 +868,13 @@ class HomeViewModel @Inject constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to update time-based events")
             _uiState.update { it.copy(timeBasedEvents = emptyList()) }
+        }
+    }
+
+    fun onHomeViewMeasured(calculatedMaxFavorites: Int) {
+        if (calculatedMaxFavorites > 0) {
+            _maxFavoritesOnHome.value = calculatedMaxFavorites
+            getFavoriteAppsUseCase.setDynamicMaxFavorites(calculatedMaxFavorites)
         }
     }
 }

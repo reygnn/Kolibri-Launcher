@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher
 
 import android.content.pm.ShortcutInfo
 import androidx.lifecycle.MutableLiveData
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.AppInfo
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.BackupPreview
@@ -582,7 +583,35 @@ class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, P
         MutableStateFlow(UiState.Loading)
     override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = favoriteAppsState
 
+    // Speichert das Limit, das vom ViewModel (im Test) gesetzt wurde
+    var currentDynamicMax: Int = AppConstants.MAX_FAVORITES_ON_HOME
+        private set
+
+    /**
+     * NEU: Implementierung der Interface-Methode.
+     * Im Test kannst du 'currentDynamicMax' prüfen, um zu sehen,
+     * ob der richtige Wert vom ViewModel gesendet wurde.
+     */
+    override fun setDynamicMaxFavorites(max: Int) {
+        currentDynamicMax = max
+        // Optional: Du könntest hier auch Logik einfügen, um
+        // 'favoriteAppsState' basierend auf dem Limit neu auszugeben,
+        // aber für die meisten Tests reicht es, den Wert zu speichern.
+    }
+
     override suspend fun purgeRepository() {
+        favoriteAppsState.value = UiState.Loading
+        currentDynamicMax = AppConstants.MAX_FAVORITES_ON_HOME
+    }
+
+    // Hilfsfunktion für deine Tests, um den State einfach zu setzen
+    fun emitSuccess(apps: List<AppInfo>) {
+        favoriteAppsState.value = UiState.Success(
+            FavoriteAppsResult(apps = apps, isFallback = false)
+        )
+    }
+
+    fun emitLoading() {
         favoriteAppsState.value = UiState.Loading
     }
 }

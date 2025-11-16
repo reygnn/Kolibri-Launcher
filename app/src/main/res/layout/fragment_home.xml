@@ -88,24 +88,16 @@
                 app:chipSpacing="@dimen/spacing_small" />
         </HorizontalScrollView>
 
-
-        <ScrollView
-            android:id="@+id/favorites_scroll_view"
+        <LinearLayout
+            android:id="@+id/favorite_apps_container"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_medium"
-            android:fillViewport="true"
+            android:layout_height="0dp" android:layout_marginTop="@dimen/spacing_medium"
+            android:orientation="vertical"
+            android:gravity="start"
             app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
-
-            <LinearLayout
-                android:id="@+id/favorite_apps_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="start" />
-        </ScrollView>
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>

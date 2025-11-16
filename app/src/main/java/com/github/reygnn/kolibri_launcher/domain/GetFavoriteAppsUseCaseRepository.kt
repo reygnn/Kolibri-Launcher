@@ -9,4 +9,5 @@ import kotlinx.coroutines.flow.Flow
  */
 interface GetFavoriteAppsUseCaseRepository : Purgeable {
     val favoriteApps: Flow<UiState<FavoriteAppsResult>>
+    fun setDynamicMaxFavorites(max: Int)
 }

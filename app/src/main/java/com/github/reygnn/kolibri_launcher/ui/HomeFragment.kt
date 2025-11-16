@@ -116,9 +116,90 @@ class HomeFragment : Fragment() {
             observeViewModel()
             setupFragmentResultListener()
             setupHomeWindowInsets()
+
+            binding.favoriteAppsContainer.post {
+                try {
+                    if (_binding == null) return@post // Sicherstellen, dass Fragment noch existiert
+                    val ctx = context ?: return@post
+
+                    val containerHeight = binding.favoriteAppsContainer.height
+                    if (containerHeight == 0) return@post // Noch nicht bereit
+
+                    val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+                    if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
+                        Timber.Forest.w("Dynamic calc failed: Item height is zero.")
+                        return@post
+                    }
+
+                    val totalHeightPerItem = itemHeight + itemMargin
+                    val maxItemsToShow = (containerHeight / totalHeightPerItem).toInt()
+
+                    Timber.Forest.i("Dynamic MAX calculated: $maxItemsToShow (H: $containerHeight, I: $totalHeightPerItem)")
+
+                    // SENDE DAS ERGEBNIS AN DAS VIEWMODEL
+                    viewModel.onHomeViewMeasured(maxItemsToShow)
+
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error calculating dynamic max favorites")
+                }
+            }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
+    }
+
+    /**
+     * Misst die Höhe eines einzelnen Favoriten-Buttons, indem ein Dummy-Button
+     * mit den exakt gleichen Eigenschaften wie in createAppButton erstellt wird.
+     *
+     * @return Ein Pair<Int, Int> mit (itemHeight, verticalMarginInPx)
+     */
+    private fun measureFavoriteItemHeight(context: Context): Pair<Int, Int> {
+        try {
+            val dummyButton = Button(context)
+
+            // Wende die exakt gleichen Eigenschaften wie in createAppButton an,
+            // die die Höhe beeinflussen.
+
+            val paddingPx = try {
+                resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+            } catch (e: Throwable) { 0 }
+            dummyButton.setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+
+            val buttonTextSizeInPx = try {
+                resources.getDimension(R.dimen.text_size_app_button)
+            } catch (e: Throwable) { 16f } // Fallback, falls Dimension nicht gefunden
+            dummyButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
+
+            dummyButton.maxLines = 1
+            dummyButton.text = "Test" // Inhalt für die Messung der Höhe
+
+            dummyButton.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+            // Messe den Button
+            dummyButton.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+
+            // Hole die Margins aus createAppButton: setMargins(0, 8, 0, 8)
+            // Das sind 8px oben + 8px unten = 16px
+            val verticalMarginInPx = 16
+
+            val itemHeight = dummyButton.measuredHeight
+
+            if (itemHeight > 0) {
+                return Pair(itemHeight, verticalMarginInPx)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error measuring dummy button")
+        }
+
+        // Fallback, falls Messung fehlschlägt
+        return Pair(0, 0)
     }
 
     private fun observeViewModel() {
