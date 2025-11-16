@@ -90,7 +90,7 @@ data class UiColorsState(
  * This ensures the home screen stays functional even under extreme conditions.
  */
 @HiltViewModel
-class HomeViewModel @Inject constructor(
+class LauncherViewModel @Inject constructor(
     private val installedAppsManager: InstalledAppsRepository,
     private val appUpdateSignal: AppUpdateSignal,
     private val installedAppsStateManager: InstalledAppsStateRepository,
@@ -119,6 +119,9 @@ class HomeViewModel @Inject constructor(
 
     private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
     val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
+
+    private val _appDrawerSearchQuery = MutableStateFlow("")
+    val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
     val sortOrder: LiveData<SortOrder> = settingsManager.sortOrderFlow.asLiveData()
@@ -875,5 +878,13 @@ class HomeViewModel @Inject constructor(
             _maxFavoritesOnHome.value = calculatedMaxFavorites
             getFavoriteAppsUseCase.setDynamicMaxFavorites(calculatedMaxFavorites)
         }
+    }
+
+    /**
+     * Wird vom AppDrawerFragment aufgerufen, wenn sich der Suchtext ändert.
+     */
+    fun onAppDrawerSearchQueryChanged(query: String) {
+        // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
+        _appDrawerSearchQuery.value = query
     }
 }

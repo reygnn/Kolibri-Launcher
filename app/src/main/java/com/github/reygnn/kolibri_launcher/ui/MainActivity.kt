@@ -57,9 +57,9 @@ import javax.inject.Inject
  * - Proper cleanup in lifecycle methods
  */
 @AndroidEntryPoint
-class MainActivity : BaseActivity<UiEvent, HomeViewModel>() {
+class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
-    override val viewModel: HomeViewModel by viewModels()
+    override val viewModel: LauncherViewModel by viewModels()
 
     private var navController: NavController? = null
     private var isReceiverRegistered = false

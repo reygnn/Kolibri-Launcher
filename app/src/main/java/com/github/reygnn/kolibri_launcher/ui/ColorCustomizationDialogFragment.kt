@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class ColorCustomizationDialogFragment : DialogFragment() {
 
-    private val viewModel: HomeViewModel by activityViewModels()
+    private val viewModel: LauncherViewModel by activityViewModels()
     private var _binding: DialogColorCustomizationBinding? = null
     private val binding get() = _binding!!
 

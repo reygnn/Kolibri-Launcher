@@ -73,7 +73,7 @@ import kotlin.math.abs
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
-    private val viewModel: HomeViewModel by activityViewModels()
+    private val viewModel: LauncherViewModel by activityViewModels()
 
     // CRASH-SAFE: Nullable binding
     private var _binding: FragmentHomeBinding? = null
@@ -165,7 +165,6 @@ class HomeFragment : Fragment() {
                 }
             }
 
-        // Füge den Listener zum Container hinzu
         binding.favoriteAppsContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
 

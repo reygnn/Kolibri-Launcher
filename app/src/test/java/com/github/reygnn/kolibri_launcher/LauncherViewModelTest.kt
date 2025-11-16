@@ -17,7 +17,6 @@ import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.data.ResetRepository
 import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
@@ -26,7 +25,7 @@ import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.SortOrder
-import com.github.reygnn.kolibri_launcher.ui.HomeViewModel
+import com.github.reygnn.kolibri_launcher.ui.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.UiState
@@ -56,7 +55,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
-class HomeViewModelTest {
+class LauncherViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -91,7 +90,7 @@ class HomeViewModelTest {
     @Mock
     private lateinit var timeBasedEventsManager: TimeBasedEventsRepository
 
-    private lateinit var viewModel: HomeViewModel
+    private lateinit var viewModel: LauncherViewModel
 
     private val app1 = AppInfo("App A", "App A", "com.a", "MainActivity")
     private val app2 = AppInfo("App B", "App B", "com.b", "MainActivity")
@@ -125,7 +124,7 @@ class HomeViewModelTest {
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
-        viewModel = HomeViewModel(
+        viewModel = LauncherViewModel(
             installedAppsManager,
             appUpdateSignal,
             installedAppsStateManager,

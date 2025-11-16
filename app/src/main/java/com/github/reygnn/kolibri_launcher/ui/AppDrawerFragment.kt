@@ -59,7 +59,7 @@ import android.view.inputmethod.InputMethodManager
 @AndroidEntryPoint
 class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
-    private val viewModel: HomeViewModel by activityViewModels()
+    private val viewModel: LauncherViewModel by activityViewModels()
 
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
@@ -119,7 +119,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 try {
                     if (sortedApps != null) {
                         masterAppList = sortedApps
-                        displayFilteredApps()
+                        displayFilteredApps(viewModel.appDrawerSearchQuery.value)
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -180,6 +180,35 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle")
+            }
+        }
+
+        // Observer 4: Für die Suchanfrage
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.appDrawerSearchQuery.collect { query ->
+                        searchJob?.cancel()
+                        searchJob = launch {
+                            try {
+                                delay(300)
+                                displayFilteredApps(query)
+                            } catch (e: CancellationException) {
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error in search delay")
+                                try {
+                                    displayFilteredApps(query)
+                                } catch (fallbackError: Throwable) {
+                                    TimberWrapper.silentError(fallbackError, "Error in search fallback")
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for search query")
             }
         }
     }
@@ -334,35 +363,13 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private fun setupSearch() {
         try {
-            binding.searchEditText.doOnTextChanged { text, _, _, _ ->
-                try {
-                    searchJob?.cancel()
+            binding.searchEditText.setText(viewModel.appDrawerSearchQuery.value)
 
-                    searchJob = viewLifecycleOwner.lifecycleScope.launch(
-                        Dispatchers.Main + fragmentExceptionHandler
-                    ) {
-                        try {
-                            delay(300)
-                            displayFilteredApps()
-                        } catch (e: CancellationException) {
-                            // Normal cancellation, ignore
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in search delay")
-                            // Show unfiltered list as fallback
-                            try {
-                                displayFilteredApps()
-                            } catch (fallbackError: Throwable) {
-                                TimberWrapper.silentError(fallbackError, "Error in search fallback")
-                            }
-                        }
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in text changed listener")
-                }
+            binding.searchEditText.doOnTextChanged { text, _, _, _ ->
+                viewModel.onAppDrawerSearchQueryChanged(text.toString())
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up search")
-            // Search won't work, but drawer still shows apps
         }
     }
 
@@ -382,7 +389,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
     }
 
-    private fun displayFilteredApps() {
+    private fun displayFilteredApps(query: String) {
         val currentBinding = _binding
         if (currentBinding == null || !isAdded) {
             Timber.Forest.w("Cannot display filtered apps - binding is null or fragment not added")
@@ -390,13 +397,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
 
         try {
-            val query = try {
-                currentBinding.searchEditText.text.toString()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting search query")
-                ""
-            }
-
             val filteredList = try {
                 if (query.isEmpty()) {
                     masterAppList
@@ -436,7 +436,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 }
                 return
             }
-                 submitListToAdapter(filteredList)
+            submitListToAdapter(filteredList)
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error in displayFilteredApps")
