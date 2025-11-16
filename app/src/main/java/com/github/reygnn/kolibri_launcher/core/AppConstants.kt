@@ -31,7 +31,7 @@ object AppConstants {
     // Bundle Arguments
     const val ARG_FAVORITES = "favorites"
 
-    const val MAX_FAVORITES_ON_HOME = 72
+    const val MAX_FAVORITES_ON_HOME = 96
 
     const val SETTINGS_DATASTORE_NAME = "kolibri_settings"
 
