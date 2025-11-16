@@ -887,4 +887,12 @@ class LauncherViewModel @Inject constructor(
         // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
         _appDrawerSearchQuery.value = query
     }
+
+    /**
+     * Wird vom AppDrawerFragment aufgerufen, wenn es geschlossen wird,
+     * um die Suchanfrage zurückzusetzen.
+     */
+    fun onAppDrawerClosed() {
+        _appDrawerSearchQuery.value = ""
+    }
 }

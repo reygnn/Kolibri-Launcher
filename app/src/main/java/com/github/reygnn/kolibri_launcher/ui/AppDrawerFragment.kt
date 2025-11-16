@@ -656,6 +656,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 TimberWrapper.silentError(e, "Error clearing adapter")
             }
 
+            viewModel.onAppDrawerClosed()
+
             _binding = null
             longClickedApp = null
         } catch (e: Throwable) {
