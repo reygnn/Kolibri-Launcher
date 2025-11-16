@@ -695,7 +695,7 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - exceeds package limit - returns LimitExceeded`() = runTest {
-        val appInfos = (1..10).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
+        val appInfos = (1..100).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
         fakeInstalledAppsRepo.installedApps = appInfos
 
         val appNames = appInfos.map { it.componentName }.toSet()
@@ -708,7 +708,7 @@ class BackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.LimitExceeded::class.java)
         val limitExceeded = result as ImportResult.LimitExceeded
-        assertThat(limitExceeded.packageCount).isEqualTo(10)
+        assertThat(limitExceeded.packageCount).isEqualTo(100)
         assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 

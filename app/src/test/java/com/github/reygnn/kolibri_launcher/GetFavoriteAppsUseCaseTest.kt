@@ -326,7 +326,7 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = (successState as UiState.Success).data
-            assertEquals(100, result.apps.size)
+            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 
@@ -407,7 +407,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when fallback size exceeds MAX_FAVORITES - limits correctly`() = runTest {
-        val manyApps = (1..50).map {
+        val manyApps = (1..100).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 
