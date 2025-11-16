@@ -255,7 +255,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // NEU: Wird bei Rechts-Wisch aufgerufen
     fun onFlingRight() = launchSafe {
         try {
             val comp = swipeRightComponent.value

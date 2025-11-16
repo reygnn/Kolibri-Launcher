@@ -98,6 +98,8 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private var layoutChangeListener: View.OnLayoutChangeListener? = null
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -116,36 +118,55 @@ class HomeFragment : Fragment() {
             observeViewModel()
             setupFragmentResultListener()
             setupHomeWindowInsets()
+            setupDynamicMaxFavoritesListener()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onViewCreated")
+        }
+    }
 
-            binding.favoriteAppsContainer.post {
+    /**
+     * Richtet den Listener ein, der die Container-Höhe überwacht
+     * und das dynamische Favoriten-Limit an das ViewModel meldet.
+     */
+    private fun setupDynamicMaxFavoritesListener() {
+        if (_binding == null) return // Verhindert Absturz, falls Binding schon null ist
+
+        // Dieser Listener wird JEDES MAL ausgelöst, wenn sich das Layout ändert
+        // (z.B. wenn die Chip-Leiste ein- oder ausgeblendet wird oder bei Rotation)
+        layoutChangeListener =
+            View.OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
                 try {
-                    if (_binding == null) return@post // Sicherstellen, dass Fragment noch existiert
-                    val ctx = context ?: return@post
+                    val newHeight = bottom - top
+                    val oldHeight = oldBottom - oldTop
 
-                    val containerHeight = binding.favoriteAppsContainer.height
-                    if (containerHeight == 0) return@post // Noch nicht bereit
+                    // Nur neu berechnen, wenn sich die Höhe tatsächlich geändert hat
+                    // und das Fragment noch gültig ist
+                    if (newHeight == oldHeight || newHeight == 0 || _binding == null) {
+                        return@OnLayoutChangeListener
+                    }
+
+                    val ctx = context ?: return@OnLayoutChangeListener
 
                     val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
                     if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
                         Timber.Forest.w("Dynamic calc failed: Item height is zero.")
-                        return@post
+                        return@OnLayoutChangeListener
                     }
 
                     val totalHeightPerItem = itemHeight + itemMargin
-                    val maxItemsToShow = (containerHeight / totalHeightPerItem).toInt()
+                    val maxItemsToShow = (newHeight / totalHeightPerItem).toInt()
 
-                    Timber.Forest.i("Dynamic MAX calculated: $maxItemsToShow (H: $containerHeight, I: $totalHeightPerItem)")
+                    Timber.Forest.i("Dynamic MAX re-calculated: $maxItemsToShow (H: $newHeight, I: $totalHeightPerItem)")
 
-                    // SENDE DAS ERGEBNIS AN DAS VIEWMODEL
                     viewModel.onHomeViewMeasured(maxItemsToShow)
 
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error calculating dynamic max favorites")
+                    TimberWrapper.silentError(e, "Error in layout change listener")
                 }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
-        }
+
+        // Füge den Listener zum Container hinzu
+        binding.favoriteAppsContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
 
     /**
@@ -1161,6 +1182,11 @@ class HomeFragment : Fragment() {
 
             gestureDetector = null
             longClickedApp = null
+
+            if (layoutChangeListener != null) {
+                _binding?.favoriteAppsContainer?.removeOnLayoutChangeListener(layoutChangeListener)
+                layoutChangeListener = null
+            }
 
             _binding = null
         } catch (e: Throwable) {
