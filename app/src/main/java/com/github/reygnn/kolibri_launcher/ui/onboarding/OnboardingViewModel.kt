@@ -13,11 +13,11 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
-import com.github.reygnn.kolibri_launcher.domain.repository.GetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingViewModelInterface
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,9 +38,9 @@ enum class LaunchMode {
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val onboardingAppsUseCase: GetOnboardingAppsUseCaseRepository,
-    private val favoritesRepository: FavoritesRepository,
-    private val settingsRepository: SettingsRepository,
+    private val onboardingAppsUseCase: GetOnboardingAppsUseCase,
+    private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase,
+    private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<OnboardingEvent>(mainDispatcher),
     OnboardingViewModelInterface {
@@ -111,7 +111,7 @@ class OnboardingViewModel @Inject constructor(
         _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
     }
 
-    override  fun loadInitialData() {
+    override fun loadInitialData() {
         if (isInitialized) return
         isInitialized = true
 
@@ -119,9 +119,7 @@ class OnboardingViewModel @Inject constructor(
             try {
                 val initialSelection = when (launchMode) {
                     LaunchMode.INITIAL_SETUP -> emptySet()
-                    LaunchMode.EDIT_FAVORITES -> {
-                        favoritesRepository.favoriteComponentsFlow.first()
-                    }
+                    LaunchMode.EDIT_FAVORITES -> getFavoriteComponentsUseCase()
                 }
                 selectedComponents.value = initialSelection
             } catch (e: Throwable) {
@@ -155,15 +153,17 @@ class OnboardingViewModel @Inject constructor(
     override fun onDoneClicked() {
         launchSafe {
             try {
-                favoritesRepository.saveFavoriteComponents(selectedComponents.value.toList())
-
-                if (launchMode == LaunchMode.INITIAL_SETUP) {
-                    settingsRepository.setOnboardingCompleted()
-                }
+                completeOnboardingUseCase(
+                    componentNames = selectedComponents.value.toList(),
+                    isInitialSetup = (launchMode == LaunchMode.INITIAL_SETUP)
+                )
 
                 sendOnboardingEvent(OnboardingEvent.NavigateToMain)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "CRITICAL: Failed to save favorites or complete onboarding.")
+                TimberWrapper.silentError(
+                    e,
+                    "CRITICAL: Failed to save favorites or complete onboarding."
+                )
                 sendOnboardingEvent(OnboardingEvent.ShowError("Save failed. Please try again."))
             }
         }

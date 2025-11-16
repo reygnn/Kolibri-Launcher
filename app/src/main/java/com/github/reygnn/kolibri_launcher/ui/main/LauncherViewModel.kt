@@ -16,7 +16,6 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.os.BatteryManager
 import android.text.format.DateFormat
-import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
@@ -24,26 +23,22 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
-import com.github.reygnn.kolibri_launcher.domain.repository.GetDrawerAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.AppLoadResult
+import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.HomeSettings
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
@@ -70,17 +65,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.retry
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import timber.log.Timber
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -125,6 +113,11 @@ class LauncherViewModel @Inject constructor(
     private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase,
     private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     private val observeInstalledAppsUseCase: ObserveInstalledAppsUseCase,
+    private val getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase,
+    private val observeHomeSettingsUseCase: ObserveHomeSettingsUseCase,
+    private val checkAppUsageUseCase: CheckAppUsageUseCase,
+    private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase,
+    private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
     @param:ApplicationContext private val context: Context,
@@ -141,6 +134,11 @@ class LauncherViewModel @Inject constructor(
     private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FAVORITES_ON_HOME)
     val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
 
+    private val _homeSettings = MutableStateFlow(HomeSettings())
+    val sortOrder: LiveData<SortOrder> = _homeSettings
+        .map { it.sortOrder }
+        .asLiveData(viewModelScope.coroutineContext)
+
     private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
     val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
 
@@ -150,25 +148,10 @@ class LauncherViewModel @Inject constructor(
     val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
-    val sortOrder: LiveData<SortOrder> = settingsManager.sortOrderFlow.asLiveData()
 
     private var fallbackToastShown = false
     private var enableLockToastShown = false
     private var enableSwipeDownToastShown = false
-
-    private val swipeLeftComponent: StateFlow<String?> =
-        swipeActionsManager.swipeLeftAppFlow.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            null
-        )
-
-    private val swipeRightComponent: StateFlow<String?> =
-        swipeActionsManager.swipeRightAppFlow.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            null
-        )
 
     companion object {
         private const val DEFAULT_TEXT_COLOR = Color.WHITE
@@ -210,6 +193,12 @@ class LauncherViewModel @Inject constructor(
                         // Das VM reagiert nur noch auf das Ergebnis
                         if (result is AppLoadResult.Error) {
                             sendEvent(UiEvent.ShowToast(result.messageResId))
+                        }
+                    }
+
+                    launchSafe {
+                        observeHomeSettingsUseCase().collect { settings ->
+                            _homeSettings.value = settings
                         }
                     }
 
@@ -275,9 +264,9 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
-    fun onFlingRight() = launchSafe {
+    fun onFlingLeft() = launchSafe {
         try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.RIGHT)) {
+            when (val result = handleSwipeActionUseCase(SwipeSlot.LEFT)) {
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
@@ -287,7 +276,7 @@ class LauncherViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onFlingRight")
+            TimberWrapper.silentError(e, "Error in onFlingLeft")
         }
     }
 
@@ -374,7 +363,7 @@ class LauncherViewModel @Inject constructor(
 
     fun onHideApp(app: AppInfo) = launchSafe {
         try {
-            hideAppUseCase(app.componentName)
+            hideAppUseCase(app)
             sendEvent(
                 UiEvent.ShowToastFromString(
                     context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
@@ -454,20 +443,9 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
-    fun refreshInstalledApps() = launchSafe {
-        try {
-            installedAppsManager.triggerAppsUpdate()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error refreshing installed apps")
-        }
-    }
-
     fun refreshDynamicUiData() {
         updateTimeAndDate()
         getInitialBatteryState()
-        updateCalendarEvent()
     }
 
     fun refreshAllData() {
@@ -508,20 +486,23 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stellt die 'autoLaunchApp'-Einstellung für Fragments bereit.
+     * Dies ist eine saubere Kapselung der Geschäftslogik.
+     */
+    suspend fun isAutoLaunchEnabled(): Boolean {
+        return getAutoLaunchSettingUseCase()
+    }
+
     // --- PRIVATE/INTERNAL LOGIC ---
 
-    /**
-     * NEU: Helper-Funktion zum Suchen der App im StateManager.
-     * Greift auf die gecachte App-Liste im State Manager zu.
-     */
-    private fun findAppByComponentName(componentName: String): AppInfo? {
-        return try {
-            installedAppsStateManager.getCurrentApps().find {
-                it.componentName == componentName
-            }
+    fun refreshInstalledApps() = launchSafe {
+        try {
+            refreshAppsUseCase()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error finding app by component name")
-            null
+            TimberWrapper.silentError(e, "Error refreshing installed apps")
         }
     }
 
@@ -529,7 +510,7 @@ class LauncherViewModel @Inject constructor(
         try {
             appUpdateSignal.events.collect {
                 try {
-                    refreshInstalledApps()
+                    refreshAppsUseCase()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
@@ -540,132 +521,6 @@ class LauncherViewModel @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error listening for app updates")
-        }
-    }
-
-    private var appLoadRetryCount = 0
-    private val maxAppLoadRetries = 3
-
-    /**
-     * Observes installed apps with triple-layer error protection:
-     * 1. Retry mechanism for transient errors
-     * 2. Catch block with cached fallback
-     * 3. Empty list protection to prevent data loss
-     */
-    private fun observeInstalledApps() = launchSafe {
-        try {
-            installedAppsManager.getInstalledApps()
-                .retry(maxAppLoadRetries.toLong()) { cause ->
-                    try {
-                        if (cause is IOException) {
-                            appLoadRetryCount++
-                            Timber.w("App loading failed, retry ${appLoadRetryCount}/${maxAppLoadRetries}")
-                            delay(1000L * appLoadRetryCount)
-                            true
-                        } else {
-                            false
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in retry logic")
-                        false
-                    }
-                }
-                .catch { e ->
-                    try {
-                        TimberWrapper.silentError(e, "Failed to collect installed apps")
-
-                        val cachedApps = installedAppsStateManager.getCurrentApps()
-                        if (cachedApps.isNotEmpty()) {
-                            Timber.w("Using cached apps as fallback (${cachedApps.size} apps)")
-                            installedAppsStateManager.updateApps(cachedApps)
-                        } else {
-                            installedAppsStateManager.updateApps(emptyList())
-                            sendEvent(UiEvent.ShowToast(R.string.error_app_list_not_loaded))
-                        }
-                    } catch (catchError: Throwable) {
-                        TimberWrapper.silentError(catchError, "Error in catch block")
-                        // Last resort: ensure we have at least an empty list
-                        try {
-                            installedAppsStateManager.updateApps(emptyList())
-                        } catch (lastResort: Throwable) {
-                            TimberWrapper.silentError(
-                                lastResort,
-                                "CRITICAL: Cannot update apps state"
-                            )
-                        }
-                    }
-                }
-                .collect { realApps ->
-                    try {
-                        if (realApps.isEmpty()) {
-                            Timber.w("Collected an empty app list. Skipping cleanup to prevent data loss.")
-                            installedAppsStateManager.updateApps(emptyList())
-                            return@collect
-                        }
-
-                        val allValidComponentNames = realApps.map { it.componentName }
-
-                        try {
-                            favoritesManager.cleanupFavoriteComponents(allValidComponentNames)
-                        } catch (cleanupError: Throwable) {
-                            TimberWrapper.silentError(cleanupError, "Error cleaning up favorites")
-                            // Continue anyway - cleanup failure shouldn't block app list
-                        }
-
-                        installedAppsStateManager.updateApps(realApps)
-                        appLoadRetryCount = 0
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error processing collected apps")
-
-                        try {
-                            installedAppsStateManager.updateApps(realApps)
-                        } catch (updateError: CancellationException) {
-                            throw updateError
-                        } catch (updateError: Throwable) {
-                            TimberWrapper.silentError(updateError, "CRITICAL: Cannot update apps")
-                        }
-                    }
-                }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error in observeInstalledApps")
-        }
-    }
-
-    private fun observeEventSettings() = launchSafe {
-        try {
-            combine(
-                settingsManager.showAlarmFlow,
-                settingsManager.showCalendarEventFlow
-            ) { showAlarm, showCalendar ->
-                Pair(showAlarm, showCalendar)
-            }.collect { (showAlarm, showCalendar) ->
-                try {
-                    updateCalendarEvent()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating events after settings change")
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error observing event settings")
-        }
-    }
-
-    private fun resetAppUsage(app: AppInfo) = launchSafe {
-        try {
-            appUsageManager.removeUsageDataForPackage(app.packageName)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error removing usage data")
-            throw e  // Re-throw to let caller handle
         }
     }
 
@@ -745,76 +600,8 @@ class LauncherViewModel @Inject constructor(
         wallpaperColorsFlow.value = wallpaperColors
     }
 
-    /**
-     * Calculates tonal shadow color with safe math operations.
-     * Protected against all math errors with safe fallbacks.
-     */
-    /**
-     * Calculates tonal shadow color with safe math operations.
-     * Protected against all math errors with safe fallbacks.
-     */
-    /**
-     * Calculates tonal shadow color with safe math operations.
-     * Only ColorUtils.calculateLuminance() can throw - math operations cannot.
-     */
-    private fun calculateTonalShadowColor(baseColor: Int): Int {
-        return try {
-            val luminance = ColorUtils.calculateLuminance(baseColor).toDouble()
-
-            // Simple lerp function - no try-catch needed (math can't throw)
-            fun lerp(start: Double, stop: Double, fraction: Double): Double {
-                return (start + fraction * (stop - start)).coerceIn(0.0, 1.0)
-            }
-
-            when {
-                luminance < 0.1 -> {
-                    Color.argb(204, 255, 255, 255) // 80% white
-                }
-
-                luminance < 0.5 -> {
-                    val fraction = ((luminance - 0.1) / 0.4).coerceIn(0.0, 1.0)
-                    val alpha = lerp(0.75, 0.4, fraction)
-                    Color.argb((alpha * 255).toInt().coerceIn(0, 255), 255, 255, 255)
-                }
-
-                luminance < 0.9 -> {
-                    val fraction = ((luminance - 0.5) / 0.4).coerceIn(0.0, 1.0)
-                    val alpha = lerp(0.3, 0.6, fraction)
-                    Color.argb((alpha * 255).toInt().coerceIn(0, 255), 0, 0, 0)
-                }
-
-                else -> {
-                    Color.argb(153, 0, 0, 0) // 60% black
-                }
-            }
-        } catch (e: Throwable) {
-            // Only ColorUtils.calculateLuminance() can throw here
-            TimberWrapper.silentError(e, "Error calculating luminance, using default shadow")
-            DEFAULT_SHADOW_COLOR
-        }
-    }
-
-    fun updateCalendarEvent() = launchSafe {
-        try {
-            val showAlarm = settingsManager.showAlarmFlow.first()
-            val showCalendar = settingsManager.showCalendarEventFlow.first()
-
-            // Wenn beides deaktiviert ist, leere Liste zurückgeben
-            if (!showAlarm && !showCalendar) {
-                _uiState.update { it.copy(timeBasedEvents = emptyList()) }
-                return@launchSafe
-            }
-
-            // Ansonsten lade Events - TimeBasedEventsManager prüft intern welche aktiviert sind
-            val events = timeBasedEventsManager.getUpcomingTimeBasedEvents(maxCount = 5)
-            _uiState.update { it.copy(timeBasedEvents = events) }
-
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to update time-based events")
-            _uiState.update { it.copy(timeBasedEvents = emptyList()) }
-        }
+    suspend fun hasUsageData(packageName: String?): Boolean {
+        return checkAppUsageUseCase(packageName)
     }
 
     fun onHomeViewMeasured(calculatedMaxFavorites: Int) {
@@ -822,6 +609,17 @@ class LauncherViewModel @Inject constructor(
             _maxFavoritesOnHome.value = calculatedMaxFavorites
             getFavoriteAppsUseCase.setDynamicMaxFavorites(calculatedMaxFavorites)
         }
+    }
+
+    suspend fun isAutoShowKeyboardEnabled(): Boolean {
+        return getAutoShowKeyboardSettingUseCase()
+    }
+
+    /**
+     * Stellt die 'textShadowEnabled'-Einstellung für Fragments bereit.
+     */
+    suspend fun isTextShadowEnabled(): Boolean {
+        return getTextShadowEnabledUseCase()
     }
 
     /**

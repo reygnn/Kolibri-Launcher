@@ -32,7 +32,7 @@ class GetDrawerAppsUseCase @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
-    override val drawerApps: LiveData<List<AppInfo>> = combine(
+    val drawerApps: LiveData<List<AppInfo>> = combine(
         // Critical Flow: rawApps darf nicht crashen (kein .catch())
         installedAppsStateRepository.rawAppsFlow,
 
@@ -131,8 +131,4 @@ class GetDrawerAppsUseCase @Inject constructor(
             emit(emptyList())
         }
         .asLiveData(scope.coroutineContext)
-
-    override suspend fun purgeRepository() {
-        // Für Tests - keine Implementierung nötig in Production
-    }
 }

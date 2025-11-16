@@ -107,7 +107,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     private fun setupShadowSwitch() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val isEnabled = viewModel.settingsManager.textShadowEnabledFlow.first()
+            val isEnabled = viewModel.isTextShadowEnabled()
             binding.switchShadow.isChecked = isEnabled
 
             binding.switchShadow.setOnCheckedChangeListener { _, isChecked ->
@@ -178,18 +178,11 @@ class ColorCustomizationDialogFragment : DialogFragment() {
      * Startet die Beobachtung beider Farb-Flows.
      */
     private fun observeChanges() {
-        // 1. Textfarbe beobachten
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.settingsManager.textColorFlow.collect { selectedColor ->
-                updateSelectedSwatchUI(selectedColor, textSwatchViews)
-            }
-        }
-
-        // 2. Chip-Hintergrundfarbe beobachten
-        viewLifecycleOwner.lifecycleScope.launch {
-            // (Setzt voraus, dass chipBackgroundColorFlow im SettingsManager existiert)
-            viewModel.settingsManager.chipBackgroundColorFlow.collect { selectedColor ->
-                updateSelectedSwatchUI(selectedColor, chipBgSwatchViews)
+            viewModel.uiColorsState.collect { colorsState ->
+                // Aktualisiere beide Paletten basierend auf dem State
+                updateSelectedSwatchUI(colorsState.textColor, textSwatchViews)
+                updateSelectedSwatchUI(colorsState.chipBackgroundColor, chipBgSwatchViews)
             }
         }
     }

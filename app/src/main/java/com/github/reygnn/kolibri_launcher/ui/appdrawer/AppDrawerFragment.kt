@@ -30,8 +30,6 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -44,7 +42,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * ULTRA CRASH-SAFE AppDrawerFragment
@@ -61,16 +58,10 @@ import javax.inject.Inject
  */
 @AndroidEntryPoint
 class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
-
     private val viewModel: LauncherViewModel by activityViewModels()
 
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
-
-    @Inject
-    lateinit var appUsageManager: AppUsageRepository
-    @Inject
-    lateinit var settingsManager: SettingsRepository
 
     private lateinit var appDrawerAdapter: AppDrawerAdapter
     private var masterAppList: List<AppInfo> = emptyList()
@@ -422,7 +413,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
                 viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
                     try {
-                        val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
+                        // *** DAS IST DIE KORRIGIERTE STELLE ***
+                        // Greift auf die saubere Methode im ViewModel zu
+                        val autoLaunchApp = viewModel.isAutoLaunchEnabled()
 
                         if (autoLaunchApp) {
                             viewModel.onAppClicked(filteredList.first())
@@ -481,7 +474,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
                 try {
                     val hasUsage = try {
-                        appUsageManager.hasUsageDataForPackage(app.packageName)
+                        viewModel.hasUsageData(app.packageName)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
@@ -578,7 +571,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
             viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
                 try {
-                    val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
+                    val autoShowKeyboard = viewModel.isAutoShowKeyboardEnabled()
                     if (autoShowKeyboard) {
                         showKeyboard()
                     }
