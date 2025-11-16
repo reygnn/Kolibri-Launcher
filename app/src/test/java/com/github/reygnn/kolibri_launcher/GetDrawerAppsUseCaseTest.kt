@@ -2,13 +2,13 @@ package com.github.reygnn.kolibri_launcher
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
-import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.data.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.SortOrder
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle

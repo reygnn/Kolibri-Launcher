@@ -1,12 +1,12 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.data.BackupPreview
-import com.github.reygnn.kolibri_launcher.data.BackupRepository
-import com.github.reygnn.kolibri_launcher.data.ImportOptions
-import com.github.reygnn.kolibri_launcher.data.ImportResult
-import com.github.reygnn.kolibri_launcher.ui.BackupState
-import com.github.reygnn.kolibri_launcher.ui.BackupViewModel
+import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
+import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
+import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.ui.backup.BackupState
+import com.github.reygnn.kolibri_launcher.ui.backup.BackupViewModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest

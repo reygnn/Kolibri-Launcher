@@ -1,10 +1,10 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.ui.CustomNamesViewModel
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

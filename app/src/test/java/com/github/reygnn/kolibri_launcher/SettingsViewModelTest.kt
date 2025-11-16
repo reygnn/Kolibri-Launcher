@@ -1,10 +1,10 @@
 package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.data.AppInfo
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.data.ResetRepository
-import com.github.reygnn.kolibri_launcher.ui.SettingsViewModel
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
+import com.github.reygnn.kolibri_launcher.ui.settings.SettingsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow

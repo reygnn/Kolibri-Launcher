@@ -2,13 +2,13 @@ package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.data.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
-import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
-import com.github.reygnn.kolibri_launcher.ui.UiState
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow

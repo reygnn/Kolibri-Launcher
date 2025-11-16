@@ -1,6 +1,17 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import javax.inject.Inject

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
-import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import java.io.IOException
 
 class FakeAppNamesRepository : CustomNamesRepository {

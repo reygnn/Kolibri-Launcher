@@ -5,6 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +44,7 @@ import javax.inject.Singleton
  * **Key Features:**
  * - Reactive updates through [kotlinx.coroutines.flow.Flow] and [kotlinx.coroutines.flow.StateFlow]
  * - Trigger-based refresh mechanism via [kotlinx.coroutines.flow.MutableSharedFlow]
- * - Custom app name resolution through [CustomNamesRepository]
+ * - Custom app name resolution through [com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository]
  * - Automatic alphabetical sorting by display name
  * - Deferred subscription with 5-second timeout (WhileSubscribed)
  *

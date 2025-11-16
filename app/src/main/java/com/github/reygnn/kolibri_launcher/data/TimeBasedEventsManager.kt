@@ -9,8 +9,11 @@ import android.provider.CalendarContract
 import android.text.format.DateUtils
 import androidx.core.content.ContextCompat
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.EventType
-import com.github.reygnn.kolibri_launcher.domain.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.CalendarEvent
+import com.github.reygnn.kolibri_launcher.domain.model.EventType
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -21,7 +24,7 @@ import javax.inject.Singleton
 import java.util.concurrent.CancellationException as JavaCancellationException
 
 /**
- * Implementierung des [TimeBasedEventsRepository].
+ * Implementierung des [com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository].
  * Verwendet Hilt für die Injektion des App-Kontexts.
  */
 @Singleton

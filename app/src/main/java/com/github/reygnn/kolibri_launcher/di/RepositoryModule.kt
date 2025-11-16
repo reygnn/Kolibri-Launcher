@@ -1,39 +1,39 @@
 package com.github.reygnn.kolibri_launcher.di
 
 import com.github.reygnn.kolibri_launcher.data.AppUsageManager
-import com.github.reygnn.kolibri_launcher.data.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.data.BackupManager
-import com.github.reygnn.kolibri_launcher.data.BackupRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
-import com.github.reygnn.kolibri_launcher.data.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.data.FavoritesManager
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
-import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.data.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsManager
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsManager
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateManager
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.data.ResetManager
-import com.github.reygnn.kolibri_launcher.data.ResetRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.data.ScreenLockManager
-import com.github.reygnn.kolibri_launcher.data.ScreenLockRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.data.SettingsManager
-import com.github.reygnn.kolibri_launcher.data.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.data.ShortcutManager
-import com.github.reygnn.kolibri_launcher.data.ShortcutRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
-import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
-import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepository
-import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.GetDrawerAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.GetFavoriteAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.GetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+//import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
+//import com.github.reygnn.kolibri_launcher.domain.repository.GetDrawerAppsUseCaseRepository
+//import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
+//import com.github.reygnn.kolibri_launcher.domain.repository.GetFavoriteAppsUseCaseRepository
+//import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
+//import com.github.reygnn.kolibri_launcher.domain.repository.GetOnboardingAppsUseCaseRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -43,6 +43,24 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
+//    @Binds
+//    @Singleton
+//    abstract fun bindGetOnboardingAppsUseCase(
+//        impl: GetOnboardingAppsUseCase
+//    ): GetOnboardingAppsUseCaseRepository
+//
+//    @Binds
+//    @Singleton
+//    abstract fun bindGetDrawerAppsUseCaseRepository(
+//        impl: GetDrawerAppsUseCase
+//    ): GetDrawerAppsUseCaseRepository
+//
+//    @Binds
+//    @Singleton
+//    abstract fun bindGetFavoriteAppsUseCaseRepository(
+//        impl: GetFavoriteAppsUseCase
+//    ): GetFavoriteAppsUseCaseRepository
 
     @Binds
     @Singleton
@@ -94,18 +112,6 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindGetFavoriteAppsUseCaseRepository(
-        impl: GetFavoriteAppsUseCase
-    ): GetFavoriteAppsUseCaseRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindGetDrawerAppsUseCaseRepository(
-        impl: GetDrawerAppsUseCase
-    ): GetDrawerAppsUseCaseRepository
-
-    @Binds
-    @Singleton
     abstract fun bindScreenLockRepository(
         screenLockManager: ScreenLockManager
     ): ScreenLockRepository
@@ -115,12 +121,6 @@ abstract class RepositoryModule {
     abstract fun bindShortcutRepository(
         shortcutManager: ShortcutManager
     ): ShortcutRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindGetOnboardingAppsUseCase(
-        impl: GetOnboardingAppsUseCase
-    ): GetOnboardingAppsUseCaseRepository
 
     @Binds
     @Singleton

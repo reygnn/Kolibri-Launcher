@@ -8,7 +8,7 @@
     <!-- Ziel 1: Das HomeFragment -->
     <fragment
         android:id="@+id/homeFragment"
-        android:name="com.github.reygnn.kolibri_launcher.ui.HomeFragment"
+        android:name="com.github.reygnn.kolibri_launcher.ui.home.HomeFragment"
         android:label="HomeFragment"
         tools:layout="@layout/fragment_home" >
 
@@ -25,7 +25,7 @@
     <!-- Ziel 2: Das AppDrawerFragment -->
     <fragment
         android:id="@+id/appDrawerFragment"
-        android:name="com.github.reygnn.kolibri_launcher.ui.AppDrawerFragment"
+        android:name="com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerFragment"
         android:label="AppDrawerFragment"
         tools:layout="@layout/fragment_app_drawer" >
 

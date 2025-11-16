@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
-import com.github.reygnn.kolibri_launcher.domain.Purgeable
+import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
