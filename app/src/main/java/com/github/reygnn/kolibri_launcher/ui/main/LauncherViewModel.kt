@@ -37,7 +37,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.HomeSettings
+import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
@@ -168,41 +168,54 @@ class LauncherViewModel @Inject constructor(
         getInitialBatteryState()
         updateUiColors()
 
+        // 1. Coroutine für Kalender-Events
         launchSafe {
             observeTimeBasedEventsUseCase().collect { events ->
                 _uiState.update { it.copy(timeBasedEvents = events) }
             }
         }
 
+        // 2. Coroutine für UI-Farben
         launchSafe {
             observeUiColorsUseCase(wallpaperColorsFlow).collect { colorsState ->
                 _uiColorsState.value = colorsState
             }
         }
 
-
         if (!testMode.isEnabled) {
+
+            // 3. EIGENE Coroutine für App-Updates (Der "Motor")
             launchSafe {
                 try {
-                    delay(100)
-                    // listenForAppUpdates() // (Diesen müssen wir auch noch auslagern)
-
-                    // --- STARTET DEN "MOTOR" ---
-                    // Der UseCase wird aufgerufen. Er kümmert sich um ALLES.
+                    delay(100) // Kleiner Start-Delay
                     observeInstalledAppsUseCase().collect { result ->
-                        // Das VM reagiert nur noch auf das Ergebnis
                         if (result is AppLoadResult.Error) {
                             sendEvent(UiEvent.ShowToast(result.messageResId))
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error observing installed apps")
+                }
+            }
 
-                    launchSafe {
-                        observeHomeSettingsUseCase().collect { settings ->
-                            _homeSettings.value = settings
-                        }
+            // 4. EIGENE Coroutine für Home-Settings
+            launchSafe {
+                try {
+                    observeHomeSettingsUseCase().collect { settings ->
+                        _homeSettings.value = settings
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error observing home settings")
+                }
+            }
 
-                    // Dieser Block bleibt, da er den UI-State für Favoriten direkt verwaltet
+            // 5. EIGENE Coroutine für Favoriten (Endlich wird sie gestartet!)
+            launchSafe {
+                try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
                         try {
                             _favoriteAppsState.value = state
@@ -219,11 +232,15 @@ class LauncherViewModel @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in init block")
+                    TimberWrapper.silentError(e, "Error observing favorite apps")
                 }
             }
+
+            // 6. App-Updates Listener starten (startet intern auch eine Coroutine via launchSafe)
+            listenForAppUpdates()
+
         } else {
-            // In test mode: ONLY observe favorites
+            // Test Mode: Nur Favoriten
             launchSafe {
                 try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
@@ -232,7 +249,7 @@ class LauncherViewModel @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in test mode init")
+                    TimberWrapper.silentError(e, "Error observing favorite apps in test mode")
                 }
             }
         }
