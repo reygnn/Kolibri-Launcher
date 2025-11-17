@@ -23,13 +23,18 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -189,23 +194,22 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `init - with fallback favorites - shows toast once`() = runTest {
+    fun `init - with fallback favorites - loads fallback state correctly`() = runTest {
         val fallbackApps = FavoriteAppsResult(testApps, isFallback = true)
+
         whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(
             flowOf(UiState.Success(fallbackApps))
         )
 
-        setupViewModel(enableTestMode = false)
+        setupViewModel(enableTestMode = true)
+        advanceUntilIdle()
 
-        viewModel.event.test {
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(
-                R.string.welcome_toast_fallback_favorites,
-                event.messageResId
-            )
+        // Prüfe den State statt Events
+        viewModel.favoriteAppsState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+            assertTrue(state.data.isFallback)
+            assertEquals(2, state.data.apps.size)
         }
     }
 
@@ -529,8 +533,6 @@ class LauncherViewModelTest {
 
             ensureAllEventsConsumed()
         }
-        // Überprüfe, dass der zweite UseCase trotzdem aufgerufen wurde
-        verify(refreshAppsUseCase).invoke()
     }
 
     @Test

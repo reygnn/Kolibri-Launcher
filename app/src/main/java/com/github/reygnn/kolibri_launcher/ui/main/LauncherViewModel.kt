@@ -240,11 +240,21 @@ class LauncherViewModel @Inject constructor(
             listenForAppUpdates()
 
         } else {
-            // Test Mode: Nur Favoriten
+            // In test mode: ONLY observe favorites (but KEEP the toast logic!)
             launchSafe {
                 try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
-                        _favoriteAppsState.value = state
+                        try {
+                            _favoriteAppsState.value = state
+                            if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
+                                fallbackToastShown = true
+                                sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error processing favorite apps state in test mode")
+                        }
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -412,15 +422,23 @@ class LauncherViewModel @Inject constructor(
 
     fun onAppClicked(app: AppInfo) = launchSafe {
         try {
+            // 1. UI-Event senden
             sendEvent(UiEvent.LaunchApp(app))
 
+            // 2. Statistik aufzeichnen (OHNE try-catch!)
+            // Wenn das hier fehlschlägt, springt der Code sofort in den catch-Block unten.
             recordAppLaunchUseCase(app)
+
+            // 3. Refresh (Wird nur erreicht, wenn Schritt 2 erfolgreich war)
             refreshAppsUseCase()
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            // Hier landet der Fehler aus recordAppLaunchUseCase
             TimberWrapper.silentError(e, "Error handling app click for ${app.packageName}")
+
+            // Und HIER wird der Toast gesendet, auf den dein Test wartet!
             sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
         }
     }
