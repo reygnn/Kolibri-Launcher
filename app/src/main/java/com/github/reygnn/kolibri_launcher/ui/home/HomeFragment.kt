@@ -89,6 +89,8 @@ class HomeFragment : Fragment() {
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
     private var currentMaxItemsOnScreen: Int = Int.MAX_VALUE
+    private var isSplitScreenActive = false
+    private var shouldBlockGlobalVerticalGestures = false
 
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -811,6 +813,8 @@ class HomeFragment : Fragment() {
      * - Split: Container ist MATCH_CONSTRAINT (füllt Screen für Scrolling).
      */
     private fun applySplitScreenMode(enableSplit: Boolean) {
+        isSplitScreenActive = enableSplit
+
         try {
             // 1. Hole Params für den Container (ConstraintLayout Params)
             val containerParams = binding.splitContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
@@ -981,6 +985,7 @@ class HomeFragment : Fragment() {
 
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
+                    shouldBlockGlobalVerticalGestures = false
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in touch listener")
@@ -988,19 +993,52 @@ class HomeFragment : Fragment() {
                 }
             }
 
-            // Damit Swipes auch erkannt werden, wenn man ÜBER der Liste wischt
-            binding.favoritesScrollView.setOnTouchListener { _, event ->
+            // 2. ScrollView Listener
+            binding.favoritesScrollView.setOnTouchListener { v, event ->
                 try {
-                    // Zuerst prüfen, ob es eine Geste (Swipe Up/Down etc.) ist
-                    if (gestureDetector?.onTouchEvent(event) == true) {
-                        // Wenn ja: Event konsumieren (true), damit ScrollView nicht scrollt
-                        return@setOnTouchListener true
+                    if (isSplitScreenActive) {
+                        // === FALL A: SPLIT SCREEN AKTIV ===
+                        // Ziel: ScrollView soll scrollen, Global SwipeUp/Down soll ignoriert werden.
+
+                        // 1. WICHTIG: Verhindert, dass der Root-View Touch-Events klaut,
+                        // wenn man am Ende der Liste anstößt (fixiert das Overscroll-Problem).
+                        v.parent.requestDisallowInterceptTouchEvent(true)
+
+                        // 2. Ampel auf ROT für vertikale Global-Gesten setzen
+                        shouldBlockGlobalVerticalGestures = true
+
+                        // 3. Detector aufrufen (für Horizontal Swipe oder DoubleTap),
+                        // aber vertikale Swipes werden jetzt im Listener (Schritt 3) ignoriert.
+                        val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
+
+                        // 4. Ampel zurücksetzen (Sauberkeit)
+                        shouldBlockGlobalVerticalGestures = false
+
+                        // Wenn Detector (z.B. horizontal) was gemacht hat -> consume (true).
+                        // Sonst -> false zurückgeben, damit der ScrollView scrollt!
+                        if (handledByDetector) true else false
+
+                    } else {
+                        // === FALL B: SPLIT SCREEN INAKTIV (Normal) ===
+                        // Ziel: ScrollView ist passiv, alle Swipes gehen an Global Action.
+
+                        // Ampel auf GRÜN
+                        shouldBlockGlobalVerticalGestures = false
+
+                        val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
+
+                        if (handledByDetector) {
+                            // Es war ein Swipe (Up/Down/Left/Right) -> Event essen!
+                            true
+                        } else {
+                            // Kein Swipe -> Event durchlassen (z.B. für Klick auf App)
+                            false
+                        }
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in ScrollView touch bridge")
+                    false
                 }
-                // Wenn keine Geste: false zurückgeben, damit ScrollView normal scrollen kann
-                false
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up gestures")
@@ -1062,6 +1100,13 @@ class HomeFragment : Fragment() {
                     if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
                         abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
                     ) {
+                        // NEU: Blockier-Check!
+                        // Wenn wir im Split-ScrollView sind, ignorieren wir das hier,
+                        // damit der ScrollView scrollt statt den Drawer zu öffnen.
+                        if (shouldBlockGlobalVerticalGestures) {
+                            return false
+                        }
+
                         if (diffY < 0) {
                             viewModel.onFlingUp()
                             true
