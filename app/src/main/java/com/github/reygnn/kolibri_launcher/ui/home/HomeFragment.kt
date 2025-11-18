@@ -806,44 +806,53 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Schaltet das Layout zwischen Vollbild und 50/50 Split um.
+     * Steuert Layout-Modus:
+     * - Normal: Container ist WRAP_CONTENT (lässt Platz unten frei für Gesten).
+     * - Split: Container ist MATCH_CONSTRAINT (füllt Screen für Scrolling).
      */
     private fun applySplitScreenMode(enableSplit: Boolean) {
         try {
+            // 1. Hole Params für den Container (ConstraintLayout Params)
+            val containerParams = binding.splitContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+
+            // 2. Hole Params für die Kinder (LinearLayout Params)
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
 
             if (enableSplit) {
-                // SPLIT MODUS: Links Scrollen (50%), Rechts Leer (50%) für Gesten
+                // --- SPLIT MODUS ---
+
+                // Container füllt den restlichen Bildschirm
+                containerParams.height = 0 // 0 entspricht MATCH_CONSTRAINT
+
+                // 50% Liste, 50% Leere Zone
                 scrollParams.weight = 1f
-                scrollParams.width = 0 // 0dp für Weight-Berechnung
-
                 gestureParams.weight = 1f
-                gestureParams.width = 0
 
-                // ScrollView aktivieren
                 binding.favoritesScrollView.isScrollContainer = true
 
-                Timber.Forest.d("Experimental: Split Screen ENABLED")
+                Timber.Forest.d("UI Mode: SPLIT SCREEN (Full Height)")
             } else {
-                // STANDARD MODUS: Links Vollbild, Rechts ausgeblendet
+                // --- NORMAL MODUS ---
+
+                // WICHTIG: Container schrumpft auf die Höhe der Apps!
+                // Dadurch bleibt der Bereich DARUNTER frei für Root-Gesten.
+                containerParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+
+                // Liste nimmt volle Breite
                 scrollParams.weight = 1f
-                scrollParams.width = 0
-
                 gestureParams.weight = 0f
-                gestureParams.width = 0
 
-                // Optional: ScrollView disablen wenn nicht nötig,
-                // aber es stört nicht, da eh alles passt.
-
-                Timber.Forest.d("Experimental: Split Screen DISABLED")
+                Timber.Forest.d("UI Mode: COMPACT SCREEN (Wrap Content)")
             }
 
+            // Params anwenden
+            binding.splitContainer.layoutParams = containerParams
             binding.favoritesScrollView.layoutParams = scrollParams
             binding.gestureZoneRight.layoutParams = gestureParams
 
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying split screen layout")
+            TimberWrapper.silentError(e, "Error changing split mode")
         }
     }
 
@@ -977,6 +986,21 @@ class HomeFragment : Fragment() {
                     TimberWrapper.silentError(e, "Error in touch listener")
                     false  // Gesture failed, but app continues
                 }
+            }
+
+            // Damit Swipes auch erkannt werden, wenn man ÜBER der Liste wischt
+            binding.favoritesScrollView.setOnTouchListener { _, event ->
+                try {
+                    // Zuerst prüfen, ob es eine Geste (Swipe Up/Down etc.) ist
+                    if (gestureDetector?.onTouchEvent(event) == true) {
+                        // Wenn ja: Event konsumieren (true), damit ScrollView nicht scrollt
+                        return@setOnTouchListener true
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in ScrollView touch bridge")
+                }
+                // Wenn keine Geste: false zurückgeben, damit ScrollView normal scrollen kann
+                false
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up gestures")

@@ -89,13 +89,13 @@
         </HorizontalScrollView>
 
 <LinearLayout
-        android:id="@+id/split_container"
+android:id="@+id/split_container"
         android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_height="0dp" 
         android:layout_marginTop="@dimen/spacing_medium"
         android:orientation="horizontal"
         android:gravity="start"
-        app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
+        app:layout_constraintVertical_bias="0.0"  app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
