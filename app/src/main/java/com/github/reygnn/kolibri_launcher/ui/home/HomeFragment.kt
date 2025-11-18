@@ -88,6 +88,7 @@ class HomeFragment : Fragment() {
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
+    private var currentMaxItemsOnScreen: Int = Int.MAX_VALUE
 
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -156,16 +157,18 @@ class HomeFragment : Fragment() {
                     val totalHeightPerItem = itemHeight + itemMargin
                     val maxItemsToShow = (newHeight / totalHeightPerItem).toInt()
 
+                    currentMaxItemsOnScreen = maxItemsToShow
+
                     Timber.Forest.i("Dynamic MAX re-calculated: $maxItemsToShow (H: $newHeight, I: $totalHeightPerItem)")
 
-                    viewModel.onHomeViewMeasured(maxItemsToShow)
+                    viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
 
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in layout change listener")
                 }
             }
 
-        binding.favoriteAppsContainer.addOnLayoutChangeListener(layoutChangeListener)
+        binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
 
     /**
@@ -738,9 +741,9 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         try {
-            for (i in 0 until binding.favoriteAppsContainer.childCount) {
+            for (i in 0 until binding.favoriteAppsList.childCount) {
                 try {
-                    val view = binding.favoriteAppsContainer.getChildAt(i)
+                    val view = binding.favoriteAppsList.getChildAt(i)
                     if (view is Button) {
                         view.setTextColor(textColor)
                         view.setShadowLayer(
@@ -763,7 +766,7 @@ class HomeFragment : Fragment() {
     private fun safelyRemoveAllViews() {
         try {
             if (_binding != null && isAdded && !isDetached) {
-                binding.favoriteAppsContainer.removeAllViews()
+                binding.favoriteAppsList.removeAllViews()
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error removing all views")
@@ -776,31 +779,71 @@ class HomeFragment : Fragment() {
         shadowColor: Int
     ) {
         if (_binding == null) return
-
-        val ctx = context
-        if (ctx == null) {
-            Timber.Forest.w("Context is null, cannot update favorite apps UI")
-            return
-        }
+        val ctx = context ?: return
 
         try {
-            safelyRemoveAllViews()
+            // 1. Alten Views entfernen (Referenz auf das innere LinearLayout)
+            binding.favoriteAppsList.removeAllViews()
 
+            // 2. EXPERIMENTAL LOGIK: Split Screen Check
+            // Wenn wir mehr Apps haben als auf einen Screen passen
+            val shouldSplitScreen = appsToShow.size > currentMaxItemsOnScreen
+
+            applySplitScreenMode(shouldSplitScreen)
+
+            // 3. Apps hinzufügen
             for (app in appsToShow) {
                 try {
                     val appButton = createAppButton(ctx, app, textColor, shadowColor)
                     if (appButton != null) {
-                        binding.favoriteAppsContainer.addView(appButton)
-                    } else {
-                        Timber.Forest.w("Failed to create button for ${app.packageName}")
+                        binding.favoriteAppsList.addView(appButton)
                     }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating/adding button for ${app.packageName}")
-                    // Continue with other apps
-                }
+                } catch (e: Throwable) { /* Silent error */ }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating favorite apps UI")
+        }
+    }
+
+    /**
+     * Schaltet das Layout zwischen Vollbild und 50/50 Split um.
+     */
+    private fun applySplitScreenMode(enableSplit: Boolean) {
+        try {
+            val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
+
+            if (enableSplit) {
+                // SPLIT MODUS: Links Scrollen (50%), Rechts Leer (50%) für Gesten
+                scrollParams.weight = 1f
+                scrollParams.width = 0 // 0dp für Weight-Berechnung
+
+                gestureParams.weight = 1f
+                gestureParams.width = 0
+
+                // ScrollView aktivieren
+                binding.favoritesScrollView.isScrollContainer = true
+
+                Timber.Forest.d("Experimental: Split Screen ENABLED")
+            } else {
+                // STANDARD MODUS: Links Vollbild, Rechts ausgeblendet
+                scrollParams.weight = 1f
+                scrollParams.width = 0
+
+                gestureParams.weight = 0f
+                gestureParams.width = 0
+
+                // Optional: ScrollView disablen wenn nicht nötig,
+                // aber es stört nicht, da eh alles passt.
+
+                Timber.Forest.d("Experimental: Split Screen DISABLED")
+            }
+
+            binding.favoritesScrollView.layoutParams = scrollParams
+            binding.gestureZoneRight.layoutParams = gestureParams
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying split screen layout")
         }
     }
 
@@ -1183,7 +1226,7 @@ class HomeFragment : Fragment() {
             longClickedApp = null
 
             if (layoutChangeListener != null) {
-                _binding?.favoriteAppsContainer?.removeOnLayoutChangeListener(layoutChangeListener)
+                _binding?.splitContainer?.removeOnLayoutChangeListener(layoutChangeListener)
                 layoutChangeListener = null
             }
 
