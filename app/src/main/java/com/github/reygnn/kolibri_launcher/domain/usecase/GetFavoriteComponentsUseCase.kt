@@ -9,12 +9,10 @@ class GetFavoriteComponentsUseCase @Inject constructor(
 ) {
     /**
      * Ruft die aktuellen favorisierten Komponenten-Namen einmalig ab.
+     *
+     * @throws Exception wenn das Laden fehlschlägt
      */
     suspend operator fun invoke(): Set<String> {
-        return try {
-            favoritesRepository.favoriteComponentsFlow.first()
-        } catch (e: Exception) {
-            emptySet() // Sicherer Fallback
-        }
+        return favoritesRepository.favoriteComponentsFlow.first()
     }
 }

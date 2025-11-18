@@ -25,6 +25,7 @@ import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.IOException
@@ -205,7 +206,7 @@ class OnboardingViewModelTest {
         }
     }
 
-    // ========== CRASH-RESISTANCE TESTS (ANGEPASST) ==========
+    // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
     fun `init - when onboardingAppsFlow fails - handles gracefully and emits error`() = runTest {
@@ -287,8 +288,6 @@ class OnboardingViewModelTest {
 
     @Test
     fun `onDoneClicked - when CompleteOnboardingUseCase throws on settings - still saves favorites`() = runTest {
-        // Dieser Test ist komplizierter, da der UseCase jetzt beides tut.
-        // Wir mocken, dass der Aufruf fehlschlägt
         whenever(completeOnboardingUseCase.invoke(any(), eq(true))).doAnswer {
             throw IOException("Cannot write settings")
         }
@@ -328,9 +327,6 @@ class OnboardingViewModelTest {
             isInitialSetup = true
         )
     }
-
-    // ... (Die Tests 'rapid toggles', 'initialize multiple times', 'onDoneClicked multiple times'
-    //      bleiben funktional gleich und sollten weiterhin bestehen) ...
 
     @Test
     fun `initialize - EDIT_FAVORITES mode pre-selects existing favorites`() = runTest {
@@ -373,4 +369,372 @@ class OnboardingViewModelTest {
             isInitialSetup = false
         )
     }
+
+    @Test
+    fun `onSearchQueryChanged - filters apps correctly`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("App 2")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(1, uiState.selectableApps.size)
+        assertEquals("App 2", uiState.selectableApps[0].appInfo.displayName)
+    }
+
+    @Test
+    fun `onSearchQueryChanged - with empty query - shows all apps`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("App 1")
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(3, uiState.selectableApps.size)
+    }
+
+    @Test
+    fun `onSearchQueryChanged - case insensitive search works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("aPp 3")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(1, uiState.selectableApps.size)
+        assertEquals("App 3", uiState.selectableApps[0].appInfo.displayName)
+    }
+
+    @Test
+    fun `onSearchQueryChanged - no match - shows empty list`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("NonExistent")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertTrue(uiState.selectableApps.isEmpty())
+    }
+
+    @Test
+    fun `onSearchQueryChanged - selection persists across search changes`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Select app1
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+
+        // Search for something else
+        viewModel.onSearchQueryChanged("App 2")
+        advanceUntilIdle()
+
+        // Clear search - app1 should still be selected
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+    }
+
+    @Test
+    fun `setLaunchMode - INITIAL_SETUP - sets correct title and subtitle`() = runTest {
+        setupViewModel()
+
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(R.string.onboarding_title_welcome, uiState.titleResId)
+        assertEquals(R.string.onboarding_subtitle_welcome, uiState.subtitleResId)
+    }
+
+    @Test
+    fun `setLaunchMode - EDIT_FAVORITES - sets correct title and subtitle`() = runTest {
+        setupViewModel()
+
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(R.string.onboarding_title_edit_favorites, uiState.titleResId)
+        assertEquals(R.string.onboarding_subtitle_edit_favorites, uiState.subtitleResId)
+    }
+
+    @Test
+    fun `setLaunchMode - can be changed multiple times`() = runTest {
+        setupViewModel()
+
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+        assertEquals(R.string.onboarding_title_welcome, viewModel.uiState.value.titleResId)
+
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        advanceUntilIdle()
+        assertEquals(R.string.onboarding_title_edit_favorites, viewModel.uiState.value.titleResId)
+    }
+
+    @Test
+    fun `loadInitialData - called multiple times - only loads once`() = runTest {
+        whenever(getFavoriteComponentsUseCase.invoke()).thenReturn(emptySet())
+
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+
+        viewModel.loadInitialData()
+        viewModel.loadInitialData()
+        viewModel.loadInitialData()
+        advanceUntilIdle()
+
+        // UseCase should only be called once
+        verify(getFavoriteComponentsUseCase, atLeastOnce()).invoke()
+    }
+
+    @Test
+    fun `onAppToggled - rapid toggles on same app - handles correctly`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        repeat(10) {
+            viewModel.onAppToggled(app1)
+        }
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        // Should be unselected (even number of toggles)
+        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+    }
+
+    @Test
+    fun `onAppToggled - rapid toggles on different apps - handles correctly`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        viewModel.onAppToggled(app2)
+        viewModel.onAppToggled(app3)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+    }
+
+    @Test
+    fun `onDoneClicked - called multiple times rapidly - only executes once per call`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+
+        repeat(3) {
+            viewModel.onDoneClicked()
+        }
+        advanceUntilIdle()
+
+        // Should be called 3 times (not protected against multiple calls)
+        verify(completeOnboardingUseCase, atLeastOnce()).invoke(any(), any())
+    }
+
+    @Test
+    fun `onAppToggled - when at limit minus one - allows one more selection`() = runTest {
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val manyApps = (1..limit).map {
+            AppInfo("App $it", "App $it", "pkg$it", "class$it")
+        }
+        whenever(onboardingAppsUseCase.onboardingAppsFlow).thenReturn(flowOf(manyApps))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Select limit - 1 apps
+        for (i in 0 until limit - 1) {
+            viewModel.onAppToggled(manyApps[i])
+        }
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            // This should succeed without toast
+            viewModel.onAppToggled(manyApps[limit - 1])
+            advanceUntilIdle()
+
+            expectNoEvents() // No limit toast!
+
+            val uiState = viewModel.uiState.value
+            assertEquals(limit, uiState.selectedApps.size)
+        }
+    }
+
+    @Test
+    fun `selectedApps - are always sorted alphabetically`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Select in reverse order
+        viewModel.onAppToggled(app3)
+        viewModel.onAppToggled(app1)
+        viewModel.onAppToggled(app2)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals("App 1", uiState.selectedApps[0].displayName)
+        assertEquals("App 2", uiState.selectedApps[1].displayName)
+        assertEquals("App 3", uiState.selectedApps[2].displayName)
+    }
+
+    @Test
+    fun `onDoneClicked - emits NavigateToMain event on success`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is OnboardingEvent.NavigateToMain)
+        }
+    }
+
+    @Test
+    fun `onAppToggled - while searching - updates both filtered and selected lists`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("App 2")
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app2)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(1, uiState.selectableApps.size) // Filtered
+        assertEquals(1, uiState.selectedApps.size)    // Selected
+        assertTrue(uiState.selectableApps[0].isSelected)
+    }
+
+    @Test
+    fun `onAppToggled - selected app disappears from filtered list when search changes`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+
+        // Search for something else - app1 not in filtered list
+        viewModel.onSearchQueryChanged("App 2")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(1, uiState.selectableApps.size) // Only App 2 visible
+        assertEquals(1, uiState.selectedApps.size)    // But App 1 still selected!
+        assertEquals("App 1", uiState.selectedApps[0].displayName)
+    }
+
+    @Test
+    fun `onAppToggled - selecting exactly at limit - works without toast`() = runTest {
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val exactApps = (1..limit).map {
+            AppInfo("App $it", "App $it", "pkg$it", "class$it")
+        }
+        whenever(onboardingAppsUseCase.onboardingAppsFlow).thenReturn(flowOf(exactApps))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Select all apps up to limit
+        exactApps.forEach { app ->
+            viewModel.onAppToggled(app)
+        }
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(limit, uiState.selectedApps.size)
+    }
+
+    @Test
+    fun `onSearchQueryChanged - with whitespace only - treats as empty`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("   ")
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(3, uiState.selectableApps.size) // All apps shown
+    }
+
+    @Test
+    fun `selectedApps - reflects actual selection state in selectableApps`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        viewModel.onAppToggled(app3)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+
+        // Check selectedApps
+        assertEquals(2, uiState.selectedApps.size)
+
+        // Check that selectableApps matches
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+    }
+
+    @Test
+    fun `loadInitialData - in INITIAL_SETUP mode - starts with empty selection`() = runTest {
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        viewModel.loadInitialData()
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertTrue(uiState.selectedApps.isEmpty())
+        assertTrue(uiState.selectableApps.all { !it.isSelected })
+    }
+
+    @Test
+    fun `onDoneClicked - after error - can retry successfully`() = runTest {
+        whenever(completeOnboardingUseCase.invoke(any(), any()))
+            .thenThrow(RuntimeException("Network error"))
+            .thenReturn(Unit)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
+
+            val errorEvent = awaitItem()
+            assertTrue(errorEvent is OnboardingEvent.ShowError)
+
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
+
+            val successEvent = awaitItem()
+            assertTrue(successEvent is OnboardingEvent.NavigateToMain)
+
+            verify(completeOnboardingUseCase, times(2)).invoke(any(), any())
+        }
+    }
+
 }

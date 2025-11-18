@@ -481,6 +481,7 @@ class LauncherViewModel @Inject constructor(
     fun refreshDynamicUiData() {
         updateTimeAndDate()
         getInitialBatteryState()
+        observeTimeBasedEventsUseCase.refresh()
     }
 
     fun refreshAllData() {
@@ -620,7 +621,7 @@ class LauncherViewModel @Inject constructor(
     fun updateBatteryLevel(level: Int, scale: Int) {
         try {
             if (level != -1 && scale != -1 && scale > 0) {
-                val batteryPercent = (level * 100 / scale)
+                val batteryPercent = (level.toLong() * 100 / scale).toInt()
                 _uiState.update { it.copy(batteryString = "${batteryPercent}%") }
             } else {
                 _uiState.update { it.copy(batteryString = DEFAULT_BATTERY) }

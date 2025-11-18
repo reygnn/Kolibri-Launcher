@@ -634,4 +634,738 @@ class LauncherViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state.timeBasedEvents.isEmpty())
     }
+
+    @Test
+    fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
+        // Mocke das ERGEBNIS des UseCase für "Remove"
+        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME))
+            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onToggleFavorite(app1)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToastFromString)
+            // Optional: Prüfe dass die Message "removed" enthält
+        }
+        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME)
+    }
+
+    @Test
+    fun `onFlingLeft - when app assigned but not installed - UseCase returns NoAction`() = runTest {
+        // Der UseCase gibt NoAction zurück wenn die App nicht installiert ist
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.LEFT))
+            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingLeft()
+            advanceUntilIdle()
+            expectNoEvents()  // Kein Event sollte emitted werden
+        }
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.LEFT)
+    }
+
+    @Test
+    fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() = runTest {
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.RIGHT))
+            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingRight()
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.RIGHT)
+    }
+
+    @Test
+    fun `init - when calendar enabled with alarm - shows alarm first chronologically`() = runTest {
+        val now = System.currentTimeMillis()
+        val alarm = TimeBasedEvent(
+            triggerTimeMillis = now + 3600000, // in 1 Stunde
+            title = "Alarm",
+            type = EventType.ALARM
+        )
+        val meeting = TimeBasedEvent(
+            triggerTimeMillis = now + 7200000, // in 2 Stunden
+            title = "Meeting",
+            type = EventType.CALENDAR
+        )
+
+        // Der UseCase gibt chronologisch sortierte Events zurück
+        whenever(observeTimeBasedEventsUseCase.invoke(any()))
+            .thenReturn(flowOf(listOf(alarm, meeting)))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.timeBasedEvents.size)
+        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
+        assertEquals(EventType.CALENDAR, state.timeBasedEvents[1].type)
+    }
+
+    @Test
+    fun `init - when only alarm enabled - shows only alarm`() = runTest {
+        val alarm = TimeBasedEvent(
+            triggerTimeMillis = System.currentTimeMillis() + 3600000,
+            title = "Alarm",
+            type = EventType.ALARM
+        )
+
+        // Der UseCase gibt nur Alarm zurück (weil Calendar deaktiviert)
+        whenever(observeTimeBasedEventsUseCase.invoke(any()))
+            .thenReturn(flowOf(listOf(alarm)))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.timeBasedEvents.size)
+        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
+    }
+
+    @Test
+    fun `init - when both calendar and alarm disabled - shows no events`() = runTest {
+        // Der UseCase gibt leere Liste zurück (weil beide deaktiviert)
+        whenever(observeTimeBasedEventsUseCase.invoke(any()))
+            .thenReturn(flowOf(emptyList()))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.timeBasedEvents.isEmpty())
+    }
+
+    @Test
+    fun `onShowApp - when UseCase throws - emits error`() = runTest {
+        whenever(showAppUseCase.invoke(any())).doAnswer {
+            throw IOException("Cannot show")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onShowApp(app1)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `toggleSortOrder - when UseCase throws - emits error`() = runTest {
+        whenever(toggleSortOrderUseCase.invoke()).doAnswer {
+            throw IOException("Cannot save")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.toggleSortOrder()
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `updateBatteryLevelFromIntent - with null intent - does not crash`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateBatteryLevelFromIntent(null)
+
+        // ViewModel sollte nicht crashen
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun `updateBatteryLevelFromIntent - with invalid data - does not update battery`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        val intent = Intent().apply {
+            putExtra(BatteryManager.EXTRA_LEVEL, -1)
+            putExtra(BatteryManager.EXTRA_SCALE, -1)
+        }
+
+        viewModel.updateBatteryLevelFromIntent(intent)
+
+        assertEquals("---%", viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `updateBatteryLevel - with invalid level - sets default battery string`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateBatteryLevel(-1, 100)
+
+        assertEquals("---%", viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `updateBatteryLevel - with zero scale - sets default battery string`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateBatteryLevel(75, 0)
+
+        assertEquals("---%", viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `onResetAppUsage - when UseCase throws - emits error`() = runTest {
+        whenever(resetAppUsageUseCase.invoke(any())).doAnswer {
+            throw IOException("Cannot reset")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onResetAppUsage(app1)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `onFlingDown - when UseCase returns ErrorDisabled - shows toast once`() = runTest {
+        whenever(requestNotificationsUseCase.invoke())
+            .thenReturn(RequestNotificationsUseCase.Result.ErrorDisabled)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingDown()
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+            assertEquals(R.string.toast_enable_swipe_down_to_notifications, event.messageResId)
+
+            // Second call should not emit event (ViewModel-Logik)
+            viewModel.onFlingDown()
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+        verify(requestNotificationsUseCase, times(2)).invoke()
+    }
+
+    @Test
+    fun `onFlingDown - when UseCase returns ErrorAccessibility - shows dialog`() = runTest {
+        whenever(requestNotificationsUseCase.invoke())
+            .thenReturn(RequestNotificationsUseCase.Result.ErrorAccessibility)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingDown()
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowAccessibilityDialog)
+        }
+    }
+
+    @Test
+    fun `onAppClicked - called rapidly multiple times - handles gracefully`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Simuliere User der wie verrückt auf die App klickt
+        repeat(10) {
+            viewModel.onAppClicked(app1)
+        }
+        advanceUntilIdle()
+
+        // Sollte 10x recordAppLaunch aufrufen
+        verify(recordAppLaunchUseCase, times(10)).invoke(app1)
+        verify(refreshAppsUseCase, times(10)).invoke()
+    }
+
+    @Test
+    fun `onToggleFavorite - called twice quickly - both complete without crash`() = runTest {
+        whenever(toggleFavoriteUseCase.invoke(any(), any()))
+            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onToggleFavorite(app1)
+            viewModel.onToggleFavorite(app1) // Schnell hintereinander!
+
+            advanceUntilIdle()
+
+            // Beide Events sollten ankommen
+            awaitItem() // Erstes Event
+            awaitItem() // Zweites Event
+        }
+    }
+
+    @Test
+    fun `multiple simultaneous operations - all complete successfully`() = runTest {
+        whenever(toggleFavoriteUseCase.invoke(any(), any()))
+            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Starte mehrere Operationen gleichzeitig
+        launch { viewModel.onAppClicked(app1) }
+        launch { viewModel.onToggleFavorite(app2) }
+        launch { viewModel.toggleSortOrder() }
+        launch { viewModel.updateTimeAndDate() }
+
+        advanceUntilIdle()
+
+        // Keine Crashes, alle Operationen abgeschlossen
+        verify(recordAppLaunchUseCase).invoke(app1)
+        verify(toggleFavoriteUseCase).invoke(eq(app2), any())  // ← eq() hinzugefügt!
+        verify(toggleSortOrderUseCase).invoke()
+    }
+
+    @Test
+    fun `favoriteAppsState - starts with Loading and transitions correctly`() = runTest {
+        val favoriteApps = FavoriteAppsResult(testApps, isFallback = false)
+        val stateFlow = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
+
+        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(stateFlow)
+
+        setupViewModel()
+
+        viewModel.favoriteAppsState.test {
+            // Initial state
+            assertEquals(UiState.Loading, awaitItem())
+
+            // Update to Success
+            stateFlow.value = UiState.Success(favoriteApps)
+            val successState = awaitItem()
+            assertTrue(successState is UiState.Success)
+            assertEquals(2, successState.data.apps.size)
+        }
+    }
+
+    @Test
+    fun `uiState - battery level updates are reflected immediately`() = runTest {
+        setupViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem()
+
+            viewModel.updateBatteryLevel(50, 100)
+            val updated = awaitItem()
+            assertEquals("50%", updated.batteryString)
+
+            viewModel.updateBatteryLevel(75, 100)
+            val updated2 = awaitItem()
+            assertEquals("75%", updated2.batteryString)
+        }
+    }
+
+    @Test
+    fun `maxFavoritesOnHome - updates when onHomeViewMeasured called`() = runTest {
+        setupViewModel()
+
+        viewModel.maxFavoritesOnHome.test {
+            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, awaitItem())
+
+            viewModel.onHomeViewMeasured(8)
+            assertEquals(8, awaitItem())
+
+            viewModel.onHomeViewMeasured(12)
+            assertEquals(12, awaitItem())
+        }
+    }
+
+    @Test
+    fun `onHomeViewMeasured - with zero or negative - ignores update`() = runTest {
+        setupViewModel()
+
+        viewModel.maxFavoritesOnHome.test {
+            val initial = awaitItem()
+
+            viewModel.onHomeViewMeasured(0)
+            viewModel.onHomeViewMeasured(-5)
+
+            expectNoEvents() // Keine Updates!
+            assertEquals(initial, viewModel.maxFavoritesOnHome.value)
+        }
+    }
+
+    @Test
+    fun `onAppDrawerSearchQueryChanged - updates search query state`() = runTest {
+        setupViewModel()
+
+        viewModel.appDrawerSearchQuery.test {
+            assertEquals("", awaitItem())
+
+            viewModel.onAppDrawerSearchQueryChanged("test")
+            assertEquals("test", awaitItem())
+
+            viewModel.onAppDrawerSearchQueryChanged("test app")
+            assertEquals("test app", awaitItem())
+        }
+    }
+
+    @Test
+    fun `onAppDrawerClosed - resets search query to empty`() = runTest {
+        setupViewModel()
+
+        viewModel.appDrawerSearchQuery.test {
+            assertEquals("", awaitItem())
+
+            viewModel.onAppDrawerSearchQueryChanged("search term")
+            assertEquals("search term", awaitItem())
+
+            viewModel.onAppDrawerClosed()
+            assertEquals("", awaitItem())
+        }
+    }
+
+    @Test
+    fun `onAppDrawerSearchQueryChanged - with empty string - works correctly`() = runTest {
+        setupViewModel()
+
+        viewModel.appDrawerSearchQuery.test {
+            awaitItem() // Initial empty
+
+            viewModel.onAppDrawerSearchQueryChanged("test")
+            awaitItem()
+
+            viewModel.onAppDrawerSearchQueryChanged("")
+            assertEquals("", awaitItem())
+        }
+    }
+
+    @Test
+    fun `onAppDrawerSearchQueryChanged - with special characters - handles correctly`() = runTest {
+        setupViewModel()
+
+        viewModel.appDrawerSearchQuery.test {
+            awaitItem()
+
+            viewModel.onAppDrawerSearchQueryChanged("test@#$%")
+            assertEquals("test@#$%", awaitItem())
+
+            viewModel.onAppDrawerSearchQueryChanged("émojï 🎉")
+            assertEquals("émojï 🎉", awaitItem())
+        }
+    }
+
+    @Test
+    fun `updateBatteryLevel - with maximum values - handles correctly`() = runTest {
+        setupViewModel()
+
+        viewModel.updateBatteryLevel(Int.MAX_VALUE, Int.MAX_VALUE)
+
+        // Sollte 100% sein
+        assertEquals("100%", viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `updateBatteryLevel - with realistic maximum value - handles correctly`() = runTest {
+        setupViewModel()
+
+        viewModel.updateBatteryLevel(100, 100)
+        assertEquals("100%", viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `updateBatteryLevel - with scale smaller than level - handles correctly`() = runTest {
+        setupViewModel()
+
+        viewModel.updateBatteryLevel(100, 50)
+
+        // Sollte 200% ergeben (mathematisch korrekt, aber unrealistisch)
+        // Oder sollte es abgefangen werden? Test zeigt das Verhalten!
+        assertNotNull(viewModel.uiState.value.batteryString)
+    }
+
+    @Test
+    fun `onToggleFavorite - with exactly max favorites - allows removal`() = runTest {
+        whenever(toggleFavoriteUseCase.invoke(any(), any()))
+            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Setze genau auf das Limit
+        viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onToggleFavorite(app1)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToastFromString)
+        }
+    }
+
+    @Test
+    fun `init - when all UseCases throw - ViewModel still initializes`() = runTest {
+        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(flow {
+            throw RuntimeException("Critical error")
+        })
+        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(flow {
+            throw RuntimeException("Critical error")
+        })
+        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(flow {
+            throw RuntimeException("Critical error")
+        })
+
+        setupViewModel(enableTestMode = false)
+        advanceUntilIdle()
+
+        // ViewModel sollte existieren und nicht crashen
+        assertNotNull(viewModel)
+        assertNotNull(viewModel.uiState.value)
+    }
+
+    @Test
+    fun `onAppClicked - emits LaunchApp before recording usage`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onAppClicked(app1)
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.LaunchApp)
+
+            advanceUntilIdle()
+        }
+
+        // Beide Aufrufe sollten passiert sein
+        verify(recordAppLaunchUseCase).invoke(app1)
+        verify(refreshAppsUseCase).invoke()
+    }
+
+    @Test
+    fun `onDoubleTapToLock - shows toast only once despite multiple calls`() = runTest {
+        whenever(requestLockUseCase.invoke())
+            .thenReturn(RequestLockUseCase.Result.ErrorDisabled)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onDoubleTapToLock()
+            advanceUntilIdle()
+            awaitItem() // First toast
+
+            viewModel.onDoubleTapToLock()
+            viewModel.onDoubleTapToLock()
+            viewModel.onDoubleTapToLock()
+            advanceUntilIdle()
+
+            expectNoEvents() // Keine weiteren Toasts!
+        }
+    }
+
+    @Test
+    fun `onFlingDown - shows toast only once despite multiple calls`() = runTest {
+        whenever(requestNotificationsUseCase.invoke())
+            .thenReturn(RequestNotificationsUseCase.Result.ErrorDisabled)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFlingDown()
+            advanceUntilIdle()
+            awaitItem() // First toast
+
+            repeat(5) { viewModel.onFlingDown() }
+            advanceUntilIdle()
+
+            expectNoEvents() // Keine weiteren Toasts!
+        }
+    }
+
+    @Test
+    fun `init - in test mode - does not observe installed apps`() = runTest {
+        setupViewModel(enableTestMode = true)
+        advanceUntilIdle()
+
+        // Im Test-Mode sollte observeInstalledAppsUseCase NICHT aufgerufen werden
+        verify(observeInstalledAppsUseCase, never()).invoke()
+    }
+
+    @Test
+    fun `init - in production mode - observes installed apps`() = runTest {
+        setupViewModel(enableTestMode = false)
+        advanceUntilIdle()
+
+        // Im Production-Mode sollte observeInstalledAppsUseCase aufgerufen werden
+        verify(observeInstalledAppsUseCase, atLeastOnce()).invoke()
+    }
+
+    @Test
+    fun `init - in test mode - still observes favorites`() = runTest {
+        val favoriteApps = FavoriteAppsResult(testApps, isFallback = false)
+        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(
+            flowOf(UiState.Success(favoriteApps))
+        )
+
+        setupViewModel(enableTestMode = true)
+        advanceUntilIdle()
+
+        viewModel.favoriteAppsState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+        }
+    }
+
+    @Test
+    fun `isAutoLaunchEnabled - returns UseCase result`() = runTest {
+        whenever(getAutoLaunchSettingUseCase.invoke()).thenReturn(true)
+        setupViewModel()
+
+        val result = viewModel.isAutoLaunchEnabled()
+        assertTrue(result)
+
+        whenever(getAutoLaunchSettingUseCase.invoke()).thenReturn(false)
+        val result2 = viewModel.isAutoLaunchEnabled()
+        assertFalse(result2)
+    }
+
+    @Test
+    fun `hasUsageData - returns UseCase result`() = runTest {
+        whenever(checkAppUsageUseCase.invoke("com.test")).thenReturn(true)
+        setupViewModel()
+
+        val result = viewModel.hasUsageData("com.test")
+        assertTrue(result)
+    }
+
+    @Test
+    fun `hasUsageData - with null package - returns false`() = runTest {
+        whenever(checkAppUsageUseCase.invoke(null)).thenReturn(false)
+        setupViewModel()
+
+        val result = viewModel.hasUsageData(null)
+        assertFalse(result)
+    }
+
+    @Test
+    fun `isAutoShowKeyboardEnabled - returns UseCase result`() = runTest {
+        whenever(getAutoShowKeyboardSettingUseCase.invoke()).thenReturn(true)
+        setupViewModel()
+
+        val result = viewModel.isAutoShowKeyboardEnabled()
+        assertTrue(result)
+    }
+
+    @Test
+    fun `isTextShadowEnabled - returns UseCase result`() = runTest {
+        whenever(getTextShadowEnabledUseCase.invoke()).thenReturn(true)
+        setupViewModel()
+
+        val result = viewModel.isTextShadowEnabled()
+        assertTrue(result)
+    }
+
+    @Test
+    fun `onSetTextColor - calls UseCase with correct color`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetTextColor(Color.RED)
+        advanceUntilIdle()
+
+        verify(setTextColorUseCase).invoke(Color.RED)
+    }
+
+    @Test
+    fun `onSetTextShadowEnabled - calls UseCase with correct value`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetTextShadowEnabled(true)
+        advanceUntilIdle()
+
+        verify(setTextShadowEnabledUseCase).invoke(true)
+
+        viewModel.onSetTextShadowEnabled(false)
+        advanceUntilIdle()
+
+        verify(setTextShadowEnabledUseCase).invoke(false)
+    }
+
+    @Test
+    fun `onSetChipBackgroundColor - calls UseCase with correct color`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetChipBackgroundColor(Color.BLUE)
+        advanceUntilIdle()
+
+        verify(setChipBackgroundColorUseCase).invoke(Color.BLUE)
+    }
+
+    @Test
+    fun `updateUiColors - updates wallpaper colors flow`() = runTest {
+        // Mock WallpaperColors (requires API level handling)
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateUiColors(null)
+        advanceUntilIdle()
+
+        // Verify that observeUiColorsUseCase was called with the flow
+        verify(observeUiColorsUseCase).invoke(any())
+    }
+
+    @Test
+    fun `onAppInfoError - emits correct error event`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onAppInfoError()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+            assertEquals(R.string.error_app_info_open, event.messageResId)
+        }
+    }
+
+    @Test
+    fun `onFavoriteAppsError - emits ShowToastFromString with custom message`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onFavoriteAppsError("Custom error message")
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToastFromString)
+            // Note: Can't check message content as it's wrapped in event
+        }
+    }
+
 }

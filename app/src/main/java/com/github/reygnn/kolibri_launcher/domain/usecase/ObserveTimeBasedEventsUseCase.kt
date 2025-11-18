@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -15,6 +16,20 @@ class ObserveTimeBasedEventsUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val timeBasedEventsRepository: TimeBasedEventsRepository
 ) {
+    private val refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
+
+    init {
+        refreshTrigger.tryEmit(Unit) // Initial trigger
+    }
+
+    /**
+     * Triggert einen manuellen Reload der Events.
+     * Wird z.B. aus refreshDynamicUiData() aufgerufen.
+     */
+    fun refresh() {
+        refreshTrigger.tryEmit(Unit)
+    }
+
     /**
      * Gibt einen Flow von Kalender-Events zurück, der automatisch aktualisiert wird,
      * wenn sich die Einstellungen (showAlarm/showCalendar) ändern.
@@ -23,8 +38,9 @@ class ObserveTimeBasedEventsUseCase @Inject constructor(
         // 1. Kombiniere die Einstellungs-Flows (Logik aus 'observeEventSettings')
         return combine(
             settingsRepository.showAlarmFlow,
-            settingsRepository.showCalendarEventFlow
-        ) { showAlarm, showCalendar ->
+            settingsRepository.showCalendarEventFlow,
+            refreshTrigger
+        ) { showAlarm, showCalendar, _ ->
             // 2. Erzeuge ein Paar (Pair) aus den Ergebnissen
             Pair(showAlarm, showCalendar)
         }
