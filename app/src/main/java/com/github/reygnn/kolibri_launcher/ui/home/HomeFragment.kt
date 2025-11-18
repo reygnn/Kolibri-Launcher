@@ -91,6 +91,8 @@ class HomeFragment : Fragment() {
     private var currentMaxItemsOnScreen: Int = Int.MAX_VALUE
     private var isSplitScreenActive = false
     private var shouldBlockGlobalVerticalGestures = false
+    private var isTouchOnAppButton = false
+
 
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -127,48 +129,56 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun runCapacityCheck(container: View) {
+        try {
+            val newHeight = container.bottom - container.top
+
+            if (newHeight == 0 || _binding == null) {
+                // Wenn die Höhe 0 ist, verwenden wir den Fallback-Wert (könnte 0 sein, was OK ist)
+                return
+            }
+
+            val ctx = context ?: return
+
+            val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+            if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
+                Timber.Forest.w("Dynamic calc failed: Item height is zero.")
+                return
+            }
+
+            val totalHeightPerItem = itemHeight + itemMargin
+            val maxItemsToShow = (newHeight / totalHeightPerItem).toInt()
+
+            currentMaxItemsOnScreen = maxItemsToShow
+
+            Timber.Forest.i("Capacity re-calculated: $maxItemsToShow (H: $newHeight)")
+
+            viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in manual capacity check")
+        }
+    }
+
     /**
-     * Richtet den Listener ein, der die Container-Höhe überwacht
-     * und das dynamische Favoriten-Limit an das ViewModel meldet.
+     * Richtet den Listener ein und führt die Initialmessung durch.
      */
     private fun setupDynamicMaxFavoritesListener() {
-        if (_binding == null) return // Verhindert Absturz, falls Binding schon null ist
+        if (_binding == null) return
 
-        // Dieser Listener wird JEDES MAL ausgelöst, wenn sich das Layout ändert
-        // (z.B. wenn die Chip-Leiste ein- oder ausgeblendet wird oder bei Rotation)
         layoutChangeListener =
             View.OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                try {
-                    val newHeight = bottom - top
-                    val oldHeight = oldBottom - oldTop
-
-                    // Nur neu berechnen, wenn sich die Höhe tatsächlich geändert hat
-                    // und das Fragment noch gültig ist
-                    if (newHeight == oldHeight || newHeight == 0 || _binding == null) {
-                        return@OnLayoutChangeListener
-                    }
-
-                    val ctx = context ?: return@OnLayoutChangeListener
-
-                    val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
-                    if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
-                        Timber.Forest.w("Dynamic calc failed: Item height is zero.")
-                        return@OnLayoutChangeListener
-                    }
-
-                    val totalHeightPerItem = itemHeight + itemMargin
-                    val maxItemsToShow = (newHeight / totalHeightPerItem).toInt()
-
-                    currentMaxItemsOnScreen = maxItemsToShow
-
-                    Timber.Forest.i("Dynamic MAX re-calculated: $maxItemsToShow (H: $newHeight, I: $totalHeightPerItem)")
-
-                    viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
-
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in layout change listener")
+                // Nur neu berechnen, wenn sich die Höhe tatsächlich geändert hat
+                if (bottom - top != oldBottom - oldTop) {
+                    runCapacityCheck(v)
                 }
             }
+
+        // Führe die Messung einmal manuell aus, da der Listener sonst nur bei Änderungen feuert
+        // Wir posten es, um sicherzustellen, dass die Layout-Initialisierung abgeschlossen ist
+        binding.splitContainer.post {
+            runCapacityCheck(binding.splitContainer)
+        }
 
         binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
@@ -372,6 +382,25 @@ class HomeFragment : Fragment() {
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
             }
+        }
+    }
+
+    private fun refreshUiStateFromViewModel() {
+        if (_binding == null) return
+
+        // Daten und Farben direkt aus den StateFlows abrufen
+        val state = viewModel.favoriteAppsState.value
+        val colors = viewModel.uiColorsState.value
+
+        if (state is UiState.Success) {
+            // 1. Favoriten-UI inklusive der SplitScreen-Logik neu rendern
+            updateFavoriteAppsUI(
+                state.data.apps,
+                colors.textColor,
+                colors.shadowColor
+            )
+            // 2. Farben auf alle Elemente (Uhrzeit, Datum, Chips, neuer Rahmen) anwenden
+            updateAllColors(colors)
         }
     }
 
@@ -743,9 +772,16 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         try {
-            for (i in 0 until binding.favoriteAppsList.childCount) {
+            // Select the active container based on the current mode
+            val activeContainer = if (isSplitScreenActive) {
+                binding.scrollingAppList
+            } else {
+                binding.staticAppList
+            }
+
+            for (i in 0 until activeContainer.childCount) {
                 try {
-                    val view = binding.favoriteAppsList.getChildAt(i)
+                    val view = activeContainer.getChildAt(i)
                     if (view is Button) {
                         view.setTextColor(textColor)
                         view.setShadowLayer(
@@ -768,7 +804,9 @@ class HomeFragment : Fragment() {
     private fun safelyRemoveAllViews() {
         try {
             if (_binding != null && isAdded && !isDetached) {
-                binding.favoriteAppsList.removeAllViews()
+                // Must target both potential list containers now
+                binding.scrollingAppList.removeAllViews()
+                binding.staticAppList.removeAllViews()
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error removing all views")
@@ -784,23 +822,34 @@ class HomeFragment : Fragment() {
         val ctx = context ?: return
 
         try {
-            // 1. Alten Views entfernen (Referenz auf das innere LinearLayout)
-            binding.favoriteAppsList.removeAllViews()
-
-            // 2. EXPERIMENTAL LOGIK: Split Screen Check
-            // Wenn wir mehr Apps haben als auf einen Screen passen
+            // 1. Modus bestimmen
             val shouldSplitScreen = appsToShow.size > currentMaxItemsOnScreen
 
-            applySplitScreenMode(shouldSplitScreen)
+            // 2. Visuals und Layout-Container aktualisieren (Sichtbarkeit umschalten)
+            applySplitScreenMode(shouldSplitScreen, textColor)
 
-            // 3. Apps hinzufügen
+            // 3. Den korrekten Container für die Buttons auswählen
+            val targetContainer = if (shouldSplitScreen) {
+                binding.scrollingAppList
+            } else {
+                binding.staticAppList
+            }
+
+            // 4. Container leeren und Buttons hinzufügen
+            targetContainer.removeAllViews()
+
             for (app in appsToShow) {
                 try {
+                    // createAppButton enthält jetzt die angepasste Touch-Logik
                     val appButton = createAppButton(ctx, app, textColor, shadowColor)
                     if (appButton != null) {
-                        binding.favoriteAppsList.addView(appButton)
+                        targetContainer.addView(appButton)
+                    } else {
+                        Timber.Forest.w("Failed to create button for ${app.packageName}")
                     }
-                } catch (e: Throwable) { /* Silent error */ }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error creating/adding button for ${app.packageName}")
+                }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating favorite apps UI")
@@ -812,51 +861,61 @@ class HomeFragment : Fragment() {
      * - Normal: Container ist WRAP_CONTENT (lässt Platz unten frei für Gesten).
      * - Split: Container ist MATCH_CONSTRAINT (füllt Screen für Scrolling).
      */
-    private fun applySplitScreenMode(enableSplit: Boolean) {
+    /**
+     * Steuert Layout-Modus und Visuals (Rahmen).
+     */
+    private fun applySplitScreenMode(enableSplit: Boolean, baseTextColor: Int) {
         isSplitScreenActive = enableSplit
 
-        try {
-            // 1. Hole Params für den Container (ConstraintLayout Params)
-            val containerParams = binding.splitContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+        // 1. WICHTIG: Sichtbarkeit der Haupt-Container umschalten
+        binding.splitContainer.visibility = if (enableSplit) View.VISIBLE else View.GONE
+        binding.staticFavoritesContainer.visibility = if (enableSplit) View.GONE else View.VISIBLE
 
-            // 2. Hole Params für die Kinder (LinearLayout Params)
+        // 2. Logik und Visuals anwenden
+        if (enableSplit) {
+            // --- SPLIT MODUS (Rahmen AN) ---
+
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
 
-            if (enableSplit) {
-                // --- SPLIT MODUS ---
-
-                // Container füllt den restlichen Bildschirm
-                containerParams.height = 0 // 0 entspricht MATCH_CONSTRAINT
-
-                // 50% Liste, 50% Leere Zone
-                scrollParams.weight = 1f
-                gestureParams.weight = 1f
-
-                binding.favoritesScrollView.isScrollContainer = true
-
-                Timber.Forest.d("UI Mode: SPLIT SCREEN (Full Height)")
-            } else {
-                // --- NORMAL MODUS ---
-
-                // WICHTIG: Container schrumpft auf die Höhe der Apps!
-                // Dadurch bleibt der Bereich DARUNTER frei für Root-Gesten.
-                containerParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
-
-                // Liste nimmt volle Breite
-                scrollParams.weight = 1f
-                gestureParams.weight = 0f
-
-                Timber.Forest.d("UI Mode: COMPACT SCREEN (Wrap Content)")
-            }
-
-            // Params anwenden
-            binding.splitContainer.layoutParams = containerParams
+            scrollParams.weight = 1f
+            gestureParams.weight = 1f // Wichtig: 50/50 Split
             binding.favoritesScrollView.layoutParams = scrollParams
             binding.gestureZoneRight.layoutParams = gestureParams
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error changing split mode")
+            binding.favoritesScrollView.isScrollContainer = true
+
+            // VISUAL: Dezenten Rahmen erstellen
+            try {
+                val alpha = 50
+                val borderColor = androidx.core.graphics.ColorUtils.setAlphaComponent(baseTextColor, alpha)
+
+                val borderDrawable = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    cornerRadius = TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics
+                    )
+                    setStroke(2, borderColor)
+                    setColor(Color.TRANSPARENT)
+                }
+
+                binding.favoritesScrollView.background = borderDrawable
+
+                val padding = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 8f, resources.displayMetrics
+                ).toInt()
+                binding.favoritesScrollView.setPadding(padding, padding, padding, padding)
+
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error creating border drawable")
+            }
+
+        } else {
+            // --- NORMAL MODUS (Rahmen AUS) ---
+
+            // Aufräumen des ScrollViews, falls er gerade unsichtbar wurde
+            binding.favoritesScrollView.background = null
+            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
         }
     }
 
@@ -936,6 +995,17 @@ class HomeFragment : Fragment() {
                     TimberWrapper.silentError(e, "Error setting layout params")
                 }
 
+                setOnLongClickListener {
+                    try {
+                        // LOKALE AKTION: Zeige Shortcut Menu
+                        showAppContextMenu(app)
+                        true // Wichtig: Konsumiert das Event, unterdrückt den Click
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in long click for ${app.packageName}")
+                        false
+                    }
+                }
+
                 setOnClickListener {
                     try {
                         viewModel.onAppClicked(app)
@@ -944,14 +1014,22 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                setOnLongClickListener {
-                    try {
-                        showAppContextMenu(app)
-                        true
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in long click for ${app.packageName}")
-                        false
+                // Die Swipe-Logik wird nun vom root_layout via Event Bubbling übernommen.
+                setOnTouchListener { v, event ->
+                    // 1. LongPress Blockade Flag setzen/zurücksetzen
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            isTouchOnAppButton = true
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            isTouchOnAppButton = false
+                        }
                     }
+
+                    // 2. WICHTIG: Immer 'false' zurückgeben.
+                    // Dies erlaubt dem Button, seine eigenen nativen Klick- und Long-Klick-Listener zu feuern.
+                    // Es lässt das Event auch zum Parent (root_layout) hochblubbern, um Swipes zu erkennen.
+                    return@setOnTouchListener false
                 }
             }
         } catch (e: Throwable) {
@@ -983,66 +1061,43 @@ class HomeFragment : Fragment() {
         try {
             gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
+            // 1. Root Listener (Fängt alles, was durchfällt - globaler Swipe)
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
                     shouldBlockGlobalVerticalGestures = false
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in touch listener")
-                    false  // Gesture failed, but app continues
+                    false
                 }
             }
 
-            // 2. ScrollView Listener
+            // 2. ScrollView Listener (NUR NOCH für den Fall, dass SplitScreen AKTIV ist)
             binding.favoritesScrollView.setOnTouchListener { v, event ->
+                if (!isSplitScreenActive) {
+                    // Im Inaktiv-Modus lassen wir das Event durch,
+                    // da der Root-Listener die Gesten erkennen soll.
+                    return@setOnTouchListener false
+                }
+
+                // Logik für Split-Modus (Vertical Swipes fressen, um Scrolling zu erlauben)
                 try {
-                    if (isSplitScreenActive) {
-                        // === FALL A: SPLIT SCREEN AKTIV ===
-                        // Ziel: ScrollView soll scrollen, Global SwipeUp/Down soll ignoriert werden.
+                    // Wichtig: Verhindert, dass der Root-View Touch-Events klaut (Overscroll-Fix).
+                    v.parent.requestDisallowInterceptTouchEvent(true)
 
-                        // 1. WICHTIG: Verhindert, dass der Root-View Touch-Events klaut,
-                        // wenn man am Ende der Liste anstößt (fixiert das Overscroll-Problem).
-                        v.parent.requestDisallowInterceptTouchEvent(true)
+                    shouldBlockGlobalVerticalGestures = true
+                    val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
+                    shouldBlockGlobalVerticalGestures = false
 
-                        // 2. Ampel auf ROT für vertikale Global-Gesten setzen
-                        shouldBlockGlobalVerticalGestures = true
-
-                        // 3. Detector aufrufen (für Horizontal Swipe oder DoubleTap),
-                        // aber vertikale Swipes werden jetzt im Listener (Schritt 3) ignoriert.
-                        val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
-
-                        // 4. Ampel zurücksetzen (Sauberkeit)
-                        shouldBlockGlobalVerticalGestures = false
-
-                        // Wenn Detector (z.B. horizontal) was gemacht hat -> consume (true).
-                        // Sonst -> false zurückgeben, damit der ScrollView scrollt!
-                        if (handledByDetector) true else false
-
-                    } else {
-                        // === FALL B: SPLIT SCREEN INAKTIV (Normal) ===
-                        // Ziel: ScrollView ist passiv, alle Swipes gehen an Global Action.
-
-                        // Ampel auf GRÜN
-                        shouldBlockGlobalVerticalGestures = false
-
-                        val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
-
-                        if (handledByDetector) {
-                            // Es war ein Swipe (Up/Down/Left/Right) -> Event essen!
-                            true
-                        } else {
-                            // Kein Swipe -> Event durchlassen (z.B. für Klick auf App)
-                            false
-                        }
-                    }
+                    // Wenn Detector Horizontal Swipe/DoubleTap erkannt hat, konsumieren wir es.
+                    if (handledByDetector) true else false
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in ScrollView touch bridge")
                     false
                 }
             }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up gestures")
-            // Gestures won't work, but home screen still functional
         }
     }
 
@@ -1051,7 +1106,9 @@ class HomeFragment : Fragment() {
 
         override fun onLongPress(e: MotionEvent) {
             try {
-                viewModel.onLongPress()
+                if (!isTouchOnAppButton) {
+                    viewModel.onLongPress() // Öffnet den Settings Dialog
+                }
             } catch (ex: Throwable) {
                 TimberWrapper.silentError(ex, "Error in long press")
             }
@@ -1252,6 +1309,25 @@ class HomeFragment : Fragment() {
         try {
             // Wenn HomeFragment sichtbar wird -> Statusleiste ausblenden
             hideStatusBar()
+
+            // Zuerst eine Layout-Pass-Aktualisierung erzwingen.
+            // Wir machen den Container kurz sichtbar und fordern ein Layout an,
+            // um die OnLayoutChangeListener-Logik zu triggern und currentMaxItemsOnScreen zu aktualisieren.
+            binding.splitContainer.visibility = View.VISIBLE
+            binding.splitContainer.requestLayout()
+
+            // Nach einer kurzen Verzögerung (einem Frame) wird dann die UI synchronisiert.
+            binding.splitContainer.post {
+                // Führt die Logik aus performInitialMeasurement erneut aus, um sicherzustellen,
+                // dass die aktuellste Messung vorliegt.
+                runCapacityCheck(binding.splitContainer)
+
+                // Erst dann die UI aktualisieren
+                refreshUiStateFromViewModel()
+
+                // Die Sichtbarkeit wird in refreshUiStateFromViewModel > updateFavoriteAppsUI > applySplitScreenMode
+                // wieder auf den korrekten Zustand (GONE oder VISIBLE) gesetzt.
+            }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume hiding status bar")
         }

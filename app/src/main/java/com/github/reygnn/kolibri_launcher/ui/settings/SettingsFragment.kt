@@ -105,8 +105,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 ).show()
             }
         }
-    // --- ENDE DER KORREKTUREN ---
-
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         try {

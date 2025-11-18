@@ -101,8 +101,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
                 )
             } else {
                 // Fallback: Top N sichtbare Apps
-                // NEU: 'maxFavoritesToShow' an Fallback übergeben
-                val fallbackApps = createFallbackApps(rawApps, hiddenApps, maxFavoritesToShow)
+                val fallbackApps = createFallbackApps(rawApps, hiddenApps, AppConstants.MAX_FALLBACK_APPS_ON_HOME)
                 Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps (Limit: $maxFavoritesToShow)")
                 UiState.Success(
                     FavoriteAppsResult(
@@ -117,8 +116,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } catch (e: Throwable) {
             // Unerwarteter Fehler in der Verarbeitung
             Timber.Forest.e(e, "Error processing apps - returning fallback")
-            // NEU: 'maxFavoritesToShow' an Fallback übergeben
-            val fallbackApps = createFallbackApps(rawApps, hiddenApps, maxFavoritesToShow)
+            val fallbackApps = createFallbackApps(rawApps, hiddenApps, AppConstants.MAX_FALLBACK_APPS_ON_HOME)
             UiState.Success(
                 FavoriteAppsResult(
                     apps = fallbackApps,

@@ -13,10 +13,10 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.reygnn.kolibri_launcher.ui.HiddenAppsActivity
-import com.github.reygnn.kolibri_launcher.ui.LaunchMode
-import com.github.reygnn.kolibri_launcher.ui.OnboardingActivity
-import com.github.reygnn.kolibri_launcher.ui.SettingsFragment
+import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsActivity
+import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
+import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
+import com.github.reygnn.kolibri_launcher.ui.settings.SettingsFragment
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi

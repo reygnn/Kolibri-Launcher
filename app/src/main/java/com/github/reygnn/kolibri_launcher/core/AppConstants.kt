@@ -32,6 +32,7 @@ object AppConstants {
     const val ARG_FAVORITES = "favorites"
 
     const val MAX_FAVORITES_ON_HOME = 96
+    const val MAX_FALLBACK_APPS_ON_HOME = 6
 
     const val SETTINGS_DATASTORE_NAME = "kolibri_settings"
 

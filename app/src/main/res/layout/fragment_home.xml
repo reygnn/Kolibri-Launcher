@@ -69,63 +69,83 @@
                     android:padding="@dimen/touch_target_padding"
                     android:layout_marginStart="@dimen/spacing_medium" />
             </LinearLayout>
-
-            </LinearLayout>
+        </LinearLayout>
 
         <HorizontalScrollView
             android:id="@+id/calendar_events_scroll"
-            android:layout_width="0dp"  android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_small"
             android:scrollbars="none"
             android:visibility="gone"
             app:layout_constraintTop_toBottomOf="@id/time_container"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"> <com.google.android.material.chip.ChipGroup
+            app:layout_constraintEnd_toEndOf="parent">
+            <com.google.android.material.chip.ChipGroup
                 android:id="@+id/calendar_chips_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 app:singleLine="true"
                 app:chipSpacing="@dimen/spacing_small" />
         </HorizontalScrollView>
-
-<LinearLayout
-        android:id="@+id/split_container"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="@dimen/spacing_medium"
-        android:orientation="horizontal"
-        android:gravity="start"
-        app:layout_constraintVertical_bias="0.0"
-        app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <ScrollView
-            android:id="@+id/favorites_scroll_view"
+        <LinearLayout
+            android:id="@+id/static_favorites_container"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:scrollbars="none"
-            android:overScrollMode="never">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="start"
+            android:visibility="gone"
+            android:layout_marginTop="@dimen/spacing_medium"
+            app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintVertical_bias="0.0">
 
             <LinearLayout
-                android:id="@+id/favorite_apps_list"
+                android:id="@+id/static_app_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
-        </ScrollView>
+        </LinearLayout>
 
-        <View
-            android:id="@+id/gesture_zone_right"
+        <LinearLayout
+            android:id="@+id/split_container"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0"
-            android:background="@android:color/transparent"
-            android:clickable="false"
-            android:focusable="false" />
+            android:layout_height="0dp"
+            android:orientation="horizontal"
+            android:gravity="start"
+            android:visibility="gone"
+            android:layout_marginTop="@dimen/spacing_medium"
+            app:layout_constraintVertical_bias="0.0"
+            app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
 
-    </LinearLayout>
+            <ScrollView
+                android:id="@+id/favorites_scroll_view"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+                <LinearLayout
+                    android:id="@+id/scrolling_app_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <View
+                android:id="@+id/gesture_zone_right"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:clickable="false"
+                android:focusable="false" />
+
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>
