@@ -91,7 +91,6 @@ class HomeFragment : Fragment() {
     private var currentDialog: DialogFragment? = null
     private var currentMaxItemsOnScreen: Int = AppConstants.MAX_FALLBACK_APPS_ON_HOME
     private var isSplitScreenActive = false
-    private var shouldBlockGlobalVerticalGestures = false
     private var isTouchOnAppButton = false
 
     // Cache für aktuelle UI-State
@@ -1009,14 +1008,6 @@ class HomeFragment : Fragment() {
         }
     }
 
-    /**
-     * Steuert Layout-Modus:
-     * - Normal: Container ist WRAP_CONTENT (lässt Platz unten frei für Gesten).
-     * - Split: Container ist MATCH_CONSTRAINT (füllt Screen für Scrolling).
-     */
-    /**
-     * Steuert Layout-Modus und Visuals (Rahmen).
-     */
     private fun applySplitScreenMode(enableSplit: Boolean) {
         isSplitScreenActive = enableSplit
 
@@ -1026,7 +1017,7 @@ class HomeFragment : Fragment() {
 
         // 2. Logik und Visuals anwenden
         if (enableSplit) {
-            // --- SPLIT MODUS (Rahmen AUS) ---
+            // --- SPLIT MODUS ---
 
             // Layout-Params für innere Views (Split-Ansicht)
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
@@ -1038,19 +1029,22 @@ class HomeFragment : Fragment() {
             binding.gestureZoneRight.layoutParams = gestureParams
 
             binding.favoritesScrollView.isScrollContainer = true
-
-            // **RAHMEN-CODE KOMPLETT ENTFERNT**
-
-            // WICHTIG: Padding muss auf 0 gesetzt werden, da es sonst zu Lücken kommt
             binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+
+            // NEU: Gesture Zone muss Touch-Events empfangen können
+            binding.gestureZoneRight.isClickable = true
+            binding.gestureZoneRight.isFocusable = true
 
         } else {
-            // --- NORMAL MODUS (Rahmen AUS) ---
+            // --- NORMAL MODUS ---
 
             // Aufräumen des ScrollViews
-            // Wir können diese Zeilen vorsichtshalber beibehalten, obwohl der Rahmen-Code entfernt wurde.
             binding.favoritesScrollView.background = null
             binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+
+            // Gesture Zone deaktivieren
+            binding.gestureZoneRight.isClickable = false
+            binding.gestureZoneRight.isFocusable = false
         }
     }
 
@@ -1196,37 +1190,58 @@ class HomeFragment : Fragment() {
         try {
             gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
-            // 1. Root Listener (Fängt alles, was durchfällt - globaler Swipe)
+            // 1. Root Listener (NUR für Normal-Modus aktiv)
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
-                    shouldBlockGlobalVerticalGestures = false
+                    // Im Split-Modus: Root ignoriert Events komplett
+                    if (isSplitScreenActive) {
+                        return@setOnTouchListener false
+                    }
+
+                    // Im Normal-Modus: Wie bisher - alle Gesten
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in root layout touch handler")
                     false
                 }
             }
 
-            // 2. ScrollView Listener (NUR NOCH für den Fall, dass SplitScreen AKTIV ist)
+            // 2. ScrollView Listener (Frisst ALLE Events im Split-Modus)
             binding.favoritesScrollView.setOnTouchListener { v, event ->
                 if (!isSplitScreenActive) {
-                    // Im Inaktiv-Modus lassen wir das Event durch,
-                    // da der Root-Listener die Gesten erkennen soll.
+                    // Im Normal-Modus: Durchlassen zum Root
                     return@setOnTouchListener false
                 }
 
-                // Logik für Split-Modus (Vertical Swipes fressen, um Scrolling zu erlauben)
+                // Im Split-Modus:
                 try {
-                    // Wichtig: Verhindert, dass der Root-View Touch-Events klaut (Overscroll-Fix).
+                    // Verhindert, dass Root-View Touch-Events klaut
                     v.parent.requestDisallowInterceptTouchEvent(true)
 
-                    shouldBlockGlobalVerticalGestures = true
-                    val handledByDetector = gestureDetector?.onTouchEvent(event) ?: false
-                    shouldBlockGlobalVerticalGestures = false
-
-                    // Wenn Detector Horizontal Swipe/DoubleTap erkannt hat, konsumieren wir es.
-                    if (handledByDetector) true else false
+                    // WICHTIG: Event KOMPLETT konsumieren!
+                    // → Keine Swipes, kein LongPress für Settings
+                    // → Nur native ScrollView-Funktionalität (Scrolling)
+                    return@setOnTouchListener true
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in ScrollView touch bridge")
+                    TimberWrapper.silentError(e, "Error in ScrollView touch handler")
+                    false
+                }
+            }
+
+            // 3. NEU: Gesture Zone rechts (NUR im Split-Modus aktiv)
+            binding.gestureZoneRight.setOnTouchListener { _, event ->
+                try {
+                    if (!isSplitScreenActive) {
+                        // Im Normal-Modus: Inaktiv
+                        return@setOnTouchListener false
+                    }
+
+                    // Im Split-Modus: Diese Zone ist für ALLE Custom Gesten
+                    // → Swipes (Up/Down/Left/Right)
+                    // → LongPress (Settings Dialog)
+                    gestureDetector?.onTouchEvent(event) ?: false
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in gesture zone touch handler")
                     false
                 }
             }
@@ -1292,13 +1307,6 @@ class HomeFragment : Fragment() {
                     if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
                         abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
                     ) {
-                        // NEU: Blockier-Check!
-                        // Wenn wir im Split-ScrollView sind, ignorieren wir das hier,
-                        // damit der ScrollView scrollt statt den Drawer zu öffnen.
-                        if (shouldBlockGlobalVerticalGestures) {
-                            return false
-                        }
-
                         if (diffY < 0) {
                             viewModel.onFlingUp()
                             true
