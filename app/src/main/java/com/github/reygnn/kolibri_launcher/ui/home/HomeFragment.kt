@@ -905,7 +905,7 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * NEUER HELPER: Intelligentes Diffing (gleicher Mode)
+     * Intelligentes Diffing
      */
     private fun updateButtonsDiff(
         newApps: List<AppInfo>,
