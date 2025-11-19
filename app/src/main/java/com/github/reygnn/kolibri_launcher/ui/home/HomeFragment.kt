@@ -921,7 +921,7 @@ class HomeFragment : Fragment() {
                 binding.staticAppList
             }
 
-            val oldApps = cachedApps
+            val oldApps = cachedApps ?: emptyList()
             val currentViewCount = targetContainer.childCount
 
             // Fall 1: Reihenfolge/Inhalt gleich, nur Farben geändert
