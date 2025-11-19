@@ -93,6 +93,12 @@ class HomeFragment : Fragment() {
     private var shouldBlockGlobalVerticalGestures = false
     private var isTouchOnAppButton = false
 
+    // NEU: Cache für aktuelle UI-State
+    private var cachedApps: List<AppInfo>? = null
+    private var cachedTextColor: Int? = null
+    private var cachedShadowColor: Int? = null
+    private var cachedSplitMode: Boolean? = null
+
 
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -111,6 +117,9 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
+
+        invalidateCachedVariables()
+
         return binding.root
     }
 
@@ -822,37 +831,165 @@ class HomeFragment : Fragment() {
         val ctx = context ?: return
 
         try {
-            // 1. Modus bestimmen
             val shouldSplitScreen = appsToShow.size > currentMaxItemsOnScreen
 
-            // 2. Visuals und Layout-Container aktualisieren (Sichtbarkeit umschalten)
-            applySplitScreenMode(shouldSplitScreen, textColor)
+            // OPTIMIERUNG 1: Prüfe ob überhaupt etwas geändert hat
+            val needsUpdate = cachedApps != appsToShow ||
+                    cachedTextColor != textColor ||
+                    cachedShadowColor != shadowColor ||
+                    cachedSplitMode != shouldSplitScreen
 
-            // 3. Den korrekten Container für die Buttons auswählen
-            val targetContainer = if (shouldSplitScreen) {
+            if (!needsUpdate) {
+                Timber.Forest.d("No changes detected, skipping UI update")
+                return
+            }
+
+            Timber.Forest.d("Updating favorites UI (changes detected)")
+
+            // OPTIMIERUNG 2: Mode-Switch benötigt komplettes Neurendering
+            val modeChanged = cachedSplitMode != shouldSplitScreen
+
+            if (modeChanged) {
+                Timber.Forest.d("Split mode changed: $cachedSplitMode -> $shouldSplitScreen")
+                applySplitScreenMode(shouldSplitScreen)
+                // Bei Mode-Wechsel: Komplettes Neurendering
+                rebuildAllButtons(appsToShow, shouldSplitScreen, textColor, shadowColor, ctx)
+            } else {
+                // OPTIMIERUNG 3: Nur Differenz updaten
+                updateButtonsDiff(appsToShow, shouldSplitScreen, textColor, shadowColor, ctx)
+            }
+
+            // Cache aktualisieren
+            cachedApps = appsToShow.toList() // Defensive copy
+            cachedTextColor = textColor
+            cachedShadowColor = shadowColor
+            cachedSplitMode = shouldSplitScreen
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating favorite apps UI")
+        }
+    }
+
+    /**
+     * NEUER HELPER: Komplettes Neurendering (bei Mode-Wechsel)
+     */
+    private fun rebuildAllButtons(
+        apps: List<AppInfo>,
+        splitMode: Boolean,
+        textColor: Int,
+        shadowColor: Int,
+        context: Context
+    ) {
+        try {
+            val targetContainer = if (splitMode) {
                 binding.scrollingAppList
             } else {
                 binding.staticAppList
             }
 
-            // 4. Container leeren und Buttons hinzufügen
             targetContainer.removeAllViews()
 
-            for (app in appsToShow) {
+            for (app in apps) {
                 try {
-                    // createAppButton enthält jetzt die angepasste Touch-Logik
-                    val appButton = createAppButton(ctx, app, textColor, shadowColor)
-                    if (appButton != null) {
-                        targetContainer.addView(appButton)
-                    } else {
-                        Timber.Forest.w("Failed to create button for ${app.packageName}")
+                    val button = createAppButton(context, app, textColor, shadowColor)
+                    if (button != null) {
+                        targetContainer.addView(button)
                     }
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating/adding button for ${app.packageName}")
+                    TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating favorite apps UI")
+            TimberWrapper.silentError(e, "Error in rebuildAllButtons")
+        }
+    }
+
+    /**
+     * NEUER HELPER: Intelligentes Diffing (gleicher Mode)
+     */
+    private fun updateButtonsDiff(
+        newApps: List<AppInfo>,
+        splitMode: Boolean,
+        textColor: Int,
+        shadowColor: Int,
+        context: Context
+    ) {
+        try {
+            val targetContainer = if (splitMode) {
+                binding.scrollingAppList
+            } else {
+                binding.staticAppList
+            }
+
+            val oldApps = cachedApps
+            val currentViewCount = targetContainer.childCount
+
+            // Fall 1: Reihenfolge/Inhalt gleich, nur Farben geändert
+            if (newApps.size == oldApps.size &&
+                newApps.zip(oldApps).all { (new, old) -> new.packageName == old.packageName }) {
+
+                val colorsChanged = textColor != cachedTextColor || shadowColor != cachedShadowColor
+                val namesChanged = newApps.zip(oldApps).any { (new, old) ->
+                    new.displayName != old.displayName
+                }
+
+                if (!colorsChanged && !namesChanged) {
+                    Timber.Forest.d("updateButtonsDiff: No visual changes, skipping update")
+                    return
+                }
+
+                Timber.Forest.d("updateButtonsDiff: Only colors/names changed, updating existing buttons")
+                updateExistingButtons(targetContainer, newApps, textColor, shadowColor)
+                return
+            }
+
+            // Fall 2: Unterschiedliche Apps -> Komplettes Neurendering
+            Timber.Forest.d("updateButtonsDiff: App list changed, rebuilding buttons")
+            rebuildAllButtons(newApps, splitMode, textColor, shadowColor, context)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in updateButtonsDiff")
+            // Fallback: Komplettes Neurendering
+            rebuildAllButtons(newApps, splitMode, textColor, shadowColor, context)
+        }
+    }
+
+    /**
+     * NEUER HELPER: Nur Farben/Text von existierenden Buttons updaten
+     */
+    private fun updateExistingButtons(
+        container: LinearLayout,
+        apps: List<AppInfo>,
+        textColor: Int,
+        shadowColor: Int
+    ) {
+        try {
+            for (i in 0 until minOf(container.childCount, apps.size)) {
+                try {
+                    val view = container.getChildAt(i)
+                    if (view is Button) {
+                        val app = apps[i]
+
+                        // Text updaten (falls custom name geändert)
+                        if (view.text.toString() != app.displayName) {
+                            view.text = app.displayName
+                        }
+
+                        // Farben updaten
+                        view.setTextColor(textColor)
+                        view.setShadowLayer(
+                            AppConstants.SHADOW_RADIUS_APPS,
+                            AppConstants.SHADOW_DX,
+                            AppConstants.SHADOW_DY,
+                            shadowColor
+                        )
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error updating button at index $i")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in updateExistingButtons")
         }
     }
 
@@ -864,7 +1001,7 @@ class HomeFragment : Fragment() {
     /**
      * Steuert Layout-Modus und Visuals (Rahmen).
      */
-    private fun applySplitScreenMode(enableSplit: Boolean, baseTextColor: Int) {
+    private fun applySplitScreenMode(enableSplit: Boolean) {
         isSplitScreenActive = enableSplit
 
         // 1. WICHTIG: Sichtbarkeit der Haupt-Container umschalten
@@ -873,47 +1010,29 @@ class HomeFragment : Fragment() {
 
         // 2. Logik und Visuals anwenden
         if (enableSplit) {
-            // --- SPLIT MODUS (Rahmen AN) ---
+            // --- SPLIT MODUS (Rahmen AUS) ---
 
+            // Layout-Params für innere Views (Split-Ansicht)
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
 
             scrollParams.weight = 1f
-            gestureParams.weight = 1f // Wichtig: 50/50 Split
+            gestureParams.weight = 1f
             binding.favoritesScrollView.layoutParams = scrollParams
             binding.gestureZoneRight.layoutParams = gestureParams
 
             binding.favoritesScrollView.isScrollContainer = true
 
-            // VISUAL: Dezenten Rahmen erstellen
-            try {
-                val alpha = 50
-                val borderColor = androidx.core.graphics.ColorUtils.setAlphaComponent(baseTextColor, alpha)
+            // **RAHMEN-CODE KOMPLETT ENTFERNT**
 
-                val borderDrawable = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                    cornerRadius = TypedValue.applyDimension(
-                        TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics
-                    )
-                    setStroke(2, borderColor)
-                    setColor(Color.TRANSPARENT)
-                }
-
-                binding.favoritesScrollView.background = borderDrawable
-
-                val padding = TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 8f, resources.displayMetrics
-                ).toInt()
-                binding.favoritesScrollView.setPadding(padding, padding, padding, padding)
-
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error creating border drawable")
-            }
+            // WICHTIG: Padding muss auf 0 gesetzt werden, da es sonst zu Lücken kommt
+            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
         } else {
             // --- NORMAL MODUS (Rahmen AUS) ---
 
-            // Aufräumen des ScrollViews, falls er gerade unsichtbar wurde
+            // Aufräumen des ScrollViews
+            // Wir können diese Zeilen vorsichtshalber beibehalten, obwohl der Rahmen-Code entfernt wurde.
             binding.favoritesScrollView.background = null
             binding.favoritesScrollView.setPadding(0, 0, 0, 0)
         }
@@ -1307,29 +1426,22 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         try {
-            // Wenn HomeFragment sichtbar wird -> Statusleiste ausblenden
             hideStatusBar()
 
-            // Zuerst eine Layout-Pass-Aktualisierung erzwingen.
-            // Wir machen den Container kurz sichtbar und fordern ein Layout an,
-            // um die OnLayoutChangeListener-Logik zu triggern und currentMaxItemsOnScreen zu aktualisieren.
-            binding.splitContainer.visibility = View.VISIBLE
-            binding.splitContainer.requestLayout()
-
-            // Nach einer kurzen Verzögerung (einem Frame) wird dann die UI synchronisiert.
+            // NEU: Nur Layout-Check, KEIN automatisches Refresh
             binding.splitContainer.post {
-                // Führt die Logik aus performInitialMeasurement erneut aus, um sicherzustellen,
-                // dass die aktuellste Messung vorliegt.
                 runCapacityCheck(binding.splitContainer)
 
-                // Erst dann die UI aktualisieren
-                refreshUiStateFromViewModel()
-
-                // Die Sichtbarkeit wird in refreshUiStateFromViewModel > updateFavoriteAppsUI > applySplitScreenMode
-                // wieder auf den korrekten Zustand (GONE oder VISIBLE) gesetzt.
+                val colors = viewModel.uiColorsState.value
+                if (cachedTextColor == -1 ||
+                    colors.shadowColor == -1 ||
+                    colors.textColor != cachedTextColor ||
+                    colors.shadowColor != cachedShadowColor) {
+                    updateAllColors(colors)
+                }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onResume hiding status bar")
+            TimberWrapper.silentError(e, "Error in onResume")
         }
     }
 
@@ -1362,8 +1474,20 @@ class HomeFragment : Fragment() {
         getInsetsController()?.show(WindowInsetsCompat.Type.statusBars())
     }
 
+    /* Setzt alle gecachten UI-State-Variablen zurück.
+    ** Wird bei onDestroyView aufgerufen, um Memory Leaks zu vermeiden.
+    */
+    private fun invalidateCachedVariables() {
+        cachedApps = emptyList()
+        cachedTextColor = -1
+        cachedShadowColor = -1
+        cachedSplitMode = false
+    }
+
     override fun onDestroyView() {
         try {
+            invalidateCachedVariables()
+
             currentDialog?.dismissAllowingStateLoss()
             currentDialog = null
 
