@@ -94,7 +94,7 @@ class HomeFragment : Fragment() {
     private var shouldBlockGlobalVerticalGestures = false
     private var isTouchOnAppButton = false
 
-    // NEU: Cache für aktuelle UI-State
+    // Cache für aktuelle UI-State
     private var cachedApps: List<AppInfo>? = null
     private var cachedTextColor: Int? = null
     private var cachedShadowColor: Int? = null
