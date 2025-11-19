@@ -11,6 +11,9 @@
     <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
     <dimen name="touch_target_padding">6dp</dimen>
 
+    <dimen name="split_screen_border_width">2dp</dimen>
+    <dimen name="split_screen_corner_radius">8dp</dimen>
+    <dimen name="split_screen_border_inset">8dp</dimen>
 
     <!-- =============================================================== -->
     <!-- == HOME FRAGMENT                                             == -->

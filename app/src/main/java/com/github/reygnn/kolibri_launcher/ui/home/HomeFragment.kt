@@ -8,6 +8,8 @@ import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -98,6 +100,7 @@ class HomeFragment : Fragment() {
     private var cachedTextColor: Int? = null
     private var cachedShadowColor: Int? = null
     private var cachedSplitMode: Boolean? = null
+
 
 
     // Ultra Paranoia: Coroutine exception handler
@@ -1031,12 +1034,24 @@ class HomeFragment : Fragment() {
             binding.favoritesScrollView.isScrollContainer = true
             binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-            // NEU: Gesture Zone muss Touch-Events empfangen können
+            // Gesture Zone muss Touch-Events empfangen können
             binding.gestureZoneRight.isClickable = true
             binding.gestureZoneRight.isFocusable = true
 
+            // ALLE Parents müssen Clipping ausschalten
+            binding.rootLayout.clipChildren = false
+            binding.rootLayout.clipToPadding = false
+            binding.splitContainer.clipChildren = false
+            binding.splitContainer.clipToPadding = false
+
+            // Rahmen setzen (mit aktueller Farbe)
+            val colors = viewModel.uiColorsState.value
+            applyScrollViewBorder(colors.textColor)
         } else {
             // --- NORMAL MODUS ---
+
+            // Aufräumen des ScrollViews
+            removeScrollViewBorder()
 
             // Aufräumen des ScrollViews
             binding.favoritesScrollView.background = null
@@ -1045,6 +1060,90 @@ class HomeFragment : Fragment() {
             // Gesture Zone deaktivieren
             binding.gestureZoneRight.isClickable = false
             binding.gestureZoneRight.isFocusable = false
+
+            // Parents Clipping wieder aktivieren
+            binding.rootLayout.clipChildren = true
+            binding.rootLayout.clipToPadding = true
+            binding.splitContainer.clipChildren = true
+            binding.splitContainer.clipToPadding = true
+        }
+    }
+
+    /**
+     * Setzt den visuellen Rahmen um den ScrollView im Split-Screen Modus.
+     * @param textColor Die Farbe für den Rahmen (wird mit Alpha 20% angewendet)
+     */
+    private fun applyScrollViewBorder(textColor: Int) {
+        try {
+            val frameColor = Color.argb(
+                30,
+                Color.red(textColor),
+                Color.green(textColor),
+                Color.blue(textColor)
+            )
+
+            val drawable = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+
+                val strokeWidth = try {
+                    resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
+                } catch (e: Throwable) {
+                    4
+                }
+                setStroke(strokeWidth, frameColor)
+
+                val cornerRadius = try {
+                    resources.getDimension(R.dimen.split_screen_corner_radius)
+                } catch (e: Throwable) {
+                    16f
+                }
+                setCornerRadius(cornerRadius)
+            }
+
+            binding.favoritesScrollView.background = drawable
+
+            // Padding für Abstand zwischen Favoriten und Rahmen
+            val borderPadding = try {
+                resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
+            } catch (e: Throwable) {
+                16
+            }
+
+            binding.favoritesScrollView.setPadding(
+                borderPadding,  // left
+                borderPadding,  // top
+                borderPadding,  // right
+                borderPadding   // bottom
+            )
+
+            // GEÄNDERT: TRUE statt false
+            // → Scroll-Inhalt kann NICHT über Padding hinaus scrollen
+            // → Favoriten bleiben innerhalb des Rahmens!
+            binding.favoritesScrollView.clipToPadding = true
+
+            // Negative Margin um das Padding zu kompensieren
+            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(-borderPadding, -borderPadding, 0, -borderPadding)
+            binding.favoritesScrollView.layoutParams = params
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying ScrollView border")
+        }
+    }
+
+    private fun removeScrollViewBorder() {
+        try {
+            binding.favoritesScrollView.background = null
+            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+            binding.favoritesScrollView.clipToPadding = true
+
+            // Margins zurücksetzen
+            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(0, 0, 0, 0)
+            binding.favoritesScrollView.layoutParams = params
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error removing ScrollView border")
         }
     }
 
@@ -1143,22 +1242,30 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                // Die Swipe-Logik wird nun vom root_layout via Event Bubbling übernommen.
-                setOnTouchListener { v, event ->
-                    // 1. LongPress Blockade Flag setzen/zurücksetzen
-                    when (event.action) {
-                        MotionEvent.ACTION_DOWN -> {
-                            isTouchOnAppButton = true
-                        }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                            isTouchOnAppButton = false
-                        }
+                // 2. ScrollView Listener (Frisst Events, ABER lässt ScrollView scrollen)
+                binding.favoritesScrollView.setOnTouchListener { v, event ->
+                    if (!isSplitScreenActive) {
+                        // Im Normal-Modus: Durchlassen zum Root
+                        return@setOnTouchListener false
                     }
 
-                    // 2. WICHTIG: Immer 'false' zurückgeben.
-                    // Dies erlaubt dem Button, seine eigenen nativen Klick- und Long-Klick-Listener zu feuern.
-                    // Es lässt das Event auch zum Parent (root_layout) hochblubbern, um Swipes zu erkennen.
-                    return@setOnTouchListener false
+                    // Im Split-Modus:
+                    try {
+                        // Verhindert, dass Root-View Touch-Events klaut
+                        v.parent.requestDisallowInterceptTouchEvent(true)
+
+                        // WICHTIG: Event ZUERST an den ScrollView weitergeben
+                        // → Erlaubt nativen Scroll-Mechanismus
+                        val handledByScrollView = v.onTouchEvent(event)
+
+                        // Dann Event konsumieren, damit es nicht zum Root bubbelt
+                        // → Verhindert Custom Swipes/LongPress im ScrollView-Bereich
+                        return@setOnTouchListener true
+
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in ScrollView touch handler")
+                        false
+                    }
                 }
             }
         } catch (e: Throwable) {
@@ -1454,7 +1561,27 @@ class HomeFragment : Fragment() {
 
             // NEU: Nur Layout-Check, KEIN automatisches Refresh
             binding.splitContainer.post {
+                // Alte Kapazität merken
+                val oldMaxItems = currentMaxItemsOnScreen
+
+                // Neue Kapazität messen
                 runCapacityCheck(binding.splitContainer)
+
+                // Wenn sich die Kapazität geändert hat, UI-Refresh erzwingen
+                if (oldMaxItems != currentMaxItemsOnScreen) {
+                    Timber.Forest.d("Capacity changed after rotation: $oldMaxItems -> $currentMaxItemsOnScreen")
+
+                    // Favorites UI neu rendern mit neuer Kapazität
+                    val state = viewModel.favoriteAppsState.value
+                    if (state is UiState.Success) {
+                        val colors = viewModel.uiColorsState.value
+                        updateFavoriteAppsUI(
+                            state.data.apps,
+                            colors.textColor,
+                            colors.shadowColor
+                        )
+                    }
+                }
 
                 val colors = viewModel.uiColorsState.value
                 if (cachedTextColor == -1 ||
