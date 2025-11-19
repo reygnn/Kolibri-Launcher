@@ -31,6 +31,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.ui.AppBarConfiguration
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -88,7 +89,7 @@ class HomeFragment : Fragment() {
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
-    private var currentMaxItemsOnScreen: Int = Int.MAX_VALUE
+    private var currentMaxItemsOnScreen: Int = AppConstants.MAX_FALLBACK_APPS_ON_HOME
     private var isSplitScreenActive = false
     private var shouldBlockGlobalVerticalGestures = false
     private var isTouchOnAppButton = false
@@ -915,6 +916,8 @@ class HomeFragment : Fragment() {
         context: Context
     ) {
         try {
+            ensureCorrectContainerVisibility(splitMode)
+
             val targetContainer = if (splitMode) {
                 binding.scrollingAppList
             } else {
@@ -951,6 +954,19 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error in updateButtonsDiff")
             // Fallback: Komplettes Neurendering
             rebuildAllButtons(newApps, splitMode, textColor, shadowColor, context)
+        }
+    }
+
+    /**
+     * Stellt sicher, dass die richtigen Container sichtbar sind.
+     * Wird von updateButtonsDiff aufgerufen, wenn applySplitScreenMode übersprungen wurde.
+     */
+    private fun ensureCorrectContainerVisibility(splitMode: Boolean) {
+        try {
+            binding.splitContainer.visibility = if (splitMode) View.VISIBLE else View.GONE
+            binding.staticFavoritesContainer.visibility = if (splitMode) View.GONE else View.VISIBLE
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error ensuring container visibility")
         }
     }
 
