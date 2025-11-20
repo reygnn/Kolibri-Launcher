@@ -9,7 +9,6 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.InsetDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -24,6 +23,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -33,7 +33,6 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.navigation.ui.AppBarConfiguration
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -43,8 +42,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.EventType
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -62,48 +59,40 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import javax.inject.Inject
 import kotlin.math.abs
 
 /**
- * ULTRA CRASH-SAFE HomeFragment
+ * ULTRA CRASH-SAFE HomeFragment - "DUMB UI" VERSION
  *
- * Multi-layer exception handling:
- * - All operations catch Throwable (Exception + Error)
- * - CoroutineExceptionHandler for all coroutines
- * - Safe button creation with complete fallback chain
- * - Protected GestureDetector with error recovery
- * - Safe color updates with individual try-catch
- * - Triple-layer observer protection
+ * Philosophy: Fragment holds NO state, only renders what ViewModel provides
  *
- * Critical for launcher - this is the home screen users see constantly!
+ * Two observers:
+ * 1. Favorites → Full rebuild (simple, robust)
+ * 2. Colors → Fast color update on existing views
+ *
+ * Screen capacity changes → Measure & report → ViewModel decides → Observer triggers → Rebuild
+ * Favorites changed → ViewModel emits → Observer triggers → Rebuild
+ *
+ * No caching, no diffing, no cleverness - just reactive rendering!
  */
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
     private val viewModel: LauncherViewModel by activityViewModels()
 
-    // CRASH-SAFE: Nullable binding
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    // CRASH-SAFE: Nullable GestureDetector
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
-    private var currentMaxItemsOnScreen: Int = AppConstants.MAX_FALLBACK_APPS_ON_HOME
-    private var isSplitScreenActive = false
-    private var isTouchOnAppButton = false
 
-    // Cache für aktuelle UI-State
-    private var cachedApps: List<AppInfo>? = null
-    private var cachedTextColor: Int? = null
-    private var cachedShadowColor: Int? = null
-    private var cachedSplitMode: Boolean? = null
+    // ONLY state: Current screen capacity (for split-mode decision)
+    private var currentScreenCapacity: Int = AppConstants.MAX_FALLBACK_APPS_ON_HOME
 
+    // ONLY flag: Is split mode currently active (for gesture routing)
+    private var isSplitModeActive = false
 
-
-    // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in HomeFragment")
@@ -120,9 +109,6 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
-
-        invalidateCachedVariables()
-
         return binding.root
     }
 
@@ -130,83 +116,117 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
+            setupBackPressHandler()
             setupGestures()
             setupDoubleTapActions()
-            observeViewModel()
             setupFragmentResultListener()
             setupHomeWindowInsets()
-            setupDynamicMaxFavoritesListener()
+            setupDynamicCapacityListener()
+            observeViewModel()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
     }
 
-    private fun runCapacityCheck(container: View) {
+    /**
+     * Prevents back button from closing launcher when we're on home screen
+     */
+    private fun setupBackPressHandler() {
         try {
-            val newHeight = container.bottom - container.top
-
-            if (newHeight == 0 || _binding == null) {
-                // Wenn die Höhe 0 ist, verwenden wir den Fallback-Wert (könnte 0 sein, was OK ist)
-                return
-            }
-
-            val ctx = context ?: return
-
-            val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
-            if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
-                Timber.Forest.w("Dynamic calc failed: Item height is zero.")
-                return
-            }
-
-            val totalHeightPerItem = itemHeight + itemMargin
-            val maxItemsToShow = (newHeight / totalHeightPerItem).toInt()
-
-            currentMaxItemsOnScreen = maxItemsToShow
-
-            Timber.Forest.i("Capacity re-calculated: $maxItemsToShow (H: $newHeight)")
-
-            viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
-
+            requireActivity().onBackPressedDispatcher.addCallback(
+                viewLifecycleOwner,
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        // Do nothing - we're home, can't go back further
+                        Timber.d("Back pressed on home screen - ignoring")
+                    }
+                }
+            )
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in manual capacity check")
+            TimberWrapper.silentError(e, "Error setting up back press handler")
         }
     }
 
+    // ============================================================================
+    // SCREEN CAPACITY MEASUREMENT (like old fragment)
+    // ============================================================================
+
     /**
-     * Richtet den Listener ein und führt die Initialmessung durch.
+     * Sets up listener that monitors container height and reports capacity to ViewModel.
+     * Triggers on: Chip bar toggle, rotation, keyboard events
      */
-    private fun setupDynamicMaxFavoritesListener() {
+    private fun setupDynamicCapacityListener() {
         if (_binding == null) return
 
-        layoutChangeListener =
-            View.OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                // Nur neu berechnen, wenn sich die Höhe tatsächlich geändert hat
-                if (bottom - top != oldBottom - oldTop) {
-                    runCapacityCheck(v)
-                }
-            }
+        layoutChangeListener = View.OnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            try {
+                val newHeight = bottom - top
+                val oldHeight = oldBottom - oldTop
 
-        // Führe die Messung einmal manuell aus, da der Listener sonst nur bei Änderungen feuert
-        // Wir posten es, um sicherzustellen, dass die Layout-Initialisierung abgeschlossen ist
+                // Only recalculate if height actually changed
+                if (newHeight == oldHeight || newHeight == 0 || _binding == null) {
+                    return@OnLayoutChangeListener
+                }
+
+                measureAndReportCapacity(v, newHeight)
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in layout change listener")
+            }
+        }
+
+        // Initial measurement after layout
         binding.splitContainer.post {
-            runCapacityCheck(binding.splitContainer)
+            try {
+                val height = binding.splitContainer.height
+                if (height > 0) {
+                    measureAndReportCapacity(binding.splitContainer, height)
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in initial capacity measurement")
+            }
         }
 
         binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
 
     /**
-     * Misst die Höhe eines einzelnen Favoriten-Buttons, indem ein Dummy-Button
-     * mit den exakt gleichen Eigenschaften wie in createAppButton erstellt wird.
-     *
-     * @return Ein Pair<Int, Int> mit (itemHeight, verticalMarginInPx)
+     * Measures screen capacity and reports to ViewModel.
+     */
+    private fun measureAndReportCapacity(container: View, containerHeight: Int) {
+        try {
+            val ctx = context ?: return
+
+            val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+            if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
+                Timber.d("Capacity calc failed: Item height is zero")
+                return
+            }
+
+            val totalHeightPerItem = itemHeight + itemMargin
+            val capacity = (containerHeight / totalHeightPerItem).toInt()
+
+            // Speichere lokale Kapazität (für Split-Entscheidung)
+            currentScreenCapacity = capacity
+
+            Timber.d("Screen capacity: $capacity items (H: $containerHeight, ItemH: $totalHeightPerItem)")
+
+            // Melde IMMER das Maximum ans ViewModel
+            // → ViewModel gibt alle Favoriten zurück
+            // → Fragment entscheidet selbst ob Split nötig ist
+            viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error measuring capacity")
+        }
+    }
+
+    /**
+     * Measures a single favorite button by creating a dummy with exact same properties.
+     * Returns (itemHeight, verticalMargin)
      */
     private fun measureFavoriteItemHeight(context: Context): Pair<Int, Int> {
         try {
             val dummyButton = Button(context)
-
-            // Wende die exakt gleichen Eigenschaften wie in createAppButton an,
-            // die die Höhe beeinflussen.
 
             val paddingPx = try {
                 resources.getDimensionPixelSize(R.dimen.touch_target_padding)
@@ -215,27 +235,24 @@ class HomeFragment : Fragment() {
 
             val buttonTextSizeInPx = try {
                 resources.getDimension(R.dimen.text_size_app_button)
-            } catch (e: Throwable) { 16f } // Fallback, falls Dimension nicht gefunden
+            } catch (e: Throwable) { 16f }
             dummyButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
 
             dummyButton.maxLines = 1
-            dummyButton.text = "Test" // Inhalt für die Messung der Höhe
+            dummyButton.text = "Test"
 
             dummyButton.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
-            // Messe den Button
             dummyButton.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             )
 
-            // Hole die Margins aus createAppButton: setMargins(0, 8, 0, 8)
-            // Das sind 8px oben + 8px unten = 16px
+            // Margins from createAppButton: setMargins(0, 8, 0, 8) = 16px total
             val verticalMarginInPx = 16
-
             val itemHeight = dummyButton.measuredHeight
 
             if (itemHeight > 0) {
@@ -245,12 +262,15 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error measuring dummy button")
         }
 
-        // Fallback, falls Messung fehlschlägt
         return Pair(0, 0)
     }
 
+    // ============================================================================
+    // OBSERVERS (Reactive - like old fragment)
+    // ============================================================================
+
     private fun observeViewModel() {
-        // Observer 1: Favorite apps list - Critical for home screen
+        // Observer 1: Favorites - MAIN OBSERVER, full rebuild
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -258,31 +278,26 @@ class HomeFragment : Fragment() {
                         viewModel.favoriteAppsState.collect { state ->
                             if (_binding == null) return@collect
 
-                            Timber.Forest.d("HomeFragment received FAV state: ${state::class.simpleName}")
+                            Timber.d("Favorites state: ${state::class.simpleName}")
 
                             try {
                                 when (state) {
                                     is UiState.Loading -> {
-                                        safelyRemoveAllViews()
+                                        clearAllViews()
                                     }
                                     is UiState.Success -> {
                                         val colors = viewModel.uiColorsState.value
-                                        updateFavoriteAppsUI(
-                                            state.data.apps,
-                                            colors.textColor,
-                                            colors.shadowColor
-                                        )
+                                        renderFavorites(state.data.apps, colors)
                                     }
                                     is UiState.Error -> {
                                         viewModel.onFavoriteAppsError(state.message)
-                                        safelyRemoveAllViews()
+                                        clearAllViews()
                                     }
                                 }
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error handling favorite apps state")
-                                // Keep showing old favorites
+                                TimberWrapper.silentError(e, "Error handling favorites state")
                             }
                         }
                     } catch (e: CancellationException) {
@@ -337,7 +352,7 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 3: Nur für TimeBasedEvents mit distinctUntilChanged
+        // Observer 3: TimeBasedEvents with distinctUntilChanged
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -367,7 +382,7 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 4: UI colors
+        // Observer 4: Colors - FAST UPDATE on existing views
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -376,11 +391,9 @@ class HomeFragment : Fragment() {
                             if (_binding == null) return@collect
 
                             try {
-                                // --- ÄNDERUNG (1/5): Aufruf der umbenannten Funktion ---
                                 updateAllColors(colors)
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating colors")
-                                // Keep old colors
                             }
                         }
                     } catch (e: CancellationException) {
@@ -397,327 +410,208 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun refreshUiStateFromViewModel() {
+    // ============================================================================
+    // DUMB UI RENDERING - No caching, no diffing, just rebuild!
+    // ============================================================================
+
+    /**
+     * MAIN RENDER METHOD - Completely rebuilds favorites UI
+     * Called by observer when favorites or capacity changes
+     */
+    private fun renderFavorites(apps: List<AppInfo>, colors: UiColorsState) {
         if (_binding == null) return
+        val ctx = context ?: return
 
-        // Daten und Farben direkt aus den StateFlows abrufen
-        val state = viewModel.favoriteAppsState.value
-        val colors = viewModel.uiColorsState.value
+        try {
+            // 1. Decide if we need split mode
+            val needsSplit = apps.size > currentScreenCapacity
 
-        if (state is UiState.Success) {
-            // 1. Favoriten-UI inklusive der SplitScreen-Logik neu rendern
-            updateFavoriteAppsUI(
-                state.data.apps,
-                colors.textColor,
-                colors.shadowColor
+            Timber.d("Rendering ${apps.size} favorites (capacity: $currentScreenCapacity, split: $needsSplit)")
+
+            // 2. Switch container mode
+            switchContainerMode(needsSplit, colors)
+
+            // 3. Select target container
+            val targetContainer = if (needsSplit) {
+                binding.scrollingAppList
+            } else {
+                binding.staticAppList
+            }
+
+            // 4. Clear everything (like old fragment!)
+            targetContainer.removeAllViews()
+
+            // 5. Create all buttons fresh (like old fragment!)
+            for (app in apps) {
+                try {
+                    val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
+                    if (button != null) {
+                        targetContainer.addView(button)
+                    } else {
+                        Timber.w("Failed to create button for ${app.packageName}")
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
+                }
+            }
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error rendering favorites")
+        }
+    }
+
+    /**
+     * Switches between normal and split-screen mode
+     */
+    private fun switchContainerMode(enableSplit: Boolean, colors: UiColorsState) {
+        try {
+            isSplitModeActive = enableSplit
+
+            // Toggle container visibility
+            binding.splitContainer.visibility = if (enableSplit) View.VISIBLE else View.GONE
+            binding.staticFavoritesContainer.visibility = if (enableSplit) View.GONE else View.VISIBLE
+
+            if (enableSplit) {
+                // SPLIT MODE
+                applySplitModeLayout(colors)
+            } else {
+                // NORMAL MODE
+                removeSplitModeLayout()
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error switching container mode")
+        }
+    }
+
+    private fun applySplitModeLayout(colors: UiColorsState) {
+        try {
+            // Layout weights for 50/50 split
+            val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
+
+            scrollParams.weight = 1f
+            gestureParams.weight = 1f
+            binding.favoritesScrollView.layoutParams = scrollParams
+            binding.gestureZoneRight.layoutParams = gestureParams
+
+            // Enable scrolling
+            binding.favoritesScrollView.isScrollContainer = true
+
+            // Enable gesture zone
+            binding.gestureZoneRight.isClickable = true
+            binding.gestureZoneRight.isFocusable = true
+
+            // Disable clipping for border effect
+            binding.rootLayout.clipChildren = false
+            binding.rootLayout.clipToPadding = false
+            binding.splitContainer.clipChildren = false
+            binding.splitContainer.clipToPadding = false
+
+            // Apply visual border
+            applyScrollViewBorder(colors.textColor)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying split mode layout")
+        }
+    }
+
+    private fun removeSplitModeLayout() {
+        try {
+            // Remove border
+            binding.favoritesScrollView.background = null
+            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+            binding.favoritesScrollView.clipToPadding = true
+
+            // Reset margins
+            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(0, 0, 0, 0)
+            binding.favoritesScrollView.layoutParams = params
+
+            // Disable gesture zone
+            binding.gestureZoneRight.isClickable = false
+            binding.gestureZoneRight.isFocusable = false
+
+            // Re-enable clipping
+            binding.rootLayout.clipChildren = true
+            binding.rootLayout.clipToPadding = true
+            binding.splitContainer.clipChildren = true
+            binding.splitContainer.clipToPadding = true
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error removing split mode layout")
+        }
+    }
+
+    private fun applyScrollViewBorder(textColor: Int) {
+        try {
+            val frameColor = Color.argb(
+                30,
+                Color.red(textColor),
+                Color.green(textColor),
+                Color.blue(textColor)
             )
-            // 2. Farben auf alle Elemente (Uhrzeit, Datum, Chips, neuer Rahmen) anwenden
-            updateAllColors(colors)
+
+            val drawable = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+
+                val strokeWidth = try {
+                    resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
+                } catch (e: Throwable) { 4 }
+                setStroke(strokeWidth, frameColor)
+
+                val cornerRadius = try {
+                    resources.getDimension(R.dimen.split_screen_corner_radius)
+                } catch (e: Throwable) { 16f }
+                setCornerRadius(cornerRadius)
+            }
+
+            binding.favoritesScrollView.background = drawable
+
+            val borderPadding = try {
+                resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
+            } catch (e: Throwable) { 16 }
+
+            binding.favoritesScrollView.setPadding(
+                borderPadding,
+                borderPadding,
+                borderPadding,
+                borderPadding
+            )
+
+            binding.favoritesScrollView.clipToPadding = true
+
+            // Negative margin to compensate for padding
+            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(-borderPadding, -borderPadding, 0, -borderPadding)
+            binding.favoritesScrollView.layoutParams = params
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying ScrollView border")
         }
     }
 
-    private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
-        if (_binding == null) return
-
+    private fun clearAllViews() {
         try {
-            binding.calendarEventsScroll.visibility = View.GONE
-            binding.calendarChipsContainer.removeAllViews()
-
-            if (events.isEmpty()) {
-                return
+            if (_binding != null && isAdded && !isDetached) {
+                binding.scrollingAppList.removeAllViews()
+                binding.staticAppList.removeAllViews()
             }
-
-            val ctx = context ?: return
-            val colors = viewModel.uiColorsState.value
-
-            val layoutPadding = try {
-                resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting layout_padding")
-                0 // Fallback
-            }
-
-            val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
-            val chipMaxWidth = (availableWidth * 0.80).toInt()
-
-            for (event in events) {
-                try {
-                    val chip = when (event.type) {
-                        EventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
-                        EventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
-                    }
-
-                    if (chip != null) {
-                        binding.calendarChipsContainer.addView(chip)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
-                }
-            }
-
-            binding.calendarEventsScroll.visibility = View.VISIBLE
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating time-based chips")
+            TimberWrapper.silentError(e, "Error clearing views")
         }
     }
 
-    /**
-     * Internal helper: Konfiguriert die gemeinsamen Styling-Eigenschaften für Alarm- und Kalender-Chips
-     */
-    private fun configureChip(
-        chip: Chip,
-        colors: UiColorsState,
-        chipMaxWidth: Int
-    ) {
-        try {
-            // Text-Ellipsize und Größe
-            chip.ellipsize = TextUtils.TruncateAt.END
-            chip.maxWidth = chipMaxWidth
-            chip.isSingleLine = true
-
-            // Hintergrundfarbe
-            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                // "Auto"-Modus: Leite Farbe von Textfarbe ab
-                Color.argb(
-                    40,
-                    Color.red(colors.textColor),
-                    Color.green(colors.textColor),
-                    Color.blue(colors.textColor)
-                )
-            } else {
-                // Vom Nutzer gewählte Farbe
-                colors.chipBackgroundColor
-            }
-            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-
-            // Textfarbe
-            chip.setTextColor(colors.textColor)
-
-            // Kein Close-Icon und nicht checkable
-            chip.isCloseIconVisible = false
-            chip.isCheckable = false
-
-            // Border
-            chip.chipStrokeWidth = 1f
-            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-
-            // Textgröße und Höhe
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error configuring chip")
-        }
-    }
-
-    /**
-     * Internal helper: Aktualisiert AUSSCHLIESSLICH die Farb-Eigenschaften
-     * eines bestehenden Chips.
-     */
-    private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
-        try {
-            // 1. Hintergrundfarbe (mit der "Auto"-Logik)
-            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                // "Auto"-Modus: Leite Farbe von Textfarbe ab
-                Color.argb(
-                    40,
-                    Color.red(colors.textColor),
-                    Color.green(colors.textColor),
-                    Color.blue(colors.textColor)
-                )
-            } else {
-                // Vom Nutzer gewählte Farbe
-                colors.chipBackgroundColor
-            }
-            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-
-            // 2. Textfarbe
-            chip.setTextColor(colors.textColor)
-
-            // 3. Border (Stroke) Farbe
-            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying colors to chip")
-        }
-    }
-
-    private fun createAlarmChip(
-        context: Context,
-        event: TimeBasedEvent,
-        colors: UiColorsState,
-        chipMaxWidth: Int
-    ): Chip? {
-        return try {
-            Chip(context).apply {
-                try {
-                    val is24Hour = DateFormat.is24HourFormat(context)
-                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-
-                    // FIX: Runde AUF zur nächsten vollen Minute
-                    // Nutzer setzen Alarme immer auf volle Minuten (06:00)
-                    // System gibt interne Trigger-Zeit zurück (05:59:22)
-                    val calendar = Calendar.getInstance()
-                    calendar.timeInMillis = event.triggerTimeMillis
-
-                    // Wenn irgendwelche Sekunden vorhanden sind, runde auf nächste Minute
-                    if (calendar.get(Calendar.SECOND) > 0 || calendar.get(Calendar.MILLISECOND) > 0) {
-                        calendar.add(Calendar.MINUTE, 1)
-                    }
-                    calendar.set(Calendar.SECOND, 0)
-                    calendar.set(Calendar.MILLISECOND, 0)
-
-                    val displayTime = calendar.timeInMillis
-                    val alarmTime = timeFormat.format(Date(displayTime))
-
-                    text = "$alarmTime ${event.title}"
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting alarm chip text")
-                    text = event.title
-                }
-
-                configureChip(this, colors, chipMaxWidth)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error creating alarm chip")
-            null
-        }
-    }
-
-    private fun createCalendarChip(
-        context: Context,
-        event: TimeBasedEvent,
-        colors: UiColorsState,
-        chipMaxWidth: Int
-    ): Chip? {
-        return try {
-            Chip(context).apply {
-                try {
-                    val is24Hour = DateFormat.is24HourFormat(context)
-                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-                    val eventTime = timeFormat.format(Date(event.triggerTimeMillis))
-
-                    text = "$eventTime ${event.title}"
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting calendar chip text")
-                    text = event.title
-                }
-
-                configureChip(this, colors, chipMaxWidth)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
-            null
-        }
-    }
-
-    private fun setupFragmentResultListener() {
-        try {
-            childFragmentManager.setFragmentResultListener(
-                AppContextMenuDialogFragment.Companion.REQUEST_KEY,
-                viewLifecycleOwner
-            ) { _, bundle ->
-                try {
-                    val app = longClickedApp
-                    if (app == null) {
-                        Timber.Forest.w("Fragment result received but longClickedApp is null")
-                        return@setFragmentResultListener
-                    }
-
-                    val action = try {
-                        bundle.getString(AppContextMenuDialogFragment.Companion.RESULT_KEY_ACTION)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting action from bundle")
-                        null
-                    }
-
-                    when (action) {
-                        "launch_shortcut" -> handleShortcutLaunch(bundle)
-                        AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
-                        AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
-                        AppContextMenuAction.Companion.ACTION_ID_HIDE_APP -> viewModel.onHideApp(app)
-                        AppContextMenuAction.Companion.ACTION_ID_UNHIDE_APP -> viewModel.onShowApp(app)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in fragment result listener")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up fragment result listener")
-        }
-    }
-
-    private fun handleShortcutLaunch(bundle: Bundle) {
-        try {
-            val shortcut = try {
-                bundle.getParcelable(
-                    AppContextMenuDialogFragment.Companion.RESULT_KEY_SHORTCUT,
-                    ShortcutInfo::class.java
-                )
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting shortcut from bundle")
-                null
-            }
-
-            if (shortcut == null) {
-                Timber.Forest.w("Shortcut is null")
-                viewModel.onAppInfoError()
-                return
-            }
-
-            try {
-                val launcherApps = requireContext()
-                    .getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-
-                if (launcherApps == null) {
-                    TimberWrapper.silentError("LauncherApps service is null")
-                    viewModel.onAppInfoError()
-                    return
-                }
-
-                launcherApps.startShortcut(shortcut, null, null)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error launching shortcut")
-                viewModel.onAppInfoError()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
-        }
-    }
-
-    private fun toggleFavorite(app: AppInfo) {
-        try {
-            viewModel.onToggleFavorite(app)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
-        }
-    }
-
-    private fun showAppInfo(app: AppInfo) {
-        try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", app.packageName, null)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(intent)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
-            viewModel.onAppInfoError()
-        }
-    }
+    // ============================================================================
+    // COLOR UPDATES - Fast update on existing views (no rebuild)
+    // ============================================================================
 
     private fun updateAllColors(colors: UiColorsState) {
         if (_binding == null) return
 
-        // Variablen aus dem State-Objekt extrahieren
         val textColor = colors.textColor
         val shadowColor = colors.shadowColor
 
-        // Update time text - individual try-catch for independence
+        // Update time text
         try {
             binding.timeText.setTextColor(textColor)
             binding.timeText.setShadowLayer(
@@ -757,8 +651,16 @@ class HomeFragment : Fragment() {
         }
 
         updateCalendarChipsColors(colors)
+        updateFavoriteButtonColors(textColor, shadowColor)
 
-        updateFavoriteAppsColors(textColor, shadowColor)
+        // Update border if in split mode
+        if (isSplitModeActive) {
+            try {
+                applyScrollViewBorder(textColor)
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error updating border color")
+            }
+        }
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -780,12 +682,11 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun updateFavoriteAppsColors(textColor: Int, shadowColor: Int) {
+    private fun updateFavoriteButtonColors(textColor: Int, shadowColor: Int) {
         if (_binding == null) return
 
         try {
-            // Select the active container based on the current mode
-            val activeContainer = if (isSplitScreenActive) {
+            val activeContainer = if (isSplitModeActive) {
                 binding.scrollingAppList
             } else {
                 binding.staticAppList
@@ -804,348 +705,17 @@ class HomeFragment : Fragment() {
                         )
                     }
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating color for child at index $i")
-                    // Continue with other buttons
+                    TimberWrapper.silentError(e, "Error updating button color at index $i")
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating favorite apps colors")
+            TimberWrapper.silentError(e, "Error updating favorite button colors")
         }
     }
 
-    private fun safelyRemoveAllViews() {
-        try {
-            if (_binding != null && isAdded && !isDetached) {
-                // Must target both potential list containers now
-                binding.scrollingAppList.removeAllViews()
-                binding.staticAppList.removeAllViews()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error removing all views")
-        }
-    }
-
-    private fun updateFavoriteAppsUI(
-        appsToShow: List<AppInfo>,
-        textColor: Int,
-        shadowColor: Int
-    ) {
-        if (_binding == null) return
-        val ctx = context ?: return
-
-        try {
-            val shouldSplitScreen = appsToShow.size > currentMaxItemsOnScreen
-
-            // OPTIMIERUNG 1: Prüfe ob überhaupt etwas geändert hat
-            val needsUpdate = cachedApps != appsToShow ||
-                    cachedTextColor != textColor ||
-                    cachedShadowColor != shadowColor ||
-                    cachedSplitMode != shouldSplitScreen
-
-            if (!needsUpdate) {
-                Timber.Forest.d("No changes detected, skipping UI update")
-                return
-            }
-
-            Timber.Forest.d("Updating favorites UI (changes detected)")
-
-            // OPTIMIERUNG 2: Mode-Switch benötigt komplettes Neurendering
-            val modeChanged = cachedSplitMode != shouldSplitScreen
-
-            if (modeChanged) {
-                Timber.Forest.d("Split mode changed: $cachedSplitMode -> $shouldSplitScreen")
-                applySplitScreenMode(shouldSplitScreen)
-                // Bei Mode-Wechsel: Komplettes Neurendering
-                rebuildAllButtons(appsToShow, shouldSplitScreen, textColor, shadowColor, ctx)
-            } else {
-                // OPTIMIERUNG 3: Nur Differenz updaten
-                updateButtonsDiff(appsToShow, shouldSplitScreen, textColor, shadowColor, ctx)
-            }
-
-            // Cache aktualisieren
-            cachedApps = appsToShow.toList() // Defensive copy
-            cachedTextColor = textColor
-            cachedShadowColor = shadowColor
-            cachedSplitMode = shouldSplitScreen
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating favorite apps UI")
-        }
-    }
-
-    /**
-     * NEUER HELPER: Komplettes Neurendering (bei Mode-Wechsel)
-     */
-    private fun rebuildAllButtons(
-        apps: List<AppInfo>,
-        splitMode: Boolean,
-        textColor: Int,
-        shadowColor: Int,
-        context: Context
-    ) {
-        try {
-            val targetContainer = if (splitMode) {
-                binding.scrollingAppList
-            } else {
-                binding.staticAppList
-            }
-
-            targetContainer.removeAllViews()
-
-            for (app in apps) {
-                try {
-                    val button = createAppButton(context, app, textColor, shadowColor)
-                    if (button != null) {
-                        targetContainer.addView(button)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in rebuildAllButtons")
-        }
-    }
-
-    /**
-     * Intelligentes Diffing
-     */
-    private fun updateButtonsDiff(
-        newApps: List<AppInfo>,
-        splitMode: Boolean,
-        textColor: Int,
-        shadowColor: Int,
-        context: Context
-    ) {
-        try {
-            ensureCorrectContainerVisibility(splitMode)
-
-            val targetContainer = if (splitMode) {
-                binding.scrollingAppList
-            } else {
-                binding.staticAppList
-            }
-
-            val oldApps = cachedApps ?: emptyList()
-            val currentViewCount = targetContainer.childCount
-
-            // Fall 1: Reihenfolge/Inhalt gleich, nur Farben geändert
-            if (newApps.size == oldApps.size &&
-                newApps.zip(oldApps).all { (new, old) -> new.packageName == old.packageName }) {
-
-                val colorsChanged = textColor != cachedTextColor || shadowColor != cachedShadowColor
-                val namesChanged = newApps.zip(oldApps).any { (new, old) ->
-                    new.displayName != old.displayName
-                }
-
-                if (!colorsChanged && !namesChanged) {
-                    Timber.Forest.d("updateButtonsDiff: No visual changes, skipping update")
-                    return
-                }
-
-                Timber.Forest.d("updateButtonsDiff: Only colors/names changed, updating existing buttons")
-                updateExistingButtons(targetContainer, newApps, textColor, shadowColor)
-                return
-            }
-
-            // Fall 2: Unterschiedliche Apps -> Komplettes Neurendering
-            Timber.Forest.d("updateButtonsDiff: App list changed, rebuilding buttons")
-            rebuildAllButtons(newApps, splitMode, textColor, shadowColor, context)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in updateButtonsDiff")
-            // Fallback: Komplettes Neurendering
-            rebuildAllButtons(newApps, splitMode, textColor, shadowColor, context)
-        }
-    }
-
-    /**
-     * Stellt sicher, dass die richtigen Container sichtbar sind.
-     * Wird von updateButtonsDiff aufgerufen, wenn applySplitScreenMode übersprungen wurde.
-     */
-    private fun ensureCorrectContainerVisibility(splitMode: Boolean) {
-        try {
-            binding.splitContainer.visibility = if (splitMode) View.VISIBLE else View.GONE
-            binding.staticFavoritesContainer.visibility = if (splitMode) View.GONE else View.VISIBLE
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error ensuring container visibility")
-        }
-    }
-
-    /**
-     * NEUER HELPER: Nur Farben/Text von existierenden Buttons updaten
-     */
-    private fun updateExistingButtons(
-        container: LinearLayout,
-        apps: List<AppInfo>,
-        textColor: Int,
-        shadowColor: Int
-    ) {
-        try {
-            for (i in 0 until minOf(container.childCount, apps.size)) {
-                try {
-                    val view = container.getChildAt(i)
-                    if (view is Button) {
-                        val app = apps[i]
-
-                        // Text updaten (falls custom name geändert)
-                        if (view.text.toString() != app.displayName) {
-                            view.text = app.displayName
-                        }
-
-                        // Farben updaten
-                        view.setTextColor(textColor)
-                        view.setShadowLayer(
-                            AppConstants.SHADOW_RADIUS_APPS,
-                            AppConstants.SHADOW_DX,
-                            AppConstants.SHADOW_DY,
-                            shadowColor
-                        )
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating button at index $i")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in updateExistingButtons")
-        }
-    }
-
-    private fun applySplitScreenMode(enableSplit: Boolean) {
-        isSplitScreenActive = enableSplit
-
-        // 1. WICHTIG: Sichtbarkeit der Haupt-Container umschalten
-        binding.splitContainer.visibility = if (enableSplit) View.VISIBLE else View.GONE
-        binding.staticFavoritesContainer.visibility = if (enableSplit) View.GONE else View.VISIBLE
-
-        // 2. Logik und Visuals anwenden
-        if (enableSplit) {
-            // --- SPLIT MODUS ---
-
-            // Layout-Params für innere Views (Split-Ansicht)
-            val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
-
-            scrollParams.weight = 1f
-            gestureParams.weight = 1f
-            binding.favoritesScrollView.layoutParams = scrollParams
-            binding.gestureZoneRight.layoutParams = gestureParams
-
-            binding.favoritesScrollView.isScrollContainer = true
-            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
-
-            // Gesture Zone muss Touch-Events empfangen können
-            binding.gestureZoneRight.isClickable = true
-            binding.gestureZoneRight.isFocusable = true
-
-            // ALLE Parents müssen Clipping ausschalten
-            binding.rootLayout.clipChildren = false
-            binding.rootLayout.clipToPadding = false
-            binding.splitContainer.clipChildren = false
-            binding.splitContainer.clipToPadding = false
-
-            // Rahmen setzen (mit aktueller Farbe)
-            val colors = viewModel.uiColorsState.value
-            applyScrollViewBorder(colors.textColor)
-        } else {
-            // --- NORMAL MODUS ---
-
-            // Aufräumen des ScrollViews
-            removeScrollViewBorder()
-
-            // Aufräumen des ScrollViews
-            binding.favoritesScrollView.background = null
-            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
-
-            // Gesture Zone deaktivieren
-            binding.gestureZoneRight.isClickable = false
-            binding.gestureZoneRight.isFocusable = false
-
-            // Parents Clipping wieder aktivieren
-            binding.rootLayout.clipChildren = true
-            binding.rootLayout.clipToPadding = true
-            binding.splitContainer.clipChildren = true
-            binding.splitContainer.clipToPadding = true
-        }
-    }
-
-    /**
-     * Setzt den visuellen Rahmen um den ScrollView im Split-Screen Modus.
-     * @param textColor Die Farbe für den Rahmen (wird mit Alpha 20% angewendet)
-     */
-    private fun applyScrollViewBorder(textColor: Int) {
-        try {
-            val frameColor = Color.argb(
-                30,
-                Color.red(textColor),
-                Color.green(textColor),
-                Color.blue(textColor)
-            )
-
-            val drawable = GradientDrawable().apply {
-                setColor(Color.TRANSPARENT)
-
-                val strokeWidth = try {
-                    resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
-                } catch (e: Throwable) {
-                    4
-                }
-                setStroke(strokeWidth, frameColor)
-
-                val cornerRadius = try {
-                    resources.getDimension(R.dimen.split_screen_corner_radius)
-                } catch (e: Throwable) {
-                    16f
-                }
-                setCornerRadius(cornerRadius)
-            }
-
-            binding.favoritesScrollView.background = drawable
-
-            // Padding für Abstand zwischen Favoriten und Rahmen
-            val borderPadding = try {
-                resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
-            } catch (e: Throwable) {
-                16
-            }
-
-            binding.favoritesScrollView.setPadding(
-                borderPadding,  // left
-                borderPadding,  // top
-                borderPadding,  // right
-                borderPadding   // bottom
-            )
-
-            // GEÄNDERT: TRUE statt false
-            // → Scroll-Inhalt kann NICHT über Padding hinaus scrollen
-            // → Favoriten bleiben innerhalb des Rahmens!
-            binding.favoritesScrollView.clipToPadding = true
-
-            // Negative Margin um das Padding zu kompensieren
-            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            params.setMargins(-borderPadding, -borderPadding, 0, -borderPadding)
-            binding.favoritesScrollView.layoutParams = params
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying ScrollView border")
-        }
-    }
-
-    private fun removeScrollViewBorder() {
-        try {
-            binding.favoritesScrollView.background = null
-            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
-            binding.favoritesScrollView.clipToPadding = true
-
-            // Margins zurücksetzen
-            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            params.setMargins(0, 0, 0, 0)
-            binding.favoritesScrollView.layoutParams = params
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error removing ScrollView border")
-        }
-    }
+    // ============================================================================
+    // BUTTON CREATION
+    // ============================================================================
 
     private fun createAppButton(
         context: Context,
@@ -1159,7 +729,7 @@ class HomeFragment : Fragment() {
                     text = app.displayName
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting button text")
-                    text = "App"  // FallbackF
+                    text = "App"
                 }
 
                 try {
@@ -1223,17 +793,6 @@ class HomeFragment : Fragment() {
                     TimberWrapper.silentError(e, "Error setting layout params")
                 }
 
-                setOnLongClickListener {
-                    try {
-                        // LOKALE AKTION: Zeige Shortcut Menu
-                        showAppContextMenu(app)
-                        true // Wichtig: Konsumiert das Event, unterdrückt den Click
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in long click for ${app.packageName}")
-                        false
-                    }
-                }
-
                 setOnClickListener {
                     try {
                         viewModel.onAppClicked(app)
@@ -1242,70 +801,205 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                // 2. ScrollView Listener (Frisst Events, ABER lässt ScrollView scrollen)
-                binding.favoritesScrollView.setOnTouchListener { v, event ->
-                    if (!isSplitScreenActive) {
-                        // Im Normal-Modus: Durchlassen zum Root
-                        return@setOnTouchListener false
-                    }
-
-                    // Im Split-Modus:
+                setOnLongClickListener {
                     try {
-                        // Verhindert, dass Root-View Touch-Events klaut
-                        v.parent.requestDisallowInterceptTouchEvent(true)
-
-                        // WICHTIG: Event ZUERST an den ScrollView weitergeben
-                        // → Erlaubt nativen Scroll-Mechanismus
-                        val handledByScrollView = v.onTouchEvent(event)
-
-                        // Dann Event konsumieren, damit es nicht zum Root bubbelt
-                        // → Verhindert Custom Swipes/LongPress im ScrollView-Bereich
-                        return@setOnTouchListener true
-
+                        showAppContextMenu(app)
+                        true
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in ScrollView touch handler")
+                        TimberWrapper.silentError(e, "Error in long click for ${app.packageName}")
                         false
                     }
                 }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error creating app button for ${app.packageName}")
-            null  // Return null, app won't be displayed but launcher won't crash
+            null
         }
     }
 
-    private fun showAppContextMenu(app: AppInfo) {
+    // ============================================================================
+    // TIME-BASED CHIPS
+    // ============================================================================
+
+    private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
+        if (_binding == null) return
+
         try {
-            currentDialog?.dismissAllowingStateLoss()
-            currentDialog = null
+            binding.calendarEventsScroll.visibility = View.GONE
+            binding.calendarChipsContainer.removeAllViews()
 
-            longClickedApp = app
-            val dialog = AppContextMenuDialogFragment.Companion.newInstance(
-                app,
-                MenuContext.HOME_SCREEN,
-                false
-            )
-            currentDialog = dialog
-            dialog.show(childFragmentManager, AppContextMenuDialogFragment.Companion.TAG)
+            if (events.isEmpty()) {
+                return
+            }
+
+            val ctx = context ?: return
+            val colors = viewModel.uiColorsState.value
+
+            val layoutPadding = try {
+                resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error getting layout_padding")
+                0
+            }
+
+            val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
+            val chipMaxWidth = (availableWidth * 0.80).toInt()
+
+            for (event in events) {
+                try {
+                    val chip = when (event.type) {
+                        EventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
+                        EventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
+                    }
+
+                    if (chip != null) {
+                        binding.calendarChipsContainer.addView(chip)
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
+                }
+            }
+
+            binding.calendarEventsScroll.visibility = View.VISIBLE
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing app context menu for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error updating time-based chips")
         }
     }
+
+    private fun configureChip(chip: Chip, colors: UiColorsState, chipMaxWidth: Int) {
+        try {
+            chip.ellipsize = TextUtils.TruncateAt.END
+            chip.maxWidth = chipMaxWidth
+            chip.isSingleLine = true
+
+            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                Color.argb(
+                    40,
+                    Color.red(colors.textColor),
+                    Color.green(colors.textColor),
+                    Color.blue(colors.textColor)
+                )
+            } else {
+                colors.chipBackgroundColor
+            }
+            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+
+            chip.setTextColor(colors.textColor)
+            chip.isCloseIconVisible = false
+            chip.isCheckable = false
+            chip.chipStrokeWidth = 1f
+            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error configuring chip")
+        }
+    }
+
+    private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
+        try {
+            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
+                Color.argb(
+                    40,
+                    Color.red(colors.textColor),
+                    Color.green(colors.textColor),
+                    Color.blue(colors.textColor)
+                )
+            } else {
+                colors.chipBackgroundColor
+            }
+            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+            chip.setTextColor(colors.textColor)
+            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying colors to chip")
+        }
+    }
+
+    private fun createAlarmChip(
+        context: Context,
+        event: TimeBasedEvent,
+        colors: UiColorsState,
+        chipMaxWidth: Int
+    ): Chip? {
+        return try {
+            Chip(context).apply {
+                try {
+                    val is24Hour = DateFormat.is24HourFormat(context)
+                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+
+                    val calendar = Calendar.getInstance()
+                    calendar.timeInMillis = event.triggerTimeMillis
+
+                    if (calendar.get(Calendar.SECOND) > 0 || calendar.get(Calendar.MILLISECOND) > 0) {
+                        calendar.add(Calendar.MINUTE, 1)
+                    }
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+
+                    val displayTime = calendar.timeInMillis
+                    val alarmTime = timeFormat.format(Date(displayTime))
+
+                    text = "$alarmTime ${event.title}"
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error formatting alarm chip text")
+                    text = event.title
+                }
+
+                configureChip(this, colors, chipMaxWidth)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error creating alarm chip")
+            null
+        }
+    }
+
+    private fun createCalendarChip(
+        context: Context,
+        event: TimeBasedEvent,
+        colors: UiColorsState,
+        chipMaxWidth: Int
+    ): Chip? {
+        return try {
+            Chip(context).apply {
+                try {
+                    val is24Hour = DateFormat.is24HourFormat(context)
+                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
+                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
+                    val eventTime = timeFormat.format(Date(event.triggerTimeMillis))
+
+                    text = "$eventTime ${event.title}"
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error formatting calendar chip text")
+                    text = event.title
+                }
+
+                configureChip(this, colors, chipMaxWidth)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
+            null
+        }
+    }
+
+    // ============================================================================
+    // GESTURES - Keep the good logic!
+    // ============================================================================
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupGestures() {
         try {
             gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
-            // 1. Root Listener (NUR für Normal-Modus aktiv)
+            // 1. Root Listener (only active in normal mode)
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
-                    // Im Split-Modus: Root ignoriert Events komplett
-                    if (isSplitScreenActive) {
+                    if (isSplitModeActive) {
                         return@setOnTouchListener false
                     }
-
-                    // Im Normal-Modus: Wie bisher - alle Gesten
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in root layout touch handler")
@@ -1313,39 +1007,36 @@ class HomeFragment : Fragment() {
                 }
             }
 
-            // 2. ScrollView Listener (Frisst ALLE Events im Split-Modus)
+            // 2. ScrollView Listener (allows scrolling, blocks gestures)
             binding.favoritesScrollView.setOnTouchListener { v, event ->
-                if (!isSplitScreenActive) {
-                    // Im Normal-Modus: Durchlassen zum Root
+                if (!isSplitModeActive) {
                     return@setOnTouchListener false
                 }
 
-                // Im Split-Modus:
                 try {
-                    // Verhindert, dass Root-View Touch-Events klaut
+                    // Verhindert, dass Parent (Root) Events klaut
                     v.parent.requestDisallowInterceptTouchEvent(true)
 
-                    // WICHTIG: Event KOMPLETT konsumieren!
-                    // → Keine Swipes, kein LongPress für Settings
-                    // → Nur native ScrollView-Funktionalität (Scrolling)
+                    // WICHTIG: Event ERST an ScrollView weitergeben
+                    // → Erlaubt native Scroll-Funktionalität
+                    v.onTouchEvent(event)
+
+                    // DANN true zurückgeben
+                    // → Verhindert, dass Event zum Root bubbelt und Gestures auslöst
                     return@setOnTouchListener true
+
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in ScrollView touch handler")
                     false
                 }
             }
 
-            // 3. NEU: Gesture Zone rechts (NUR im Split-Modus aktiv)
+            // 3. Gesture Zone (only active in split mode)
             binding.gestureZoneRight.setOnTouchListener { _, event ->
                 try {
-                    if (!isSplitScreenActive) {
-                        // Im Normal-Modus: Inaktiv
+                    if (!isSplitModeActive) {
                         return@setOnTouchListener false
                     }
-
-                    // Im Split-Modus: Diese Zone ist für ALLE Custom Gesten
-                    // → Swipes (Up/Down/Left/Right)
-                    // → LongPress (Settings Dialog)
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in gesture zone touch handler")
@@ -1363,9 +1054,7 @@ class HomeFragment : Fragment() {
 
         override fun onLongPress(e: MotionEvent) {
             try {
-                if (!isTouchOnAppButton) {
-                    viewModel.onLongPress() // Öffnet den Settings Dialog
-                }
+                viewModel.onLongPress()
             } catch (ex: Throwable) {
                 TimberWrapper.silentError(ex, "Error in long press")
             }
@@ -1393,16 +1082,13 @@ class HomeFragment : Fragment() {
                 val diffY = e2.y - e1.y
                 val diffX = e2.x - e1.x
 
-                // Prüfe, ob die Geste primär horizontal oder vertikal war
                 if (abs(diffX) > abs(diffY)) {
-                    // HORIZONTALE Geste
+                    // Horizontal gesture
                     if (abs(diffX) > AppConstants.SWIPE_THRESHOLD && abs(vX) > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
                         if (diffX > 0) {
-                            // Wisch von Links nach Rechts
                             viewModel.onFlingLeft()
                             true
                         } else {
-                            // Wisch von Rechts nach Links
                             viewModel.onFlingRight()
                             true
                         }
@@ -1410,7 +1096,7 @@ class HomeFragment : Fragment() {
                         false
                     }
                 } else {
-                    // VERTIKALE Geste
+                    // Vertical gesture
                     if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
                         abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
                     ) {
@@ -1500,9 +1186,131 @@ class HomeFragment : Fragment() {
         abstract fun onDoubleClick()
     }
 
+    // ============================================================================
+    // CONTEXT MENU & FRAGMENT RESULT
+    // ============================================================================
+
+    private fun setupFragmentResultListener() {
+        try {
+            childFragmentManager.setFragmentResultListener(
+                AppContextMenuDialogFragment.REQUEST_KEY,
+                viewLifecycleOwner
+            ) { _, bundle ->
+                try {
+                    val app = longClickedApp
+                    if (app == null) {
+                        Timber.w("Fragment result received but longClickedApp is null")
+                        return@setFragmentResultListener
+                    }
+
+                    val action = try {
+                        bundle.getString(AppContextMenuDialogFragment.RESULT_KEY_ACTION)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error getting action from bundle")
+                        null
+                    }
+
+                    when (action) {
+                        "launch_shortcut" -> handleShortcutLaunch(bundle)
+                        AppContextMenuAction.ACTION_ID_APP_INFO -> showAppInfo(app)
+                        AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
+                        AppContextMenuAction.ACTION_ID_HIDE_APP -> viewModel.onHideApp(app)
+                        AppContextMenuAction.ACTION_ID_UNHIDE_APP -> viewModel.onShowApp(app)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in fragment result listener")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting up fragment result listener")
+        }
+    }
+
+    private fun handleShortcutLaunch(bundle: Bundle) {
+        try {
+            val shortcut = try {
+                bundle.getParcelable(
+                    AppContextMenuDialogFragment.RESULT_KEY_SHORTCUT,
+                    ShortcutInfo::class.java
+                )
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error getting shortcut from bundle")
+                null
+            }
+
+            if (shortcut == null) {
+                Timber.w("Shortcut is null")
+                viewModel.onAppInfoError()
+                return
+            }
+
+            try {
+                val launcherApps = requireContext()
+                    .getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+
+                if (launcherApps == null) {
+                    TimberWrapper.silentError("LauncherApps service is null")
+                    viewModel.onAppInfoError()
+                    return
+                }
+
+                launcherApps.startShortcut(shortcut, null, null)
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error launching shortcut")
+                viewModel.onAppInfoError()
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
+        }
+    }
+
+    private fun toggleFavorite(app: AppInfo) {
+        try {
+            viewModel.onToggleFavorite(app)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
+        }
+    }
+
+    private fun showAppInfo(app: AppInfo) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", app.packageName, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
+            viewModel.onAppInfoError()
+        }
+    }
+
+    private fun showAppContextMenu(app: AppInfo) {
+        try {
+            currentDialog?.dismissAllowingStateLoss()
+            currentDialog = null
+
+            longClickedApp = app
+            val dialog = AppContextMenuDialogFragment.newInstance(
+                app,
+                MenuContext.HOME_SCREEN,
+                false
+            )
+            currentDialog = dialog
+            dialog.show(childFragmentManager, AppContextMenuDialogFragment.TAG)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing app context menu for ${app.packageName}")
+        }
+    }
+
+    // ============================================================================
+    // WINDOW INSETS
+    // ============================================================================
+
     private fun setupHomeWindowInsets() {
         try {
-            // Speichere die ursprünglichen Abstände aus dem XML
             val initialRootPadding = Rect(
                 binding.rootLayout.paddingLeft,
                 binding.rootLayout.paddingTop,
@@ -1510,16 +1318,14 @@ class HomeFragment : Fragment() {
                 binding.rootLayout.paddingBottom
             )
 
-            // Sicherstellen, dass die LayoutParams MarginLayoutParams sind
             val timeContainerParams = binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
             if (timeContainerParams == null) {
-                TimberWrapper.silentError("TimeContainer LayoutParams sind keine MarginLayoutParams")
-                // Fallback: Nutze das Root-Padding für alles
+                TimberWrapper.silentError("TimeContainer LayoutParams are not MarginLayoutParams")
                 ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
                     val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                     v.setPadding(
                         initialRootPadding.left + systemBars.left,
-                        initialRootPadding.top + systemBars.top, // Fallback
+                        initialRootPadding.top + systemBars.top,
                         initialRootPadding.right + systemBars.right,
                         initialRootPadding.bottom + systemBars.bottom
                     )
@@ -1533,20 +1339,16 @@ class HomeFragment : Fragment() {
             ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
 
-                // 1. Root-Layout für Gesten-Navigation (unten) und Ränder (links/rechts) padden
                 v.setPadding(
                     initialRootPadding.left + systemBars.left,
-                    initialRootPadding.top, // Top-Padding des Roots bleibt statisch (von XML)
+                    initialRootPadding.top,
                     initialRootPadding.right + systemBars.right,
-                    initialRootPadding.bottom + systemBars.bottom // Wichtig für Gesten-Navigationsleiste
+                    initialRootPadding.bottom + systemBars.bottom
                 )
 
-                // 2. Den Zeit-Container dynamisch positionieren:
-                // (initialMargin + systemBars.top)
                 timeContainerParams.topMargin = initialTimeMarginTop + systemBars.top
                 binding.timeContainer.layoutParams = timeContainerParams
 
-                // Wichtig: Insets nicht konsumieren, nur darauf reagieren
                 insets
             }
         } catch (e: Throwable) {
@@ -1554,43 +1356,27 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // ============================================================================
+    // LIFECYCLE
+    // ============================================================================
+
     override fun onResume() {
         super.onResume()
         try {
             hideStatusBar()
 
-            // NEU: Nur Layout-Check, KEIN automatisches Refresh
+            // Re-measure capacity (rotation might have changed it)
             binding.splitContainer.post {
-                // Alte Kapazität merken
-                val oldMaxItems = currentMaxItemsOnScreen
-
-                // Neue Kapazität messen
-                runCapacityCheck(binding.splitContainer)
-
-                // Wenn sich die Kapazität geändert hat, UI-Refresh erzwingen
-                if (oldMaxItems != currentMaxItemsOnScreen) {
-                    Timber.Forest.d("Capacity changed after rotation: $oldMaxItems -> $currentMaxItemsOnScreen")
-
-                    // Favorites UI neu rendern mit neuer Kapazität
-                    val state = viewModel.favoriteAppsState.value
-                    if (state is UiState.Success) {
-                        val colors = viewModel.uiColorsState.value
-                        updateFavoriteAppsUI(
-                            state.data.apps,
-                            colors.textColor,
-                            colors.shadowColor
-                        )
+                try {
+                    val height = binding.splitContainer.height
+                    if (height > 0) {
+                        measureAndReportCapacity(binding.splitContainer, height)
                     }
-                }
-
-                val colors = viewModel.uiColorsState.value
-                if (cachedTextColor == -1 ||
-                    colors.shadowColor == -1 ||
-                    colors.textColor != cachedTextColor ||
-                    colors.shadowColor != cachedShadowColor) {
-                    updateAllColors(colors)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in onResume capacity check")
                 }
             }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume")
         }
@@ -1599,8 +1385,6 @@ class HomeFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         try {
-            // Wenn HomeFragment verlassen wird -> Statusleiste wieder einblenden
-            // Wichtig, damit andere Apps und dein AppDrawer sie anzeigen.
             showStatusBar()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onPause showing status bar")
@@ -1614,31 +1398,16 @@ class HomeFragment : Fragment() {
 
     private fun hideStatusBar() {
         val controller = getInsetsController() ?: return
-        // Icons der Statusleiste verstecken
         controller.hide(WindowInsetsCompat.Type.statusBars())
-        // Verhalten festlegen: Leiste erscheint kurz bei Wisch von oben
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     private fun showStatusBar() {
-        // Icons der Statusleiste wieder anzeigen
         getInsetsController()?.show(WindowInsetsCompat.Type.statusBars())
-    }
-
-    /* Setzt alle gecachten UI-State-Variablen zurück.
-    ** Wird bei onDestroyView aufgerufen, um Memory Leaks zu vermeiden.
-    */
-    private fun invalidateCachedVariables() {
-        cachedApps = emptyList()
-        cachedTextColor = -1
-        cachedShadowColor = -1
-        cachedSplitMode = false
     }
 
     override fun onDestroyView() {
         try {
-            invalidateCachedVariables()
-
             currentDialog?.dismissAllowingStateLoss()
             currentDialog = null
 
