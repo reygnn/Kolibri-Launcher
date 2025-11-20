@@ -55,7 +55,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -192,36 +191,26 @@ class HomeFragment : Fragment() {
      */
     private fun measureAndEmitCapacity(container: View, containerHeight: Int) {
         try {
-            Timber.d("DEBUG: measureAndEmitCapacity called with height=$containerHeight")
-
             val ctx = context ?: return
 
             val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
-            Timber.d("DEBUG: itemHeight=$itemHeight, itemMargin=$itemMargin")
-
             if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
-                Timber.e("DEBUG: Capacity calc failed: Item height is zero")
-                // ✅ FALLBACK
-                _screenCapacity.value = 10
+                _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
                 return
             }
 
             val totalHeightPerItem = itemHeight + itemMargin
             val capacity = (containerHeight / totalHeightPerItem).toInt()
 
-            Timber.d("DEBUG: ✅ EMITTING capacity = $capacity")
-
-            // ✅ EMIT to Flow
             _screenCapacity.value = capacity
-
             viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error measuring capacity")
-            // ✅ FALLBACK
-            _screenCapacity.value = 10
+            _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
         }
     }
+
 
     /**
      * Measures a single favorite button by creating a dummy with exact same properties.
@@ -1374,18 +1363,6 @@ class HomeFragment : Fragment() {
         super.onResume()
         try {
             hideStatusBar()
-
-            // Re-measure capacity after rotation (StatusBar already hidden in onViewCreated)
-            binding.splitContainer.post {
-                try {
-                    val height = binding.splitContainer.height
-                    if (height > 0) {
-                        measureAndEmitCapacity(binding.splitContainer, height)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in onResume capacity check")
-                }
-            }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume")
