@@ -51,7 +51,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -62,18 +68,18 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * ULTRA CRASH-SAFE HomeFragment - "DUMB UI" VERSION
+ * ULTRA CRASH-SAFE HomeFragment - REACTIVE "DUMB UI" VERSION
  *
  * Philosophy: Fragment holds NO state, only renders what ViewModel provides
  *
- * Two observers:
- * 1. Favorites → Full rebuild (simple, robust)
- * 2. Colors → Fast color update on existing views
+ * Reactive approach:
+ * - Screen capacity is a Flow (not a var!)
+ * - Favorites from ViewModel are a Flow
+ * - combine() waits for BOTH before rendering
+ * - debounce() prevents flicker during StatusBar animation
+ * - distinctUntilChanged() filters duplicate emissions
  *
- * Screen capacity changes → Measure & report → ViewModel decides → Observer triggers → Rebuild
- * Favorites changed → ViewModel emits → Observer triggers → Rebuild
- *
- * No caching, no diffing, no cleverness - just reactive rendering!
+ * No hacks, no flags, no force-renders - pure reactive streams!
  */
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -87,10 +93,11 @@ class HomeFragment : Fragment() {
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
 
-    // ONLY state: Current screen capacity (for split-mode decision)
-    private var currentScreenCapacity: Int = AppConstants.MAX_FALLBACK_APPS_ON_HOME
+    // Reactive screen capacity - Flow instead of var!
+    private val _screenCapacity = MutableStateFlow<Int?>(null)
+    private val screenCapacity: StateFlow<Int?> = _screenCapacity.asStateFlow()
 
-    // ONLY flag: Is split mode currently active (for gesture routing)
+    // Only flag: Is split mode currently active (for gesture routing)
     private var isSplitModeActive = false
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -116,43 +123,31 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
+            // ✅ CRITICAL: Hide StatusBar BEFORE measuring capacity
+            hideStatusBar()
+
             setupBackPressHandler()
             setupGestures()
             setupDoubleTapActions()
             setupFragmentResultListener()
             setupHomeWindowInsets()
+
+            // ✅ Measure AFTER StatusBar is hidden
             setupDynamicCapacityListener()
+
+            // ✅ Observers last (will wait for capacity)
             observeViewModel()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
     }
 
-    /**
-     * Prevents back button from closing launcher when we're on home screen
-     */
-    private fun setupBackPressHandler() {
-        try {
-            requireActivity().onBackPressedDispatcher.addCallback(
-                viewLifecycleOwner,
-                object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        // Do nothing - we're home, can't go back further
-                        Timber.d("Back pressed on home screen - ignoring")
-                    }
-                }
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up back press handler")
-        }
-    }
-
     // ============================================================================
-    // SCREEN CAPACITY MEASUREMENT (like old fragment)
+    // SCREEN CAPACITY MEASUREMENT - Reactive Flow!
     // ============================================================================
 
     /**
-     * Sets up listener that monitors container height and reports capacity to ViewModel.
+     * Sets up listener that monitors container height and emits capacity to Flow.
      * Triggers on: Chip bar toggle, rotation, keyboard events
      */
     private fun setupDynamicCapacityListener() {
@@ -163,60 +158,68 @@ class HomeFragment : Fragment() {
                 val newHeight = bottom - top
                 val oldHeight = oldBottom - oldTop
 
-                // Only recalculate if height actually changed
                 if (newHeight == oldHeight || newHeight == 0 || _binding == null) {
                     return@OnLayoutChangeListener
                 }
 
-                measureAndReportCapacity(v, newHeight)
+                measureAndEmitCapacity(v, newHeight)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in layout change listener")
             }
         }
 
-        // Initial measurement after layout
+        binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
+
         binding.splitContainer.post {
             try {
                 val height = binding.splitContainer.height
+
                 if (height > 0) {
-                    measureAndReportCapacity(binding.splitContainer, height)
+                    measureAndEmitCapacity(binding.splitContainer, height)
+                } else {
+                    Timber.d("DEBUG: Emitting fallback capacity=8")
+                    _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
                 }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in initial capacity measurement")
+                _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
             }
         }
-
-        binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
     }
 
     /**
-     * Measures screen capacity and reports to ViewModel.
+     * Measures screen capacity and emits to Flow (reactive!)
      */
-    private fun measureAndReportCapacity(container: View, containerHeight: Int) {
+    private fun measureAndEmitCapacity(container: View, containerHeight: Int) {
         try {
+            Timber.d("DEBUG: measureAndEmitCapacity called with height=$containerHeight")
+
             val ctx = context ?: return
 
             val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+            Timber.d("DEBUG: itemHeight=$itemHeight, itemMargin=$itemMargin")
+
             if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
-                Timber.d("Capacity calc failed: Item height is zero")
+                Timber.e("DEBUG: Capacity calc failed: Item height is zero")
+                // ✅ FALLBACK
+                _screenCapacity.value = 10
                 return
             }
 
             val totalHeightPerItem = itemHeight + itemMargin
             val capacity = (containerHeight / totalHeightPerItem).toInt()
 
-            // Speichere lokale Kapazität (für Split-Entscheidung)
-            currentScreenCapacity = capacity
+            Timber.d("DEBUG: ✅ EMITTING capacity = $capacity")
 
-            Timber.d("Screen capacity: $capacity items (H: $containerHeight, ItemH: $totalHeightPerItem)")
+            // ✅ EMIT to Flow
+            _screenCapacity.value = capacity
 
-            // Melde IMMER das Maximum ans ViewModel
-            // → ViewModel gibt alle Favoriten zurück
-            // → Fragment entscheidet selbst ob Split nötig ist
             viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error measuring capacity")
+            // ✅ FALLBACK
+            _screenCapacity.value = 10
         }
     }
 
@@ -251,7 +254,6 @@ class HomeFragment : Fragment() {
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             )
 
-            // Margins from createAppButton: setMargins(0, 8, 0, 8) = 16px total
             val verticalMarginInPx = 16
             val itemHeight = dummyButton.measuredHeight
 
@@ -266,50 +268,57 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // OBSERVERS (Reactive - like old fragment)
+    // OBSERVERS - Pure Reactive!
     // ============================================================================
 
     private fun observeViewModel() {
-        // Observer 1: Favorites - MAIN OBSERVER, full rebuild
+        // Observer 1: COMBINED Favorites + Capacity
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     try {
-                        viewModel.favoriteAppsState.collect { state ->
+                        combine(
+                            viewModel.favoriteAppsState,
+                            screenCapacity
+                                .filterNotNull()              // Wait for first measurement
+                                .distinctUntilChanged()       // Filter duplicates
+                        ) { favState, capacity ->
+                            Pair(favState, capacity)
+                        }.collect { (favState, capacity) ->
                             if (_binding == null) return@collect
 
-                            Timber.d("Favorites state: ${state::class.simpleName}")
+                            Timber.d("Combined state: Fav=${favState::class.simpleName}, Capacity=$capacity")
 
                             try {
-                                when (state) {
+                                when (favState) {
                                     is UiState.Loading -> {
                                         clearAllViews()
                                     }
                                     is UiState.Success -> {
                                         val colors = viewModel.uiColorsState.value
-                                        renderFavorites(state.data.apps, colors)
+                                        renderFavorites(favState.data.apps, colors, capacity)
                                     }
                                     is UiState.Error -> {
-                                        viewModel.onFavoriteAppsError(state.message)
+                                        viewModel.onFavoriteAppsError(favState.message)
                                         clearAllViews()
                                     }
                                 }
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error handling favorites state")
+                                TimberWrapper.silentError(e, "Error handling combined state")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting favoriteAppsState")
+                        TimberWrapper.silentError(e, "Error collecting combined state")
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for favorites")
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for combined state")
             }
         }
 
@@ -411,37 +420,37 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // DUMB UI RENDERING - No caching, no diffing, just rebuild!
+    // PURE RENDERING - No side effects on member variables!
     // ============================================================================
 
     /**
-     * MAIN RENDER METHOD - Completely rebuilds favorites UI
-     * Called by observer when favorites or capacity changes
+     * PURE FUNCTION - Renders favorites with given capacity
+     * No dependency on currentScreenCapacity member variable!
      */
-    private fun renderFavorites(apps: List<AppInfo>, colors: UiColorsState) {
+    private fun renderFavorites(
+        apps: List<AppInfo>,
+        colors: UiColorsState,
+        screenCapacity: Int
+    ) {
         if (_binding == null) return
         val ctx = context ?: return
 
         try {
-            // 1. Decide if we need split mode
-            val needsSplit = apps.size > currentScreenCapacity
+            // Pure decision based on parameters
+            val needsSplit = apps.size > screenCapacity
 
-            Timber.d("Rendering ${apps.size} favorites (capacity: $currentScreenCapacity, split: $needsSplit)")
+            Timber.d("Rendering ${apps.size} favorites (capacity: $screenCapacity, split: $needsSplit)")
 
-            // 2. Switch container mode
             switchContainerMode(needsSplit, colors)
 
-            // 3. Select target container
             val targetContainer = if (needsSplit) {
                 binding.scrollingAppList
             } else {
                 binding.staticAppList
             }
 
-            // 4. Clear everything (like old fragment!)
             targetContainer.removeAllViews()
 
-            // 5. Create all buttons fresh (like old fragment!)
             for (app in apps) {
                 try {
                     val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
@@ -467,15 +476,12 @@ class HomeFragment : Fragment() {
         try {
             isSplitModeActive = enableSplit
 
-            // Toggle container visibility
             binding.splitContainer.visibility = if (enableSplit) View.VISIBLE else View.GONE
             binding.staticFavoritesContainer.visibility = if (enableSplit) View.GONE else View.VISIBLE
 
             if (enableSplit) {
-                // SPLIT MODE
                 applySplitModeLayout(colors)
             } else {
-                // NORMAL MODE
                 removeSplitModeLayout()
             }
         } catch (e: Throwable) {
@@ -485,7 +491,6 @@ class HomeFragment : Fragment() {
 
     private fun applySplitModeLayout(colors: UiColorsState) {
         try {
-            // Layout weights for 50/50 split
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
 
@@ -494,20 +499,16 @@ class HomeFragment : Fragment() {
             binding.favoritesScrollView.layoutParams = scrollParams
             binding.gestureZoneRight.layoutParams = gestureParams
 
-            // Enable scrolling
             binding.favoritesScrollView.isScrollContainer = true
 
-            // Enable gesture zone
             binding.gestureZoneRight.isClickable = true
             binding.gestureZoneRight.isFocusable = true
 
-            // Disable clipping for border effect
             binding.rootLayout.clipChildren = false
             binding.rootLayout.clipToPadding = false
             binding.splitContainer.clipChildren = false
             binding.splitContainer.clipToPadding = false
 
-            // Apply visual border
             applyScrollViewBorder(colors.textColor)
 
         } catch (e: Throwable) {
@@ -517,21 +518,17 @@ class HomeFragment : Fragment() {
 
     private fun removeSplitModeLayout() {
         try {
-            // Remove border
             binding.favoritesScrollView.background = null
             binding.favoritesScrollView.setPadding(0, 0, 0, 0)
             binding.favoritesScrollView.clipToPadding = true
 
-            // Reset margins
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             params.setMargins(0, 0, 0, 0)
             binding.favoritesScrollView.layoutParams = params
 
-            // Disable gesture zone
             binding.gestureZoneRight.isClickable = false
             binding.gestureZoneRight.isFocusable = false
 
-            // Re-enable clipping
             binding.rootLayout.clipChildren = true
             binding.rootLayout.clipToPadding = true
             binding.splitContainer.clipChildren = true
@@ -580,7 +577,6 @@ class HomeFragment : Fragment() {
 
             binding.favoritesScrollView.clipToPadding = true
 
-            // Negative margin to compensate for padding
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             params.setMargins(-borderPadding, -borderPadding, 0, -borderPadding)
             binding.favoritesScrollView.layoutParams = params
@@ -611,7 +607,6 @@ class HomeFragment : Fragment() {
         val textColor = colors.textColor
         val shadowColor = colors.shadowColor
 
-        // Update time text
         try {
             binding.timeText.setTextColor(textColor)
             binding.timeText.setShadowLayer(
@@ -624,7 +619,6 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error updating time text color")
         }
 
-        // Update date text
         try {
             binding.dateText.setTextColor(textColor)
             binding.dateText.setShadowLayer(
@@ -637,7 +631,6 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error updating date text color")
         }
 
-        // Update battery text
         try {
             binding.batteryText.setTextColor(textColor)
             binding.batteryText.setShadowLayer(
@@ -653,7 +646,6 @@ class HomeFragment : Fragment() {
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-        // Update border if in split mode
         if (isSplitModeActive) {
             try {
                 applyScrollViewBorder(textColor)
@@ -1007,22 +999,19 @@ class HomeFragment : Fragment() {
                 }
             }
 
-            // 2. ScrollView Listener (allows scrolling, blocks gestures)
+            // 2. ScrollView Listener (consumes events in split mode, allows scrolling)
             binding.favoritesScrollView.setOnTouchListener { v, event ->
                 if (!isSplitModeActive) {
                     return@setOnTouchListener false
                 }
 
                 try {
-                    // Verhindert, dass Parent (Root) Events klaut
                     v.parent.requestDisallowInterceptTouchEvent(true)
 
-                    // WICHTIG: Event ERST an ScrollView weitergeben
-                    // → Erlaubt native Scroll-Funktionalität
+                    // ✅ CRITICAL: Pass event to ScrollView first (allows scrolling!)
                     v.onTouchEvent(event)
 
-                    // DANN true zurückgeben
-                    // → Verhindert, dass Event zum Root bubbelt und Gestures auslöst
+                    // Then consume event (blocks gestures from bubbling to root)
                     return@setOnTouchListener true
 
                 } catch (e: Throwable) {
@@ -1083,7 +1072,6 @@ class HomeFragment : Fragment() {
                 val diffX = e2.x - e1.x
 
                 if (abs(diffX) > abs(diffY)) {
-                    // Horizontal gesture
                     if (abs(diffX) > AppConstants.SWIPE_THRESHOLD && abs(vX) > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
                         if (diffX > 0) {
                             viewModel.onFlingLeft()
@@ -1096,7 +1084,6 @@ class HomeFragment : Fragment() {
                         false
                     }
                 } else {
-                    // Vertical gesture
                     if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
                         abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
                     ) {
@@ -1184,6 +1171,29 @@ class HomeFragment : Fragment() {
         }
 
         abstract fun onDoubleClick()
+    }
+
+    // ============================================================================
+    // BACK PRESS HANDLER
+    // ============================================================================
+
+    /**
+     * Prevents back button from closing launcher when we're on home screen
+     */
+    private fun setupBackPressHandler() {
+        try {
+            requireActivity().onBackPressedDispatcher.addCallback(
+                viewLifecycleOwner,
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        // Stay on home screen - we're the launcher!
+                        Timber.d("Back pressed on home screen - ignoring")
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting up back press handler")
+        }
     }
 
     // ============================================================================
@@ -1365,12 +1375,12 @@ class HomeFragment : Fragment() {
         try {
             hideStatusBar()
 
-            // Re-measure capacity (rotation might have changed it)
+            // Re-measure capacity after rotation (StatusBar already hidden in onViewCreated)
             binding.splitContainer.post {
                 try {
                     val height = binding.splitContainer.height
                     if (height > 0) {
-                        measureAndReportCapacity(binding.splitContainer, height)
+                        measureAndEmitCapacity(binding.splitContainer, height)
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in onResume capacity check")
