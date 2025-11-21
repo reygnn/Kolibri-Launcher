@@ -438,12 +438,12 @@ class HomeFragment : Fragment() {
                     // LANDSCAPE:
                     scrollParams.weight = 30F
                     gestureParams.weight = 70F
-                    Timber.d("  → Split mode: 25/75 (landscape)")
+                    Timber.d("  → Split mode: (landscape)")
                 } else {
                     // PORTRAIT:
                     scrollParams.weight = 55F
                     gestureParams.weight = 45F
-                    Timber.d("  → Split mode: 55/45 (portrait)")
+                    Timber.d("  → Split mode: (portrait)")
                 }
 
                 binding.gestureZone.visibility = View.VISIBLE
