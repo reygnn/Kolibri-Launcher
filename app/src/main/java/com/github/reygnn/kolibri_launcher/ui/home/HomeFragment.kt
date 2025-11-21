@@ -22,6 +22,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
@@ -133,10 +134,24 @@ class HomeFragment : Fragment() {
         try {
             Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
 
-            // ✅ Re-check scroll state after rotation
-            binding.favoritesScrollView.post {
-                checkAndEmitScrollState()
-            }
+            // ✅ Warte bis Layout WIRKLICH fertig ist
+            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        try {
+                            // Listener sofort entfernen (oneshot)
+                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+
+                            // JETZT ist das Layout fertig!
+                            checkAndEmitScrollState()
+
+                            Timber.d("✅ Scroll state checked after layout completed")
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error in layout listener")
+                        }
+                    }
+                }
+            )
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
         }
@@ -374,10 +389,20 @@ class HomeFragment : Fragment() {
                 }
             }
 
-            // ✅ MAGIC: Check scroll capability AFTER rendering
-            binding.favoritesScrollView.post {
-                checkAndEmitScrollState()
-            }
+            // ✅ Warte bis Layout fertig ist!
+            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        try {
+                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                            checkAndEmitScrollState()
+                            Timber.d("✅ Scroll state checked after rendering")
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error in layout listener")
+                        }
+                    }
+                }
+            )
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error rendering favorites")
@@ -751,6 +776,22 @@ class HomeFragment : Fragment() {
             }
 
             binding.calendarEventsScroll.visibility = View.VISIBLE
+
+            // ✅ Warte bis Layout wirklich fertig ist!
+            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        try {
+                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                            checkAndEmitScrollState()
+                            Timber.d("✅ Scroll state checked after chips updated")
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error in layout listener after chips")
+                        }
+                    }
+                }
+            )
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating chips")
         }
