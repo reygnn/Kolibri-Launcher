@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
-import android.R.attr.button
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -66,17 +65,55 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
+// ============================================================================
+// REACTIVE SPLIT MODE FLOW - HOW IT WORKS
+// ============================================================================
 /**
- * FULLY REACTIVE HomeFragment - canScrollVertically() Flow
+ * REVOLUTIONARY REACTIVE APPROACH - NO CAPACITY MEASUREMENTS NEEDED!
  *
- * Revolutionary approach:
- * - No capacity measurements!
- * - No dummy buttons!
- * - System decides via canScrollVertically()
- * - Pure reactive: ScrollView state → Flow → UI reacts
+ * The Problem We Solved:
+ * - Old approach: Try to calculate "how many buttons fit" (unreliable, timing issues)
+ * - Race conditions between rendering and measurement
+ * - Complex dummy button logic prone to crashes
+ *
+ * Our Solution: Let Android Decide!
+ *
+ * Flow Architecture:
+ * 1. User adds favorites / rotates device / chips appear
+ *    → renderFavorites() / onConfigurationChanged() / updateTimeBasedChips()
+ *
+ * 2. After rendering completes (OnGlobalLayoutListener ensures timing)
+ *    → checkScrollStateAfterNextLayout() is called
+ *
+ * 3. System determines scroll capability
+ *    → checkAndEmitScrollState() asks: canScrollVertically(1)?
+ *    → TRUE = content overflows, scrolling needed
+ *    → FALSE = content fits, no scrolling needed
+ *
+ * 4. Emit new state to Flow
+ *    → _needsSplit.value = canScroll
+ *    → Flow only emits if value actually changed (prevents redundant updates)
+ *
+ * 5. Observer reacts automatically
+ *    → needsSplit.collect { split -> ... }
+ *    → adjustScrollViewWidth(split) gets called
+ *
+ * 6. UI adapts based on split mode:
+ *    - split=false: ScrollView takes 100% width, fully transparent to touches
+ *                   → All gestures work across entire screen
+ *    - split=true:  ScrollView takes 55% (portrait) or 40% (landscape)
+ *                   → Border appears, scrolling enabled
+ *                   → Gesture zone takes remaining space for swipe gestures
+ *
+ * Why This Works:
+ * - System (canScrollVertically) is the single source of truth
+ * - Pure reactive: State change → Flow emission → UI reaction
+ * - No manual calculations = no race conditions
+ * - Self-correcting: Every content change re-evaluates automatically
  *
  * IT SIMPLY WORKS!
  */
+
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
@@ -136,7 +173,6 @@ class HomeFragment : Fragment() {
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rotation")
-            )
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
         }
