@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
@@ -141,6 +142,37 @@ class HomeFragment : Fragment() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        try {
+            Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
+
+            // ✅ LÖSUNG: Mehrere Messversuche mit steigenden Delays
+            // Das Layout braucht Zeit, sich an die neue Orientierung anzupassen
+            val delays = listOf(100L, 250L, 400L) // Mehrere Versuche
+
+            delays.forEach { delay ->
+                binding.splitContainer.postDelayed({
+                    try {
+                        if (_binding != null && isAdded) {
+                            val height = binding.splitContainer.height
+                            Timber.d("Re-measuring after config change (delay=${delay}ms): height=$height")
+
+                            if (height > 0) {
+                                measureAndEmitCapacity(binding.splitContainer, height)
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in config change re-measure")
+                    }
+                }, delay)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onConfigurationChanged")
+        }
+    }
+
     // ============================================================================
     // SCREEN CAPACITY MEASUREMENT - Reactive Flow!
     // ============================================================================
@@ -151,6 +183,8 @@ class HomeFragment : Fragment() {
      */
     private fun setupDynamicCapacityListener() {
         if (_binding == null) return
+
+        Timber.d("DEBUG: setupDynamicCapacityListener")
 
         layoutChangeListener = View.OnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
             try {
@@ -176,7 +210,6 @@ class HomeFragment : Fragment() {
                 if (height > 0) {
                     measureAndEmitCapacity(binding.splitContainer, height)
                 } else {
-                    Timber.d("DEBUG: Emitting fallback capacity=8")
                     _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
                 }
             } catch (e: Throwable) {
@@ -194,13 +227,28 @@ class HomeFragment : Fragment() {
             val ctx = context ?: return
 
             val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+
+            // ✅ DEBUG: Log die Messwerte
+            Timber.d("📏 CONTAINER HEIGHTS:")
+            Timber.d("  - splitContainer: ${binding.splitContainer.height}")
+            Timber.d("  - staticFavoritesContainer: ${binding.staticFavoritesContainer.height}")
+            Timber.d("  - staticAppList: ${binding.staticAppList.height}")
+            Timber.d("  - scrollingAppList: ${binding.scrollingAppList.height}")
+            Timber.d("  - favoritesScrollView: ${binding.favoritesScrollView.height}")
+            Timber.d("  - Passed containerHeight: $containerHeight")
+
             if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
+                Timber.w("  ⚠️ Invalid item measurements, using fallback")
                 _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
                 return
             }
 
             val totalHeightPerItem = itemHeight + itemMargin
             val capacity = (containerHeight / totalHeightPerItem).toInt()
+
+            // ✅ DEBUG: Log das Ergebnis
+            Timber.d("  ✅ CALCULATED CAPACITY: $capacity")
+            Timber.d("  - Total height per item: $totalHeightPerItem")
 
             _screenCapacity.value = capacity
             viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
@@ -220,6 +268,10 @@ class HomeFragment : Fragment() {
         try {
             val dummyButton = Button(context)
 
+            // ✅ CRITICAL: Verwende MaterialButton Properties!
+            dummyButton.background = null
+            dummyButton.isAllCaps = false
+
             val paddingPx = try {
                 resources.getDimensionPixelSize(R.dimen.touch_target_padding)
             } catch (e: Throwable) { 0 }
@@ -231,20 +283,35 @@ class HomeFragment : Fragment() {
             dummyButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
 
             dummyButton.maxLines = 1
-            dummyButton.text = "Test"
+            dummyButton.ellipsize = TextUtils.TruncateAt.END
+            dummyButton.text = "Test Application"  // Längerer Text
+            dummyButton.gravity = Gravity.START or Gravity.CENTER_VERTICAL
 
-            dummyButton.layoutParams = LinearLayout.LayoutParams(
+            // ✅ NEU: Setze LayoutParams MIT Margins!
+            val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            lp.setMargins(0, 8, 0, 8)  // WICHTIG: Margins wie echte Buttons!
+            dummyButton.layoutParams = lp
+
+            // ✅ NEU: Messe mit Container-Breite für realistic wrapping
+            val displayMetrics = resources.displayMetrics
+            val containerWidth = displayMetrics.widthPixels - (paddingPx * 2)
 
             dummyButton.measure(
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(containerWidth, View.MeasureSpec.AT_MOST),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             )
 
-            val verticalMarginInPx = 16
             val itemHeight = dummyButton.measuredHeight
+            val verticalMarginInPx = 16  // 8+8 aus setMargins
+
+            Timber.d("📐 Dummy button measured:")
+            Timber.d("  - measuredHeight: $itemHeight")
+            Timber.d("  - measuredWidth: ${dummyButton.measuredWidth}")
+            Timber.d("  - containerWidth: $containerWidth")
+            Timber.d("  - margins: $verticalMarginInPx")
 
             if (itemHeight > 0) {
                 return Pair(itemHeight, verticalMarginInPx)
@@ -270,7 +337,7 @@ class HomeFragment : Fragment() {
                             viewModel.favoriteAppsState,
                             screenCapacity
                                 .filterNotNull()              // Wait for first measurement
-                                .distinctUntilChanged()       // Filter duplicates
+                                // .distinctUntilChanged()       // Filter duplicates
                         ) { favState, capacity ->
                             Pair(favState, capacity)
                         }.collect { (favState, capacity) ->
@@ -427,6 +494,12 @@ class HomeFragment : Fragment() {
         try {
             // Pure decision based on parameters
             val needsSplit = apps.size > screenCapacity
+
+            // ✅ DEBUG: Log die Entscheidung
+            Timber.d("🎨 RENDER FAVORITES:")
+            Timber.d("  - Apps count: ${apps.size}")
+            Timber.d("  - Screen capacity: $screenCapacity")
+            Timber.d("  - Needs split: $needsSplit")
 
             Timber.d("Rendering ${apps.size} favorites (capacity: $screenCapacity, split: $needsSplit)")
 
