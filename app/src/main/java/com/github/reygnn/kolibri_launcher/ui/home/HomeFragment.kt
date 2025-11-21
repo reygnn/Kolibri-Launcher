@@ -398,8 +398,8 @@ class HomeFragment : Fragment() {
 
             if (enableSplit) {
                 // 🟢 SPLIT MODE: 50% / 50%.
-                scrollParams.weight = 1f
-                gestureParams.weight = 1f
+                scrollParams.weight = 55F
+                gestureParams.weight = 45F
                 binding.gestureZone.visibility = View.VISIBLE
                 applyScrollViewBorder(colors.textColor)
 
@@ -453,8 +453,9 @@ class HomeFragment : Fragment() {
 
     private fun applyScrollViewBorder(textColor: Int) {
         try {
+            // ... (Berechnung von frameColor und Drawable bleibt unverändert) ...
             val frameColor = Color.argb(
-                30,
+                51,
                 Color.red(textColor),
                 Color.green(textColor),
                 Color.blue(textColor)
@@ -480,17 +481,27 @@ class HomeFragment : Fragment() {
                 resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
             } catch (e: Throwable) { 16 }
 
+            // ✅ Padding setzen: Der Rahmen ist außerhalb dieses Paddings (wenn background gesetzt).
             binding.favoritesScrollView.setPadding(
-                borderPadding,
+                0,
                 borderPadding,
                 borderPadding,
                 borderPadding
             )
 
-            binding.favoritesScrollView.clipToPadding = true
+            binding.favoritesScrollView.clipToPadding = true // Behalten, um den Inhalt im Rahmen zu halten
 
+            // ⚠️ KRITISCHE ÄNDERUNG: MARGINS LÖSCHEN/VEREINFACHEN
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            params.setMargins(-borderPadding, -borderPadding, 0, -borderPadding)
+
+            // Margins zurücksetzen, um zu verhindern, dass die View nach links verschoben wird
+            // Setzen Sie alle Margins auf 0
+            params.setMargins(0, 0, 0, 0)
+
+            // OPTIONAL: Wenn Sie den Rahmen rechts bündig halten möchten,
+            // setzen Sie das rechte Margin auf den Border-Inset-Wert (oder lassen es bei 0)
+            // params.rightMargin = borderPadding
+
             binding.favoritesScrollView.layoutParams = params
 
         } catch (e: Throwable) {
@@ -682,18 +693,6 @@ class HomeFragment : Fragment() {
 
         // 2. Button in den WRAP_CONTENT LinearLayout-Wrapper packen und diesen zurückgeben
         return LinearLayout(context).apply {
-            // 🚨 TEMPORÄRES VISUELLES DEBUGGING START 🚨
-
-            // 1. Erstellen eines einfachen Rahmens (z.B. 2px breite rote Linie)
-            val border = GradientDrawable().apply {
-                setColor(Color.TRANSPARENT) // Hintergrund bleibt transparent
-                setStroke(2, Color.RED)     // Roter Rahmen (2 Pixel breit)
-            }
-            background = border // Den Rahmen auf den Wrapper anwenden
-
-            // 🚨 TEMPORÄRES VISUELLES DEBUGGING ENDE 🚨
-
-
             // Konfiguration des Wrappers
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, // KRITISCH: Begrenzt die Touch-Fläche
