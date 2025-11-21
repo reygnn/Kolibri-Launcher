@@ -422,9 +422,21 @@ class HomeFragment : Fragment() {
             val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
 
             if (enableSplit) {
-                // 🟢 SPLIT MODE: 50% / 50%.
-                scrollParams.weight = 55F
-                gestureParams.weight = 45F
+                // ✅ Orientation-abhängige Gewichtung
+                val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+                if (isLandscape) {
+                    // 🌄 LANDSCAPE: 25% / 75%
+                    scrollParams.weight = 40F
+                    gestureParams.weight = 60F
+                    Timber.d("  → Split mode: 25/75 (landscape)")
+                } else {
+                    // 📱 PORTRAIT: 55% / 45%
+                    scrollParams.weight = 55F
+                    gestureParams.weight = 45F
+                    Timber.d("  → Split mode: 55/45 (portrait)")
+                }
+
                 binding.gestureZone.visibility = View.VISIBLE
                 applyScrollViewBorder(colors.textColor)
 
