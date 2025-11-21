@@ -67,7 +67,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * ✨ FULLY REACTIVE HomeFragment - canScrollVertically() Flow
+ * FULLY REACTIVE HomeFragment - canScrollVertically() Flow
  *
  * Revolutionary approach:
  * - No capacity measurements!
@@ -75,7 +75,7 @@ import kotlin.math.abs
  * - System decides via canScrollVertically()
  * - Pure reactive: ScrollView state → Flow → UI reacts
  *
- * IT SIMPLY WORKS! 🚀
+ * IT SIMPLY WORKS!
  */
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -90,7 +90,7 @@ class HomeFragment : Fragment() {
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
 
-    // ✅ REACTIVE: Scroll state determines split mode
+    // REACTIVE: Scroll state determines split mode
     private val _needsSplit = MutableStateFlow(false)
     private val needsSplit: StateFlow<Boolean> = _needsSplit.asStateFlow()
 
@@ -134,23 +134,8 @@ class HomeFragment : Fragment() {
         try {
             Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
 
-            // ✅ Warte bis Layout WIRKLICH fertig ist
-            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        try {
-                            // Listener sofort entfernen (oneshot)
-                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-
-                            // JETZT ist das Layout fertig!
-                            checkAndEmitScrollState()
-
-                            Timber.d("✅ Scroll state checked after layout completed")
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in layout listener")
-                        }
-                    }
-                }
+            // Warte bis Layout wirklich fertig ist!
+            checkScrollStateAfterNextLayout("Scroll state checked after rotation")
             )
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
@@ -162,7 +147,7 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     /**
-     * ✅ THE MAGIC: Check if ScrollView can scroll
+     * THE MAGIC: Check if ScrollView can scroll
      * System decides → we react!
      */
     private fun checkAndEmitScrollState() {
@@ -172,7 +157,7 @@ class HomeFragment : Fragment() {
             val canScroll = binding.favoritesScrollView.canScrollVertically(1)
 
             if (_needsSplit.value != canScroll) {
-                Timber.d("📜 Scroll capability changed: canScroll=$canScroll")
+                Timber.d("Scroll capability changed: canScroll=$canScroll")
                 _needsSplit.value = canScroll
             }
         } catch (e: Throwable) {
@@ -235,7 +220,7 @@ class HomeFragment : Fragment() {
                             if (_binding == null) return@collect
 
                             try {
-                                Timber.d("🔄 Adjusting layout: split=$split")
+                                Timber.d("Adjusting layout: split=$split")
                                 val colors = viewModel.uiColorsState.value
                                 adjustScrollViewWidth(split, colors)
                             } catch (e: Throwable) {
@@ -308,7 +293,7 @@ class HomeFragment : Fragment() {
                                 try {
                                     updateTimeBasedChips(events)
 
-                                    // ✅ Re-check scroll state after chips change
+                                    // Re-check scroll state after chips change
                                     binding.favoritesScrollView.post {
                                         checkAndEmitScrollState()
                                     }
@@ -362,7 +347,7 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     /**
-     * ✅ SIMPLIFIED: No capacity calculation!
+     * SIMPLIFIED: No capacity calculation!
      * Just render, then check scroll capability
      */
     private fun renderFavorites(
@@ -373,9 +358,9 @@ class HomeFragment : Fragment() {
         val ctx = context ?: return
 
         try {
-            Timber.d("🎨 Rendering ${apps.size} favorites")
+            Timber.d("Rendering ${apps.size} favorites")
 
-            // ✅ Clear and populate
+            // Clear and populate
             binding.appList.removeAllViews()
 
             for (app in apps) {
@@ -389,20 +374,8 @@ class HomeFragment : Fragment() {
                 }
             }
 
-            // ✅ Warte bis Layout fertig ist!
-            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        try {
-                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                            checkAndEmitScrollState()
-                            Timber.d("✅ Scroll state checked after rendering")
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in layout listener")
-                        }
-                    }
-                }
-            )
+            // Warte bis Layout wirklich fertig ist!
+            checkScrollStateAfterNextLayout("Scroll state checked after rendering")
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error rendering favorites")
@@ -410,7 +383,7 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * ✅ Adjust ScrollView width based on split mode
+     * Adjust ScrollView width based on split mode
      */
 // In HomeFragment.kt
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
@@ -422,11 +395,11 @@ class HomeFragment : Fragment() {
             val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
 
             if (enableSplit) {
-                // ✅ Orientation-abhängige Gewichtung
+                // Orientation-abhängige Gewichtung
                 val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
                 if (isLandscape) {
-                    // 🌄 LANDSCAPE: 25% / 75%
+                    // LANDSCAPE: 25% / 75%
                     scrollParams.weight = 40F
                     gestureParams.weight = 60F
                     Timber.d("  → Split mode: 25/75 (landscape)")
@@ -440,16 +413,16 @@ class HomeFragment : Fragment() {
                 binding.gestureZone.visibility = View.VISIBLE
                 applyScrollViewBorder(colors.textColor)
 
-                // ✅ ScrollView darf Touches abfangen (zum Scrollen)
+                // ScrollView darf Touches abfangen (zum Scrollen)
                 customScrollView.allowIntercept = true
 
-                // ✅ ScrollView ist touchbar
+                // ScrollView ist touchbar
                 customScrollView.isScrollContainer = true
                 customScrollView.isClickable = true
                 customScrollView.isFocusable = true
                 customScrollView.isFocusableInTouchMode = true
 
-                // ✅ Touch Listener für Split Mode: Gesture Zone verarbeitet Gesten auf der rechten Hälfte
+                // Touch Listener für Split Mode: Gesture Zone verarbeitet Gesten auf der rechten Hälfte
                 binding.gestureZone.setOnTouchListener { _, event ->
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
@@ -457,23 +430,23 @@ class HomeFragment : Fragment() {
                 Timber.d("  → Split mode: 50% / 50%")
 
             } else {
-                // 🔴 FULL MODE: 100% / 0%. ScrollView muss Event-Abfangen verhindern.
+                // FULL MODE: 100% / 0%. ScrollView muss Event-Abfangen verhindern.
                 scrollParams.weight = 1f
                 gestureParams.weight = 0f
                 binding.gestureZone.visibility = View.GONE
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-                // ❌ ScrollView MUSS das Abfangen von Touches verhindern (Vertikales Scrollen)
+                // ScrollView MUSS das Abfangen von Touches verhindern (Vertikales Scrollen)
                 customScrollView.allowIntercept = false
 
-                // ❌ ScrollView "unsichtbar" für Touch-Events machen (zusätzliche Sicherheit)
+                // ScrollView "unsichtbar" für Touch-Events machen (zusätzliche Sicherheit)
                 customScrollView.isScrollContainer = false
                 customScrollView.isClickable = false
                 customScrollView.isFocusable = false
                 customScrollView.isFocusableInTouchMode = false
 
-                // ❌ Listener auf NULL setzen
+                // Listener auf NULL setzen
                 customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
@@ -518,7 +491,7 @@ class HomeFragment : Fragment() {
                 resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
             } catch (e: Throwable) { 16 }
 
-            // ✅ Padding setzen: Der Rahmen ist außerhalb dieses Paddings (wenn background gesetzt).
+            // Padding setzen: Der Rahmen ist außerhalb dieses Paddings (wenn background gesetzt).
             binding.favoritesScrollView.setPadding(
                 0,
                 borderPadding,
@@ -528,7 +501,7 @@ class HomeFragment : Fragment() {
 
             binding.favoritesScrollView.clipToPadding = true // Behalten, um den Inhalt im Rahmen zu halten
 
-            // ⚠️ KRITISCHE ÄNDERUNG: MARGINS LÖSCHEN/VEREINFACHEN
+            // KRITISCHE ÄNDERUNG: MARGINS LÖSCHEN/VEREINFACHEN
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
 
             // Margins zurücksetzen, um zu verhindern, dass die View nach links verschoben wird
@@ -668,41 +641,50 @@ class HomeFragment : Fragment() {
         textColor: Int,
         shadowColor: Int
     ): View? {
-        // 1. Button-Instanz außerhalb des Scopes initialisieren, um sie später zu verwenden
-        val button: Button
-
-        try {
-            button = Button(context).apply {
+        // 1. Button-Instanz erstellen
+        val button: Button = try {
+            Button(context).apply {
                 // --- UI Konfiguration ---
+                try {
+                    text = app.displayName
+                    background = null
 
-                text = app.displayName
-                background = null
+                    val paddingPx = try {
+                        resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error getting padding dimension")
+                        16 // Fallback
+                    }
+                    setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
 
-                val paddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-                setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    setTextColor(textColor)
 
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setTextColor(textColor)
+                    val buttonTextSizeInPx = try {
+                        resources.getDimension(R.dimen.text_size_app_button)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error getting text size dimension")
+                        48f // Fallback
+                    }
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
 
-                val buttonTextSizeInPx = resources.getDimension(R.dimen.text_size_app_button)
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
 
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
+                    setShadowLayer(
+                        AppConstants.SHADOW_RADIUS_APPS,
+                        AppConstants.SHADOW_DX,
+                        AppConstants.SHADOW_DY,
+                        shadowColor
+                    )
 
-                setShadowLayer(
-                    AppConstants.SHADOW_RADIUS_APPS,
-                    AppConstants.SHADOW_DX,
-                    AppConstants.SHADOW_DY,
-                    shadowColor
-                )
-
-                // KRITISCH: LayoutParams für den Button INNERHALB des Wrappers
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, // <- Nimmt volle Breite des Wrappers
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                // Die Margins werden dem Wrapper hinzugefügt!
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error configuring button UI for ${app.packageName}")
+                }
 
                 // --- Click Handler ---
                 setOnClickListener {
@@ -724,26 +706,32 @@ class HomeFragment : Fragment() {
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating button instance")
+            TimberWrapper.silentError(e, "Error creating button instance for ${app.packageName}")
             return null
         }
 
-        // 2. Button in den WRAP_CONTENT LinearLayout-Wrapper packen und diesen zurückgeben
-        return LinearLayout(context).apply {
-            // Konfiguration des Wrappers
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, // KRITISCH: Begrenzt die Touch-Fläche
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                // Margins für den Abstand zwischen den Buttons
-                setMargins(0, 8, 0, 8)
+        // 2. Wrapper AUCH absichern!
+        return try {
+            LinearLayout(context).apply {
+                try {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        setMargins(0, 8, 0, 8)
+                    }
+
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.START
+
+                    addView(button)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error configuring wrapper for ${app.packageName}")
+                }
             }
-
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.START
-
-            // ✅ Die Button-Instanz hinzufügen (nicht eine ID)
-            addView(button)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error creating wrapper for ${app.packageName}")
+            null
         }
     }
 
@@ -789,20 +777,8 @@ class HomeFragment : Fragment() {
 
             binding.calendarEventsScroll.visibility = View.VISIBLE
 
-            // ✅ Warte bis Layout wirklich fertig ist!
-            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        try {
-                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                            checkAndEmitScrollState()
-                            Timber.d("✅ Scroll state checked after chips updated")
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in layout listener after chips")
-                        }
-                    }
-                }
-            )
+            // Warte bis Layout wirklich fertig ist!
+            checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating chips")
@@ -1276,6 +1252,44 @@ class HomeFragment : Fragment() {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error applying window insets")
+        }
+    }
+
+    // ============================================================================
+    // HELPER
+    // ==========================================================================
+
+    /**
+     * ✅ Helper: Registriert einen ONE-SHOT OnGlobalLayoutListener.
+     * Wird nach dem nächsten Layout-Pass automatisch entfernt.
+     * Ruft dann checkAndEmitScrollState() auf.
+     */
+    private fun checkScrollStateAfterNextLayout(debugMessage: String = "") {
+        try {
+            if (_binding == null || !isAdded) return
+
+            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        try {
+                            if (_binding == null || !isAdded) return
+
+                            // ✅ ONE-SHOT: Listener sofort entfernen
+                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+
+                            checkAndEmitScrollState()
+
+                            if (debugMessage.isNotEmpty()) {
+                                Timber.d("✅ $debugMessage")
+                            }
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error in one-shot layout listener")
+                        }
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error registering one-shot layout listener")
         }
     }
 
