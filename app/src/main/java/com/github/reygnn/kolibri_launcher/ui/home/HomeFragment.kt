@@ -101,7 +101,7 @@ import kotlin.math.abs
  * 6. UI adapts based on split mode:
  *    - split=false: ScrollView takes 100% width, fully transparent to touches
  *                   → All gestures work across entire screen
- *    - split=true:  ScrollView takes 55% (portrait) or 40% (landscape)
+ *    - split=true:  ScrollView takes 55% (portrait) or 30% (landscape)
  *                   → Border appears, scrolling enabled
  *                   → Gesture zone takes remaining space for swipe gestures
  *
@@ -435,12 +435,12 @@ class HomeFragment : Fragment() {
                 val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
                 if (isLandscape) {
-                    // LANDSCAPE: 25% / 75%
-                    scrollParams.weight = 40F
-                    gestureParams.weight = 60F
+                    // LANDSCAPE:
+                    scrollParams.weight = 30F
+                    gestureParams.weight = 70F
                     Timber.d("  → Split mode: 25/75 (landscape)")
                 } else {
-                    // 📱 PORTRAIT: 55% / 45%
+                    // PORTRAIT:
                     scrollParams.weight = 55F
                     gestureParams.weight = 45F
                     Timber.d("  → Split mode: 55/45 (portrait)")
