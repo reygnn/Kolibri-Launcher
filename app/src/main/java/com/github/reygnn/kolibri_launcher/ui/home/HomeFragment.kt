@@ -385,38 +385,60 @@ class HomeFragment : Fragment() {
     /**
      * ✅ Adjust ScrollView width based on split mode
      */
+// In HomeFragment.kt
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
 
             if (enableSplit) {
-                // Split mode: 50% / 50%
+                // 🟢 SPLIT MODE: 50% / 50%. ScrollView muss Touches für das Scrollen konsumieren.
                 scrollParams.weight = 1f
                 gestureParams.weight = 1f
                 binding.gestureZone.visibility = View.VISIBLE
-
-                // Add border to ScrollView
                 applyScrollViewBorder(colors.textColor)
 
-                // Enable scrolling
+                // ✅ ScrollView reaktivieren und Touch-Listener setzen (für Scrolling)
                 binding.favoritesScrollView.isScrollContainer = true
+                binding.favoritesScrollView.isClickable = true
+                binding.favoritesScrollView.isFocusable = true
+                binding.favoritesScrollView.isFocusableInTouchMode = true
+
+                binding.favoritesScrollView.setOnTouchListener { v, event ->
+                    // Scrollen erlauben
+                    v.parent.requestDisallowInterceptTouchEvent(true)
+                    v.onTouchEvent(event)
+                    return@setOnTouchListener true
+                }
+
+                // ✅ Gesture Zone Listener setzen (für globale Gesten auf der rechten Hälfte)
+                binding.gestureZone.setOnTouchListener { _, event ->
+                    gestureDetector?.onTouchEvent(event) ?: false
+                }
 
                 Timber.d("  → Split mode: 50% / 50%")
+
             } else {
-                // Full mode: 100% / 0%
+                // 🔴 FULL MODE: 100% / 0%. ScrollView blockiert Gesten NICHT.
                 scrollParams.weight = 1f
                 gestureParams.weight = 0f
                 binding.gestureZone.visibility = View.GONE
-
-                // Remove border
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-                // Disable scrolling (not needed)
+                // ✅ ScrollView "unsichtbar" für Touch-Events machen
                 binding.favoritesScrollView.isScrollContainer = false
+                binding.favoritesScrollView.isClickable = false
+                binding.favoritesScrollView.isFocusable = false
+                binding.favoritesScrollView.isFocusableInTouchMode = false
 
-                Timber.d("  → Full mode: 100%")
+                // ⚠️ KRITISCH: Listener auf NULL setzen, damit Touches zum rootLayout durchfallen!
+                binding.favoritesScrollView.setOnTouchListener(null)
+
+                // ✅ Gesture Zone Listener auf NULL setzen
+                binding.gestureZone.setOnTouchListener(null)
+
+                Timber.d("  → Full mode: 100% (ScrollView touch-transparent)")
             }
 
             binding.favoritesScrollView.layoutParams = scrollParams
@@ -864,7 +886,8 @@ class HomeFragment : Fragment() {
         try {
             gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
-            // ✅ Root Layout: Only active when NOT in split mode
+            // Root Layout: Only active when NOT in split mode
+            // Dient als Fallback-Ebene für Gesten im Full Mode.
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
                     if (_needsSplit.value) {
@@ -876,36 +899,6 @@ class HomeFragment : Fragment() {
                     false
                 }
             }
-
-            // ✅ ScrollView: Allow scrolling in split mode, block gestures
-            binding.favoritesScrollView.setOnTouchListener { v, event ->
-                if (!_needsSplit.value) {
-                    return@setOnTouchListener false
-                }
-
-                try {
-                    v.parent.requestDisallowInterceptTouchEvent(true)
-                    v.onTouchEvent(event)
-                    return@setOnTouchListener true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in scroll touch")
-                    false
-                }
-            }
-
-            // ✅ Gesture Zone: Only active in split mode
-            binding.gestureZone.setOnTouchListener { _, event ->
-                try {
-                    if (!_needsSplit.value) {
-                        return@setOnTouchListener false
-                    }
-                    gestureDetector?.onTouchEvent(event) ?: false
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in gesture zone touch")
-                    false
-                }
-            }
-
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up gestures")
         }
