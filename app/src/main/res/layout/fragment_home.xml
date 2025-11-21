@@ -1,151 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="false">
+    android:orientation="vertical"
+    android:padding="@dimen/layout_padding">
 
-    <ImageView
-        android:id="@+id/wallpaper_background"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:visibility="gone"
-        android:contentDescription="@string/wallpaper_background" />
+    <!-- ✅ Zeit, Datum, Batterie - aus altem Layout übernommen -->
+    <LinearLayout
+        android:id="@+id/timeContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_xlarge"
+        android:orientation="vertical"
+        android:gravity="start">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/root_layout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="@dimen/layout_padding"
-        android:background="@android:color/transparent"
-        android:clickable="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true">
-
-        <LinearLayout
-            android:id="@+id/time_container"
+        <TextView
+            android:id="@+id/timeText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_xlarge"
-            android:orientation="vertical"
-            android:gravity="start"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent">
+            android:text="@string/time_placeholder"
+            android:textSize="@dimen/text_size_time"
+            android:textColor="@color/default_text_color"
+            android:fontFamily="sans-serif-light" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="@dimen/spacing_small">
 
             <TextView
-                android:id="@+id/time_text"
+                android:id="@+id/dateText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/time_placeholder"
-                android:textSize="@dimen/text_size_time"
+                android:text="@string/date_placeholder"
+                android:textSize="@dimen/text_size_secondary_info"
                 android:textColor="@color/default_text_color"
-                android:fontFamily="sans-serif-light" />
+                android:padding="@dimen/touch_target_padding" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/batteryText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="@dimen/spacing_small">
-
-                <TextView
-                    android:id="@+id/date_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/date_placeholder"
-                    android:textSize="@dimen/text_size_secondary_info"
-                    android:textColor="@color/default_text_color"
-                    android:padding="@dimen/touch_target_padding" />
-
-                <TextView
-                    android:id="@+id/battery_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="100%"
-                    android:textSize="@dimen/text_size_secondary_info"
-                    android:textColor="@color/default_text_color"
-                    android:padding="@dimen/touch_target_padding"
-                    android:layout_marginStart="@dimen/spacing_medium" />
-            </LinearLayout>
+                android:text="100%"
+                android:textSize="@dimen/text_size_secondary_info"
+                android:textColor="@color/default_text_color"
+                android:padding="@dimen/touch_target_padding"
+                android:layout_marginStart="@dimen/spacing_medium" />
         </LinearLayout>
+    </LinearLayout>
 
-        <HorizontalScrollView
-            android:id="@+id/calendar_events_scroll"
-            android:layout_width="0dp"
+    <!-- Kalender/Alarm Chips -->
+    <HorizontalScrollView
+        android:id="@+id/calendarEventsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_small"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/calendarChipsContainer"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_small"
-            android:scrollbars="none"
-            android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/time_container"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/calendar_chips_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:singleLine="true"
-                app:chipSpacing="@dimen/spacing_small" />
-        </HorizontalScrollView>
-        <LinearLayout
-            android:id="@+id/static_favorites_container"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- ✅ VEREINFACHTER FAVORITES CONTAINER -->
+    <!-- Nur noch EIN Layout! -->
+    <LinearLayout
+        android:id="@+id/favoritesContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="@dimen/spacing_medium"
+        android:orientation="horizontal"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <!-- ScrollView (Breite dynamisch: 100% oder 50%) -->
+        <ScrollView
+            android:id="@+id/favoritesScrollView"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="start"
-            android:visibility="gone"
-            android:layout_marginTop="@dimen/spacing_medium"
-            app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintVertical_bias="0.0">
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/static_app_list"
+                android:id="@+id/appList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
-        </LinearLayout>
+        </ScrollView>
 
-        <LinearLayout
-            android:id="@+id/split_container"
+        <!-- Rechte Hälfte für Gesten (nur sichtbar wenn Split-Mode) -->
+        <View
+            android:id="@+id/gestureZone"
             android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:orientation="horizontal"
-            android:gravity="start"
-            android:visibility="gone"
-            android:layout_marginTop="@dimen/spacing_medium"
-            app:layout_constraintVertical_bias="0.0"
-            app:layout_constraintTop_toBottomOf="@id/calendar_events_scroll"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent">
+            android:layout_height="match_parent"
+            android:layout_weight="0"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone" />
+    </LinearLayout>
 
-            <ScrollView
-                android:id="@+id/favorites_scroll_view"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:scrollbars="none"
-                android:overScrollMode="never">
-
-                <LinearLayout
-                    android:id="@+id/scrolling_app_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
-
-            <View
-                android:id="@+id/gesture_zone_right"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:clickable="false"
-                android:focusable="false" />
-
-        </LinearLayout>
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</FrameLayout>
+</LinearLayout>

@@ -8,7 +8,6 @@ import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -55,9 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -68,18 +65,15 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * ULTRA CRASH-SAFE HomeFragment - REACTIVE "DUMB UI" VERSION
+ * ✨ FULLY REACTIVE HomeFragment - canScrollVertically() Flow
  *
- * Philosophy: Fragment holds NO state, only renders what ViewModel provides
+ * Revolutionary approach:
+ * - No capacity measurements!
+ * - No dummy buttons!
+ * - System decides via canScrollVertically()
+ * - Pure reactive: ScrollView state → Flow → UI reacts
  *
- * Reactive approach:
- * - Screen capacity is a Flow (not a var!)
- * - Favorites from ViewModel are a Flow
- * - combine() waits for BOTH before rendering
- * - debounce() prevents flicker during StatusBar animation
- * - distinctUntilChanged() filters duplicate emissions
- *
- * No hacks, no flags, no force-renders - pure reactive streams!
+ * IT SIMPLY WORKS! 🚀
  */
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -93,12 +87,9 @@ class HomeFragment : Fragment() {
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
 
-    // Reactive screen capacity - Flow instead of var!
-    private val _screenCapacity = MutableStateFlow<Int?>(null)
-    private val screenCapacity: StateFlow<Int?> = _screenCapacity.asStateFlow()
-
-    // Only flag: Is split mode currently active (for gesture routing)
-    private var isSplitModeActive = false
+    // ✅ REACTIVE: Scroll state determines split mode
+    private val _needsSplit = MutableStateFlow(false)
+    private val needsSplit: StateFlow<Boolean> = _needsSplit.asStateFlow()
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
@@ -107,8 +98,6 @@ class HomeFragment : Fragment() {
             // Even logging can fail
         }
     }
-
-    private var layoutChangeListener: View.OnLayoutChangeListener? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -123,19 +112,13 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
-            // ✅ CRITICAL: Hide StatusBar BEFORE measuring capacity
             hideStatusBar()
-
             setupBackPressHandler()
             setupGestures()
             setupDoubleTapActions()
             setupFragmentResultListener()
             setupHomeWindowInsets()
 
-            // ✅ Measure AFTER StatusBar is hidden
-            setupDynamicCapacityListener()
-
-            // ✅ Observers last (will wait for capacity)
             observeViewModel()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
@@ -148,25 +131,9 @@ class HomeFragment : Fragment() {
         try {
             Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
 
-            // ✅ LÖSUNG: Mehrere Messversuche mit steigenden Delays
-            // Das Layout braucht Zeit, sich an die neue Orientierung anzupassen
-            val delays = listOf(100L, 250L, 400L) // Mehrere Versuche
-
-            delays.forEach { delay ->
-                binding.splitContainer.postDelayed({
-                    try {
-                        if (_binding != null && isAdded) {
-                            val height = binding.splitContainer.height
-                            Timber.d("Re-measuring after config change (delay=${delay}ms): height=$height")
-
-                            if (height > 0) {
-                                measureAndEmitCapacity(binding.splitContainer, height)
-                            }
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in config change re-measure")
-                    }
-                }, delay)
+            // ✅ Re-check scroll state after rotation
+            binding.favoritesScrollView.post {
+                checkAndEmitScrollState()
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
@@ -174,185 +141,49 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // SCREEN CAPACITY MEASUREMENT - Reactive Flow!
+    // REACTIVE SCROLL STATE DETECTION
     // ============================================================================
 
     /**
-     * Sets up listener that monitors container height and emits capacity to Flow.
-     * Triggers on: Chip bar toggle, rotation, keyboard events
+     * ✅ THE MAGIC: Check if ScrollView can scroll
+     * System decides → we react!
      */
-    private fun setupDynamicCapacityListener() {
-        if (_binding == null) return
-
-        Timber.d("DEBUG: setupDynamicCapacityListener")
-
-        layoutChangeListener = View.OnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
-            try {
-                val newHeight = bottom - top
-                val oldHeight = oldBottom - oldTop
-
-                if (newHeight == oldHeight || newHeight == 0 || _binding == null) {
-                    return@OnLayoutChangeListener
-                }
-
-                measureAndEmitCapacity(v, newHeight)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in layout change listener")
-            }
-        }
-
-        binding.splitContainer.addOnLayoutChangeListener(layoutChangeListener)
-
-        binding.splitContainer.post {
-            try {
-                val height = binding.splitContainer.height
-
-                if (height > 0) {
-                    measureAndEmitCapacity(binding.splitContainer, height)
-                } else {
-                    _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
-                }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in initial capacity measurement")
-                _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
-            }
-        }
-    }
-
-    /**
-     * Measures screen capacity and emits to Flow (reactive!)
-     */
-    private fun measureAndEmitCapacity(container: View, containerHeight: Int) {
+    private fun checkAndEmitScrollState() {
         try {
-            val ctx = context ?: return
+            if (_binding == null || !isAdded) return
 
-            val (itemHeight, itemMargin) = measureFavoriteItemHeight(ctx)
+            val canScroll = binding.favoritesScrollView.canScrollVertically(1)
 
-            // ✅ DEBUG: Log die Messwerte
-            Timber.d("📏 CONTAINER HEIGHTS:")
-            Timber.d("  - splitContainer: ${binding.splitContainer.height}")
-            Timber.d("  - staticFavoritesContainer: ${binding.staticFavoritesContainer.height}")
-            Timber.d("  - staticAppList: ${binding.staticAppList.height}")
-            Timber.d("  - scrollingAppList: ${binding.scrollingAppList.height}")
-            Timber.d("  - favoritesScrollView: ${binding.favoritesScrollView.height}")
-            Timber.d("  - Passed containerHeight: $containerHeight")
-
-            if (itemHeight == 0 || (itemHeight + itemMargin) == 0) {
-                Timber.w("  ⚠️ Invalid item measurements, using fallback")
-                _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
-                return
-            }
-
-            val totalHeightPerItem = itemHeight + itemMargin
-            val capacity = (containerHeight / totalHeightPerItem).toInt()
-
-            // ✅ DEBUG: Log das Ergebnis
-            Timber.d("  ✅ CALCULATED CAPACITY: $capacity")
-            Timber.d("  - Total height per item: $totalHeightPerItem")
-
-            _screenCapacity.value = capacity
-            viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error measuring capacity")
-            _screenCapacity.value = AppConstants.MAX_FALLBACK_APPS_ON_HOME
-        }
-    }
-
-
-    /**
-     * Measures a single favorite button by creating a dummy with exact same properties.
-     * Returns (itemHeight, verticalMargin)
-     */
-    private fun measureFavoriteItemHeight(context: Context): Pair<Int, Int> {
-        try {
-            val dummyButton = Button(context)
-
-            // ✅ CRITICAL: Verwende MaterialButton Properties!
-            dummyButton.background = null
-            dummyButton.isAllCaps = false
-
-            val paddingPx = try {
-                resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-            } catch (e: Throwable) { 0 }
-            dummyButton.setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
-
-            val buttonTextSizeInPx = try {
-                resources.getDimension(R.dimen.text_size_app_button)
-            } catch (e: Throwable) { 16f }
-            dummyButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
-
-            dummyButton.maxLines = 1
-            dummyButton.ellipsize = TextUtils.TruncateAt.END
-            dummyButton.text = "Test Application"  // Längerer Text
-            dummyButton.gravity = Gravity.START or Gravity.CENTER_VERTICAL
-
-            // ✅ NEU: Setze LayoutParams MIT Margins!
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            lp.setMargins(0, 8, 0, 8)  // WICHTIG: Margins wie echte Buttons!
-            dummyButton.layoutParams = lp
-
-            // ✅ NEU: Messe mit Container-Breite für realistic wrapping
-            val displayMetrics = resources.displayMetrics
-            val containerWidth = displayMetrics.widthPixels - (paddingPx * 2)
-
-            dummyButton.measure(
-                View.MeasureSpec.makeMeasureSpec(containerWidth, View.MeasureSpec.AT_MOST),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-            )
-
-            val itemHeight = dummyButton.measuredHeight
-            val verticalMarginInPx = 16  // 8+8 aus setMargins
-
-            Timber.d("📐 Dummy button measured:")
-            Timber.d("  - measuredHeight: $itemHeight")
-            Timber.d("  - measuredWidth: ${dummyButton.measuredWidth}")
-            Timber.d("  - containerWidth: $containerWidth")
-            Timber.d("  - margins: $verticalMarginInPx")
-
-            if (itemHeight > 0) {
-                return Pair(itemHeight, verticalMarginInPx)
+            if (_needsSplit.value != canScroll) {
+                Timber.d("📜 Scroll capability changed: canScroll=$canScroll")
+                _needsSplit.value = canScroll
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error measuring dummy button")
+            TimberWrapper.silentError(e, "Error checking scroll state")
         }
-
-        return Pair(0, 0)
     }
 
     // ============================================================================
-    // OBSERVERS - Pure Reactive!
+    // OBSERVERS - PURE REACTIVE!
     // ============================================================================
 
     private fun observeViewModel() {
-        // Observer 1: COMBINED Favorites + Capacity
+        // Observer 1: Favorites (no capacity needed!)
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     try {
-                        combine(
-                            viewModel.favoriteAppsState,
-                            screenCapacity
-                                .filterNotNull()              // Wait for first measurement
-                                // .distinctUntilChanged()       // Filter duplicates
-                        ) { favState, capacity ->
-                            Pair(favState, capacity)
-                        }.collect { (favState, capacity) ->
+                        viewModel.favoriteAppsState.collect { favState ->
                             if (_binding == null) return@collect
 
-                            Timber.d("Combined state: Fav=${favState::class.simpleName}, Capacity=$capacity")
+                            Timber.d("📦 Favorites state: ${favState::class.simpleName}")
 
                             try {
                                 when (favState) {
-                                    is UiState.Loading -> {
-                                        clearAllViews()
-                                    }
+                                    is UiState.Loading -> clearAllViews()
                                     is UiState.Success -> {
                                         val colors = viewModel.uiColorsState.value
-                                        renderFavorites(favState.data.apps, colors, capacity)
+                                        renderFavorites(favState.data.apps, colors)
                                     }
                                     is UiState.Error -> {
                                         viewModel.onFavoriteAppsError(favState.message)
@@ -362,23 +193,52 @@ class HomeFragment : Fragment() {
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error handling combined state")
+                                TimberWrapper.silentError(e, "Error handling favorites state")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting combined state")
+                        TimberWrapper.silentError(e, "Error collecting favorites")
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for combined state")
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for favorites")
             }
         }
 
-        // Observer 2: Time, date, battery
+        // Observer 2: Scroll state → Layout adjustment
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        needsSplit.collect { split ->
+                            if (_binding == null) return@collect
+
+                            try {
+                                Timber.d("🔄 Adjusting layout: split=$split")
+                                val colors = viewModel.uiColorsState.value
+                                adjustScrollViewWidth(split, colors)
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error adjusting layout")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error collecting scroll state")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for scroll state")
+            }
+        }
+
+        // Observer 3: Time, date, battery
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -389,19 +249,19 @@ class HomeFragment : Fragment() {
                             try {
                                 binding.timeText.text = state.timeString
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating time text")
+                                TimberWrapper.silentError(e, "Error updating time")
                             }
 
                             try {
                                 binding.dateText.text = state.dateString
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating date text")
+                                TimberWrapper.silentError(e, "Error updating date")
                             }
 
                             try {
                                 binding.batteryText.text = state.batteryString
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating battery text")
+                                TimberWrapper.silentError(e, "Error updating battery")
                             }
                         }
                     } catch (e: CancellationException) {
@@ -417,7 +277,7 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 3: TimeBasedEvents with distinctUntilChanged
+        // Observer 4: TimeBasedEvents
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -430,24 +290,29 @@ class HomeFragment : Fragment() {
 
                                 try {
                                     updateTimeBasedChips(events)
+
+                                    // ✅ Re-check scroll state after chips change
+                                    binding.favoritesScrollView.post {
+                                        checkAndEmitScrollState()
+                                    }
                                 } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error updating time-based chips")
+                                    TimberWrapper.silentError(e, "Error updating chips")
                                 }
                             }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting timeBasedEvents")
+                        TimberWrapper.silentError(e, "Error collecting events")
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for timeBasedEvents")
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for events")
             }
         }
 
-        // Observer 4: Colors - FAST UPDATE on existing views
+        // Observer 5: Colors
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -464,7 +329,7 @@ class HomeFragment : Fragment() {
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting uiColorsState")
+                        TimberWrapper.silentError(e, "Error collecting colors")
                     }
                 }
             } catch (e: CancellationException) {
@@ -476,54 +341,40 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // PURE RENDERING - No side effects on member variables!
+    // RENDERING - ULTRA SIMPLIFIED!
     // ============================================================================
 
     /**
-     * PURE FUNCTION - Renders favorites with given capacity
-     * No dependency on currentScreenCapacity member variable!
+     * ✅ SIMPLIFIED: No capacity calculation!
+     * Just render, then check scroll capability
      */
     private fun renderFavorites(
         apps: List<AppInfo>,
-        colors: UiColorsState,
-        screenCapacity: Int
+        colors: UiColorsState
     ) {
         if (_binding == null) return
         val ctx = context ?: return
 
         try {
-            // Pure decision based on parameters
-            val needsSplit = apps.size > screenCapacity
+            Timber.d("🎨 Rendering ${apps.size} favorites")
 
-            // ✅ DEBUG: Log die Entscheidung
-            Timber.d("🎨 RENDER FAVORITES:")
-            Timber.d("  - Apps count: ${apps.size}")
-            Timber.d("  - Screen capacity: $screenCapacity")
-            Timber.d("  - Needs split: $needsSplit")
-
-            Timber.d("Rendering ${apps.size} favorites (capacity: $screenCapacity, split: $needsSplit)")
-
-            switchContainerMode(needsSplit, colors)
-
-            val targetContainer = if (needsSplit) {
-                binding.scrollingAppList
-            } else {
-                binding.staticAppList
-            }
-
-            targetContainer.removeAllViews()
+            // ✅ Clear and populate
+            binding.appList.removeAllViews()
 
             for (app in apps) {
                 try {
                     val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
                     if (button != null) {
-                        targetContainer.addView(button)
-                    } else {
-                        Timber.w("Failed to create button for ${app.packageName}")
+                        binding.appList.addView(button)
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
                 }
+            }
+
+            // ✅ MAGIC: Check scroll capability AFTER rendering
+            binding.favoritesScrollView.post {
+                checkAndEmitScrollState()
             }
 
         } catch (e: Throwable) {
@@ -532,72 +383,47 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Switches between normal and split-screen mode
+     * ✅ Adjust ScrollView width based on split mode
      */
-    private fun switchContainerMode(enableSplit: Boolean, colors: UiColorsState) {
-        try {
-            isSplitModeActive = enableSplit
-
-            binding.splitContainer.visibility = if (enableSplit) View.VISIBLE else View.GONE
-            binding.staticFavoritesContainer.visibility = if (enableSplit) View.GONE else View.VISIBLE
-
-            if (enableSplit) {
-                applySplitModeLayout(colors)
-            } else {
-                removeSplitModeLayout()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error switching container mode")
-        }
-    }
-
-    private fun applySplitModeLayout(colors: UiColorsState) {
+    private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            val gestureParams = binding.gestureZoneRight.layoutParams as LinearLayout.LayoutParams
+            val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
 
-            scrollParams.weight = 1f
-            gestureParams.weight = 1f
+            if (enableSplit) {
+                // Split mode: 50% / 50%
+                scrollParams.weight = 1f
+                gestureParams.weight = 1f
+                binding.gestureZone.visibility = View.VISIBLE
+
+                // Add border to ScrollView
+                applyScrollViewBorder(colors.textColor)
+
+                // Enable scrolling
+                binding.favoritesScrollView.isScrollContainer = true
+
+                Timber.d("  → Split mode: 50% / 50%")
+            } else {
+                // Full mode: 100% / 0%
+                scrollParams.weight = 1f
+                gestureParams.weight = 0f
+                binding.gestureZone.visibility = View.GONE
+
+                // Remove border
+                binding.favoritesScrollView.background = null
+                binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+
+                // Disable scrolling (not needed)
+                binding.favoritesScrollView.isScrollContainer = false
+
+                Timber.d("  → Full mode: 100%")
+            }
+
             binding.favoritesScrollView.layoutParams = scrollParams
-            binding.gestureZoneRight.layoutParams = gestureParams
-
-            binding.favoritesScrollView.isScrollContainer = true
-
-            binding.gestureZoneRight.isClickable = true
-            binding.gestureZoneRight.isFocusable = true
-
-            binding.rootLayout.clipChildren = false
-            binding.rootLayout.clipToPadding = false
-            binding.splitContainer.clipChildren = false
-            binding.splitContainer.clipToPadding = false
-
-            applyScrollViewBorder(colors.textColor)
+            binding.gestureZone.layoutParams = gestureParams
 
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying split mode layout")
-        }
-    }
-
-    private fun removeSplitModeLayout() {
-        try {
-            binding.favoritesScrollView.background = null
-            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
-            binding.favoritesScrollView.clipToPadding = true
-
-            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            params.setMargins(0, 0, 0, 0)
-            binding.favoritesScrollView.layoutParams = params
-
-            binding.gestureZoneRight.isClickable = false
-            binding.gestureZoneRight.isFocusable = false
-
-            binding.rootLayout.clipChildren = true
-            binding.rootLayout.clipToPadding = true
-            binding.splitContainer.clipChildren = true
-            binding.splitContainer.clipToPadding = true
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error removing split mode layout")
+            TimberWrapper.silentError(e, "Error adjusting ScrollView width")
         }
     }
 
@@ -644,15 +470,14 @@ class HomeFragment : Fragment() {
             binding.favoritesScrollView.layoutParams = params
 
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying ScrollView border")
+            TimberWrapper.silentError(e, "Error applying border")
         }
     }
 
     private fun clearAllViews() {
         try {
             if (_binding != null && isAdded && !isDetached) {
-                binding.scrollingAppList.removeAllViews()
-                binding.staticAppList.removeAllViews()
+                binding.appList.removeAllViews()
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error clearing views")
@@ -660,7 +485,7 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // COLOR UPDATES - Fast update on existing views (no rebuild)
+    // COLOR UPDATES
     // ============================================================================
 
     private fun updateAllColors(colors: UiColorsState) {
@@ -678,7 +503,7 @@ class HomeFragment : Fragment() {
                 shadowColor
             )
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating time text color")
+            TimberWrapper.silentError(e, "Error updating time color")
         }
 
         try {
@@ -690,7 +515,7 @@ class HomeFragment : Fragment() {
                 shadowColor
             )
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating date text color")
+            TimberWrapper.silentError(e, "Error updating date color")
         }
 
         try {
@@ -702,13 +527,13 @@ class HomeFragment : Fragment() {
                 shadowColor
             )
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating battery text color")
+            TimberWrapper.silentError(e, "Error updating battery color")
         }
 
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-        if (isSplitModeActive) {
+        if (_needsSplit.value) {
             try {
                 applyScrollViewBorder(textColor)
             } catch (e: Throwable) {
@@ -728,11 +553,11 @@ class HomeFragment : Fragment() {
                         configureChipColorOnly(view, colors)
                     }
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating chip color at index $i")
+                    TimberWrapper.silentError(e, "Error updating chip $i")
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in updateCalendarChipsColors")
+            TimberWrapper.silentError(e, "Error updating chips colors")
         }
     }
 
@@ -740,15 +565,9 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         try {
-            val activeContainer = if (isSplitModeActive) {
-                binding.scrollingAppList
-            } else {
-                binding.staticAppList
-            }
-
-            for (i in 0 until activeContainer.childCount) {
+            for (i in 0 until binding.appList.childCount) {
                 try {
-                    val view = activeContainer.getChildAt(i)
+                    val view = binding.appList.getChildAt(i)
                     if (view is Button) {
                         view.setTextColor(textColor)
                         view.setShadowLayer(
@@ -759,11 +578,11 @@ class HomeFragment : Fragment() {
                         )
                     }
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating button color at index $i")
+                    TimberWrapper.silentError(e, "Error updating button $i")
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating favorite button colors")
+            TimberWrapper.silentError(e, "Error updating button colors")
         }
     }
 
@@ -782,7 +601,7 @@ class HomeFragment : Fragment() {
                 try {
                     text = app.displayName
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting button text")
+                    TimberWrapper.silentError(e, "Error setting text")
                     text = "App"
                 }
 
@@ -822,7 +641,7 @@ class HomeFragment : Fragment() {
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting ellipsize/maxlines")
+                    TimberWrapper.silentError(e, "Error setting ellipsize")
                 }
 
                 try {
@@ -851,7 +670,7 @@ class HomeFragment : Fragment() {
                     try {
                         viewModel.onAppClicked(app)
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in app click for ${app.packageName}")
+                        TimberWrapper.silentError(e, "Error in click")
                     }
                 }
 
@@ -860,13 +679,13 @@ class HomeFragment : Fragment() {
                         showAppContextMenu(app)
                         true
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in long click for ${app.packageName}")
+                        TimberWrapper.silentError(e, "Error in long click")
                         false
                     }
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error creating app button for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error creating button")
             null
         }
     }
@@ -891,10 +710,7 @@ class HomeFragment : Fragment() {
 
             val layoutPadding = try {
                 resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting layout_padding")
-                0
-            }
+            } catch (e: Throwable) { 0 }
 
             val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
             val chipMaxWidth = (availableWidth * 0.80).toInt()
@@ -910,13 +726,13 @@ class HomeFragment : Fragment() {
                         binding.calendarChipsContainer.addView(chip)
                     }
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip for ${event.title}")
+                    TimberWrapper.silentError(e, "Error creating chip")
                 }
             }
 
             binding.calendarEventsScroll.visibility = View.VISIBLE
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating time-based chips")
+            TimberWrapper.silentError(e, "Error updating chips")
         }
     }
 
@@ -968,7 +784,7 @@ class HomeFragment : Fragment() {
             chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
 
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying colors to chip")
+            TimberWrapper.silentError(e, "Error updating chip color")
         }
     }
 
@@ -999,14 +815,14 @@ class HomeFragment : Fragment() {
 
                     text = "$alarmTime ${event.title}"
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting alarm chip text")
+                    TimberWrapper.silentError(e, "Error formatting alarm")
                     text = event.title
                 }
 
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error creating alarm chip")
+            TimberWrapper.silentError(e, "Error creating alarm chip")
             null
         }
     }
@@ -1027,20 +843,20 @@ class HomeFragment : Fragment() {
 
                     text = "$eventTime ${event.title}"
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting calendar chip text")
+                    TimberWrapper.silentError(e, "Error formatting calendar")
                     text = event.title
                 }
 
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error creating calendar chip")
+            TimberWrapper.silentError(e, "Error creating calendar chip")
             null
         }
     }
 
     // ============================================================================
-    // GESTURES - Keep the good logic!
+    // GESTURES - SIMPLIFIED ROUTING
     // ============================================================================
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1048,49 +864,44 @@ class HomeFragment : Fragment() {
         try {
             gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
-            // 1. Root Listener (only active in normal mode)
+            // ✅ Root Layout: Only active when NOT in split mode
             binding.rootLayout.setOnTouchListener { _, event ->
                 try {
-                    if (isSplitModeActive) {
+                    if (_needsSplit.value) {
                         return@setOnTouchListener false
                     }
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in root layout touch handler")
+                    TimberWrapper.silentError(e, "Error in root touch")
                     false
                 }
             }
 
-            // 2. ScrollView Listener (consumes events in split mode, allows scrolling)
+            // ✅ ScrollView: Allow scrolling in split mode, block gestures
             binding.favoritesScrollView.setOnTouchListener { v, event ->
-                if (!isSplitModeActive) {
+                if (!_needsSplit.value) {
                     return@setOnTouchListener false
                 }
 
                 try {
                     v.parent.requestDisallowInterceptTouchEvent(true)
-
-                    // ✅ CRITICAL: Pass event to ScrollView first (allows scrolling!)
                     v.onTouchEvent(event)
-
-                    // Then consume event (blocks gestures from bubbling to root)
                     return@setOnTouchListener true
-
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in ScrollView touch handler")
+                    TimberWrapper.silentError(e, "Error in scroll touch")
                     false
                 }
             }
 
-            // 3. Gesture Zone (only active in split mode)
-            binding.gestureZoneRight.setOnTouchListener { _, event ->
+            // ✅ Gesture Zone: Only active in split mode
+            binding.gestureZone.setOnTouchListener { _, event ->
                 try {
-                    if (!isSplitModeActive) {
+                    if (!_needsSplit.value) {
                         return@setOnTouchListener false
                     }
                     gestureDetector?.onTouchEvent(event) ?: false
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in gesture zone touch handler")
+                    TimberWrapper.silentError(e, "Error in gesture zone touch")
                     false
                 }
             }
@@ -1181,7 +992,7 @@ class HomeFragment : Fragment() {
                 }
             })
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting time click listener")
+            TimberWrapper.silentError(e, "Error setting time click")
         }
 
         try {
@@ -1195,7 +1006,7 @@ class HomeFragment : Fragment() {
                 }
             })
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting date click listener")
+            TimberWrapper.silentError(e, "Error setting date click")
         }
 
         try {
@@ -1209,7 +1020,7 @@ class HomeFragment : Fragment() {
                 }
             })
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting battery click listener")
+            TimberWrapper.silentError(e, "Error setting battery click")
         }
     }
 
@@ -1228,7 +1039,7 @@ class HomeFragment : Fragment() {
                 }
                 lastClickTime = clickTime
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in DoubleClickListener onClick")
+                TimberWrapper.silentError(e, "Error in onClick")
             }
         }
 
@@ -1239,17 +1050,13 @@ class HomeFragment : Fragment() {
     // BACK PRESS HANDLER
     // ============================================================================
 
-    /**
-     * Prevents back button from closing launcher when we're on home screen
-     */
     private fun setupBackPressHandler() {
         try {
             requireActivity().onBackPressedDispatcher.addCallback(
                 viewLifecycleOwner,
                 object : OnBackPressedCallback(true) {
                     override fun handleOnBackPressed() {
-                        // Stay on home screen - we're the launcher!
-                        Timber.d("Back pressed on home screen - ignoring")
+                        Timber.d("Back pressed - ignoring (we're the launcher)")
                     }
                 }
             )
@@ -1271,14 +1078,14 @@ class HomeFragment : Fragment() {
                 try {
                     val app = longClickedApp
                     if (app == null) {
-                        Timber.w("Fragment result received but longClickedApp is null")
+                        Timber.w("Result received but longClickedApp is null")
                         return@setFragmentResultListener
                     }
 
                     val action = try {
                         bundle.getString(AppContextMenuDialogFragment.RESULT_KEY_ACTION)
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting action from bundle")
+                        TimberWrapper.silentError(e, "Error getting action")
                         null
                     }
 
@@ -1292,11 +1099,11 @@ class HomeFragment : Fragment() {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in fragment result listener")
+                    TimberWrapper.silentError(e, "Error in result listener")
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up fragment result listener")
+            TimberWrapper.silentError(e, "Error setting up result listener")
         }
     }
 
@@ -1308,7 +1115,7 @@ class HomeFragment : Fragment() {
                     ShortcutInfo::class.java
                 )
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting shortcut from bundle")
+                TimberWrapper.silentError(e, "Error getting shortcut")
                 null
             }
 
@@ -1342,7 +1149,7 @@ class HomeFragment : Fragment() {
         try {
             viewModel.onToggleFavorite(app)
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error toggling favorite")
         }
     }
 
@@ -1354,7 +1161,7 @@ class HomeFragment : Fragment() {
             }
             startActivity(intent)
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error showing app info")
             viewModel.onAppInfoError()
         }
     }
@@ -1373,7 +1180,7 @@ class HomeFragment : Fragment() {
             currentDialog = dialog
             dialog.show(childFragmentManager, AppContextMenuDialogFragment.TAG)
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing app context menu for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error showing context menu")
         }
     }
 
@@ -1383,7 +1190,7 @@ class HomeFragment : Fragment() {
 
     private fun setupHomeWindowInsets() {
         try {
-            val initialRootPadding = Rect(
+            val initialRootPadding = android.graphics.Rect(
                 binding.rootLayout.paddingLeft,
                 binding.rootLayout.paddingTop,
                 binding.rootLayout.paddingRight,
@@ -1392,7 +1199,7 @@ class HomeFragment : Fragment() {
 
             val timeContainerParams = binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
             if (timeContainerParams == null) {
-                TimberWrapper.silentError("TimeContainer LayoutParams are not MarginLayoutParams")
+                TimberWrapper.silentError("TimeContainer params not MarginLayoutParams")
                 ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
                     val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                     v.setPadding(
@@ -1424,7 +1231,7 @@ class HomeFragment : Fragment() {
                 insets
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying window insets to HomeFragment")
+            TimberWrapper.silentError(e, "Error applying window insets")
         }
     }
 
@@ -1436,7 +1243,6 @@ class HomeFragment : Fragment() {
         super.onResume()
         try {
             hideStatusBar()
-
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume")
         }
@@ -1447,7 +1253,7 @@ class HomeFragment : Fragment() {
         try {
             showStatusBar()
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onPause showing status bar")
+            TimberWrapper.silentError(e, "Error in onPause")
         }
     }
 
@@ -1473,11 +1279,6 @@ class HomeFragment : Fragment() {
 
             gestureDetector = null
             longClickedApp = null
-
-            if (layoutChangeListener != null) {
-                _binding?.splitContainer?.removeOnLayoutChangeListener(layoutChangeListener)
-                layoutChangeListener = null
-            }
 
             _binding = null
         } catch (e: Throwable) {
