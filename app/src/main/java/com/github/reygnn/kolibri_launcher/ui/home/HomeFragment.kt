@@ -214,7 +214,7 @@ class HomeFragment : Fragment() {
                         viewModel.favoriteAppsState.collect { favState ->
                             if (_binding == null) return@collect
 
-                            Timber.d("📦 Favorites state: ${favState::class.simpleName}")
+                            Timber.d("Favorites state: ${favState::class.simpleName}")
 
                             try {
                                 when (favState) {
