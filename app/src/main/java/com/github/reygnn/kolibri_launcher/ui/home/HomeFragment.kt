@@ -55,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -131,12 +132,23 @@ class HomeFragment : Fragment() {
     private val _needsSplit = MutableStateFlow(false)
     private val needsSplit: StateFlow<Boolean> = _needsSplit.asStateFlow()
 
+    private lateinit var _orientationState: MutableStateFlow<Int>
+    val orientationState: StateFlow<Int> get() = _orientationState.asStateFlow()
+
+
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in HomeFragment")
         } catch (e: Throwable) {
             // Even logging can fail
         }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Dieser Code greift bei der Instanziierung auf Ressourcen zu!
+        _orientationState = MutableStateFlow(resources.configuration.orientation)
     }
 
     override fun onCreateView(
@@ -170,6 +182,9 @@ class HomeFragment : Fragment() {
 
         try {
             Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
+
+            // Den Orientation-State sofort aktualisieren
+            _orientationState.value = newConfig.orientation
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rotation")
@@ -223,6 +238,7 @@ class HomeFragment : Fragment() {
                                         val colors = viewModel.uiColorsState.value
                                         renderFavorites(favState.data.apps, colors)
                                     }
+
                                     is UiState.Error -> {
                                         viewModel.onFavoriteAppsError(favState.message)
                                         clearAllViews()
@@ -252,17 +268,27 @@ class HomeFragment : Fragment() {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     try {
-                        needsSplit.collect { split ->
-                            if (_binding == null) return@collect
-
-                            try {
-                                Timber.d("Adjusting layout: split=$split")
-                                val colors = viewModel.uiColorsState.value
-                                adjustScrollViewWidth(split, colors)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error adjusting layout")
-                            }
+                        needsSplit.combine(orientationState) { split, orientation ->
+                            // Ein Tupel (Pair) zurückgeben,
+                            // das sowohl den Split-Status als auch die Ausrichtung enthält.
+                            Pair(split, orientation)
                         }
+                            // distinctUntilChanged() vergleicht nun BEIDE Werte im Pair
+                            .distinctUntilChanged()
+                            .collect { (split, orientation) -> // Destrukturierung des Pairs
+                                if (_binding == null) return@collect
+
+                                try {
+                                    Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
+                                    val colors = viewModel.uiColorsState.value
+
+                                    // adjustScrollViewWidth(split, colors) wird aufgerufen,
+                                    // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
+                                    adjustScrollViewWidth(split, colors)
+                                } catch (e: Throwable) {
+                                    TimberWrapper.silentError(e, "Error adjusting layout")
+                                }
+                            }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
@@ -432,19 +458,22 @@ class HomeFragment : Fragment() {
 
             if (enableSplit) {
                 // Orientation-abhängige Gewichtung
-                val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val isLandscape =
+                    resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
                 if (isLandscape) {
                     // LANDSCAPE:
-                    scrollParams.weight = 30F
-                    gestureParams.weight = 70F
+                    scrollParams.weight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT
+                    gestureParams.weight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
                     Timber.d("  → Split mode: (landscape)")
                 } else {
                     // PORTRAIT:
-                    scrollParams.weight = 55F
-                    gestureParams.weight = 45F
+                    scrollParams.weight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT
+                    gestureParams.weight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT
                     Timber.d("  → Split mode: (portrait)")
                 }
+
+                Timber.d("Konfiguration: isLandscape=${isLandscape}, ScrollWeight=${scrollParams.weight}, GestureWeight=${gestureParams.weight}")
 
                 binding.gestureZone.visibility = View.VISIBLE
                 applyScrollViewBorder(colors.textColor)
@@ -462,9 +491,6 @@ class HomeFragment : Fragment() {
                 binding.gestureZone.setOnTouchListener { _, event ->
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
-
-                Timber.d("  → Split mode: 50% / 50%")
-
             } else {
                 // FULL MODE: 100% / 0%. ScrollView muss Event-Abfangen verhindern.
                 scrollParams.weight = 1f
@@ -486,7 +512,7 @@ class HomeFragment : Fragment() {
                 customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
-                Timber.d("  → Full mode: 100% (ScrollView touch-transparent)")
+                Timber.d("Full mode: 100% (ScrollView touch-transparent)")
             }
 
             binding.favoritesScrollView.layoutParams = scrollParams
@@ -512,12 +538,16 @@ class HomeFragment : Fragment() {
 
                 val strokeWidth = try {
                     resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
-                } catch (e: Throwable) { 4 }
+                } catch (e: Throwable) {
+                    4
+                }
                 setStroke(strokeWidth, frameColor)
 
                 val cornerRadius = try {
                     resources.getDimension(R.dimen.split_screen_corner_radius)
-                } catch (e: Throwable) { 16f }
+                } catch (e: Throwable) {
+                    16f
+                }
                 setCornerRadius(cornerRadius)
             }
 
@@ -525,7 +555,9 @@ class HomeFragment : Fragment() {
 
             val borderPadding = try {
                 resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
-            } catch (e: Throwable) { 16 }
+            } catch (e: Throwable) {
+                16
+            }
 
             // Padding setzen: Der Rahmen ist außerhalb dieses Paddings (wenn background gesetzt).
             binding.favoritesScrollView.setPadding(
@@ -535,7 +567,8 @@ class HomeFragment : Fragment() {
                 borderPadding
             )
 
-            binding.favoritesScrollView.clipToPadding = true // Behalten, um den Inhalt im Rahmen zu halten
+            binding.favoritesScrollView.clipToPadding =
+                true // Behalten, um den Inhalt im Rahmen zu halten
 
             // KRITISCHE ÄNDERUNG: MARGINS LÖSCHEN/VEREINFACHEN
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
@@ -719,7 +752,10 @@ class HomeFragment : Fragment() {
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     )
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error configuring button UI for ${app.packageName}")
+                    TimberWrapper.silentError(
+                        e,
+                        "Error configuring button UI for ${app.packageName}"
+                    )
                 }
 
                 // --- Click Handler ---
@@ -791,7 +827,9 @@ class HomeFragment : Fragment() {
 
             val layoutPadding = try {
                 resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-            } catch (e: Throwable) { 0 }
+            } catch (e: Throwable) {
+                0
+            }
 
             val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
             val chipMaxWidth = (availableWidth * 0.80).toInt()
@@ -1253,7 +1291,8 @@ class HomeFragment : Fragment() {
                 binding.rootLayout.paddingBottom
             )
 
-            val timeContainerParams = binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
+            val timeContainerParams =
+                binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
             if (timeContainerParams == null) {
                 TimberWrapper.silentError("TimeContainer params not MarginLayoutParams")
                 ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
@@ -1311,7 +1350,9 @@ class HomeFragment : Fragment() {
                             if (_binding == null || !isAdded) return
 
                             // ONE-SHOT: Listener sofort entfernen
-                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(
+                                this
+                            )
 
                             checkAndEmitScrollState()
 
@@ -1359,7 +1400,8 @@ class HomeFragment : Fragment() {
     private fun hideStatusBar() {
         val controller = getInsetsController() ?: return
         controller.hide(WindowInsetsCompat.Type.statusBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     private fun showStatusBar() {

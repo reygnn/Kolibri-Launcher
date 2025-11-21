@@ -10,10 +10,14 @@ object AppConstants {
     const val SWIPE_THRESHOLD = 50
     const val SWIPE_VELOCITY_THRESHOLD = 50
     const val DOUBLE_CLICK_THRESHOLD = 300L
+    const val LANDSCAPE_SPLIT_SCROLL_WEIGHT = 40F
+    const val LANDSCAPE_SPLIT_GESTURE_WEIGHT = (100F - LANDSCAPE_SPLIT_SCROLL_WEIGHT)
+    const val PORTRAIT_SPLIT_SCROLL_WEIGHT = 55F
+    const val PORTRAIT_SPLIT_GESTURE_WEIGHT = (100F - PORTRAIT_SPLIT_SCROLL_WEIGHT)
 
 
     // Text Shadow Constants (verwendet in HomeFragment)
-    const val SHADOW_RADIUS_TIME = 4f      // Für große Zeit-Anzeige
+    const val SHADOW_RADIUS_TIME = 4f      // Für grosse Zeit-Anzeige
     const val SHADOW_RADIUS_DATE = 3f      // Für Datum
     const val SHADOW_RADIUS_BATTERY = 3f   // Für Batterie-Anzeige
     const val SHADOW_RADIUS_APPS = 3f      // Für App-Buttons
