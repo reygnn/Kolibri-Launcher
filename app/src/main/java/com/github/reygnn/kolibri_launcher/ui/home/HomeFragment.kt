@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import android.R.attr.button
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -82,6 +83,7 @@ class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+    private val favoritesScrollView get() = binding.favoritesScrollView as NonInterceptingScrollView
 
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
@@ -391,27 +393,26 @@ class HomeFragment : Fragment() {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
 
+            // 1. Zugriff auf das Custom ScrollView
+            val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
+
             if (enableSplit) {
-                // 🟢 SPLIT MODE: 50% / 50%. ScrollView muss Touches für das Scrollen konsumieren.
+                // 🟢 SPLIT MODE: 50% / 50%.
                 scrollParams.weight = 1f
                 gestureParams.weight = 1f
                 binding.gestureZone.visibility = View.VISIBLE
                 applyScrollViewBorder(colors.textColor)
 
-                // ✅ ScrollView reaktivieren und Touch-Listener setzen (für Scrolling)
-                binding.favoritesScrollView.isScrollContainer = true
-                binding.favoritesScrollView.isClickable = true
-                binding.favoritesScrollView.isFocusable = true
-                binding.favoritesScrollView.isFocusableInTouchMode = true
+                // ✅ ScrollView darf Touches abfangen (zum Scrollen)
+                customScrollView.allowIntercept = true
 
-                binding.favoritesScrollView.setOnTouchListener { v, event ->
-                    // Scrollen erlauben
-                    v.parent.requestDisallowInterceptTouchEvent(true)
-                    v.onTouchEvent(event)
-                    return@setOnTouchListener true
-                }
+                // ✅ ScrollView ist touchbar
+                customScrollView.isScrollContainer = true
+                customScrollView.isClickable = true
+                customScrollView.isFocusable = true
+                customScrollView.isFocusableInTouchMode = true
 
-                // ✅ Gesture Zone Listener setzen (für globale Gesten auf der rechten Hälfte)
+                // ✅ Touch Listener für Split Mode: Gesture Zone verarbeitet Gesten auf der rechten Hälfte
                 binding.gestureZone.setOnTouchListener { _, event ->
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
@@ -419,23 +420,24 @@ class HomeFragment : Fragment() {
                 Timber.d("  → Split mode: 50% / 50%")
 
             } else {
-                // 🔴 FULL MODE: 100% / 0%. ScrollView blockiert Gesten NICHT.
+                // 🔴 FULL MODE: 100% / 0%. ScrollView muss Event-Abfangen verhindern.
                 scrollParams.weight = 1f
                 gestureParams.weight = 0f
                 binding.gestureZone.visibility = View.GONE
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-                // ✅ ScrollView "unsichtbar" für Touch-Events machen
-                binding.favoritesScrollView.isScrollContainer = false
-                binding.favoritesScrollView.isClickable = false
-                binding.favoritesScrollView.isFocusable = false
-                binding.favoritesScrollView.isFocusableInTouchMode = false
+                // ❌ ScrollView MUSS das Abfangen von Touches verhindern (Vertikales Scrollen)
+                customScrollView.allowIntercept = false
 
-                // ⚠️ KRITISCH: Listener auf NULL setzen, damit Touches zum rootLayout durchfallen!
-                binding.favoritesScrollView.setOnTouchListener(null)
+                // ❌ ScrollView "unsichtbar" für Touch-Events machen (zusätzliche Sicherheit)
+                customScrollView.isScrollContainer = false
+                customScrollView.isClickable = false
+                customScrollView.isFocusable = false
+                customScrollView.isFocusableInTouchMode = false
 
-                // ✅ Gesture Zone Listener auf NULL setzen
+                // ❌ Listener auf NULL setzen
+                customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
                 Timber.d("  → Full mode: 100% (ScrollView touch-transparent)")
@@ -617,77 +619,44 @@ class HomeFragment : Fragment() {
         app: AppInfo,
         textColor: Int,
         shadowColor: Int
-    ): Button? {
-        return try {
-            Button(context).apply {
-                try {
-                    text = app.displayName
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting text")
-                    text = "App"
-                }
+    ): View? {
+        // 1. Button-Instanz außerhalb des Scopes initialisieren, um sie später zu verwenden
+        val button: Button
 
-                try {
-                    background = null
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting background")
-                }
+        try {
+            button = Button(context).apply {
+                // --- UI Konfiguration ---
 
-                try {
-                    val paddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-                    setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting padding")
-                }
+                text = app.displayName
+                background = null
 
-                try {
-                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting gravity")
-                }
+                val paddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+                setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
 
-                try {
-                    setTextColor(textColor)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting text color")
-                }
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setTextColor(textColor)
 
-                try {
-                    val buttonTextSizeInPx = resources.getDimension(R.dimen.text_size_app_button)
-                    setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting text size")
-                }
+                val buttonTextSizeInPx = resources.getDimension(R.dimen.text_size_app_button)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
 
-                try {
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting ellipsize")
-                }
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
 
-                try {
-                    setShadowLayer(
-                        AppConstants.SHADOW_RADIUS_APPS,
-                        AppConstants.SHADOW_DX,
-                        AppConstants.SHADOW_DY,
-                        shadowColor
-                    )
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting shadow")
-                }
+                setShadowLayer(
+                    AppConstants.SHADOW_RADIUS_APPS,
+                    AppConstants.SHADOW_DX,
+                    AppConstants.SHADOW_DY,
+                    shadowColor
+                )
 
-                try {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        setMargins(0, 8, 0, 8)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting layout params")
-                }
+                // KRITISCH: LayoutParams für den Button INNERHALB des Wrappers
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, // <- Nimmt volle Breite des Wrappers
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                // Die Margins werden dem Wrapper hinzugefügt!
 
+                // --- Click Handler ---
                 setOnClickListener {
                     try {
                         viewModel.onAppClicked(app)
@@ -707,8 +676,38 @@ class HomeFragment : Fragment() {
                 }
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating button")
-            null
+            TimberWrapper.silentError(e, "Error creating button instance")
+            return null
+        }
+
+        // 2. Button in den WRAP_CONTENT LinearLayout-Wrapper packen und diesen zurückgeben
+        return LinearLayout(context).apply {
+            // 🚨 TEMPORÄRES VISUELLES DEBUGGING START 🚨
+
+            // 1. Erstellen eines einfachen Rahmens (z.B. 2px breite rote Linie)
+            val border = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT) // Hintergrund bleibt transparent
+                setStroke(2, Color.RED)     // Roter Rahmen (2 Pixel breit)
+            }
+            background = border // Den Rahmen auf den Wrapper anwenden
+
+            // 🚨 TEMPORÄRES VISUELLES DEBUGGING ENDE 🚨
+
+
+            // Konfiguration des Wrappers
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, // KRITISCH: Begrenzt die Touch-Fläche
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                // Margins für den Abstand zwischen den Buttons
+                setMargins(0, 8, 0, 8)
+            }
+
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+
+            // ✅ Die Button-Instanz hinzufügen (nicht eine ID)
+            addView(button)
         }
     }
 

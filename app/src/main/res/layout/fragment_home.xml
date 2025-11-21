@@ -81,20 +81,20 @@
         android:clipToPadding="false">
 
         <!-- ScrollView (Breite dynamisch: 100% oder 50%) -->
-        <ScrollView
-            android:id="@+id/favoritesScrollView"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:fillViewport="true"
-            android:scrollbars="none">
+    <com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView
+        android:id="@+id/favoritesScrollView"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
-            <LinearLayout
-                android:id="@+id/appList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </ScrollView>
+        <LinearLayout
+            android:id="@+id/appList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+</com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView>
 
         <!-- Rechte Hälfte für Gesten (nur sichtbar wenn Split-Mode) -->
         <View
