@@ -1260,7 +1260,7 @@ class HomeFragment : Fragment() {
     // ==========================================================================
 
     /**
-     * ✅ Helper: Registriert einen ONE-SHOT OnGlobalLayoutListener.
+     * Registriert einen ONE-SHOT OnGlobalLayoutListener.
      * Wird nach dem nächsten Layout-Pass automatisch entfernt.
      * Ruft dann checkAndEmitScrollState() auf.
      */
@@ -1274,13 +1274,13 @@ class HomeFragment : Fragment() {
                         try {
                             if (_binding == null || !isAdded) return
 
-                            // ✅ ONE-SHOT: Listener sofort entfernen
+                            // ONE-SHOT: Listener sofort entfernen
                             binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
 
                             checkAndEmitScrollState()
 
                             if (debugMessage.isNotEmpty()) {
-                                Timber.d("✅ $debugMessage")
+                                Timber.d(debugMessage)
                             }
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in one-shot layout listener")
