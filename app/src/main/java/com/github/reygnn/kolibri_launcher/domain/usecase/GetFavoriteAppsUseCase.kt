@@ -7,11 +7,9 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.GetFavoriteAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import timber.log.Timber
@@ -26,10 +24,6 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private val appVisibilityManager: HiddenAppsRepository
 ) {
 
-    // NEU: Interner StateFlow für das dynamische Limit.
-    // Startet mit dem Standard-Fallback-Wert aus AppConstants.
-    private val dynamicMaxFavorites = MutableStateFlow(AppConstants.MAX_FAVORITES_ON_HOME)
-
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
         installedAppsStateRepository.rawAppsFlow,
         favoritesManager.favoriteComponentsFlow.catch { e ->
@@ -43,18 +37,16 @@ class GetFavoriteAppsUseCase @Inject constructor(
         favoritesOrderManager.favoriteComponentsOrderFlow.catch { e ->
             Timber.Forest.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
-        },
-        dynamicMaxFavorites // <-- NEU: Das dynamische Limit einbeziehen
-    ) { rawApps, favorites, hiddenApps, savedOrder, maxFavoritesToShow -> // <-- NEUER PARAMETER
-        Timber.Forest.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}, max: $maxFavoritesToShow")
+        }
+    ) { rawApps, favorites, hiddenApps, savedOrder ->
+        Timber.Forest.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
         // Leere App-Liste → Loading state
         if (rawApps.isEmpty()) {
             return@combine UiState.Loading
         }
 
-        // NEU: 'maxFavoritesToShow' an processApps übergeben
-        processApps(rawApps, favorites, hiddenApps, savedOrder, maxFavoritesToShow)
+        processApps(rawApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
         Timber.Forest.e(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
@@ -64,8 +56,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         rawApps: List<AppInfo>,
         favorites: Set<String>,
         hiddenApps: Set<String>,
-        savedOrder: List<String>,
-        maxFavoritesToShow: Int
+        savedOrder: List<String>
     ): UiState<FavoriteAppsResult> {
         return try {
             // Markiere Favoriten-Status
@@ -86,23 +77,22 @@ class GetFavoriteAppsUseCase @Inject constructor(
                 favoriteApps.sortedBy { it.displayName.lowercase() }
             }
 
-            // NEU: Wende das dynamische Limit auf die ECHTEN Favoriten an
-            val limitedOrderedFavorites = orderedFavorites.take(maxFavoritesToShow)
-
+            // Limitiere auf MAX_FAVORITES_ON_HOME
+            val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FAVORITES_ON_HOME)
 
             // Wenn Favoriten vorhanden: Diese verwenden
             if (limitedOrderedFavorites.isNotEmpty()) {
-                Timber.Forest.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites (Limit: $maxFavoritesToShow)")
+                Timber.Forest.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
                 UiState.Success(
                     FavoriteAppsResult(
-                        apps = limitedOrderedFavorites, // <-- BENUTZE DIE LIMITIERTE LISTE
+                        apps = limitedOrderedFavorites,
                         isFallback = false
                     )
                 )
             } else {
                 // Fallback: Top N sichtbare Apps
-                val fallbackApps = createFallbackApps(rawApps, hiddenApps, AppConstants.MAX_FALLBACK_APPS_ON_HOME)
-                Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps (Limit: $maxFavoritesToShow)")
+                val fallbackApps = createFallbackApps(rawApps, hiddenApps)
+                Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
                 UiState.Success(
                     FavoriteAppsResult(
                         apps = fallbackApps,
@@ -116,7 +106,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } catch (e: Throwable) {
             // Unerwarteter Fehler in der Verarbeitung
             Timber.Forest.e(e, "Error processing apps - returning fallback")
-            val fallbackApps = createFallbackApps(rawApps, hiddenApps, AppConstants.MAX_FALLBACK_APPS_ON_HOME)
+            val fallbackApps = createFallbackApps(rawApps, hiddenApps)
             UiState.Success(
                 FavoriteAppsResult(
                     apps = fallbackApps,
@@ -128,33 +118,20 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
     private fun createFallbackApps(
         rawApps: List<AppInfo>,
-        hiddenApps: Set<String>,
-        maxFavoritesToShow: Int // <-- NEUER PARAMETER
+        hiddenApps: Set<String>
     ): List<AppInfo> {
         return try {
             rawApps
                 .filter { !hiddenApps.contains(it.componentName) }
                 .sortedBy { it.displayName.lowercase() }
-                .take(maxFavoritesToShow) // <-- BENUTZE DEN DYNAMISCHEN WERT
+                .take(AppConstants.MAX_FAVORITES_ON_HOME)
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Error creating fallback - using first $maxFavoritesToShow apps")
-            rawApps.take(maxFavoritesToShow) // <-- BENUTZE DEN DYNAMISCHEN WERT
-        }
-    }
-
-    /**
-     * NEU: Implementierung der Interface-Methode.
-     * Wird vom HomeViewModel aufgerufen.
-     */
-    fun setDynamicMaxFavorites(max: Int) {
-        if (max > 0 && max != dynamicMaxFavorites.value) {
-            Timber.Forest.i("Setting dynamic max favorites to: $max")
-            dynamicMaxFavorites.value = max
+            Timber.Forest.e(e, "Error creating fallback - using first ${AppConstants.MAX_FAVORITES_ON_HOME} apps")
+            rawApps.take(AppConstants.MAX_FAVORITES_ON_HOME)
         }
     }
 
     suspend fun purgeRepository() {
-        // Für Tests: Setze das Limit zurück
-        dynamicMaxFavorites.value = AppConstants.MAX_FAVORITES_ON_HOME
+        // Für Tests
     }
 }

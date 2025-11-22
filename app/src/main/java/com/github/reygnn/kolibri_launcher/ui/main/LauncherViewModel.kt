@@ -640,13 +640,6 @@ class LauncherViewModel @Inject constructor(
         return checkAppUsageUseCase(packageName)
     }
 
-    fun onHomeViewMeasured(calculatedMaxFavorites: Int) {
-        if (calculatedMaxFavorites > 0) {
-            _maxFavoritesOnHome.value = calculatedMaxFavorites
-            getFavoriteAppsUseCase.setDynamicMaxFavorites(calculatedMaxFavorites)
-        }
-    }
-
     suspend fun isAutoShowKeyboardEnabled(): Boolean {
         return getAutoShowKeyboardSettingUseCase()
     }

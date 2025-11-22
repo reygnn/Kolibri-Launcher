@@ -986,36 +986,6 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `maxFavoritesOnHome - updates when onHomeViewMeasured called`() = runTest {
-        setupViewModel()
-
-        viewModel.maxFavoritesOnHome.test {
-            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, awaitItem())
-
-            viewModel.onHomeViewMeasured(8)
-            assertEquals(8, awaitItem())
-
-            viewModel.onHomeViewMeasured(12)
-            assertEquals(12, awaitItem())
-        }
-    }
-
-    @Test
-    fun `onHomeViewMeasured - with zero or negative - ignores update`() = runTest {
-        setupViewModel()
-
-        viewModel.maxFavoritesOnHome.test {
-            val initial = awaitItem()
-
-            viewModel.onHomeViewMeasured(0)
-            viewModel.onHomeViewMeasured(-5)
-
-            expectNoEvents() // Keine Updates!
-            assertEquals(initial, viewModel.maxFavoritesOnHome.value)
-        }
-    }
-
-    @Test
     fun `onAppDrawerSearchQueryChanged - updates search query state`() = runTest {
         setupViewModel()
 
@@ -1102,27 +1072,6 @@ class LauncherViewModelTest {
         // Sollte 200% ergeben (mathematisch korrekt, aber unrealistisch)
         // Oder sollte es abgefangen werden? Test zeigt das Verhalten!
         assertNotNull(viewModel.uiState.value.batteryString)
-    }
-
-    @Test
-    fun `onToggleFavorite - with exactly max favorites - allows removal`() = runTest {
-        whenever(toggleFavoriteUseCase.invoke(any(), any()))
-            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites))
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Setze genau auf das Limit
-        viewModel.onHomeViewMeasured(AppConstants.MAX_FAVORITES_ON_HOME)
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onToggleFavorite(app1)
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
-        }
     }
 
     @Test

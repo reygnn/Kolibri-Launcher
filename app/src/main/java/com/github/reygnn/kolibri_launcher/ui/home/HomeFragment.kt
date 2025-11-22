@@ -135,6 +135,8 @@ class HomeFragment : Fragment() {
     private lateinit var _orientationState: MutableStateFlow<Int>
     val orientationState: StateFlow<Int> get() = _orientationState.asStateFlow()
 
+    private val showBorder = false
+
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
@@ -475,8 +477,13 @@ class HomeFragment : Fragment() {
 
                 Timber.d("Konfiguration: isLandscape=${isLandscape}, ScrollWeight=${scrollParams.weight}, GestureWeight=${gestureParams.weight}")
 
+                if (showBorder) {
+                    applyScrollViewBorder(colors.textColor)
+                } else {
+                    removeScrollViewBorder()
+                }
+
                 binding.gestureZone.visibility = View.VISIBLE
-                applyScrollViewBorder(colors.textColor)
 
                 // ScrollView darf Touches abfangen (zum Scrollen)
                 customScrollView.allowIntercept = true
@@ -512,6 +519,8 @@ class HomeFragment : Fragment() {
                 customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
+                removeScrollViewBorder()
+
                 Timber.d("Full mode: 100% (ScrollView touch-transparent)")
             }
 
@@ -525,7 +534,6 @@ class HomeFragment : Fragment() {
 
     private fun applyScrollViewBorder(textColor: Int) {
         try {
-            // ... (Berechnung von frameColor und Drawable bleibt unverändert) ...
             val frameColor = Color.argb(
                 51,
                 Color.red(textColor),
@@ -585,6 +593,26 @@ class HomeFragment : Fragment() {
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error applying border")
+        }
+    }
+
+    private fun removeScrollViewBorder() {
+        try {
+            if (_binding == null) return
+
+            // 1. Hintergrund (Rahmen) entfernen
+            binding.favoritesScrollView.background = null
+
+            // 2. Padding zurücksetzen (falls es für den Rahmen gesetzt wurde)
+            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+
+            // 3. Negative Margins entfernen und auf 0 setzen
+            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(0, 0, 0, 0)
+            binding.favoritesScrollView.layoutParams = params
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error removing border")
         }
     }
 
