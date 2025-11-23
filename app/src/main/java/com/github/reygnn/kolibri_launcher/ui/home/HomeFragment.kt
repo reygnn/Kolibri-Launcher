@@ -52,6 +52,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -135,7 +137,9 @@ class HomeFragment : Fragment() {
     private lateinit var _orientationState: MutableStateFlow<Int>
     val orientationState: StateFlow<Int> get() = _orientationState.asStateFlow()
 
+    private var verifyJob: Job? = null
     private val showBorder = false
+    private var wasInSplitMode = false
 
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -191,9 +195,7 @@ class HomeFragment : Fragment() {
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rotation")
 
-            binding.favoritesScrollView.post {
-                verifyAndFixScrollState()
-            }
+            safePost { scheduleScrollVerification() }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
         }
@@ -216,7 +218,7 @@ class HomeFragment : Fragment() {
             val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
             val canScrollByDirection = canScrollDown || canScrollUp
 
-            // METHOD 2: Content height check (more reliable)
+            // METHOD 2: Content height check (more reliable) with hysteresis
             val contentHeight = try {
                 binding.appList.height
             } catch (e: Throwable) {
@@ -229,7 +231,13 @@ class HomeFragment : Fragment() {
                 0
             }
 
-            val canScrollByHeight = contentHeight > scrollViewHeight
+            // HYSTERESIS: Add tolerance to prevent flickering
+            // When content is VERY close to ScrollView height, minor rendering
+            // differences could cause rapid mode switching. 4px tolerance prevents this.
+            val HYSTERESIS_TOLERANCE_PX = 4
+
+            // Use hysteresis: Content must be noticeably larger than ScrollView
+            val canScrollByHeight = contentHeight > (scrollViewHeight + HYSTERESIS_TOLERANCE_PX)
 
             // Use height-based check as primary, direction check as fallback
             val canScroll = if (scrollViewHeight > 0) {
@@ -238,8 +246,15 @@ class HomeFragment : Fragment() {
                 canScrollByDirection
             }
 
+            // Only update if state actually changed (Flow handles distinctUntilChanged)
             if (_needsSplit.value != canScroll) {
-                Timber.d("Scroll capability changed: canScroll=$canScroll (down=$canScrollDown, up=$canScrollUp, contentH=$contentHeight, scrollH=$scrollViewHeight)")
+                Timber.d(
+                    "Scroll capability changed: canScroll=$canScroll " +
+                            "(down=$canScrollDown, up=$canScrollUp, " +
+                            "contentH=$contentHeight, scrollH=$scrollViewHeight, " +
+                            "diff=${contentHeight - scrollViewHeight}px, " +
+                            "threshold=${HYSTERESIS_TOLERANCE_PX}px)"
+                )
                 _needsSplit.value = canScroll
             }
         } catch (e: Throwable) {
@@ -391,11 +406,6 @@ class HomeFragment : Fragment() {
 
                                 try {
                                     updateTimeBasedChips(events)
-
-                                    // Re-check scroll state after chips change
-                                    binding.favoritesScrollView.post {
-                                        checkAndEmitScrollState()
-                                    }
                                 } catch (e: Throwable) {
                                     TimberWrapper.silentError(e, "Error updating chips")
                                 }
@@ -476,9 +486,7 @@ class HomeFragment : Fragment() {
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rendering")
 
-            binding.favoritesScrollView.post {
-                verifyAndFixScrollState()
-            }
+            safePost { scheduleScrollVerification() }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error rendering favorites")
@@ -495,6 +503,8 @@ class HomeFragment : Fragment() {
             val customScrollView = binding.favoritesScrollView
 
             if (enableSplit) {
+                wasInSplitMode = true
+
                 // Orientation-abhängige Gewichtung
                 val isLandscape =
                     resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -541,13 +551,15 @@ class HomeFragment : Fragment() {
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-                // CRITICAL FIX: Reset scroll position to prevent user being stuck
-                try {
-                    binding.favoritesScrollView.scrollTo(0, 0)
-                    Timber.d("Scroll position reset to top in full mode")
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error resetting scroll position")
+                if (wasInSplitMode) {
+                    try {
+                        binding.favoritesScrollView.scrollTo(0, 0)
+                        Timber.d("Scroll position reset to top in full mode")
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error resetting scroll position")
+                    }
                 }
+                wasInSplitMode = false
 
                 // ScrollView MUSS das Abfangen von Touches verhindern
                 customScrollView.allowIntercept = false
@@ -923,9 +935,7 @@ class HomeFragment : Fragment() {
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
 
-            binding.favoritesScrollView.post {
-                verifyAndFixScrollState()
-            }
+            safePost { scheduleScrollVerification() }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating chips")
@@ -1416,30 +1426,63 @@ class HomeFragment : Fragment() {
         try {
             if (_binding == null || !isAdded) return
 
-            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        try {
-                            if (_binding == null || !isAdded) return
-
-                            // ONE-SHOT: Listener sofort entfernen
-                            binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(
-                                this
-                            )
-
-                            checkAndEmitScrollState()
-
-                            if (debugMessage.isNotEmpty()) {
-                                Timber.d(debugMessage)
+            val listener = object : ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    try {
+                        if (_binding == null || !isAdded) {
+                            try {
+                                binding?.favoritesScrollView?.viewTreeObserver?.removeOnGlobalLayoutListener(this)
+                            } catch (e: Throwable) {
+                                // Ignore - View könnte schon weg sein
                             }
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in one-shot layout listener")
+                            return
                         }
+
+                        binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        checkAndEmitScrollState()
+
+                        if (debugMessage.isNotEmpty()) {
+                            Timber.d(debugMessage)
+                        }
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in one-shot layout listener")
                     }
                 }
-            )
+            }
+
+            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(listener)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error registering one-shot layout listener")
+        }
+    }
+
+    private fun scheduleScrollVerification() {
+        verifyJob?.cancel()
+        verifyJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(50) // 50ms debounce
+            try {
+                verifyAndFixScrollState()
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in scheduled verification")
+            }
+        }
+    }
+
+    private fun safePost(action: () -> Unit) {
+        try {
+            if (_binding == null || !isAdded) return
+
+            binding.favoritesScrollView.post {
+                try {
+                    if (_binding != null && isAdded) {
+                        action()
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in safe post action")
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in safePost")
         }
     }
 
@@ -1448,7 +1491,7 @@ class HomeFragment : Fragment() {
             if (_binding == null || !isAdded) return
 
             val currentSplitState = _needsSplit.value
-            val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
+            val customScrollView = binding.favoritesScrollView
 
             // If we're in full mode but allowIntercept is true, something went wrong
             if (!currentSplitState && customScrollView.allowIntercept) {
