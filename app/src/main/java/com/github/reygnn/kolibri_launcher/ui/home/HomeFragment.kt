@@ -52,7 +52,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -123,7 +122,7 @@ class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
-    private val favoritesScrollView get() = binding.favoritesScrollView as NonInterceptingScrollView
+    private val favoritesScrollView get() = binding.favoritesScrollView
 
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
@@ -493,7 +492,7 @@ class HomeFragment : Fragment() {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
-            val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
+            val customScrollView = binding.favoritesScrollView
 
             if (enableSplit) {
                 // Orientation-abhängige Gewichtung
@@ -528,7 +527,10 @@ class HomeFragment : Fragment() {
                 customScrollView.isFocusableInTouchMode = true
 
                 // Touch Listener für Split Mode
-                binding.gestureZone.setOnTouchListener { _, event ->
+                binding.gestureZone.setOnTouchListener { view, event ->
+                    if (event.action == MotionEvent.ACTION_UP) {
+                        view.performClick()
+                    }
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
             } else {
@@ -560,7 +562,7 @@ class HomeFragment : Fragment() {
 
                 removeScrollViewBorder()
 
-                Timber.d("Full mode: 100% (ScrollView touch-transparent, scroll position reset)")
+                Timber.d("Full mode: 100%% (ScrollView touch-transparent, scroll position reset)")
             }
 
             binding.favoritesScrollView.layoutParams = scrollParams

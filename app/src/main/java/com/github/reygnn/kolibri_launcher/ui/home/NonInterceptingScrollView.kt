@@ -41,4 +41,9 @@ class NonInterceptingScrollView @JvmOverloads constructor(
         }
         return super.onTouchEvent(ev)
     }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
 }
