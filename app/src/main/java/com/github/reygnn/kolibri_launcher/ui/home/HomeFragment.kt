@@ -89,7 +89,7 @@ import kotlin.math.abs
  *    → checkScrollStateAfterNextLayout() is called
  *
  * 3. System determines scroll capability
- *    → checkAndEmitScrollState() asks: canScrollVertically(1)?
+ *    → checkAndEmitScrollState() asks: canScrollVertically(1) oder canScrollVertically(-1)?
  *    → TRUE = content overflows, scrolling needed
  *    → FALSE = content fits, no scrolling needed
  *
@@ -209,43 +209,30 @@ class HomeFragment : Fragment() {
         try {
             if (_binding == null || !isAdded) return
 
-            // Android weiß am besten ob scrollen nötig ist!
-            val canScrollDown = binding.favoritesScrollView.canScrollVertically(1)
-            val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
-            val needsScroll = canScrollDown || canScrollUp
+            val scrollView = binding.favoritesScrollView
+
+            // Android entscheidet - funktioniert auf ALLEN Devices!
+            val canScrollDown = scrollView.canScrollVertically(1)
+            val canScrollUp = scrollView.canScrollVertically(-1)
+            val canScroll = canScrollDown || canScrollUp
 
             // State Update nur bei Änderung
-            if (_needsSplit.value != needsScroll) {
-                // Optional: Detailliertes Logging nur wenn du debuggen willst
-                if (needsScroll) {
-                    val contentHeight = binding.appList.height
-                    val scrollViewHeight = binding.favoritesScrollView.height -
-                            binding.favoritesScrollView.paddingTop -
-                            binding.favoritesScrollView.paddingBottom
-                    val overflow = contentHeight - scrollViewHeight
+            if (_needsSplit.value != canScroll) {
+                Timber.d("checkAndEmitScrollState: splitMode = $canScroll")
+                _needsSplit.value = canScroll
+            }
 
-                    Timber.d(
-                        "Scroll capability changed: needsScroll=$needsScroll " +
-                                "(contentH=$contentHeight, scrollH=$scrollViewHeight, " +
-                                "overflow=${overflow}px, canScrollDown=$canScrollDown, canScrollUp=$canScrollUp)"
-                    )
-                } else {
-                    Timber.d("Scroll capability changed: needsScroll=false (content fits)")
-                }
-
-                _needsSplit.value = needsScroll
+            // Reset scroll position wenn kein Split Mode
+            if (!canScroll) {
+                scrollView.scrollTo(0, 0)
             }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking scroll state")
-            // Ultra-paranoider Fallback: Child count check
-            try {
-                if (!_needsSplit.value && binding.appList.childCount > 10) {
-                    Timber.w("Error checking scroll - enabling split via fallback")
-                    _needsSplit.value = true
-                }
-            } catch (fallbackError: Throwable) {
-                TimberWrapper.silentError(fallbackError, "Even fallback failed")
+            // Fail-Safe: Im Zweifel split mode aktivieren (sicherer)
+            if (!_needsSplit.value) {
+                Timber.w("Error checking scroll - enabling split as safety fallback")
+                _needsSplit.value = true
             }
         }
     }
