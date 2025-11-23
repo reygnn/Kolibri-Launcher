@@ -20,8 +20,7 @@
     <dimen name="text_size_time">60sp</dimen>
     <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
     <dimen name="text_size_app_button">18sp</dimen>
-    <dimen name="app_item_vertical_margin">8dp</dimen>
-    
+     
     <!-- =============================================================== -->
     <!-- == APP DRAWER                                                == -->
     <!-- =============================================================== -->
