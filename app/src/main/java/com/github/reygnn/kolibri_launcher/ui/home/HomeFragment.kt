@@ -499,9 +499,6 @@ class HomeFragment : Fragment() {
     /**
      * Adjust ScrollView width based on split mode
      */
-    /**
-     * Adjust ScrollView width based on split mode
-     */
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
@@ -625,7 +622,6 @@ class HomeFragment : Fragment() {
                 16
             }
 
-            // Padding setzen: Der Rahmen ist außerhalb dieses Paddings (wenn background gesetzt).
             binding.favoritesScrollView.setPadding(
                 0,
                 borderPadding,
@@ -636,16 +632,9 @@ class HomeFragment : Fragment() {
             binding.favoritesScrollView.clipToPadding =
                 true // Behalten, um den Inhalt im Rahmen zu halten
 
-            // KRITISCHE ÄNDERUNG: MARGINS LÖSCHEN/VEREINFACHEN
             val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
 
-            // Margins zurücksetzen, um zu verhindern, dass die View nach links verschoben wird
-            // Setzen Sie alle Margins auf 0
             params.setMargins(0, 0, 0, 0)
-
-            // OPTIONAL: Wenn Sie den Rahmen rechts bündig halten möchten,
-            // setzen Sie das rechte Margin auf den Border-Inset-Wert (oder lassen es bei 0)
-            // params.rightMargin = borderPadding
 
             binding.favoritesScrollView.layoutParams = params
 
@@ -890,6 +879,15 @@ class HomeFragment : Fragment() {
 
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.START
+
+//                    // === DEBUG VISUALISIERUNG START ===
+//                    // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
+//                    val debugBorder = android.graphics.drawable.GradientDrawable().apply {
+//                        setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
+//                        setStroke(2, android.graphics.Color.RED) // 2px roter Rand
+//                    }
+//                    background = debugBorder
+//                    // === DEBUG VISUALISIERUNG ENDE ===
 
                     addView(button)
                 } catch (e: Throwable) {
