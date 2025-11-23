@@ -206,8 +206,13 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     /**
-     * THE MAGIC: Check if ScrollView can scroll
-     * System decides → we react!
+     * THE MAGIC: Check if ScrollView can scroll IN ANY DIRECTION
+     *
+     * BIDIRECTIONAL HYSTERESIS WITH BUTTON-HEIGHT AWARENESS:
+     * - Full → Split: Requires at least 30% of a button to be hidden
+     * - Split → Full: Allows switching back with small tolerance (10% of button)
+     *
+     * This prevents "5px scrollbar" issues while avoiding flickering.
      */
     private fun checkAndEmitScrollState() {
         try {
@@ -218,7 +223,7 @@ class HomeFragment : Fragment() {
             val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
             val canScrollByDirection = canScrollDown || canScrollUp
 
-            // METHOD 2: Content height check (more reliable) with hysteresis
+            // METHOD 2: Content height check
             val contentHeight = try {
                 binding.appList.height
             } catch (e: Throwable) {
@@ -231,36 +236,25 @@ class HomeFragment : Fragment() {
                 0
             }
 
-            // HYSTERESIS: Add tolerance to prevent flickering
-            // When content is VERY close to ScrollView height, minor rendering
-            // differences could cause rapid mode switching. 4px tolerance prevents this.
-            val HYSTERESIS_TOLERANCE_PX = 4
-
-            // Use hysteresis: Content must be noticeably larger than ScrollView
-            val canScrollByHeight = contentHeight > (scrollViewHeight + HYSTERESIS_TOLERANCE_PX)
-
-            // Use height-based check as primary, direction check as fallback
+            // Simple check: Does content overflow?
             val canScroll = if (scrollViewHeight > 0) {
-                canScrollByHeight
+                contentHeight > scrollViewHeight
             } else {
                 canScrollByDirection
             }
 
-            // Only update if state actually changed (Flow handles distinctUntilChanged)
+            // Only update if state actually changed
             if (_needsSplit.value != canScroll) {
                 Timber.d(
                     "Scroll capability changed: canScroll=$canScroll " +
-                            "(down=$canScrollDown, up=$canScrollUp, " +
-                            "contentH=$contentHeight, scrollH=$scrollViewHeight, " +
-                            "diff=${contentHeight - scrollViewHeight}px, " +
-                            "threshold=${HYSTERESIS_TOLERANCE_PX}px)"
+                            "(contentH=$contentHeight, scrollH=$scrollViewHeight, " +
+                            "diff=${contentHeight - scrollViewHeight}px)"
                 )
                 _needsSplit.value = canScroll
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking scroll state")
-            // Emergency fallback: If we can't determine, assume split is needed
-            // This is safer than disabling scroll and potentially trapping the user
+            // Emergency fallback
             if (!_needsSplit.value && binding.appList.childCount > 5) {
                 Timber.w("Error checking scroll - enabling split mode as safety fallback")
                 _needsSplit.value = true
@@ -496,6 +490,9 @@ class HomeFragment : Fragment() {
     /**
      * Adjust ScrollView width based on split mode
      */
+    /**
+     * Adjust ScrollView width based on split mode
+     */
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
@@ -512,14 +509,12 @@ class HomeFragment : Fragment() {
                 if (isLandscape) {
                     scrollParams.weight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT
                     gestureParams.weight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
-                    Timber.d("  → Split mode: (landscape)")
+                    Timber.d("Split mode: landscape (${scrollParams.weight}/${gestureParams.weight})")
                 } else {
                     scrollParams.weight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT
                     gestureParams.weight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT
-                    Timber.d("  → Split mode: (portrait)")
+                    Timber.d("Split mode: portrait (${scrollParams.weight}/${gestureParams.weight})")
                 }
-
-                Timber.d("Konfiguration: isLandscape=${isLandscape}, ScrollWeight=${scrollParams.weight}, GestureWeight=${gestureParams.weight}")
 
                 if (showBorder) {
                     applyScrollViewBorder(colors.textColor)
@@ -543,6 +538,7 @@ class HomeFragment : Fragment() {
                     }
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
+
             } else {
                 // FULL MODE: 100% / 0%
                 scrollParams.weight = 1f
@@ -554,7 +550,7 @@ class HomeFragment : Fragment() {
                 if (wasInSplitMode) {
                     try {
                         binding.favoritesScrollView.scrollTo(0, 0)
-                        Timber.d("Scroll position reset to top in full mode")
+                        Timber.d("Scroll position reset to top (split→full)")
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error resetting scroll position")
                     }
@@ -574,7 +570,7 @@ class HomeFragment : Fragment() {
 
                 removeScrollViewBorder()
 
-                Timber.d("Full mode: 100%% (ScrollView touch-transparent, scroll position reset)")
+                Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
             }
 
             binding.favoritesScrollView.layoutParams = scrollParams
