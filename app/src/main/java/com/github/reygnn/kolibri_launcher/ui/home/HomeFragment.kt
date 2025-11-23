@@ -850,6 +850,7 @@ class HomeFragment : Fragment() {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.START
 
+/*
                     // === DEBUG VISUALISIERUNG START ===
                     // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
                     val debugBorder = android.graphics.drawable.GradientDrawable().apply {
@@ -858,6 +859,7 @@ class HomeFragment : Fragment() {
                     }
                     background = debugBorder
                     // === DEBUG VISUALISIERUNG ENDE ===
+*/
 
                     addView(button)
                 } catch (e: Throwable) {
