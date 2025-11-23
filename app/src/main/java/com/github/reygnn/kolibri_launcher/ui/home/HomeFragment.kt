@@ -205,59 +205,68 @@ class HomeFragment : Fragment() {
     // REACTIVE SCROLL STATE DETECTION
     // ============================================================================
 
-    /**
-     * THE MAGIC: Check if ScrollView can scroll IN ANY DIRECTION
-     *
-     * BIDIRECTIONAL HYSTERESIS WITH BUTTON-HEIGHT AWARENESS:
-     * - Full → Split: Requires at least 30% of a button to be hidden
-     * - Split → Full: Allows switching back with small tolerance (10% of button)
-     *
-     * This prevents "5px scrollbar" issues while avoiding flickering.
-     */
     private fun checkAndEmitScrollState() {
         try {
             if (_binding == null || !isAdded) return
 
-            // METHOD 1: Check both scroll directions
-            val canScrollDown = binding.favoritesScrollView.canScrollVertically(1)
-            val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
-            val canScrollByDirection = canScrollDown || canScrollUp
-
-            // METHOD 2: Content height check
+            // Höhen mit Fehlerbehandlung messen
             val contentHeight = try {
                 binding.appList.height
             } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error getting content height")
                 0
             }
 
             val scrollViewHeight = try {
-                binding.favoritesScrollView.height
+                binding.favoritesScrollView.height -
+                        binding.favoritesScrollView.paddingTop -
+                        binding.favoritesScrollView.paddingBottom
             } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error getting scroll view height")
                 0
             }
 
-            // Simple check: Does content overflow?
-            val canScroll = if (scrollViewHeight > 0) {
-                contentHeight > scrollViewHeight
-            } else {
-                canScrollByDirection
+            // Toleranz für abgeschnittenen Margin
+            val tolerancePx = try {
+                resources.getDimensionPixelSize(R.dimen.app_item_vertical_margin)
+            } catch (e: Throwable) {
+                (8 * resources.displayMetrics.density).toInt()
             }
 
-            // Only update if state actually changed
-            if (_needsSplit.value != canScroll) {
-                Timber.d(
-                    "Scroll capability changed: canScroll=$canScroll " +
-                            "(contentH=$contentHeight, scrollH=$scrollViewHeight, " +
-                            "diff=${contentHeight - scrollViewHeight}px)"
-                )
-                _needsSplit.value = canScroll
+            // Overflow berechnen
+            val overflow = contentHeight - scrollViewHeight
+
+            // Split nur wenn WIRKLICH content abgeschnitten ist (nicht nur Margin)
+            val needsScroll = when {
+                contentHeight == 0 || scrollViewHeight == 0 -> {
+                    // Fallback auf canScrollVertically wenn Messung fehlschlägt
+                    binding.favoritesScrollView.canScrollVertically(1) ||
+                            binding.favoritesScrollView.canScrollVertically(-1)
+                }
+                else -> overflow > tolerancePx
             }
+
+            // State Update nur bei Änderung
+            if (_needsSplit.value != needsScroll) {
+                Timber.d(
+                    "Scroll capability changed: needsScroll=$needsScroll " +
+                            "(contentH=$contentHeight, scrollH=$scrollViewHeight, " +
+                            "overflow=${overflow}px, tolerance=${tolerancePx}px)"
+                )
+                _needsSplit.value = needsScroll
+            }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking scroll state")
-            // Emergency fallback
-            if (!_needsSplit.value && binding.appList.childCount > 5) {
-                Timber.w("Error checking scroll - enabling split mode as safety fallback")
-                _needsSplit.value = true
+            // Ultra-paranoider Fallback
+            try {
+                val canScroll = binding.favoritesScrollView.canScrollVertically(1)
+                if (!_needsSplit.value && canScroll) {
+                    Timber.w("Error checking scroll - enabling split via fallback")
+                    _needsSplit.value = true
+                }
+            } catch (fallbackError: Throwable) {
+                TimberWrapper.silentError(fallbackError, "Even fallback failed")
             }
         }
     }
@@ -867,7 +876,16 @@ class HomeFragment : Fragment() {
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                        setMargins(0, 8, 0, 8)
+                        // 1. Hole den korrekten Pixel-Wert für 8dp
+                        val marginPx = try {
+                            resources.getDimensionPixelSize(R.dimen.app_item_vertical_margin)
+                        } catch (e: Throwable) {
+                            // Fallback: Manuelle Umrechnung falls Resource fehlt (8dp in px)
+                            (8 * resources.displayMetrics.density).toInt()
+                        }
+
+                        // 2. Setze Margin in Pixeln
+                        setMargins(0, marginPx, 0, marginPx)
                     }
 
                     orientation = LinearLayout.HORIZONTAL
