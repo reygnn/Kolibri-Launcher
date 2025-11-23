@@ -24,6 +24,7 @@ import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -1310,6 +1311,49 @@ class LauncherViewModelTest {
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToastFromString)
             // Note: Can't check message content as it's wrapped in event
+        }
+    }
+
+    @Test
+    fun `refreshDynamicUiData - updates time, date, battery and events`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        val initialTime = viewModel.uiState.value.timeString
+
+        // Simulate time passing
+        delay(100)
+
+        viewModel.refreshDynamicUiData()
+        advanceUntilIdle()
+
+        // Verify refresh was triggered
+        verify(observeTimeBasedEventsUseCase, atLeastOnce()).refresh()
+        assertNotNull(viewModel.uiState.value.timeString)
+    }
+
+    @Test
+    fun `refreshAllData - calls both dynamic and installed apps refresh`() = runTest {
+        setupViewModel(enableTestMode = false)
+        advanceUntilIdle()
+
+        // Reset mocks
+        clearInvocations(refreshAppsUseCase, observeTimeBasedEventsUseCase)
+
+        viewModel.refreshAllData()
+        advanceUntilIdle()
+
+        verify(observeTimeBasedEventsUseCase).refresh()
+        verify(refreshAppsUseCase).invoke()
+    }
+
+    @Test
+    fun `maxFavoritesOnHome - has correct default value`() = runTest {
+        setupViewModel()
+
+        viewModel.maxFavoritesOnHome.test {
+            val value = awaitItem()
+            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, value)
         }
     }
 

@@ -52,6 +52,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -190,6 +191,10 @@ class HomeFragment : Fragment() {
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rotation")
+
+            binding.favoritesScrollView.post {
+                verifyAndFixScrollState()
+            }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onConfigurationChanged")
         }
@@ -207,14 +212,45 @@ class HomeFragment : Fragment() {
         try {
             if (_binding == null || !isAdded) return
 
-            val canScroll = binding.favoritesScrollView.canScrollVertically(1)
+            // METHOD 1: Check both scroll directions
+            val canScrollDown = binding.favoritesScrollView.canScrollVertically(1)
+            val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
+            val canScrollByDirection = canScrollDown || canScrollUp
+
+            // METHOD 2: Content height check (more reliable)
+            val contentHeight = try {
+                binding.appList.height
+            } catch (e: Throwable) {
+                0
+            }
+
+            val scrollViewHeight = try {
+                binding.favoritesScrollView.height
+            } catch (e: Throwable) {
+                0
+            }
+
+            val canScrollByHeight = contentHeight > scrollViewHeight
+
+            // Use height-based check as primary, direction check as fallback
+            val canScroll = if (scrollViewHeight > 0) {
+                canScrollByHeight
+            } else {
+                canScrollByDirection
+            }
 
             if (_needsSplit.value != canScroll) {
-                Timber.d("Scroll capability changed: canScroll=$canScroll")
+                Timber.d("Scroll capability changed: canScroll=$canScroll (down=$canScrollDown, up=$canScrollUp, contentH=$contentHeight, scrollH=$scrollViewHeight)")
                 _needsSplit.value = canScroll
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking scroll state")
+            // Emergency fallback: If we can't determine, assume split is needed
+            // This is safer than disabling scroll and potentially trapping the user
+            if (!_needsSplit.value && binding.appList.childCount > 5) {
+                Timber.w("Error checking scroll - enabling split mode as safety fallback")
+                _needsSplit.value = true
+            }
         }
     }
 
@@ -223,7 +259,7 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun observeViewModel() {
-        // Observer 1: Favorites (no capacity needed!)
+        // Observer 1: Favorites
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -441,6 +477,10 @@ class HomeFragment : Fragment() {
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rendering")
 
+            binding.favoritesScrollView.post {
+                verifyAndFixScrollState()
+            }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error rendering favorites")
         }
@@ -449,13 +489,10 @@ class HomeFragment : Fragment() {
     /**
      * Adjust ScrollView width based on split mode
      */
-// In HomeFragment.kt
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
         try {
             val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
             val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
-
-            // 1. Zugriff auf das Custom ScrollView
             val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
 
             if (enableSplit) {
@@ -464,12 +501,10 @@ class HomeFragment : Fragment() {
                     resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
                 if (isLandscape) {
-                    // LANDSCAPE:
                     scrollParams.weight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT
                     gestureParams.weight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
                     Timber.d("  → Split mode: (landscape)")
                 } else {
-                    // PORTRAIT:
                     scrollParams.weight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT
                     gestureParams.weight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT
                     Timber.d("  → Split mode: (portrait)")
@@ -487,29 +522,33 @@ class HomeFragment : Fragment() {
 
                 // ScrollView darf Touches abfangen (zum Scrollen)
                 customScrollView.allowIntercept = true
-
-                // ScrollView ist touchbar
                 customScrollView.isScrollContainer = true
                 customScrollView.isClickable = true
                 customScrollView.isFocusable = true
                 customScrollView.isFocusableInTouchMode = true
 
-                // Touch Listener für Split Mode: Gesture Zone verarbeitet Gesten auf der rechten Hälfte
+                // Touch Listener für Split Mode
                 binding.gestureZone.setOnTouchListener { _, event ->
                     gestureDetector?.onTouchEvent(event) ?: false
                 }
             } else {
-                // FULL MODE: 100% / 0%. ScrollView muss Event-Abfangen verhindern.
+                // FULL MODE: 100% / 0%
                 scrollParams.weight = 1f
                 gestureParams.weight = 0f
                 binding.gestureZone.visibility = View.GONE
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-                // ScrollView MUSS das Abfangen von Touches verhindern (Vertikales Scrollen)
-                customScrollView.allowIntercept = false
+                // CRITICAL FIX: Reset scroll position to prevent user being stuck
+                try {
+                    binding.favoritesScrollView.scrollTo(0, 0)
+                    Timber.d("Scroll position reset to top in full mode")
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error resetting scroll position")
+                }
 
-                // ScrollView "unsichtbar" für Touch-Events machen (zusätzliche Sicherheit)
+                // ScrollView MUSS das Abfangen von Touches verhindern
+                customScrollView.allowIntercept = false
                 customScrollView.isScrollContainer = false
                 customScrollView.isClickable = false
                 customScrollView.isFocusable = false
@@ -521,7 +560,7 @@ class HomeFragment : Fragment() {
 
                 removeScrollViewBorder()
 
-                Timber.d("Full mode: 100% (ScrollView touch-transparent)")
+                Timber.d("Full mode: 100% (ScrollView touch-transparent, scroll position reset)")
             }
 
             binding.favoritesScrollView.layoutParams = scrollParams
@@ -881,6 +920,10 @@ class HomeFragment : Fragment() {
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
+
+            binding.favoritesScrollView.post {
+                verifyAndFixScrollState()
+            }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating chips")
@@ -1398,6 +1441,43 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun verifyAndFixScrollState() {
+        try {
+            if (_binding == null || !isAdded) return
+
+            val currentSplitState = _needsSplit.value
+            val customScrollView = binding.favoritesScrollView as NonInterceptingScrollView
+
+            // If we're in full mode but allowIntercept is true, something went wrong
+            if (!currentSplitState && customScrollView.allowIntercept) {
+                Timber.w("Scroll state mismatch detected - fixing...")
+                customScrollView.allowIntercept = false
+                customScrollView.scrollTo(0, 0)
+            }
+
+            // If we're in split mode but can't scroll, re-check state
+            if (currentSplitState && !customScrollView.allowIntercept) {
+                Timber.w("Split mode but intercept disabled - fixing...")
+                customScrollView.allowIntercept = true
+            }
+
+            // Verify we can scroll if in split mode
+            if (currentSplitState) {
+                val canScrollDown = binding.favoritesScrollView.canScrollVertically(1)
+                val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
+
+                if (!canScrollDown && !canScrollUp) {
+                    // We think we need split but can't actually scroll
+                    // Re-evaluate the state
+                    Timber.w("Split mode active but no scroll capability - re-evaluating...")
+                    checkAndEmitScrollState()
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error verifying scroll state")
+        }
+    }
+
     // ============================================================================
     // LIFECYCLE
     // ============================================================================
@@ -1406,6 +1486,7 @@ class HomeFragment : Fragment() {
         super.onResume()
         try {
             hideStatusBar()
+            verifyAndFixScrollState()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onResume")
         }
