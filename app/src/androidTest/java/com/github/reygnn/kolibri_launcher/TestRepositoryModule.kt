@@ -583,7 +583,7 @@ class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, P
     override val favoriteApps: Flow<UiState<FavoriteAppsResult>> = favoriteAppsState
 
     // Speichert das Limit, das vom ViewModel (im Test) gesetzt wurde
-    var currentDynamicMax: Int = AppConstants.MAX_FAVORITES_ON_HOME
+    var currentDynamicMax: Int = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
         private set
 
     /**
@@ -600,7 +600,7 @@ class FakeGetFavoriteAppsUseCaseRepository : GetFavoriteAppsUseCaseRepository, P
 
     override suspend fun purgeRepository() {
         favoriteAppsState.value = UiState.Loading
-        currentDynamicMax = AppConstants.MAX_FAVORITES_ON_HOME
+        currentDynamicMax = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
     }
 
     // Hilfsfunktion für deine Tests, um den State einfach zu setzen

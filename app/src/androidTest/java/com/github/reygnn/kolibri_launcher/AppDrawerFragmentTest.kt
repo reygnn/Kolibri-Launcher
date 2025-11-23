@@ -188,7 +188,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
 
         // --- KORREKTUR: SCHRITT 1: ERSTELLE EINEN KONSISTENTEN ZUSTAND ---
         // Diese App-Liste dient sowohl als "installierte Apps" als auch als "Favoriten".
-        val maxFavoriteApps = (1..AppConstants.MAX_FAVORITES_ON_HOME).map {
+        val maxFavoriteApps = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map {
             val componentName = "com.fake.app$it"
             AppInfo(componentName, componentName, componentName, componentName)
         }
@@ -222,7 +222,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         // --- SCHRITT 4: ÜBERPRÜFE DAS ENDERGEBNIS ---
         // Die Favoritenliste sollte unverändert sein.
         assertThat(fakeFavoritesRepo.favorites).doesNotContain(appToAdd.componentName)
-        assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FAVORITES_ON_HOME)
+        assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test

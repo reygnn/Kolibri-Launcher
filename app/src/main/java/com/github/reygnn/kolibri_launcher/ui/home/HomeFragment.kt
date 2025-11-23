@@ -226,11 +226,11 @@ class HomeFragment : Fragment() {
                 0
             }
 
-            // Toleranz für abgeschnittenen Margin
+            // Toleranz definieren
             val tolerancePx = try {
-                resources.getDimensionPixelSize(R.dimen.app_item_vertical_margin)
+                resources.getDimensionPixelSize(R.dimen.touch_target_padding)
             } catch (e: Throwable) {
-                (8 * resources.displayMetrics.density).toInt()
+                (6 * resources.displayMetrics.density).toInt()
             }
 
             // Overflow berechnen
@@ -865,29 +865,20 @@ class HomeFragment : Fragment() {
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                        // 1. Hole den korrekten Pixel-Wert für 8dp
-                        val marginPx = try {
-                            resources.getDimensionPixelSize(R.dimen.app_item_vertical_margin)
-                        } catch (e: Throwable) {
-                            // Fallback: Manuelle Umrechnung falls Resource fehlt (8dp in px)
-                            (8 * resources.displayMetrics.density).toInt()
+                            setMargins(0, 0, 0, 0)
                         }
-
-                        // 2. Setze Margin in Pixeln
-                        setMargins(0, marginPx, 0, marginPx)
-                    }
 
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.START
 
-//                    // === DEBUG VISUALISIERUNG START ===
-//                    // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
-//                    val debugBorder = android.graphics.drawable.GradientDrawable().apply {
-//                        setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
-//                        setStroke(2, android.graphics.Color.RED) // 2px roter Rand
-//                    }
-//                    background = debugBorder
-//                    // === DEBUG VISUALISIERUNG ENDE ===
+                    // === DEBUG VISUALISIERUNG START ===
+                    // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
+                    val debugBorder = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
+                        setStroke(2, android.graphics.Color.RED) // 2px roter Rand
+                    }
+                    background = debugBorder
+                    // === DEBUG VISUALISIERUNG ENDE ===
 
                     addView(button)
                 } catch (e: Throwable) {
