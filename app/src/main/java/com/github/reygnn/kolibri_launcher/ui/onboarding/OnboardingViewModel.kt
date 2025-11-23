@@ -18,7 +18,6 @@ import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
-import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingViewModelInterface
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -27,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
@@ -141,8 +139,8 @@ class OnboardingViewModel @Inject constructor(
             if (currentSelection.contains(component)) {
                 selectedComponents.value = currentSelection - component
             } else {
-                if (currentSelection.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
-                    sendOnboardingEvent(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FAVORITES_ON_HOME))
+                if (currentSelection.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
+                    sendOnboardingEvent(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
                 } else {
                     selectedComponents.value = currentSelection + component
                 }

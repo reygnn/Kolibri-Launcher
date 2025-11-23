@@ -82,7 +82,7 @@ class FavoritesManagerTest {
     @Test
     fun `addFavoriteComponent returns false when max limit is reached for new packages`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val fullSet = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
+        val fullSet = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
         val favoritesManager = FavoritesManager(
             fakeDataStore,
@@ -95,7 +95,7 @@ class FavoritesManagerTest {
 
         assertFalse(result)
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, savedFavorites?.size)
+        assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, savedFavorites?.size)
     }
 
     @Test
@@ -141,7 +141,7 @@ class FavoritesManagerTest {
     @Test
     fun `addFavoriteComponent when limit reached allows adding component from existing favorite package`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val fullSet = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
+        val fullSet = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
         val favoritesManager = FavoritesManager(
             fakeDataStore,
@@ -154,7 +154,7 @@ class FavoritesManagerTest {
 
         assertTrue(result)
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertEquals(AppConstants.MAX_FAVORITES_ON_HOME + 1, savedFavorites?.size)
+        assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME + 1, savedFavorites?.size)
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========

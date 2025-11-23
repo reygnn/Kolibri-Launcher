@@ -124,7 +124,7 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = (successState as UiState.Success).data
-            val expectedFallbackSize = AppConstants.MAX_FAVORITES_ON_HOME.coerceAtMost(allApps.size)
+            val expectedFallbackSize = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME.coerceAtMost(allApps.size)
 
             assertEquals(expectedFallbackSize, result.apps.size)
 
@@ -326,7 +326,7 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = (successState as UiState.Success).data
-            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
+            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 
@@ -424,7 +424,7 @@ class GetFavoriteAppsUseCaseTest {
 
             val result = (successState as UiState.Success).data
             assertTrue(result.isFallback)
-            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
+            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 }

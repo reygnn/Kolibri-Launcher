@@ -24,7 +24,6 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
-import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -180,7 +179,7 @@ class OnboardingViewModelTest {
     // --- onAppToggled Limit Test (bleibt gleich) ---
     @Test
     fun `onAppToggled - whenLimitReached - emitsToastEventAndDoesNotSelectApp`() = runTest {
-        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
         val appsOverLimit = (1..(limit + 1)).map {
             AppInfo("App $it", "App $it", "pkg$it", "class$it")
         }
@@ -547,7 +546,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `onAppToggled - when at limit minus one - allows one more selection`() = runTest {
-        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
         val manyApps = (1..limit).map {
             AppInfo("App $it", "App $it", "pkg$it", "class$it")
         }
@@ -645,7 +644,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `onAppToggled - selecting exactly at limit - works without toast`() = runTest {
-        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
         val exactApps = (1..limit).map {
             AppInfo("App $it", "App $it", "pkg$it", "class$it")
         }

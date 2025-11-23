@@ -23,9 +23,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -33,8 +31,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.yield
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -284,7 +280,7 @@ class LauncherViewModelTest {
     @Test
     fun `onToggleFavorite - when not favorite - calls UseCase and shows toast`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME))
+        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
             .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
 
         setupViewModel()
@@ -298,13 +294,13 @@ class LauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
         }
         // Überprüfe den UseCase
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME)
+        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test
     fun `onToggleFavorite - when limit reached - calls UseCase and shows limit message`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME))
+        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
             .thenReturn(ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached))
 
         setupViewModel()
@@ -318,7 +314,7 @@ class LauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
         }
         // Überprüfe den UseCase
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME)
+        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test
@@ -638,7 +634,7 @@ class LauncherViewModelTest {
     @Test
     fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
         // Mocke das ERGEBNIS des UseCase für "Remove"
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME))
+        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
             .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites))
 
         setupViewModel()
@@ -652,7 +648,7 @@ class LauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
             // Optional: Prüfe dass die Message "removed" enthält
         }
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME)
+        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test

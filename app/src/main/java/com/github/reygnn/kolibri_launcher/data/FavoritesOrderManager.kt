@@ -154,7 +154,7 @@ open class FavoritesOrderManager private constructor(
         private const val AVG_COMPONENTS_PER_PACKAGE = 6
         private const val SAFETY_BUFFER = 2
         private const val MAX_ORDER_LIST_SIZE =
-            AppConstants.MAX_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
+            AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
 
 
         @VisibleForTesting

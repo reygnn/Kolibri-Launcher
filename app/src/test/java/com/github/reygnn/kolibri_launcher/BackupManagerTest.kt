@@ -709,7 +709,7 @@ class BackupManagerTest {
         assertThat(result).isInstanceOf(ImportResult.LimitExceeded::class.java)
         val limitExceeded = result as ImportResult.LimitExceeded
         assertThat(limitExceeded.packageCount).isEqualTo(300)
-        assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
+        assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test

@@ -131,7 +131,7 @@ class LauncherViewModel @Inject constructor(
     private val _uiColorsState = MutableStateFlow(UiColorsState())
     val uiColorsState: StateFlow<UiColorsState> = _uiColorsState.asStateFlow()
 
-    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FAVORITES_ON_HOME)
+    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
 
     private val _homeSettings = MutableStateFlow(HomeSettings())

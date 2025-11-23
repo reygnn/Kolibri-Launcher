@@ -201,7 +201,7 @@ class FavoritesManager : FavoritesRepository {
 
             val currentFavoritePackages = currentFavorites.map { it.split('/')[0] }.toSet()
 
-            if (currentFavoritePackages.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
+            if (currentFavoritePackages.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
                 val newPackageName = componentName.split('/')[0]
                 if (!currentFavoritePackages.contains(newPackageName)) {
                     Timber.Forest.w("Favorites limit reached. Cannot add component from new package: $componentName")

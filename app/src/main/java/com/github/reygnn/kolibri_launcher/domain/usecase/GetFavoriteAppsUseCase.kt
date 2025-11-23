@@ -78,7 +78,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
             }
 
             // Limitiere auf MAX_FAVORITES_ON_HOME
-            val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FAVORITES_ON_HOME)
+            val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
 
             // Wenn Favoriten vorhanden: Diese verwenden
             if (limitedOrderedFavorites.isNotEmpty()) {
@@ -124,10 +124,10 @@ class GetFavoriteAppsUseCase @Inject constructor(
             rawApps
                 .filter { !hiddenApps.contains(it.componentName) }
                 .sortedBy { it.displayName.lowercase() }
-                .take(AppConstants.MAX_FAVORITES_ON_HOME)
+                .take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Error creating fallback - using first ${AppConstants.MAX_FAVORITES_ON_HOME} apps")
-            rawApps.take(AppConstants.MAX_FAVORITES_ON_HOME)
+            Timber.Forest.e(e, "Error creating fallback - using first ${AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME} apps")
+            rawApps.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
         }
     }
 
