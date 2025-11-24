@@ -71,7 +71,6 @@ class BackupManager @Inject constructor(
             val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
             val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
             val customAppNames = appNamesManager.getAllCustomNames()
-
             val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
             val textColor = settingsManager.textColorFlow.first()
@@ -93,16 +92,16 @@ class BackupManager @Inject constructor(
                 customAppNames = customAppNames,
                 swipeLeftApp = swipeLeftApp,
                 swipeRightApp = swipeRightApp,
-                textColor = textColor.takeIf { it != 0 },
-                chipBackgroundColor = chipBackgroundColor.takeIf { it != 0 },
-                textShadowEnabled = textShadowEnabled.takeIf { !it },
-                showCalendarEvent = showCalendarEvent.takeIf { it },
-                showAlarm = showAlarm.takeIf { it },
-                doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it },
-                autoShowKeyboard = autoShowKeyboard.takeIf { it },
-                autoLaunchApp = autoLaunchApp.takeIf { it },
-                splitModeThreshold = splitModeThreshold.takeIf { it != 0 }
+                textColor = textColor,
+                chipBackgroundColor = chipBackgroundColor,
+                textShadowEnabled = textShadowEnabled,
+                showCalendarEvent = showCalendarEvent,
+                showAlarm = showAlarm,
+                doubleTapToLockEnabled = doubleTapToLockEnabled,
+                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
+                autoShowKeyboard = autoShowKeyboard,
+                autoLaunchApp = autoLaunchApp,
+                splitModeThreshold = splitModeThreshold
             )
 
             val backup = BackupData(
