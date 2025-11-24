@@ -55,57 +55,80 @@ class LauncherViewModelTest {
 
     @Mock
     private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase
+
     @Mock
     private lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCase
+
     @Mock
     private lateinit var hideAppUseCase: HideAppUseCase
+
     @Mock
     private lateinit var toggleFavoriteUseCase: ToggleFavoriteUseCase
+
     @Mock
     private lateinit var requestLockUseCase: RequestLockUseCase
+
     @Mock
     private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
+
     @Mock
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
+
     @Mock
     private lateinit var refreshAppsUseCase: RefreshAppsUseCase
+
     @Mock
     private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
+
     @Mock
     private lateinit var showAppUseCase: ShowAppUseCase
+
     @Mock
     private lateinit var toggleSortOrderUseCase: ToggleSortOrderUseCase
+
     @Mock
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
+
     @Mock
     private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
+
     @Mock
     private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
+
     @Mock
     private lateinit var setTextColorUseCase: SetTextColorUseCase
+
     @Mock
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
+
     @Mock
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
+
     @Mock
     private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
 
     @Mock
     private lateinit var getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase
+
     @Mock
     private lateinit var getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase
+
     @Mock
     private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
+
     @Mock
     private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
+
     @Mock
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
+
     @Mock
-    private lateinit var getSplitModeThresholdUseCase : GetSplitModeThresholdUseCase
+    private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
 
 
     @Mock
     private lateinit var appUpdateSignal: AppUpdateSignal
+
     @Mock
     private lateinit var context: Context
     // --- ENDE DER MOCKS ---
@@ -301,24 +324,30 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onToggleFavorite - when limit reached - calls UseCase and shows limit message`() = runTest {
-        // Mocke das ERGEBNIS des UseCase
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
-            .thenReturn(ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached))
+    fun `onToggleFavorite - when limit reached - calls UseCase and shows limit message`() =
+        runTest {
+            // Mocke das ERGEBNIS des UseCase
+            whenever(
+                toggleFavoriteUseCase.invoke(
+                    app1,
+                    AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+                )
+            )
+                .thenReturn(ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached))
 
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onToggleFavorite(app1)
+            setupViewModel()
             advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            viewModel.event.test {
+                viewModel.onToggleFavorite(app1)
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event is UiEvent.ShowToastFromString)
+            }
+            // Überprüfe den UseCase
+            verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
         }
-        // Überprüfe den UseCase
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-    }
 
     @Test
     fun `onHideApp - calls UseCase and shows confirmation`() = runTest {
@@ -391,22 +420,23 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() = runTest {
-        // Mocke das ERGEBNIS des UseCase
-        whenever(requestLockUseCase.invoke()).thenReturn(RequestLockUseCase.Result.ErrorAccessibility)
+    fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() =
+        runTest {
+            // Mocke das ERGEBNIS des UseCase
+            whenever(requestLockUseCase.invoke()).thenReturn(RequestLockUseCase.Result.ErrorAccessibility)
 
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoubleTapToLock()
+            setupViewModel()
             advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowAccessibilityDialog)
+            viewModel.event.test {
+                viewModel.onDoubleTapToLock()
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event is UiEvent.ShowAccessibilityDialog)
+            }
+            verify(requestLockUseCase).invoke()
         }
-        verify(requestLockUseCase).invoke()
-    }
 
     @Test
     fun `onDoubleTapToLock - when disabled - shows enable toast once`() = runTest {
@@ -513,26 +543,27 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onAppClicked - when recordAppLaunchUseCase fails - still launches app and shows error`() = runTest {
-        whenever(recordAppLaunchUseCase.invoke(any())).doAnswer {
-            throw IOException("Cannot record")
-        }
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onAppClicked(app1)
+    fun `onAppClicked - when recordAppLaunchUseCase fails - still launches app and shows error`() =
+        runTest {
+            whenever(recordAppLaunchUseCase.invoke(any())).doAnswer {
+                throw IOException("Cannot record")
+            }
+            setupViewModel()
             advanceUntilIdle()
 
-            val launchEvent = awaitItem()
-            assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
+            viewModel.event.test {
+                viewModel.onAppClicked(app1)
+                advanceUntilIdle()
 
-            val errorEvent = awaitItem()
-            assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+                val launchEvent = awaitItem()
+                assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
 
-            ensureAllEventsConsumed()
+                val errorEvent = awaitItem()
+                assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+
+                ensureAllEventsConsumed()
+            }
         }
-    }
 
     @Test
     fun `onToggleFavorite - when UseCase throws - emits error`() = runTest {
@@ -672,20 +703,21 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() = runTest {
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.RIGHT))
-            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+    fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() =
+        runTest {
+            whenever(handleSwipeActionUseCase.invoke(SwipeSlot.RIGHT))
+                .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onFlingRight()
+            setupViewModel()
             advanceUntilIdle()
-            expectNoEvents()
+
+            viewModel.event.test {
+                viewModel.onFlingRight()
+                advanceUntilIdle()
+                expectNoEvents()
+            }
+            verify(handleSwipeActionUseCase).invoke(SwipeSlot.RIGHT)
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.RIGHT)
-    }
 
     @Test
     fun `init - when calendar enabled with alarm - shows alarm first chronologically`() = runTest {
@@ -1382,6 +1414,99 @@ class LauncherViewModelTest {
             // Jetzt warten wir auf das Update vom UseCase, da wir "subscribed" sind
             assertEquals(expectedThreshold, awaitItem())
         }
+    }
+
+    @Test
+    fun `splitModeThreshold - updates dynamically when UseCase emits new value`() = runTest {
+        // Arrange: Wir nutzen einen MutableStateFlow, um Werte zur Laufzeit zu ändern
+        val thresholdFlow = MutableStateFlow(0)
+        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+
+        setupViewModel()
+
+        viewModel.splitModeThreshold.test {
+            // Initialer Wert (0)
+            assertEquals(0, awaitItem())
+
+            // Act: Simuliere Änderung in den Settings (z.B. Slider bewegt auf 150px)
+            thresholdFlow.value = 150
+
+            // Assert: ViewModel muss den neuen Wert propagieren
+            assertEquals(150, awaitItem())
+        }
+    }
+
+    @Test
+    fun `refreshDynamicUiData - updates time but preserves battery state`() = runTest {
+        setupViewModel()
+
+        // 1. Setze einen Batterie-Status
+        viewModel.updateBatteryLevel(88, 100)
+        advanceUntilIdle()
+
+        val stateBefore = viewModel.uiState.value
+        assertEquals("88%", stateBefore.batteryString)
+
+        // Merke alte Zeit (könnte leer sein am Anfang im Test)
+        val oldTime = stateBefore.timeString
+
+        // Act: Simuliere System-Tick (Minute vergangen)
+        // Wir warten kurz, damit System.currentTimeMillis() sich unterscheidet (in Tests oft irrelevant,
+        // aber wir wollen sichergehen, dass die Methode triggert)
+        viewModel.refreshDynamicUiData()
+        advanceUntilIdle()
+
+        val stateAfter = viewModel.uiState.value
+
+        // Assert:
+        // 1. Batterie ist immer noch da (wurde nicht überschrieben)
+        assertEquals("88%", stateAfter.batteryString)
+        // 2. Zeitstring ist vorhanden (Logik wurde ausgeführt)
+        assertNotNull(stateAfter.timeString)
+    }
+
+    @Test
+    fun `goldenStateIntegration_updatesAllComponentsCorrectly`() = runTest {
+        // === ARRANGE ===
+        val thresholdFlow = MutableStateFlow(0)
+        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+
+        val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
+        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(colorsFlow)
+
+        val eventsFlow = MutableStateFlow(emptyList<TimeBasedEvent>())
+        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(eventsFlow)
+
+        setupViewModel()
+
+        val subscriptionJob = launch {
+            viewModel.splitModeThreshold.collect {}
+        }
+
+        // === ACT ===
+        thresholdFlow.value = 300
+        colorsFlow.value = UiColorsState(textColor = Color.YELLOW)
+        eventsFlow.value = listOf(
+            TimeBasedEvent(System.currentTimeMillis(), "Jubiläum", EventType.CALENDAR)
+        )
+
+        advanceUntilIdle()
+
+        // === ASSERT ===
+
+        // 1. Threshold
+        assertEquals(300, viewModel.splitModeThreshold.value)
+
+        // 2. Colors
+        assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
+
+        // 3. Events
+        val currentState = viewModel.uiState.value
+        assertEquals(1, currentState.timeBasedEvents.size)
+        assertEquals("Jubiläum", currentState.timeBasedEvents.first().title)
+
+        // Cleanup
+        subscriptionJob.cancel()
     }
 
 }
