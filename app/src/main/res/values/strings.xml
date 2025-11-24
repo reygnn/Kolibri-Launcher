@@ -290,12 +290,12 @@
     <string name="split_mode_threshold_title">Split-Mode Threshold</string>
     <string name="split_mode_threshold_summary">Current: %1$s\n%2$s</string>
     <string name="split_mode_threshold_dialog_title">Split-Mode Threshold (0–512 Pixel)</string>
-    <string name="split_mode_threshold_dialog_message">Controls when split-mode activates on the home screen:\n\n• 0 px = Auto (Android decides, fail-safe)\n• 42 px = Ignore typical padding/margins\n• 60-100 px = More aggressive\n\nMost users should leave this at 0.</string>
+<string name="split_mode_threshold_dialog_message">Controls when split-mode activates on the home screen:\n\n• 0 px = Auto (Android default)\n• 120 px = Good start value for tinkering\n• 512 px = Max value</string>
     
     <!-- Threshold Descriptions -->
-    <string name="split_mode_threshold_desc_auto">Auto (Android decides, fail-safe)</string>
-    <string name="split_mode_threshold_desc_ignore_padding">Ignore typical padding (recommended for power users)</string>
-    <string name="split_mode_threshold_desc_aggressive">Aggressive (only large overflows)</string>
+    <string name="split_mode_threshold_desc_auto">Auto (Android default)</string>
+    <string name="split_mode_threshold_desc_tinkering">Good start value for tinkering</string>
+    <string name="split_mode_threshold_desc_max">Max value</string>
     <string name="split_mode_threshold_desc_custom">Custom threshold: %d pixels</string>
     
     <!-- Toast Messages -->

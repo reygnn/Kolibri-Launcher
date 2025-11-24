@@ -760,11 +760,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 splitModeThresholdPreference?.apply {
                                     text = threshold.toString()
 
-                                    // Generiere benutzerfreundliche Summary
                                     val description = when {
                                         threshold == 0 -> getString(R.string.split_mode_threshold_desc_auto)
-                                        threshold in 1..50 -> getString(R.string.split_mode_threshold_desc_ignore_padding)
-                                        threshold in 51..512 -> getString(R.string.split_mode_threshold_desc_aggressive)
+                                        threshold == 512 -> getString(R.string.split_mode_threshold_desc_max)
+                                        threshold in 1..200 -> getString(R.string.split_mode_threshold_desc_tinkering)
                                         else -> getString(R.string.split_mode_threshold_desc_custom, threshold)
                                     }
 

@@ -28,6 +28,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.isNotEmpty
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -210,8 +211,6 @@ class HomeFragment : Fragment() {
             if (_binding == null || !isAdded) return
 
             val scrollView = binding.favoritesScrollView
-            // Wir holen den aktuellen Wert direkt aus dem StateFlow des ViewModels
-            // Das ist sicher, da StateFlow immer einen Wert hat (initial 0).
             val threshold = viewModel.splitModeThreshold.value
 
             val shouldSplit: Boolean
@@ -498,6 +497,7 @@ class HomeFragment : Fragment() {
                 TimberWrapper.silentError(e, "Error observing threshold")
             }
         }
+
     }
 
     // ============================================================================
@@ -534,7 +534,6 @@ class HomeFragment : Fragment() {
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after rendering")
-
             safePost { scheduleScrollVerification() }
 
         } catch (e: Throwable) {
