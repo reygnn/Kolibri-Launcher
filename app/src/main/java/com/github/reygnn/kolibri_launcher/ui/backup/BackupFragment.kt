@@ -209,6 +209,11 @@ class BackupFragment : Fragment() {
                     checkboxImportQualityOfLife.text = getString(R.string.import_option_qol)
                     checkboxImportQualityOfLife.isVisible = qolVisible
                     checkboxImportQualityOfLife.isChecked = qolVisible
+
+                    val powerUserVisible = preview.hasPowerUserSettings
+                    checkboxImportPowerUserSettings.text = getString(R.string.import_option_power_user)
+                    checkboxImportPowerUserSettings.isVisible = powerUserVisible
+                    checkboxImportPowerUserSettings.isChecked = powerUserVisible
                 }
 
                 // 4. Dialog anzeigen
@@ -225,7 +230,8 @@ class BackupFragment : Fragment() {
                             importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked,
                             importGestureSettings = dialogBinding.checkboxImportGestureSettings.isChecked,
                             importTimeBasedEvents = dialogBinding.checkboxImportTimeBasedEvents.isChecked,
-                            importQualityOfLife = dialogBinding.checkboxImportQualityOfLife.isChecked
+                            importQualityOfLife = dialogBinding.checkboxImportQualityOfLife.isChecked,
+                            importPowerUserSettings = dialogBinding.checkboxImportPowerUserSettings.isChecked
                         )
 
                         if (options.importNothing) {

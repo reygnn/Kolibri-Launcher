@@ -301,6 +301,7 @@
     <!-- Toast Messages -->
     <string name="split_mode_threshold_invalid">Please enter a value between 0 and 512</string>
     <string name="split_mode_threshold_saved">Split-mode threshold saved: %d px</string>
+    <string name="import_option_power_user">Power User Settings</string>
     
 
 </resources>

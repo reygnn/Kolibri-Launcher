@@ -289,6 +289,7 @@
     
     <string name="split_mode_threshold_invalid">Bitte einen Wert zwischen 0 und 512 eingeben</string>
     <string name="split_mode_threshold_saved">Split-Mode Schwellwert gespeichert: %d px</string>
+    <string name="import_option_power_user">Power-User-Einstellungen</string>
     
 
 </resources>
