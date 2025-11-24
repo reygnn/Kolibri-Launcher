@@ -218,12 +218,12 @@ class HomeFragment : Fragment() {
 
             // State Update nur bei Änderung
             if (_needsSplit.value != canScroll) {
-                Timber.d("checkAndEmitScrollState: splitMode = $canScroll")
+                Timber.d("Scroll mode: ${if (canScroll) "SPLIT" else "FULL"}")
                 _needsSplit.value = canScroll
             }
 
             // Reset scroll position wenn kein Split Mode
-            if (!canScroll) {
+            if (!canScroll && _needsSplit.value) {
                 scrollView.scrollTo(0, 0)
             }
 
