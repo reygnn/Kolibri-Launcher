@@ -493,6 +493,8 @@ class HomeFragment : Fragment() {
                         safePost { scheduleScrollVerification() }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error observing threshold")
             }
