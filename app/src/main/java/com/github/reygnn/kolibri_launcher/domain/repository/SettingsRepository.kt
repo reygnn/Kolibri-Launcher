@@ -40,4 +40,22 @@ interface SettingsRepository : Purgeable {
 
     val autoLaunchAppFlow: Flow<Boolean>
     suspend fun setAutoLaunchApp(isEnabled: Boolean)
+
+    /**
+     * Flow für den Split-Mode Threshold in Pixel.
+     *
+     * - 0 = Default Verhalten (Android's canScrollVertically)
+     * - > 0 = Custom Threshold (z.B. 42, 60, 100)
+     *
+     * Max: 512 Pixel
+     */
+    val splitModeThresholdFlow: Flow<Int>
+    /**
+     * Setzt den Split-Mode Threshold.
+     *
+     * @param thresholdPixels Threshold in Pixel (0-512)
+     *                        0 = Android decides (fail-safe)
+     *                        2-200 = Typische Power-User Werte
+     */
+    suspend fun setSplitModeThreshold(thresholdPixels: Int)
 }

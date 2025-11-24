@@ -21,6 +21,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
@@ -82,6 +83,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
+    private var splitModeThresholdPreference: EditTextPreference? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -183,6 +185,48 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
+                    false
+                }
+            }
+
+            splitModeThresholdPreference = findPreference("split_mode_threshold")
+            splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val thresholdString = newValue as? String ?: "0"
+                    val threshold = thresholdString.toIntOrNull() ?: 0
+
+                    // Validierung: 0-512 Pixel
+                    if (threshold !in 0..512) {
+                        Toast.makeText(
+                            requireContext(),
+                            R.string.split_mode_threshold_invalid,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        false // Verhindere das Update
+                    } else {
+                        // Speichere den validen Wert
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            settingsManager.setSplitModeThreshold(threshold)
+
+                            // Zeige Bestätigung
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.split_mode_threshold_saved, threshold),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        true // Erlaube das Update
+                    }
+                } catch (e: NumberFormatException) {
+                    TimberWrapper.silentError(e, "Invalid number format for split-mode threshold")
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.split_mode_threshold_invalid,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    false
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in split-mode threshold change listener")
                     false
                 }
             }
@@ -704,6 +748,40 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in autoLaunchApp flow collection")
+                    }
+                }
+
+                // Observer für Split-Mode Threshold
+                launch {
+                    try {
+                        settingsManager.splitModeThresholdFlow.collect { threshold ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                splitModeThresholdPreference?.apply {
+                                    text = threshold.toString()
+
+                                    // Generiere benutzerfreundliche Summary
+                                    val description = when {
+                                        threshold == 0 -> getString(R.string.split_mode_threshold_desc_auto)
+                                        threshold in 1..50 -> getString(R.string.split_mode_threshold_desc_ignore_padding)
+                                        threshold in 51..512 -> getString(R.string.split_mode_threshold_desc_aggressive)
+                                        else -> getString(R.string.split_mode_threshold_desc_custom, threshold)
+                                    }
+
+                                    summary = getString(
+                                        R.string.split_mode_threshold_summary,
+                                        "$threshold px",
+                                        description
+                                    )
+                                }
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating split-mode threshold preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in splitModeThreshold flow collection")
                     }
                 }
 

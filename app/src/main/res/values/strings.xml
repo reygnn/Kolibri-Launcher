@@ -283,4 +283,24 @@
 <string name="auto_launch_app_title">Auto-launch single result</string>
 <string name="auto_launch_app_summary">Automatically launch an app when it\'s the only search result</string>
 
+    <!-- Advanced Settings Category -->
+    <string name="category_advanced_title">Advanced Settings</string>
+    
+    <!-- Split-Mode Threshold Setting -->
+    <string name="split_mode_threshold_title">Split-Mode Threshold</string>
+    <string name="split_mode_threshold_summary">Current: %1$s\n%2$s</string>
+    <string name="split_mode_threshold_dialog_title">Split-Mode Threshold (0–512 Pixel)</string>
+    <string name="split_mode_threshold_dialog_message">Controls when split-mode activates on the home screen:\n\n• 0 px = Auto (Android decides, fail-safe)\n• 42 px = Ignore typical padding/margins\n• 60-100 px = More aggressive\n\nMost users should leave this at 0.</string>
+    
+    <!-- Threshold Descriptions -->
+    <string name="split_mode_threshold_desc_auto">Auto (Android decides, fail-safe)</string>
+    <string name="split_mode_threshold_desc_ignore_padding">Ignore typical padding (recommended for power users)</string>
+    <string name="split_mode_threshold_desc_aggressive">Aggressive (only large overflows)</string>
+    <string name="split_mode_threshold_desc_custom">Custom threshold: %d pixels</string>
+    
+    <!-- Toast Messages -->
+    <string name="split_mode_threshold_invalid">Please enter a value between 0 and 512</string>
+    <string name="split_mode_threshold_saved">Split-mode threshold saved: %d px</string>
+    
+
 </resources>

@@ -39,7 +39,9 @@ data class LauncherSettings(
     @SerialName("auto_show_keyboard")
     val autoShowKeyboard: Boolean? = null,
     @SerialName("auto_launch_app")
-    val autoLaunchApp: Boolean? = null
+    val autoLaunchApp: Boolean? = null,
+    @SerialName("split_mode_threshold")
+    val splitModeThreshold: Int? = null
 
 )
 
@@ -52,7 +54,8 @@ data class ImportOptions(
     val importThemeSettings: Boolean = true,
     val importGestureSettings: Boolean = true,
     val importTimeBasedEvents: Boolean = true,
-    val importQualityOfLife: Boolean = true
+    val importQualityOfLife: Boolean = true,
+    val importPowerUserSettings: Boolean = true
 ) {
     val importNothing: Boolean
         get() = !importFavorites &&
@@ -63,7 +66,8 @@ data class ImportOptions(
                 !importThemeSettings &&
                 !importGestureSettings &&
                 !importTimeBasedEvents &&
-                !importQualityOfLife
+                !importQualityOfLife &&
+                !importPowerUserSettings
 }
 
 data class BackupPreview(
@@ -78,7 +82,8 @@ data class BackupPreview(
     val hasThemeSettings: Boolean,
     val hasGestureSettings: Boolean,
     val hasTimeBasedEvents: Boolean,
-    val hasQualityOfLife: Boolean
+    val hasQualityOfLife: Boolean,
+    val hasPowerUserSettings: Boolean
 )
 
 sealed class ImportResult {

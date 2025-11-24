@@ -39,6 +39,7 @@ class SettingsManager @Inject constructor(
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
         val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
         val AUTO_LAUNCH_APP = booleanPreferencesKey("auto_launch_app")
+        val SPLIT_MODE_THRESHOLD = intPreferencesKey("split_mode_threshold")
     }
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data
@@ -351,6 +352,35 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val splitModeThresholdFlow: Flow<Int> = dataStore.data
+        .catch { e ->
+            if (e is IOException) {
+                TimberWrapper.silentError(e, "Error reading SplitModeThreshold preferences")
+                emit(emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { preferences ->
+            val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD] ?: 0
+            // Validierung: Stelle sicher, dass der Wert im gültigen Bereich liegt
+            threshold.coerceIn(0, 512)
+        }
+
+    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
+        try {
+            // Validiere Input (0-512)
+            val validThreshold = thresholdPixels.coerceIn(0, 512)
+
+            dataStore.edit { settings ->
+                settings[PreferenceKeys.SPLIT_MODE_THRESHOLD] = validThreshold
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting split mode threshold: $thresholdPixels")
+        }
+    }
 
     override suspend fun purgeRepository() {
         try {
@@ -377,6 +407,9 @@ class SettingsManager @Inject constructor(
 
                 preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
                 preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
+
+                // Power-User Settings
+                preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
             }
         } catch (e: CancellationException) {
             throw e

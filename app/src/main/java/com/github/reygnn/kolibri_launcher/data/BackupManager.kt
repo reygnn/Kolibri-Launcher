@@ -83,6 +83,7 @@ class BackupManager @Inject constructor(
             val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
             val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
             val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
+            val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
 
 
             val settings = LauncherSettings(
@@ -100,7 +101,8 @@ class BackupManager @Inject constructor(
                 doubleTapToLockEnabled = doubleTapToLockEnabled.takeIf { it },
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled.takeIf { it },
                 autoShowKeyboard = autoShowKeyboard.takeIf { it },
-                autoLaunchApp = autoLaunchApp.takeIf { it }
+                autoLaunchApp = autoLaunchApp.takeIf { it },
+                splitModeThreshold = splitModeThreshold.takeIf { it != 0 }
             )
 
             val backup = BackupData(
@@ -353,9 +355,27 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // ===== PHASE 10: Import Power-User Settings =====
+            if (options.importPowerUserSettings) {
+                var powerUserImported = false
+
+                // Importiere Split-Mode Threshold (nur wenn im Backup vorhanden)
+                backup.settings.splitModeThreshold?.let { threshold ->
+                    // Validiere Threshold (0-512)
+                    val validThreshold = threshold.coerceIn(0, 512)
+                    settingsManager.setSplitModeThreshold(validThreshold)
+                    powerUserImported = true
+                    Timber.Forest.i("Imported split-mode threshold: $validThreshold px")
+                }
+
+                if (powerUserImported) {
+                    Timber.Forest.i("Imported power-user settings.")
+                }
+            }
+
 
             Timber.Forest.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b, QoL: %b",
+                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b, QoL: %b, PowerUser: %b",
                 options.importFavorites,
                 importedCount,
                 options.importOrder,
@@ -365,7 +385,8 @@ class BackupManager @Inject constructor(
                 options.importThemeSettings,
                 options.importGestureSettings,
                 options.importTimeBasedEvents,
-                options.importQualityOfLife
+                options.importQualityOfLife,
+                options.importPowerUserSettings
             )
 
             ImportResult.Success(
@@ -578,14 +599,16 @@ class BackupManager @Inject constructor(
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
                         backup.settings.swipeDownToNotificationsEnabled != null,
                 hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
-                        backup.settings.autoLaunchApp != null
+                        backup.settings.autoLaunchApp != null,
+                hasPowerUserSettings = backup.settings.splitModeThreshold != null
             )
 
             Timber.Forest.i(
                 "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, " +
                         "swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}, " +
                         "theme=${preview.hasThemeSettings}, gestures=${preview.hasGestureSettings}, " +
-                        "timeEvents=${preview.hasTimeBasedEvents}"
+                        "timeEvents=${preview.hasTimeBasedEvents}, qol=${preview.hasQualityOfLife}, " +
+                        "powerUser=${preview.hasPowerUserSettings}"
             )
             preview
 

@@ -276,4 +276,19 @@
 <string name="auto_launch_app_title">Auto-Start bei Einzeltreffer</string>
 <string name="auto_launch_app_summary">Startet die App sofort, wenn sie das einzige Suchergebnis ist</string>
 
+    <string name="category_advanced_title">Erweiterte Einstellungen</string>
+    <string name="split_mode_threshold_title">Split-Mode Schwellwert</string>
+    <string name="split_mode_threshold_summary">Aktuell: %1$s\n%2$s</string>
+    <string name="split_mode_threshold_dialog_title">Split-Mode Schwellwert (0–512 Pixel)</string>
+    <string name="split_mode_threshold_dialog_message">Steuert, wann der Split-Mode auf dem Homescreen aktiviert wird:\n\n• 0 px = Auto (Android entscheidet, fail-safe)\n• 42 px = Typisches Padding ignorieren\n• 60-100 px = Aggressiver\n\nDie meisten Nutzer sollten dies bei 0 lassen.</string>
+    
+    <string name="split_mode_threshold_desc_auto">Auto (Android entscheidet, fail-safe)</string>
+    <string name="split_mode_threshold_desc_ignore_padding">Typisches Padding ignorieren (empfohlen für Power-User)</string>
+    <string name="split_mode_threshold_desc_aggressive">Aggressiv (nur große Überläufe)</string>
+    <string name="split_mode_threshold_desc_custom">Benutzerdefiniert: %d Pixel</string>
+    
+    <string name="split_mode_threshold_invalid">Bitte einen Wert zwischen 0 und 512 eingeben</string>
+    <string name="split_mode_threshold_saved">Split-Mode Schwellwert gespeichert: %d px</string>
+    
+
 </resources>
