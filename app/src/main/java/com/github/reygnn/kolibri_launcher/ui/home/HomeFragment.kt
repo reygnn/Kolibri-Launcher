@@ -89,7 +89,7 @@ import kotlin.math.abs
  *    → checkScrollStateAfterNextLayout() is called
  *
  * 3. System determines scroll capability
- *    → checkAndEmitScrollState() asks: canScrollVertically(1) oder canScrollVertically(-1)?
+ *    → checkAndEmitScrollState() asks: canScrollVertically ?
  *    → TRUE = content overflows, scrolling needed
  *    → FALSE = content fits, no scrolling needed
  *
@@ -257,6 +257,38 @@ class HomeFragment : Fragment() {
                 if (!shouldSplit) {
                     scrollView.scrollTo(0, 0)
                 }
+            }
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error checking scroll state")
+            // Fail-Safe: Im Zweifel split mode aktivieren (sicherer)
+            if (!_needsSplit.value) {
+                Timber.w("Error checking scroll - enabling split as safety fallback")
+                _needsSplit.value = true
+            }
+        }
+    }
+
+    private fun origCheckAndEmitScrollState() {
+        try {
+            if (_binding == null || !isAdded) return
+
+            val scrollView = binding.favoritesScrollView
+
+            // Android entscheidet - funktioniert auf ALLEN Devices!
+            val canScrollDown = scrollView.canScrollVertically(1)
+            val canScrollUp = scrollView.canScrollVertically(-1)
+            val canScroll = canScrollDown || canScrollUp
+
+            // State Update nur bei Änderung
+            if (_needsSplit.value != canScroll) {
+                Timber.d("checkAndEmitScrollState: splitMode = $canScroll")
+                _needsSplit.value = canScroll
+            }
+
+            // Reset scroll position wenn kein Split Mode
+            if (!canScroll) {
+                scrollView.scrollTo(0, 0)
             }
 
         } catch (e: Throwable) {
