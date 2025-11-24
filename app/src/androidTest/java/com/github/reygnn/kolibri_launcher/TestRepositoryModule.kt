@@ -375,6 +375,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val onboardingFlowState = MutableStateFlow(false)
     private val autoShowKeyboardFlowState = MutableStateFlow(false)
     private val autoLaunchAppFlowState = MutableStateFlow(false)
+    private val splitModeThresholdFlowState = MutableStateFlow(0)
 
     var shadow: Boolean
         get() = shadowFlow.value
@@ -427,6 +428,12 @@ class FakeSettingsRepository : SettingsRepository {
     var autoLaunchApp: Boolean
         get() = autoLaunchAppFlowState.value
         set(value) { autoLaunchAppFlowState.value = value }
+
+    var splitModeThreshold: Int
+        get() = splitModeThresholdFlowState.value
+        set(value) {
+            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
+        }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -489,6 +496,11 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = isEnabled
     }
 
+    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
+    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
+        splitModeThreshold = thresholdPixels
+    }
+
     // ===== HELPER METHODS FÜR TESTS (BLOCKING) =====
     fun setReadabilityModeBlocking(mode: String) {
         readabilityModeFlowState.value = mode
@@ -496,6 +508,10 @@ class FakeSettingsRepository : SettingsRepository {
 
     fun setSortOrderBlocking(sortOrder: SortOrder) {
         sortOrderFlowState.value = sortOrder
+    }
+
+    fun setSplitModeThresholdBlocking(threshold: Int) {
+        splitModeThresholdFlowState.value = threshold.coerceIn(0, 512)
     }
 
     override suspend fun purgeRepository() {
@@ -511,6 +527,7 @@ class FakeSettingsRepository : SettingsRepository {
         onboardingFlowState.value = false
         autoShowKeyboardFlowState.value = false
         autoLaunchAppFlowState.value = false
+        splitModeThresholdFlowState.value = 0
     }
 }
 
@@ -790,7 +807,8 @@ class FakeBackupRepository : BackupRepository, Purgeable {
             hasThemeSettings = false,
             hasTimeBasedEvents = false,
             hasGestureSettings = false,
-            hasQualityOfLife = false
+            hasQualityOfLife = false,
+            hasPowerUserSettings = false
         )
     }
 

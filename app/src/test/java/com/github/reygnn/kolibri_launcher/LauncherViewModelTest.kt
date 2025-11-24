@@ -90,7 +90,6 @@ class LauncherViewModelTest {
     @Mock
     private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
 
-    // UseCases, die für die Fragmente benötigt werden
     @Mock
     private lateinit var getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase
     @Mock
@@ -98,11 +97,13 @@ class LauncherViewModelTest {
     @Mock
     private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
     @Mock
-    private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase // Wichtig für 'sortOrder'
+    private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
     @Mock
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
+    @Mock
+    private lateinit var getSplitModeThresholdUseCase : GetSplitModeThresholdUseCase
 
-    // Helfer, die bleiben
+
     @Mock
     private lateinit var appUpdateSignal: AppUpdateSignal
     @Mock
@@ -134,8 +135,8 @@ class LauncherViewModelTest {
         whenever(observeUiColorsUseCase.invoke(any())).thenReturn(flowOf(UiColorsState()))
         whenever(observeInstalledAppsUseCase.invoke()).thenReturn(flowOf(AppLoadResult.Success))
 
-        // Wichtig: Der 'sortOrder'-Test braucht das
         whenever(observeHomeSettingsUseCase.invoke()).thenReturn(flowOf(HomeSettings()))
+        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(0))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -163,6 +164,7 @@ class LauncherViewModelTest {
             checkAppUsageUseCase,
             getAutoShowKeyboardSettingUseCase,
             getTextShadowEnabledUseCase,
+            getSplitModeThresholdUseCase,
             appUpdateSignal,
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -1354,6 +1356,31 @@ class LauncherViewModelTest {
         viewModel.maxFavoritesOnHome.test {
             val value = awaitItem()
             assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, value)
+        }
+    }
+
+    @Test
+    fun `splitModeThreshold - reflects value from UseCase`() = runTest {
+        // Arrange
+        val expectedThreshold = 250
+        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(expectedThreshold))
+
+        // Act
+        setupViewModel()
+
+        // Assert mit Turbine
+        viewModel.splitModeThreshold.test {
+            // StateFlow emittiert sofort den Initialwert (0) beim Subscriben
+            val initialValue = awaitItem()
+
+            // Wenn der Flow extrem schnell war, könnte es schon 250 sein,
+            // aber meistens kommt erst 0, dann 250.
+            if (initialValue == expectedThreshold) {
+                return@test
+            }
+
+            // Jetzt warten wir auf das Update vom UseCase, da wir "subscribed" sind
+            assertEquals(expectedThreshold, awaitItem())
         }
     }
 

@@ -104,11 +104,12 @@ class BackupManagerTest {
         assertThat(backup.settings.swipeRightApp).isNull()
         assertThat(backup.settings.textColor).isNull()
         assertThat(backup.settings.chipBackgroundColor).isNull()
-        assertThat(backup.settings.textShadowEnabled).isNull()  // Default=true → null
-        assertThat(backup.settings.doubleTapToLockEnabled).isNull()  // Default=false → null
-        assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull() // Default=false → null
+        assertThat(backup.settings.textShadowEnabled).isNull()
+        assertThat(backup.settings.doubleTapToLockEnabled).isNull()
+        assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull()
         assertThat(backup.settings.autoShowKeyboard).isNull()
         assertThat(backup.settings.autoLaunchApp).isNull()
+        assertThat(backup.settings.splitModeThreshold).isNull()
     }
 
     @Test
@@ -170,7 +171,7 @@ class BackupManagerTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = true,
-            importGestureSettings = false  // Explizit false
+            importGestureSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -301,6 +302,7 @@ class BackupManagerTest {
         fakeSettingsRepo.swipeDown = true
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
+        fakeSettingsRepo.splitModeThreshold = 60
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -318,6 +320,7 @@ class BackupManagerTest {
         assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
         assertThat(backup.settings.autoShowKeyboard).isTrue()
         assertThat(backup.settings.autoLaunchApp).isTrue()
+        assertThat(backup.settings.splitModeThreshold).isEqualTo(60)
     }
 
     @Test
@@ -332,6 +335,36 @@ class BackupManagerTest {
         assertThat(backup.timestamp).isAtLeast(beforeExport)
         assertThat(backup.timestamp).isAtMost(afterExport)
         assertThat(backup.timestamp).isGreaterThan(0L)
+    }
+
+    @Test
+    fun `exportToJson - with splitModeThreshold enabled - includes in backup`() = runTest {
+        fakeSettingsRepo.splitModeThreshold = 42
+
+        val jsonString = backupManager.exportToJson()
+        val backup = json.decodeFromString<BackupData>(jsonString)
+
+        assertThat(backup.settings.splitModeThreshold).isEqualTo(42)
+    }
+
+    @Test
+    fun `exportToJson - with splitModeThreshold at default zero - returns null`() = runTest {
+        fakeSettingsRepo.splitModeThreshold = 0
+
+        val jsonString = backupManager.exportToJson()
+        val backup = json.decodeFromString<BackupData>(jsonString)
+
+        assertThat(backup.settings.splitModeThreshold).isNull()
+    }
+
+    @Test
+    fun `exportToJson - with splitModeThreshold at 100px - includes in backup`() = runTest {
+        fakeSettingsRepo.splitModeThreshold = 100
+
+        val jsonString = backupManager.exportToJson()
+        val backup = json.decodeFromString<BackupData>(jsonString)
+
+        assertThat(backup.settings.splitModeThreshold).isEqualTo(100)
     }
 
     // ========== IMPORT TESTS - SELECTIVE ==========
@@ -352,7 +385,8 @@ class BackupManagerTest {
             importThemeSettings = false,
             importTimeBasedEvents = false,
             importGestureSettings = false,
-            importQualityOfLife = false
+            importQualityOfLife = false,
+            importPowerUserSettings = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -546,6 +580,103 @@ class BackupManagerTest {
     }
 
     @Test
+    fun `importFromJson - only power user settings - imports only threshold`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.splitModeThreshold = 0
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.RED,
+            splitModeThreshold = 42
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = false,
+            importOrder = false,
+            importHiddenApps = false,
+            importCustomNames = false,
+            importSwipeActions = false,
+            importThemeSettings = false,
+            importGestureSettings = false,
+            importTimeBasedEvents = false,
+            importQualityOfLife = false,
+            importPowerUserSettings = true
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+    }
+
+    @Test
+    fun `importFromJson - power user disabled - does not import threshold`() = runTest {
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
+        fakeSettingsRepo.splitModeThreshold = 0
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            textColor = Color.RED,
+            splitModeThreshold = 100
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importFavorites = true,
+            importThemeSettings = true,
+            importPowerUserSettings = false
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Assert 1: Threshold sollte NICHT importiert worden sein (bleibt 0)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+
+        // Assert 2: Farbe sollte importiert worden sein (wird RED)
+        assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
+
+        // Assert 3: Favorit sollte importiert worden sein (da Option true und App installiert)
+        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+    }
+
+    @Test
+    fun `importFromJson - threshold validates to 0-512 range`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+
+        val backup = createTestBackup(splitModeThreshold = 999)
+        val jsonString = json.encodeToString(backup)
+        val options = ImportOptions(importPowerUserSettings = true)
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(512)
+    }
+
+    @Test
+    fun `importFromJson - threshold validates negative to zero`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+
+        val backup = createTestBackup(splitModeThreshold = -50)
+        val jsonString = json.encodeToString(backup)
+        val options = ImportOptions(importPowerUserSettings = true)
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+    }
+
+    @Test
     fun `importFromJson - swipe actions - filters non-installed left app`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app2", "com.app2.MainActivity")
@@ -622,6 +753,7 @@ class BackupManagerTest {
         fakeSettingsRepo.swipeDown = false
         fakeSettingsRepo.autoShowKeyboard = false
         fakeSettingsRepo.autoLaunchApp = false
+        fakeSettingsRepo.splitModeThreshold = 0
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
@@ -636,7 +768,8 @@ class BackupManagerTest {
             doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
-            autoLaunchApp = true
+            autoLaunchApp = true,
+            splitModeThreshold = 42
         )
         val jsonString = json.encodeToString(backup)
 
@@ -648,7 +781,8 @@ class BackupManagerTest {
             importSwipeActions = true,
             importThemeSettings = true,
             importGestureSettings = true,
-            importQualityOfLife = true
+            importQualityOfLife = true,
+            importPowerUserSettings = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -667,6 +801,7 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     // ========== VALIDATION TESTS ==========
@@ -869,17 +1004,11 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - performance test with large dataset`() = runTest {
-        // Simuliere 100 installierte Apps
         val installedApps = (1..100).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
         fakeInstalledAppsRepo.installedApps = installedApps
 
-        // Backup mit 8 Favoriten (8 verschiedene Packages - Maximum erlaubt)
         val favorites = (1..8).map { "com.app$it/com.app$it.MainActivity" }.toSet()
-
-        // 50 versteckte Apps
         val hidden = (20..69).map { "com.app$it/com.app$it.MainActivity" }.toSet()
-
-        // 60 Custom Names
         val names = (1..60).associate { "com.app$it" to "Custom $it" }
 
         val backup = createTestBackup(
@@ -894,7 +1023,8 @@ class BackupManagerTest {
             doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
-            autoLaunchApp = true
+            autoLaunchApp = true,
+            splitModeThreshold = 42
         )
         val jsonString = json.encodeToString(backup)
 
@@ -903,12 +1033,11 @@ class BackupManagerTest {
         val duration = System.currentTimeMillis() - startTime
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(duration).isLessThan(1000) // Sollte < 1 Sekunde sein
+        assertThat(duration).isLessThan(1000)
 
-        // Validiere Ergebnisse
-        assertThat(fakeFavoritesRepo.favorites).hasSize(8)  // 8 Favoriten
-        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(50)  // 50 hidden
-        assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)  // 60 names
+        assertThat(fakeFavoritesRepo.favorites).hasSize(8)
+        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(50)
+        assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)
         assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
@@ -918,17 +1047,15 @@ class BackupManagerTest {
         assertThat(fakeSettingsRepo.swipeDown).isTrue()
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     @Test
     fun `importFromJson - old backup without theme keys - does not change theme`() = runTest {
-        // Setze initiale Werte, die *nicht* geändert werden dürfen
         fakeSettingsRepo.color = Color.CYAN
         fakeSettingsRepo.chipBgColor = Color.BLUE
         fakeSettingsRepo.shadow = false
 
-        // Ein JSON-String, der die Keys 'textColor', 'textShadowEnabled'
-        // und 'chipBackgroundColor' *nicht* enthält
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = null,
@@ -937,18 +1064,11 @@ class BackupManagerTest {
         )
         val oldBackupJson = json.encodeToString(backup)
 
-        // Sicherstellen, dass die Keys wirklich fehlen
-//        assertThat(oldBackupJson).doesNotContain("text_color")
-//        assertThat(oldBackupJson).doesNotContain("chip_bg_color")
-//        assertThat(oldBackupJson).doesNotContain("text_shadow_enabled")
-
         val options = ImportOptions(importThemeSettings = true)
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // Prüfen: Theme-Werte sind unverändert, da im Backup null (nicht vorhanden)
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
         assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
         assertThat(fakeSettingsRepo.shadow).isFalse()
@@ -956,11 +1076,9 @@ class BackupManagerTest {
 
     @Test
     fun `importFromJson - old backup without gesture keys - does not change gestures`() = runTest {
-        // Setze initiale Werte, die *nicht* geändert werden dürfen
         fakeSettingsRepo.doubleTap = true
         fakeSettingsRepo.swipeDown = false
 
-        // Ein JSON-String, der die Keys nicht enthält
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             doubleTapToLockEnabled = null,
@@ -968,19 +1086,63 @@ class BackupManagerTest {
         )
         val oldBackupJson = json.encodeToString(backup)
 
-        // Sicherstellen, dass die Keys wirklich fehlen
-//        assertThat(oldBackupJson).doesNotContain("double_tap_to_lock_enabled")
-//        assertThat(oldBackupJson).doesNotContain("swipe_down_to_notifications_enabled")
-
         val options = ImportOptions(importGestureSettings = true)
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // Prüfen: Gesture-Werte sind unverändert, da im Backup null (nicht vorhanden)
         assertThat(fakeSettingsRepo.doubleTap).isTrue()
         assertThat(fakeSettingsRepo.swipeDown).isFalse()
+    }
+
+    @Test
+    fun `importFromJson - old backup without threshold key - does not change threshold`() = runTest {
+        fakeSettingsRepo.splitModeThreshold = 100
+
+        val backup = createTestBackup(
+            favorites = setOf("com.app1/com.app1.MainActivity"),
+            splitModeThreshold = null
+        )
+        val oldBackupJson = json.encodeToString(backup)
+
+        val options = ImportOptions(importPowerUserSettings = true)
+
+        val result = backupManager.importFromJson(oldBackupJson, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
+    }
+
+    @Test
+    fun `importFromJson - threshold zero in backup - imports as zero`() = runTest {
+        fakeSettingsRepo.splitModeThreshold = 42
+
+        val backup = createTestBackup(splitModeThreshold = 0)
+        val jsonString = json.encodeToString(backup)
+        val options = ImportOptions(importPowerUserSettings = true)
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+    }
+
+    @Test
+    fun `importFromJson - threshold at preset values - imports correctly`() = runTest {
+        fakeInstalledAppsRepo.installedApps = emptyList()
+
+        val presetValues = listOf(0, 42, 60, 100, 512)
+
+        for (presetValue in presetValues) {
+            val backup = createTestBackup(splitModeThreshold = presetValue)
+            val jsonString = json.encodeToString(backup)
+            val options = ImportOptions(importPowerUserSettings = true)
+
+            val result = backupManager.importFromJson(jsonString, options)
+
+            assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+            assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(presetValue)
+        }
     }
 
     // ========== EXPORT TESTS - AUTO SHOW KEYBOARD ==========
@@ -1002,7 +1164,6 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        // Default (false) wird als null exportiert (takeIf { it })
         assertThat(backup.settings.autoShowKeyboard).isNull()
     }
 
@@ -1066,34 +1227,26 @@ class BackupManagerTest {
             importHiddenApps = false,
             importCustomNames = false,
             importSwipeActions = false,
-            importThemeSettings = false,  // Explizit false
+            importThemeSettings = false,
             importGestureSettings = false,
             importTimeBasedEvents = false,
-            importQualityOfLife = false  // Explizit false
+            importQualityOfLife = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // importQualityOfLife Settings dürfen NICHT importiert worden sein
         assertThat(fakeSettingsRepo.autoShowKeyboard).isFalse()
         assertThat(fakeSettingsRepo.autoLaunchApp).isFalse()
-
-        // Aber Favorites WURDEN importiert
         assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-
-        // Theme wurde NICHT importiert
         assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
     }
 
     @Test
     fun `importFromJson - old backup without QoL keys - does not change QoL settings`() = runTest {
-        // Setze initialen Wert, der *nicht* geändert werden darf
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
 
-        // Ein JSON-String, der den Key 'autoShowKeyboard' *nicht* enthält
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             autoShowKeyboard = null,
@@ -1101,17 +1254,11 @@ class BackupManagerTest {
         )
         val oldBackupJson = json.encodeToString(backup)
 
-        // Sicherstellen, dass die Keys wirklich fehlen
-//        assertThat(oldBackupJson).doesNotContain("auto_show_keyboard")
-//        assertThat(oldBackupJson).doesNotContain("auto_launch_app")
-
         val options = ImportOptions(importQualityOfLife = true)
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // Prüfen: QoL-Werte sind unverändert, da im Backup null (nicht vorhanden)
         assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
@@ -1142,7 +1289,8 @@ class BackupManagerTest {
         doubleTapToLockEnabled: Boolean? = null,
         swipeDownToNotificationsEnabled: Boolean? = null,
         autoShowKeyboard: Boolean? = null,
-        autoLaunchApp: Boolean? = null
+        autoLaunchApp: Boolean? = null,
+        splitModeThreshold: Int? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -1161,7 +1309,8 @@ class BackupManagerTest {
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,
-                autoLaunchApp = autoLaunchApp
+                autoLaunchApp = autoLaunchApp,
+                splitModeThreshold = splitModeThreshold
             )
         )
     }
@@ -1251,16 +1400,11 @@ class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
         return flowOf(installedApps)
     }
 
-    override suspend fun triggerAppsUpdate() {
-        // Nichts tun im Test
-    }
+    override suspend fun triggerAppsUpdate() {}
 
-    override suspend fun purgeRepository() {
-        // Nichts tun im Test
-    }
+    override suspend fun purgeRepository() {}
 }
 
-// Fake SwipeActionsRepository
 class FakeSwipeActionsRepository : SwipeActionsRepository {
     private val leftFlow = MutableStateFlow<String?>(null)
     private val rightFlow = MutableStateFlow<String?>(null)
@@ -1296,68 +1440,58 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
 
 class FakeSettingsRepository : SettingsRepository {
 
-    private val shadowFlow = MutableStateFlow(true) // Default: true
-    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
-    private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
-    private val calendarFlow = MutableStateFlow(false) // Default false
-    private val alarmFlow = MutableStateFlow(false) // Default: false
-    private val doubleTapFlow = MutableStateFlow(false) // Default false
-    private val swipeDownFlow = MutableStateFlow(false) // Default false
+    private val shadowFlow = MutableStateFlow(true)
+    private val colorFlow = MutableStateFlow(0)
+    private val chipBgColorFlow = MutableStateFlow(0)
+    private val calendarFlow = MutableStateFlow(false)
+    private val alarmFlow = MutableStateFlow(false)
+    private val doubleTapFlow = MutableStateFlow(false)
+    private val swipeDownFlow = MutableStateFlow(false)
     private val autoShowKeyboardFlowState = MutableStateFlow(false)
     private val autoLaunchAppFlowState = MutableStateFlow(false)
-
+    private val splitModeThresholdFlowState = MutableStateFlow(0)
 
     var shadow: Boolean
         get() = shadowFlow.value
-        set(value) {
-            shadowFlow.value = value
-        }
+        set(value) { shadowFlow.value = value }
 
     var color: Int
         get() = colorFlow.value
-        set(value) {
-            colorFlow.value = value
-        }
+        set(value) { colorFlow.value = value }
 
     var chipBgColor: Int
         get() = chipBgColorFlow.value
-        set(value) {
-            chipBgColorFlow.value = value
-        }
+        set(value) { chipBgColorFlow.value = value }
 
     var showCalendar: Boolean
         get() = calendarFlow.value
-        set(value) {
-            calendarFlow.value = value
-        }
+        set(value) { calendarFlow.value = value }
 
     var showAlarm: Boolean
         get() = alarmFlow.value
-        set(value) {
-            alarmFlow.value = value
-        }
+        set(value) { alarmFlow.value = value }
 
     var doubleTap: Boolean
         get() = doubleTapFlow.value
-        set(value) {
-            doubleTapFlow.value = value
-        }
+        set(value) { doubleTapFlow.value = value }
 
     var swipeDown: Boolean
         get() = swipeDownFlow.value
-        set(value) {
-            swipeDownFlow.value = value
-        }
+        set(value) { swipeDownFlow.value = value }
 
     var autoShowKeyboard: Boolean
         get() = autoShowKeyboardFlowState.value
-        set(value) {
-            autoShowKeyboardFlowState.value = value
-        }
+        set(value) { autoShowKeyboardFlowState.value = value }
 
     var autoLaunchApp: Boolean
         get() = autoLaunchAppFlowState.value
         set(value) { autoLaunchAppFlowState.value = value }
+
+    var splitModeThreshold: Int
+        get() = splitModeThresholdFlowState.value
+        set(value) {
+            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
+        }
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
@@ -1414,6 +1548,12 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = isEnabled
     }
 
+    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
+
+    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
+        splitModeThreshold = thresholdPixels
+    }
+
     override suspend fun purgeRepository() {
         color = 0
         shadow = true
@@ -1424,5 +1564,6 @@ class FakeSettingsRepository : SettingsRepository {
         swipeDown = false
         autoShowKeyboard = false
         autoLaunchApp = false
+        splitModeThreshold = 0
     }
 }

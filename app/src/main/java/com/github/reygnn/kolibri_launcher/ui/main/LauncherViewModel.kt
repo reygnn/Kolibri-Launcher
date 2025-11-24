@@ -38,6 +38,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
@@ -65,9 +66,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -118,6 +121,7 @@ class LauncherViewModel @Inject constructor(
     private val checkAppUsageUseCase: CheckAppUsageUseCase,
     private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
+    private val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
     @param:ApplicationContext private val context: Context,
@@ -666,4 +670,12 @@ class LauncherViewModel @Inject constructor(
     fun onAppDrawerClosed() {
         _appDrawerSearchQuery.value = ""
     }
+
+    // Default 0 = Automatik (Android entscheidet)
+    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
 }

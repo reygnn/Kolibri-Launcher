@@ -207,7 +207,8 @@ class BackupViewModelTest {
                 hasThemeSettings = true,
                 hasGestureSettings = true,
                 hasTimeBasedEvents = false,
-                hasQualityOfLife = true
+                hasQualityOfLife = true,
+                hasPowerUserSettings = true
             )
             fakeBackupRepository.previewResult = expectedPreview
 
@@ -285,7 +286,8 @@ class BackupViewModelTest {
             hasThemeSettings = true,
             hasTimeBasedEvents = false,
             hasGestureSettings = false,
-            hasQualityOfLife = false
+            hasQualityOfLife = false,
+            hasPowerUserSettings = false
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)

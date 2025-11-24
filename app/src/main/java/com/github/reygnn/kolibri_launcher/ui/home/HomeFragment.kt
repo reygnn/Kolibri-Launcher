@@ -201,8 +201,8 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // ============================================================================
-    // REACTIVE SCROLL STATE DETECTION
+// ============================================================================
+    // REACTIVE SCROLL STATE DETECTION (POWER USER UPDATED)
     // ============================================================================
 
     private fun checkAndEmitScrollState() {
@@ -210,21 +210,53 @@ class HomeFragment : Fragment() {
             if (_binding == null || !isAdded) return
 
             val scrollView = binding.favoritesScrollView
+            // Wir holen den aktuellen Wert direkt aus dem StateFlow des ViewModels
+            // Das ist sicher, da StateFlow immer einen Wert hat (initial 0).
+            val threshold = viewModel.splitModeThreshold.value
 
-            // Android entscheidet - funktioniert auf ALLEN Devices!
-            val canScrollDown = scrollView.canScrollVertically(1)
-            val canScrollUp = scrollView.canScrollVertically(-1)
-            val canScroll = canScrollDown || canScrollUp
+            val shouldSplit: Boolean
 
-            // State Update nur bei Änderung
-            if (_needsSplit.value != canScroll) {
-                Timber.d("Scroll mode: ${if (canScroll) "SPLIT" else "FULL"}")
-                _needsSplit.value = canScroll
+            if (threshold == 0) {
+                // 1. STANDARD MODUS: Android entscheidet (Fail-Safe)
+                // "canScrollVertically" ist die zuverlässigste Methode für Standard-User
+                val canScrollDown = scrollView.canScrollVertically(1)
+                val canScrollUp = scrollView.canScrollVertically(-1)
+                shouldSplit = canScrollDown || canScrollUp
+
+                // Debug Log nur bei Änderung, um Spam zu vermeiden
+                if (_needsSplit.value != shouldSplit) {
+                    Timber.d("Scroll check (Auto): canScrollDown=$canScrollDown, canScrollUp=$canScrollUp -> split=$shouldSplit")
+                }
+
+            } else {
+                // 2. POWER USER MODUS: Benutzerdefinierter Pixel-Threshold
+                // Wir berechnen die physische Höhe des Inhalts vs. Höhe des Containers
+
+                val childView = scrollView.getChildAt(0)
+                if (childView != null) {
+                    val contentHeight = childView.height
+                    val scrollViewHeight = scrollView.height
+                    val scrollablePixels = (contentHeight - scrollViewHeight).coerceAtLeast(0)
+
+                    shouldSplit = scrollablePixels > threshold
+
+                    if (_needsSplit.value != shouldSplit) {
+                        Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
+                    }
+                } else {
+                    // Fallback: Wenn kein Child da ist, brauchen wir keinen Split
+                    shouldSplit = false
+                }
             }
 
-            // Reset scroll position wenn kein Split Mode
-            if (!canScroll && _needsSplit.value) {
-                scrollView.scrollTo(0, 0)
+            // State Update nur bei Änderung (Deduping)
+            if (_needsSplit.value != shouldSplit) {
+                _needsSplit.value = shouldSplit
+
+                // Reset scroll position wenn kein Split Mode
+                if (!shouldSplit) {
+                    scrollView.scrollTo(0, 0)
+                }
             }
 
         } catch (e: Throwable) {
@@ -416,6 +448,22 @@ class HomeFragment : Fragment() {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
+            }
+        }
+
+        // Observer 6: Split Mode Threshold Changes
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.splitModeThreshold.collect { threshold ->
+                        Timber.d("Split threshold changed to: $threshold")
+
+                        checkScrollStateAfterNextLayout("Threshold changed check")
+                        safePost { scheduleScrollVerification() }
+                    }
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error observing threshold")
             }
         }
     }
