@@ -102,14 +102,14 @@ class BackupManagerTest {
         assertThat(backup.settings.customAppNames).isEmpty()
         assertThat(backup.settings.swipeLeftApp).isNull()
         assertThat(backup.settings.swipeRightApp).isNull()
-        assertThat(backup.settings.textColor).isNull()
-        assertThat(backup.settings.chipBackgroundColor).isNull()
-        assertThat(backup.settings.textShadowEnabled).isNull()
-        assertThat(backup.settings.doubleTapToLockEnabled).isNull()
-        assertThat(backup.settings.swipeDownToNotificationsEnabled).isNull()
-        assertThat(backup.settings.autoShowKeyboard).isNull()
-        assertThat(backup.settings.autoLaunchApp).isNull()
-        assertThat(backup.settings.splitModeThreshold).isNull()
+        assertThat(backup.settings.textColor).isEqualTo(0)
+        assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
+        assertThat(backup.settings.textShadowEnabled).isTrue()
+        assertThat(backup.settings.doubleTapToLockEnabled).isFalse()
+        assertThat(backup.settings.swipeDownToNotificationsEnabled).isFalse()
+        assertThat(backup.settings.autoShowKeyboard).isFalse()
+        assertThat(backup.settings.autoLaunchApp).isFalse()
+        assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -354,7 +354,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.splitModeThreshold).isNull()
+        assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -1164,7 +1164,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.autoShowKeyboard).isNull()
+        assertThat(backup.settings.autoShowKeyboard).isFalse()
     }
 
     // ========== IMPORT TESTS - QUALITY OF LIFE SETTINGS ==========
