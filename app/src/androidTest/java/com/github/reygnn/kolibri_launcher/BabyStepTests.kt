@@ -11,6 +11,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.reygnn.kolibri_launcher.EspressoTestUtils.waitForView
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeGetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.home.HomeFragment
 import dagger.hilt.android.testing.HiltAndroidTest

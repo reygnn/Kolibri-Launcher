@@ -17,6 +17,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeGetDrawerAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeGetFavoriteAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerFragment
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.google.common.truth.Truth.assertThat

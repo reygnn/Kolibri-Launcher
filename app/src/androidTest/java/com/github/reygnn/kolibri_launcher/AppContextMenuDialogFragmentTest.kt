@@ -12,6 +12,9 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -94,7 +97,7 @@ class AppContextMenuDialogFragmentTest : BaseAndroidTest() {
 
     @Test
     fun showsUnhideAction_whenAppIsHidden() = testCoroutineRule.runTestAndLaunchUI {
-        (appVisibilityRepository as FakeAppVisibilityRepository).hideComponent(testApp.componentName)
+        (appVisibilityRepository as FakeHiddenAppsRepository).hideComponent(testApp.componentName)
         launchDialog(testApp, MenuContext.APP_DRAWER, false)
 
         onView(withText(R.string.unhide_app_in_drawer)).inRoot(isDialog()).check(matches(isDisplayed()))

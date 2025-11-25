@@ -16,6 +16,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.EspressoTestUtils.awaitAll
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingAppListAdapter
 import com.google.common.truth.Truth.assertThat
@@ -46,7 +48,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
     fun screen_displaysCorrectTitleAndApps() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange: Bereite den Zustand der Fakes vor
         (installedAppsRepository as FakeInstalledAppsRepository).appsFlow.value = testApps
-        (appVisibilityRepository as FakeAppVisibilityRepository).hiddenAppsState.value = emptySet()
+        (appVisibilityRepository as FakeHiddenAppsRepository).hiddenAppsState.value = emptySet()
 
         // Act: Starte die Activity
         ActivityScenario.launch(HiddenAppsActivity::class.java)
@@ -64,7 +66,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
     fun selectAndDeselectApp_updatesChipsCorrectly() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange
         (installedAppsRepository as FakeInstalledAppsRepository).appsFlow.value = testApps
-        (appVisibilityRepository as FakeAppVisibilityRepository).hiddenAppsState.value = emptySet()
+        (appVisibilityRepository as FakeHiddenAppsRepository).hiddenAppsState.value = emptySet()
 
         // Act & Assert
         ActivityScenario.launch(HiddenAppsActivity::class.java)
@@ -94,7 +96,7 @@ class HiddenAppsActivityTest : BaseAndroidTest() {
     @Test
     fun doneButton_updatesRepositoryStateAndFinishesActivity() =
         testCoroutineRule.runTestAndLaunchUI {
-            val fakeVisibilityRepo = appVisibilityRepository as FakeAppVisibilityRepository
+            val fakeVisibilityRepo = appVisibilityRepository as FakeHiddenAppsRepository
             val fakeInstalledAppsRepo = installedAppsRepository as FakeInstalledAppsRepository
 
             // Arrange
