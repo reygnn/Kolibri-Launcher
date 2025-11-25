@@ -17,10 +17,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.*
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetFontBoldUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetLayoutScaleUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetVerticalPaddingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -147,6 +147,9 @@ class LauncherViewModelTest {
 
     @Mock
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
+
+    @Mock
+    private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -178,6 +181,7 @@ class LauncherViewModelTest {
         whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flowOf(AppConstants.DEFAULT_LAYOUT_SCALE))
         whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
         whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
+        whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(flowOf(0f))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -210,6 +214,7 @@ class LauncherViewModelTest {
             setLayoutScaleUseCase,
             setVerticalPaddingUseCase,
             setFontBoldUseCase,
+            setContentTopMarginUseCase,
             appUpdateSignal,
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -2363,5 +2368,77 @@ class LauncherViewModelTest {
         viewModel.verticalPaddingState.test {
             assertEquals(customPadding, awaitItem())
         }
+    }
+
+    // ========== CONTENT TOP MARGIN TESTS (NEU) ==========
+
+    @Test
+    fun `contentTopMarginState - default value is 0`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.contentTopMarginState.test {
+            assertEquals(0f, awaitItem())
+        }
+    }
+
+    @Test
+    fun `contentTopMarginState - reflects value from UseCase`() = runTest {
+        val marginFlow = MutableStateFlow(0f)
+        whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(marginFlow)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.contentTopMarginState.test {
+            assertEquals(0f, awaitItem())
+
+            marginFlow.value = 0.5f
+            assertEquals(0.5f, awaitItem())
+        }
+    }
+
+    @Test
+    fun `onSetContentTopMargin - calls UseCase with correct value`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetContentTopMargin(0.3f)
+        advanceUntilIdle()
+
+        verify(setContentTopMarginUseCase).invoke(0.3f)
+    }
+
+    @Test
+    fun `onSetContentTopMargin - coerces negative value to 0`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetContentTopMargin(-0.1f)
+        advanceUntilIdle()
+
+        verify(setContentTopMarginUseCase).invoke(0f)
+    }
+
+    @Test
+    fun `onSetContentTopMargin - coerces value above 1 to 1`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetContentTopMargin(1.5f)
+        advanceUntilIdle()
+
+        verify(setContentTopMarginUseCase).invoke(1.0f)
+    }
+
+    @Test
+    fun `onSetContentTopMargin - boundary value 1 works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetContentTopMargin(1.0f)
+        advanceUntilIdle()
+
+        verify(setContentTopMarginUseCase).invoke(1.0f)
     }
 }
