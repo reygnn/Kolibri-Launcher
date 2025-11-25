@@ -8,7 +8,7 @@ import com.github.reygnn.kolibri_launcher.util.DisableAnimationsRule
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.util.TestCoroutineRule
 import com.github.reygnn.kolibri_launcher.data.TestDataSource
-import com.github.reygnn.kolibri_launcher.di.HiltTestActivity
+import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.di.TestDispatcherModule
 import com.github.reygnn.kolibri_launcher.di.launchFragmentInHiltContainer
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository

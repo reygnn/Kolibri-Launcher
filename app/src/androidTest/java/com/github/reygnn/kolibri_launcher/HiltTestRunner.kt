@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.di
+package com.github.reygnn.kolibri_launcher
 
 import android.app.Application
 import android.content.Context

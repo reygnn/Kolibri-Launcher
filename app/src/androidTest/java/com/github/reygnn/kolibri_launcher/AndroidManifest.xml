@@ -4,7 +4,7 @@
 
     <application>
         <activity
-            android:name=".di.HiltTestActivity"
+            android:name=".HiltTestActivity"
             android:exported="false" />
     </application>
 
