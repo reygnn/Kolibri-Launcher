@@ -40,9 +40,8 @@ class OnboardingViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @get:Rule
-    val instantExecutorRule = InstantTaskExecutorRule() // Für LiveData, falls verwendet
+    val instantExecutorRule = InstantTaskExecutorRule()
 
-    // --- NEUE MOCKS (NUR USECASES) ---
     @Mock private lateinit var onboardingAppsUseCase: GetOnboardingAppsUseCase
     @Mock private lateinit var getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase
     @Mock private lateinit var completeOnboardingUseCase: CompleteOnboardingUseCase
@@ -57,12 +56,10 @@ class OnboardingViewModelTest {
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
-        // Mocke den Flow der UseCase-KLASSE
         whenever(onboardingAppsUseCase.onboardingAppsFlow).thenReturn(flowOf(testApps))
     }
 
     private fun setupViewModel() {
-        // Rufe den NEUEN, sauberen Konstruktor auf
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,

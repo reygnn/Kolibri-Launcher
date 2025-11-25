@@ -7,22 +7,17 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.data.BackupManager
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.fakes.StaticFakeInstalledAppsRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Before
@@ -49,9 +44,9 @@ class BackupManagerTest {
     private lateinit var mockContext: Context
     private lateinit var fakeFavoritesRepo: FakeFavoritesRepository
     private lateinit var fakeFavoritesOrderRepo: FakeFavoritesOrderRepository
-    private lateinit var fakeVisibilityRepo: FakeAppVisibilityRepository
+    private lateinit var fakeVisibilityRepo: FakeHiddenAppsRepository
     private lateinit var fakeNamesRepo: FakeAppNamesRepository
-    private lateinit var fakeInstalledAppsRepo: SimpleFakeInstalledAppsRepository
+    private lateinit var fakeInstalledAppsRepo: StaticFakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
 
@@ -66,10 +61,10 @@ class BackupManagerTest {
     @Before
     fun setUp() {
         mockContext = mock(Context::class.java)
-        fakeInstalledAppsRepo = SimpleFakeInstalledAppsRepository()
+        fakeInstalledAppsRepo = StaticFakeInstalledAppsRepository()
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
-        fakeVisibilityRepo = FakeAppVisibilityRepository()
+        fakeVisibilityRepo = FakeHiddenAppsRepository()
         fakeNamesRepo = FakeAppNamesRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
@@ -1313,306 +1308,5 @@ class BackupManagerTest {
                 splitModeThreshold = splitModeThreshold
             )
         )
-    }
-}
-
-// ========== FAKE REPOSITORIES ==========
-
-class FakeFavoritesRepository : FavoritesRepository {
-    private val flow = MutableStateFlow(setOf<String>())
-
-    var favorites: Set<String>
-        get() = flow.value
-        set(value) {
-            flow.value = value
-        }
-
-    override val favoriteComponentsFlow = flow
-
-    override suspend fun isFavoriteComponent(componentName: String?) = componentName in favorites
-    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {}
-    override suspend fun toggleFavoriteComponent(componentName: String) = true
-    override suspend fun addFavoriteComponent(componentName: String) = true
-    override suspend fun removeFavoriteComponent(componentName: String) = true
-    override suspend fun saveFavoriteComponents(componentNames: List<String>) {
-        favorites = componentNames.toSet()
-    }
-
-    override suspend fun purgeRepository() {
-        favorites = emptySet()
-    }
-}
-
-class FakeFavoritesOrderRepository : FavoritesOrderRepository {
-    private val flow = MutableStateFlow(listOf<String>())
-
-    var order: List<String>
-        get() = flow.value
-        set(value) {
-            flow.value = value
-        }
-
-    override val favoriteComponentsOrderFlow = flow
-
-    override suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>) =
-        favoriteApps
-
-    override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
-        order = orderedComponentNames
-        return true
-    }
-
-    override suspend fun purgeRepository() {
-        order = emptyList()
-    }
-}
-
-class FakeAppVisibilityRepository : HiddenAppsRepository {
-    private val flow = MutableStateFlow(setOf<String>())
-
-    var hiddenApps: Set<String>
-        get() = flow.value
-        set(value) {
-            flow.value = value
-        }
-
-    override val hiddenAppsFlow = flow
-
-    override suspend fun isComponentHidden(componentName: String?) = componentName in hiddenApps
-    override suspend fun hideComponent(componentName: String?) = true
-    override suspend fun showComponent(componentName: String?) = true
-    override suspend fun updateComponentVisibilities(
-        componentsToHide: Set<String>,
-        componentsToShow: Set<String>
-    ) {
-        hiddenApps = (hiddenApps + componentsToHide) - componentsToShow
-    }
-
-    override suspend fun purgeRepository() {
-        hiddenApps = emptySet()
-    }
-}
-
-class SimpleFakeInstalledAppsRepository : InstalledAppsRepository {
-    var installedApps = listOf<AppInfo>()
-
-    override fun getInstalledApps(): Flow<List<AppInfo>> {
-        return flowOf(installedApps)
-    }
-
-    override suspend fun triggerAppsUpdate() {}
-
-    override suspend fun purgeRepository() {}
-}
-
-class FakeSwipeActionsRepository : SwipeActionsRepository {
-    private val leftFlow = MutableStateFlow<String?>(null)
-    private val rightFlow = MutableStateFlow<String?>(null)
-
-    var swipeLeftApp: String?
-        get() = leftFlow.value
-        set(value) {
-            leftFlow.value = value
-        }
-
-    var swipeRightApp: String?
-        get() = rightFlow.value
-        set(value) {
-            rightFlow.value = value
-        }
-
-    override val swipeLeftAppFlow = leftFlow
-    override val swipeRightAppFlow = rightFlow
-
-    override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
-        when (slot) {
-            SwipeSlot.LEFT -> swipeLeftApp = componentName
-            SwipeSlot.RIGHT -> swipeRightApp = componentName
-            SwipeSlot.NONE -> {}
-        }
-    }
-
-    override suspend fun purgeRepository() {
-        swipeLeftApp = null
-        swipeRightApp = null
-    }
-}
-
-// duplizieren in TestRepositoryModule.kt
-class FakeSettingsRepository : SettingsRepository {
-
-    private val shadowFlow = MutableStateFlow(true)
-    private val colorFlow = MutableStateFlow(0)
-    private val chipBgColorFlow = MutableStateFlow(0)
-    private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
-    private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-    private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-
-    private val contentTopMarginFlow = MutableStateFlow(0f)
-
-    private val calendarFlow = MutableStateFlow(false)
-    private val alarmFlow = MutableStateFlow(false)
-    private val doubleTapFlow = MutableStateFlow(false)
-    private val swipeDownFlow = MutableStateFlow(false)
-    private val autoShowKeyboardFlowState = MutableStateFlow(false)
-    private val autoLaunchAppFlowState = MutableStateFlow(false)
-    private val splitModeThresholdFlowState = MutableStateFlow(0)
-
-    var shadow: Boolean
-        get() = shadowFlow.value
-        set(value) { shadowFlow.value = value }
-
-    var color: Int
-        get() = colorFlow.value
-        set(value) { colorFlow.value = value }
-
-    var chipBgColor: Int
-        get() = chipBgColorFlow.value
-        set(value) { chipBgColorFlow.value = value }
-
-    var layoutScale: Float
-        get() = layoutScaleFlow.value
-        set(value) { layoutScaleFlow.value = value }
-
-    var verticalPadding: Float
-        get() = verticalPaddingFlow.value
-        set(value) { verticalPaddingFlow.value = value }
-
-    var isFontBold: Boolean
-        get() = isFontBoldFlow.value
-        set(value) { isFontBoldFlow.value = value }
-
-    var contentTopMargin: Float
-        get() = contentTopMarginFlow.value
-        set(value) { contentTopMarginFlow.value = value }
-
-    var showCalendar: Boolean
-        get() = calendarFlow.value
-        set(value) { calendarFlow.value = value }
-
-    var showAlarm: Boolean
-        get() = alarmFlow.value
-        set(value) { alarmFlow.value = value }
-
-    var doubleTap: Boolean
-        get() = doubleTapFlow.value
-        set(value) { doubleTapFlow.value = value }
-
-    var swipeDown: Boolean
-        get() = swipeDownFlow.value
-        set(value) { swipeDownFlow.value = value }
-
-    var autoShowKeyboard: Boolean
-        get() = autoShowKeyboardFlowState.value
-        set(value) { autoShowKeyboardFlowState.value = value }
-
-    var autoLaunchApp: Boolean
-        get() = autoLaunchAppFlowState.value
-        set(value) { autoLaunchAppFlowState.value = value }
-
-    var splitModeThreshold: Int
-        get() = splitModeThresholdFlowState.value
-        set(value) {
-            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
-        }
-
-    override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
-    override val textColorFlow: Flow<Int> = colorFlow
-    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
-    override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
-    override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
-    override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
-
-    override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
-
-    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
-        shadow = isEnabled
-    }
-
-    override suspend fun setTextColor(color: Int) {
-        this.color = color
-    }
-
-    override suspend fun setChipBackgroundColor(color: Int) {
-        this.chipBgColor = color
-    }
-
-    override suspend fun setLayoutScale(scale: Float) {
-        layoutScale = scale
-    }
-
-    override suspend fun setVerticalPadding(scale: Float) {
-        verticalPadding = scale
-    }
-
-    override suspend fun setFontBold(isBold: Boolean) {
-        isFontBold = isBold
-    }
-
-    override suspend fun setContentTopMarginScale(scale: Float) {
-        contentTopMargin = scale
-    }
-
-    override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
-    override suspend fun setSortOrder(sortOrder: SortOrder) {}
-
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
-        doubleTap = isEnabled
-    }
-
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
-    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
-        swipeDown = isEnabled
-    }
-
-    override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
-    override suspend fun setReadabilityMode(mode: String) {}
-
-    override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
-    override suspend fun setOnboardingCompleted() {}
-
-    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
-        showCalendar = isEnabled
-    }
-
-    override val showAlarmFlow: Flow<Boolean> = alarmFlow
-    override suspend fun setShowAlarm(isEnabled: Boolean) {
-        showAlarm = isEnabled
-    }
-
-    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
-    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
-        autoShowKeyboard = isEnabled
-    }
-
-    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
-    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
-        autoLaunchApp = isEnabled
-    }
-
-    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
-
-    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
-        splitModeThreshold = thresholdPixels
-    }
-
-    override suspend fun purgeRepository() {
-        color = 0
-        shadow = true
-        chipBgColor = 0
-        layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
-        verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
-        isFontBold = AppConstants.DEFAULT_FONT_BOLD
-        contentTopMargin = 0f
-
-        showCalendar = false
-        showAlarm = false
-        doubleTap = false
-        swipeDown = false
-        autoShowKeyboard = false
-        autoLaunchApp = false
-        splitModeThreshold = 0
     }
 }

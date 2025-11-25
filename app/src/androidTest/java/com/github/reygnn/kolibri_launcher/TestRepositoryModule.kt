@@ -721,7 +721,6 @@ class FakeSettingsRepository : SettingsRepository {
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-
     private val contentTopMarginFlow = MutableStateFlow(0f)
 
     private val calendarFlow = MutableStateFlow(false)
@@ -800,7 +799,6 @@ class FakeSettingsRepository : SettingsRepository {
     override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
     override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
-
     override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
 
 

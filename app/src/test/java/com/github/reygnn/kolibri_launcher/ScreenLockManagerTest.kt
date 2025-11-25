@@ -242,7 +242,6 @@ class ScreenLockManagerTest {
             cancel()
         }
 
-        // New collector should still work
         screenLockManager.isLockingAvailableFlow.test {
             assertEquals(false, awaitItem())
 
@@ -261,7 +260,6 @@ class ScreenLockManagerTest {
             cancel()
         }
 
-        // New collector should still work
         screenLockManager.lockRequestFlow.test {
             screenLockManager.requestLock()
             assertEquals(Unit, awaitItem())

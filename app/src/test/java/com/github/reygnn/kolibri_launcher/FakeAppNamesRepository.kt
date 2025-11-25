@@ -11,7 +11,7 @@ class FakeAppNamesRepository : CustomNamesRepository {
     var shouldFailOnSet = false
 
     // Für BackupManagerTest
-    var batchSetCalled = false          // ← FEHLTE!
+    var batchSetCalled = false
     var shouldFailOnBatch = false
 
     override suspend fun getDisplayNameForPackage(packageName: String, originalName: String): String {
@@ -67,6 +67,6 @@ class FakeAppNamesRepository : CustomNamesRepository {
         onUpdateTrigger = null
         shouldFailOnSet = false
         shouldFailOnBatch = false
-        batchSetCalled = false  // ← Reset auch hier!
+        batchSetCalled = false
     }
 }

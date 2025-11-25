@@ -2,14 +2,12 @@ package com.github.reygnn.kolibri_launcher
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.ReactiveFakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -31,14 +29,14 @@ class AppNamesViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeAppNamesRepository: FakeAppNamesRepository
-    private lateinit var fakeInstalledAppsRepository: DependencyFakeInstalledAppsRepository
+    private lateinit var fakeInstalledAppsRepository: ReactiveFakeInstalledAppsRepository
     private lateinit var viewModel: CustomNamesViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeAppNamesRepository = FakeAppNamesRepository()
-        fakeInstalledAppsRepository = DependencyFakeInstalledAppsRepository(fakeAppNamesRepository)
+        fakeInstalledAppsRepository = ReactiveFakeInstalledAppsRepository(fakeAppNamesRepository)
         viewModel = CustomNamesViewModel(
             fakeAppNamesRepository,
             fakeInstalledAppsRepository,
@@ -378,42 +376,5 @@ class AppNamesViewModelTest {
 
         val result = fakeAppNamesRepository.getAllCustomNames()
         assertThat(result).isEqualTo(names)
-    }
-}
-
-// ========== FAKE REPOSITORIES ==========
-
-class DependencyFakeInstalledAppsRepository(
-    private val appNamesRepository: CustomNamesRepository
-) : InstalledAppsRepository {
-
-    private val rawApps = listOf(
-        AppInfo("Clock", "Clock", "com.android.clock", "com.android.clock.Clock", true),
-        AppInfo("Camera", "Camera", "com.android.camera", "com.android.camera.Camera", true),
-        AppInfo(
-            "Calculator",
-            "Calculator",
-            "com.android.calculator",
-            "com.android.calculator.Calculator",
-            true
-        )
-    )
-    private val appFlow = MutableStateFlow<List<AppInfo>>(emptyList())
-
-    override fun getInstalledApps(): Flow<List<AppInfo>> {
-        return appFlow
-    }
-
-    override suspend fun triggerAppsUpdate() {
-        val processedList = rawApps.map { app ->
-            val displayName = appNamesRepository.getDisplayNameForPackage(app.packageName, app.originalName)
-            app.copy(displayName = displayName)
-        }.sortedBy { it.displayName.lowercase() }
-
-        appFlow.value = processedList
-    }
-
-    override suspend fun purgeRepository() {
-        appFlow.value = emptyList()
     }
 }
