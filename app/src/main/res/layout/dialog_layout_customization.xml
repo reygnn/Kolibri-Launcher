@@ -95,7 +95,7 @@
             android:stepSize="0.01" />
 
         <Space android:layout_width="match_parent" android:layout_height="@dimen/spacing_large" />
-        
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switch_bold_text"
             android:layout_width="match_parent"
@@ -103,6 +103,6 @@
             android:text="@string/layout_bold_text"
             android:textAppearance="?attr/textAppearanceTitleMedium"
             android:textColor="?attr/colorOnSurface" />
-            
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

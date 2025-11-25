@@ -80,6 +80,7 @@ class BackupManager @Inject constructor(
             val layoutScale = settingsManager.layoutScaleStateFlow.first()
             val verticalPaddingScale = settingsManager.verticalPaddingStateFlow.first()
             val isFontBold = settingsManager.isFontBoldStateFlow.first()
+            val contentTopMarginScale = settingsManager.contentTopMarginScaleFlow.first()
 
             val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
             val showAlarm = settingsManager.showAlarmFlow.first()
@@ -101,6 +102,7 @@ class BackupManager @Inject constructor(
                 layoutScale = layoutScale,
                 verticalPaddingScale = verticalPaddingScale,
                 isFontBold = isFontBold,
+                contentTopMarginScale = contentTopMarginScale,
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
                 showCalendarEvent = showCalendarEvent,
@@ -325,6 +327,11 @@ class BackupManager @Inject constructor(
                 }
                 backup.settings.isFontBold?.let {
                     settingsManager.setFontBold(it)
+                    themeImported = true
+                }
+
+                backup.settings.contentTopMarginScale?.let {
+                    settingsManager.setContentTopMarginScale(it)
                     themeImported = true
                 }
 
@@ -615,7 +622,8 @@ class BackupManager @Inject constructor(
                         backup.settings.textShadowEnabled != null ||
                         backup.settings.layoutScale != null ||
                         backup.settings.verticalPaddingScale != null ||
-                        backup.settings.isFontBold != null,
+                        backup.settings.isFontBold != null ||
+                        backup.settings.contentTopMarginScale != null,
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||

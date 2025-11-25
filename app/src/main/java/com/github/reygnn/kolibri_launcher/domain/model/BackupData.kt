@@ -36,6 +36,8 @@ data class LauncherSettings(
     val verticalPaddingScale: Float? = null,
     @SerialName("is_font_bold")
     val isFontBold: Boolean? = null,
+    @SerialName("top_margin_scale")
+    val contentTopMarginScale: Float? = null,
 
     @SerialName("show_calendar_event")
     val showCalendarEvent: Boolean? = null,
