@@ -1,8 +1,7 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.di
 
 import android.content.Context
 import android.content.pm.PackageManager
-import com.github.reygnn.kolibri_launcher.di.AppModule
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides

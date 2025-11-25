@@ -1,13 +1,14 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.receiver
 
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.reygnn.kolibri_launcher.core.BaseAndroidTest
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUpdateSignal
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -43,7 +44,7 @@ class PackageUpdateReceiverTest : BaseAndroidTest() {
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Überprüfe den Zustand des Fakes, den Hilt uns injiziert hat.
-        assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(1)
+        Truth.assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(1)
     }
 
     @Test
@@ -57,7 +58,7 @@ class PackageUpdateReceiverTest : BaseAndroidTest() {
         receiver.handleReceive(context, intent) {}
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(1)
+        Truth.assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(1)
     }
 
     @Test
@@ -69,6 +70,6 @@ class PackageUpdateReceiverTest : BaseAndroidTest() {
         receiver.handleReceive(context, intent) {}
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
-        assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(0)
+        Truth.assertThat(fakeAppUpdateSignal.signalSentCount).isEqualTo(0)
     }
 }

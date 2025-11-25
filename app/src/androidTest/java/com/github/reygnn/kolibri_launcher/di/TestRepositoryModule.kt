@@ -1,7 +1,6 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.di
 
 import com.github.reygnn.kolibri_launcher.data.TestDataSource
-import com.github.reygnn.kolibri_launcher.di.RepositoryModule
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -43,10 +42,6 @@ import dagger.Provides
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import javax.inject.Singleton
-
-// =================================================================================
-// --- HILT TEST MODULE: Ersetzt die echten Repositories durch unsere Fakes ---
-// =================================================================================
 
 /**
  * Test-Modul für Domain-Level Dependencies (Repositories, UseCases).

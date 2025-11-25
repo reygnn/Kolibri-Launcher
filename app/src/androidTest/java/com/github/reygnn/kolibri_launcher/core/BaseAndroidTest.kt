@@ -1,10 +1,16 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.core
 
 import android.os.Bundle
 import androidx.annotation.StyleRes
 import androidx.fragment.app.Fragment
 import androidx.test.core.app.ActivityScenario
+import com.github.reygnn.kolibri_launcher.util.DisableAnimationsRule
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.util.TestCoroutineRule
 import com.github.reygnn.kolibri_launcher.data.TestDataSource
+import com.github.reygnn.kolibri_launcher.di.HiltTestActivity
+import com.github.reygnn.kolibri_launcher.di.TestDispatcherModule
+import com.github.reygnn.kolibri_launcher.di.launchFragmentInHiltContainer
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -23,13 +29,14 @@ import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepos
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import javax.inject.Inject
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltAndroidTest
 abstract class BaseAndroidTest {
 

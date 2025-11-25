@@ -1,19 +1,25 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.BoundedMatcher
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.BaseAndroidTest
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.ui.favorites.FavoritesSortFragment
+import com.github.reygnn.kolibri_launcher.util.EspressoTestUtils
+import com.github.reygnn.kolibri_launcher.util.TestCoroutineRule
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -174,14 +180,14 @@ class FavoritesSortFragmentTest : BaseAndroidTest() {
 }
 
 fun withItemTextAtPosition(position: Int, expectedText: String): Matcher<View> {
-    return object : androidx.test.espresso.matcher.BoundedMatcher<View, RecyclerView>(RecyclerView::class.java) {
+    return object : BoundedMatcher<View, RecyclerView>(RecyclerView::class.java) {
         override fun describeTo(description: Description) {
             description.appendText("has item with text '$expectedText' at position $position")
         }
 
         override fun matchesSafely(recyclerView: RecyclerView): Boolean {
             val viewHolder = recyclerView.findViewHolderForAdapterPosition(position)
-            val textView = viewHolder?.itemView?.findViewById<android.widget.TextView>(R.id.app_name)
+            val textView = viewHolder?.itemView?.findViewById<TextView>(R.id.app_name)
             return textView?.text.toString() == expectedText
         }
     }

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.util
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

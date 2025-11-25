@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.util
 
 import android.graphics.Rect
 import android.view.View
@@ -12,24 +12,15 @@ import androidx.test.espresso.PerformException
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.ViewAssertion
-import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
-import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast
-import androidx.test.espresso.matcher.ViewMatchers.isRoot
-import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
-import androidx.test.espresso.matcher.ViewMatchers.Visibility
-import androidx.test.espresso.matcher.ViewMatchers.assertThat
+import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.espresso.util.HumanReadables
 import androidx.test.espresso.util.TreeIterables
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.util.TestCoroutineRule
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matcher
-import org.hamcrest.Matchers.any
-import org.hamcrest.Matchers.allOf
-import org.hamcrest.Matchers.anyOf
-import org.hamcrest.Matchers.`is`
+import org.hamcrest.Matchers
 import java.util.concurrent.TimeoutException
 
 object EspressoTestUtils {
@@ -46,7 +37,7 @@ object EspressoTestUtils {
     fun waitForView(matcher: Matcher<View>, timeoutMillis: Long = 5000): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return isRoot()
+                return ViewMatchers.isRoot()
             }
 
             override fun getDescription(): String {
@@ -91,13 +82,13 @@ object EspressoTestUtils {
     fun nestedScrollTo(): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return allOf(
-                    withEffectiveVisibility(Visibility.VISIBLE),
-                    isDescendantOfA(
-                        anyOf(
-                            isAssignableFrom(ScrollView::class.java),
-                            isAssignableFrom(HorizontalScrollView::class.java),
-                            isAssignableFrom(NestedScrollView::class.java)
+                return Matchers.allOf(
+                    ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE),
+                    ViewMatchers.isDescendantOfA(
+                        Matchers.anyOf(
+                            ViewMatchers.isAssignableFrom(ScrollView::class.java),
+                            ViewMatchers.isAssignableFrom(HorizontalScrollView::class.java),
+                            ViewMatchers.isAssignableFrom(NestedScrollView::class.java)
                         )
                     )
                 )
@@ -120,7 +111,7 @@ object EspressoTestUtils {
     fun clickOnChipCloseIcon(): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return isAssignableFrom(Chip::class.java)
+                return ViewMatchers.isAssignableFrom(Chip::class.java)
             }
 
             override fun getDescription(): String {
@@ -141,7 +132,7 @@ object EspressoTestUtils {
     fun waitForUiThread(): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return isDisplayed()
+                return ViewMatchers.isDisplayed()
             }
 
             override fun getDescription(): String {
@@ -162,7 +153,7 @@ object EspressoTestUtils {
     fun waitForUiThreadAnyView(): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return any(View::class.java) // Akzeptiert jede View
+                return Matchers.any(View::class.java) // Akzeptiert jede View
             }
 
             override fun getDescription(): String {
@@ -182,7 +173,7 @@ object EspressoTestUtils {
     fun waitForUiThreadMultiple(iterations: Int = 2): ViewAction {
         return object : ViewAction {
             override fun getConstraints(): Matcher<View> {
-                return any(View::class.java)
+                return Matchers.any(View::class.java)
             }
 
             override fun getDescription(): String {
@@ -209,7 +200,7 @@ object EspressoTestUtils {
             }
             val recyclerView = view as RecyclerView
             val adapter = recyclerView.adapter
-            assertThat(adapter!!.itemCount, matcher)
+            ViewMatchers.assertThat(adapter!!.itemCount, matcher)
         }
 
         companion object {
@@ -217,7 +208,7 @@ object EspressoTestUtils {
                 return RecyclerViewItemCountAssertion(matcher)
             }
             fun withItemCount(expectedCount: Int): RecyclerViewItemCountAssertion {
-                return RecyclerViewItemCountAssertion(`is`(expectedCount))
+                return RecyclerViewItemCountAssertion(Matchers.`is`(expectedCount))
             }
         }
     }

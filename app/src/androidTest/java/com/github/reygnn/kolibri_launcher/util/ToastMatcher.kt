@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.util
 
 import android.os.IBinder
 import androidx.test.espresso.Root

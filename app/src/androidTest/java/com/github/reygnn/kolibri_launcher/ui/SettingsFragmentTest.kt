@@ -1,28 +1,27 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import androidx.recyclerview.widget.RecyclerView
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.assertion.ViewAssertions
 import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.intent.Intents
-import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
-import androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra
-import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.intent.matcher.IntentMatchers
+import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.BaseAndroidTest
+import com.github.reygnn.kolibri_launcher.di.launchFragmentInHiltContainer
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsFragment
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import org.hamcrest.CoreMatchers.allOf
+import org.hamcrest.CoreMatchers
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -50,31 +49,42 @@ class SettingsFragmentTest : BaseAndroidTest() {
         launchFragmentInHiltContainer<SettingsFragment>()
         // Kein Thread.sleep mehr nötig, Espresso wartet auf die Views
 
-        onView(withText(R.string.category_apps_title)).check(matches(isDisplayed()))
-        onView(withText(R.string.hidden_apps_title)).check(matches(isDisplayed()))
-        onView(withText(R.string.double_tap_to_lock_title)).check(matches(isDisplayed()))
-        onView(withText(R.string.change_wallpaper_title)).check(matches(isDisplayed()))
+        Espresso.onView(ViewMatchers.withText(R.string.category_apps_title))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        Espresso.onView(ViewMatchers.withText(R.string.hidden_apps_title))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        Espresso.onView(ViewMatchers.withText(R.string.double_tap_to_lock_title))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        Espresso.onView(ViewMatchers.withText(R.string.change_wallpaper_title))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
     }
 
     @Test
     fun hiddenAppsPreference_launchesHiddenAppsActivity() = testCoroutineRule.runTestAndLaunchUI {
         launchFragmentInHiltContainer<SettingsFragment>()
 
-        onView(withText(R.string.hidden_apps_title)).perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.hidden_apps_title))
+            .perform(ViewActions.click())
 
-        Intents.intended(hasComponent(HiddenAppsActivity::class.java.name))
+        Intents.intended(IntentMatchers.hasComponent(HiddenAppsActivity::class.java.name))
     }
 
     @Test
     fun editFavoritesPreference_launchesOnboardingActivity() = testCoroutineRule.runTestAndLaunchUI {
         launchFragmentInHiltContainer<SettingsFragment>()
 
-        onView(withText(R.string.settings_select_favorites_title)).perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.settings_select_favorites_title))
+            .perform(ViewActions.click())
 
-        Intents.intended(allOf(
-            hasComponent(OnboardingActivity::class.java.name),
-            hasExtra(OnboardingActivity.EXTRA_LAUNCH_MODE, LaunchMode.EDIT_FAVORITES.name)
-        ))
+        Intents.intended(
+            CoreMatchers.allOf(
+                IntentMatchers.hasComponent(OnboardingActivity::class.java.name),
+                IntentMatchers.hasExtra(
+                    OnboardingActivity.Companion.EXTRA_LAUNCH_MODE,
+                    LaunchMode.EDIT_FAVORITES.name
+                )
+            )
+        )
     }
 
     @Test
@@ -85,13 +95,14 @@ class SettingsFragmentTest : BaseAndroidTest() {
 
         // Act
         launchFragmentInHiltContainer<SettingsFragment>()
-        onView(withText(R.string.double_tap_to_lock_title)).perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.double_tap_to_lock_title))
+            .perform(ViewActions.click())
 
         // Synchronisation
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert: Überprüfe den Zustand des Fakes
-        assertThat(fakeSettingsRepo.doubleTap).isTrue() // KORRIGIERT: Verwende die Property
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue() // KORRIGIERT: Verwende die Property
     }
 
     @Test
@@ -102,18 +113,19 @@ class SettingsFragmentTest : BaseAndroidTest() {
 
         // Act
         launchFragmentInHiltContainer<SettingsFragment>()
-        onView(withId(androidx.preference.R.id.recycler_view))
+        Espresso.onView(ViewMatchers.withId(androidx.preference.R.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
-                hasDescendant(withText(R.string.swipe_down_to_notifications_title))
+                    ViewMatchers.hasDescendant(ViewMatchers.withText(R.string.swipe_down_to_notifications_title))
             ))
-        onView(withText(R.string.swipe_down_to_notifications_title)).perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.swipe_down_to_notifications_title))
+            .perform(ViewActions.click())
 
         // Synchronisation
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
-        assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
     }
 
     @Test
@@ -123,7 +135,7 @@ class SettingsFragmentTest : BaseAndroidTest() {
 
         // Act
         launchFragmentInHiltContainer<SettingsFragment>()
-        onView(withText(R.string.sort_favorites)).perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.sort_favorites)).perform(ViewActions.click())
 
         // Assert: Der Test ist erfolgreich, wenn hier keine Exception fliegt.
         // Optional könnte man hier auf eine Toast-Message prüfen.

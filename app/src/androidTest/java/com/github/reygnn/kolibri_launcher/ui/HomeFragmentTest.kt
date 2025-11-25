@@ -1,30 +1,26 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.longClick
-import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.Visibility
-import androidx.test.espresso.matcher.ViewMatchers.hasChildCount
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.assertion.ViewAssertions
+import androidx.test.espresso.matcher.RootMatchers
+import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.BaseAndroidTest
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.home.HomeFragment
-import com.google.common.truth.Truth.assertThat
+import com.github.reygnn.kolibri_launcher.util.EspressoTestUtils
+import com.github.reygnn.kolibri_launcher.util.TestCoroutineRule
+import com.google.common.truth.Truth
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import org.hamcrest.CoreMatchers.containsString
-import org.hamcrest.CoreMatchers.not
+import org.hamcrest.CoreMatchers
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -53,7 +49,7 @@ class HomeFragmentTest : BaseAndroidTest() {
         launchAndTrackFragment<HomeFragment>()
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.rootLayout))
+        Espresso.onView(ViewMatchers.withId(R.id.rootLayout))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
     }
 
@@ -71,7 +67,7 @@ class HomeFragmentTest : BaseAndroidTest() {
         }
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.appList))
+        Espresso.onView(ViewMatchers.withId(R.id.appList))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 3))
     }
 
@@ -95,8 +91,10 @@ class HomeFragmentTest : BaseAndroidTest() {
         )
         setupFragmentWithApps(testFavorites)
 
-        onView(withText("Test Favorite 1")).check(matches(isDisplayed()))
-        onView(withText("Test Favorite 2")).check(matches(isDisplayed()))
+        Espresso.onView(ViewMatchers.withText("Test Favorite 1"))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        Espresso.onView(ViewMatchers.withText("Test Favorite 2"))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
     }
 
     @Test
@@ -106,12 +104,12 @@ class HomeFragmentTest : BaseAndroidTest() {
         val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
         setupFragmentWithApps(listOf(testApp))
 
-        onView(withText("Mail")).perform(click())
+        Espresso.onView(ViewMatchers.withText("Mail")).perform(ViewActions.click())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         val fakeRepo = appUsageRepository as FakeAppUsageRepository
-        assertThat(fakeRepo.launchedPackages).contains("com.mail")
+        Truth.assertThat(fakeRepo.launchedPackages).contains("com.mail")
     }
 
     @Test
@@ -121,14 +119,14 @@ class HomeFragmentTest : BaseAndroidTest() {
         val testApp = AppInfo("Mail", "Mail", "com.mail", "com.mail.MainActivity")
         setupFragmentWithApps(listOf(testApp))
 
-        onView(withText("Mail")).perform(longClick())
+        Espresso.onView(ViewMatchers.withText("Mail")).perform(ViewActions.longClick())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Überprüfe, ob der Dialog mit dem App-Namen erscheint
-        onView(withText(testApp.displayName))
-            .inRoot(isDialog())
-            .check(matches(isDisplayed()))
+        Espresso.onView(ViewMatchers.withText(testApp.displayName))
+            .inRoot(RootMatchers.isDialog())
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
     }
 
     @Test
@@ -137,9 +135,9 @@ class HomeFragmentTest : BaseAndroidTest() {
     ) {
         setupFragmentWithApps(emptyList())
 
-        onView(withId(R.id.appList))
-            .check(matches(withEffectiveVisibility(Visibility.VISIBLE)))
-            .check(matches(hasChildCount(0)))
+        Espresso.onView(ViewMatchers.withId(R.id.appList))
+            .check(ViewAssertions.matches(ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE)))
+            .check(ViewAssertions.matches(ViewMatchers.hasChildCount(0)))
     }
 
     @Test
@@ -163,22 +161,22 @@ class HomeFragmentTest : BaseAndroidTest() {
         launchAndTrackFragment<HomeFragment>()
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.rootLayout))
+        Espresso.onView(ViewMatchers.withId(R.id.rootLayout))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 2))
 
-        onView(withText("Mail")).perform(longClick())
+        Espresso.onView(ViewMatchers.withText("Mail")).perform(ViewActions.longClick())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Klicke auf "Remove from favorites" im Dialog
-        onView(withText(R.string.remove_from_favorites))
-            .inRoot(isDialog())
-            .perform(click())
+        Espresso.onView(ViewMatchers.withText(R.string.remove_from_favorites))
+            .inRoot(RootMatchers.isDialog())
+            .perform(ViewActions.click())
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Überprüfe, ob die Methode im Fake aufgerufen wurde
-        assertThat(fakeFavRepo.favorites).doesNotContain(testApp.componentName)
+        Truth.assertThat(fakeFavRepo.favorites).doesNotContain(testApp.componentName)
     }
 
     @Test
@@ -190,7 +188,8 @@ class HomeFragmentTest : BaseAndroidTest() {
         )
         setupFragmentWithApps(initialFavorites)
 
-        onView(withText("App One")).check(matches(isDisplayed()))
+        Espresso.onView(ViewMatchers.withText("App One"))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
 
         // Simuliere ein Update mit korrektem Helper
         val updatedFavorites = listOf(
@@ -199,9 +198,11 @@ class HomeFragmentTest : BaseAndroidTest() {
         )
         updateAppsWhileRunning(updatedFavorites)
 
-        onView(withText("App One")).check(doesNotExist())
-        onView(withText("App Two")).check(matches(isDisplayed()))
-        onView(withText("App Three")).check(matches(isDisplayed()))
+        Espresso.onView(ViewMatchers.withText("App One")).check(ViewAssertions.doesNotExist())
+        Espresso.onView(ViewMatchers.withText("App Two"))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        Espresso.onView(ViewMatchers.withText("App Three"))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
     }
 
     @Test
@@ -218,19 +219,19 @@ class HomeFragmentTest : BaseAndroidTest() {
         launchAndTrackFragment<HomeFragment>()
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
-        onView(withId(R.id.rootLayout))
+        Espresso.onView(ViewMatchers.withId(R.id.rootLayout))
             .perform(EspressoTestUtils.waitForUiThreadMultiple(iterations = 3))
 
-        onView(withId(R.id.timeText))
-            .check(matches(isDisplayed()))
-            .check(matches(withText(not(""))))
+        Espresso.onView(ViewMatchers.withId(R.id.timeText))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+            .check(ViewAssertions.matches(ViewMatchers.withText(CoreMatchers.not(""))))
 
-        onView(withId(R.id.dateText))
-            .check(matches(isDisplayed()))
-            .check(matches(withText(not(""))))
+        Espresso.onView(ViewMatchers.withId(R.id.dateText))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+            .check(ViewAssertions.matches(ViewMatchers.withText(CoreMatchers.not(""))))
 
-        onView(withId(R.id.batteryText))
-            .check(matches(isDisplayed()))
-            .check(matches(withText(containsString("%"))))
+        Espresso.onView(ViewMatchers.withId(R.id.batteryText))
+            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+            .check(ViewAssertions.matches(ViewMatchers.withText(CoreMatchers.containsString("%"))))
     }
 }

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.di
 
 import androidx.appcompat.app.AppCompatActivity
 import dagger.hilt.android.AndroidEntryPoint

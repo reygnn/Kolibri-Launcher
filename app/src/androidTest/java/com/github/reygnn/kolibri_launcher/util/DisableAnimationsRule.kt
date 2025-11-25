@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.util
 
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.rules.TestWatcher
