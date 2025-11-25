@@ -732,6 +732,10 @@ class FakeSettingsRepository : SettingsRepository {
     private val autoLaunchAppFlowState = MutableStateFlow(false)
     private val splitModeThresholdFlowState = MutableStateFlow(0)
 
+    private val readabilityModeState = MutableStateFlow("smart_contrast")
+
+    override val readabilityModeFlow: Flow<String> = readabilityModeState
+
     var shadow: Boolean
         get() = shadowFlow.value
         set(value) { shadowFlow.value = value }
@@ -799,6 +803,7 @@ class FakeSettingsRepository : SettingsRepository {
 
     override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
 
+
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
         shadow = isEnabled
     }
@@ -840,8 +845,12 @@ class FakeSettingsRepository : SettingsRepository {
         swipeDown = isEnabled
     }
 
-    override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
-    override suspend fun setReadabilityMode(mode: String) {}
+    override suspend fun setReadabilityMode(mode: String) {
+        readabilityModeState.value = mode
+    }
+    fun setReadabilityModeBlocking(mode: String) {
+        readabilityModeState.value = mode
+    }
 
     override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
     override suspend fun setOnboardingCompleted() {}

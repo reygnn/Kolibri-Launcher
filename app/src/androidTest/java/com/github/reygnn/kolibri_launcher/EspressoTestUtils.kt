@@ -1,27 +1,121 @@
 package com.github.reygnn.kolibri_launcher
 
+import android.graphics.Rect
 import android.view.View
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
+import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.NoMatchingViewException
+import androidx.test.espresso.PerformException
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.ViewAssertion
-import androidx.test.espresso.matcher.ViewMatchers.assertThat
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
+import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
+import androidx.test.espresso.matcher.ViewMatchers.Visibility
+import androidx.test.espresso.matcher.ViewMatchers.assertThat
+import androidx.test.espresso.util.HumanReadables
+import androidx.test.espresso.util.TreeIterables
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.any
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.anyOf
 import org.hamcrest.Matchers.`is`
+import java.util.concurrent.TimeoutException
 
 object EspressoTestUtils {
 
     // =================================================================================
     // --- Custom ViewActions ---
     // =================================================================================
+
+    /**
+     * WICHTIG für asynchrone UI-Updates (Flows/Coroutines):
+     * Wartet bis ein View, der dem Matcher entspricht, in der Hierarchie auftaucht.
+     * Zwingend notwendig, wenn Views dynamisch per addView() hinzugefügt werden.
+     */
+    fun waitForView(matcher: Matcher<View>, timeoutMillis: Long = 5000): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> {
+                return isRoot()
+            }
+
+            override fun getDescription(): String {
+                return "wait for a specific view with timeout $timeoutMillis ms"
+            }
+
+            override fun perform(uiController: UiController, view: View) {
+                uiController.loopMainThreadUntilIdle()
+                val startTime = System.currentTimeMillis()
+                val endTime = startTime + timeoutMillis
+
+                do {
+                    try {
+                        // Durchsucht den gesamten ViewTree nach dem Matcher
+                        val foundViews = TreeIterables.breadthFirstViewTraversal(view)
+                            .filter { matcher.matches(it) }
+
+                        if (foundViews.isNotEmpty()) {
+                            return // Gefunden!
+                        }
+                    } catch (e: Throwable) {
+                        // Ignorieren und weiter warten
+                    }
+
+                    uiController.loopMainThreadForAtLeast(50)
+                } while (System.currentTimeMillis() < endTime)
+
+                // Timeout: Exception werfen
+                throw PerformException.Builder()
+                    .withActionDescription(this.description)
+                    .withViewDescription(HumanReadables.describe(view))
+                    .withCause(TimeoutException())
+                    .build()
+            }
+        }
+    }
+
+    /**
+     * Alternative zu scrollTo(), die robuster bei verschachtelten Layouts (ScrollView -> LinearLayout -> Wrapper) ist.
+     * Standard scrollTo() verlangt oft direkte Kinder oder strikte Constraints, die hier fehlschlagen.
+     */
+    fun nestedScrollTo(): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> {
+                return allOf(
+                    withEffectiveVisibility(Visibility.VISIBLE),
+                    isDescendantOfA(
+                        anyOf(
+                            isAssignableFrom(ScrollView::class.java),
+                            isAssignableFrom(HorizontalScrollView::class.java),
+                            isAssignableFrom(NestedScrollView::class.java)
+                        )
+                    )
+                )
+            }
+
+            override fun getDescription(): String {
+                return "scroll to view in nested hierarchy"
+            }
+
+            override fun perform(uiController: UiController, view: View) {
+                val rect = Rect()
+                view.getDrawingRect(rect)
+                // requestRectangleOnScreen triggert das Scrollen der Eltern-Views
+                view.requestRectangleOnScreen(rect, true)
+                uiController.loopMainThreadUntilIdle()
+            }
+        }
+    }
 
     fun clickOnChipCloseIcon(): ViewAction {
         return object : ViewAction {
