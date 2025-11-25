@@ -560,7 +560,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             val options = arrayOf(
                 getString(R.string.customize_colors_and_shadow),
-                "Layout & Grösse",  // TODO: In strings.xml auslagern
+                getString(R.string.customize_layout_title),
                 getString(R.string.more_settings)
             )
 

@@ -303,5 +303,9 @@
     <string name="split_mode_threshold_saved">Split-mode threshold saved: %d px</string>
     <string name="import_option_power_user">Power User Settings</string>
     
-
+    <string name="customize_layout_title">Layout &amp; Size</string>
+    <string name="layout_text_size">Text Size</string>
+    <string name="layout_vertical_spacing">Line Spacing</string>
+    <string name="layout_bold_text">Bold Text</string>
+    <string name="action_reset">Reset</string>
 </resources>

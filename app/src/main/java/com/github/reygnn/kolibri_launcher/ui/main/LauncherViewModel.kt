@@ -151,14 +151,12 @@ class LauncherViewModel @Inject constructor(
     private val _appDrawerSearchQuery = MutableStateFlow("")
     val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
-    // 0.0 = Min (18sp), 1.0 = Max (60sp)
-    private val _layoutScaleState = MutableStateFlow(0.0f)
+    private val _layoutScaleState = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     val layoutScaleState = _layoutScaleState.asStateFlow()
-
-    // 0.0 = 0px Padding, 1.0 = 100% der Texthöhe
-    // Default 0.3f entspricht ca. den originalen 6dp bei kleiner Schrift
-    private val _verticalPaddingState = MutableStateFlow(0.3f)
+    private val _verticalPaddingState = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     val verticalPaddingState = _verticalPaddingState.asStateFlow()
+    private val _isFontBoldState = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+    val isFontBoldState = _isFontBoldState.asStateFlow()
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
@@ -482,10 +480,15 @@ class LauncherViewModel @Inject constructor(
         // TODO: Speichern im Repository
     }
 
+    fun onSetFontBold(isBold: Boolean) {
+        _isFontBoldState.value = isBold
+        // TODO: Speichern im Repository
+    }
+
     fun onResetLayoutSettings() {
-        // Reset auf Standardwerte
-        _layoutScaleState.value = 0.0f
-        _verticalPaddingState.value = 0.3f
+        _layoutScaleState.value = AppConstants.DEFAULT_LAYOUT_SCALE
+        _verticalPaddingState.value = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        _isFontBoldState.value = AppConstants.DEFAULT_FONT_BOLD
     }
 
     fun onAppInfoError() = launchSafe {

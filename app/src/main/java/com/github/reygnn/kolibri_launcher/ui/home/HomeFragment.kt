@@ -143,6 +143,7 @@ class HomeFragment : Fragment() {
     private var wasInSplitMode = false
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
+    private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
 
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -173,8 +174,11 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
-            currentTextSizePx = resources.getDimension(R.dimen.text_size_app_button)
-            currentVerticalPaddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+            recalculateLayoutCache(
+                viewModel.layoutScaleState.value,
+                viewModel.verticalPaddingState.value,
+                viewModel.isFontBoldState.value
+            )
 
             hideStatusBar()
             setupBackPressHandler()
@@ -517,14 +521,16 @@ class HomeFragment : Fragment() {
                     try {
                         combine(
                             viewModel.layoutScaleState,
-                            viewModel.verticalPaddingState
-                        ) { scale, paddingFactor ->
-                            Pair(scale, paddingFactor)
-                        }.collect { (scale, paddingFactor) ->
+                            viewModel.verticalPaddingState,
+                            viewModel.isFontBoldState
+                        ) { scale, paddingFactor, isBold ->
+                            Triple(scale, paddingFactor, isBold)
+                        }.collect { (scale, paddingFactor, isBold) ->
                             if (_binding == null) return@collect
 
                             try {
-                                applyDynamicLayout(scale, paddingFactor)
+                                recalculateLayoutCache(scale, paddingFactor, isBold)
+                                applyLayoutToExistingViews()
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
@@ -545,44 +551,56 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun applyDynamicLayout(scale: Float, paddingFactor: Float) {
+    /**
+     * Zentralisierte Berechnung der Cache-Werte.
+     * Wird sowohl beim Start (onViewCreated) als auch bei Änderungen (Flow) genutzt.
+     */
+    private fun recalculateLayoutCache(scale: Float, paddingFactor: Float, isBold: Boolean) {
         try {
-            // 1. Min/Max Grenzen aus XML laden
             val minSizePx = resources.getDimension(R.dimen.text_size_secondary_info)
             val maxSizePx = resources.getDimension(R.dimen.text_size_time)
 
-            // 2. Textgröße berechnen
-            val targetTextSize = minSizePx + (maxSizePx - minSizePx) * scale
-            currentTextSizePx = targetTextSize // Cache updaten
+            currentTextSizePx = minSizePx + (maxSizePx - minSizePx) * scale
+            currentVerticalPaddingPx = (currentTextSizePx * paddingFactor).toInt()
+            isCurrentFontBold = isBold
+        } catch (e: Throwable) {
+            currentTextSizePx = 48f
+            currentVerticalPaddingPx = 16
+        }
+    }
 
-            // 3. Vertikales Padding berechnen (abhängig von Textgröße)
-            val targetVertPadding = (targetTextSize * paddingFactor).toInt()
-            currentVerticalPaddingPx = targetVertPadding // Cache updaten
-
-            // 4. Horizontales Padding (konstant)
+    /**
+     * Wendet die berechneten Cache-Werte auf die existierenden Views an.
+     */
+    private fun applyLayoutToExistingViews() {
+        try {
             val horizPadding = try {
                 resources.getDimensionPixelSize(R.dimen.touch_target_padding)
             } catch (e: Exception) { 16 }
 
-            // 5. Alle existierenden Buttons in der Liste updaten
+            val targetTypeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+
             for (i in 0 until binding.appList.childCount) {
                 val wrapper = binding.appList.getChildAt(i) as? LinearLayout
                 val button = wrapper?.getChildAt(0) as? Button
 
                 if (button != null) {
-                    button.setTextSize(TypedValue.COMPLEX_UNIT_PX, targetTextSize)
-                    button.setPadding(horizPadding, targetVertPadding, horizPadding, targetVertPadding)
+                    button.setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
+
+                    button.minHeight = 0
+                    button.minimumHeight = 0
+                    button.includeFontPadding = false
+
+                    button.setPadding(horizPadding, currentVerticalPaddingPx, horizPadding, currentVerticalPaddingPx)
+
+                    button.typeface = targetTypeface
                 }
             }
 
-            // 6. Scroll-Verhalten prüfen (Split Mode Logik triggern)
             checkScrollStateAfterNextLayout("Layout resized")
             safePost { scheduleScrollVerification() }
-
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying dynamic layout")
+            TimberWrapper.silentError(e, "Error applying layout to views")
         }
     }
 
@@ -653,11 +671,11 @@ class HomeFragment : Fragment() {
                     Timber.d("Split mode: portrait (${scrollParams.weight}/${gestureParams.weight})")
                 }
 
-                if (showBorder) {
+/*                if (showBorder) {
                     applyScrollViewBorder(colors.textColor)
                 } else {
                     removeScrollViewBorder()
-                }
+                }*/
 
                 binding.gestureZone.visibility = View.VISIBLE
 
@@ -853,13 +871,13 @@ class HomeFragment : Fragment() {
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-        if (_needsSplit.value) {
+/*        if (_needsSplit.value) {
             try {
                 applyScrollViewBorder(textColor)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error updating border color")
             }
-        }
+        }*/
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -928,6 +946,15 @@ class HomeFragment : Fragment() {
                     text = app.displayName
                     background = null
 
+                    // WICHTIG: Mindestgrössen entfernen, damit Padding < 48dp funktioniert
+                    minHeight = 0
+                    minimumHeight = 0
+                    minWidth = 0
+                    minimumWidth = 0
+
+                    // WICHTIG: Font Padding entfernen für exakte Abstände
+                    includeFontPadding = false
+
                     setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
 
                     val horizPaddingPx = try {
@@ -938,16 +965,10 @@ class HomeFragment : Fragment() {
                     }
                     setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
 
+                    typeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
                     setTextColor(textColor)
-
-                    val buttonTextSizeInPx = try {
-                        resources.getDimension(R.dimen.text_size_app_button)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting text size dimension")
-                        48f // Fallback
-                    }
-                    setTextSize(TypedValue.COMPLEX_UNIT_PX, buttonTextSizeInPx)
 
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END

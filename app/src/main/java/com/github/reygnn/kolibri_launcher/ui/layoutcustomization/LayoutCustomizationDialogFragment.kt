@@ -11,8 +11,11 @@ import androidx.lifecycle.lifecycleScope
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class LayoutCustomizationDialogFragment : DialogFragment() {
@@ -21,14 +24,51 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     private var _binding: DialogLayoutCustomizationBinding? = null
     private val binding get() = _binding!!
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = DialogLayoutCustomizationBinding.inflate(inflater, container, false)
-        return binding.root
+    // ==================== Lifecycle ====================
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        return try {
+            _binding = DialogLayoutCustomizationBinding.inflate(inflater, container, false)
+            binding.root
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to inflate LayoutCustomizationDialog")
+            null
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        // Dialog unten positionieren und Hintergrund transparent machen
+        try {
+            configureDialogWindow()
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to configure dialog window")
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        try {
+            setupControls()
+            observeViewModel()
+            setupDragListener()
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to setup LayoutCustomizationDialog")
+            dismissSafe()
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    // ==================== Window Configuration ====================
+
+    private fun configureDialogWindow() {
         dialog?.window?.let { window ->
             window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -44,65 +84,127 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         }
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        setupControls()
-        observeViewModel()
-        setupDragListener()
-    }
+    // ==================== Controls Setup ====================
 
     private fun setupControls() {
         // Slider Listener
         binding.sliderTextSize.addOnChangeListener { _, value, fromUser ->
-            if (fromUser) viewModel.onSetLayoutScale(value)
+            safeRun("sliderTextSize.onChange") {
+                if (fromUser) viewModel.onSetLayoutScale(value)
+            }
         }
+
         binding.sliderPadding.addOnChangeListener { _, value, fromUser ->
-            if (fromUser) viewModel.onSetVerticalPadding(value)
+            safeRun("sliderPadding.onChange") {
+                if (fromUser) viewModel.onSetVerticalPadding(value)
+            }
+        }
+
+        // Switch Listener
+        binding.switchBoldText.setOnCheckedChangeListener { _, isChecked ->
+            safeRun("switchBoldText.onChange") {
+                viewModel.onSetFontBold(isChecked)
+            }
         }
 
         // Reset Button Listener
         binding.btnReset.setOnClickListener {
-            viewModel.onResetLayoutSettings()
+            safeRun("btnReset.onClick") {
+                viewModel.onResetLayoutSettings()
+            }
         }
     }
 
+    // ==================== ViewModel Observation ====================
+
     private fun observeViewModel() {
-        // Updates vom ViewModel empfangen (auch wichtig für Reset!)
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.layoutScaleState.collectLatest { binding.sliderTextSize.value = it }
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.layoutScale") {
+            viewModel.layoutScaleState.collectLatest { scale ->
+                safeRun("apply.layoutScale") {
+                    binding.sliderTextSize.value = scale
+                }
+            }
         }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.verticalPaddingState.collectLatest { binding.sliderPadding.value = it }
+
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.verticalPadding") {
+            viewModel.verticalPaddingState.collectLatest { padding ->
+                safeRun("apply.verticalPadding") {
+                    binding.sliderPadding.value = padding
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.isFontBold") {
+            viewModel.isFontBoldState.collectLatest { isBold ->
+                safeRun("apply.isFontBold") {
+                    binding.switchBoldText.isChecked = isBold
+                }
+            }
         }
     }
+
+    // ==================== Drag Handling ====================
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDragListener() {
         val dragHandle = binding.dragHandle
         val window = dialog?.window ?: return
+
         var initialY = 0
         var initialTouchY = 0f
 
         dragHandle.setOnTouchListener { _, event ->
-            val layoutParams = window.attributes
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialY = layoutParams.y
-                    initialTouchY = event.rawY
-                    true
+            try {
+                val layoutParams = window.attributes
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialY = layoutParams.y
+                        initialTouchY = event.rawY
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        layoutParams.y = initialY - (event.rawY - initialTouchY).toInt()
+                        window.attributes = layoutParams
+                        true
+                    }
+                    else -> false
                 }
-                MotionEvent.ACTION_MOVE -> {
-                    layoutParams.y = initialY - (event.rawY - initialTouchY).toInt()
-                    window.attributes = layoutParams
-                    true
-                }
-                else -> false
+            } catch (e: Throwable) {
+                Timber.e(e, "Error in drag handling")
+                false
             }
         }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    // ==================== Safe Utilities ====================
+
+    private inline fun safeRun(context: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (e: Throwable) {
+            Timber.e(e, "Error in $context")
+        }
+    }
+
+    private fun CoroutineScope.launchSafe(
+        context: String,
+        block: suspend CoroutineScope.() -> Unit
+    ) = launch {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            Timber.d("Coroutine cancelled: $context")
+            throw e  // WICHTIG: Immer rethrowen!
+        } catch (e: Throwable) {
+            Timber.e(e, "Error in coroutine: $context")
+        }
+    }
+
+    private fun dismissSafe() {
+        try {
+            dismissAllowingStateLoss()
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to dismiss dialog")
+        }
     }
 }

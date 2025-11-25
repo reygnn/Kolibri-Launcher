@@ -291,5 +291,10 @@
     <string name="split_mode_threshold_saved">Split-Mode Schwellwert gespeichert: %d px</string>
     <string name="import_option_power_user">Power-User-Einstellungen</string>
     
+    <string name="customize_layout_title">Layout &amp; Größe</string>
+    <string name="layout_text_size">Textgröße</string>
+    <string name="layout_vertical_spacing">Zeilenabstand</string>
+    <string name="layout_bold_text">Fetter Text</string>
+    <string name="action_reset">Reset</string>
 
 </resources>
