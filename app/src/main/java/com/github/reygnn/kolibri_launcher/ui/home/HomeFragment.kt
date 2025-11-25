@@ -28,7 +28,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.isNotEmpty
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -117,6 +116,13 @@ import kotlin.math.abs
  *
  * IT SIMPLY WORKS!
  */
+
+data class LayoutConfig(
+    val scale: Float,
+    val paddingFactor: Float,
+    val isBold: Boolean,
+    val marginScale: Float
+)
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -519,22 +525,42 @@ class HomeFragment : Fragment() {
             try {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     try {
+                        // Wir kombinieren 4 Flows zu einem LayoutConfig Objekt
                         combine(
                             viewModel.layoutScaleState,
                             viewModel.verticalPaddingState,
-                            viewModel.isFontBoldState
-                        ) { scale, paddingFactor, isBold ->
-                            Triple(scale, paddingFactor, isBold)
-                        }.collect { (scale, paddingFactor, isBold) ->
+                            viewModel.isFontBoldState,
+                            viewModel.contentTopMarginState
+                        ) { scale, paddingFactor, isBold, marginScale ->
+
+                            LayoutConfig(
+                                scale = scale,
+                                paddingFactor = paddingFactor,
+                                isBold = isBold,
+                                marginScale = marginScale
+                            )
+
+                        }.collect { config ->
                             if (_binding == null) return@collect
 
                             try {
-                                recalculateLayoutCache(scale, paddingFactor, isBold)
+                                // 1. Cache für Textgröße/Padding neu berechnen
+                                recalculateLayoutCache(
+                                    config.scale,
+                                    config.paddingFactor,
+                                    config.isBold
+                                )
+
+                                // 2. Den neuen Abstand (Margin) anwenden
+                                applyTopMargin(config.marginScale)
+
+                                // 3. Alle existierenden Buttons aktualisieren (Textgröße etc.)
                                 applyLayoutToExistingViews()
+
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error applying layout")
+                                TimberWrapper.silentError(e, "Error applying layout config")
                             }
                         }
                     } catch (e: CancellationException) {
@@ -558,7 +584,7 @@ class HomeFragment : Fragment() {
     private fun recalculateLayoutCache(scale: Float, paddingFactor: Float, isBold: Boolean) {
         try {
             val minSizePx = resources.getDimension(R.dimen.text_size_secondary_info)
-            val maxSizePx = resources.getDimension(R.dimen.text_size_time) * 0.75f
+            val maxSizePx = resources.getDimension(R.dimen.text_size_time) * AppConstants.MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME
 
             currentTextSizePx = minSizePx + (maxSizePx - minSizePx) * scale
             currentVerticalPaddingPx = (currentTextSizePx * paddingFactor).toInt()
@@ -566,6 +592,39 @@ class HomeFragment : Fragment() {
         } catch (e: Throwable) {
             currentTextSizePx = 48f
             currentVerticalPaddingPx = 16
+        }
+    }
+
+    // Margin berechnen und anwenden
+    private fun applyTopMargin(scale: Float) {
+        try {
+            if (_binding == null) return
+
+            // Basis-Abstand aus XML (Standard)
+            val baseMargin = try {
+                resources.getDimensionPixelSize(R.dimen.spacing_medium)
+            } catch (e: Exception) { 16 } // Fallback
+
+            // Maximaler ZUSÄTZLICHER Abstand (z.B. 30% der Bildschirmhöhe)
+            // Das gibt dem User genug Spielraum, die Apps nach unten zu schieben.
+            val maxAdditionalMargin = resources.displayMetrics.heightPixels * 0.30f
+
+            // Berechnung: Basis + (Prozentsatz * Max)
+            val newTopMargin = (baseMargin + (maxAdditionalMargin * scale)).toInt()
+
+            val params = binding.favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
+
+            if (params != null && params.topMargin != newTopMargin) {
+                params.topMargin = newTopMargin
+                binding.favoritesContainer.layoutParams = params
+
+                // WICHTIG: Da wir den Platz für die Apps verkleinert haben,
+                // müssen wir prüfen, ob jetzt der Split-Mode (Scrollen) nötig ist.
+                checkScrollStateAfterNextLayout("Top margin changed")
+                safePost { scheduleScrollVerification() }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying top margin")
         }
     }
 

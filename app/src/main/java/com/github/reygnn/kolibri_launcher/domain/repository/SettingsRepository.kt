@@ -49,6 +49,9 @@ interface SettingsRepository : Purgeable {
     val autoLaunchAppFlow: Flow<Boolean>
     suspend fun setAutoLaunchApp(isEnabled: Boolean)
 
+    val contentTopMarginScaleFlow: Flow<Float>
+    suspend fun setContentTopMarginScale(scale: Float)
+
     /**
      * Flow für den Split-Mode Threshold in Pixel.
      *

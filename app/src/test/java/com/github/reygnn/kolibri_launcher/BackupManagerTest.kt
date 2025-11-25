@@ -1447,6 +1447,9 @@ class FakeSettingsRepository : SettingsRepository {
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+
+    private val contentTopMarginFlow = MutableStateFlow(0f)
+
     private val calendarFlow = MutableStateFlow(false)
     private val alarmFlow = MutableStateFlow(false)
     private val doubleTapFlow = MutableStateFlow(false)
@@ -1478,6 +1481,10 @@ class FakeSettingsRepository : SettingsRepository {
     var isFontBold: Boolean
         get() = isFontBoldFlow.value
         set(value) { isFontBoldFlow.value = value }
+
+    var contentTopMargin: Float
+        get() = contentTopMarginFlow.value
+        set(value) { contentTopMarginFlow.value = value }
 
     var showCalendar: Boolean
         get() = calendarFlow.value
@@ -1516,6 +1523,8 @@ class FakeSettingsRepository : SettingsRepository {
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
     override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
 
+    override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
+
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
         shadow = isEnabled
     }
@@ -1538,6 +1547,10 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setFontBold(isBold: Boolean) {
         isFontBold = isBold
+    }
+
+    override suspend fun setContentTopMarginScale(scale: Float) {
+        contentTopMargin = scale
     }
 
     override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
@@ -1592,6 +1605,8 @@ class FakeSettingsRepository : SettingsRepository {
         layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
         verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
         isFontBold = AppConstants.DEFAULT_FONT_BOLD
+        contentTopMargin = 0f
+
         showCalendar = false
         showAlarm = false
         doubleTap = false

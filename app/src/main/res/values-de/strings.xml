@@ -296,5 +296,6 @@
     <string name="layout_vertical_spacing">Zeilenabstand</string>
     <string name="layout_bold_text">Fetter Text</string>
     <string name="action_reset">Reset</string>
+    <string name="layout_top_margin">Abstand oben</string>
 
 </resources>

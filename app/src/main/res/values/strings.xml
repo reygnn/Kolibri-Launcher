@@ -308,4 +308,5 @@
     <string name="layout_vertical_spacing">Line Spacing</string>
     <string name="layout_bold_text">Bold Text</string>
     <string name="action_reset">Reset</string>
+    <string name="layout_top_margin">Top offset</string>
 </resources>

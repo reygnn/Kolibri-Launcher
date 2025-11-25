@@ -16,16 +16,18 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
-import java.util.concurrent.CancellationException as JavaCancellationException
 
 /**
  * Implementierung des [com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository].
- * Verwendet Hilt für die Injektion des App-Kontexts.
+ *
+ * SAFETY FIRST:
+ * Wir verwenden hier KEIN runCatching, damit CancellationExceptions (Coroutine Abbruch)
+ * sauber durchgereicht werden und nicht als Crash reportet werden.
  */
 @Singleton
 class TimeBasedEventsManager @Inject constructor(
@@ -39,105 +41,87 @@ class TimeBasedEventsManager @Inject constructor(
     }
 
     override suspend fun getUpcomingTimeBasedEvents(maxCount: Int): List<TimeBasedEvent> {
-        return runCatching {
-            val events = mutableListOf<TimeBasedEvent>()
+        val events = mutableListOf<TimeBasedEvent>()
 
-            // Prüfe Einstellungen
-            val showAlarm = try {
-                settingsManager.showAlarmFlow.first()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error reading showAlarm setting, defaulting to true")
-                true
-            }
-
-            val showCalendarEvents = try {
-                settingsManager.showCalendarEventFlow.first()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error reading showCalendarEvent setting, defaulting to false")
-                false
-            }
-
-            // 1. Alarm hinzufügen (falls aktiviert und vorhanden)
-            if (showAlarm) {
-                try {
-                    getNextAlarm()?.let { alarm ->
-                        events.add(alarm)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error adding alarm to events")
-                    // Weiter mit Kalenderterminen
-                }
-            }
-
-
-            // 2. Kalendertermine hinzufügen (falls aktiviert)
-            if (showCalendarEvents) {
-                try {
-                    val calendarEvents = getCalendarEvents(maxCount)
-                    calendarEvents.forEach { calEvent ->
-                        events.add(
-                            TimeBasedEvent(
-                                triggerTimeMillis = calEvent.startTimeMillis,
-                                title = calEvent.title,
-                                type = EventType.CALENDAR
-                            )
-                        )
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error adding calendar events")
-                    // Weiter - vielleicht haben wir ja den Alarm
-                }
-            }
-
-            // 3. Chronologisch sortieren und limitieren
-            events.sortedBy { it.triggerTimeMillis }.take(maxCount)
-
-        }.getOrElse { e ->
-            if (e is CancellationException || e is JavaCancellationException) throw e
-            TimberWrapper.silentError(e, "Error getting time-based events")
-            emptyList()
+        // 1. Einstellungen laden (Safely)
+        val showAlarm = try {
+            settingsManager.showAlarmFlow.first()
+        } catch (e: CancellationException) {
+            throw e // Abbruch sofort weiterleiten!
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error reading showAlarm setting")
+            true // Fallback
         }
+
+        val showCalendarEvents = try {
+            settingsManager.showCalendarEventFlow.first()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error reading showCalendarEvent setting")
+            false // Fallback
+        }
+
+        // 2. Alarm abrufen
+        if (showAlarm) {
+            try {
+                getNextAlarm()?.let { events.add(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error adding alarm")
+            }
+        }
+
+        // 3. Kalender abrufen
+        if (showCalendarEvents) {
+            try {
+                // getCalendarEvents läuft auf Dispatchers.IO, ist also safe
+                val calendarEvents = getCalendarEvents(maxCount)
+
+                // Mapping auf TimeBasedEvent
+                calendarEvents.forEach { calEvent ->
+                    events.add(
+                        TimeBasedEvent(
+                            triggerTimeMillis = calEvent.startTimeMillis,
+                            title = calEvent.title,
+                            type = EventType.CALENDAR
+                        )
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error adding calendar events")
+            }
+        }
+
+        // 4. Sortieren & Limitieren (CPU bound, safe)
+        return events.sortedBy { it.triggerTimeMillis }.take(maxCount)
     }
 
-    /**
-     * Private: Ruft den nächsten Alarm ab.
-     */
     private fun getNextAlarm(): TimeBasedEvent? {
-        return runCatching {
+        // System-Service Zugriff ist schnell, aber sicherheitshalber try-catch
+        return try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
 
             if (alarmManager == null) {
-                TimberWrapper.silentError("AlarmManager service is null")
-                return@runCatching null
+                return null
             }
 
-            val nextAlarm = alarmManager.nextAlarmClock
-
-            if (nextAlarm == null) {
-                // Kein Alarm gesetzt - das ist normal, kein Error
-                return@runCatching null
-            }
+            val nextAlarm = alarmManager.nextAlarmClock ?: return null
 
             TimeBasedEvent(
                 triggerTimeMillis = nextAlarm.triggerTime,
-                title = "Alarm", // System gibt uns keinen Alarm-Namen
+                title = "Alarm",
                 type = EventType.ALARM
             )
-
-        }.getOrElse { e ->
-            if (e is CancellationException || e is JavaCancellationException) throw e
+        } catch (e: Exception) { // CancellationException ist hier unwahrscheinlich, aber Exception fängt alles außer Errors
             TimberWrapper.silentError(e, "Error getting next alarm")
             null
         }
     }
 
-    /**
-     * Private Helper: Lädt Kalendertermine für die nächsten 12 Stunden.
-     */
     private suspend fun getCalendarEvents(maxCount: Int): List<CalendarEvent> {
         // Berechtigungsprüfung
         if (ContextCompat.checkSelfPermission(
@@ -145,30 +129,29 @@ class TimeBasedEventsManager @Inject constructor(
                 Manifest.permission.READ_CALENDAR
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            TimberWrapper.silentError("Fehlende READ_CALENDAR Berechtigung")
             return emptyList()
         }
 
-        val projection = arrayOf(
-            CalendarContract.Instances.TITLE,
-            CalendarContract.Instances.BEGIN,
-            CalendarContract.Instances.END
-        )
-
-        val now = System.currentTimeMillis()
-        val endOfQueryRange = now + QUERY_DURATION
-
-        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
-            .also {
-                ContentUris.appendId(it, now)
-                ContentUris.appendId(it, endOfQueryRange)
-            }.build()
-
-        val selection = "${CalendarContract.Instances.ALL_DAY} = 0"
-        val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
-
         return try {
             withContext(Dispatchers.IO) {
+                val projection = arrayOf(
+                    CalendarContract.Instances.TITLE,
+                    CalendarContract.Instances.BEGIN,
+                    CalendarContract.Instances.END
+                )
+
+                val now = System.currentTimeMillis()
+                val endOfQueryRange = now + QUERY_DURATION
+
+                val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
+                    .also {
+                        ContentUris.appendId(it, now)
+                        ContentUris.appendId(it, endOfQueryRange)
+                    }.build()
+
+                val selection = "${CalendarContract.Instances.ALL_DAY} = 0"
+                val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
+
                 context.contentResolver.query(
                     uri,
                     projection,
@@ -177,45 +160,36 @@ class TimeBasedEventsManager @Inject constructor(
                     sortOrder
                 )?.use { cursor ->
                     val events = mutableListOf<CalendarEvent>()
-
                     val titleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
                     val beginIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
                     val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
 
                     while (cursor.moveToNext() && events.size < maxCount) {
+                        // Einzelne Row-Fehler sollten nicht alles abbrechen
                         try {
                             events.add(
                                 CalendarEvent(
-                                    title = cursor.getString(titleIdx) ?: "Unbekannt",
+                                    title = cursor.getString(titleIdx) ?: "Event",
                                     startTimeMillis = cursor.getLong(beginIdx),
                                     endTimeMillis = cursor.getLong(endIdx)
                                 )
                             )
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Fehler beim Parsen eines Events")
-                            // Überspringe diesen Termin, mache mit dem nächsten weiter
+                        } catch (e: Exception) {
+                            // Ignoriere defekte Zeilen
                         }
                     }
-
                     events
                 } ?: emptyList()
             }
         } catch (e: CancellationException) {
-            throw e
+            throw e // WICHTIG: IO-Cancellation weiterleiten
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Fehler beim Abfragen der Kalender-Instanzen")
+            TimberWrapper.silentError(e, "Error querying calendar provider")
             emptyList()
         }
     }
 
     override suspend fun purgeRepository() {
-        // NICHTS TUN!
-        // Der TimeBasedEventsManager liest Daten direkt vom System (AlarmManager, CalendarProvider).
-        // Diese System-Daten können und sollten nicht geleert werden.
-        // Alarme und Kalendertermine sind keine App-Einstellungen, sondern Systemdaten.
-        // Ein Neuladen erfolgt automatisch bei jedem Aufruf von getUpcomingTimeBasedEvents().
-
-        // Für Tests: Diese Methode existiert nur für das Purgeable-Interface,
-        // hat aber keine Auswirkung, da keine persistierten Daten vorhanden sind.
+        // No-op
     }
 }

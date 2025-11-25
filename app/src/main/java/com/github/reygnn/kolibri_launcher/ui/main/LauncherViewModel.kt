@@ -38,6 +38,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
@@ -49,15 +50,15 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetFontBoldUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetLayoutScaleUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -132,6 +133,7 @@ class LauncherViewModel @Inject constructor(
     private val setLayoutScaleUseCase: SetLayoutScaleUseCase,
     private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     private val setFontBoldUseCase: SetFontBoldUseCase,
+    private val setContentTopMarginUseCase: SetContentTopMarginUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
     @param:ApplicationContext private val context: Context,
@@ -197,6 +199,14 @@ class LauncherViewModel @Inject constructor(
             emit(AppConstants.DEFAULT_FONT_BOLD)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_FONT_BOLD)
+
+    val contentTopMarginState: StateFlow<Float> = getLayoutSettingsUseCase.contentTopMargin
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing content top margin")
+            emit(0f) // Default 0.0
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
     private var fallbackToastShown = false
@@ -532,10 +542,15 @@ class LauncherViewModel @Inject constructor(
         setFontBoldUseCase(isBold)
     }
 
+    fun onSetContentTopMargin(scale: Float) = launchSafe {
+        setContentTopMarginUseCase(scale.coerceIn(0f, 1.0f))
+    }
+
     fun onResetLayoutSettings() = launchSafe {
         setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
         setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
+        setContentTopMarginUseCase(0f)
     }
 
     fun onAppInfoError() = launchSafe {

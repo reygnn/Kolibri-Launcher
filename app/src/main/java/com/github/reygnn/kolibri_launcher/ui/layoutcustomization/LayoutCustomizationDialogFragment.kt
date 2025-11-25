@@ -113,6 +113,12 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                 viewModel.onResetLayoutSettings()
             }
         }
+
+        binding.sliderTopMargin.addOnChangeListener { _, value, fromUser ->
+            safeRun("sliderTopMargin.onChange") {
+                if (fromUser) viewModel.onSetContentTopMargin(value)
+            }
+        }
     }
 
     // ==================== ViewModel Observation ====================
@@ -141,6 +147,15 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.contentTopMargin") {
+            viewModel.contentTopMarginState.collectLatest { marginScale ->
+                safeRun("apply.contentTopMargin") {
+                    binding.sliderTopMargin.value = marginScale
+                }
+            }
+        }
+
     }
 
     // ==================== Drag Handling ====================

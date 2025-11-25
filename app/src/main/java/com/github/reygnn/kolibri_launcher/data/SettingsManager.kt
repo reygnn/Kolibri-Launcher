@@ -39,6 +39,7 @@ class SettingsManager @Inject constructor(
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
+        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey("content_top_margin_scale")
         val LAYOUT_SCALE = floatPreferencesKey("layout_scale")
         val VERTICAL_PADDING_SCALE = floatPreferencesKey("vertical_padding_scale")
         val IS_FONT_BOLD = booleanPreferencesKey("is_font_bold")
@@ -435,6 +436,22 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data
+        .catch { e ->
+            if (e is IOException) emit(emptyPreferences()) else throw e
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] ?: 0.0f
+        }
+
+    override suspend fun setContentTopMarginScale(scale: Float) {
+        try {
+            dataStore.edit { it[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] = scale }
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting content top margin")
+        }
+    }
+
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->
@@ -456,6 +473,7 @@ class SettingsManager @Inject constructor(
                 preferences.remove(PreferenceKeys.LAYOUT_SCALE)
                 preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
                 preferences.remove(PreferenceKeys.IS_FONT_BOLD)
+                preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)
 
                 // Home Screen Events
                 preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
