@@ -520,30 +520,22 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
-    fun onSetLayoutScale(scale: Float) {
-        viewModelScope.launch {
-            setLayoutScaleUseCase(scale.coerceIn(0f, 1.0f))
-        }
+    fun onSetLayoutScale(scale: Float) = launchSafe {
+        setLayoutScaleUseCase(scale.coerceIn(0f, 1.0f))
     }
 
-    fun onSetVerticalPadding(factor: Float) {
-        viewModelScope.launch {
-            setVerticalPaddingUseCase(factor.coerceIn(0f, 1.0f))
-        }
+    fun onSetVerticalPadding(factor: Float) = launchSafe {
+        setVerticalPaddingUseCase(factor.coerceIn(0f, 1.0f))
     }
 
-    fun onSetFontBold(isBold: Boolean) {
-        viewModelScope.launch {
-            setFontBoldUseCase(isBold)
-        }
+    fun onSetFontBold(isBold: Boolean) = launchSafe {
+        setFontBoldUseCase(isBold)
     }
 
-    fun onResetLayoutSettings() {
-        viewModelScope.launch {
-            setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
-            setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-            setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
-        }
+    fun onResetLayoutSettings() = launchSafe {
+        setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
+        setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
     }
 
     fun onAppInfoError() = launchSafe {

@@ -558,7 +558,7 @@ class HomeFragment : Fragment() {
     private fun recalculateLayoutCache(scale: Float, paddingFactor: Float, isBold: Boolean) {
         try {
             val minSizePx = resources.getDimension(R.dimen.text_size_secondary_info)
-            val maxSizePx = resources.getDimension(R.dimen.text_size_time)
+            val maxSizePx = resources.getDimension(R.dimen.text_size_time) * 0.75f
 
             currentTextSizePx = minSizePx + (maxSizePx - minSizePx) * scale
             currentVerticalPaddingPx = (currentTextSizePx * paddingFactor).toInt()

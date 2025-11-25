@@ -27,8 +27,8 @@ object AppConstants {
     const val SHADOW_DY_SMALL = 1f         // Y-Offset für Datum und Batterie
 
     // Layout Defaults
-    const val DEFAULT_LAYOUT_SCALE = 0.2f
-    const val DEFAULT_VERTICAL_PADDING_FACTOR = 0.5f
+    const val DEFAULT_LAYOUT_SCALE = 0.05f
+    const val DEFAULT_VERTICAL_PADDING_FACTOR = 0.6f
     const val DEFAULT_FONT_BOLD = true
 
     const val KEY_NAME_PREFIX = "name_"
