@@ -38,6 +38,7 @@ import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizati
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -559,6 +560,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             val options = arrayOf(
                 getString(R.string.customize_colors_and_shadow),
+                "Layout & Grösse",  // TODO: In strings.xml auslagern
                 getString(R.string.more_settings)
             )
 
@@ -574,6 +576,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                             }
                         }
                         1 -> {
+                            try {
+                                LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error showing layout customization")
+                            }
+                        }
+                        2 -> {
                             try {
                                 val intent = Intent(this, SettingsActivity::class.java)
                                 startActivity(intent)

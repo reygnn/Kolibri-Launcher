@@ -141,6 +141,8 @@ class HomeFragment : Fragment() {
     private var verifyJob: Job? = null
     private val showBorder = false
     private var wasInSplitMode = false
+    private var currentTextSizePx: Float = 0f
+    private var currentVerticalPaddingPx: Int = 0
 
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -171,6 +173,9 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         try {
+            currentTextSizePx = resources.getDimension(R.dimen.text_size_app_button)
+            currentVerticalPaddingPx = resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+
             hideStatusBar()
             setupBackPressHandler()
             setupGestures()
@@ -179,6 +184,9 @@ class HomeFragment : Fragment() {
             setupHomeWindowInsets()
 
             observeViewModel()
+            observeLayoutChanges()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
@@ -502,6 +510,82 @@ class HomeFragment : Fragment() {
 
     }
 
+    private fun observeLayoutChanges() {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        combine(
+                            viewModel.layoutScaleState,
+                            viewModel.verticalPaddingState
+                        ) { scale, paddingFactor ->
+                            Pair(scale, paddingFactor)
+                        }.collect { (scale, paddingFactor) ->
+                            if (_binding == null) return@collect
+
+                            try {
+                                applyDynamicLayout(scale, paddingFactor)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error applying layout")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error collecting layout changes")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for layout")
+            }
+        }
+    }
+
+    private fun applyDynamicLayout(scale: Float, paddingFactor: Float) {
+        try {
+            // 1. Min/Max Grenzen aus XML laden
+            val minSizePx = resources.getDimension(R.dimen.text_size_secondary_info)
+            val maxSizePx = resources.getDimension(R.dimen.text_size_time)
+
+            // 2. Textgröße berechnen
+            val targetTextSize = minSizePx + (maxSizePx - minSizePx) * scale
+            currentTextSizePx = targetTextSize // Cache updaten
+
+            // 3. Vertikales Padding berechnen (abhängig von Textgröße)
+            val targetVertPadding = (targetTextSize * paddingFactor).toInt()
+            currentVerticalPaddingPx = targetVertPadding // Cache updaten
+
+            // 4. Horizontales Padding (konstant)
+            val horizPadding = try {
+                resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+            } catch (e: Exception) { 16 }
+
+            // 5. Alle existierenden Buttons in der Liste updaten
+            for (i in 0 until binding.appList.childCount) {
+                val wrapper = binding.appList.getChildAt(i) as? LinearLayout
+                val button = wrapper?.getChildAt(0) as? Button
+
+                if (button != null) {
+                    button.setTextSize(TypedValue.COMPLEX_UNIT_PX, targetTextSize)
+                    button.setPadding(horizPadding, targetVertPadding, horizPadding, targetVertPadding)
+                }
+            }
+
+            // 6. Scroll-Verhalten prüfen (Split Mode Logik triggern)
+            checkScrollStateAfterNextLayout("Layout resized")
+            safePost { scheduleScrollVerification() }
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying dynamic layout")
+        }
+    }
+
     // ============================================================================
     // RENDERING - ULTRA SIMPLIFIED!
     // ============================================================================
@@ -803,10 +887,14 @@ class HomeFragment : Fragment() {
         try {
             for (i in 0 until binding.appList.childCount) {
                 try {
-                    val view = binding.appList.getChildAt(i)
-                    if (view is Button) {
-                        view.setTextColor(textColor)
-                        view.setShadowLayer(
+                    // Wir müssen erst den Wrapper (LinearLayout) holen
+                    val wrapper = binding.appList.getChildAt(i) as? LinearLayout
+                    // Dann den Button aus dem Wrapper (Index 0)
+                    val button = wrapper?.getChildAt(0) as? Button
+
+                    if (button != null) {
+                        button.setTextColor(textColor)
+                        button.setShadowLayer(
                             AppConstants.SHADOW_RADIUS_APPS,
                             AppConstants.SHADOW_DX,
                             AppConstants.SHADOW_DY,
@@ -840,13 +928,15 @@ class HomeFragment : Fragment() {
                     text = app.displayName
                     background = null
 
-                    val paddingPx = try {
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
+
+                    val horizPaddingPx = try {
                         resources.getDimensionPixelSize(R.dimen.touch_target_padding)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error getting padding dimension")
                         16 // Fallback
                     }
-                    setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+                    setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
 
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
                     setTextColor(textColor)

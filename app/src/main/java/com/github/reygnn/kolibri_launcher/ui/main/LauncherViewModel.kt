@@ -151,6 +151,15 @@ class LauncherViewModel @Inject constructor(
     private val _appDrawerSearchQuery = MutableStateFlow("")
     val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
+    // 0.0 = Min (18sp), 1.0 = Max (60sp)
+    private val _layoutScaleState = MutableStateFlow(0.0f)
+    val layoutScaleState = _layoutScaleState.asStateFlow()
+
+    // 0.0 = 0px Padding, 1.0 = 100% der Texthöhe
+    // Default 0.3f entspricht ca. den originalen 6dp bei kleiner Schrift
+    private val _verticalPaddingState = MutableStateFlow(0.3f)
+    val verticalPaddingState = _verticalPaddingState.asStateFlow()
+
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
     private var fallbackToastShown = false
@@ -461,6 +470,22 @@ class LauncherViewModel @Inject constructor(
             TimberWrapper.silentError(e, "Failed to show app ${app.packageName}")
             sendEvent(UiEvent.ShowToast(R.string.error_generic))
         }
+    }
+
+    fun onSetLayoutScale(scale: Float) {
+        _layoutScaleState.value = scale.coerceIn(0f, 1.0f)
+        // TODO: Speichern im Repository
+    }
+
+    fun onSetVerticalPadding(factor: Float) {
+        _verticalPaddingState.value = factor.coerceIn(0f, 1.0f)
+        // TODO: Speichern im Repository
+    }
+
+    fun onResetLayoutSettings() {
+        // Reset auf Standardwerte
+        _layoutScaleState.value = 0.0f
+        _verticalPaddingState.value = 0.3f
     }
 
     fun onAppInfoError() = launchSafe {
