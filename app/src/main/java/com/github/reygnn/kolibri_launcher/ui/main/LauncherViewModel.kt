@@ -73,6 +73,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -160,21 +161,42 @@ class LauncherViewModel @Inject constructor(
     private val _appDrawerSearchQuery = MutableStateFlow("")
     val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
-//    private val _layoutScaleState = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
-//    val layoutScaleState = _layoutScaleState.asStateFlow()
-//    private val _verticalPaddingState = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-//    val verticalPaddingState = _verticalPaddingState.asStateFlow()
-//    private val _isFontBoldState = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-//    val isFontBoldState = _isFontBoldState.asStateFlow()
+    // Default 0 = Automatik (Android entscheidet)
+    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing split mode threshold")
+            emit(0)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
     val layoutScaleState: StateFlow<Float> = getLayoutSettingsUseCase.layoutScale
-    .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_LAYOUT_SCALE)
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing layout scale")
+            emit(AppConstants.DEFAULT_LAYOUT_SCALE)
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_LAYOUT_SCALE)
 
     val verticalPaddingState: StateFlow<Float> = getLayoutSettingsUseCase.verticalPadding
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing vertical padding")
+            emit(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        )
 
     val isFontBoldState: StateFlow<Boolean> = getLayoutSettingsUseCase.isFontBold
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing font bold")
+            emit(AppConstants.DEFAULT_FONT_BOLD)
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_FONT_BOLD)
-
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
     private var fallbackToastShown = false
@@ -281,7 +303,10 @@ class LauncherViewModel @Inject constructor(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error processing favorite apps state in test mode")
+                            TimberWrapper.silentError(
+                                e,
+                                "Error processing favorite apps state in test mode"
+                            )
                         }
                     }
                 } catch (e: CancellationException) {
@@ -304,15 +329,18 @@ class LauncherViewModel @Inject constructor(
 
             is RequestNotificationsUseCase.Result.Success -> {
             }
+
             is RequestNotificationsUseCase.Result.ErrorAccessibility -> {
                 sendEvent(UiEvent.ShowAccessibilityDialog)
             }
+
             is RequestNotificationsUseCase.Result.ErrorDisabled -> {
                 if (!enableSwipeDownToastShown) {
                     enableSwipeDownToastShown = true
                     sendEvent(UiEvent.ShowToast(R.string.toast_enable_swipe_down_to_notifications))
                 }
             }
+
             is RequestNotificationsUseCase.Result.ErrorGeneric -> {
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
             }
@@ -325,6 +353,7 @@ class LauncherViewModel @Inject constructor(
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
+
                 is HandleSwipeActionUseCase.Result.NoAction -> {
                 }
             }
@@ -341,6 +370,7 @@ class LauncherViewModel @Inject constructor(
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
+
                 is HandleSwipeActionUseCase.Result.NoAction -> {
                 }
             }
@@ -372,15 +402,18 @@ class LauncherViewModel @Inject constructor(
 
             is RequestLockUseCase.Result.Success -> {
             }
+
             is RequestLockUseCase.Result.ErrorAccessibility -> {
                 sendEvent(UiEvent.ShowAccessibilityDialog)
             }
+
             is RequestLockUseCase.Result.ErrorDisabled -> {
                 if (!enableLockToastShown) {
                     enableLockToastShown = true
                     sendEvent(UiEvent.ShowToast(R.string.toast_enable_double_tap_to_lock))
                 }
             }
+
             is RequestLockUseCase.Result.ErrorGeneric -> {
             }
         }
@@ -720,12 +753,4 @@ class LauncherViewModel @Inject constructor(
     fun onAppDrawerClosed() {
         _appDrawerSearchQuery.value = ""
     }
-
-    // Default 0 = Automatik (Android entscheidet)
-    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0
-        )
 }

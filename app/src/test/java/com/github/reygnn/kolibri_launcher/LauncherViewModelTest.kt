@@ -17,6 +17,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.*
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.GetLayoutSettingsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetFontBoldUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetLayoutScaleUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -126,12 +130,23 @@ class LauncherViewModelTest {
     @Mock
     private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
 
-
     @Mock
     private lateinit var appUpdateSignal: AppUpdateSignal
 
     @Mock
     private lateinit var context: Context
+
+    @Mock
+    private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
+
+    @Mock
+    private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
+
+    @Mock
+    private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
+
+    @Mock
+    private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -144,13 +159,11 @@ class LauncherViewModelTest {
     fun setup() {
         MockitoAnnotations.openMocks(this)
 
-        // Mocks für Helfer und Context
         whenever(context.registerReceiver(any(), any(), any())).thenReturn(null)
         whenever(appUpdateSignal.events).thenReturn(MutableSharedFlow())
         whenever(context.getString(any())).thenReturn("Test String")
         whenever(context.getString(any(), any())).thenReturn("Test String with args")
 
-        // Mocks für UseCases, die Flows bereitstellen (für den init-Block)
         whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(flowOf(UiState.Loading))
         whenever(getDrawerAppsUseCase.drawerApps).thenReturn(
             MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()
@@ -161,6 +174,10 @@ class LauncherViewModelTest {
 
         whenever(observeHomeSettingsUseCase.invoke()).thenReturn(flowOf(HomeSettings()))
         whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(0))
+
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flowOf(AppConstants.DEFAULT_LAYOUT_SCALE))
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
+        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -189,6 +206,10 @@ class LauncherViewModelTest {
             getAutoShowKeyboardSettingUseCase,
             getTextShadowEnabledUseCase,
             getSplitModeThresholdUseCase,
+            getLayoutSettingsUseCase,
+            setLayoutScaleUseCase,
+            setVerticalPaddingUseCase,
+            setFontBoldUseCase,
             appUpdateSignal,
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -1980,4 +2001,367 @@ class LauncherViewModelTest {
         assertEquals(100, viewModel.splitModeThreshold.value)
     }
 
+    // ========== LAYOUT SETTINGS TESTS ==========
+    @Test
+    fun `layoutScaleState - default value matches AppConstants`() = runTest {
+        // Setup verwendet bereits AppConstants.DEFAULT_LAYOUT_SCALE
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.layoutScaleState.test {
+            assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, awaitItem())
+        }
+    }
+
+    @Test
+    fun `verticalPaddingState - default value matches AppConstants`() = runTest {
+        // Setup verwendet bereits AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.verticalPaddingState.test {
+            assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, awaitItem())
+        }
+    }
+
+    @Test
+    fun `isFontBoldState - default value matches AppConstants`() = runTest {
+        // Setup verwendet bereits AppConstants.DEFAULT_FONT_BOLD
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.isFontBoldState.test {
+            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+        }
+    }
+
+    @Test
+    fun `layoutScaleState - updates dynamically when UseCase emits new value`() = runTest {
+        val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+
+        setupViewModel()
+
+        viewModel.layoutScaleState.test {
+            assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, awaitItem())
+
+            scaleFlow.value = 0.5f
+            assertEquals(0.5f, awaitItem())
+
+            scaleFlow.value = 0.8f
+            assertEquals(0.8f, awaitItem())
+        }
+    }
+
+    @Test
+    fun `verticalPaddingState - updates dynamically when UseCase emits new value`() = runTest {
+        val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
+
+        setupViewModel()
+
+        viewModel.verticalPaddingState.test {
+            assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, awaitItem())
+
+            paddingFlow.value = 0.3f
+            assertEquals(0.3f, awaitItem())
+        }
+    }
+
+    @Test
+    fun `isFontBoldState - updates dynamically when UseCase emits new value`() = runTest {
+        val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
+
+        setupViewModel()
+
+        viewModel.isFontBoldState.test {
+            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+
+            boldFlow.value = !AppConstants.DEFAULT_FONT_BOLD
+            assertEquals(!AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+
+            boldFlow.value = AppConstants.DEFAULT_FONT_BOLD
+            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+        }
+    }
+
+    @Test
+    fun `layout settings - all three update simultaneously`() = runTest {
+        val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+        val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
+        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Alle gleichzeitig ändern
+        launch { scaleFlow.value = 0.7f }
+        launch { paddingFlow.value = 0.5f }
+        launch { boldFlow.value = !AppConstants.DEFAULT_FONT_BOLD }
+
+        advanceUntilIdle()
+
+        assertEquals(0.7f, viewModel.layoutScaleState.value)
+        assertEquals(0.5f, viewModel.verticalPaddingState.value)
+        assertEquals(!AppConstants.DEFAULT_FONT_BOLD, viewModel.isFontBoldState.value)
+    }
+
+    @Test
+    fun `layout settings - survive UseCase throwing exception`() = runTest {
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flow {
+            throw RuntimeException("Settings corrupted")
+        })
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
+        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // ViewModel sollte überleben und Default-Wert verwenden
+        assertNotNull(viewModel)
+        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, viewModel.layoutScaleState.value)
+    }
+
+    @Test
+    fun `layout settings - rapid slider changes are handled gracefully`() = runTest {
+        val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+
+        setupViewModel()
+
+        val receivedValues = mutableListOf<Float>()
+        val job = launch {
+            viewModel.layoutScaleState.collect { receivedValues.add(it) }
+        }
+
+        advanceUntilIdle()
+
+        // Simuliere schnelle Slider-Bewegung
+        repeat(50) { i ->
+            scaleFlow.value = i / 50f
+        }
+        advanceUntilIdle()
+
+        job.cancel()
+
+        assertTrue(receivedValues.isNotEmpty())
+        assertNotNull(viewModel.layoutScaleState.value)
+    }
+
+    @Test
+    fun `goldenStateIntegration - layout settings included`() = runTest {
+        val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+        val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+        val thresholdFlow = MutableStateFlow(0)
+        val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
+
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
+        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
+        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(colorsFlow)
+
+        setupViewModel()
+
+        // WICHTIG: Subscriber für WhileSubscribed Flow
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.splitModeThreshold.collect {}
+        }
+
+        advanceUntilIdle()
+
+        // Alle Settings gleichzeitig ändern
+        scaleFlow.value = 0.8f
+        paddingFlow.value = 0.6f
+        boldFlow.value = !AppConstants.DEFAULT_FONT_BOLD
+        thresholdFlow.value = 100
+        colorsFlow.value = UiColorsState(textColor = Color.YELLOW)
+
+        advanceUntilIdle()
+
+        assertEquals(0.8f, viewModel.layoutScaleState.value)
+        assertEquals(0.6f, viewModel.verticalPaddingState.value)
+        assertEquals(!AppConstants.DEFAULT_FONT_BOLD, viewModel.isFontBoldState.value)
+        assertEquals(100, viewModel.splitModeThreshold.value)
+        assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
+    }
+
+// ========== LAYOUT SETTINGS - SETTER TESTS ==========
+
+    @Test
+    fun `onSetLayoutScale - calls UseCase with correct value`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetLayoutScale(0.75f)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(0.75f)
+    }
+
+    @Test
+    fun `onSetLayoutScale - coerces value above 1 to 1`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetLayoutScale(1.5f)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(1.0f)
+    }
+
+    @Test
+    fun `onSetLayoutScale - coerces negative value to 0`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetLayoutScale(-0.5f)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(0f)
+    }
+
+    @Test
+    fun `onSetLayoutScale - boundary value 0 works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetLayoutScale(0f)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(0f)
+    }
+
+    @Test
+    fun `onSetLayoutScale - boundary value 1 works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetLayoutScale(1.0f)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(1.0f)
+    }
+
+    @Test
+    fun `onSetVerticalPadding - calls UseCase with correct value`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetVerticalPadding(0.6f)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(0.6f)
+    }
+
+    @Test
+    fun `onSetVerticalPadding - coerces value above 1 to 1`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetVerticalPadding(2.0f)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(1.0f)
+    }
+
+    @Test
+    fun `onSetVerticalPadding - coerces negative value to 0`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetVerticalPadding(-1.0f)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(0f)
+    }
+
+    @Test
+    fun `onSetVerticalPadding - boundary value 0 works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetVerticalPadding(0f)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(0f)
+    }
+
+    @Test
+    fun `onSetVerticalPadding - boundary value 1 works`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetVerticalPadding(1.0f)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(1.0f)
+    }
+
+    @Test
+    fun `onSetFontBold - calls UseCase with true`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetFontBold(true)
+        advanceUntilIdle()
+
+        verify(setFontBoldUseCase).invoke(true)
+    }
+
+    @Test
+    fun `onSetFontBold - calls UseCase with false`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetFontBold(false)
+        advanceUntilIdle()
+
+        verify(setFontBoldUseCase).invoke(false)
+    }
+
+    @Test
+    fun `onResetLayoutSettings - resets all layout values to defaults`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onResetLayoutSettings()
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(AppConstants.DEFAULT_LAYOUT_SCALE)
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        verify(setFontBoldUseCase).invoke(AppConstants.DEFAULT_FONT_BOLD)
+    }
+
+    @Test
+    fun `layoutScaleState - reflects custom value from UseCase`() = runTest {
+        val customScale = 0.65f
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flowOf(customScale))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.layoutScaleState.test {
+            assertEquals(customScale, awaitItem())
+        }
+    }
+
+    @Test
+    fun `verticalPaddingState - reflects custom value from UseCase`() = runTest {
+        val customPadding = 0.4f
+        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(customPadding))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.verticalPaddingState.test {
+            assertEquals(customPadding, awaitItem())
+        }
+    }
 }

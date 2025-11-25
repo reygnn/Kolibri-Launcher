@@ -75,7 +75,6 @@ android {
         secretsProperties.load(FileInputStream(secretsPropertiesFile))
     }
 
-
     defaultConfig {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!

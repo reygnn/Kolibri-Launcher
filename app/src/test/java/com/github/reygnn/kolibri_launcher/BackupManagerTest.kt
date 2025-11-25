@@ -1438,11 +1438,15 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
     }
 }
 
+// duplizieren in TestRepositoryModule.kt
 class FakeSettingsRepository : SettingsRepository {
 
     private val shadowFlow = MutableStateFlow(true)
     private val colorFlow = MutableStateFlow(0)
     private val chipBgColorFlow = MutableStateFlow(0)
+    private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+    private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+    private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
     private val calendarFlow = MutableStateFlow(false)
     private val alarmFlow = MutableStateFlow(false)
     private val doubleTapFlow = MutableStateFlow(false)
@@ -1462,6 +1466,18 @@ class FakeSettingsRepository : SettingsRepository {
     var chipBgColor: Int
         get() = chipBgColorFlow.value
         set(value) { chipBgColorFlow.value = value }
+
+    var layoutScale: Float
+        get() = layoutScaleFlow.value
+        set(value) { layoutScaleFlow.value = value }
+
+    var verticalPadding: Float
+        get() = verticalPaddingFlow.value
+        set(value) { verticalPaddingFlow.value = value }
+
+    var isFontBold: Boolean
+        get() = isFontBoldFlow.value
+        set(value) { isFontBoldFlow.value = value }
 
     var showCalendar: Boolean
         get() = calendarFlow.value
@@ -1496,6 +1512,9 @@ class FakeSettingsRepository : SettingsRepository {
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
     override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
+    override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
+    override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
+    override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
 
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
         shadow = isEnabled
@@ -1507,6 +1526,18 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setChipBackgroundColor(color: Int) {
         this.chipBgColor = color
+    }
+
+    override suspend fun setLayoutScale(scale: Float) {
+        layoutScale = scale
+    }
+
+    override suspend fun setVerticalPadding(scale: Float) {
+        verticalPadding = scale
+    }
+
+    override suspend fun setFontBold(isBold: Boolean) {
+        isFontBold = isBold
     }
 
     override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
@@ -1558,6 +1589,9 @@ class FakeSettingsRepository : SettingsRepository {
         color = 0
         shadow = true
         chipBgColor = 0
+        layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
+        verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        isFontBold = AppConstants.DEFAULT_FONT_BOLD
         showCalendar = false
         showAlarm = false
         doubleTap = false

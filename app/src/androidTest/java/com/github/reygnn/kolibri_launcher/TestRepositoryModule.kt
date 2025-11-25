@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
@@ -358,176 +359,6 @@ class FakeAppVisibilityRepository : HiddenAppsRepository, Purgeable {
 
     override suspend fun purgeRepository() {
         hiddenAppsState.value = emptySet()
-    }
-}
-
-class FakeSettingsRepository : SettingsRepository {
-
-    private val shadowFlow = MutableStateFlow(true) // Default: true
-    private val colorFlow = MutableStateFlow(0) // Default: 0 (Auto)
-    private val chipBgColorFlow = MutableStateFlow(0) // Default: 0 (Auto)
-    private val calendarFlow = MutableStateFlow(false) // Default false
-    private val alarmFlow = MutableStateFlow(false) // Default: false
-    private val doubleTapFlow = MutableStateFlow(false) // Default false
-    private val swipeDownFlow = MutableStateFlow(false) // Default false
-    private val sortOrderFlowState = MutableStateFlow(SortOrder.ALPHABETICAL)
-    private val readabilityModeFlowState = MutableStateFlow("smart_contrast")
-    private val onboardingFlowState = MutableStateFlow(false)
-    private val autoShowKeyboardFlowState = MutableStateFlow(false)
-    private val autoLaunchAppFlowState = MutableStateFlow(false)
-    private val splitModeThresholdFlowState = MutableStateFlow(0)
-
-    var shadow: Boolean
-        get() = shadowFlow.value
-        set(value) {
-            shadowFlow.value = value
-        }
-
-    var color: Int
-        get() = colorFlow.value
-        set(value) {
-            colorFlow.value = value
-        }
-
-    var chipBgColor: Int
-        get() = chipBgColorFlow.value
-        set(value) {
-            chipBgColorFlow.value = value
-        }
-
-    var showCalendar: Boolean
-        get() = calendarFlow.value
-        set(value) {
-            calendarFlow.value = value
-        }
-
-    var showAlarm: Boolean
-        get() = alarmFlow.value
-        set(value) {
-            alarmFlow.value = value
-        }
-
-    var doubleTap: Boolean
-        get() = doubleTapFlow.value
-        set(value) {
-            doubleTapFlow.value = value
-        }
-
-    var swipeDown: Boolean
-        get() = swipeDownFlow.value
-        set(value) {
-            swipeDownFlow.value = value
-        }
-
-    var autoShowKeyboard: Boolean
-        get() = autoShowKeyboardFlowState.value
-        set(value) {
-            autoShowKeyboardFlowState.value = value
-        }
-
-    var autoLaunchApp: Boolean
-        get() = autoLaunchAppFlowState.value
-        set(value) { autoLaunchAppFlowState.value = value }
-
-    var splitModeThreshold: Int
-        get() = splitModeThresholdFlowState.value
-        set(value) {
-            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
-        }
-
-    override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
-    override val textColorFlow: Flow<Int> = colorFlow
-    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
-
-    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
-        shadow = isEnabled
-    }
-
-    override suspend fun setTextColor(color: Int) {
-        this.color = color
-    }
-
-    override suspend fun setChipBackgroundColor(color: Int) {
-        this.chipBgColor = color
-    }
-
-    override val sortOrderFlow: Flow<SortOrder> = sortOrderFlowState
-    override suspend fun setSortOrder(sortOrder: SortOrder) {
-        sortOrderFlowState.value = sortOrder
-    }
-
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
-        doubleTap = isEnabled
-    }
-
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
-    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
-        swipeDown = isEnabled
-    }
-
-    override val readabilityModeFlow: Flow<String> = readabilityModeFlowState
-    override suspend fun setReadabilityMode(mode: String) {
-        readabilityModeFlowState.value = mode
-    }
-
-    override val onboardingCompletedFlow: Flow<Boolean> = onboardingFlowState
-    override suspend fun setOnboardingCompleted() {
-        onboardingFlowState.value = true
-    }
-
-    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
-        showCalendar = isEnabled
-    }
-
-    override val showAlarmFlow: Flow<Boolean> = alarmFlow
-    override suspend fun setShowAlarm(isEnabled: Boolean) {
-        showAlarm = isEnabled
-    }
-
-    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
-    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
-        autoShowKeyboard = isEnabled
-    }
-
-    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
-    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
-        autoLaunchApp = isEnabled
-    }
-
-    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
-    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
-        splitModeThreshold = thresholdPixels
-    }
-
-    // ===== HELPER METHODS FÜR TESTS (BLOCKING) =====
-    fun setReadabilityModeBlocking(mode: String) {
-        readabilityModeFlowState.value = mode
-    }
-
-    fun setSortOrderBlocking(sortOrder: SortOrder) {
-        sortOrderFlowState.value = sortOrder
-    }
-
-    fun setSplitModeThresholdBlocking(threshold: Int) {
-        splitModeThresholdFlowState.value = threshold.coerceIn(0, 512)
-    }
-
-    override suspend fun purgeRepository() {
-        color = 0
-        shadow = true
-        chipBgColor = 0
-        showCalendar = false
-        showAlarm = false
-        doubleTap = false
-        swipeDown = false
-        sortOrderFlowState.value = SortOrder.ALPHABETICAL
-        readabilityModeFlowState.value = "smart_contrast"
-        onboardingFlowState.value = false
-        autoShowKeyboardFlowState.value = false
-        autoLaunchAppFlowState.value = false
-        splitModeThresholdFlowState.value = 0
     }
 }
 
@@ -879,5 +710,168 @@ class FakeResetRepository @Inject constructor() : ResetRepository, Purgeable {
         resetUserDataCalled = false
         resetSettingsCalled = false
         resetAppUsageDataCalled = false
+    }
+}
+
+class FakeSettingsRepository : SettingsRepository {
+
+    private val shadowFlow = MutableStateFlow(true)
+    private val colorFlow = MutableStateFlow(0)
+    private val chipBgColorFlow = MutableStateFlow(0)
+    private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+    private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+    private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+    private val calendarFlow = MutableStateFlow(false)
+    private val alarmFlow = MutableStateFlow(false)
+    private val doubleTapFlow = MutableStateFlow(false)
+    private val swipeDownFlow = MutableStateFlow(false)
+    private val autoShowKeyboardFlowState = MutableStateFlow(false)
+    private val autoLaunchAppFlowState = MutableStateFlow(false)
+    private val splitModeThresholdFlowState = MutableStateFlow(0)
+
+    var shadow: Boolean
+        get() = shadowFlow.value
+        set(value) { shadowFlow.value = value }
+
+    var color: Int
+        get() = colorFlow.value
+        set(value) { colorFlow.value = value }
+
+    var chipBgColor: Int
+        get() = chipBgColorFlow.value
+        set(value) { chipBgColorFlow.value = value }
+
+    var layoutScale: Float
+        get() = layoutScaleFlow.value
+        set(value) { layoutScaleFlow.value = value }
+
+    var verticalPadding: Float
+        get() = verticalPaddingFlow.value
+        set(value) { verticalPaddingFlow.value = value }
+
+    var isFontBold: Boolean
+        get() = isFontBoldFlow.value
+        set(value) { isFontBoldFlow.value = value }
+
+    var showCalendar: Boolean
+        get() = calendarFlow.value
+        set(value) { calendarFlow.value = value }
+
+    var showAlarm: Boolean
+        get() = alarmFlow.value
+        set(value) { alarmFlow.value = value }
+
+    var doubleTap: Boolean
+        get() = doubleTapFlow.value
+        set(value) { doubleTapFlow.value = value }
+
+    var swipeDown: Boolean
+        get() = swipeDownFlow.value
+        set(value) { swipeDownFlow.value = value }
+
+    var autoShowKeyboard: Boolean
+        get() = autoShowKeyboardFlowState.value
+        set(value) { autoShowKeyboardFlowState.value = value }
+
+    var autoLaunchApp: Boolean
+        get() = autoLaunchAppFlowState.value
+        set(value) { autoLaunchAppFlowState.value = value }
+
+    var splitModeThreshold: Int
+        get() = splitModeThresholdFlowState.value
+        set(value) {
+            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
+        }
+
+    override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
+    override val textColorFlow: Flow<Int> = colorFlow
+    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
+    override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
+    override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
+    override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
+
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
+        shadow = isEnabled
+    }
+
+    override suspend fun setTextColor(color: Int) {
+        this.color = color
+    }
+
+    override suspend fun setChipBackgroundColor(color: Int) {
+        this.chipBgColor = color
+    }
+
+    override suspend fun setLayoutScale(scale: Float) {
+        layoutScale = scale
+    }
+
+    override suspend fun setVerticalPadding(scale: Float) {
+        verticalPadding = scale
+    }
+
+    override suspend fun setFontBold(isBold: Boolean) {
+        isFontBold = isBold
+    }
+
+    override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
+    override suspend fun setSortOrder(sortOrder: SortOrder) {}
+
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
+        doubleTap = isEnabled
+    }
+
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
+        swipeDown = isEnabled
+    }
+
+    override val readabilityModeFlow: Flow<String> = flowOf("smart_contrast")
+    override suspend fun setReadabilityMode(mode: String) {}
+
+    override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
+    override suspend fun setOnboardingCompleted() {}
+
+    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
+        showCalendar = isEnabled
+    }
+
+    override val showAlarmFlow: Flow<Boolean> = alarmFlow
+    override suspend fun setShowAlarm(isEnabled: Boolean) {
+        showAlarm = isEnabled
+    }
+
+    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
+    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
+        autoShowKeyboard = isEnabled
+    }
+
+    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
+    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
+        autoLaunchApp = isEnabled
+    }
+
+    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
+
+    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
+        splitModeThreshold = thresholdPixels
+    }
+
+    override suspend fun purgeRepository() {
+        color = 0
+        shadow = true
+        chipBgColor = 0
+        layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
+        verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        isFontBold = AppConstants.DEFAULT_FONT_BOLD
+        showCalendar = false
+        showAlarm = false
+        doubleTap = false
+        swipeDown = false
+        autoShowKeyboard = false
+        autoLaunchApp = false
+        splitModeThreshold = 0
     }
 }
