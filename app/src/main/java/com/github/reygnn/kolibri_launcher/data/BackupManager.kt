@@ -73,9 +73,14 @@ class BackupManager @Inject constructor(
             val customAppNames = appNamesManager.getAllCustomNames()
             val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
             val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
+
             val textColor = settingsManager.textColorFlow.first()
             val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
             val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
+            val layoutScale = settingsManager.layoutScaleStateFlow.first()
+            val verticalPaddingScale = settingsManager.verticalPaddingStateFlow.first()
+            val isFontBold = settingsManager.isFontBoldStateFlow.first()
+
             val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
             val showAlarm = settingsManager.showAlarmFlow.first()
             val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
@@ -93,6 +98,9 @@ class BackupManager @Inject constructor(
                 swipeLeftApp = swipeLeftApp,
                 swipeRightApp = swipeRightApp,
                 textColor = textColor,
+                layoutScale = layoutScale,
+                verticalPaddingScale = verticalPaddingScale,
+                isFontBold = isFontBold,
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
                 showCalendarEvent = showCalendarEvent,
@@ -307,6 +315,18 @@ class BackupManager @Inject constructor(
                     themeImported = true
                 }
 
+                backup.settings.layoutScale?.let {
+                    settingsManager.setLayoutScale(it)
+                    themeImported = true
+                }
+                backup.settings.verticalPaddingScale?.let {
+                    settingsManager.setVerticalPadding(it)
+                    themeImported = true
+                }
+                backup.settings.isFontBold?.let {
+                    settingsManager.setFontBold(it)
+                    themeImported = true
+                }
 
                 if (themeImported) {
                     Timber.Forest.i("Imported theme settings.")
@@ -592,7 +612,10 @@ class BackupManager @Inject constructor(
                 hasSwipeRight = backup.settings.swipeRightApp != null,
                 hasThemeSettings = backup.settings.textColor != null ||
                         backup.settings.chipBackgroundColor != null ||
-                        backup.settings.textShadowEnabled != null,
+                        backup.settings.textShadowEnabled != null ||
+                        backup.settings.layoutScale != null ||
+                        backup.settings.verticalPaddingScale != null ||
+                        backup.settings.isFontBold != null,
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||

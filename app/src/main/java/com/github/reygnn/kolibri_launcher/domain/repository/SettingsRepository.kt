@@ -27,6 +27,14 @@ interface SettingsRepository : Purgeable {
 
     val chipBackgroundColorFlow: Flow<Int>
     suspend fun setChipBackgroundColor(color: Int)
+    val layoutScaleStateFlow: Flow<Float>
+    suspend fun setLayoutScale(scale: Float)
+
+    val verticalPaddingStateFlow: Flow<Float>
+    suspend fun setVerticalPadding(scale: Float)
+
+    val isFontBoldStateFlow: Flow<Boolean>
+    suspend fun setFontBold(isBold: Boolean)
 
 
     val showCalendarEventFlow: Flow<Boolean>

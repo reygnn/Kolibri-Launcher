@@ -54,6 +54,10 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.GetLayoutSettingsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetFontBoldUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetLayoutScaleUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.settings.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -72,6 +76,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -122,6 +127,10 @@ class LauncherViewModel @Inject constructor(
     private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
     private val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase,
+    private val getLayoutSettingsUseCase: GetLayoutSettingsUseCase,
+    private val setLayoutScaleUseCase: SetLayoutScaleUseCase,
+    private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
+    private val setFontBoldUseCase: SetFontBoldUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
     @param:ApplicationContext private val context: Context,
@@ -151,12 +160,20 @@ class LauncherViewModel @Inject constructor(
     private val _appDrawerSearchQuery = MutableStateFlow("")
     val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
 
-    private val _layoutScaleState = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
-    val layoutScaleState = _layoutScaleState.asStateFlow()
-    private val _verticalPaddingState = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-    val verticalPaddingState = _verticalPaddingState.asStateFlow()
-    private val _isFontBoldState = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-    val isFontBoldState = _isFontBoldState.asStateFlow()
+//    private val _layoutScaleState = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+//    val layoutScaleState = _layoutScaleState.asStateFlow()
+//    private val _verticalPaddingState = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+//    val verticalPaddingState = _verticalPaddingState.asStateFlow()
+//    private val _isFontBoldState = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
+//    val isFontBoldState = _isFontBoldState.asStateFlow()
+    val layoutScaleState: StateFlow<Float> = getLayoutSettingsUseCase.layoutScale
+    .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_LAYOUT_SCALE)
+
+    val verticalPaddingState: StateFlow<Float> = getLayoutSettingsUseCase.verticalPadding
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+
+    val isFontBoldState: StateFlow<Boolean> = getLayoutSettingsUseCase.isFontBold
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_FONT_BOLD)
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
@@ -471,24 +488,29 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun onSetLayoutScale(scale: Float) {
-        _layoutScaleState.value = scale.coerceIn(0f, 1.0f)
-        // TODO: Speichern im Repository
+        viewModelScope.launch {
+            setLayoutScaleUseCase(scale.coerceIn(0f, 1.0f))
+        }
     }
 
     fun onSetVerticalPadding(factor: Float) {
-        _verticalPaddingState.value = factor.coerceIn(0f, 1.0f)
-        // TODO: Speichern im Repository
+        viewModelScope.launch {
+            setVerticalPaddingUseCase(factor.coerceIn(0f, 1.0f))
+        }
     }
 
     fun onSetFontBold(isBold: Boolean) {
-        _isFontBoldState.value = isBold
-        // TODO: Speichern im Repository
+        viewModelScope.launch {
+            setFontBoldUseCase(isBold)
+        }
     }
 
     fun onResetLayoutSettings() {
-        _layoutScaleState.value = AppConstants.DEFAULT_LAYOUT_SCALE
-        _verticalPaddingState.value = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
-        _isFontBoldState.value = AppConstants.DEFAULT_FONT_BOLD
+        viewModelScope.launch {
+            setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
+            setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+            setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
+        }
     }
 
     fun onAppInfoError() = launchSafe {

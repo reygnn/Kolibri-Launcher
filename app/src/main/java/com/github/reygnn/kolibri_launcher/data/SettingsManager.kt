@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -37,6 +39,9 @@ class SettingsManager @Inject constructor(
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
+        val LAYOUT_SCALE = floatPreferencesKey("layout_scale")
+        val VERTICAL_PADDING_SCALE = floatPreferencesKey("vertical_padding_scale")
+        val IS_FONT_BOLD = booleanPreferencesKey("is_font_bold")
         val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
         val AUTO_LAUNCH_APP = booleanPreferencesKey("auto_launch_app")
         val SPLIT_MODE_THRESHOLD = intPreferencesKey("split_mode_threshold")
@@ -382,6 +387,54 @@ class SettingsManager @Inject constructor(
         }
     }
 
+    override val layoutScaleStateFlow: Flow<Float> = dataStore.data
+        .catch { e ->
+            if (e is IOException) emit(emptyPreferences()) else throw e
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.LAYOUT_SCALE] ?: AppConstants.DEFAULT_LAYOUT_SCALE
+        }
+
+    override suspend fun setLayoutScale(scale: Float) {
+        try {
+            dataStore.edit { it[PreferenceKeys.LAYOUT_SCALE] = scale }
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting layout scale")
+        }
+    }
+
+    override val verticalPaddingStateFlow: Flow<Float> = dataStore.data
+        .catch { e ->
+            if (e is IOException) emit(emptyPreferences()) else throw e
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.VERTICAL_PADDING_SCALE] ?: AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+        }
+
+    override suspend fun setVerticalPadding(scale: Float) {
+        try {
+            dataStore.edit { it[PreferenceKeys.VERTICAL_PADDING_SCALE] = scale }
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting vertical padding")
+        }
+    }
+
+    override val isFontBoldStateFlow: Flow<Boolean> = dataStore.data
+        .catch { e ->
+            if (e is IOException) emit(emptyPreferences()) else throw e
+        }
+        .map { preferences ->
+            preferences[PreferenceKeys.IS_FONT_BOLD] ?: AppConstants.DEFAULT_FONT_BOLD
+        }
+
+    override suspend fun setFontBold(isBold: Boolean) {
+        try {
+            dataStore.edit { it[PreferenceKeys.IS_FONT_BOLD] = isBold }
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error setting font bold")
+        }
+    }
+
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->
@@ -400,6 +453,9 @@ class SettingsManager @Inject constructor(
                 preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
                 preferences.remove(PreferenceKeys.TEXT_COLOR)
                 preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
+                preferences.remove(PreferenceKeys.LAYOUT_SCALE)
+                preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
+                preferences.remove(PreferenceKeys.IS_FONT_BOLD)
 
                 // Home Screen Events
                 preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
