@@ -10,11 +10,13 @@ import androidx.test.espresso.assertion.ViewAssertions
 import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.BaseAndroidTest
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeGetOnboardingAppsUseCaseRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingAppListAdapter
@@ -55,11 +57,18 @@ class OnboardingActivityTest : BaseAndroidTest() {
 
     @Test
     fun initialSetupMode_displaysCorrectTitleAndApps() = testCoroutineRule.runTestAndLaunchUI {
-        // Arrange: Setze den Zustand des steuerbaren Flows im Fake
-        (getOnboardingAppsUseCase as FakeGetOnboardingAppsUseCaseRepository).mutableOnboardingAppsFlow.value = testApps
+        // Arrange: Setze den Zustand auf dem RICHTIGEN Repository
+        val fakeInstalledApps = installedAppsRepository as FakeInstalledAppsRepository
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            fakeInstalledApps.appsFlow.value = testApps
+        }
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Act & Assert
         launchActivityWithMode(LaunchMode.INITIAL_SETUP)
+
         Espresso.onView(ViewMatchers.withId(R.id.title_text))
             .check(ViewAssertions.matches(ViewMatchers.withText(R.string.onboarding_title_welcome)))
         Espresso.onView(ViewMatchers.withText("Photos"))
@@ -69,7 +78,13 @@ class OnboardingActivityTest : BaseAndroidTest() {
     @Test
     fun selectAndDeselectApp_updatesChipsCorrectly() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange
-        (getOnboardingAppsUseCase as FakeGetOnboardingAppsUseCaseRepository).mutableOnboardingAppsFlow.value = testApps
+        val fakeInstalledApps = installedAppsRepository as FakeInstalledAppsRepository
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            fakeInstalledApps.appsFlow.value = testApps
+        }
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Act & Assert
         launchActivityWithMode(LaunchMode.INITIAL_SETUP)
@@ -85,16 +100,14 @@ class OnboardingActivityTest : BaseAndroidTest() {
                 ViewMatchers.withText("Maps"),
                 ViewMatchers.isDescendantOfA(ViewMatchers.withId(R.id.selection_chip_group))
             )
-        )
-            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        ).check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
 
         Espresso.onView(
             Matchers.allOf(
                 ViewMatchers.withText("Maps"),
                 ViewMatchers.isDescendantOfA(ViewMatchers.withId(R.id.selection_chip_group))
             )
-        )
-            .perform(EspressoTestUtils.clickOnChipCloseIcon())
+        ).perform(EspressoTestUtils.clickOnChipCloseIcon())
 
         Espresso.onView(ViewMatchers.withId(R.id.chips_scroll_view))
             .check(ViewAssertions.matches(Matchers.not(ViewMatchers.isDisplayed())))
@@ -104,15 +117,16 @@ class OnboardingActivityTest : BaseAndroidTest() {
     fun doneButton_savesFavoritesAndFinishesActivity() = testCoroutineRule.runTestAndLaunchUI {
         // Arrange
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
-        (getOnboardingAppsUseCase as FakeGetOnboardingAppsUseCaseRepository).mutableOnboardingAppsFlow.value = testApps
+        val fakeInstalledApps = installedAppsRepository as FakeInstalledAppsRepository
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            fakeInstalledApps.appsFlow.value = testApps
+        }
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Act
         val scenario = launchActivityWithMode(LaunchMode.EDIT_FAVORITES)
-        scenario.onActivity { activity ->
-            (activity as OnboardingActivity).viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
-            (activity as OnboardingActivity).viewModel.loadInitialData()
-        }
-        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         // Execute
         Espresso.onView(ViewMatchers.withId(R.id.all_apps_recycler_view)).perform(
@@ -127,10 +141,7 @@ class OnboardingActivityTest : BaseAndroidTest() {
         )
 
         Espresso.onView(ViewMatchers.withId(R.id.done_button)).perform(ViewActions.click())
-
-
         testCoroutineRule.awaitAll()
-
 
         // Assert
         val expectedFavorites = setOf(
