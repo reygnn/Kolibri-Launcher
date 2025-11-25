@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -7,15 +7,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -61,7 +58,7 @@ class AppNamesManagerTest {
 
         val displayName = appNamesManager.getDisplayNameForPackage(packageName, "Original Name")
 
-        assertEquals(customName, displayName)
+        Assert.assertEquals(customName, displayName)
     }
 
     @Test
@@ -73,7 +70,7 @@ class AppNamesManagerTest {
 
         val displayName = appNamesManager.getDisplayNameForPackage(packageName, originalName)
 
-        assertEquals(originalName, displayName)
+        Assert.assertEquals(originalName, displayName)
     }
 
     @Test
@@ -82,7 +79,7 @@ class AppNamesManagerTest {
 
         val result = appNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
     }
 
@@ -93,7 +90,7 @@ class AppNamesManagerTest {
 
         val result = appNamesManager.setCustomNameForPackage(packageName, "  ")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
     }
 
@@ -104,7 +101,7 @@ class AppNamesManagerTest {
         val testPreferences = preferencesOf(nameKey to "Some Name")
         whenever(mockDataStore.data).thenReturn(flowOf(testPreferences))
 
-        assertTrue(appNamesManager.hasCustomNameForPackage(packageName))
+        Assert.assertTrue(appNamesManager.hasCustomNameForPackage(packageName))
     }
 
     @Test
@@ -112,7 +109,7 @@ class AppNamesManagerTest {
         val packageName = "com.test.app"
         whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
 
-        assertFalse(appNamesManager.hasCustomNameForPackage(packageName))
+        Assert.assertFalse(appNamesManager.hasCustomNameForPackage(packageName))
     }
 
     @Test
@@ -123,7 +120,7 @@ class AppNamesManagerTest {
 
         val result = appNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -142,32 +139,34 @@ class AppNamesManagerTest {
     }
 
     @Test
-    fun `getDisplayNameForPackage - when DataStore throws IOException - returns original name`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw IOException("Disk error")
-        })
+    fun `getDisplayNameForPackage - when DataStore throws IOException - returns original name`() =
+        runTest {
+            // Arrange
+            whenever(mockDataStore.data).thenReturn(flow {
+                throw IOException("Disk error")
+            })
 
-        // Act
-        val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
+            // Act
+            val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
 
-        // Assert
-        assertEquals("Original", result)
-    }
+            // Assert
+            Assert.assertEquals("Original", result)
+        }
 
     @Test
-    fun `getDisplayNameForPackage - when DataStore throws RuntimeException - returns original name`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw RuntimeException("Corrupted data")
-        })
+    fun `getDisplayNameForPackage - when DataStore throws RuntimeException - returns original name`() =
+        runTest {
+            // Arrange
+            whenever(mockDataStore.data).thenReturn(flow {
+                throw RuntimeException("Corrupted data")
+            })
 
-        // Act
-        val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
+            // Act
+            val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
 
-        // Assert
-        assertEquals("Original", result)
-    }
+            // Assert
+            Assert.assertEquals("Original", result)
+        }
 
     @Test
     fun `hasCustomNameForPackage - when DataStore corrupted - returns false`() = runTest {
@@ -180,7 +179,7 @@ class AppNamesManagerTest {
         val result = appNamesManager.hasCustomNameForPackage("com.test.app")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -194,7 +193,7 @@ class AppNamesManagerTest {
         val result = appNamesManager.removeCustomNameForPackage("com.test.app")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test

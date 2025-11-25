@@ -1,11 +1,13 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.fakes.FakeAppNamesRepository
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.ReactiveFakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
@@ -61,13 +63,13 @@ class AppNamesViewModelTest {
             fakeInstalledAppsRepository.triggerAppsUpdate()
 
             val state = awaitItem()
-            assertThat(state.displayedApps).hasSize(3)
-            assertThat(state.displayedApps.map { it.displayName }).containsExactly(
+            Truth.assertThat(state.displayedApps).hasSize(3)
+            Truth.assertThat(state.displayedApps.map { it.displayName }).containsExactly(
                 "Calculator", "Clock", "My Camera"
             ).inOrder()
 
-            assertThat(state.appsWithCustomNames).hasSize(1)
-            assertThat(state.appsWithCustomNames.first().displayName).isEqualTo("My Camera")
+            Truth.assertThat(state.appsWithCustomNames).hasSize(1)
+            Truth.assertThat(state.appsWithCustomNames.first().displayName).isEqualTo("My Camera")
         }
     }
 
@@ -83,17 +85,19 @@ class AppNamesViewModelTest {
             fakeInstalledAppsRepository.triggerAppsUpdate()
 
             val loadedState = awaitItem()
-            assertThat(loadedState.displayedApps).hasSize(3)
-            assertThat(loadedState.appsWithCustomNames).isEmpty()
+            Truth.assertThat(loadedState.displayedApps).hasSize(3)
+            Truth.assertThat(loadedState.appsWithCustomNames).isEmpty()
 
             viewModel.setCustomName("com.android.clock", "World Clock")
 
             val finalState = awaitItem()
 
-            assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock")).isTrue()
-            assertThat(finalState.appsWithCustomNames).hasSize(1)
-            assertThat(finalState.appsWithCustomNames.first().displayName).isEqualTo("World Clock")
-            assertThat(finalState.displayedApps.map { it.displayName }).containsExactly(
+            Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock"))
+                .isTrue()
+            Truth.assertThat(finalState.appsWithCustomNames).hasSize(1)
+            Truth.assertThat(finalState.appsWithCustomNames.first().displayName)
+                .isEqualTo("World Clock")
+            Truth.assertThat(finalState.displayedApps.map { it.displayName }).containsExactly(
                 "Calculator", "Camera", "World Clock"
             ).inOrder()
         }
@@ -107,6 +111,7 @@ class AppNamesViewModelTest {
             override fun getInstalledApps() = flow<List<AppInfo>> {
                 throw IOException("Cannot load apps")
             }
+
             override suspend fun triggerAppsUpdate() {}
             override suspend fun purgeRepository() {}
         }
@@ -131,6 +136,7 @@ class AppNamesViewModelTest {
             override fun getInstalledApps() = flow<List<AppInfo>> {
                 throw RuntimeException("Database corrupted")
             }
+
             override suspend fun triggerAppsUpdate() {}
             override suspend fun purgeRepository() {}
         }
@@ -205,7 +211,7 @@ class AppNamesViewModelTest {
             viewModel.setCustomName("com.android.clock", "")
 
             val state = awaitItem()
-            assertThat(state.appsWithCustomNames).isEmpty()
+            Truth.assertThat(state.appsWithCustomNames).isEmpty()
         }
     }
 
@@ -230,7 +236,7 @@ class AppNamesViewModelTest {
             viewModel.setCustomName("com.android.clock", "Name3")
             val finalState = awaitItem()
 
-            assertThat(finalState.appsWithCustomNames.first().displayName).isEqualTo("Name3")
+            Truth.assertThat(finalState.appsWithCustomNames.first().displayName).isEqualTo("Name3")
         }
     }
 
@@ -270,7 +276,7 @@ class AppNamesViewModelTest {
             viewModel.setCustomName("com.android.clock", longName)
 
             val state = awaitItem()
-            assertThat(state.appsWithCustomNames.first().displayName).isEqualTo(longName)
+            Truth.assertThat(state.appsWithCustomNames.first().displayName).isEqualTo(longName)
         }
     }
 
@@ -280,7 +286,7 @@ class AppNamesViewModelTest {
     fun `getAllCustomNames - returns empty map when no names set`() = runTest {
         val result = fakeAppNamesRepository.getAllCustomNames()
 
-        assertThat(result).isEmpty()
+        Truth.assertThat(result).isEmpty()
     }
 
     @Test
@@ -290,9 +296,9 @@ class AppNamesViewModelTest {
 
         val result = fakeAppNamesRepository.getAllCustomNames()
 
-        assertThat(result).hasSize(2)
-        assertThat(result).containsEntry("com.android.clock", "My Clock")
-        assertThat(result).containsEntry("com.android.camera", "My Camera")
+        Truth.assertThat(result).hasSize(2)
+        Truth.assertThat(result).containsEntry("com.android.clock", "My Clock")
+        Truth.assertThat(result).containsEntry("com.android.camera", "My Camera")
     }
 
     @Test
@@ -305,10 +311,13 @@ class AppNamesViewModelTest {
 
         val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
 
-        assertThat(success).isTrue()
-        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock")).isTrue()
-        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.camera")).isTrue()
-        assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.calculator")).isTrue()
+        Truth.assertThat(success).isTrue()
+        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock"))
+            .isTrue()
+        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.camera"))
+            .isTrue()
+        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.calculator"))
+            .isTrue()
     }
 
     @Test
@@ -327,7 +336,7 @@ class AppNamesViewModelTest {
         fakeAppNamesRepository.setCustomNamesInBatch(names)
 
         // Should trigger only once, not 3 times
-        assertThat(triggerCount).isEqualTo(1)
+        Truth.assertThat(triggerCount).isEqualTo(1)
     }
 
     @Test
@@ -339,8 +348,8 @@ class AppNamesViewModelTest {
 
         val success = fakeAppNamesRepository.setCustomNamesInBatch(emptyMap())
 
-        assertThat(success).isTrue()
-        assertThat(triggerCount).isEqualTo(0) // Empty batch should not trigger
+        Truth.assertThat(success).isTrue()
+        Truth.assertThat(triggerCount).isEqualTo(0) // Empty batch should not trigger
     }
 
     @Test
@@ -350,8 +359,9 @@ class AppNamesViewModelTest {
         val names = mapOf("com.android.clock" to "New Name")
         fakeAppNamesRepository.setCustomNamesInBatch(names)
 
-        val displayName = fakeAppNamesRepository.getDisplayNameForPackage("com.android.clock", "Clock")
-        assertThat(displayName).isEqualTo("New Name")
+        val displayName =
+            fakeAppNamesRepository.getDisplayNameForPackage("com.android.clock", "Clock")
+        Truth.assertThat(displayName).isEqualTo("New Name")
     }
 
     @Test
@@ -361,7 +371,7 @@ class AppNamesViewModelTest {
         val names = mapOf("com.android.clock" to "Name")
         val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
 
-        assertThat(success).isFalse()
+        Truth.assertThat(success).isFalse()
     }
 
     @Test
@@ -375,6 +385,6 @@ class AppNamesViewModelTest {
         fakeAppNamesRepository.setCustomNamesInBatch(names)
 
         val result = fakeAppNamesRepository.getAllCustomNames()
-        assertThat(result).isEqualTo(names)
+        Truth.assertThat(result).isEqualTo(names)
     }
 }

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.content.Intent
@@ -8,8 +8,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
-import com.github.reygnn.kolibri_launcher.data.ShortcutManager
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -30,9 +29,12 @@ class ShortcutManagerTest {
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
 
-    @Mock private lateinit var context: Context
-    @Mock private lateinit var launcherApps: LauncherApps
-    @Mock private lateinit var packageManager: PackageManager
+    @Mock
+    private lateinit var context: Context
+    @Mock
+    private lateinit var launcherApps: LauncherApps
+    @Mock
+    private lateinit var packageManager: PackageManager
 
     private lateinit var shortcutManager: ShortcutManager
 
@@ -79,7 +81,7 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -89,7 +91,7 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -99,7 +101,7 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -113,7 +115,7 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -125,21 +127,21 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
     fun `getShortcutsForPackage - with empty package name - returns empty list`() {
         val result = shortcutManager.getShortcutsForPackage("")
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
     fun `getShortcutsForPackage - with blank package name - returns empty list`() {
         val result = shortcutManager.getShortcutsForPackage("   ")
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -149,7 +151,7 @@ class ShortcutManagerTest {
         val managerWithNullService = ShortcutManager(context)
         val result = managerWithNullService.getShortcutsForPackage("com.test.app")
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -196,7 +198,7 @@ class ShortcutManagerTest {
 
         val result = shortcutManager.getShortcutsForPackage(packageName)
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -228,7 +230,7 @@ class ShortcutManagerTest {
             .thenReturn(fakeShortcuts)
 
         val result1 = shortcutManager.getShortcutsForPackage(packageName)
-        assertTrue(result1.isEmpty())
+        Assert.assertTrue(result1.isEmpty())
 
         val result2 = shortcutManager.getShortcutsForPackage(packageName)
         assertEquals(1, result2.size)

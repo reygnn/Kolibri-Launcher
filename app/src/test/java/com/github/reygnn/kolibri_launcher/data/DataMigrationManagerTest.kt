@@ -1,18 +1,17 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
-import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
@@ -25,9 +24,12 @@ import kotlin.test.assertFailsWith
 
 class DataMigrationManagerTest {
 
-    @Mock private lateinit var context: Context
-    @Mock private lateinit var sharedPreferences: SharedPreferences
-    @Mock private lateinit var sharedPreferencesEditor: SharedPreferences.Editor
+    @Mock
+    private lateinit var context: Context
+    @Mock
+    private lateinit var sharedPreferences: SharedPreferences
+    @Mock
+    private lateinit var sharedPreferencesEditor: SharedPreferences.Editor
 
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var dataMigrationManager: DataMigrationManager
@@ -41,9 +43,9 @@ class DataMigrationManagerTest {
         MockitoAnnotations.openMocks(this)
         fakeDataStore = FakeDataStore()
 
-        whenever(context.getSharedPreferences(eq(VERSION_PREFS_NAME), anyInt())).thenReturn(sharedPreferences)
+        whenever(context.getSharedPreferences(eq(VERSION_PREFS_NAME), ArgumentMatchers.anyInt())).thenReturn(sharedPreferences)
         whenever(sharedPreferences.edit()).thenReturn(sharedPreferencesEditor)
-        whenever(sharedPreferencesEditor.putInt(any(), anyInt())).thenReturn(sharedPreferencesEditor)
+        whenever(sharedPreferencesEditor.putInt(any(), ArgumentMatchers.anyInt())).thenReturn(sharedPreferencesEditor)
 
         dataMigrationManager = DataMigrationManager(context, fakeDataStore)
     }
@@ -51,49 +53,68 @@ class DataMigrationManagerTest {
     // ========== EXISTING TESTS ==========
 
     @Test
-    fun `runMigrationIfNeeded - when first installation - sets version without clearing`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
-        fakeDataStore.setInitialData(preferencesOf(stringPreferencesKey("some_key") to "some_value"))
+    fun `runMigrationIfNeeded - when first installation - sets version without clearing`() =
+        runTest {
+            whenever(
+                sharedPreferences.getInt(
+                    eq(KEY_DATA_VERSION),
+                    ArgumentMatchers.anyInt()
+                )
+            ).thenReturn(0)
+            fakeDataStore.setInitialData(preferencesOf(stringPreferencesKey("some_key") to "some_value"))
 
-        dataMigrationManager.runMigrationIfNeeded()
+            dataMigrationManager.runMigrationIfNeeded()
 
-        val data = fakeDataStore.data.first()
-        assertFalse("DataStore should not be cleared on first installation", data.asMap().isEmpty())
+            val data = fakeDataStore.data.first()
+            Assert.assertFalse(
+                "DataStore should not be cleared on first installation",
+                data.asMap().isEmpty()
+            )
 
-        verify(sharedPreferencesEditor).putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION))
-        verify(sharedPreferencesEditor).apply()
-    }
+            verify(sharedPreferencesEditor).putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION))
+            verify(sharedPreferencesEditor).apply()
+        }
 
     @Test
     fun `runMigrationIfNeeded - when version is current - does nothing`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(TARGET_DATA_VERSION)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(TARGET_DATA_VERSION)
         fakeDataStore.setInitialData(preferencesOf(stringPreferencesKey("some_key") to "some_value"))
 
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        assertFalse(data.asMap().isEmpty())
+        Assert.assertFalse(data.asMap().isEmpty())
 
-        verify(sharedPreferencesEditor, never()).putInt(any(), anyInt())
+        verify(sharedPreferencesEditor, never()).putInt(any(), ArgumentMatchers.anyInt())
     }
 
     @Test
     fun `isFirstLaunch - returns true when version is old`() {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
-        assertTrue(dataMigrationManager.isFirstLaunch())
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(0)
+        Assert.assertTrue(dataMigrationManager.isFirstLaunch())
     }
 
     @Test
     fun `isFirstLaunch - returns false when version is current`() {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(TARGET_DATA_VERSION)
-        assertFalse(dataMigrationManager.isFirstLaunch())
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION)
+        Assert.assertFalse(dataMigrationManager.isFirstLaunch())
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
 
     @Test
     fun `runMigrationIfNeeded - when DataStore clear fails - still updates version`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(0)
         fakeDataStore.makeEditFail()
 
         // Should not crash
@@ -104,7 +125,12 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - when SharedPreferences edit fails - does not crash`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(0)
         whenever(sharedPreferencesEditor.apply()).doAnswer {
             throw RuntimeException("Cannot write preferences")
         }
@@ -115,8 +141,13 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - when SharedPreferences putInt fails - does not crash`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
-        whenever(sharedPreferencesEditor.putInt(any(), anyInt())).doAnswer {
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(0)
+        whenever(sharedPreferencesEditor.putInt(any(), ArgumentMatchers.anyInt())).doAnswer {
             throw RuntimeException("Cannot put int")
         }
 
@@ -126,7 +157,12 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - when CancellationException - propagates it`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(-1)  // ✅ Alte Version, nicht 0!
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(-1)  // ✅ Alte Version, nicht 0!
         fakeDataStore.makeCancellable()
 
         assertFailsWith<CancellationException> {
@@ -136,29 +172,29 @@ class DataMigrationManagerTest {
 
     @Test
     fun `isFirstLaunch - when SharedPreferences throws exception - returns true`() {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).doAnswer {
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).doAnswer {
             throw RuntimeException("Cannot read preferences")
         }
 
         // Should default to true (safe fallback)
         val result = dataMigrationManager.isFirstLaunch()
 
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 
     @Test
     fun `isFirstLaunch - when SharedPreferences is null - returns true`() {
-        whenever(context.getSharedPreferences(eq(VERSION_PREFS_NAME), anyInt())).thenReturn(null)
+        whenever(context.getSharedPreferences(eq(VERSION_PREFS_NAME), ArgumentMatchers.anyInt())).thenReturn(null)
         val managerWithNullPrefs = DataMigrationManager(context, fakeDataStore)
 
         val result = managerWithNullPrefs.isFirstLaunch()
 
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 
     @Test
     fun `runMigrationIfNeeded - called multiple times - only migrates once`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt()))
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt()))
             .thenReturn(0)
             .thenReturn(TARGET_DATA_VERSION)
 
@@ -171,7 +207,12 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - with negative version number - treats as old version`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(-1)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(-1)
 
         dataMigrationManager.runMigrationIfNeeded()
 
@@ -180,34 +221,44 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - with very high version number - does nothing`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(999)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(999)
         fakeDataStore.setInitialData(preferencesOf(stringPreferencesKey("key") to "value"))
 
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        assertFalse(data.asMap().isEmpty())
+        Assert.assertFalse(data.asMap().isEmpty())
 
-        verify(sharedPreferencesEditor, never()).putInt(any(), anyInt())
+        verify(sharedPreferencesEditor, never()).putInt(any(), ArgumentMatchers.anyInt())
     }
 
     @Test
     fun `isFirstLaunch - with version equals to target - returns false`() {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(TARGET_DATA_VERSION)
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION)
 
-        assertFalse(dataMigrationManager.isFirstLaunch())
+        Assert.assertFalse(dataMigrationManager.isFirstLaunch())
     }
 
     @Test
     fun `isFirstLaunch - with version higher than target - returns false`() {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(TARGET_DATA_VERSION + 1)
+        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION + 1)
 
-        assertFalse(dataMigrationManager.isFirstLaunch())
+        Assert.assertFalse(dataMigrationManager.isFirstLaunch())
     }
 
     @Test
     fun `runMigrationIfNeeded - when DataStore has no data - still sets version`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(0)
         // fakeDataStore is empty by default
 
         dataMigrationManager.runMigrationIfNeeded()
@@ -218,7 +269,12 @@ class DataMigrationManagerTest {
 
     @Test
     fun `runMigrationIfNeeded - when DataStore read fails - still updates version`() = runTest {
-        whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), anyInt())).thenReturn(0)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(0)
         fakeDataStore.makeReadFail()
 
         // Should not crash

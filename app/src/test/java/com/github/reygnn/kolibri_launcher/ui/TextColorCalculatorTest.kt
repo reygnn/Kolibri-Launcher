@@ -1,11 +1,12 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import com.github.reygnn.kolibri_launcher.core.TextColorCalculator
-import org.junit.Assert.assertEquals
+import org.junit.Assert
 import org.junit.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
@@ -20,7 +21,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.BLACK
         val expectedTextColor = Color.WHITE
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -28,7 +29,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.WHITE
         val expectedTextColor = Color.BLACK
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -36,7 +37,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.RED
         val expectedTextColor = Color.WHITE
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -44,7 +45,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.GREEN
         val expectedTextColor = Color.BLACK
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -52,7 +53,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.BLUE
         val expectedTextColor = Color.WHITE
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -60,7 +61,7 @@ class TextColorCalculatorTest {
         val backgroundColor = Color.YELLOW
         val expectedTextColor = Color.BLACK
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     @Test
@@ -69,7 +70,7 @@ class TextColorCalculatorTest {
         val backgroundColor = 0xFF646464.toInt()
         val expectedTextColor = Color.WHITE
         val actualTextColor = TextColorCalculator.getOptimalTextColor(backgroundColor)
-        assertEquals(expectedTextColor, actualTextColor)
+        Assert.assertEquals(expectedTextColor, actualTextColor)
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -83,7 +84,7 @@ class TextColorCalculatorTest {
 
         assertNotNull(result)
         // Transparent white should be treated as bright (luminance calculation ignores alpha)
-        assertEquals(Color.BLACK, result)
+        Assert.assertEquals(Color.BLACK, result)
     }
 
     @Test
@@ -94,7 +95,7 @@ class TextColorCalculatorTest {
         val result = TextColorCalculator.getOptimalTextColor(semiTransparentDark)
 
         assertNotNull(result)
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
@@ -105,7 +106,7 @@ class TextColorCalculatorTest {
         val result = TextColorCalculator.getOptimalTextColor(semiTransparentBright)
 
         assertNotNull(result)
-        assertEquals(Color.BLACK, result)
+        Assert.assertEquals(Color.BLACK, result)
     }
 
     @Test
@@ -113,7 +114,7 @@ class TextColorCalculatorTest {
         val result = TextColorCalculator.getOptimalTextColor(0)
 
         // 0 is transparent black, should be treated as dark
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
@@ -121,7 +122,7 @@ class TextColorCalculatorTest {
         val result = TextColorCalculator.getOptimalTextColor(-1)
 
         // -1 is opaque white in Android
-        assertEquals(Color.BLACK, result)
+        Assert.assertEquals(Color.BLACK, result)
     }
 
     @Test
@@ -147,7 +148,7 @@ class TextColorCalculatorTest {
 
         val result = TextColorCalculator.getOptimalTextColor(black)
 
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
@@ -157,7 +158,7 @@ class TextColorCalculatorTest {
 
         val result = TextColorCalculator.getOptimalTextColor(white)
 
-        assertEquals(Color.BLACK, result)
+        Assert.assertEquals(Color.BLACK, result)
     }
 
     @Test
@@ -179,7 +180,7 @@ class TextColorCalculatorTest {
 
         val result = TextColorCalculator.getOptimalTextColor(darkRed)
 
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
@@ -189,7 +190,7 @@ class TextColorCalculatorTest {
 
         val result = TextColorCalculator.getOptimalTextColor(brightCyan)
 
-        assertEquals(Color.BLACK, result)
+        Assert.assertEquals(Color.BLACK, result)
     }
 
     @Test
@@ -201,8 +202,8 @@ class TextColorCalculatorTest {
         val result2 = TextColorCalculator.getOptimalTextColor(testColor)
         val result3 = TextColorCalculator.getOptimalTextColor(testColor)
 
-        assertEquals(result1, result2)
-        assertEquals(result2, result3)
+        Assert.assertEquals(result1, result2)
+        Assert.assertEquals(result2, result3)
     }
 
     @Test
@@ -213,21 +214,21 @@ class TextColorCalculatorTest {
 
         assertNotNull(result)
         // Should return WHITE for dark blue
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
     fun `getOptimalTextColorForWallpaper - with drawable that throws on draw - returns WHITE`() {
         val mockDrawable = mock<Drawable>()
         whenever(mockDrawable.setBounds(0, 0, 50, 50)).thenAnswer { }
-        whenever(mockDrawable.draw(org.mockito.kotlin.any())).doAnswer {
+        whenever(mockDrawable.draw(any())).doAnswer {
             throw RuntimeException("Cannot draw")
         }
 
         val result = TextColorCalculator.getOptimalTextColorForWallpaper(mockDrawable)
 
         // Should fallback to WHITE on error
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test
@@ -239,7 +240,7 @@ class TextColorCalculatorTest {
 
         val result = TextColorCalculator.getOptimalTextColorForWallpaper(mockDrawable)
 
-        assertEquals(Color.WHITE, result)
+        Assert.assertEquals(Color.WHITE, result)
     }
 
     @Test

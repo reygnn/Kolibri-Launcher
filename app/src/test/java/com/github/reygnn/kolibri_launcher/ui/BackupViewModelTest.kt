@@ -1,13 +1,14 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeBackupRepository
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupState
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupViewModel
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -42,11 +43,11 @@ class BackupViewModelTest {
             fakeBackupRepository.exportSuccess = true
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.exportBackup(mockUriString) // Übergabe als String
 
                 // 'Loading' wird übersprungen (korrektes Testverhalten)
-                assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
             }
         }
 
@@ -57,11 +58,11 @@ class BackupViewModelTest {
             fakeBackupRepository.exportSuccess = false
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.exportBackup(mockUriString)
 
                 val errorState = awaitItem() as BackupState.Error
-                assertThat(errorState.message).isEqualTo("Export failed")
+                Truth.assertThat(errorState.message).isEqualTo("Export failed")
             }
         }
 
@@ -72,11 +73,11 @@ class BackupViewModelTest {
             fakeBackupRepository.shouldThrowOnExport = true
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.exportBackup(mockUriString)
 
                 val errorState = awaitItem() as BackupState.Error
-                assertThat(errorState.message).contains("Simulated")
+                Truth.assertThat(errorState.message).contains("Simulated")
             }
         }
 
@@ -94,13 +95,13 @@ class BackupViewModelTest {
             )
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.importBackup(mockUriString, options)
 
                 val successState = awaitItem() as BackupState.ImportSuccess
-                assertThat(successState.importedCount).isEqualTo(5)
-                assertThat(successState.skippedCount).isEqualTo(2)
-                assertThat(successState.missingApps).hasSize(1)
+                Truth.assertThat(successState.importedCount).isEqualTo(5)
+                Truth.assertThat(successState.skippedCount).isEqualTo(2)
+                Truth.assertThat(successState.missingApps).hasSize(1)
             }
         }
 
@@ -114,11 +115,11 @@ class BackupViewModelTest {
             fakeBackupRepository.importResult = ImportResult.UnsupportedVersion("2.0.0")
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.importBackup(mockUriString, options)
 
                 val versionState = awaitItem() as BackupState.UnsupportedVersion
-                assertThat(versionState.version).isEqualTo("2.0.0")
+                Truth.assertThat(versionState.version).isEqualTo("2.0.0")
             }
         }
 
@@ -133,12 +134,12 @@ class BackupViewModelTest {
             )
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.importBackup(mockUriString, options)
 
                 val limitState = awaitItem() as BackupState.LimitExceeded
-                assertThat(limitState.packageCount).isEqualTo(10)
-                assertThat(limitState.limit).isEqualTo(8)
+                Truth.assertThat(limitState.packageCount).isEqualTo(10)
+                Truth.assertThat(limitState.limit).isEqualTo(8)
             }
         }
 
@@ -150,10 +151,10 @@ class BackupViewModelTest {
             fakeBackupRepository.importResult = ImportResult.InvalidFormat
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.importBackup(mockUriString, options)
 
-                assertThat(awaitItem()).isEqualTo(BackupState.InvalidFormat)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.InvalidFormat)
             }
         }
 
@@ -164,11 +165,11 @@ class BackupViewModelTest {
         fakeBackupRepository.importResult = ImportResult.Error("Custom error message")
 
         viewModel.backupState.test {
-            assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+            Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
             viewModel.importBackup(mockUriString, options)
 
             val errorState = awaitItem() as BackupState.Error
-            assertThat(errorState.message).isEqualTo("Custom error message")
+            Truth.assertThat(errorState.message).isEqualTo("Custom error message")
         }
     }
 
@@ -180,11 +181,11 @@ class BackupViewModelTest {
             fakeBackupRepository.shouldThrowOnImport = true
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 viewModel.importBackup(mockUriString, options)
 
                 val errorState = awaitItem() as BackupState.Error
-                assertThat(errorState.message).contains("Simulated")
+                Truth.assertThat(errorState.message).contains("Simulated")
             }
         }
 
@@ -213,16 +214,16 @@ class BackupViewModelTest {
             fakeBackupRepository.previewResult = expectedPreview
 
             viewModel.backupPreview.test {
-                assertThat(awaitItem()).isNull()
+                Truth.assertThat(awaitItem()).isNull()
                 viewModel.previewBackup(mockUriString)
                 val preview = awaitItem()
-                assertThat(preview).isNotNull()
-                assertThat(preview?.favoriteCount).isEqualTo(5)
-                assertThat(preview?.hasSwipeLeft).isTrue()
-                assertThat(preview?.hasSwipeRight).isFalse()
-                assertThat(preview?.hasThemeSettings).isTrue()
-                assertThat(preview?.hasGestureSettings).isTrue()
-                assertThat(preview?.hasQualityOfLife).isTrue()
+                Truth.assertThat(preview).isNotNull()
+                Truth.assertThat(preview?.favoriteCount).isEqualTo(5)
+                Truth.assertThat(preview?.hasSwipeLeft).isTrue()
+                Truth.assertThat(preview?.hasSwipeRight).isFalse()
+                Truth.assertThat(preview?.hasThemeSettings).isTrue()
+                Truth.assertThat(preview?.hasGestureSettings).isTrue()
+                Truth.assertThat(preview?.hasQualityOfLife).isTrue()
             }
         }
 
@@ -232,7 +233,7 @@ class BackupViewModelTest {
         fakeBackupRepository.previewResult = null
 
         viewModel.backupPreview.test {
-            assertThat(awaitItem()).isNull()
+            Truth.assertThat(awaitItem()).isNull()
             viewModel.previewBackup(mockUriString)
             expectNoEvents() // Bleibt null
         }
@@ -245,7 +246,7 @@ class BackupViewModelTest {
             fakeBackupRepository.shouldThrowOnPreview = true
 
             viewModel.backupPreview.test {
-                assertThat(awaitItem()).isNull()
+                Truth.assertThat(awaitItem()).isNull()
                 viewModel.previewBackup(mockUriString)
                 expectNoEvents() // Bleibt null
             }
@@ -263,9 +264,9 @@ class BackupViewModelTest {
 
         // Act & Assert
         viewModel.backupState.test {
-            assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
+            Truth.assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
             viewModel.resetBackupState()
-            assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+            Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
         }
     }
 
@@ -294,9 +295,9 @@ class BackupViewModelTest {
 
         // Act & Assert
         viewModel.backupPreview.test {
-            assertThat(awaitItem()).isEqualTo(preview)
+            Truth.assertThat(awaitItem()).isEqualTo(preview)
             viewModel.resetBackupState()
-            assertThat(awaitItem()).isNull()
+            Truth.assertThat(awaitItem()).isNull()
         }
     }
 
@@ -309,19 +310,19 @@ class BackupViewModelTest {
             fakeBackupRepository.exportSuccess = true
 
             viewModel.backupState.test {
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
                 // Export
                 viewModel.exportBackup(mockUriString)
-                assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.ExportSuccess)
 
                 // Reset
                 viewModel.resetBackupState()
-                assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
 
                 // Import
                 fakeBackupRepository.importResult = ImportResult.Success(1, 0, emptySet())
                 viewModel.importBackup(mockUriString, ImportOptions())
-                assertThat(awaitItem()).isInstanceOf(BackupState.ImportSuccess::class.java)
+                Truth.assertThat(awaitItem()).isInstanceOf(BackupState.ImportSuccess::class.java)
             }
         }
 
@@ -340,13 +341,10 @@ class BackupViewModelTest {
             viewModel.importBackup(mockUriString, options)
 
             // Verify options were passed to repository
-            assertThat(fakeBackupRepository.lastOptions).isNotNull()
-            assertThat(fakeBackupRepository.lastOptions?.importFavorites).isTrue()
-            assertThat(fakeBackupRepository.lastOptions?.importOrder).isFalse()
-            assertThat(fakeBackupRepository.lastOptions?.importHiddenApps).isTrue()
-            assertThat(fakeBackupRepository.lastOptions?.importCustomNames).isFalse()
+            Truth.assertThat(fakeBackupRepository.lastOptions).isNotNull()
+            Truth.assertThat(fakeBackupRepository.lastOptions?.importFavorites).isTrue()
+            Truth.assertThat(fakeBackupRepository.lastOptions?.importOrder).isFalse()
+            Truth.assertThat(fakeBackupRepository.lastOptions?.importHiddenApps).isTrue()
+            Truth.assertThat(fakeBackupRepository.lastOptions?.importCustomNames).isFalse()
         }
 }
-
-// ========== FAKE REPOSITORY (Angepasst an String-Interface) ==========
-

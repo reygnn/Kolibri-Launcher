@@ -1,30 +1,29 @@
-package com.github.reygnn.kolibri_launcher
-
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.graphics.Color
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
-import com.github.reygnn.kolibri_launcher.data.BackupManager
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
+import com.github.reygnn.kolibri_launcher.fakes.FakeAppNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.fakes.StaticFakeInstalledAppsRepository
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.Mockito.mock
-
+import org.mockito.Mockito
 
 /**
  * Unit-Test für den BackupManager.
@@ -60,7 +59,7 @@ class BackupManagerTest {
 
     @Before
     fun setUp() {
-        mockContext = mock(Context::class.java)
+        mockContext = Mockito.mock(Context::class.java)
         fakeInstalledAppsRepo = StaticFakeInstalledAppsRepository()
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
@@ -89,22 +88,22 @@ class BackupManagerTest {
 
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.version).isEqualTo("1.0.0")
-        assertThat(backup.timestamp).isGreaterThan(0L)
-        assertThat(backup.settings.favoriteComponents).isEmpty()
-        assertThat(backup.settings.favoritesOrder).isEmpty()
-        assertThat(backup.settings.hiddenComponents).isEmpty()
-        assertThat(backup.settings.customAppNames).isEmpty()
-        assertThat(backup.settings.swipeLeftApp).isNull()
-        assertThat(backup.settings.swipeRightApp).isNull()
-        assertThat(backup.settings.textColor).isEqualTo(0)
-        assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
-        assertThat(backup.settings.textShadowEnabled).isTrue()
-        assertThat(backup.settings.doubleTapToLockEnabled).isFalse()
-        assertThat(backup.settings.swipeDownToNotificationsEnabled).isFalse()
-        assertThat(backup.settings.autoShowKeyboard).isFalse()
-        assertThat(backup.settings.autoLaunchApp).isFalse()
-        assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
+        Truth.assertThat(backup.version).isEqualTo("1.0.0")
+        Truth.assertThat(backup.timestamp).isGreaterThan(0L)
+        Truth.assertThat(backup.settings.favoriteComponents).isEmpty()
+        Truth.assertThat(backup.settings.favoritesOrder).isEmpty()
+        Truth.assertThat(backup.settings.hiddenComponents).isEmpty()
+        Truth.assertThat(backup.settings.customAppNames).isEmpty()
+        Truth.assertThat(backup.settings.swipeLeftApp).isNull()
+        Truth.assertThat(backup.settings.swipeRightApp).isNull()
+        Truth.assertThat(backup.settings.textColor).isEqualTo(0)
+        Truth.assertThat(backup.settings.chipBackgroundColor).isEqualTo(0)
+        Truth.assertThat(backup.settings.textShadowEnabled).isTrue()
+        Truth.assertThat(backup.settings.doubleTapToLockEnabled).isFalse()
+        Truth.assertThat(backup.settings.swipeDownToNotificationsEnabled).isFalse()
+        Truth.assertThat(backup.settings.autoShowKeyboard).isFalse()
+        Truth.assertThat(backup.settings.autoLaunchApp).isFalse()
+        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -134,11 +133,11 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.doubleTap).isTrue()
-        assertThat(fakeSettingsRepo.swipeDown).isTrue()
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
-        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
 
     @Test
@@ -171,12 +170,12 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
-        assertThat(fakeSettingsRepo.shadow).isFalse()
-        assertThat(fakeSettingsRepo.doubleTap).isFalse()
-        assertThat(fakeSettingsRepo.swipeDown).isFalse()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
+        Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isFalse()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
     @Test
@@ -189,8 +188,8 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.favoriteComponents).hasSize(2)
-        assertThat(backup.settings.favoriteComponents).containsExactly(
+        Truth.assertThat(backup.settings.favoriteComponents).hasSize(2)
+        Truth.assertThat(backup.settings.favoriteComponents).containsExactly(
             "com.app1/com.app1.MainActivity",
             "com.app2/com.app2.MainActivity"
         )
@@ -206,7 +205,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.favoritesOrder).containsExactly(
+        Truth.assertThat(backup.settings.favoritesOrder).containsExactly(
             "com.app2/com.app2.MainActivity",
             "com.app1/com.app1.MainActivity"
         ).inOrder()
@@ -222,8 +221,8 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.hiddenComponents).hasSize(2)
-        assertThat(backup.settings.hiddenComponents).containsExactly(
+        Truth.assertThat(backup.settings.hiddenComponents).hasSize(2)
+        Truth.assertThat(backup.settings.hiddenComponents).containsExactly(
             "com.app3/com.app3.MainActivity",
             "com.app4/com.app4.MainActivity"
         )
@@ -241,9 +240,9 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.customAppNames).hasSize(2)
-        assertThat(backup.settings.customAppNames).containsEntry("com.app1", "Custom App 1")
-        assertThat(backup.settings.customAppNames).containsEntry("com.app2", "Custom App 2")
+        Truth.assertThat(backup.settings.customAppNames).hasSize(2)
+        Truth.assertThat(backup.settings.customAppNames).containsEntry("com.app1", "Custom App 1")
+        Truth.assertThat(backup.settings.customAppNames).containsEntry("com.app2", "Custom App 2")
     }
 
     @Test
@@ -254,8 +253,8 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
-        assertThat(backup.settings.swipeRightApp).isNull()
+        Truth.assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
+        Truth.assertThat(backup.settings.swipeRightApp).isNull()
     }
 
     @Test
@@ -266,8 +265,8 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.swipeLeftApp).isNull()
-        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
+        Truth.assertThat(backup.settings.swipeLeftApp).isNull()
+        Truth.assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
@@ -278,8 +277,8 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
-        assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
+        Truth.assertThat(backup.settings.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
+        Truth.assertThat(backup.settings.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
@@ -302,20 +301,20 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.favoriteComponents).hasSize(1)
-        assertThat(backup.settings.favoritesOrder).hasSize(1)
-        assertThat(backup.settings.hiddenComponents).hasSize(1)
-        assertThat(backup.settings.customAppNames).hasSize(1)
-        assertThat(backup.settings.swipeLeftApp).isNotNull()
-        assertThat(backup.settings.swipeRightApp).isNotNull()
-        assertThat(backup.settings.textColor).isEqualTo(Color.RED)
-        assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
-        assertThat(backup.settings.textShadowEnabled).isFalse()
-        assertThat(backup.settings.doubleTapToLockEnabled).isTrue()
-        assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
-        assertThat(backup.settings.autoShowKeyboard).isTrue()
-        assertThat(backup.settings.autoLaunchApp).isTrue()
-        assertThat(backup.settings.splitModeThreshold).isEqualTo(60)
+        Truth.assertThat(backup.settings.favoriteComponents).hasSize(1)
+        Truth.assertThat(backup.settings.favoritesOrder).hasSize(1)
+        Truth.assertThat(backup.settings.hiddenComponents).hasSize(1)
+        Truth.assertThat(backup.settings.customAppNames).hasSize(1)
+        Truth.assertThat(backup.settings.swipeLeftApp).isNotNull()
+        Truth.assertThat(backup.settings.swipeRightApp).isNotNull()
+        Truth.assertThat(backup.settings.textColor).isEqualTo(Color.RED)
+        Truth.assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
+        Truth.assertThat(backup.settings.textShadowEnabled).isFalse()
+        Truth.assertThat(backup.settings.doubleTapToLockEnabled).isTrue()
+        Truth.assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
+        Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
+        Truth.assertThat(backup.settings.autoLaunchApp).isTrue()
+        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(60)
     }
 
     @Test
@@ -327,9 +326,9 @@ class BackupManagerTest {
 
         val afterExport = System.currentTimeMillis()
 
-        assertThat(backup.timestamp).isAtLeast(beforeExport)
-        assertThat(backup.timestamp).isAtMost(afterExport)
-        assertThat(backup.timestamp).isGreaterThan(0L)
+        Truth.assertThat(backup.timestamp).isAtLeast(beforeExport)
+        Truth.assertThat(backup.timestamp).isAtMost(afterExport)
+        Truth.assertThat(backup.timestamp).isGreaterThan(0L)
     }
 
     @Test
@@ -339,7 +338,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.splitModeThreshold).isEqualTo(42)
+        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(42)
     }
 
     @Test
@@ -349,7 +348,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
+        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -359,7 +358,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.splitModeThreshold).isEqualTo(100)
+        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(100)
     }
 
     // ========== IMPORT TESTS - SELECTIVE ==========
@@ -386,7 +385,7 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Error::class.java)
     }
 
     @Test
@@ -419,14 +418,14 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-        assertThat(fakeFavoritesOrderRepo.order).isEmpty()
-        assertThat(fakeVisibilityRepo.hiddenApps).isEmpty()
-        assertThat(fakeNamesRepo.getAllCustomNames()).isEmpty()
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeFavoritesOrderRepo.order).isEmpty()
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).isEmpty()
+        Truth.assertThat(fakeNamesRepo.getAllCustomNames()).isEmpty()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
     }
 
     @Test
@@ -453,8 +452,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesOrderRepo.order).hasSize(1)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesOrderRepo.order).hasSize(1)
     }
 
     @Test
@@ -478,8 +477,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
     }
 
     @Test
@@ -503,9 +502,9 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
-        assertThat(fakeNamesRepo.batchSetCalled).isTrue()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
+        Truth.assertThat(fakeNamesRepo.batchSetCalled).isTrue()
     }
 
     @Test
@@ -533,10 +532,12 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesRepo.favorites).isEmpty()
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp)
+            .isEqualTo("com.app1/com.app1.MainActivity")
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp)
+            .isEqualTo("com.app2/com.app2.MainActivity")
     }
 
     @Test
@@ -565,13 +566,13 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
-        assertThat(fakeSettingsRepo.shadow).isFalse()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
+        Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
 
-        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
 
     @Test
@@ -602,10 +603,10 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
-        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
 
     @Test
@@ -631,16 +632,16 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         // Assert 1: Threshold sollte NICHT importiert worden sein (bleibt 0)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
 
         // Assert 2: Farbe sollte importiert worden sein (wird RED)
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
 
         // Assert 3: Favorit sollte importiert worden sein (da Option true und App installiert)
-        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
     }
 
     @Test
@@ -653,8 +654,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(512)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(512)
     }
 
     @Test
@@ -667,8 +668,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -686,11 +687,13 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
-        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp)
+            .isEqualTo("com.app2/com.app2.MainActivity")
+        Truth.assertThat(success.missingApps)
+            .contains("com.nonexistent/com.nonexistent.MainActivity")
     }
 
     @Test
@@ -708,11 +711,13 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
-        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp)
+            .isEqualTo("com.app1/com.app1.MainActivity")
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        Truth.assertThat(success.missingApps)
+            .contains("com.nonexistent/com.nonexistent.MainActivity")
     }
 
     @Test
@@ -728,11 +733,11 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
-        assertThat(success.missingApps).hasSize(2)
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        Truth.assertThat(success.missingApps).hasSize(2)
     }
 
     @Test
@@ -782,21 +787,21 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-        assertThat(fakeFavoritesOrderRepo.order).hasSize(1)
-        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
-        assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
-        assertThat(fakeSettingsRepo.shadow).isFalse()
-        assertThat(fakeSettingsRepo.doubleTap).isTrue()
-        assertThat(fakeSettingsRepo.swipeDown).isTrue()
-        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
-        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeFavoritesOrderRepo.order).hasSize(1)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
+        Truth.assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(1)
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
+        Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     // ========== VALIDATION TESTS ==========
@@ -809,8 +814,8 @@ class BackupManagerTest {
         val options = ImportOptions()
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.UnsupportedVersion::class.java)
-        assertThat((result as ImportResult.UnsupportedVersion).version).isEqualTo("2.0.0")
+        Truth.assertThat(result).isInstanceOf(ImportResult.UnsupportedVersion::class.java)
+        Truth.assertThat((result as ImportResult.UnsupportedVersion).version).isEqualTo("2.0.0")
     }
 
     @Test
@@ -820,7 +825,7 @@ class BackupManagerTest {
         val options = ImportOptions()
         val result = backupManager.importFromJson(invalidJson, options)
 
-        assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -836,10 +841,10 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.LimitExceeded::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.LimitExceeded::class.java)
         val limitExceeded = result as ImportResult.LimitExceeded
-        assertThat(limitExceeded.packageCount).isEqualTo(300)
-        assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+        Truth.assertThat(limitExceeded.packageCount).isEqualTo(300)
+        Truth.assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     @Test
@@ -859,13 +864,14 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(success.importedCount).isEqualTo(1)
-        assertThat(success.skippedCount).isEqualTo(1)
-        assertThat(success.missingApps).contains("com.nonexistent/com.nonexistent.MainActivity")
-        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-        assertThat(fakeFavoritesRepo.favorites).contains("com.app1/com.app1.MainActivity")
+        Truth.assertThat(success.importedCount).isEqualTo(1)
+        Truth.assertThat(success.skippedCount).isEqualTo(1)
+        Truth.assertThat(success.missingApps)
+            .contains("com.nonexistent/com.nonexistent.MainActivity")
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeFavoritesRepo.favorites).contains("com.app1/com.app1.MainActivity")
     }
 
     @Test
@@ -893,8 +899,9 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesOrderRepo.order).containsExactly("com.app1/com.app1.MainActivity")
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesOrderRepo.order)
+            .containsExactly("com.app1/com.app1.MainActivity")
     }
 
     @Test
@@ -914,9 +921,9 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
-        assertThat(fakeVisibilityRepo.hiddenApps).contains("com.app1/com.app1.MainActivity")
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).contains("com.app1/com.app1.MainActivity")
     }
 
     @Test
@@ -936,10 +943,10 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val importedNames = fakeNamesRepo.getAllCustomNames()
-        assertThat(importedNames).hasSize(1)
-        assertThat(importedNames).containsKey("com.app1")
+        Truth.assertThat(importedNames).hasSize(1)
+        Truth.assertThat(importedNames).containsKey("com.app1")
     }
 
     // ========== EDGE CASES ==========
@@ -953,10 +960,10 @@ class BackupManagerTest {
         val options = ImportOptions()
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        assertThat(success.importedCount).isEqualTo(0)
-        assertThat(success.skippedCount).isEqualTo(0)
+        Truth.assertThat(success.importedCount).isEqualTo(0)
+        Truth.assertThat(success.skippedCount).isEqualTo(0)
     }
 
     @Test
@@ -969,8 +976,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeNamesRepo.batchSetCalled).isFalse()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeNamesRepo.batchSetCalled).isFalse()
     }
 
     @Test
@@ -993,8 +1000,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeFavoritesRepo.favorites).hasSize(3)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(3)
     }
 
     @Test
@@ -1027,22 +1034,22 @@ class BackupManagerTest {
         val result = backupManager.importFromJson(jsonString, ImportOptions())
         val duration = System.currentTimeMillis() - startTime
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(duration).isLessThan(1000)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(duration).isLessThan(1000)
 
-        assertThat(fakeFavoritesRepo.favorites).hasSize(8)
-        assertThat(fakeVisibilityRepo.hiddenApps).hasSize(50)
-        assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)
-        assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
-        assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
-        assertThat(fakeSettingsRepo.shadow).isFalse()
-        assertThat(fakeSettingsRepo.doubleTap).isTrue()
-        assertThat(fakeSettingsRepo.swipeDown).isTrue()
-        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
-        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(8)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(50)
+        Truth.assertThat(fakeNamesRepo.getAllCustomNames()).hasSize(60)
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
+        Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     @Test
@@ -1063,10 +1070,10 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
-        assertThat(fakeSettingsRepo.shadow).isFalse()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
+        Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
     @Test
@@ -1085,28 +1092,29 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.doubleTap).isTrue()
-        assertThat(fakeSettingsRepo.swipeDown).isFalse()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
+        Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
     @Test
-    fun `importFromJson - old backup without threshold key - does not change threshold`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 100
+    fun `importFromJson - old backup without threshold key - does not change threshold`() =
+        runTest {
+            fakeSettingsRepo.splitModeThreshold = 100
 
-        val backup = createTestBackup(
-            favorites = setOf("com.app1/com.app1.MainActivity"),
-            splitModeThreshold = null
-        )
-        val oldBackupJson = json.encodeToString(backup)
+            val backup = createTestBackup(
+                favorites = setOf("com.app1/com.app1.MainActivity"),
+                splitModeThreshold = null
+            )
+            val oldBackupJson = json.encodeToString(backup)
 
-        val options = ImportOptions(importPowerUserSettings = true)
+            val options = ImportOptions(importPowerUserSettings = true)
 
-        val result = backupManager.importFromJson(oldBackupJson, options)
+            val result = backupManager.importFromJson(oldBackupJson, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
-    }
+            Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
+        }
 
     @Test
     fun `importFromJson - threshold zero in backup - imports as zero`() = runTest {
@@ -1118,8 +1126,8 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
     }
 
     @Test
@@ -1135,8 +1143,8 @@ class BackupManagerTest {
 
             val result = backupManager.importFromJson(jsonString, options)
 
-            assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-            assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(presetValue)
+            Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(presetValue)
         }
     }
 
@@ -1149,7 +1157,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.autoShowKeyboard).isTrue()
+        Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
     }
 
     @Test
@@ -1159,7 +1167,7 @@ class BackupManagerTest {
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
 
-        assertThat(backup.settings.autoShowKeyboard).isFalse()
+        Truth.assertThat(backup.settings.autoShowKeyboard).isFalse()
     }
 
     // ========== IMPORT TESTS - QUALITY OF LIFE SETTINGS ==========
@@ -1192,11 +1200,11 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
-        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
-        assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
     }
 
     @Test
@@ -1230,11 +1238,11 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(jsonString, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.autoShowKeyboard).isFalse()
-        assertThat(fakeSettingsRepo.autoLaunchApp).isFalse()
-        assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-        assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isFalse()
+        Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isFalse()
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
     }
 
     @Test
@@ -1253,9 +1261,9 @@ class BackupManagerTest {
 
         val result = backupManager.importFromJson(oldBackupJson, options)
 
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
-        assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
+        Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
 
     // ========== HELPER METHODS ==========

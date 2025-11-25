@@ -1,17 +1,17 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.data.SettingsManager
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,21 +48,21 @@ class SettingsManagerTest {
 
     @Test
     fun `sortOrderFlow - when no value is set - returns default value`() = runTest {
-        assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
     }
 
     @Test
     fun `sortOrderFlow - when a value is set - returns that value`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
 
-        assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
     }
 
     @Test
     fun `sortOrderFlow - when invalid value is stored - returns default value`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = "INVALID_ENUM_VALUE" }
 
-        assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
     }
 
     @Test
@@ -70,7 +70,7 @@ class SettingsManagerTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
 
         val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
-        assertEquals(SortOrder.ALPHABETICAL.name, savedValue)
+        Assert.assertEquals(SortOrder.ALPHABETICAL.name, savedValue)
     }
 
     @Test
@@ -102,11 +102,11 @@ class SettingsManagerTest {
     @Test
     fun `flows - emit new values when they are changed`() = runTest {
         settingsManager.sortOrderFlow.test {
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
 
             settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
 
-            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
         }
     }
 
@@ -176,17 +176,18 @@ class SettingsManagerTest {
 
         val result = settingsManager.sortOrderFlow.first()
 
-        assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
     }
 
     @Test
-    fun `doubleTapToLockEnabledFlow - when DataStore read fails - returns default false`() = runTest {
-        fakeDataStore.makeReadFail()
+    fun `doubleTapToLockEnabledFlow - when DataStore read fails - returns default false`() =
+        runTest {
+            fakeDataStore.makeReadFail()
 
-        val result = settingsManager.doubleTapToLockEnabledFlow.first()
+            val result = settingsManager.doubleTapToLockEnabledFlow.first()
 
-        assertFalse(result)
-    }
+            assertFalse(result)
+        }
 
     @Test
     fun `onboardingCompletedFlow - when DataStore read fails - returns default false`() = runTest {
@@ -200,29 +201,29 @@ class SettingsManagerTest {
     @Test
     fun `setSortOrder - called multiple times - all values are saved`() = runTest {
         settingsManager.sortOrderFlow.test {
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
 
             settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
-            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
 
             settingsManager.setSortOrder(SortOrder.TIME_WEIGHTED_USAGE)
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
         }
     }
 
     @Test
     fun `setDoubleTapToLock - toggling multiple times - works correctly`() = runTest {
         settingsManager.doubleTapToLockEnabledFlow.test {
-            assertEquals(false, awaitItem())
+            Assert.assertEquals(false, awaitItem())
 
             settingsManager.setDoubleTapToLock(true)
-            assertEquals(true, awaitItem())
+            Assert.assertEquals(true, awaitItem())
 
             settingsManager.setDoubleTapToLock(false)
-            assertEquals(false, awaitItem())
+            Assert.assertEquals(false, awaitItem())
 
             settingsManager.setDoubleTapToLock(true)
-            assertEquals(true, awaitItem())
+            Assert.assertEquals(true, awaitItem())
         }
     }
 
@@ -230,7 +231,7 @@ class SettingsManagerTest {
     fun `readabilityModeFlow - when no value is set - returns default`() = runTest {
         val result = settingsManager.readabilityModeFlow.first()
 
-        assertEquals("smart_contrast", result)
+        Assert.assertEquals("smart_contrast", result)
     }
 
     @Test
@@ -238,7 +239,7 @@ class SettingsManagerTest {
         settingsManager.setReadabilityMode("light")
 
         val savedValue = fakeDataStore.data.first()[READABILITY_MODE_KEY]
-        assertEquals("light", savedValue)
+        Assert.assertEquals("light", savedValue)
     }
 
     @Test
@@ -248,19 +249,19 @@ class SettingsManagerTest {
         settingsManager.setReadabilityMode("dark")
 
         // Should maintain default
-        assertEquals("smart_contrast", settingsManager.readabilityModeFlow.first())
+        Assert.assertEquals("smart_contrast", settingsManager.readabilityModeFlow.first())
     }
 
     @Test
     fun `readabilityModeFlow - emits new values when changed`() = runTest {
         settingsManager.readabilityModeFlow.test {
-            assertEquals("smart_contrast", awaitItem())
+            Assert.assertEquals("smart_contrast", awaitItem())
 
             settingsManager.setReadabilityMode("dark")
-            assertEquals("dark", awaitItem())
+            Assert.assertEquals("dark", awaitItem())
 
             settingsManager.setReadabilityMode("light")
-            assertEquals("light", awaitItem())
+            Assert.assertEquals("light", awaitItem())
         }
     }
 
@@ -271,24 +272,24 @@ class SettingsManagerTest {
         settingsManager.setOnboardingCompleted()
         settingsManager.setReadabilityMode("dark")
 
-        assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
         assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertTrue(settingsManager.onboardingCompletedFlow.first())
-        assertEquals("dark", settingsManager.readabilityModeFlow.first())
+        Assert.assertEquals("dark", settingsManager.readabilityModeFlow.first())
     }
 
     @Test
     fun `sortOrderFlow - with corrupted data - returns default`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = "" }
 
-        assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
     }
 
     @Test
     fun `sortOrderFlow - with null value - returns default`() = runTest {
         // Explicitly don't set any value
 
-        assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
     }
 
     // ========== SHOW ALARM TESTS ==========
@@ -362,29 +363,29 @@ class SettingsManagerTest {
     @Test
     fun `showAlarmFlow - emits new values when changed`() = runTest {
         settingsManager.showAlarmFlow.test {
-            assertEquals(false, awaitItem())  // Default
+            Assert.assertEquals(false, awaitItem())  // Default
 
             settingsManager.setShowAlarm(true)   // ✓ Ändere zu true
-            assertEquals(true, awaitItem())
+            Assert.assertEquals(true, awaitItem())
 
             settingsManager.setShowAlarm(false)  // ✓ Zurück zu false
-            assertEquals(false, awaitItem())
+            Assert.assertEquals(false, awaitItem())
         }
     }
 
     @Test
     fun `setShowAlarm - toggling multiple times - works correctly`() = runTest {
         settingsManager.showAlarmFlow.test {
-            assertEquals(false, awaitItem())  // Default
+            Assert.assertEquals(false, awaitItem())  // Default
 
             settingsManager.setShowAlarm(true)   // ✓ Toggle zu true
-            assertEquals(true, awaitItem())
+            Assert.assertEquals(true, awaitItem())
 
             settingsManager.setShowAlarm(false)  // ✓ Toggle zu false
-            assertEquals(false, awaitItem())
+            Assert.assertEquals(false, awaitItem())
 
             settingsManager.setShowAlarm(true)   // ✓ Toggle zu true
-            assertEquals(true, awaitItem())
+            Assert.assertEquals(true, awaitItem())
         }
     }
 
@@ -412,7 +413,7 @@ class SettingsManagerTest {
         settingsManager.setShowCalendarEvent(true)
         settingsManager.setShowAlarm(false)
 
-        assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
         assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertTrue(settingsManager.showCalendarEventFlow.first())
         assertFalse(settingsManager.showAlarmFlow.first())

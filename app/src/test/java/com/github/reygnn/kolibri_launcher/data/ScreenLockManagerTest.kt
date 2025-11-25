@@ -1,7 +1,6 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.data.ScreenLockManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -236,19 +235,20 @@ class ScreenLockManagerTest {
     }
 
     @Test
-    fun `isLockingAvailableFlow - collector cancelled - does not affect other collectors`() = runTest {
-        screenLockManager.isLockingAvailableFlow.test {
-            awaitItem()
-            cancel()
-        }
+    fun `isLockingAvailableFlow - collector cancelled - does not affect other collectors`() =
+        runTest {
+            screenLockManager.isLockingAvailableFlow.test {
+                awaitItem()
+                cancel()
+            }
 
-        screenLockManager.isLockingAvailableFlow.test {
-            assertEquals(false, awaitItem())
+            screenLockManager.isLockingAvailableFlow.test {
+                assertEquals(false, awaitItem())
 
-            screenLockManager.setServiceState(true)
-            assertEquals(true, awaitItem())
+                screenLockManager.setServiceState(true)
+                assertEquals(true, awaitItem())
+            }
         }
-    }
 
     @Test
     fun `lockRequestFlow - collector cancelled - does not affect other collectors`() = runTest {

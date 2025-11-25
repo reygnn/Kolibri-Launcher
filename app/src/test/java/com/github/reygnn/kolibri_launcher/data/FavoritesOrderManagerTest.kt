@@ -1,19 +1,17 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -38,7 +36,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val unsortedApps = listOf(
@@ -70,7 +68,7 @@ class FavoritesOrderManagerTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(unsortedApps, savedOrder)
 
-        assertEquals(expectedSortedApps, sortedApps)
+        Assert.assertEquals(expectedSortedApps, sortedApps)
     }
 
     @Test
@@ -79,7 +77,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val unsortedApps = listOf(
@@ -110,7 +108,7 @@ class FavoritesOrderManagerTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(unsortedApps, emptyList())
 
-        assertEquals(expectedSortedApps, sortedApps)
+        Assert.assertEquals(expectedSortedApps, sortedApps)
     }
 
     @Test
@@ -119,7 +117,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val installedApps = listOf(
@@ -145,56 +143,57 @@ class FavoritesOrderManagerTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(installedApps, savedOrder)
 
-        assertEquals(expectedSortedApps, sortedApps)
+        Assert.assertEquals(expectedSortedApps, sortedApps)
     }
 
     @Test
-    fun `sortAppsWithGivenOrder with new apps appends them alphabetically by displayName`() = runTest {
-        val manager = FavoritesOrderManager.createForTesting(
-            dataStore = mockDataStore,
-            context = mockContext,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
-        )
-
-        val apps = listOf(
-            AppInfo(
-                originalName = "D",
-                displayName = "Delta",
-                packageName = "com.d",
-                className = "d"
-            ),
-            AppInfo(
-                originalName = "A",
-                displayName = "Alpha",
-                packageName = "com.a",
-                className = "a"
-            ),
-            AppInfo(
-                originalName = "B",
-                displayName = "Bravo",
-                packageName = "com.b",
-                className = "b"
-            ),
-            AppInfo(
-                originalName = "C",
-                displayName = "Charlie",
-                packageName = "com.c",
-                className = "c"
+    fun `sortAppsWithGivenOrder with new apps appends them alphabetically by displayName`() =
+        runTest {
+            val manager = FavoritesOrderManager.createForTesting(
+                dataStore = mockDataStore,
+                context = mockContext,
+                externalScope = this.backgroundScope,
+                sharingStrategy = SharingStarted.Companion.Lazily
             )
-        )
-        val savedOrder = listOf("com.b/b", "com.a/a")
-        val expectedSortedApps = listOf(
-            apps[2], // Bravo (aus der gespeicherten Reihenfolge)
-            apps[1], // Alpha (aus der gespeicherten Reihenfolge)
-            apps[3], // Charlie (alphabetisch angehängt)
-            apps[0]  // Delta (alphabetisch angehängt)
-        )
 
-        val sortedApps = manager.sortAppsWithGivenOrder(apps, savedOrder)
+            val apps = listOf(
+                AppInfo(
+                    originalName = "D",
+                    displayName = "Delta",
+                    packageName = "com.d",
+                    className = "d"
+                ),
+                AppInfo(
+                    originalName = "A",
+                    displayName = "Alpha",
+                    packageName = "com.a",
+                    className = "a"
+                ),
+                AppInfo(
+                    originalName = "B",
+                    displayName = "Bravo",
+                    packageName = "com.b",
+                    className = "b"
+                ),
+                AppInfo(
+                    originalName = "C",
+                    displayName = "Charlie",
+                    packageName = "com.c",
+                    className = "c"
+                )
+            )
+            val savedOrder = listOf("com.b/b", "com.a/a")
+            val expectedSortedApps = listOf(
+                apps[2], // Bravo (aus der gespeicherten Reihenfolge)
+                apps[1], // Alpha (aus der gespeicherten Reihenfolge)
+                apps[3], // Charlie (alphabetisch angehängt)
+                apps[0]  // Delta (alphabetisch angehängt)
+            )
 
-        assertEquals(expectedSortedApps, sortedApps)
-    }
+            val sortedApps = manager.sortAppsWithGivenOrder(apps, savedOrder)
+
+            Assert.assertEquals(expectedSortedApps, sortedApps)
+        }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
 
@@ -204,12 +203,12 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val result = manager.sortAppsWithGivenOrder(emptyList(), listOf("com.a/a"))
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
@@ -218,7 +217,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val apps = listOf(
@@ -228,8 +227,8 @@ class FavoritesOrderManagerTest {
 
         val result = manager.sortAppsWithGivenOrder(apps, emptyList())
 
-        assertEquals("A", result[0].displayName)
-        assertEquals("Z", result[1].displayName)
+        Assert.assertEquals("A", result[0].displayName)
+        Assert.assertEquals("Z", result[1].displayName)
     }
 
     @Test
@@ -238,7 +237,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val apps = listOf(
@@ -250,7 +249,7 @@ class FavoritesOrderManagerTest {
         val result = manager.sortAppsWithGivenOrder(apps, duplicateOrder)
 
         // Sollte keine Duplikate in result haben
-        assertEquals(apps.size, result.size)
+        Assert.assertEquals(apps.size, result.size)
     }
 
     @Test
@@ -259,7 +258,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val apps = listOf(
@@ -271,7 +270,7 @@ class FavoritesOrderManagerTest {
         val result = manager.sortAppsWithGivenOrder(apps, malformedOrder)
 
         // Sollte Apps trotzdem sortieren
-        assertEquals(2, result.size)
+        Assert.assertEquals(2, result.size)
     }
 
 /*    @Test
@@ -297,12 +296,12 @@ class FavoritesOrderManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val result = manager.saveOrder(listOf("com.a/a"))
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -313,7 +312,7 @@ class FavoritesOrderManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         assertFailsWith<CancellationException> {
@@ -328,14 +327,14 @@ class FavoritesOrderManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val result = manager.saveOrder(emptyList())
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        assertTrue(savedOrder.isEmpty())
+        Assert.assertTrue(savedOrder.isEmpty())
     }
 
     @Test
@@ -345,35 +344,36 @@ class FavoritesOrderManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val result = manager.sortFavoriteComponents(emptyList(), emptyList())
 
-        assertTrue(result.isEmpty())
+        Assert.assertTrue(result.isEmpty())
     }
 
     @Test
-    fun `sortFavoriteComponents - when DataStore read fails - falls back to alphabetical`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        fakeDataStore.makeReadFail()
-        val manager = FavoritesOrderManager.createForTesting(
-            dataStore = fakeDataStore,
-            context = mockContext,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
-        )
+    fun `sortFavoriteComponents - when DataStore read fails - falls back to alphabetical`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            fakeDataStore.makeReadFail()
+            val manager = FavoritesOrderManager.createForTesting(
+                dataStore = fakeDataStore,
+                context = mockContext,
+                externalScope = this.backgroundScope,
+                sharingStrategy = SharingStarted.Companion.Lazily
+            )
 
-        val apps = listOf(
-            AppInfo("Z", "Z", "com.z", "z"),
-            AppInfo("A", "A", "com.a", "a")
-        )
+            val apps = listOf(
+                AppInfo("Z", "Z", "com.z", "z"),
+                AppInfo("A", "A", "com.a", "a")
+            )
 
-        val result = manager.sortFavoriteComponents(apps, emptyList())
+            val result = manager.sortFavoriteComponents(apps, emptyList())
 
-        // Fallback zu alphabetischer Sortierung
-        assertEquals("A", result[0].displayName)
-    }
+            // Fallback zu alphabetischer Sortierung
+            Assert.assertEquals("A", result[0].displayName)
+        }
 
     @Test
     fun `sortAppsWithGivenOrder - with apps that have identical displayNames - maintains stable order`() {
@@ -381,7 +381,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val apps = listOf(
@@ -393,7 +393,7 @@ class FavoritesOrderManagerTest {
         val result = manager.sortAppsWithGivenOrder(apps, emptyList())
 
         // Sollte eine stabile Sortierung haben
-        assertEquals(3, result.size)
+        Assert.assertEquals(3, result.size)
     }
 
     @Test
@@ -402,7 +402,7 @@ class FavoritesOrderManagerTest {
             dataStore = mockDataStore,
             context = mockContext,
             externalScope = null,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val apps = (1..100).map {
@@ -412,9 +412,9 @@ class FavoritesOrderManagerTest {
 
         val result = manager.sortAppsWithGivenOrder(apps, order)
 
-        assertEquals(100, result.size)
-        assertEquals("App 100", result[0].displayName)
-        assertEquals("App 1", result[99].displayName)
+        Assert.assertEquals(100, result.size)
+        Assert.assertEquals("App 100", result[0].displayName)
+        Assert.assertEquals("App 1", result[99].displayName)
     }
 
     @Test
@@ -424,7 +424,7 @@ class FavoritesOrderManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         println("Before saveOrder call")
@@ -432,7 +432,7 @@ class FavoritesOrderManagerTest {
         println("After saveOrder call, result: $result")
         println("updateDataCallCount: ${fakeDataStore.updateDataCallCount}")
 
-        assertTrue("Expected true but got false", result)
+        Assert.assertTrue("Expected true but got false", result)
     }
 
     @Test
@@ -441,7 +441,7 @@ class FavoritesOrderManagerTest {
         val jsonArray = JSONArray(list)
         val orderString = jsonArray.toString()
         println("JSON String: $orderString")
-        assertTrue(orderString.isNotEmpty())
+        Assert.assertTrue(orderString.isNotEmpty())
     }
 
 }

@@ -1,19 +1,16 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.data.FavoritesManager
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -40,12 +37,12 @@ class FavoritesManagerTest {
             dataStore = fakeDataStore,
             context = mockContext,
             externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
+            sharingStrategy = SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.isFavoriteComponent("com.favorite.app/ComponentA")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 
     @Test
@@ -56,10 +53,10 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
-        assertFalse(favoritesManager.isFavoriteComponent("com.not.favorite/ComponentC"))
+        Assert.assertFalse(favoritesManager.isFavoriteComponent("com.not.favorite/ComponentC"))
     }
 
     @Test
@@ -69,34 +66,37 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.addFavoriteComponent("com.new.favorite/ComponentD")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertTrue(savedFavorites?.contains("com.new.favorite/ComponentD") == true)
+        Assert.assertTrue(savedFavorites?.contains("com.new.favorite/ComponentD") == true)
     }
 
     @Test
-    fun `addFavoriteComponent returns false when max limit is reached for new packages`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        val fullSet = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
-        val favoritesManager = FavoritesManager(
-            fakeDataStore,
-            mockContext,
-            this.backgroundScope,
-            SharingStarted.Lazily
-        )
+    fun `addFavoriteComponent returns false when max limit is reached for new packages`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            val fullSet =
+                (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }
+                    .toSet()
+            fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
+            val favoritesManager = FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                this.backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
-        val result = favoritesManager.addFavoriteComponent("com.over.limit/ComponentE")
+            val result = favoritesManager.addFavoriteComponent("com.over.limit/ComponentE")
 
-        assertFalse(result)
-        val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, savedFavorites?.size)
-    }
+            Assert.assertFalse(result)
+            val savedFavorites = fakeDataStore.data.first()[favoritesKey]
+            Assert.assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, savedFavorites?.size)
+        }
 
     @Test
     fun `removeFavoriteComponent removes component`() = runTest {
@@ -107,55 +107,62 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         favoritesManager.removeFavoriteComponent("com.to.remove/ComponentG")
 
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertFalse(savedFavorites?.contains("com.to.remove/ComponentG") == true)
-        assertEquals(1, savedFavorites?.size)
+        Assert.assertFalse(savedFavorites?.contains("com.to.remove/ComponentG") == true)
+        Assert.assertEquals(1, savedFavorites?.size)
     }
 
     @Test
     fun `cleanupFavoriteComponents removes orphaned favorites`() = runTest {
         val fakeDataStore = FakeDataStore()
         val currentFavorites = setOf("com.installed.app/ComponentH", "com.orphaned.app/ComponentI")
-        val installedComponents = listOf("com.installed.app/ComponentH", "com.another.installed.app/ComponentJ")
+        val installedComponents =
+            listOf("com.installed.app/ComponentH", "com.another.installed.app/ComponentJ")
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to currentFavorites))
         val favoritesManager = FavoritesManager(
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         favoritesManager.cleanupFavoriteComponents(installedComponents)
 
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertTrue(savedFavorites?.contains("com.installed.app/ComponentH") == true)
-        assertFalse(savedFavorites?.contains("com.orphaned.app/ComponentI") == true)
-        assertEquals(1, savedFavorites?.size)
+        Assert.assertTrue(savedFavorites?.contains("com.installed.app/ComponentH") == true)
+        Assert.assertFalse(savedFavorites?.contains("com.orphaned.app/ComponentI") == true)
+        Assert.assertEquals(1, savedFavorites?.size)
     }
 
     @Test
-    fun `addFavoriteComponent when limit reached allows adding component from existing favorite package`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        val fullSet = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }.toSet()
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
-        val favoritesManager = FavoritesManager(
-            fakeDataStore,
-            mockContext,
-            this.backgroundScope,
-            SharingStarted.Lazily
-        )
+    fun `addFavoriteComponent when limit reached allows adding component from existing favorite package`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            val fullSet =
+                (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }
+                    .toSet()
+            fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
+            val favoritesManager = FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                this.backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
-        val result = favoritesManager.addFavoriteComponent("com.app1/AnotherComponent")
+            val result = favoritesManager.addFavoriteComponent("com.app1/AnotherComponent")
 
-        assertTrue(result)
-        val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME + 1, savedFavorites?.size)
-    }
+            Assert.assertTrue(result)
+            val savedFavorites = fakeDataStore.data.first()[favoritesKey]
+            Assert.assertEquals(
+                AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME + 1,
+                savedFavorites?.size
+            )
+        }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
 
@@ -167,12 +174,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.addFavoriteComponent("com.test/Component")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -183,7 +190,7 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         assertFailsWith<CancellationException> {
@@ -198,12 +205,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.addFavoriteComponent("")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
 
@@ -211,13 +218,18 @@ class FavoritesManagerTest {
     fun `addFavoriteComponent - with blank componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
         val favoritesManager =
-            FavoritesManager(fakeDataStore, mockContext, backgroundScope, SharingStarted.Lazily)
+            FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
         val resultEmpty = favoritesManager.addFavoriteComponent("")
         val resultBlank = favoritesManager.addFavoriteComponent("   ")
 
-        assertFalse(resultEmpty)
-        assertFalse(resultBlank)
+        Assert.assertFalse(resultEmpty)
+        Assert.assertFalse(resultBlank)
     }
 
     @Test
@@ -229,12 +241,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.removeFavoriteComponent("com.test/Component")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -247,7 +259,7 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         assertFailsWith<CancellationException> {
@@ -262,12 +274,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.removeFavoriteComponent("")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -277,12 +289,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.removeFavoriteComponent("")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -293,12 +305,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.isFavoriteComponent("com.test/Component")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -308,12 +320,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.isFavoriteComponent(null)
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -323,12 +335,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.isFavoriteComponent("  ")
 
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -336,13 +348,18 @@ class FavoritesManagerTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
         val favoritesManager =
-            FavoritesManager(fakeDataStore, mockContext, backgroundScope, SharingStarted.Lazily)
+            FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
         // KEIN result mehr - gibt Unit zurück
         favoritesManager.saveFavoriteComponents(emptyList())
 
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertTrue(savedFavorites.isNullOrEmpty())
+        Assert.assertTrue(savedFavorites.isNullOrEmpty())
     }
 
     @Test
@@ -350,31 +367,44 @@ class FavoritesManagerTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeEditFail()
         val favoritesManager =
-            FavoritesManager(fakeDataStore, mockContext, backgroundScope, SharingStarted.Lazily)
+            FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
         // KEIN result mehr - sollte nur nicht crashen
         favoritesManager.saveFavoriteComponents(listOf("com.test/Component"))
 
         // Verify it attempted but failed
-        assertNotNull(favoritesManager)
+        Assert.assertNotNull(favoritesManager)
     }
 
     @Test
-    fun `cleanupFavoriteComponents - with empty installed list - removes all favorites`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component", "com.app2/Component")))
-        val favoritesManager = FavoritesManager(
-            fakeDataStore,
-            mockContext,
-            this.backgroundScope,
-            SharingStarted.Lazily
-        )
+    fun `cleanupFavoriteComponents - with empty installed list - removes all favorites`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            fakeDataStore.setInitialData(
+                preferencesOf(
+                    favoritesKey to setOf(
+                        "com.app1/Component",
+                        "com.app2/Component"
+                    )
+                )
+            )
+            val favoritesManager = FavoritesManager(
+                fakeDataStore,
+                mockContext,
+                this.backgroundScope,
+                SharingStarted.Companion.Lazily
+            )
 
-        favoritesManager.cleanupFavoriteComponents(emptyList())
+            favoritesManager.cleanupFavoriteComponents(emptyList())
 
-        val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        assertTrue(savedFavorites.isNullOrEmpty())
-    }
+            val savedFavorites = fakeDataStore.data.first()[favoritesKey]
+            Assert.assertTrue(savedFavorites.isNullOrEmpty())
+        }
 
     @Test
     fun `cleanupFavoriteComponents - when DataStore edit fails - keeps current state`() = runTest {
@@ -385,7 +415,7 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         // Wait for initialization
@@ -399,7 +429,7 @@ class FavoritesManagerTest {
 
         // Assert - old data should remain
         val favorites = fakeDataStore.data.first()[favoritesKey]
-        assertTrue(favorites?.contains("com.app1/Component") == true)
+        Assert.assertTrue(favorites?.contains("com.app1/Component") == true)
     }
 
     @Test
@@ -410,12 +440,12 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.addFavoriteComponent("com.test/Component")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 
     @Test
@@ -425,11 +455,11 @@ class FavoritesManagerTest {
             fakeDataStore,
             mockContext,
             this.backgroundScope,
-            SharingStarted.Lazily
+            SharingStarted.Companion.Lazily
         )
 
         val result = favoritesManager.removeFavoriteComponent("com.not.favorite/Component")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 }

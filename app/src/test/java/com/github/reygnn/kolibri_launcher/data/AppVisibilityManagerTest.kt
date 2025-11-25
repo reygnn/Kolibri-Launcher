@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -6,13 +6,11 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -54,7 +52,7 @@ class AppVisibilityManagerTest {
         val testPreferences = preferencesOf(hiddenComponentsKey to hiddenComponents)
         whenever(mockDataStore.data).thenReturn(flowOf(testPreferences))
 
-        assertTrue(appVisibilityManager.isComponentHidden("com.hidden.app/ComponentA"))
+        Assert.assertTrue(appVisibilityManager.isComponentHidden("com.hidden.app/ComponentA"))
     }
 
     @Test
@@ -63,7 +61,7 @@ class AppVisibilityManagerTest {
         val testPreferences = preferencesOf(hiddenComponentsKey to hiddenComponents)
         whenever(mockDataStore.data).thenReturn(flowOf(testPreferences))
 
-        assertFalse(appVisibilityManager.isComponentHidden("com.visible.app/ComponentC"))
+        Assert.assertFalse(appVisibilityManager.isComponentHidden("com.visible.app/ComponentC"))
     }
 
     @Test
@@ -75,7 +73,7 @@ class AppVisibilityManagerTest {
 
         val result = appVisibilityManager.hideComponent("com.new.to.hide/ComponentE")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
     }
 
@@ -88,7 +86,7 @@ class AppVisibilityManagerTest {
 
         val result = appVisibilityManager.showComponent("com.to.show/ComponentG")
 
-        assertTrue(result)
+        Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
     }
 
@@ -105,22 +103,23 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.isComponentHidden("com.test.app/Component")
 
         // Assert - Fallback: assume visible
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
-    fun `isComponentHidden - when DataStore fails with RuntimeException - returns false`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flow {
-            throw RuntimeException("Corrupted data")
-        })
+    fun `isComponentHidden - when DataStore fails with RuntimeException - returns false`() =
+        runTest {
+            // Arrange
+            whenever(mockDataStore.data).thenReturn(flow {
+                throw RuntimeException("Corrupted data")
+            })
 
-        // Act
-        val result = appVisibilityManager.isComponentHidden("com.test.app/Component")
+            // Act
+            val result = appVisibilityManager.isComponentHidden("com.test.app/Component")
 
-        // Assert
-        assertFalse(result)
-    }
+            // Assert
+            Assert.assertFalse(result)
+        }
 
     @Test
     fun `isComponentHidden - when CancellationException - propagates it`() = runTest {
@@ -147,24 +146,25 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.hideComponent("com.test.app/Component")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
         verify(mockDataStore).edit(any())
     }
 
     @Test
-    fun `hideComponent - when DataStore edit fails with RuntimeException - returns false`() = runTest {
-        // Arrange
-        whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
-        whenever(mockDataStore.edit(any())).doAnswer {
-            throw RuntimeException("Unexpected error")
+    fun `hideComponent - when DataStore edit fails with RuntimeException - returns false`() =
+        runTest {
+            // Arrange
+            whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
+            whenever(mockDataStore.edit(any())).doAnswer {
+                throw RuntimeException("Unexpected error")
+            }
+
+            // Act
+            val result = appVisibilityManager.hideComponent("com.test.app/Component")
+
+            // Assert
+            Assert.assertFalse(result)
         }
-
-        // Act
-        val result = appVisibilityManager.hideComponent("com.test.app/Component")
-
-        // Assert
-        assertFalse(result)
-    }
 
     @Test
     fun `hideComponent - when CancellationException - propagates it`() = runTest {
@@ -194,7 +194,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.showComponent("com.test.app/Component")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -219,7 +219,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.hideComponent(null)
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -228,7 +228,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.hideComponent("   ")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -241,7 +241,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.hideComponent("invalid_format_no_slash")
 
         // Assert - should succeed (even if malformed)
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 
     @Test
@@ -250,7 +250,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.showComponent(null)
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -259,7 +259,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.showComponent("")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -271,7 +271,7 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.isComponentHidden(null)
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
@@ -283,23 +283,24 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.isComponentHidden("  ")
 
         // Assert
-        assertFalse(result)
+        Assert.assertFalse(result)
     }
 
     @Test
-    fun `hideComponent - when component already hidden - returns true and no duplicate added`() = runTest {
-        // Arrange
-        val alreadyHidden = setOf("com.test.app/Component")
-        val initialPrefs = preferencesOf(hiddenComponentsKey to alreadyHidden)
-        whenever(mockDataStore.data).thenReturn(flowOf(initialPrefs))
-        whenever(mockDataStore.edit(any())).doReturn(initialPrefs)
+    fun `hideComponent - when component already hidden - returns true and no duplicate added`() =
+        runTest {
+            // Arrange
+            val alreadyHidden = setOf("com.test.app/Component")
+            val initialPrefs = preferencesOf(hiddenComponentsKey to alreadyHidden)
+            whenever(mockDataStore.data).thenReturn(flowOf(initialPrefs))
+            whenever(mockDataStore.edit(any())).doReturn(initialPrefs)
 
-        // Act
-        val result = appVisibilityManager.hideComponent("com.test.app/Component")
+            // Act
+            val result = appVisibilityManager.hideComponent("com.test.app/Component")
 
-        // Assert
-        assertTrue(result)
-    }
+            // Assert
+            Assert.assertTrue(result)
+        }
 
     @Test
     fun `showComponent - when component not hidden - returns true`() = runTest {
@@ -311,6 +312,6 @@ class AppVisibilityManagerTest {
         val result = appVisibilityManager.showComponent("com.test.app/Component")
 
         // Assert
-        assertTrue(result)
+        Assert.assertTrue(result)
     }
 }

@@ -1,6 +1,7 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
@@ -111,24 +112,25 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `installedApps - when repository flow crashes with RuntimeException - handles gracefully`() = runTest {
-        whenever(installedAppsRepository.getInstalledApps()).thenReturn(flow {
-            throw RuntimeException("Database corrupted")
-        })
+    fun `installedApps - when repository flow crashes with RuntimeException - handles gracefully`() =
+        runTest {
+            whenever(installedAppsRepository.getInstalledApps()).thenReturn(flow {
+                throw RuntimeException("Database corrupted")
+            })
 
-        viewModel = SettingsViewModel(
-            installedAppsRepository,
-            resetManager,
-            mainDispatcher = mainDispatcherRule.testDispatcher
-        )
+            viewModel = SettingsViewModel(
+                installedAppsRepository,
+                resetManager,
+                mainDispatcher = mainDispatcherRule.testDispatcher
+            )
 
-        viewModel.installedApps.test {
-            advanceUntilIdle()
+            viewModel.installedApps.test {
+                advanceUntilIdle()
 
-            val result = awaitItem()
-            assertNotNull(result)
+                val result = awaitItem()
+                assertNotNull(result)
+            }
         }
-    }
 
     @Test
     fun `installedApps - with very large app list - handles efficiently`() = runTest {
@@ -243,33 +245,34 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `installedApps - when created multiple times - each instance has independent state`() = runTest {
-        val viewModel1 = SettingsViewModel(
-            installedAppsRepository,
-            resetManager,
-            mainDispatcher = mainDispatcherRule.testDispatcher
-        )
-        val viewModel2 = SettingsViewModel(
-            installedAppsRepository,
-            resetManager,
-            mainDispatcher = mainDispatcherRule.testDispatcher
-        )
+    fun `installedApps - when created multiple times - each instance has independent state`() =
+        runTest {
+            val viewModel1 = SettingsViewModel(
+                installedAppsRepository,
+                resetManager,
+                mainDispatcher = mainDispatcherRule.testDispatcher
+            )
+            val viewModel2 = SettingsViewModel(
+                installedAppsRepository,
+                resetManager,
+                mainDispatcher = mainDispatcherRule.testDispatcher
+            )
 
-        viewModel1.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
-
-            viewModel2.installedApps.test {
+            viewModel1.installedApps.test {
                 assertEquals(emptyList(), awaitItem())
 
-                rawAppsFlow.value = testApps
+                viewModel2.installedApps.test {
+                    assertEquals(emptyList(), awaitItem())
 
-                // Both should receive the update
+                    rawAppsFlow.value = testApps
+
+                    // Both should receive the update
+                    assertEquals(2, awaitItem().size)
+                }
+
                 assertEquals(2, awaitItem().size)
             }
-
-            assertEquals(2, awaitItem().size)
         }
-    }
 
     @Test
     fun `installedApps - stateIn operator - maintains last value for new collectors`() = runTest {

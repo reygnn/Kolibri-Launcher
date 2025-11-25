@@ -1,18 +1,21 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.ui
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase // NEU
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase // NEU
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase // NEU
+import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingEvent
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -42,9 +45,12 @@ class OnboardingViewModelTest {
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
 
-    @Mock private lateinit var onboardingAppsUseCase: GetOnboardingAppsUseCase
-    @Mock private lateinit var getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase
-    @Mock private lateinit var completeOnboardingUseCase: CompleteOnboardingUseCase
+    @Mock
+    private lateinit var onboardingAppsUseCase: GetOnboardingAppsUseCase
+    @Mock
+    private lateinit var getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase
+    @Mock
+    private lateinit var completeOnboardingUseCase: CompleteOnboardingUseCase
 
     private lateinit var viewModel: OnboardingViewModel
 
@@ -111,52 +117,59 @@ class OnboardingViewModelTest {
     // --- onDoneClicked Tests (ANGEPASST, PRÜFEN USECASES) ---
 
     @Test
-    fun `onDoneClicked - in INITIAL_SETUP mode - calls CompleteOnboardingUseCase correctly`() = runTest {
-        setupViewModel()
-        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
-        viewModel.loadInitialData()
-        advanceUntilIdle()
+    fun `onDoneClicked - in INITIAL_SETUP mode - calls CompleteOnboardingUseCase correctly`() =
+        runTest {
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            viewModel.loadInitialData()
+            advanceUntilIdle()
 
-        viewModel.onAppToggled(testApps[0])
-        advanceUntilIdle()
+            viewModel.onAppToggled(testApps[0])
+            advanceUntilIdle()
 
-        viewModel.onDoneClicked()
-        advanceUntilIdle()
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
 
-        // PRÜFE DEN USECASE
-        verify(completeOnboardingUseCase).invoke(
-            componentNames = listOf(app1.componentName),
-            isInitialSetup = true
-        )
-    }
+            // PRÜFE DEN USECASE
+            verify(completeOnboardingUseCase).invoke(
+                componentNames = listOf(app1.componentName),
+                isInitialSetup = true
+            )
+        }
 
     @Test
-    fun `onDoneClicked - in EDIT_FAVORITES mode - calls CompleteOnboardingUseCase correctly`() = runTest {
-        // Mocke den GetFavoriteComponentsUseCase für loadInitialData
-        whenever(getFavoriteComponentsUseCase.invoke()).thenReturn(emptySet())
+    fun `onDoneClicked - in EDIT_FAVORITES mode - calls CompleteOnboardingUseCase correctly`() =
+        runTest {
+            // Mocke den GetFavoriteComponentsUseCase für loadInitialData
+            whenever(getFavoriteComponentsUseCase.invoke()).thenReturn(emptySet())
 
-        setupViewModel()
-        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
-        viewModel.loadInitialData()
-        advanceUntilIdle()
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            viewModel.loadInitialData()
+            advanceUntilIdle()
 
-        viewModel.onAppToggled(testApps[2])
-        advanceUntilIdle()
+            viewModel.onAppToggled(testApps[2])
+            advanceUntilIdle()
 
-        viewModel.onDoneClicked()
-        advanceUntilIdle()
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
 
-        // PRÜFE DEN USECASE
-        verify(completeOnboardingUseCase).invoke(
-            componentNames = listOf(app3.componentName),
-            isInitialSetup = false // Korrekt
-        )
-    }
+            // PRÜFE DEN USECASE
+            verify(completeOnboardingUseCase).invoke(
+                componentNames = listOf(app3.componentName),
+                isInitialSetup = false // Korrekt
+            )
+        }
 
     @Test
     fun `onDoneClicked - when CompleteOnboardingUseCase fails - emits error event`() = runTest {
         // Mocke den UseCase, damit er einen Fehler wirft
-        whenever(completeOnboardingUseCase.invoke(any(), any())).thenThrow(RuntimeException("Speichern fehlgeschlagen"))
+        whenever(
+            completeOnboardingUseCase.invoke(
+                any(),
+                any()
+            )
+        ).thenThrow(RuntimeException("Speichern fehlgeschlagen"))
 
         setupViewModel()
         advanceUntilIdle()
@@ -211,7 +224,7 @@ class OnboardingViewModelTest {
             throw IOException("Cannot load apps")
         })
 
-        val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val testDispatcher = StandardTestDispatcher(testScheduler)
 
         // 3. ViewModel initialisieren (Die Coroutine im init-Block wird jetzt "pausiert" gestartet)
         viewModel = OnboardingViewModel(
@@ -237,76 +250,79 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `initialize - in EDIT_FAVORITES mode when GetFavoriteComponentsUseCase fails - handles gracefully`() = runTest {
-        // 1. Mock Setup: Verwende doAnswer für suspend functions!
-        whenever(getFavoriteComponentsUseCase.invoke()).doAnswer {
-            throw IOException("Cannot read favorites")
+    fun `initialize - in EDIT_FAVORITES mode when GetFavoriteComponentsUseCase fails - handles gracefully`() =
+        runTest {
+            // 1. Mock Setup: Verwende doAnswer für suspend functions!
+            whenever(getFavoriteComponentsUseCase.invoke()).doAnswer {
+                throw IOException("Cannot read favorites")
+            }
+
+            // 2. ViewModel Setup
+            setupViewModel()
+
+            // 3. Test
+            viewModel.event.test {
+                viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+                viewModel.loadInitialData()
+
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event is OnboardingEvent.ShowError)
+
+                val uiState = viewModel.uiState.value
+                assertNotNull(uiState)
+            }
         }
 
-        // 2. ViewModel Setup
-        setupViewModel()
+    @Test
+    fun `onDoneClicked - when CompleteOnboardingUseCase throws IOException - emits error`() =
+        runTest {
+            // Mocke den UseCase
+            whenever(completeOnboardingUseCase.invoke(any(), any())).doAnswer {
+                throw IOException("Disk full")
+            }
 
-        // 3. Test
-        viewModel.event.test {
-            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            setupViewModel()
+            advanceUntilIdle()
+
+            viewModel.onAppToggled(testApps[0])
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.onDoneClicked()
+                advanceUntilIdle()
+                val event = awaitItem()
+                assertTrue(event is OnboardingEvent.ShowError)
+            }
+        }
+
+    @Test
+    fun `onDoneClicked - when CompleteOnboardingUseCase throws on settings - still saves favorites`() =
+        runTest {
+            whenever(completeOnboardingUseCase.invoke(any(), eq(true))).doAnswer {
+                throw IOException("Cannot write settings")
+            }
+
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
             viewModel.loadInitialData()
-
             advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-
-            val uiState = viewModel.uiState.value
-            assertNotNull(uiState)
-        }
-    }
-
-    @Test
-    fun `onDoneClicked - when CompleteOnboardingUseCase throws IOException - emits error`() = runTest {
-        // Mocke den UseCase
-        whenever(completeOnboardingUseCase.invoke(any(), any())).doAnswer {
-            throw IOException("Disk full")
-        }
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.onAppToggled(testApps[0])
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoneClicked()
-            advanceUntilIdle()
-            val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-        }
-    }
-
-    @Test
-    fun `onDoneClicked - when CompleteOnboardingUseCase throws on settings - still saves favorites`() = runTest {
-        whenever(completeOnboardingUseCase.invoke(any(), eq(true))).doAnswer {
-            throw IOException("Cannot write settings")
-        }
-
-        setupViewModel()
-        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
-        viewModel.loadInitialData()
-        advanceUntilIdle()
-
-        viewModel.onAppToggled(testApps[0])
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoneClicked()
+            viewModel.onAppToggled(testApps[0])
             advanceUntilIdle()
 
-            // Der UseCase wurde aufgerufen (auch wenn er fehlgeschlagen ist)
-            verify(completeOnboardingUseCase).invoke(listOf(app1.componentName), true)
+            viewModel.event.test {
+                viewModel.onDoneClicked()
+                advanceUntilIdle()
 
-            val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
+                // Der UseCase wurde aufgerufen (auch wenn er fehlgeschlagen ist)
+                verify(completeOnboardingUseCase).invoke(listOf(app1.componentName), true)
+
+                val event = awaitItem()
+                assertTrue(event is OnboardingEvent.ShowError)
+            }
         }
-    }
 
     @Test
     fun `onDoneClicked - with no apps selected - calls UseCase with empty list`() = runTest {
@@ -342,29 +358,30 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `onDoneClicked - in EDIT_FAVORITES after removing all favorites - calls UseCase with empty list`() = runTest {
-        val existingFavorites = setOf(app1.componentName)
-        // Mocke den GetFavoriteComponentsUseCase
-        whenever(getFavoriteComponentsUseCase.invoke()).thenReturn(existingFavorites)
+    fun `onDoneClicked - in EDIT_FAVORITES after removing all favorites - calls UseCase with empty list`() =
+        runTest {
+            val existingFavorites = setOf(app1.componentName)
+            // Mocke den GetFavoriteComponentsUseCase
+            whenever(getFavoriteComponentsUseCase.invoke()).thenReturn(existingFavorites)
 
-        setupViewModel()
-        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
-        viewModel.loadInitialData()
-        advanceUntilIdle()
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            viewModel.loadInitialData()
+            advanceUntilIdle()
 
-        // Remove the only favorite
-        viewModel.onAppToggled(app1)
-        advanceUntilIdle()
+            // Remove the only favorite
+            viewModel.onAppToggled(app1)
+            advanceUntilIdle()
 
-        viewModel.onDoneClicked()
-        advanceUntilIdle()
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
 
-        // PRÜFE DEN USECASE
-        verify(completeOnboardingUseCase).invoke(
-            componentNames = emptyList(),
-            isInitialSetup = false
-        )
-    }
+            // PRÜFE DEN USECASE
+            verify(completeOnboardingUseCase).invoke(
+                componentNames = emptyList(),
+                isInitialSetup = false
+            )
+        }
 
     @Test
     fun `onSearchQueryChanged - filters apps correctly`() = runTest {
@@ -622,22 +639,23 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `onAppToggled - selected app disappears from filtered list when search changes`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
+    fun `onAppToggled - selected app disappears from filtered list when search changes`() =
+        runTest {
+            setupViewModel()
+            advanceUntilIdle()
 
-        viewModel.onAppToggled(app1)
-        advanceUntilIdle()
+            viewModel.onAppToggled(app1)
+            advanceUntilIdle()
 
-        // Search for something else - app1 not in filtered list
-        viewModel.onSearchQueryChanged("App 2")
-        advanceUntilIdle()
+            // Search for something else - app1 not in filtered list
+            viewModel.onSearchQueryChanged("App 2")
+            advanceUntilIdle()
 
-        val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size) // Only App 2 visible
-        assertEquals(1, uiState.selectedApps.size)    // But App 1 still selected!
-        assertEquals("App 1", uiState.selectedApps[0].displayName)
-    }
+            val uiState = viewModel.uiState.value
+            assertEquals(1, uiState.selectableApps.size) // Only App 2 visible
+            assertEquals(1, uiState.selectedApps.size)    // But App 1 still selected!
+            assertEquals("App 1", uiState.selectedApps[0].displayName)
+        }
 
     @Test
     fun `onAppToggled - selecting exactly at limit - works without toast`() = runTest {

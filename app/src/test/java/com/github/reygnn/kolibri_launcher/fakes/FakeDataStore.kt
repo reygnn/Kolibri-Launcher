@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.fakes
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences

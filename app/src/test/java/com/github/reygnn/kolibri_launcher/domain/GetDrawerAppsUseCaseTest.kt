@@ -1,14 +1,15 @@
-package com.github.reygnn.kolibri_launcher
+package com.github.reygnn.kolibri_launcher.domain
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
+import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -39,10 +40,14 @@ class GetDrawerAppsUseCaseTest {
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
 
-    @Mock private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
-    @Mock private lateinit var appUsageManager: AppUsageRepository
-    @Mock private lateinit var appVisibilityManager: HiddenAppsRepository
-    @Mock private lateinit var settingsManager: SettingsRepository
+    @Mock
+    private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
+    @Mock
+    private lateinit var appUsageManager: AppUsageRepository
+    @Mock
+    private lateinit var appVisibilityManager: HiddenAppsRepository
+    @Mock
+    private lateinit var settingsManager: SettingsRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var hiddenAppsFlow: MutableStateFlow<Set<String>>
@@ -145,7 +150,9 @@ class GetDrawerAppsUseCaseTest {
         val observer = Observer<List<AppInfo>> { results.add(it) }
 
         val timeWeightedSortedList = listOf(app2, app3, app1) // C, B, A
-        whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).thenReturn(timeWeightedSortedList)
+        whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).thenReturn(
+            timeWeightedSortedList
+        )
 
         useCase.drawerApps.observeForever(observer)
 
@@ -186,7 +193,9 @@ class GetDrawerAppsUseCaseTest {
             assertEquals("App A", initialDrawerApps[0].displayName)
 
             val timeWeightedSortedList = listOf(app2, app3, app1)
-            whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).thenReturn(timeWeightedSortedList)
+            whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).thenReturn(
+                timeWeightedSortedList
+            )
 
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
             advanceUntilIdle()
@@ -219,61 +228,63 @@ class GetDrawerAppsUseCaseTest {
     // ========== NEW CRASH-RESISTANCE TESTS ==========
 
     @Test
-    fun `drawerApps - when appUsageManager throws exception - falls back to alphabetical`() = runTest {
-        val results = mutableListOf<List<AppInfo>>()
-        val observer = Observer<List<AppInfo>> { results.add(it) }
+    fun `drawerApps - when appUsageManager throws exception - falls back to alphabetical`() =
+        runTest {
+            val results = mutableListOf<List<AppInfo>>()
+            val observer = Observer<List<AppInfo>> { results.add(it) }
 
-        whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).doAnswer {
-            throw RuntimeException("Sorting failed")
+            whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).doAnswer {
+                throw RuntimeException("Sorting failed")
+            }
+
+            useCase.drawerApps.observeForever(observer)
+
+            try {
+                advanceUntilIdle()
+
+                sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+                rawAppsFlow.value = allApps
+                advanceUntilIdle()
+
+                val result = results.last()
+
+                // Assert - sollte alphabetisch sortiert sein als Fallback
+                assertEquals(3, result.size)
+                assertEquals("App A", result[0].displayName)
+                assertEquals("App B", result[1].displayName)
+                assertEquals("App C", result[2].displayName)
+            } finally {
+                useCase.drawerApps.removeObserver(observer)
+            }
         }
-
-        useCase.drawerApps.observeForever(observer)
-
-        try {
-            advanceUntilIdle()
-
-            sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
-            rawAppsFlow.value = allApps
-            advanceUntilIdle()
-
-            val result = results.last()
-
-            // Assert - sollte alphabetisch sortiert sein als Fallback
-            assertEquals(3, result.size)
-            assertEquals("App A", result[0].displayName)
-            assertEquals("App B", result[1].displayName)
-            assertEquals("App C", result[2].displayName)
-        } finally {
-            useCase.drawerApps.removeObserver(observer)
-        }
-    }
 
     @Test
-    fun `drawerApps - when appUsageManager throws IOException - falls back to alphabetical`() = runTest {
-        val results = mutableListOf<List<AppInfo>>()
-        val observer = Observer<List<AppInfo>> { results.add(it) }
+    fun `drawerApps - when appUsageManager throws IOException - falls back to alphabetical`() =
+        runTest {
+            val results = mutableListOf<List<AppInfo>>()
+            val observer = Observer<List<AppInfo>> { results.add(it) }
 
-        whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).doAnswer {
-            throw IOException("Cannot read usage data")
+            whenever(appUsageManager.sortAppsByTimeWeightedUsage(any())).doAnswer {
+                throw IOException("Cannot read usage data")
+            }
+
+            useCase.drawerApps.observeForever(observer)
+
+            try {
+                advanceUntilIdle()
+
+                sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+                rawAppsFlow.value = allApps
+                advanceUntilIdle()
+
+                val result = results.last()
+                assertEquals("App A", result[0].displayName)
+                assertEquals("App B", result[1].displayName)
+                assertEquals("App C", result[2].displayName)
+            } finally {
+                useCase.drawerApps.removeObserver(observer)
+            }
         }
-
-        useCase.drawerApps.observeForever(observer)
-
-        try {
-            advanceUntilIdle()
-
-            sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
-            rawAppsFlow.value = allApps
-            advanceUntilIdle()
-
-            val result = results.last()
-            assertEquals("App A", result[0].displayName)
-            assertEquals("App B", result[1].displayName)
-            assertEquals("App C", result[2].displayName)
-        } finally {
-            useCase.drawerApps.removeObserver(observer)
-        }
-    }
 
     @Test
     fun `drawerApps - with all apps hidden - returns empty list`() = runTest {
