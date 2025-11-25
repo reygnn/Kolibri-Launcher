@@ -269,31 +269,32 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
         val appToAdd = testApps.first { it.displayName == "Apple" }
         val fakeFavoritesRepo = favoritesRepository as FakeFavoritesRepository
         val fakeInstalledState = installedAppsStateRepository as FakeInstalledAppsStateRepository
+        val fakeHiddenApps = appVisibilityRepository as FakeHiddenAppsRepository
 
-        // Erstelle max Favoriten
-        val maxFavoriteApps = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map {
-            val componentName = "com.fake.app$it"
-            AppInfo(componentName, componentName, componentName, componentName)
-        }
-        val maxFavoriteComponentNames = maxFavoriteApps.map { it.componentName }.toSet()
-
-        // Setze die Favoriten
-        fakeFavoritesRepo.favoritesState.value = maxFavoriteComponentNames
-
-        // Alle Apps als "installiert" markieren (max + testApps)
-        val allApps = maxFavoriteApps + testApps
+        // 256 Fake-ComponentNames für die Limit-Prüfung (keine echten AppInfo nötig!)
+        val fakeComponentNames = (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map {
+            "com.fake.app$it/com.fake.app$it.MainActivity"
+        }.toSet()
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
-            fakeInstalledState.updateApps(allApps)
-            (appVisibilityRepository as FakeHiddenAppsRepository).hiddenAppsState.value = emptySet()
+            // Favoriten-State hat 256 Einträge (für UseCase Limit-Check)
+            fakeFavoritesRepo.favoritesState.value = fakeComponentNames
+
+            // ABER: Nur testApps werden gerendert (schnell + "Apple" sichtbar)
+            fakeInstalledState.updateApps(testApps)
+            fakeHiddenApps.hiddenAppsState.value = emptySet()
         }
+
+        testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
         launchFragmentInHiltContainer<AppDrawerFragment>()
 
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
         Espresso.onView(ViewMatchers.withId(R.id.apps_recycler_view))
             .perform(EspressoTestUtils.waitForUiThread())
+
+        // Nur 3 Apps sichtbar, aber Favoriten-Count = 256
         Espresso.onView(ViewMatchers.withText(appToAdd.displayName))
             .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
 
@@ -303,6 +304,7 @@ class AppDrawerFragmentTest : BaseAndroidTest() {
             .inRoot(RootMatchers.isDialog()).perform(ViewActions.click())
         testCoroutineRule.testDispatcher.scheduler.advanceUntilIdle()
 
+        // Verify: Limit erreicht, App nicht hinzugefügt
         Truth.assertThat(fakeFavoritesRepo.favorites).doesNotContain(appToAdd.componentName)
         Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
