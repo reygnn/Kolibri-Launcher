@@ -5,10 +5,10 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -20,8 +20,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val installedAppsRepository: InstalledAppsRepository,
-    private val resetManager: ResetRepository,
+    private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
+    private val factoryResetUseCase: FactoryResetUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -35,7 +35,8 @@ class SettingsViewModel @Inject constructor(
     private fun observeApps() {
         launchSafe {
             try {
-                installedAppsRepository.getInstalledApps().collect { apps ->
+                // Nutzung des UseCases statt des Repositories
+                getInstalledAppsUseCase().collect { apps ->
                     try {
                         if (BuildConfig.DEBUG) {
                             Timber.Forest.d("[ViewModel] Collected ${apps.size} apps")
@@ -112,31 +113,20 @@ class SettingsViewModel @Inject constructor(
      */
     fun onFactoryResetConfirmed(includeUsageData: Boolean) {
         launchSafe {
-            try {
-                // SCHRITT 1: Lösche Einstellungen & Benutzerdaten (Favoriten, etc.)
-                val settingsSuccess = resetManager.resetSettings()
-                val userDataSuccess = resetManager.resetUserData()
+            // Nutzung des UseCases statt des Repositories
+            val result = factoryResetUseCase(includeUsageData)
 
-                // SCHRITT 2: (Optional) Lösche App-Nutzungsdaten
-                var usageSuccess = true
-                if (includeUsageData) {
-                    usageSuccess = resetManager.resetAppUsageData()
-                }
-
-                val allSuccess = settingsSuccess && userDataSuccess && usageSuccess
-
-                if (allSuccess) {
-                    installedAppsRepository.triggerAppsUpdate()
+            when (result) {
+                is FactoryResetUseCase.Result.Success -> {
                     sendEvent(UiEvent.ShowToast(R.string.reset_success))
-                } else {
+                }
+                is FactoryResetUseCase.Result.PartialFailure -> {
+                    // Optionale Unterscheidung, hier standardmäßig "failed" Toast
                     sendEvent(UiEvent.ShowToast(R.string.reset_failed))
                 }
-
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error during factory reset")
-                sendEvent(UiEvent.ShowToast(R.string.reset_failed))
+                is FactoryResetUseCase.Result.Error -> {
+                    sendEvent(UiEvent.ShowToast(R.string.reset_failed))
+                }
             }
         }
     }
