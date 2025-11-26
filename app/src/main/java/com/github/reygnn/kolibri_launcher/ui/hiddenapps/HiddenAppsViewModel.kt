@@ -5,10 +5,11 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -22,8 +23,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HiddenAppsViewModel @Inject constructor(
-    private val installedAppsRepository: InstalledAppsRepository,
-    private val visibilityRepository: HiddenAppsRepository,
+    private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
+    private val getHiddenAppsUseCase: GetHiddenAppsUseCase,
+    private val updateHiddenAppsUseCase: UpdateHiddenAppsUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -84,30 +86,16 @@ class HiddenAppsViewModel @Inject constructor(
     }
 
     /**
-     * Kicks off the initial data loading for the ViewModel, fetching the list of all installed
-     * apps and the set of currently hidden apps.
-     *
-     * ARCHITECTURAL NOTE & TESTABILITY:
-     * This method is intentionally NOT called from the ViewModel's `init` block.
-     *
-     * 1.  **The Problem:** Placing data loading in `init` creates a race condition in unit tests.
-     *     The coroutine would start immediately upon ViewModel creation, potentially emitting an
-     *     event (e.g., a loading error) *before* the test framework (like Turbine) has a chance
-     *     to attach a collector to the `eventFlow`. This leads to missed events and flaky tests.
-     *
-     * 2.  **The Solution:** By making this an `internal` method, the responsibility to start the
-     *     data load is shifted to the owner of the ViewModel (the `HiddenAppsActivity`). This
-     *     gives tests full control to create the ViewModel, set up their listeners first, and
-     *     *then* explicitly call `initialize()` to trigger the action in a predictable order.
+     * Kicks off the initial data loading for the ViewModel.
      */
     fun initialize() {
         launchSafe {
             try {
-                val allApps = installedAppsRepository.getInstalledApps().first()
+                val allApps = getInstalledAppsUseCase().first()
                     .sortedBy { it.displayName.lowercase() }
                 allAppsMasterList.value = allApps
 
-                initialHiddenComponents = visibilityRepository.hiddenAppsFlow.first()
+                initialHiddenComponents = getHiddenAppsUseCase().first()
                 selectedComponents.value = initialHiddenComponents
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading hidden apps")
@@ -143,7 +131,7 @@ class HiddenAppsViewModel @Inject constructor(
                 val componentsToShow = initialHiddenComponents - finalHiddenComponents
 
                 if (componentsToHide.isNotEmpty() || componentsToShow.isNotEmpty()) {
-                    visibilityRepository.updateComponentVisibilities(
+                    updateHiddenAppsUseCase(
                         componentsToHide = componentsToHide,
                         componentsToShow = componentsToShow
                     )

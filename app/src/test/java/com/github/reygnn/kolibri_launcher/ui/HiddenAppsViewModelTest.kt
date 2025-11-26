@@ -5,6 +5,9 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +43,11 @@ class HiddenAppsViewModelTest {
     @Mock
     private lateinit var visibilityRepository: HiddenAppsRepository
 
+    // UseCases
+    private lateinit var getInstalledAppsUseCase: GetInstalledAppsUseCase
+    private lateinit var getHiddenAppsUseCase: GetHiddenAppsUseCase
+    private lateinit var updateHiddenAppsUseCase: UpdateHiddenAppsUseCase
+
     private lateinit var viewModel: HiddenAppsViewModel
 
     private val app1 = AppInfo("App A", "App A", "pkg1", "class1")
@@ -53,9 +61,15 @@ class HiddenAppsViewModelTest {
     }
 
     private fun setupViewModel() {
+        // UseCases mit Mocks initialisieren
+        getInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepository)
+        getHiddenAppsUseCase = GetHiddenAppsUseCase(visibilityRepository)
+        updateHiddenAppsUseCase = UpdateHiddenAppsUseCase(visibilityRepository)
+
         viewModel = HiddenAppsViewModel(
-            installedAppsRepository,
-            visibilityRepository,
+            getInstalledAppsUseCase,
+            getHiddenAppsUseCase,
+            updateHiddenAppsUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
     }
@@ -150,7 +164,7 @@ class HiddenAppsViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // Überprüfe den EINEN Aufruf der neuen Methode
+            // Überprüfe den EINEN Aufruf der neuen Methode (via UseCase)
             verify(visibilityRepository).updateComponentVisibilities(
                 componentsToHide = setOf(app3.componentName), // App3 sollte versteckt werden
                 componentsToShow = setOf(app1.componentName)  // App1 sollte sichtbar gemacht werden
@@ -180,7 +194,7 @@ class HiddenAppsViewModelTest {
         }
     }
 
-    // ========== NEW CRASH-RESISTANCE TESTS ==========
+    // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
     fun `initialize - when hiddenAppsFlow fails - emits error event`() = runTest {
