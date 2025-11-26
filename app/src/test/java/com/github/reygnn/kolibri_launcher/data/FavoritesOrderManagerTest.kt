@@ -3,12 +3,15 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
 import org.junit.Assert
@@ -273,7 +276,7 @@ class FavoritesOrderManagerTest {
         Assert.assertEquals(2, result.size)
     }
 
-/*    @Test
+    /*    @Test
     fun `saveOrder - when successful - returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
         val manager = FavoritesOrderManager.createForTesting(
@@ -444,4 +447,121 @@ class FavoritesOrderManagerTest {
         Assert.assertTrue(orderString.isNotEmpty())
     }
 
+    // ========== MISSING REMOVE TESTS ==========
+
+    @Test
+    fun `removeComponentFromOrder - removes existing component and updates DataStore`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        val initialOrder = listOf("com.a/a", "com.b/b", "com.c/c")
+        val jsonArray = JSONArray(initialOrder)
+
+        val prefs = preferencesOf(
+            stringPreferencesKey("favorites_order_components_list_json") to jsonArray.toString()
+        )
+        fakeDataStore.setInitialData(prefs)
+
+        val manager = FavoritesOrderManager.createForTesting(
+            dataStore = fakeDataStore,
+            context = mockContext,
+            externalScope = null,  // <-- KEIN shareIn()
+            sharingStrategy = SharingStarted.Eagerly
+        )
+
+        // Debug: Prüfen ob Daten korrekt geladen wurden
+        val current = manager.favoriteComponentsOrderFlow.first()
+        Assert.assertEquals("Initial load failed", 3, current.size)
+        Assert.assertTrue("Item missing before remove", current.contains("com.b/b"))
+
+        // Act
+        val result = manager.removeComponentFromOrder("com.b/b")
+
+        // Assert
+        Assert.assertTrue("Result should be true", result)
+        val savedOrder = manager.favoriteComponentsOrderFlow.first()
+        Assert.assertEquals("Should have 2 items left", 2, savedOrder.size)
+        Assert.assertEquals(listOf("com.a/a", "com.c/c"), savedOrder)
+    }
+
+    @Test
+    fun `removeComponentFromOrder - when component not in list - returns true and does nothing`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            val initialOrder = listOf("com.a/a")
+            val jsonArray = JSONArray(initialOrder)
+
+            val prefs = preferencesOf(
+                stringPreferencesKey("favorites_order_components_list_json") to jsonArray.toString()
+            )
+            fakeDataStore.setInitialData(prefs)
+
+            val manager = FavoritesOrderManager.createForTesting(
+                dataStore = fakeDataStore,
+                context = mockContext,
+                externalScope = null,  // <-- KEIN shareIn()
+                sharingStrategy = SharingStarted.Eagerly
+            )
+
+            // Act
+            val result = manager.removeComponentFromOrder("com.z/z")
+
+            // Assert
+            Assert.assertTrue(result)
+            Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        }
+
+    // ========== MISSING LIMIT & PURGE TESTS ==========
+
+    @Test
+    fun `saveOrder - enforces size limit - truncates list`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        val manager = FavoritesOrderManager.createForTesting(
+            dataStore = fakeDataStore,
+            context = mockContext,
+            externalScope = this.backgroundScope,
+            sharingStrategy = SharingStarted.Eagerly
+        )
+
+        val hugeList = (1..300).map { "com.app$it/Component" }
+
+        // Act
+        manager.saveOrder(hugeList)
+        advanceUntilIdle()
+
+        // Assert
+        val savedOrder = manager.favoriteComponentsOrderFlow.first()
+        // Wir prüfen, ob die gespeicherte Liste kleiner ist als die Eingabe
+        Assert.assertTrue(
+            "List should be truncated (Saved: ${savedOrder.size}, Input: 500)",
+            savedOrder.size < 500
+        )
+        // Prüfen, ob die ersten Items erhalten blieben (Reihenfolge wichtig)
+        Assert.assertEquals("com.app1/Component", savedOrder.first())
+    }
+
+    @Test
+    fun `purgeRepository - removes order key`() = runTest {
+        val fakeDataStore = FakeDataStore()
+
+        val prefs = androidx.datastore.preferences.core.preferencesOf(
+            androidx.datastore.preferences.core.stringPreferencesKey("favorites_order_components_list_json") to "[\"com.a/a\"]"
+        )
+        fakeDataStore.setInitialData(prefs)
+
+        val manager = FavoritesOrderManager.createForTesting(
+            dataStore = fakeDataStore,
+            context = mockContext,
+            externalScope = this.backgroundScope,
+            sharingStrategy = SharingStarted.Eagerly
+        )
+
+        advanceUntilIdle()
+
+        // Act
+        manager.purgeRepository()
+        advanceUntilIdle()
+
+        // Assert
+        val savedOrder = manager.favoriteComponentsOrderFlow.first()
+        Assert.assertTrue("Order list should be empty after purge", savedOrder.isEmpty())
+    }
 }
