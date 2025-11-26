@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
@@ -461,5 +462,118 @@ class FavoritesManagerTest {
         val result = favoritesManager.removeFavoriteComponent("com.not.favorite/Component")
 
         Assert.assertTrue(result)
+    }
+
+    // ========== TOGGLE TESTS ==========
+
+    @Test
+    fun `toggleFavoriteComponent - when not favorite - adds it and returns true`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        val favoritesManager = FavoritesManager(
+            fakeDataStore,
+            mockContext,
+            externalScope = null,  // <-- KEIN shareIn()
+            SharingStarted.Eagerly
+        )
+
+        // Initial leer
+        Assert.assertFalse(favoritesManager.isFavoriteComponent("com.test/Component"))
+
+        // Act
+        val result = favoritesManager.toggleFavoriteComponent("com.test/Component")
+
+        // Assert
+        Assert.assertTrue("Should return true (added)", result)
+        Assert.assertTrue(favoritesManager.isFavoriteComponent("com.test/Component"))
+    }
+
+    @Test
+    fun `toggleFavoriteComponent - when already favorite - removes it and returns false`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))
+
+        val favoritesManager = FavoritesManager(
+            fakeDataStore,
+            mockContext,
+            externalScope = null,  // <-- KEIN shareIn()
+            SharingStarted.Eagerly
+        )
+
+        // Verify initial state
+        Assert.assertTrue(favoritesManager.isFavoriteComponent("com.test/Component"))
+
+        // Act
+        val result = favoritesManager.toggleFavoriteComponent("com.test/Component")
+
+        // Assert
+        Assert.assertFalse("Should return false (removed)", result)
+        Assert.assertFalse(favoritesManager.isFavoriteComponent("com.test/Component"))
+    }
+
+    // ========== SAVE & PURGE TESTS ==========
+
+    @Test
+    fun `saveFavoriteComponents - with valid list - overwrites existing favorites`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        // Vorher: App A ist Favorit
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.old/AppA")))
+
+        val favoritesManager = FavoritesManager(
+            fakeDataStore,
+            mockContext,
+            this.backgroundScope,
+            SharingStarted.Companion.Lazily
+        )
+
+        val newFavorites = listOf("com.new/AppB", "com.new/AppC")
+
+        // Act
+        favoritesManager.saveFavoriteComponents(newFavorites)
+
+        // Assert
+        val saved = fakeDataStore.data.first()[favoritesKey]
+        Assert.assertEquals(2, saved?.size)
+        Assert.assertTrue(saved?.contains("com.new/AppB") == true)
+        Assert.assertTrue(saved?.contains("com.new/AppC") == true)
+        Assert.assertFalse(saved?.contains("com.old/AppA") == true) // Alt überschrieben
+    }
+
+    @Test
+    fun `purgeRepository - clears all favorites`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/App")))
+
+        val favoritesManager = FavoritesManager(
+            fakeDataStore,
+            mockContext,
+            this.backgroundScope,
+            SharingStarted.Companion.Lazily
+        )
+
+        // Act
+        favoritesManager.purgeRepository()
+
+        // Assert
+        val saved = fakeDataStore.data.first()[favoritesKey]
+        Assert.assertTrue(saved.isNullOrEmpty())
+    }
+
+    @Test
+    fun `purgeRepository - handles exceptions gracefully`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.makeEditFail()
+
+        val favoritesManager = FavoritesManager(
+            fakeDataStore,
+            mockContext,
+            this.backgroundScope,
+            SharingStarted.Companion.Lazily
+        )
+
+        // Act - should not crash
+        favoritesManager.purgeRepository()
+
+        // Assert
+        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
     }
 }
