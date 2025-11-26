@@ -1,14 +1,15 @@
 package com.github.reygnn.kolibri_launcher.ui.backup
 
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
-import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
-import com.github.reygnn.kolibri_launcher.di.MainDispatcher
-import com.github.reygnn.kolibri_launcher.ui.backup.BackupState
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.domain.usecase.ExportBackupUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.PreviewBackupUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class BackupViewModel @Inject constructor(
-    private val backupManager: BackupRepository,
+    private val exportBackupUseCase: ExportBackupUseCase,
+    private val importBackupUseCase: ImportBackupUseCase,
+    private val previewBackupUseCase: PreviewBackupUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -33,7 +36,7 @@ class BackupViewModel @Inject constructor(
             try {
                 _backupState.value = BackupState.Loading
 
-                val success = backupManager.saveBackupToFile(uriString)
+                val success = exportBackupUseCase(uriString)
 
                 _backupState.value = if (success) {
                     BackupState.ExportSuccess
@@ -52,7 +55,7 @@ class BackupViewModel @Inject constructor(
             try {
                 _backupState.value = BackupState.Loading
 
-                when (val result = backupManager.loadBackupFromFile(uriString, options)) {
+                when (val result = importBackupUseCase(uriString, options)) {
                     is ImportResult.Success -> {
                         _backupState.value = BackupState.ImportSuccess(
                             importedCount = result.importedCount,
@@ -86,7 +89,7 @@ class BackupViewModel @Inject constructor(
     fun previewBackup(uriString: String) {
         launchSafe {
             try {
-                val preview = backupManager.previewBackup(uriString)
+                val preview = previewBackupUseCase(uriString)
                 _backupPreview.value = preview
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error previewing backup")
@@ -102,4 +105,3 @@ class BackupViewModel @Inject constructor(
         }
     }
 }
-
