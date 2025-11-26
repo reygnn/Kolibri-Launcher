@@ -69,6 +69,9 @@ class FakeSettingsRepository : SettingsRepository {
     private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE)
     override val sortOrderFlow: Flow<SortOrder> = sortOrderState
 
+    private val onboardingCompletedState = MutableStateFlow(false)
+    override val onboardingCompletedFlow: Flow<Boolean> = onboardingCompletedState
+
     var shadow: Boolean
         get() = shadowFlow.value
         set(value) { shadowFlow.value = value }
@@ -131,6 +134,10 @@ class FakeSettingsRepository : SettingsRepository {
         get() = sortOrderState.value
         private set(value) { sortOrderState.value = value }
 
+    var onboardingCompleted: Boolean
+        get() = onboardingCompletedState.value
+        private set(value) { onboardingCompletedState.value = value }
+
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
     override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
@@ -185,9 +192,6 @@ class FakeSettingsRepository : SettingsRepository {
         readabilityModeState.value = mode
     }
 
-    override val onboardingCompletedFlow: Flow<Boolean> = flowOf(false)
-    override suspend fun setOnboardingCompleted() {}
-
     override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         showCalendar = isEnabled
@@ -216,6 +220,10 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setSortOrder(sortOrder: SortOrder) {
         sortOrderState.value = sortOrder
+    }
+
+    override suspend fun setOnboardingCompleted() {
+        onboardingCompletedState.value = true
     }
 
     override suspend fun purgeRepository() {
@@ -248,5 +256,9 @@ class FakeSettingsRepository : SettingsRepository {
 
     fun setSortOrderForTest(sortOrder: SortOrder) {
         sortOrderState.value = sortOrder
+    }
+
+    fun setOnboardingCompletedForTest(completed: Boolean) {
+        onboardingCompletedState.value = completed
     }
 }
