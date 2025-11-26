@@ -1266,6 +1266,80 @@ class BackupManagerTest {
         Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
 
+    // ========== THEME SETTINGS CHECKS ==========
+
+    @Test
+    fun `importFromJson - extended theme settings - imports layout and font settings`() = runTest {
+        // Arrange
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        // Reset Fake values (Assuming defaults)
+        fakeSettingsRepo.layoutScale = 1.0f
+        fakeSettingsRepo.verticalPadding = 1.0f
+        fakeSettingsRepo.isFontBold = false
+        fakeSettingsRepo.contentTopMargin = 1.0f
+
+        val backup = createTestBackup(
+            layoutScale = 1.2f,
+            verticalPaddingScale = 0.8f,
+            isFontBold = true,
+            contentTopMarginScale = 0.5f
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importThemeSettings = true
+            // all others false by default
+        )
+
+        // Act
+        val result = backupManager.importFromJson(jsonString, options)
+
+        // Assert
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        Truth.assertThat(fakeSettingsRepo.layoutScale).isEqualTo(1.2f)
+        Truth.assertThat(fakeSettingsRepo.verticalPadding).isEqualTo(0.8f)
+        Truth.assertThat(fakeSettingsRepo.isFontBold).isTrue()
+        Truth.assertThat(fakeSettingsRepo.contentTopMargin).isEqualTo(0.5f)
+    }
+
+    // ========== TIME-BASED EVENTS TEST ==========
+
+    @Test
+    fun `importFromJson - only time based events - imports only time settings`() = runTest {
+        // Arrange
+        fakeInstalledAppsRepo.installedApps = emptyList()
+        fakeSettingsRepo.showCalendar = false
+        fakeSettingsRepo.showAlarm = false
+        fakeSettingsRepo.color = Color.BLACK // Sollte nicht geändert werden
+
+        val backup = createTestBackup(
+            showCalendarEvent = true,
+            showAlarm = true,
+            textColor = Color.RED // Sollte ignoriert werden
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importTimeBasedEvents = true,
+            importThemeSettings = false
+            // others false
+        )
+
+        // Act
+        val result = backupManager.importFromJson(jsonString, options)
+
+        // Assert
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Time settings imported?
+        Truth.assertThat(fakeSettingsRepo.showCalendar).isTrue()
+        Truth.assertThat(fakeSettingsRepo.showAlarm).isTrue()
+
+        // Theme settings NOT imported?
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
+    }
+
+
     // ========== HELPER METHODS ==========
 
     private fun createAppInfo(packageName: String, className: String): AppInfo {
@@ -1289,6 +1363,12 @@ class BackupManagerTest {
         textColor: Int? = null,
         chipBackgroundColor: Int? = null,
         textShadowEnabled: Boolean? = null,
+        layoutScale: Float? = null,
+        verticalPaddingScale: Float? = null,
+        isFontBold: Boolean? = null,
+        contentTopMarginScale: Float? = null,
+        showCalendarEvent: Boolean? = null,
+        showAlarm: Boolean? = null,
         doubleTapToLockEnabled: Boolean? = null,
         swipeDownToNotificationsEnabled: Boolean? = null,
         autoShowKeyboard: Boolean? = null,
@@ -1309,6 +1389,12 @@ class BackupManagerTest {
                 textColor = textColor,
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
+                layoutScale = layoutScale,
+                verticalPaddingScale = verticalPaddingScale,
+                isFontBold = isFontBold,
+                contentTopMarginScale = contentTopMarginScale,
+                showCalendarEvent = showCalendarEvent,
+                showAlarm = showAlarm,
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,

@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -471,5 +472,79 @@ class AppUsageManagerTest {
 
         val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps)
         Assert.assertEquals("Test", sorted[0].displayName) // Mehr Starts = höherer Score
+    }
+
+    // ========== NEW TESTS: LIMITS & CLEANUP ==========
+
+    @Test
+    fun `recordPackageLaunch - enforces max timestamps limit`() = runTest {
+        // Arrange
+        val packageName = "com.limit.test"
+        // Wir simulieren, dass das Limit bereits erreicht ist
+        val limit = AppConstants.MAX_TIMESTAMPS_PER_APP
+
+        val currentTime = System.currentTimeMillis()
+        // Erzeuge eine Liste von validen Timestamps (z.B. letzte 150 Sekunden),
+        // damit sie nicht vom Manager als "zu alt" gefiltert werden.
+        val existingTimestamps = (1..limit).map {
+            (currentTime - (it * 1000)).toString()
+        }.toSet()
+
+        val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
+        fakeDataStore.setInitialData(preferencesOf(usageKey to existingTimestamps))
+
+        // Act - Neuer Launch hinzufügen (Limit + 1)
+        appUsageManager.recordPackageLaunch(packageName)
+
+        // Assert
+        // Wir müssen prüfen, ob die Anzahl der Einträge nicht gewachsen ist (oder zumindest das Limit nicht überschreitet)
+        // Hinweis: Das setzt voraus, dass wir den FakeDataStore inspizieren können oder die Logik indirekt testen.
+        val prefs = fakeDataStore.data.first()
+        val storedTimestamps = prefs[usageKey] ?: emptySet()
+
+        Assert.assertEquals(limit, storedTimestamps.size)
+    }
+
+    @Test
+    fun `purgeRepository - removes all usage data`() = runTest {
+        // Arrange
+        val app1 = "com.app1"
+        val app2 = "com.app2"
+
+        // Daten für zwei Apps anlegen
+        val initialData = preferencesOf(
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + app1) to setOf("1000"),
+            stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + app2) to setOf("2000"),
+            // Ein anderer Key, der NICHT gelöscht werden soll (Simulation)
+            stringSetPreferencesKey("some_other_setting") to setOf("value")
+        )
+        fakeDataStore.setInitialData(initialData)
+
+        Assert.assertTrue(appUsageManager.hasUsageDataForPackage(app1))
+        Assert.assertTrue(appUsageManager.hasUsageDataForPackage(app2))
+
+        // Act
+        appUsageManager.purgeRepository()
+
+        // Assert
+        Assert.assertFalse(appUsageManager.hasUsageDataForPackage(app1))
+        Assert.assertFalse(appUsageManager.hasUsageDataForPackage(app2))
+
+        // Prüfen, ob der andere Key noch da ist (optional, falls AppUsageManager selektiv löscht)
+        // Laut deiner Implementierung filtert er nach KEY_USAGE_PREFIX, also sollte "some_other_setting" bleiben.
+        val prefs = fakeDataStore.data.first()
+        Assert.assertTrue(prefs.contains(stringSetPreferencesKey("some_other_setting")))
+    }
+
+    @Test
+    fun `purgeRepository - handles exceptions gracefully`() = runTest {
+        // Arrange
+        fakeDataStore.makeEditFail()
+
+        // Act - sollte nicht crashen
+        appUsageManager.purgeRepository()
+
+        // Assert
+        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
     }
 }
