@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
@@ -15,14 +15,6 @@ import kotlinx.coroutines.flow.retry
 import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
-
-/**
- * Definiert das Ergebnis des App-Ladevorgangs für das ViewModel.
- */
-sealed class AppLoadResult {
-    data object Success : AppLoadResult()
-    data class Error(val messageResId: Int) : AppLoadResult()
-}
 
 class ObserveInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,

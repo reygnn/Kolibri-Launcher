@@ -29,11 +29,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-enum class LaunchMode {
-    INITIAL_SETUP,
-    EDIT_FAVORITES
-}
-
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val onboardingAppsUseCase: GetOnboardingAppsUseCase,

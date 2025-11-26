@@ -7,10 +7,6 @@ package com.github.reygnn.kolibri_launcher.domain.model
 data class TimeBasedEvent(
     val triggerTimeMillis: Long,
     val title: String,
-    val type: EventType
+    val type: TimeBasedEventType
 )
 
-enum class EventType {
-    ALARM,
-    CALENDAR
-}

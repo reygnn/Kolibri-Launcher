@@ -13,7 +13,7 @@ import org.mockito.kotlin.whenever
 import kotlin.test.assertSame
 
 @ExperimentalCoroutinesApi
-class GetLayoutSettingsUseCasesTest {
+class LayoutSettingsUseCasesTest {
 
     @Mock
     private lateinit var repository: SettingsRepository

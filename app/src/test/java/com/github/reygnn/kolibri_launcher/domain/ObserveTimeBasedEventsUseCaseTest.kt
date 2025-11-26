@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.domain.model.EventType
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeTimeBasedEventsRepository
@@ -22,12 +22,12 @@ class ObserveTimeBasedEventsUseCaseTest {
         TimeBasedEvent(
             triggerTimeMillis = System.currentTimeMillis() + 3600000,
             title = "Alarm",
-            type = EventType.ALARM
+            type = TimeBasedEventType.ALARM
         ),
         TimeBasedEvent(
             triggerTimeMillis = System.currentTimeMillis() + 7200000,
             title = "Meeting",
-            type = EventType.CALENDAR
+            type = TimeBasedEventType.CALENDAR
         )
     )
 
@@ -202,19 +202,19 @@ class ObserveTimeBasedEventsUseCaseTest {
             TimeBasedEvent(
                 triggerTimeMillis = System.currentTimeMillis(),
                 title = "Alarm 1",
-                type = EventType.ALARM
+                type = TimeBasedEventType.ALARM
             )
         )
         val updatedEvents = listOf(
             TimeBasedEvent(
                 triggerTimeMillis = System.currentTimeMillis(),
                 title = "Alarm 1",
-                type = EventType.ALARM
+                type = TimeBasedEventType.ALARM
             ),
             TimeBasedEvent(
                 triggerTimeMillis = System.currentTimeMillis() + 1000,
                 title = "Alarm 2",
-                type = EventType.ALARM
+                type = TimeBasedEventType.ALARM
             )
         )
         timeBasedEventsRepository.setEvents(initialEvents)

@@ -9,8 +9,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModelInterface
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorData
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorEventBus
 import com.github.reygnn.kolibri_launcher.ui.util.Event

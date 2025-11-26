@@ -10,7 +10,7 @@ import android.text.format.DateUtils
 import androidx.core.content.ContextCompat
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.CalendarEvent
-import com.github.reygnn.kolibri_launcher.domain.model.EventType
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
@@ -85,7 +85,7 @@ class TimeBasedEventsManager @Inject constructor(
                         TimeBasedEvent(
                             triggerTimeMillis = calEvent.startTimeMillis,
                             title = calEvent.title,
-                            type = EventType.CALENDAR
+                            type = TimeBasedEventType.CALENDAR
                         )
                     )
                 }
@@ -114,7 +114,7 @@ class TimeBasedEventsManager @Inject constructor(
             TimeBasedEvent(
                 triggerTimeMillis = nextAlarm.triggerTime,
                 title = "Alarm",
-                type = EventType.ALARM
+                type = TimeBasedEventType.ALARM
             )
         } catch (e: Exception) { // CancellationException ist hier unwahrscheinlich, aber Exception fängt alles außer Errors
             TimberWrapper.silentError(e, "Error getting next alarm")

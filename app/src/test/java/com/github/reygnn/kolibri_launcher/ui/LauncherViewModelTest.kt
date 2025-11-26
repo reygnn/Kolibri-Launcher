@@ -12,13 +12,13 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.EventType
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
-import com.github.reygnn.kolibri_launcher.domain.usecase.AppLoadResult
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
@@ -701,7 +701,7 @@ class LauncherViewModelTest {
         val testEvent = TimeBasedEvent(
             triggerTimeMillis = System.currentTimeMillis() + 10000,
             title = "Test Meeting",
-            type = EventType.CALENDAR
+            type = TimeBasedEventType.CALENDAR
         )
         val testEventList = listOf(testEvent)
         // Mocke den UseCase, der die Logik (inkl. Settings) bereits enthält
@@ -787,12 +787,12 @@ class LauncherViewModelTest {
         val alarm = TimeBasedEvent(
             triggerTimeMillis = now + 3600000, // in 1 Stunde
             title = "Alarm",
-            type = EventType.ALARM
+            type = TimeBasedEventType.ALARM
         )
         val meeting = TimeBasedEvent(
             triggerTimeMillis = now + 7200000, // in 2 Stunden
             title = "Meeting",
-            type = EventType.CALENDAR
+            type = TimeBasedEventType.CALENDAR
         )
 
         // Der UseCase gibt chronologisch sortierte Events zurück
@@ -804,8 +804,8 @@ class LauncherViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.timeBasedEvents.size)
-        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
-        assertEquals(EventType.CALENDAR, state.timeBasedEvents[1].type)
+        assertEquals(TimeBasedEventType.ALARM, state.timeBasedEvents[0].type)
+        assertEquals(TimeBasedEventType.CALENDAR, state.timeBasedEvents[1].type)
     }
 
     @Test
@@ -813,7 +813,7 @@ class LauncherViewModelTest {
         val alarm = TimeBasedEvent(
             triggerTimeMillis = System.currentTimeMillis() + 3600000,
             title = "Alarm",
-            type = EventType.ALARM
+            type = TimeBasedEventType.ALARM
         )
 
         // Der UseCase gibt nur Alarm zurück (weil Calendar deaktiviert)
@@ -825,7 +825,7 @@ class LauncherViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(1, state.timeBasedEvents.size)
-        assertEquals(EventType.ALARM, state.timeBasedEvents[0].type)
+        assertEquals(TimeBasedEventType.ALARM, state.timeBasedEvents[0].type)
     }
 
     @Test
@@ -1551,7 +1551,7 @@ class LauncherViewModelTest {
         thresholdFlow.value = 300
         colorsFlow.value = UiColorsState(textColor = Color.YELLOW)
         eventsFlow.value = listOf(
-            TimeBasedEvent(System.currentTimeMillis(), "Jubiläum", EventType.CALENDAR)
+            TimeBasedEvent(System.currentTimeMillis(), "Jubiläum", TimeBasedEventType.CALENDAR)
         )
 
         advanceUntilIdle()

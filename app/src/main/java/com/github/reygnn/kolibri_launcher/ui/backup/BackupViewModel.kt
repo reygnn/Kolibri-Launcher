@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
+import com.github.reygnn.kolibri_launcher.ui.backup.BackupState
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -102,20 +103,3 @@ class BackupViewModel @Inject constructor(
     }
 }
 
-sealed class BackupState {
-    object Idle : BackupState()
-    object Loading : BackupState()
-    object ExportSuccess : BackupState()
-    data class ImportSuccess(
-        val importedCount: Int,
-        val skippedCount: Int,
-        val missingApps: Set<String>
-    ) : BackupState()
-    data class LimitExceeded(
-        val packageCount: Int,
-        val limit: Int
-    ) : BackupState()
-    data class UnsupportedVersion(val version: String) : BackupState()
-    object InvalidFormat : BackupState()
-    data class Error(val message: String) : BackupState()
-}
