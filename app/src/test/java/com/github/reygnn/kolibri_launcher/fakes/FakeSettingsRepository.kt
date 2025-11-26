@@ -228,7 +228,13 @@ class FakeSettingsRepository : SettingsRepository {
         splitModeThreshold = 0
     }
 
+    // HELPER
+
     fun setDoubleTapToLockEnabled(enabled: Boolean) {
         doubleTap = enabled
+    }
+
+    fun setSwipeDownToNotificationsEnabled(enabled: Boolean) {
+        swipeDown = enabled
     }
 }

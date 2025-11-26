@@ -17,6 +17,9 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
 
     val appsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
 
+    var triggerUpdateCallCount = 0
+        private set
+
     /** Convenience-Property für einfache Zuweisung */
     var installedApps: List<AppInfo>
         get() = appsFlow.value
@@ -25,10 +28,11 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
     override fun getInstalledApps(): Flow<List<AppInfo>> = appsFlow
 
     override suspend fun triggerAppsUpdate() {
-        // No-op für Tests - State wird direkt gesetzt
+        triggerUpdateCallCount++
     }
 
     override suspend fun purgeRepository() {
         appsFlow.value = emptyList()
+        triggerUpdateCallCount = 0
     }
 }

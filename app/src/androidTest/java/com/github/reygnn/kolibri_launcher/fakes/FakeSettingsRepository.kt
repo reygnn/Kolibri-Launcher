@@ -7,6 +7,43 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 
+/**
+ * ============================================================================
+ * FAKE SETTINGS REPOSITORY - SHARED BETWEEN UNIT TESTS AND ANDROID TESTS
+ * ============================================================================
+ *
+ * WICHTIG: Diese Datei existiert in ZWEI Locations und muss synchron gehalten werden!
+ *
+ * Locations:
+ *   - src/test/kotlin/.../fakes/FakeSettingsRepository.kt        (Unit Tests)
+ *   - src/androidTest/kotlin/.../FakeSettingsRepository.kt       (Android Tests)
+ *
+ * WARUM DUPLIZIERUNG STATT SHARED SOURCE SET?
+ *   - testFixtures: @Incubating API (potenziell instabil)
+ *   - sharedTest srcDir: "duplicate content roots" Fehler in Android Studio
+ *   - Eigenes Modul: Overkill für wenige Fakes
+ *   → Pragmatische Lösung: Manuelle Synchronisation
+ *
+ * REGELN:
+ *   1. Änderungen IMMER in BEIDEN Dateien durchführen!
+ *   2. Bei Interface-Änderungen bricht der Build in beiden Test-Arten
+ *      → Compiler zeigt dir automatisch was fehlt
+ *   3. Diese Klasse darf KEINE Android-spezifischen APIs verwenden
+ *      (kein Context, SharedPreferences, Resources, etc.)
+ *   4. Nur Kotlin/Coroutines APIs: MutableStateFlow, Flow, flowOf
+ *
+ * HELPER-METHODEN FÜR TESTS:
+ *   - setReadabilityModeBlocking(): Synchrones Update für runOnMainSync {} Blöcke
+ *   - Direkte Property-Setter (z.B. shadow = true) für einfache Test-Setups
+ *
+ * SIEHE AUCH:
+ *   - Andere Fakes folgen demselben Pattern
+ *   - BaseAndroidTest.kt für Injection-Setup
+ *   - TestRepositoryModule.kt für Hilt-Konfiguration (nur androidTest)
+ *
+ * ============================================================================
+ */
+
 class FakeSettingsRepository : SettingsRepository {
 
     private val shadowFlow = MutableStateFlow(true)
@@ -189,5 +226,15 @@ class FakeSettingsRepository : SettingsRepository {
         autoShowKeyboard = false
         autoLaunchApp = false
         splitModeThreshold = 0
+    }
+
+    // HELPER
+
+    fun setDoubleTapToLockEnabled(enabled: Boolean) {
+        doubleTap = enabled
+    }
+
+    fun setSwipeDownToNotificationsEnabled(enabled: Boolean) {
+        swipeDown = enabled
     }
 }
