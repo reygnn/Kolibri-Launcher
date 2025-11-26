@@ -245,4 +245,38 @@ class ShortcutManagerTest {
 
         assertNotNull(result)
     }
+
+    // ========== DEFAULT LAUNCHER CHECK ==========
+
+    @Test
+    fun `getShortcutsForPackage - when NOT default launcher - returns empty list without calling service`() {
+        // Arrange: Simuliere, dass ein ANDERER Launcher der Standard ist
+        val otherResolveInfo = org.mockito.kotlin.mock<ResolveInfo>()
+        val otherActivityInfo = org.mockito.kotlin.mock<ActivityInfo>()
+        otherActivityInfo.packageName = "com.other.launcher" // Nicht unsere App
+        otherResolveInfo.activityInfo = otherActivityInfo
+
+        whenever(packageManager.resolveActivity(any<Intent>(), eq(0)))
+            .thenReturn(otherResolveInfo)
+
+        // Act
+        val result = shortcutManager.getShortcutsForPackage("com.test.app")
+
+        // Assert
+        Assert.assertTrue("Should return empty list when not default launcher", result.isEmpty())
+
+        // WICHTIG: Der Service darf gar nicht erst aufgerufen werden, um Crashes zu vermeiden
+        org.mockito.kotlin.verify(launcherApps, org.mockito.kotlin.never()).getShortcuts(any(), anyOrNull())
+    }
+
+    // ========== PURGE TEST ==========
+
+    @Test
+    fun `purgeRepository - does nothing and does not crash`() = kotlinx.coroutines.test.runTest {
+        // Act
+        shortcutManager.purgeRepository()
+
+        // Assert
+        // Keine Interaktion erwartet, keine Exception
+    }
 }
