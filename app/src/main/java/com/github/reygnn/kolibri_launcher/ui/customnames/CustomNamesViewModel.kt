@@ -11,12 +11,13 @@ package com.github.reygnn.kolibri_launcher.ui.customnames
 
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,8 +29,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CustomNamesViewModel @Inject constructor(
-    private val appNamesManager: CustomNamesRepository,
-    private val installedAppsManager: InstalledAppsRepository,
+    private val setCustomNameUseCase: SetCustomNameUseCase,
+    private val removeCustomNameUseCase: RemoveCustomNameUseCase,
+    private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -43,7 +45,7 @@ class CustomNamesViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isLoading = true) }
 
-                installedAppsManager.getInstalledApps().collect { fullyProcessedList ->
+                getInstalledAppsUseCase().collect { fullyProcessedList ->
                     try {
                         masterAppList = fullyProcessedList
                         updateUiFromMasterList()
@@ -67,16 +69,17 @@ class CustomNamesViewModel @Inject constructor(
         }
     }
 
-    // CHANGED: launchSafe mit error handling
     fun setCustomName(packageName: String, customName: String) {
         launchSafe {
             try {
                 val app = masterAppList.find { it.packageName == packageName }
 
+                // Logik: Wenn Name nicht leer UND ungleich dem Original -> Setzen
+                // Sonst -> Entfernen (Reset auf Original)
                 if (customName.isNotBlank() && customName != app?.originalName) {
-                    appNamesManager.setCustomNameForPackage(packageName, customName)
+                    setCustomNameUseCase(packageName, customName)
                 } else {
-                    appNamesManager.removeCustomNameForPackage(packageName)
+                    removeCustomNameUseCase(packageName)
                 }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting custom name for $packageName")
@@ -88,7 +91,7 @@ class CustomNamesViewModel @Inject constructor(
     fun removeCustomName(packageName: String) {
         launchSafe {
             try {
-                appNamesManager.removeCustomNameForPackage(packageName)
+                removeCustomNameUseCase(packageName)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error removing custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))

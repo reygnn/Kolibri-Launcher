@@ -1,10 +1,13 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.ReactiveFakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth
@@ -34,14 +37,26 @@ class CustomNamesViewModelTest {
     private lateinit var fakeInstalledAppsRepository: ReactiveFakeInstalledAppsRepository
     private lateinit var viewModel: CustomNamesViewModel
 
+    // UseCases
+    private lateinit var setCustomNameUseCase: SetCustomNameUseCase
+    private lateinit var removeCustomNameUseCase: RemoveCustomNameUseCase
+    private lateinit var getInstalledAppsUseCase: GetInstalledAppsUseCase
+
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeCustomNamesRepository = FakeCustomNamesRepository()
         fakeInstalledAppsRepository = ReactiveFakeInstalledAppsRepository(fakeCustomNamesRepository)
+
+        // Initialize UseCases with Fakes
+        setCustomNameUseCase = SetCustomNameUseCase(fakeCustomNamesRepository)
+        removeCustomNameUseCase = RemoveCustomNameUseCase(fakeCustomNamesRepository)
+        getInstalledAppsUseCase = GetInstalledAppsUseCase(fakeInstalledAppsRepository)
+
         viewModel = CustomNamesViewModel(
-            fakeCustomNamesRepository,
-            fakeInstalledAppsRepository,
+            setCustomNameUseCase,
+            removeCustomNameUseCase,
+            getInstalledAppsUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
     }
@@ -58,7 +73,7 @@ class CustomNamesViewModelTest {
         fakeCustomNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
 
         viewModel.uiState.test {
-            awaitItem()
+            awaitItem() // Initial state
 
             fakeInstalledAppsRepository.triggerAppsUpdate()
 
@@ -116,9 +131,12 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
+        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository)
+
         val vm = CustomNamesViewModel(
-            fakeCustomNamesRepository,
-            crashingRepository,
+            setCustomNameUseCase,
+            removeCustomNameUseCase,
+            crashingUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -141,9 +159,12 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
+        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository)
+
         val vm = CustomNamesViewModel(
-            fakeCustomNamesRepository,
-            crashingRepository,
+            setCustomNameUseCase,
+            removeCustomNameUseCase,
+            crashingUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -248,9 +269,12 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
+        val emptyUseCase = GetInstalledAppsUseCase(emptyRepository)
+
         val vm = CustomNamesViewModel(
-            fakeCustomNamesRepository,
-            emptyRepository,
+            setCustomNameUseCase,
+            removeCustomNameUseCase,
+            emptyUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -280,7 +304,7 @@ class CustomNamesViewModelTest {
         }
     }
 
-    // ========== NEW TESTS FOR BATCH OPERATIONS ==========
+    // ========== NEW TESTS FOR BATCH OPERATIONS (Repo Only) ==========
 
     @Test
     fun `getAllCustomNames - returns empty map when no names set`() = runTest {
