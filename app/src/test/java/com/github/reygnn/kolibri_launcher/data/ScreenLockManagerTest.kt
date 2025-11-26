@@ -265,4 +265,55 @@ class ScreenLockManagerTest {
             assertEquals(Unit, awaitItem())
         }
     }
+
+    // ========== OPEN NOTIFICATIONS TESTS ==========
+
+    @Test
+    fun `requestOpenNotifications - when service is available - emits request`() = runTest {
+        screenLockManager.setServiceState(true)
+
+        screenLockManager.openNotificationsRequestFlow.test {
+            screenLockManager.requestOpenNotifications()
+            assertEquals(Unit, awaitItem())
+        }
+    }
+
+    @Test
+    fun `requestOpenNotifications - when service is NOT available - does NOT emit request`() = runTest {
+        screenLockManager.setServiceState(false)
+
+        screenLockManager.openNotificationsRequestFlow.test {
+            screenLockManager.requestOpenNotifications()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `requestOpenNotifications - triggers correct flow and NOT lock flow`() = runTest {
+        screenLockManager.setServiceState(true)
+
+        // Wir hören auf BEIDE Flows um sicherzustellen, dass keine Verwechslung vorliegt
+        screenLockManager.lockRequestFlow.test {
+            screenLockManager.openNotificationsRequestFlow.test {
+
+                screenLockManager.requestOpenNotifications()
+
+                assertEquals(Unit, awaitItem()) // Notification flow should emit
+                expectNoEvents() // Lock flow should stay silent
+            }
+        }
+    }
+
+    // ========== PURGE TEST ==========
+
+    @Test
+    fun `purgeRepository - does nothing and does not crash`() = runTest {
+        // Act
+        screenLockManager.purgeRepository()
+
+        // Assert
+        // Wir können hier nur prüfen, ob keine Exception fliegt.
+        // Da der Manager keinen persistierten State hat, gibt es nichts zu verifizieren.
+        // Der Test dient der Code-Coverage und Sicherheit.
+    }
 }
