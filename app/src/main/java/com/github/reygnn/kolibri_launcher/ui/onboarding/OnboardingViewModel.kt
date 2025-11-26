@@ -115,6 +115,8 @@ class OnboardingViewModel @Inject constructor(
                     LaunchMode.EDIT_FAVORITES -> getFavoriteComponentsUseCase()
                 }
                 selectedComponents.value = initialSelection
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading initial favorites.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
@@ -152,6 +154,8 @@ class OnboardingViewModel @Inject constructor(
                 )
 
                 sendOnboardingEvent(OnboardingEvent.NavigateToMain)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(
                     e,

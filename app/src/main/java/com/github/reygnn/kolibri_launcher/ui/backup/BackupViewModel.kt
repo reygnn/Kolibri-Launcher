@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @HiltViewModel
 class BackupViewModel @Inject constructor(
@@ -43,7 +44,9 @@ class BackupViewModel @Inject constructor(
                 } else {
                     BackupState.Error("Export failed")
                 }
-            } catch (e: Throwable) {
+            } catch (e: CancellationException) {
+            throw e
+        }catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error exporting backup")
                 _backupState.value = BackupState.Error(e.message ?: "Unknown error")
             }
@@ -79,6 +82,8 @@ class BackupViewModel @Inject constructor(
                         _backupState.value = BackupState.Error(result.message)
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error importing backup")
                 _backupState.value = BackupState.Error(e.message ?: "Import failed")
@@ -91,6 +96,8 @@ class BackupViewModel @Inject constructor(
             try {
                 val preview = previewBackupUseCase(uriString)
                 _backupPreview.value = preview
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error previewing backup")
                 _backupPreview.value = null

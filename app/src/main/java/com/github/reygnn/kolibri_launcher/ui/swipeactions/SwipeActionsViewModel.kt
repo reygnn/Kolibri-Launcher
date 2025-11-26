@@ -4,11 +4,12 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeLeftAppUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeRightAppUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,11 +18,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @HiltViewModel
 class SwipeActionsViewModel @Inject constructor(
-    private val installedAppsRepository: InstalledAppsRepository,
-    private val swipeActionsRepository: SwipeActionsRepository,
+    private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
+    private val getSwipeLeftAppUseCase: GetSwipeLeftAppUseCase,
+    private val getSwipeRightAppUseCase: GetSwipeRightAppUseCase,
+    private val setSwipeActionUseCase: SetSwipeActionUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -91,15 +95,17 @@ class SwipeActionsViewModel @Inject constructor(
     internal fun initialize() {
         launchSafe {
             try {
-                // Lade alle installierten Apps
-                val allApps = installedAppsRepository.getInstalledApps().first()
+                // Lade alle installierten Apps via UseCase
+                val allApps = getInstalledAppsUseCase().first()
                     .sortedBy { it.displayName.lowercase() }
                 allAppsMasterList.value = allApps
 
-                // Lade die aktuell gespeicherten Zuweisungen
-                swipeLeftComponent.value = swipeActionsRepository.swipeLeftAppFlow.first()
-                swipeRightComponent.value = swipeActionsRepository.swipeRightAppFlow.first()
+                // Lade die aktuell gespeicherten Zuweisungen via UseCases
+                swipeLeftComponent.value = getSwipeLeftAppUseCase().first()
+                swipeRightComponent.value = getSwipeRightAppUseCase().first()
 
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading swipe actions")
                 sendEvent(UiEvent.ShowToast(R.string.error_loading_apps))
@@ -113,10 +119,6 @@ class SwipeActionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Wird aufgerufen, wenn der Benutzer oben auf "Links" oder "Rechts" tippt.
-     * Setzt den Slot, der als Nächstes befüllt wird.
-     */
     fun onSlotSelected(slot: SwipeSlot) {
         executeSafe {
             if (slot != SwipeSlot.NONE) {
@@ -125,10 +127,6 @@ class SwipeActionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Wird aufgerufen, wenn der Benutzer eine App in der RecyclerView antippt.
-     * Weist die App dem aktuell aktiven Slot zu.
-     */
     fun onAppSelected(app: AppInfo) {
         executeSafe {
             val component = app.componentName
@@ -139,21 +137,17 @@ class SwipeActionsViewModel @Inject constructor(
 
             if (activeSlot == SwipeSlot.LEFT) {
                 // App dem "Left"-Slot zuweisen
-                // Wenn die App schon "Left" war, hebe Zuweisung auf (setze auf null)
                 val newLeft = if (currentLeft == component) null else component
                 swipeLeftComponent.value = newLeft
 
-                // Wenn diese App vorher "Right" war, entferne sie von "Right"
                 if (newLeft != null && currentRight == component) {
                     swipeRightComponent.value = null
                 }
             } else {
                 // App dem "Right"-Slot zuweisen
-                // Wenn die App schon "Right" war, hebe Zuweisung auf
                 val newRight = if (currentRight == component) null else component
                 swipeRightComponent.value = newRight
 
-                // Wenn diese App vorher "Left" war, entferne sie von "Left"
                 if (newRight != null && currentLeft == component) {
                     swipeLeftComponent.value = null
                 }
@@ -161,34 +155,30 @@ class SwipeActionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Setzt den angegebenen Slot auf null (keine App zugewiesen).
-     */
     fun onSlotCleared(slot: SwipeSlot) {
         executeSafe {
             when (slot) {
                 SwipeSlot.LEFT -> swipeLeftComponent.value = null
                 SwipeSlot.RIGHT -> swipeRightComponent.value = null
-                SwipeSlot.NONE -> {} // Nichts tun
+                SwipeSlot.NONE -> {}
             }
         }
     }
 
-    /**
-     * Speichert die aktuelle Auswahl und schließt den Bildschirm.
-     */
     fun onDoneClicked() {
         launchSafe {
             try {
-                // Speichere die finalen Werte im Repository
-                swipeActionsRepository.setSwipeAction(SwipeSlot.LEFT, swipeLeftComponent.value)
-                swipeActionsRepository.setSwipeAction(SwipeSlot.RIGHT, swipeRightComponent.value)
+                // Speichere via UseCase
+                setSwipeActionUseCase(SwipeSlot.LEFT, swipeLeftComponent.value)
+                setSwipeActionUseCase(SwipeSlot.RIGHT, swipeRightComponent.value)
 
                 sendEvent(UiEvent.NavigateUp)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error saving swipe actions")
                 sendEvent(UiEvent.ShowToast(R.string.error_saving_swipe_actions))
-                sendEvent(UiEvent.NavigateUp) // Trotz Fehler schließen
+                sendEvent(UiEvent.NavigateUp)
             }
         }
     }

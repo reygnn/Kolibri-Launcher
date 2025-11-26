@@ -81,6 +81,8 @@ class CustomNamesViewModel @Inject constructor(
                 } else {
                     removeCustomNameUseCase(packageName)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))
@@ -92,6 +94,8 @@ class CustomNamesViewModel @Inject constructor(
         launchSafe {
             try {
                 removeCustomNameUseCase(packageName)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error removing custom name for $packageName")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic))

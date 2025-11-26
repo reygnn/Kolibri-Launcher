@@ -97,6 +97,8 @@ class HiddenAppsViewModel @Inject constructor(
 
                 initialHiddenComponents = getHiddenAppsUseCase().first()
                 selectedComponents.value = initialHiddenComponents
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading hidden apps")
                 sendEvent(UiEvent.ShowToast(R.string.error_loading_hidden_apps))
@@ -138,6 +140,8 @@ class HiddenAppsViewModel @Inject constructor(
                 }
 
                 sendEvent(UiEvent.NavigateUp)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error saving hidden apps")
                 sendEvent(UiEvent.NavigateUp)
