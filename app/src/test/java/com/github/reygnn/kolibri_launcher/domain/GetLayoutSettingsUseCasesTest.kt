@@ -10,11 +10,10 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 @ExperimentalCoroutinesApi
-class LayoutSettingsUseCasesTest {
+class GetLayoutSettingsUseCasesTest {
 
     @Mock
     private lateinit var repository: SettingsRepository
