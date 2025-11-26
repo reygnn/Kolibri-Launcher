@@ -45,6 +45,7 @@ class OnboardingViewModelTest {
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
 
+    // UseCases als Mocks
     @Mock
     private lateinit var onboardingAppsUseCase: GetOnboardingAppsUseCase
     @Mock
@@ -62,6 +63,7 @@ class OnboardingViewModelTest {
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
+        // Default behavior für Apps Flow
         whenever(onboardingAppsUseCase.onboardingAppsFlow).thenReturn(flowOf(testApps))
     }
 
@@ -74,7 +76,7 @@ class OnboardingViewModelTest {
         )
     }
 
-    // ========== TESTS (ANGEPASST) ==========
+    // ========== TESTS (ANGEPASST AN USECASES) ==========
 
     @Test
     fun `init - loads apps and creates initial state correctly`() = runTest {
@@ -87,7 +89,6 @@ class OnboardingViewModelTest {
         assertFalse(uiState.selectableApps[0].isSelected)
     }
 
-    // --- onAppToggled Tests (bleiben gleich, da sie keine Repos aufrufen) ---
     @Test
     fun `onAppToggled - adds app to selection correctly`() = runTest {
         setupViewModel()
@@ -114,8 +115,6 @@ class OnboardingViewModelTest {
         assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
     }
 
-    // --- onDoneClicked Tests (ANGEPASST, PRÜFEN USECASES) ---
-
     @Test
     fun `onDoneClicked - in INITIAL_SETUP mode - calls CompleteOnboardingUseCase correctly`() =
         runTest {
@@ -130,7 +129,7 @@ class OnboardingViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // PRÜFE DEN USECASE
+            // PRÜFE DEN USECASE AUFRUF
             verify(completeOnboardingUseCase).invoke(
                 componentNames = listOf(app1.componentName),
                 isInitialSetup = true
@@ -154,10 +153,10 @@ class OnboardingViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // PRÜFE DEN USECASE
+            // PRÜFE DEN USECASE AUFRUF
             verify(completeOnboardingUseCase).invoke(
                 componentNames = listOf(app3.componentName),
-                isInitialSetup = false // Korrekt
+                isInitialSetup = false
             )
         }
 
@@ -186,7 +185,6 @@ class OnboardingViewModelTest {
         }
     }
 
-    // --- onAppToggled Limit Test (bleibt gleich) ---
     @Test
     fun `onAppToggled - whenLimitReached - emitsToastEventAndDoesNotSelectApp`() = runTest {
         val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
@@ -226,7 +224,7 @@ class OnboardingViewModelTest {
 
         val testDispatcher = StandardTestDispatcher(testScheduler)
 
-        // 3. ViewModel initialisieren (Die Coroutine im init-Block wird jetzt "pausiert" gestartet)
+        // 3. ViewModel initialisieren
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
