@@ -418,4 +418,137 @@ class SettingsManagerTest {
         assertTrue(settingsManager.showCalendarEventFlow.first())
         assertFalse(settingsManager.showAlarmFlow.first())
     }
+
+    // ========== GESTURE & AUTO TESTS ==========
+
+    @Test
+    fun `swipeDownToNotificationsEnabledFlow - defaults to false and updates correctly`() = runTest {
+        // Default check
+        assertFalse(settingsManager.swipeDownToNotificationsEnabledFlow.first())
+
+        // Act
+        settingsManager.setSwipeDownToNotifications(true)
+
+        // Assert
+        assertTrue(settingsManager.swipeDownToNotificationsEnabledFlow.first())
+    }
+
+    @Test
+    fun `autoShowKeyboardFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.autoShowKeyboardFlow.first())
+
+        settingsManager.setAutoShowKeyboard(true)
+
+        assertTrue(settingsManager.autoShowKeyboardFlow.first())
+    }
+
+    @Test
+    fun `autoLaunchAppFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.autoLaunchAppFlow.first())
+
+        settingsManager.setAutoLaunchApp(true)
+
+        assertTrue(settingsManager.autoLaunchAppFlow.first())
+    }
+
+    // ========== THEME & APPEARANCE TESTS ==========
+
+    @Test
+    fun `textShadowEnabledFlow - defaults to TRUE and updates correctly`() = runTest {
+        // WICHTIG: Default ist hier TRUE im Manager!
+        assertTrue(settingsManager.textShadowEnabledFlow.first(), "Default should be true")
+
+        settingsManager.setTextShadowEnabled(false)
+
+        assertFalse(settingsManager.textShadowEnabledFlow.first())
+    }
+
+    @Test
+    fun `textColorFlow - defaults to 0 and updates correctly`() = runTest {
+        Assert.assertEquals(0, settingsManager.textColorFlow.first())
+
+        val newColor = -16777216 // Black
+        settingsManager.setTextColor(newColor)
+
+        Assert.assertEquals(newColor, settingsManager.textColorFlow.first())
+    }
+
+    @Test
+    fun `chipBackgroundColorFlow - defaults to 0 and updates correctly`() = runTest {
+        Assert.assertEquals(0, settingsManager.chipBackgroundColorFlow.first())
+
+        val newColor = -1 // White
+        settingsManager.setChipBackgroundColor(newColor)
+
+        Assert.assertEquals(newColor, settingsManager.chipBackgroundColorFlow.first())
+    }
+
+    @Test
+    fun `isFontBoldStateFlow - updates correctly`() = runTest {
+        // Default ist AppConstant dependent, wir testen hier Set/Get
+        settingsManager.setFontBold(true)
+        assertTrue(settingsManager.isFontBoldStateFlow.first())
+
+        settingsManager.setFontBold(false)
+        assertFalse(settingsManager.isFontBoldStateFlow.first())
+    }
+
+    @Test
+    fun `layoutScales - update correctly`() = runTest {
+        settingsManager.setLayoutScale(1.5f)
+        settingsManager.setVerticalPadding(2.0f)
+        settingsManager.setContentTopMarginScale(0.5f)
+
+        Assert.assertEquals(1.5f, settingsManager.layoutScaleStateFlow.first())
+        Assert.assertEquals(2.0f, settingsManager.verticalPaddingStateFlow.first())
+        Assert.assertEquals(0.5f, settingsManager.contentTopMarginScaleFlow.first())
+    }
+
+    // ========== HOME EVENT TESTS ==========
+
+    @Test
+    fun `showCalendarEventFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.showCalendarEventFlow.first())
+
+        settingsManager.setShowCalendarEvent(true)
+
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+    }
+
+    // ========== SPLIT MODE VALIDATION TEST ==========
+
+    @Test
+    fun `setSplitModeThreshold - validates input range correctly`() = runTest {
+        // Test 1: Valid value
+        settingsManager.setSplitModeThreshold(100)
+        Assert.assertEquals(100, settingsManager.splitModeThresholdFlow.first())
+
+        // Test 2: Too low (negative) -> should clamp to 0
+        settingsManager.setSplitModeThreshold(-50)
+        Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first())
+
+        // Test 3: Too high (> 512) -> should clamp to 512
+        settingsManager.setSplitModeThreshold(1000)
+        Assert.assertEquals(512, settingsManager.splitModeThresholdFlow.first())
+    }
+
+    // ========== PURGE TEST ==========
+
+    @Test
+    fun `purgeRepository - clears all settings keys`() = runTest {
+        // Arrange: Setze diverse Werte, um sicherzugehen, dass sie gelöscht werden
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        settingsManager.setDoubleTapToLock(true)
+        settingsManager.setShowAlarm(true)
+        settingsManager.setSplitModeThreshold(100)
+
+        // Act
+        settingsManager.purgeRepository()
+
+        // Assert: Alle Flows sollten auf ihre Defaults zurückfallen
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first()) // Default
+        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first()) // Default false
+        assertFalse(settingsManager.showAlarmFlow.first()) // Default false
+        Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first()) // Default 0
+    }
 }
