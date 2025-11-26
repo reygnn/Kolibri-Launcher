@@ -4,7 +4,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-// 1. Get Layout Settings (Alle 3 Flows)
+// 1. Get Layout Settings (Alle 4 Flows)
 class GetLayoutSettingsUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
