@@ -227,4 +227,8 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = false
         splitModeThreshold = 0
     }
+
+    fun setDoubleTapToLockEnabled(enabled: Boolean) {
+        doubleTap = enabled
+    }
 }
