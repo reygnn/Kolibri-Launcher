@@ -422,4 +422,16 @@ class InstalledAppsManagerTest {
         // Empty package name might still be processed, just verify no crash
         Assert.assertTrue(actualAppList.isNotEmpty())
     }
+
+    // ========== MISSING PURGE TEST ==========
+
+    @Test
+    fun `purgeRepository - does nothing and does not crash`() = runTest {
+        // Act
+        installedAppsManager.purgeRepository()
+
+        // Assert
+        // Wir erwarten keine Interaktionen mit Mocks und keine Exception
+        verify(mockAppsUpdateTrigger, org.mockito.kotlin.never()).emit(any())
+    }
 }
