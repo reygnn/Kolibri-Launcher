@@ -282,4 +282,32 @@ class DataMigrationManagerTest {
 
         verify(sharedPreferencesEditor).putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION))
     }
+
+    @Test
+    fun `runMigrationIfNeeded - when old version detected - clears DataStore content`() = runTest {
+        // Arrange
+        // Simuliere alte Version (kleiner als 1)
+        whenever(
+            sharedPreferences.getInt(
+                eq(KEY_DATA_VERSION),
+                ArgumentMatchers.anyInt()
+            )
+        ).thenReturn(-1)
+
+        // Fülle den DataStore mit Daten, um zu sehen, ob sie gelöscht werden
+        fakeDataStore.setInitialData(preferencesOf(stringPreferencesKey("existing_key") to "must_be_deleted"))
+
+        // Sicherstellen, dass Daten da sind
+        Assert.assertFalse(fakeDataStore.data.first().asMap().isEmpty())
+
+        // Act
+        dataMigrationManager.runMigrationIfNeeded()
+
+        // Assert
+        val data = fakeDataStore.data.first()
+        Assert.assertTrue("DataStore should be empty after migration from old version", data.asMap().isEmpty())
+
+        // Version muss trotzdem geupdated werden
+        verify(sharedPreferencesEditor).putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION))
+    }
 }
