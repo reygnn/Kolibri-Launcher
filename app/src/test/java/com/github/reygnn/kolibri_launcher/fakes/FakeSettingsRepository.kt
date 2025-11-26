@@ -66,6 +66,9 @@ class FakeSettingsRepository : SettingsRepository {
 
     override val readabilityModeFlow: Flow<String> = readabilityModeState
 
+    private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE)
+    override val sortOrderFlow: Flow<SortOrder> = sortOrderState
+
     var shadow: Boolean
         get() = shadowFlow.value
         set(value) { shadowFlow.value = value }
@@ -124,6 +127,10 @@ class FakeSettingsRepository : SettingsRepository {
             splitModeThresholdFlowState.value = value.coerceIn(0, 512)
         }
 
+    var currentSortOrder: SortOrder
+        get() = sortOrderState.value
+        private set(value) { sortOrderState.value = value }
+
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
     override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
@@ -160,9 +167,6 @@ class FakeSettingsRepository : SettingsRepository {
     override suspend fun setContentTopMarginScale(scale: Float) {
         contentTopMargin = scale
     }
-
-    override val sortOrderFlow: Flow<SortOrder> = flowOf(SortOrder.TIME_WEIGHTED_USAGE)
-    override suspend fun setSortOrder(sortOrder: SortOrder) {}
 
     override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
@@ -210,6 +214,10 @@ class FakeSettingsRepository : SettingsRepository {
         splitModeThreshold = thresholdPixels
     }
 
+    override suspend fun setSortOrder(sortOrder: SortOrder) {
+        sortOrderState.value = sortOrder
+    }
+
     override suspend fun purgeRepository() {
         color = 0
         shadow = true
@@ -236,5 +244,9 @@ class FakeSettingsRepository : SettingsRepository {
 
     fun setSwipeDownToNotificationsEnabled(enabled: Boolean) {
         swipeDown = enabled
+    }
+
+    fun setSortOrderForTest(sortOrder: SortOrder) {
+        sortOrderState.value = sortOrder
     }
 }
