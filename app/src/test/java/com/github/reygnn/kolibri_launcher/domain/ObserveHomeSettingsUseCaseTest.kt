@@ -1,9 +1,8 @@
-package com.github.reygnn.kolibri_launcher.domain
+package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -31,7 +30,6 @@ class ObserveHomeSettingsUseCaseTest {
     @Test
     fun `invoke - combines flows into HomeSettings correctly`() = runTest {
         // Arrange
-        // Nutzung eines echten Enum-Wertes statt eines Mocks
         val expectedSortOrder = SortOrder.ALPHABETICAL
 
         val sortOrderFlow = MutableStateFlow(expectedSortOrder)
@@ -46,13 +44,23 @@ class ObserveHomeSettingsUseCaseTest {
 
         // Act
         useCase().test {
-            val result = awaitItem()
+            // 1. Initial State Check
+            val initialResult = awaitItem()
+            assertEquals(expectedSortOrder, initialResult.sortOrder)
+            assertEquals(true, initialResult.doubleTapToLockEnabled)
+            assertEquals(false, initialResult.swipeDownToNotificationsEnabled)
+            assertEquals(true, initialResult.autoLaunchApp)
 
-            // Assert
-            assertEquals(expectedSortOrder, result.sortOrder)
-            assertEquals(true, result.doubleTapToLockEnabled)
-            assertEquals(false, result.swipeDownToNotificationsEnabled)
-            assertEquals(true, result.autoLaunchApp)
+            // 2. Reactivity Check (Update one flow)
+            // Ändere einen Wert im Repository
+            val newSortOrder = SortOrder.TIME_WEIGHTED_USAGE
+            sortOrderFlow.value = newSortOrder
+
+            // Der UseCase muss ein neues HomeSettings Objekt emittieren
+            val updatedResult = awaitItem()
+            assertEquals(newSortOrder, updatedResult.sortOrder)
+            // Die anderen Werte müssen unverändert bleiben
+            assertEquals(true, updatedResult.doubleTapToLockEnabled)
         }
     }
 }
