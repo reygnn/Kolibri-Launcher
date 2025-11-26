@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.fakes.FakeAppNamesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
@@ -24,23 +24,23 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
-class AppNamesViewModelTest {
+class CustomNamesViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var fakeAppNamesRepository: FakeAppNamesRepository
+    private lateinit var fakeCustomNamesRepository: FakeCustomNamesRepository
     private lateinit var fakeInstalledAppsRepository: ReactiveFakeInstalledAppsRepository
     private lateinit var viewModel: CustomNamesViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        fakeAppNamesRepository = FakeAppNamesRepository()
-        fakeInstalledAppsRepository = ReactiveFakeInstalledAppsRepository(fakeAppNamesRepository)
+        fakeCustomNamesRepository = FakeCustomNamesRepository()
+        fakeInstalledAppsRepository = ReactiveFakeInstalledAppsRepository(fakeCustomNamesRepository)
         viewModel = CustomNamesViewModel(
-            fakeAppNamesRepository,
+            fakeCustomNamesRepository,
             fakeInstalledAppsRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
@@ -55,7 +55,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `init - collects pre-processed app list from flow`() = runTest {
-        fakeAppNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
+        fakeCustomNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
 
         viewModel.uiState.test {
             awaitItem()
@@ -75,7 +75,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomName - calls repository and triggers update`() = runTest {
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             fakeInstalledAppsRepository.triggerAppsUpdate()
         }
 
@@ -92,7 +92,7 @@ class AppNamesViewModelTest {
 
             val finalState = awaitItem()
 
-            Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock"))
+            Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock"))
                 .isTrue()
             Truth.assertThat(finalState.appsWithCustomNames).hasSize(1)
             Truth.assertThat(finalState.appsWithCustomNames.first().displayName)
@@ -117,7 +117,7 @@ class AppNamesViewModelTest {
         }
 
         val vm = CustomNamesViewModel(
-            fakeAppNamesRepository,
+            fakeCustomNamesRepository,
             crashingRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
@@ -142,7 +142,7 @@ class AppNamesViewModelTest {
         }
 
         val vm = CustomNamesViewModel(
-            fakeAppNamesRepository,
+            fakeCustomNamesRepository,
             crashingRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
@@ -155,7 +155,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomName - when repository throws IOException - does not crash`() = runTest {
-        fakeAppNamesRepository.shouldFailOnSet = true
+        fakeCustomNamesRepository.shouldFailOnSet = true
 
         viewModel.uiState.test {
             awaitItem()
@@ -193,7 +193,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomName - with empty custom name - removes custom name`() = runTest {
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             fakeInstalledAppsRepository.triggerAppsUpdate()
         }
 
@@ -217,7 +217,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomName - called multiple times rapidly - handles correctly`() = runTest {
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             fakeInstalledAppsRepository.triggerAppsUpdate()
         }
 
@@ -249,7 +249,7 @@ class AppNamesViewModelTest {
         }
 
         val vm = CustomNamesViewModel(
-            fakeAppNamesRepository,
+            fakeCustomNamesRepository,
             emptyRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
@@ -262,7 +262,7 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomName - with very long name - handles correctly`() = runTest {
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             fakeInstalledAppsRepository.triggerAppsUpdate()
         }
 
@@ -284,17 +284,17 @@ class AppNamesViewModelTest {
 
     @Test
     fun `getAllCustomNames - returns empty map when no names set`() = runTest {
-        val result = fakeAppNamesRepository.getAllCustomNames()
+        val result = fakeCustomNamesRepository.getAllCustomNames()
 
         Truth.assertThat(result).isEmpty()
     }
 
     @Test
     fun `getAllCustomNames - returns all custom names`() = runTest {
-        fakeAppNamesRepository.setCustomNameForPackage("com.android.clock", "My Clock")
-        fakeAppNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
+        fakeCustomNamesRepository.setCustomNameForPackage("com.android.clock", "My Clock")
+        fakeCustomNamesRepository.setCustomNameForPackage("com.android.camera", "My Camera")
 
-        val result = fakeAppNamesRepository.getAllCustomNames()
+        val result = fakeCustomNamesRepository.getAllCustomNames()
 
         Truth.assertThat(result).hasSize(2)
         Truth.assertThat(result).containsEntry("com.android.clock", "My Clock")
@@ -309,21 +309,21 @@ class AppNamesViewModelTest {
             "com.android.calculator" to "Math Tool"
         )
 
-        val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
+        val success = fakeCustomNamesRepository.setCustomNamesInBatch(names)
 
         Truth.assertThat(success).isTrue()
-        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.clock"))
+        Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock"))
             .isTrue()
-        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.camera"))
+        Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.camera"))
             .isTrue()
-        Truth.assertThat(fakeAppNamesRepository.hasCustomNameForPackage("com.android.calculator"))
+        Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.calculator"))
             .isTrue()
     }
 
     @Test
     fun `setCustomNamesInBatch - triggers update only once`() = runTest {
         var triggerCount = 0
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             triggerCount++
         }
 
@@ -333,7 +333,7 @@ class AppNamesViewModelTest {
             "com.android.calculator" to "Name3"
         )
 
-        fakeAppNamesRepository.setCustomNamesInBatch(names)
+        fakeCustomNamesRepository.setCustomNamesInBatch(names)
 
         // Should trigger only once, not 3 times
         Truth.assertThat(triggerCount).isEqualTo(1)
@@ -342,11 +342,11 @@ class AppNamesViewModelTest {
     @Test
     fun `setCustomNamesInBatch - with empty map - returns true and triggers once`() = runTest {
         var triggerCount = 0
-        fakeAppNamesRepository.onUpdateTrigger = {
+        fakeCustomNamesRepository.onUpdateTrigger = {
             triggerCount++
         }
 
-        val success = fakeAppNamesRepository.setCustomNamesInBatch(emptyMap())
+        val success = fakeCustomNamesRepository.setCustomNamesInBatch(emptyMap())
 
         Truth.assertThat(success).isTrue()
         Truth.assertThat(triggerCount).isEqualTo(0) // Empty batch should not trigger
@@ -354,22 +354,22 @@ class AppNamesViewModelTest {
 
     @Test
     fun `setCustomNamesInBatch - overwrites existing names`() = runTest {
-        fakeAppNamesRepository.setCustomNameForPackage("com.android.clock", "Old Name")
+        fakeCustomNamesRepository.setCustomNameForPackage("com.android.clock", "Old Name")
 
         val names = mapOf("com.android.clock" to "New Name")
-        fakeAppNamesRepository.setCustomNamesInBatch(names)
+        fakeCustomNamesRepository.setCustomNamesInBatch(names)
 
         val displayName =
-            fakeAppNamesRepository.getDisplayNameForPackage("com.android.clock", "Clock")
+            fakeCustomNamesRepository.getDisplayNameForPackage("com.android.clock", "Clock")
         Truth.assertThat(displayName).isEqualTo("New Name")
     }
 
     @Test
     fun `setCustomNamesInBatch - when fails - returns false`() = runTest {
-        fakeAppNamesRepository.shouldFailOnBatch = true
+        fakeCustomNamesRepository.shouldFailOnBatch = true
 
         val names = mapOf("com.android.clock" to "Name")
-        val success = fakeAppNamesRepository.setCustomNamesInBatch(names)
+        val success = fakeCustomNamesRepository.setCustomNamesInBatch(names)
 
         Truth.assertThat(success).isFalse()
     }
@@ -382,9 +382,9 @@ class AppNamesViewModelTest {
             "com.package3" to "App 3"
         )
 
-        fakeAppNamesRepository.setCustomNamesInBatch(names)
+        fakeCustomNamesRepository.setCustomNamesInBatch(names)
 
-        val result = fakeAppNamesRepository.getAllCustomNames()
+        val result = fakeCustomNamesRepository.getAllCustomNames()
         Truth.assertThat(result).isEqualTo(names)
     }
 }

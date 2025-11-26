@@ -9,13 +9,13 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
-import com.github.reygnn.kolibri_launcher.fakes.FakeAppNamesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.fakes.StaticFakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -44,8 +44,8 @@ class BackupManagerTest {
     private lateinit var fakeFavoritesRepo: FakeFavoritesRepository
     private lateinit var fakeFavoritesOrderRepo: FakeFavoritesOrderRepository
     private lateinit var fakeVisibilityRepo: FakeHiddenAppsRepository
-    private lateinit var fakeNamesRepo: FakeAppNamesRepository
-    private lateinit var fakeInstalledAppsRepo: StaticFakeInstalledAppsRepository
+    private lateinit var fakeNamesRepo: FakeCustomNamesRepository
+    private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
 
@@ -60,11 +60,11 @@ class BackupManagerTest {
     @Before
     fun setUp() {
         mockContext = Mockito.mock(Context::class.java)
-        fakeInstalledAppsRepo = StaticFakeInstalledAppsRepository()
+        fakeInstalledAppsRepo = FakeInstalledAppsRepository()
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
         fakeVisibilityRepo = FakeHiddenAppsRepository()
-        fakeNamesRepo = FakeAppNamesRepository()
+        fakeNamesRepo = FakeCustomNamesRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
 

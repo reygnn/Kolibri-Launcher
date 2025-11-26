@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import java.io.IOException
 
-class FakeAppNamesRepository : CustomNamesRepository {
+class FakeCustomNamesRepository : CustomNamesRepository {
     private val customNames = mutableMapOf<String, String>()
 
     // Für AppNamesViewModelTest

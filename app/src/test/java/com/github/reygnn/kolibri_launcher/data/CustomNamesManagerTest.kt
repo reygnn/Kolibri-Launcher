@@ -27,14 +27,14 @@ import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertFailsWith
 
-class AppNamesManagerTest {
+class CustomNamesManagerTest {
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
 
     @Mock
     private lateinit var mockDataStore: DataStore<Preferences>
-    private lateinit var appNamesManager: CustomNamesManager
+    private lateinit var customNamesManager: CustomNamesManager
     @Mock
     private lateinit var mockAppsUpdateTrigger: MutableSharedFlow<Unit>
     @Mock
@@ -42,7 +42,7 @@ class AppNamesManagerTest {
 
     @Before
     fun setup() {
-        appNamesManager = CustomNamesManager(mockDataStore, mockAppsUpdateTrigger, mockContext)
+        customNamesManager = CustomNamesManager(mockDataStore, mockAppsUpdateTrigger, mockContext)
     }
 
     // ========== EXISTING TESTS ==========
@@ -56,7 +56,7 @@ class AppNamesManagerTest {
 
         whenever(mockDataStore.data).thenReturn(flowOf(testPreferences))
 
-        val displayName = appNamesManager.getDisplayNameForPackage(packageName, "Original Name")
+        val displayName = customNamesManager.getDisplayNameForPackage(packageName, "Original Name")
 
         Assert.assertEquals(customName, displayName)
     }
@@ -68,7 +68,7 @@ class AppNamesManagerTest {
 
         whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
 
-        val displayName = appNamesManager.getDisplayNameForPackage(packageName, originalName)
+        val displayName = customNamesManager.getDisplayNameForPackage(packageName, originalName)
 
         Assert.assertEquals(originalName, displayName)
     }
@@ -77,7 +77,7 @@ class AppNamesManagerTest {
     fun `setCustomNameForPackage calls edit to save the new name`() = runTest {
         whenever(mockDataStore.edit(any())).doReturn(preferencesOf())
 
-        val result = appNamesManager.setCustomNameForPackage("com.test.app", "New Name")
+        val result = customNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
         Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
@@ -88,7 +88,7 @@ class AppNamesManagerTest {
         val packageName = "com.test.app"
         whenever(mockDataStore.edit(any())).doReturn(preferencesOf())
 
-        val result = appNamesManager.setCustomNameForPackage(packageName, "  ")
+        val result = customNamesManager.setCustomNameForPackage(packageName, "  ")
 
         Assert.assertTrue(result)
         verify(mockDataStore).edit(any())
@@ -101,7 +101,7 @@ class AppNamesManagerTest {
         val testPreferences = preferencesOf(nameKey to "Some Name")
         whenever(mockDataStore.data).thenReturn(flowOf(testPreferences))
 
-        Assert.assertTrue(appNamesManager.hasCustomNameForPackage(packageName))
+        Assert.assertTrue(customNamesManager.hasCustomNameForPackage(packageName))
     }
 
     @Test
@@ -109,7 +109,7 @@ class AppNamesManagerTest {
         val packageName = "com.test.app"
         whenever(mockDataStore.data).thenReturn(flowOf(preferencesOf()))
 
-        Assert.assertFalse(appNamesManager.hasCustomNameForPackage(packageName))
+        Assert.assertFalse(customNamesManager.hasCustomNameForPackage(packageName))
     }
 
     @Test
@@ -118,7 +118,7 @@ class AppNamesManagerTest {
             throw IOException("Disk is full")
         }
 
-        val result = appNamesManager.setCustomNameForPackage("com.test.app", "New Name")
+        val result = customNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
         Assert.assertFalse(result)
     }
@@ -134,7 +134,7 @@ class AppNamesManagerTest {
 
         // Act & Assert
         assertFailsWith<CancellationException> {
-            appNamesManager.setCustomNameForPackage("com.test.app", "New Name")
+            customNamesManager.setCustomNameForPackage("com.test.app", "New Name")
         }
     }
 
@@ -147,7 +147,7 @@ class AppNamesManagerTest {
             })
 
             // Act
-            val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
+            val result = customNamesManager.getDisplayNameForPackage("com.test.app", "Original")
 
             // Assert
             Assert.assertEquals("Original", result)
@@ -162,7 +162,7 @@ class AppNamesManagerTest {
             })
 
             // Act
-            val result = appNamesManager.getDisplayNameForPackage("com.test.app", "Original")
+            val result = customNamesManager.getDisplayNameForPackage("com.test.app", "Original")
 
             // Assert
             Assert.assertEquals("Original", result)
@@ -176,7 +176,7 @@ class AppNamesManagerTest {
         })
 
         // Act
-        val result = appNamesManager.hasCustomNameForPackage("com.test.app")
+        val result = customNamesManager.hasCustomNameForPackage("com.test.app")
 
         // Assert
         Assert.assertFalse(result)
@@ -190,7 +190,7 @@ class AppNamesManagerTest {
         }
 
         // Act
-        val result = appNamesManager.removeCustomNameForPackage("com.test.app")
+        val result = customNamesManager.removeCustomNameForPackage("com.test.app")
 
         // Assert
         Assert.assertFalse(result)
@@ -205,7 +205,7 @@ class AppNamesManagerTest {
 
         // Act & Assert
         assertFailsWith<CancellationException> {
-            appNamesManager.removeCustomNameForPackage("com.test.app")
+            customNamesManager.removeCustomNameForPackage("com.test.app")
         }
     }
 
@@ -218,14 +218,14 @@ class AppNamesManagerTest {
 
         // Act & Assert
         assertFailsWith<CancellationException> {
-            appNamesManager.hasCustomNameForPackage("com.test.app")
+            customNamesManager.hasCustomNameForPackage("com.test.app")
         }
     }
 
     @Test
     fun `triggerCustomNameUpdate - calls emit on trigger flow`() = runTest {
         // Act
-        appNamesManager.triggerCustomNameUpdate()
+        customNamesManager.triggerCustomNameUpdate()
 
         // Assert
         verify(mockAppsUpdateTrigger).emit(Unit)
