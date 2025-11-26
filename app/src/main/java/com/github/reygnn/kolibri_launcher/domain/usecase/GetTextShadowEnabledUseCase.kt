@@ -14,7 +14,7 @@ class GetTextShadowEnabledUseCase @Inject constructor(
         return try {
             settingsRepository.textShadowEnabledFlow.first()
         } catch (e: Exception) {
-            false // Sicherer Fallback
+            true // Sicherer Fallback
         }
     }
 }
