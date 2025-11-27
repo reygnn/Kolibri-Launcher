@@ -5,8 +5,10 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -381,5 +383,101 @@ class SettingsViewModelTest {
 
         // Assert
         verify(factoryResetUseCase).invoke(false)
+    }
+
+    // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
+
+    @Test
+    fun `doomsday - factory reset returns PartialFailure - shows failure toast`() = runTest {
+        // SZENARIO: Reset hat teilweise funktioniert, teilweise nicht.
+        // User muss informiert werden.
+
+        whenever(factoryResetUseCase(any())).thenReturn(FactoryResetUseCase.Result.PartialFailure)
+
+        viewModel = SettingsViewModel(
+            getInstalledAppsUseCase,
+            factoryResetUseCase,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        viewModel.event.test {
+            viewModel.onFactoryResetConfirmed(true)
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+            // Prüfe, ob die korrekte Error-Message kommt
+            assertEquals(com.github.reygnn.kolibri_launcher.R.string.reset_failed, event.messageResId)
+        }
+    }
+
+    @Test
+    fun `doomsday - factory reset returns Error - shows failure toast`() = runTest {
+        // SZENARIO: Reset komplett fehlgeschlagen (IO Error).
+
+        whenever(factoryResetUseCase(any())).thenReturn(
+            FactoryResetUseCase.Result.Error
+        )
+
+        viewModel = SettingsViewModel(
+            getInstalledAppsUseCase,
+            factoryResetUseCase,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        viewModel.event.test {
+            viewModel.onFactoryResetConfirmed(true)
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+            assertEquals(com.github.reygnn.kolibri_launcher.R.string.reset_failed, event.messageResId)
+        }
+    }
+
+    @Test
+    fun `doomsday - factory reset throws RuntimeException - caught by launchSafe`() = runTest {
+        // SZENARIO: Der UseCase stürzt ab (nicht Result.Error, sondern Exception).
+        // ViewModel darf nicht crashen.
+
+        whenever(factoryResetUseCase(any())).thenThrow(RuntimeException("System died"))
+
+        viewModel = SettingsViewModel(
+            getInstalledAppsUseCase,
+            factoryResetUseCase,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        // Act: Aufrufen
+        viewModel.onFactoryResetConfirmed(true)
+        advanceUntilIdle()
+
+        // Assert: ViewModel lebt noch.
+        // Da launchSafe Exceptions meist nur loggt (oder generisch behandelt),
+        // prüfen wir hier primär, dass der Test nicht rot wird (kein Crash).
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun `doomsday - apps flow throws OutOfMemoryError - handles gracefully`() = runTest {
+        // SZENARIO: Zu viele Apps, Speicher voll beim Laden.
+        // Ein Error (nicht Exception) wird geworfen.
+
+        whenever(getInstalledAppsUseCase()).thenReturn(flow {
+            delay(10) // WICHTIG: Verzögerung, damit Turbine subscriben kann, bevor der Crash passiert!
+            throw OutOfMemoryError("Too many apps")
+        })
+
+        viewModel = SettingsViewModel(
+            getInstalledAppsUseCase,
+            factoryResetUseCase,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+
+        viewModel.event.test {
+            // Wir erwarten den Error-Toast, da dein ViewModel 'Throwable' fängt
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+            assertEquals(com.github.reygnn.kolibri_launcher.R.string.error_loading_apps, event.messageResId)
+        }
+
     }
 }

@@ -14,11 +14,11 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
-import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,15 +48,22 @@ class SettingsManager @Inject constructor(
         val SPLIT_MODE_THRESHOLD = intPreferencesKey("split_mode_threshold")
     }
 
-    override val sortOrderFlow: Flow<SortOrder> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading SortOrder preferences")
+    /**
+     * ROCKY BALBOA HELPER:
+     * Fängt ALLE Exceptions ab (nicht nur IOException), damit die App niemals crasht,
+     * selbst wenn DataStore korrupt ist, Rechte fehlen oder Typen falsch sind.
+     */
+    private val Flow<Preferences>.safeData: Flow<Preferences>
+        get() = this.catch { e ->
+            if (e is Exception) {
+                TimberWrapper.silentError(e, "SafeDataStore: Fallback to empty prefs")
                 emit(emptyPreferences())
             } else {
-                throw e
+                throw e // Nur fatale Errors (OOM etc.) durchlassen
             }
         }
+
+    override val sortOrderFlow: Flow<SortOrder> = dataStore.data.safeData
         .map { preferences ->
             val sortName = preferences[PreferenceKeys.SORT_ORDER_KEY] ?: SortOrder.TIME_WEIGHTED_USAGE.name
             try {
@@ -82,15 +89,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading DoubleTapToLock preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] ?: false
         }
@@ -107,15 +106,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading SwipeDownToNotifications preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] ?: false
         }
@@ -132,15 +123,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val readabilityModeFlow: Flow<String> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading ReadabilityMode preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val readabilityModeFlow: Flow<String> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.READABILITY_MODE] ?: "smart_contrast"
         }
@@ -157,15 +140,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val onboardingCompletedFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading OnboardingCompleted preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val onboardingCompletedFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.ONBOARDING_COMPLETED] ?: false
         }
@@ -182,15 +157,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val textShadowEnabledFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading TextShadowEnabled preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val textShadowEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.TEXT_SHADOW_ENABLED] ?: true
         }
@@ -207,15 +174,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val textColorFlow: Flow<Int> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading TextColor preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val textColorFlow: Flow<Int> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.TEXT_COLOR] ?: 0
         }
@@ -232,28 +191,12 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val showCalendarEventFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading ShowCalendarEvent preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val showCalendarEventFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.SHOW_CALENDAR_EVENT] ?: false
         }
 
-    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading ChipBackgroundColor preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data.safeData
         .map { preferences ->
             // 0 = Auto (was dem alten halb-transparenten Look entspricht)
             preferences[PreferenceKeys.CHIP_BACKGROUND_COLOR] ?: 0
@@ -271,15 +214,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val showAlarmFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading ShowAlarm preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val showAlarmFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.SHOW_ALARM] ?: false
         }
@@ -308,15 +243,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val autoShowKeyboardFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading AutoShowKeyboard preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val autoShowKeyboardFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.AUTO_SHOW_KEYBOARD] ?: false // Standardwert
         }
@@ -333,15 +260,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val autoLaunchAppFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading AutoLaunchApp preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val autoLaunchAppFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.AUTO_LAUNCH_APP] ?: false // Standardwert false
         }
@@ -358,15 +277,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val splitModeThresholdFlow: Flow<Int> = dataStore.data
-        .catch { e ->
-            if (e is IOException) {
-                TimberWrapper.silentError(e, "Error reading SplitModeThreshold preferences")
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
-        }
+    override val splitModeThresholdFlow: Flow<Int> = dataStore.data.safeData
         .map { preferences ->
             val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD] ?: 0
             // Validierung: Stelle sicher, dass der Wert im gültigen Bereich liegt
@@ -388,10 +299,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val layoutScaleStateFlow: Flow<Float> = dataStore.data
-        .catch { e ->
-            if (e is IOException) emit(emptyPreferences()) else throw e
-        }
+    override val layoutScaleStateFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.LAYOUT_SCALE] ?: AppConstants.DEFAULT_LAYOUT_SCALE
         }
@@ -404,10 +312,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val verticalPaddingStateFlow: Flow<Float> = dataStore.data
-        .catch { e ->
-            if (e is IOException) emit(emptyPreferences()) else throw e
-        }
+    override val verticalPaddingStateFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.VERTICAL_PADDING_SCALE] ?: AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
         }
@@ -420,10 +325,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val isFontBoldStateFlow: Flow<Boolean> = dataStore.data
-        .catch { e ->
-            if (e is IOException) emit(emptyPreferences()) else throw e
-        }
+    override val isFontBoldStateFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.IS_FONT_BOLD] ?: AppConstants.DEFAULT_FONT_BOLD
         }
@@ -436,10 +338,7 @@ class SettingsManager @Inject constructor(
         }
     }
 
-    override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data
-        .catch { e ->
-            if (e is IOException) emit(emptyPreferences()) else throw e
-        }
+    override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] ?: 0.0f
         }

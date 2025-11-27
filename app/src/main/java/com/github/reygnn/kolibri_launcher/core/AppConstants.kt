@@ -26,6 +26,18 @@ object AppConstants {
     const val SHADOW_DX_SMALL = 1f         // X-Offset für Datum und Batterie
     const val SHADOW_DY_SMALL = 1f         // Y-Offset für Datum und Batterie
 
+    const val LAYOUT_SCALE_MIN = 0.0f
+    const val LAYOUT_SCALE_MAX = 2.0f
+
+    const val VERTICAL_PADDING_SCALE_MIN = 0.0f
+    const val VERTICAL_PADDING_SCALE_MAX = 2.0f
+
+    const val CONTENT_TOP_MARGIN_SCALE_MIN = 0.0f
+    const val CONTENT_TOP_MARGIN_SCALE_MAX = 1.0f
+
+    const val SPLIT_MODE_THRESHOLD_MIN = 0
+    const val SPLIT_MODE_THRESHOLD_MAX = 512
+
     // Layout Defaults
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
     const val DEFAULT_LAYOUT_SCALE = 0.05f

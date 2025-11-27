@@ -24,6 +24,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.json.JSONException
+import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
 import java.util.concurrent.CancellationException
@@ -33,19 +35,10 @@ import javax.inject.Singleton
 /**
  * Backup & Restore Manager für Kolibri Launcher Settings.
  *
- * CLEAN ARCHITECTURE - 100% Interface-basiert:
- * - Kein direkter DataStore-Zugriff
- * - Nutzt nur Repository-Interfaces
- * - Alle Manager-Flows triggern automatisch
- * - UI updated sich reaktiv
- *
- * Exportiert/Importiert:
- * - Favoriten (Component Names + Order)
- * - Versteckte Apps (Component Names)
- * - Custom App Names (Package Name → Custom Name)
- * - Swipe Actions (Left/Right Component Names)
- *
- * Selektiver Import erlaubt User, einzelne Kategorien zu wählen.
+ * Hybrid Implementation:
+ * - Primär: kotlinx.serialization für rückwärtskompatibles Parsing
+ * - Fallback: org.json für striktes Parsing bei manuell erstellten/korrupten JSONs
+ * - Validierung: Strikte Wertprüfung nach dem Parsing
  */
 @Singleton
 class BackupManager @Inject constructor(
@@ -59,6 +52,7 @@ class BackupManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
+    // Wird für Export und Preview genutzt
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -132,304 +126,421 @@ class BackupManager @Inject constructor(
 
     override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
-            // 1. Parse JSON
-            val backup = json.decodeFromString<BackupData>(jsonString)
+            // === PHASE 1: PARSING (Hybrid-Ansatz) ===
+            val backup = parseBackupData(jsonString)
+                ?: return ImportResult.InvalidFormat
 
-            // 2. Validiere Options
+            // === PHASE 2: VALIDIERUNG ===
             if (options.importNothing) {
                 return ImportResult.Error("No import options selected")
             }
 
-            // 3. Validiere Version
             if (!isVersionSupported(backup.version)) {
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
-            // 4. Hole installierte Apps (einmalig)
-            val installedApps = installedAppsManager.getInstalledApps().first()
-            val installedComponents = installedApps.map { it.componentName }.toSet()
-
-            // PERFORMANCE-OPTIMIERUNG: Convert zu HashSet für O(1) Lookups
-            val installedComponentsSet = installedComponents.toHashSet()
-            val installedPackagesSet = installedComponents
-                .mapTo(HashSet()) { it.split('/')[0] }
-
-            var importedCount = 0
-            var skippedCount = 0
-            val missingApps = mutableSetOf<String>()
-
-            // ===== PHASE 1: Import Favorites =====
-            if (options.importFavorites) {
-                // OPTIMIERT: Nutze HashSet für schnelle Lookups
-                val validFavorites = backup.settings.favoriteComponents
-                    .filterTo(HashSet()) { it in installedComponentsSet }
-
-                skippedCount += backup.settings.favoriteComponents.size - validFavorites.size
-                missingApps.addAll(backup.settings.favoriteComponents - installedComponentsSet)
-
-                // Prüfe Package-Limit (nicht Component-Limit!)
-                val uniquePackages = validFavorites
-                    .mapTo(HashSet()) { it.split('/')[0] }
-
-                if (uniquePackages.size > AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
-                    return ImportResult.LimitExceeded(
-                        packageCount = uniquePackages.size,
-                        limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
-                    )
-                }
-
-                favoritesManager.saveFavoriteComponents(validFavorites.toList())
-                importedCount += validFavorites.size
-
-                Timber.Forest.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
-            }
-
-            // ===== PHASE 2: Import Order =====
-            if (options.importOrder) {
-                val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
-
-                // OPTIMIERT: HashSet für Lookup
-                val currentFavoritesSet = currentFavorites.toHashSet()
-
-                val validOrder = backup.settings.favoritesOrder
-                    .filter { it in currentFavoritesSet && it in installedComponentsSet }
-
-                favoritesOrderManager.saveOrder(validOrder)
-                Timber.Forest.i("Imported order: ${validOrder.size} items")
-            }
-
-            // ===== PHASE 3: Import Hidden Apps =====
-            if (options.importHiddenApps) {
-                // OPTIMIERT: filterTo mit HashSet
-                val validHidden = backup.settings.hiddenComponents
-                    .filterTo(HashSet()) { it in installedComponentsSet }
-
-                val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
-                if (skippedHidden > 0) {
-                    Timber.Forest.i("Skipped $skippedHidden non-installed hidden apps")
-                }
-
-                // Batch-Update: Alle importierten Apps verstecken
-                appVisibilityManager.updateComponentVisibilities(
-                    componentsToHide = validHidden,
-                    componentsToShow = emptySet()
-                )
-
-                Timber.Forest.i("Imported hidden apps: ${validHidden.size}")
-            }
-
-            // ===== PHASE 4: Import Custom App Names =====
-            if (options.importCustomNames) {
-                // OPTIMIERT: filterKeys nutzt jetzt HashSet (O(1) statt O(n))
-                val validNames = backup.settings.customAppNames
-                    .filterKeys { it in installedPackagesSet }
-
-                val skippedNames = backup.settings.customAppNames.size - validNames.size
-
-                if (validNames.isNotEmpty()) {
-                    appNamesManager.setCustomNamesInBatch(validNames)
-                    Timber.Forest.i("Imported custom names: ${validNames.size}, skipped: $skippedNames")
-                } else {
-                    Timber.Forest.i("No custom names to import")
-                }
-            }
-
-            // ===== PHASE 5: Import Swipe Actions =====
-            if (options.importSwipeActions) {
-                var swipeImportedCount = 0
-                var swipeSkippedCount = 0
-
-                // Import Left Swipe
-                val leftApp = backup.settings.swipeLeftApp
-                if (leftApp != null) {
-                    if (leftApp in installedComponentsSet) {
-                        swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, leftApp)
-                        swipeImportedCount++
-                        Timber.Forest.i("Imported swipe left: $leftApp")
-                    } else {
-                        swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
-                        swipeSkippedCount++
-                        missingApps.add(leftApp)
-                        Timber.Forest.i("Skipped swipe left (not installed): $leftApp")
-                    }
-                }
-
-                // Import Right Swipe
-                val rightApp = backup.settings.swipeRightApp
-                if (rightApp != null) {
-                    if (rightApp in installedComponentsSet) {
-                        swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, rightApp)
-                        swipeImportedCount++
-                        Timber.Forest.i("Imported swipe right: $rightApp")
-                    } else {
-                        swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
-                        swipeSkippedCount++
-                        missingApps.add(rightApp)
-                        Timber.Forest.i("Skipped swipe right (not installed): $rightApp")
-                    }
-                }
-
-                if (swipeImportedCount > 0 || swipeSkippedCount > 0) {
-                    Timber.Forest.i("Imported swipe actions: $swipeImportedCount, skipped: $swipeSkippedCount")
-                }
-            }
-
-            // ===== PHASE 6: Import Gesture Settings =====
-            if (options.importGestureSettings) {
-                var gestureImported = false
-
-                // Importiere Double Tap to Lock (nur wenn im Backup vorhanden)
-                backup.settings.doubleTapToLockEnabled?.let {
-                    settingsManager.setDoubleTapToLock(it)
-                    gestureImported = true
-                }
-
-                // Importiere Swipe Down to Notifications (nur wenn im Backup vorhanden)
-                backup.settings.swipeDownToNotificationsEnabled?.let {
-                    settingsManager.setSwipeDownToNotifications(it)
-                    gestureImported = true
-                }
-
-                if (gestureImported) {
-                    Timber.Forest.i("Imported gesture settings.")
-                }
-            }
-
-            // ===== PHASE 7: Import Theme Settings =====
-            if (options.importThemeSettings) {
-                var themeImported = false
-
-                // Importiere Textfarbe (nur wenn im Backup vorhanden)
-                backup.settings.textColor?.let {
-                    settingsManager.setTextColor(it)
-                    themeImported = true
-                }
-
-                // Importiere Chip-Hintergrundfarbe (nur wenn im Backup vorhanden)
-                backup.settings.chipBackgroundColor?.let {
-                    settingsManager.setChipBackgroundColor(it)
-                    themeImported = true
-                }
-
-                // Importiere Textschatten (nur wenn im Backup vorhanden)
-                backup.settings.textShadowEnabled?.let {
-                    settingsManager.setTextShadowEnabled(it)
-                    themeImported = true
-                }
-
-                backup.settings.layoutScale?.let {
-                    settingsManager.setLayoutScale(it)
-                    themeImported = true
-                }
-                backup.settings.verticalPaddingScale?.let {
-                    settingsManager.setVerticalPadding(it)
-                    themeImported = true
-                }
-                backup.settings.isFontBold?.let {
-                    settingsManager.setFontBold(it)
-                    themeImported = true
-                }
-
-                backup.settings.contentTopMarginScale?.let {
-                    settingsManager.setContentTopMarginScale(it)
-                    themeImported = true
-                }
-
-                if (themeImported) {
-                    Timber.Forest.i("Imported theme settings.")
-                }
-            }
-
-            // ===== PHASE 8: Import Time-Based Events =====
-            if (options.importTimeBasedEvents) {
-                var timeEventsImported = false
-
-                // Importiere Show Calendar Event (nur wenn im Backup vorhanden)
-                backup.settings.showCalendarEvent?.let {
-                    settingsManager.setShowCalendarEvent(it)
-                    timeEventsImported = true
-                }
-
-                // Importiere Show Alarm (nur wenn im Backup vorhanden)
-                backup.settings.showAlarm?.let {
-                    settingsManager.setShowAlarm(it)
-                    timeEventsImported = true
-                }
-
-                if (timeEventsImported) {
-                    Timber.Forest.i("Imported time-based event settings.")
-                }
-            }
-
-            // ===== PHASE 9: Import Quality-of-Life Settings =====
-            if (options.importQualityOfLife) {
-                var qolImported = false
-
-                // Importiere Auto Show Keyboard (nur wenn im Backup vorhanden)
-                backup.settings.autoShowKeyboard?.let {
-                    settingsManager.setAutoShowKeyboard(it)
-                    qolImported = true
-                }
-
-                backup.settings.autoLaunchApp?.let {
-                    settingsManager.setAutoLaunchApp(it)
-                    qolImported = true
-                }
-
-                if (qolImported) {
-                    Timber.Forest.i("Imported quality-of-life settings.")
-                }
-            }
-
-            // ===== PHASE 10: Import Power-User Settings =====
-            if (options.importPowerUserSettings) {
-                var powerUserImported = false
-
-                // Importiere Split-Mode Threshold (nur wenn im Backup vorhanden)
-                backup.settings.splitModeThreshold?.let { threshold ->
-                    // Validiere Threshold (0-512)
-                    val validThreshold = threshold.coerceIn(0, 512)
-                    settingsManager.setSplitModeThreshold(validThreshold)
-                    powerUserImported = true
-                    Timber.Forest.i("Imported split-mode threshold: $validThreshold px")
-                }
-
-                if (powerUserImported) {
-                    Timber.Forest.i("Imported power-user settings.")
-                }
-            }
-
-
-            Timber.Forest.i(
-                "Import completed - Favorites: %b (%d), Order: %b, Hidden: %b, Names: %b, Swipes: %b, Theme: %b, Gestures: %b, TimeEvents: %b, QoL: %b, PowerUser: %b",
-                options.importFavorites,
-                importedCount,
-                options.importOrder,
-                options.importHiddenApps,
-                options.importCustomNames,
-                options.importSwipeActions,
-                options.importThemeSettings,
-                options.importGestureSettings,
-                options.importTimeBasedEvents,
-                options.importQualityOfLife,
-                options.importPowerUserSettings
-            )
-
-            ImportResult.Success(
-                importedCount = importedCount,
-                skippedCount = skippedCount,
-                missingApps = missingApps
-            )
+            // === PHASE 3: IMPORT ===
+            performImport(backup, options)
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: SerializationException) {
-            TimberWrapper.silentError(e, "Invalid backup format")
-            ImportResult.InvalidFormat
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error importing backup")
             ImportResult.Error(e.message ?: "Unknown error")
         }
+    }
+
+    /**
+     * Hybrid-Parsing mit Fallback und Typ-Validierung.
+     *
+     * 1. kotlinx.serialization für normale Backups
+     * 2. Fallback auf org.json für minimale/manuelle JSONs
+     * 3. Typ-Validierung für Doomsday-Schutz
+     */
+    /**
+     * Hybrid-Parsing: kotlinx.serialization für Struktur, org.json für primitive Werte.
+     */
+    private fun parseBackupData(jsonString: String): BackupData? {
+        // PHASE 1: Typ-Validierung (Doomsday-Schutz)
+        if (!validateJsonTypes(jsonString)) {
+            return null
+        }
+
+        // PHASE 2: Parse mit kotlinx.serialization
+        val backup = try {
+            json.decodeFromString<BackupData>(jsonString)
+        } catch (e: SerializationException) {
+            TimberWrapper.silentError(e, "kotlinx.serialization failed, trying strict parsing")
+            return tryStrictParsing(jsonString)
+        } catch (e: IllegalArgumentException) {
+            TimberWrapper.silentError(e, "Invalid argument, trying strict parsing")
+            return tryStrictParsing(jsonString)
+        }
+
+        // PHASE 3: Merge mit org.json Werten (nur überschreiben wenn org.json einen Wert hat)
+        return mergeWithStrictValues(backup, jsonString)
+    }
+
+    private fun tryStrictParsing(jsonString: String): BackupData? {
+        return try {
+            parseStrictly(jsonString)
+        } catch (e: JSONException) {
+            TimberWrapper.silentError(e, "Strict parsing failed")
+            null
+        } catch (e: NumberFormatException) {
+            TimberWrapper.silentError(e, "Number format error")
+            null
+        }
+    }
+
+    /**
+     * Merged org.json Werte mit kotlinx.serialization Werten.
+     * org.json Wert wird nur genommen wenn er nicht null ist, sonst bleibt der Original-Wert.
+     */
+    private fun mergeWithStrictValues(backup: BackupData, jsonString: String): BackupData {
+        return try {
+            val root = JSONObject(jsonString)
+            if (!root.has("settings")) return backup
+            val settings = root.getJSONObject("settings")
+
+            val enrichedSettings = backup.settings.copy(
+                swipeLeftApp = settings.getStrictString("swipeLeftApp") ?: backup.settings.swipeLeftApp,
+                swipeRightApp = settings.getStrictString("swipeRightApp") ?: backup.settings.swipeRightApp,
+                textColor = settings.getStrictInt("textColor") ?: backup.settings.textColor,
+                chipBackgroundColor = settings.getStrictInt("chipBackgroundColor") ?: backup.settings.chipBackgroundColor,
+                splitModeThreshold = settings.getStrictInt("splitModeThreshold") ?: backup.settings.splitModeThreshold,
+                layoutScale = settings.getStrictFloat("layoutScale") ?: backup.settings.layoutScale,
+                verticalPaddingScale = settings.getStrictFloat("verticalPaddingScale") ?: backup.settings.verticalPaddingScale,
+                contentTopMarginScale = settings.getStrictFloat("contentTopMarginScale") ?: backup.settings.contentTopMarginScale,
+                isFontBold = settings.getStrictBool("isFontBold") ?: backup.settings.isFontBold,
+                textShadowEnabled = settings.getStrictBool("textShadowEnabled") ?: backup.settings.textShadowEnabled,
+                showCalendarEvent = settings.getStrictBool("showCalendarEvent") ?: backup.settings.showCalendarEvent,
+                showAlarm = settings.getStrictBool("showAlarm") ?: backup.settings.showAlarm,
+                doubleTapToLockEnabled = settings.getStrictBool("doubleTapToLockEnabled") ?: backup.settings.doubleTapToLockEnabled,
+                swipeDownToNotificationsEnabled = settings.getStrictBool("swipeDownToNotificationsEnabled") ?: backup.settings.swipeDownToNotificationsEnabled,
+                autoShowKeyboard = settings.getStrictBool("autoShowKeyboard") ?: backup.settings.autoShowKeyboard,
+                autoLaunchApp = settings.getStrictBool("autoLaunchApp") ?: backup.settings.autoLaunchApp
+            )
+
+            backup.copy(settings = enrichedSettings)
+        } catch (e: JSONException) {
+            TimberWrapper.silentError(e, "Failed to merge with strict values")
+            backup
+        }
+    }
+
+    /**
+     * Validiert kritische Felder auf korrekte JSON-Typen.
+     * Verhindert, dass Strings als Integers akzeptiert werden, etc.
+     */
+    private fun validateJsonTypes(jsonString: String): Boolean {
+        return try {
+            val root = JSONObject(jsonString)
+
+            if (!root.has("settings")) {
+                return true // Wird später als Fehler behandelt
+            }
+
+            val settings = root.getJSONObject("settings")
+
+            // Validiere Integer-Felder: Wenn vorhanden und nicht null, muss es eine Zahl sein
+            val intFields = listOf("textColor", "chipBackgroundColor", "splitModeThreshold")
+            for (field in intFields) {
+                if (settings.has(field) && !settings.isNull(field)) {
+                    val value = settings.get(field)
+                    if (value !is Number) {
+                        Timber.Forest.w("Type validation failed: $field is not a number")
+                        return false
+                    }
+                }
+            }
+
+            // Validiere Float-Felder
+            val floatFields = listOf("layoutScale", "verticalPaddingScale", "contentTopMarginScale")
+            for (field in floatFields) {
+                if (settings.has(field) && !settings.isNull(field)) {
+                    val value = settings.get(field)
+                    if (value !is Number) {
+                        Timber.Forest.w("Type validation failed: $field is not a number")
+                        return false
+                    }
+                }
+            }
+
+            // Validiere Boolean-Felder
+            val boolFields = listOf(
+                "isFontBold", "textShadowEnabled", "showCalendarEvent", "showAlarm",
+                "doubleTapToLockEnabled", "swipeDownToNotificationsEnabled",
+                "autoShowKeyboard", "autoLaunchApp"
+            )
+            for (field in boolFields) {
+                if (settings.has(field) && !settings.isNull(field)) {
+                    val value = settings.get(field)
+                    if (value !is Boolean) {
+                        Timber.Forest.w("Type validation failed: $field is not a boolean")
+                        return false
+                    }
+                }
+            }
+
+            true
+        } catch (e: JSONException) {
+            TimberWrapper.silentError(e, "JSON validation failed")
+            false
+        }
+    }
+
+    /**
+     * Striktes Parsing mit org.json für Doomsday-Resilience.
+     * Fängt korrupte Datentypen und Integer Overflows sicher ab.
+     */
+    private fun parseStrictly(jsonString: String): BackupData {
+        val root = JSONObject(jsonString)
+
+        val version = if (root.has("version")) root.getString("version") else "1.0.0"
+        val timestamp = root.optLong("timestamp", System.currentTimeMillis())
+
+        if (!root.has("settings")) {
+            throw JSONException("Missing required field: settings")
+        }
+        val settingsJson = root.getJSONObject("settings")
+
+        // Manuelle Extraktion der Listen
+        val favoriteComponents = settingsJson.getStrictStringList("favoriteComponents").toSet()
+        val favoritesOrder = settingsJson.getStrictStringList("favoritesOrder")
+        val hiddenComponents = settingsJson.getStrictStringList("hiddenComponents").toSet()
+
+        // Manuelle Extraktion der Map (Custom Names)
+        val customAppNames = mutableMapOf<String, String>()
+        if (settingsJson.has("customAppNames") && !settingsJson.isNull("customAppNames")) {
+            val namesObj = settingsJson.getJSONObject("customAppNames")
+            namesObj.keys().forEach { key ->
+                customAppNames[key] = namesObj.getString(key)
+            }
+        }
+
+        val settings = LauncherSettings(
+            favoriteComponents = favoriteComponents,
+            favoritesOrder = favoritesOrder,
+            hiddenComponents = hiddenComponents,
+            customAppNames = customAppNames,
+            swipeLeftApp = settingsJson.getStrictString("swipeLeftApp"),
+            swipeRightApp = settingsJson.getStrictString("swipeRightApp"),
+            textColor = settingsJson.getStrictInt("textColor"),
+            chipBackgroundColor = settingsJson.getStrictInt("chipBackgroundColor"),
+            splitModeThreshold = settingsJson.getStrictInt("splitModeThreshold"),
+            layoutScale = settingsJson.getStrictFloat("layoutScale"),
+            verticalPaddingScale = settingsJson.getStrictFloat("verticalPaddingScale"),
+            contentTopMarginScale = settingsJson.getStrictFloat("contentTopMarginScale"),
+            isFontBold = settingsJson.getStrictBool("isFontBold"),
+            textShadowEnabled = settingsJson.getStrictBool("textShadowEnabled"),
+            showCalendarEvent = settingsJson.getStrictBool("showCalendarEvent"),
+            showAlarm = settingsJson.getStrictBool("showAlarm"),
+            doubleTapToLockEnabled = settingsJson.getStrictBool("doubleTapToLockEnabled"),
+            swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipeDownToNotificationsEnabled"),
+            autoShowKeyboard = settingsJson.getStrictBool("autoShowKeyboard"),
+            autoLaunchApp = settingsJson.getStrictBool("autoLaunchApp")
+        )
+
+        return BackupData(
+            version = version,
+            timestamp = timestamp,
+            appVersion = root.optString("appVersion", ""),
+            settings = settings
+        )
+    }
+
+    /**
+     * Führt den eigentlichen Import durch.
+     * Extrahiert aus der alten importFromJson Methode.
+     */
+    private suspend fun performImport(backup: BackupData, options: ImportOptions): ImportResult {
+        // Hole installierte Apps (einmalig)
+        val installedApps = installedAppsManager.getInstalledApps().first()
+        val installedComponents = installedApps.map { it.componentName }.toSet()
+
+        // PERFORMANCE-OPTIMIERUNG: Convert zu HashSet für O(1) Lookups
+        val installedComponentsSet = installedComponents.toHashSet()
+        val installedPackagesSet = installedComponents
+            .mapTo(HashSet()) { it.split('/')[0] }
+
+        var importedCount = 0
+        var skippedCount = 0
+        val missingApps = mutableSetOf<String>()
+
+        // ===== PHASE 1: Import Favorites =====
+        if (options.importFavorites) {
+            val validFavorites = backup.settings.favoriteComponents
+                .filterTo(HashSet()) { it in installedComponentsSet }
+
+            skippedCount += backup.settings.favoriteComponents.size - validFavorites.size
+            missingApps.addAll(backup.settings.favoriteComponents - installedComponentsSet)
+
+            val uniquePackages = validFavorites
+                .mapTo(HashSet()) { it.split('/')[0] }
+
+            if (uniquePackages.size > AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
+                return ImportResult.LimitExceeded(
+                    packageCount = uniquePackages.size,
+                    limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+                )
+            }
+
+            favoritesManager.saveFavoriteComponents(validFavorites.toList())
+            importedCount += validFavorites.size
+
+            Timber.Forest.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
+        }
+
+        // ===== PHASE 2: Import Order =====
+        if (options.importOrder) {
+            val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
+            val currentFavoritesSet = currentFavorites.toHashSet()
+
+            val validOrder = backup.settings.favoritesOrder
+                .filter { it in currentFavoritesSet && it in installedComponentsSet }
+
+            favoritesOrderManager.saveOrder(validOrder)
+            Timber.Forest.i("Imported order: ${validOrder.size} items")
+        }
+
+        // ===== PHASE 3: Import Hidden Apps =====
+        if (options.importHiddenApps) {
+            val validHidden = backup.settings.hiddenComponents
+                .filterTo(HashSet()) { it in installedComponentsSet }
+
+            val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
+            appVisibilityManager.updateComponentVisibilities(
+                componentsToHide = validHidden,
+                componentsToShow = emptySet()
+            )
+            Timber.Forest.i("Imported hidden apps: ${validHidden.size} (skipped $skippedHidden)")
+        }
+
+        // ===== PHASE 4: Import Custom App Names =====
+        if (options.importCustomNames) {
+            val validNames = backup.settings.customAppNames
+                .filterKeys { it in installedPackagesSet }
+
+            if (validNames.isNotEmpty()) {
+                appNamesManager.setCustomNamesInBatch(validNames)
+                Timber.Forest.i("Imported custom names: ${validNames.size}")
+            }
+        }
+
+        // ===== PHASE 5: Import Swipe Actions =====
+        if (options.importSwipeActions) {
+            var swipeImportedCount = 0
+            // Import Left Swipe
+            val leftApp = backup.settings.swipeLeftApp
+            if (leftApp != null) {
+                if (leftApp in installedComponentsSet) {
+                    swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, leftApp)
+                    swipeImportedCount++
+                } else {
+                    swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
+                    missingApps.add(leftApp)
+                }
+            }
+            // Import Right Swipe
+            val rightApp = backup.settings.swipeRightApp
+            if (rightApp != null) {
+                if (rightApp in installedComponentsSet) {
+                    swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, rightApp)
+                    swipeImportedCount++
+                } else {
+                    swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
+                    missingApps.add(rightApp)
+                }
+            }
+            if (swipeImportedCount > 0) Timber.Forest.i("Imported swipe actions")
+        }
+
+        // ===== PHASE 6: Import Gesture Settings =====
+        if (options.importGestureSettings) {
+            backup.settings.doubleTapToLockEnabled?.let { settingsManager.setDoubleTapToLock(it) }
+            backup.settings.swipeDownToNotificationsEnabled?.let { settingsManager.setSwipeDownToNotifications(it) }
+        }
+
+        // ===== PHASE 7: Import Theme Settings =====
+        if (options.importThemeSettings) {
+            backup.settings.textColor?.let { settingsManager.setTextColor(it) }
+            backup.settings.chipBackgroundColor?.let { settingsManager.setChipBackgroundColor(it) }
+            backup.settings.textShadowEnabled?.let { settingsManager.setTextShadowEnabled(it) }
+            backup.settings.isFontBold?.let { settingsManager.setFontBold(it) }
+
+            backup.settings.layoutScale?.let {
+                settingsManager.setLayoutScale(it.coerceIn(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
+            }
+            backup.settings.verticalPaddingScale?.let {
+                settingsManager.setVerticalPadding(it.coerceIn(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))
+            }
+            backup.settings.contentTopMarginScale?.let {
+                settingsManager.setContentTopMarginScale(it.coerceIn(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
+            }
+        }
+
+        // ===== PHASE 8: Import Time-Based Events =====
+        if (options.importTimeBasedEvents) {
+            backup.settings.showCalendarEvent?.let { settingsManager.setShowCalendarEvent(it) }
+            backup.settings.showAlarm?.let { settingsManager.setShowAlarm(it) }
+        }
+
+        // ===== PHASE 9: Import Quality-of-Life Settings =====
+        if (options.importQualityOfLife) {
+            backup.settings.autoShowKeyboard?.let { settingsManager.setAutoShowKeyboard(it) }
+            backup.settings.autoLaunchApp?.let { settingsManager.setAutoLaunchApp(it) }
+        }
+
+        // ===== PHASE 10: Import Power-User Settings =====
+        if (options.importPowerUserSettings) {
+            backup.settings.splitModeThreshold?.let { threshold ->
+                settingsManager.setSplitModeThreshold(threshold.coerceIn(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
+            }
+        }
+
+        return ImportResult.Success(
+            importedCount = importedCount,
+            skippedCount = skippedCount,
+            missingApps = missingApps
+        )
+    }
+
+    // --- Helper für Strict Parsing ---
+
+    private fun JSONObject.getStrictString(key: String): String? {
+        if (!this.has(key) || this.isNull(key)) return null
+        return this.getString(key)
+    }
+
+    private fun JSONObject.getStrictInt(key: String): Int? {
+        if (!this.has(key) || this.isNull(key)) return null
+        // TRICK: Wir lesen als Long und casten zu Int.
+        // Warum? Manche JSON-Generatoren schreiben Farben (0xFFFFFFFF) als große positive Zahl.
+        // getInt() wirft bei > 2.1 Mrd eine Exception. getLong() schluckt es, und .toInt() macht daraus korrekt -1.
+        return this.getLong(key).toInt()
+    }
+
+    private fun JSONObject.getStrictFloat(key: String): Float? {
+        if (!this.has(key) || this.isNull(key)) return null
+        // getDouble ist robuster für Zahlenformate (1 vs 1.0)
+        return this.getDouble(key).toFloat()
+    }
+
+    private fun JSONObject.getStrictBool(key: String): Boolean? {
+        if (!this.has(key) || this.isNull(key)) return null
+        return this.getBoolean(key)
+    }
+
+    private fun JSONObject.getStrictStringList(key: String): List<String> {
+        if (!this.has(key) || this.isNull(key)) return emptyList()
+
+        val jsonArray = this.getJSONArray(key)
+        val list = mutableListOf<String>()
+        for (i in 0 until jsonArray.length()) {
+            list.add(jsonArray.getString(i))
+        }
+        return list
     }
 
     override suspend fun saveBackupToFile(uriString: String): Boolean {
@@ -492,63 +603,23 @@ class BackupManager @Inject constructor(
 
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
         return try {
-            // 1. Validiere URI-String
-            if (uriString.isBlank()) {
-                Timber.Forest.e("Empty URI string provided")
-                return ImportResult.Error("Invalid file location")
-            }
+            if (uriString.isBlank()) return ImportResult.Error("Invalid file location")
+            val uri = try { uriString.toUri() } catch (e: Exception) { return ImportResult.Error("Invalid format") }
 
-            // 2. Parse URI mit expliziter Exception-Behandlung
-            val uri = try {
-                uriString.toUri()
-            } catch (e: IllegalArgumentException) {
-                Timber.Forest.e(e, "Invalid URI format: $uriString")
-                return ImportResult.Error("Invalid file location format")
-            }
-
-            // 3. Prüfe URI-Scheme
-            val scheme = uri.scheme
-            if (scheme == null || scheme !in listOf("content", "file")) {
-                Timber.Forest.e("Unsupported URI scheme: $scheme")
-                return ImportResult.Error("Unsupported file location type")
-            }
-
-            // 4. Lese File
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
-            } ?: run {
-                Timber.Forest.e("Failed to open input stream for URI: $uri")
-                return ImportResult.Error("Cannot read from selected location")
-            }
+            } ?: return ImportResult.Error("Cannot read from selected location")
 
-            // 5. Validiere File-Größe
-            if (jsonString.length > 10 * 1024 * 1024) { // 10 MB
-                Timber.Forest.e("Backup file too large: ${jsonString.length / 1024 / 1024} MB")
-                return ImportResult.Error("Backup file is too large")
-            }
+            if (jsonString.length > 10 * 1024 * 1024) return ImportResult.Error("Backup file is too large")
+            if (!jsonString.trim().startsWith("{")) return ImportResult.InvalidFormat
 
-            // 6. Validiere JSON-Format (basic check)
-            if (!jsonString.trim().startsWith("{")) {
-                Timber.Forest.e("File does not appear to be valid JSON")
-                return ImportResult.InvalidFormat
-            }
-
-            Timber.Forest.i("Loading backup from file: $uri (${jsonString.length / 1024} KB)")
-
-            // 7. Import durchführen
             importFromJson(jsonString, options)
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: SecurityException) {
-            Timber.Forest.e(e, "Permission denied for URI")
-            ImportResult.Error("No permission to read from this location")
-        } catch (e: IOException) {
-            Timber.Forest.e(e, "I/O error while loading backup")
-            ImportResult.Error("Failed to read file (file corrupted or unavailable?)")
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Unexpected error loading backup")
-            ImportResult.Error("Failed to load backup: ${e.message ?: "Unknown error"}")
+            Timber.Forest.e(e, "Error loading backup")
+            ImportResult.Error("Failed to load backup")
         }
     }
 

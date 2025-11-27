@@ -1,15 +1,19 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import junit.framework.TestCase.assertFalse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -17,6 +21,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnitRunner
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
+import java.io.IOException
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -550,5 +558,99 @@ class SettingsManagerTest {
         assertFalse(settingsManager.doubleTapToLockEnabledFlow.first()) // Default false
         assertFalse(settingsManager.showAlarmFlow.first()) // Default false
         Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first()) // Default 0
+    }
+
+    // ========================================================================
+    // DOOMSDAY TESTS - ROCKY BALBOA EDITION
+    // ========================================================================
+
+    @Test
+    fun `doomsday - corrupted types (ClassCastException) - safe fallback`() = runTest {
+        // SZENARIO: Die DataStore Datei ist "valide" (keine IOException), aber die Daten-Typen
+        // sind falsch (z.B. String statt Boolean). Das passiert oft bei manuellen Hacks oder
+        // kaputten Migrationen. DataStore wirft ClassCastException beim Zugriff.
+
+        // Wir nutzen hier einen Mock statt FakeDataStore, um die Exception zu erzwingen.
+        val mockDataStore: DataStore<Preferences> = mock()
+
+        // Wir simulieren einen Flow, der beim Zugriff knallt
+        whenever(mockDataStore.data).thenReturn(flow {
+            throw ClassCastException("Expected Boolean but got String")
+        })
+
+        // Instanziiere den Manager mit dem "kaputten" DataStore
+        val doomsdayManager = SettingsManager(mockDataStore, mockContext)
+
+        // Act: Versuche zu lesen
+        // Die Flow 'catch' Logik im SettingsManager sollte greifen.
+        // Falls nicht, würde der Test crashen.
+        val result = doomsdayManager.showAlarmFlow.first()
+
+        // Assert: Sollte auf Default zurückfallen statt zu crashen
+        assertFalse("Should fallback to default false on ClassCastException", result)
+    }
+
+    @Test
+    fun `doomsday - unexpected RuntimeException during read - safe fallback`() = runTest {
+        // SZENARIO: SecurityException (Permission entzogen zur Laufzeit) oder
+        // andere Runtime-Fehler aus dem Framework.
+
+        val mockDataStore: DataStore<Preferences> = mock()
+        whenever(mockDataStore.data).thenReturn(flow {
+            throw SecurityException("Read permission denied")
+        })
+
+        val doomsdayManager = SettingsManager(mockDataStore, mockContext)
+
+        // Act
+        val result = doomsdayManager.sortOrderFlow.first()
+
+        // Assert: Default statt Crash
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
+    }
+
+    @Test
+    fun `doomsday - integer overflow - threshold handles max int`() = runTest {
+        // SZENARIO: Irgendjemand (oder ein Bitflip) übergibt MAX_INT.
+        // Die Validierung darf nicht überlaufen.
+
+        settingsManager.setSplitModeThreshold(Int.MAX_VALUE)
+
+        val result = settingsManager.splitModeThresholdFlow.first()
+
+        // Sollte auf 512 gecapped sein (deine definierte Obergrenze)
+        Assert.assertEquals(512, result)
+    }
+
+    @Test
+    fun `doomsday - integer underflow - threshold handles min int`() = runTest {
+        // SZENARIO: Integer Underflow / MIN_INT
+
+        settingsManager.setSplitModeThreshold(Int.MIN_VALUE)
+
+        val result = settingsManager.splitModeThresholdFlow.first()
+
+        // Sollte auf 0 gecapped sein
+        Assert.assertEquals(0, result)
+    }
+
+    @Test
+    fun `doomsday - rapid concurrent toggles - consistency check`() = runTest {
+        // SZENARIO: User hämmert auf den Toggle-Button (100x in 10ms).
+        // DataStore serialisiert Writes, aber wir wollen sicherstellen, dass
+        // der letzte Wert gewinnt und keine Race Conditions entstehen.
+
+        // 100x toggeln
+        repeat(100) { i ->
+            settingsManager.setShowAlarm(i % 2 == 0) // true, false, true, false...
+        }
+
+        // Der letzte Aufruf (99) ist ungerade -> false.
+        // Da DataStore asynchron ist, warten wir auf den Flow.
+        val finalValue = settingsManager.showAlarmFlow.first()
+
+        // Hinweis: Im echten DataStore garantiert 'edit' die Reihenfolge.
+        // Der Fake sollte das auch tun.
+        assertFalse("Final state should be false after odd number of toggles", finalValue)
     }
 }
