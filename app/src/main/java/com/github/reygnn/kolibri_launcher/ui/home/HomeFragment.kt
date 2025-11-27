@@ -83,6 +83,11 @@ class HomeFragment : Fragment() {
 
     private val splitModeCalculator = SplitModeCalculator()
     private val scrollStateVerifier = ScrollStateVerifier()
+    private val layoutCalculator = LayoutCalculator()
+    private val topMarginCalculator = TopMarginCalculator()
+    private val splitWeightCalculator = SplitWeightCalculator()
+
+
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
@@ -518,14 +523,26 @@ class HomeFragment : Fragment() {
     private fun recalculateLayoutCache(scale: Float, paddingFactor: Float, isBold: Boolean) {
         try {
             val minSizePx = resources.getDimension(R.dimen.text_size_secondary_info)
-            val maxSizePx = resources.getDimension(R.dimen.text_size_time) * AppConstants.MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME
+            val maxSizePx = resources.getDimension(R.dimen.text_size_time) *
+                    AppConstants.MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME
 
-            currentTextSizePx = minSizePx + (maxSizePx - minSizePx) * scale
-            currentVerticalPaddingPx = (currentTextSizePx * paddingFactor).toInt()
-            isCurrentFontBold = isBold
+            val cache = layoutCalculator.calculate(
+                scale = scale,
+                paddingFactor = paddingFactor,
+                isBold = isBold,
+                minTextSizePx = minSizePx,
+                maxTextSizePx = maxSizePx
+            )
+
+            currentTextSizePx = cache.textSizePx
+            currentVerticalPaddingPx = cache.verticalPaddingPx
+            isCurrentFontBold = cache.isBold
+
         } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error calculating layout cache")
             currentTextSizePx = 48f
             currentVerticalPaddingPx = 16
+            isCurrentFontBold = false
         }
     }
 
@@ -534,17 +551,15 @@ class HomeFragment : Fragment() {
         try {
             if (_binding == null) return
 
-            // Basis-Abstand aus XML (Standard)
             val baseMargin = try {
                 resources.getDimensionPixelSize(R.dimen.spacing_medium)
-            } catch (e: Exception) { 16 } // Fallback
+            } catch (e: Exception) { 16 }
 
-            // Maximaler ZUSÄTZLICHER Abstand (z.B. 30% der Bildschirmhöhe)
-            // Das gibt dem User genug Spielraum, die Apps nach unten zu schieben.
-            val maxAdditionalMargin = resources.displayMetrics.heightPixels * 0.30f
-
-            // Berechnung: Basis + (Prozentsatz * Max)
-            val newTopMargin = (baseMargin + (maxAdditionalMargin * scale)).toInt()
+            val newTopMargin = topMarginCalculator.calculate(
+                scale = scale,
+                baseMarginPx = baseMargin,
+                screenHeightPx = resources.displayMetrics.heightPixels
+            )
 
             val params = binding.favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
 
@@ -552,8 +567,6 @@ class HomeFragment : Fragment() {
                 params.topMargin = newTopMargin
                 binding.favoritesContainer.layoutParams = params
 
-                // WICHTIG: Da wir den Platz für die Apps verkleinert haben,
-                // müssen wir prüfen, ob jetzt der Split-Mode (Scrollen) nötig ist.
                 checkScrollStateAfterNextLayout("Top margin changed")
                 safePost { scheduleScrollVerification() }
             }
@@ -647,28 +660,22 @@ class HomeFragment : Fragment() {
             val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
             val customScrollView = binding.favoritesScrollView
 
+            val weights = splitWeightCalculator.calculate(
+                enableSplit = enableSplit,
+                orientation = resources.configuration.orientation,
+                portraitScrollWeight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT,
+                portraitGestureWeight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT,
+                landscapeScrollWeight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT,
+                landscapeGestureWeight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
+            )
+
+            scrollParams.weight = weights.scrollViewWeight
+            gestureParams.weight = weights.gestureZoneWeight
+
             if (enableSplit) {
                 wasInSplitMode = true
 
-                // Orientation-abhängige Gewichtung
-                val isLandscape =
-                    resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-                if (isLandscape) {
-                    scrollParams.weight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT
-                    gestureParams.weight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
-                    Timber.d("Split mode: landscape (${scrollParams.weight}/${gestureParams.weight})")
-                } else {
-                    scrollParams.weight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT
-                    gestureParams.weight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT
-                    Timber.d("Split mode: portrait (${scrollParams.weight}/${gestureParams.weight})")
-                }
-
-/*                if (showBorder) {
-                    applyScrollViewBorder(colors.textColor)
-                } else {
-                    removeScrollViewBorder()
-                }*/
+                Timber.d("Split mode: ${if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"} (${weights.scrollViewWeight}/${weights.gestureZoneWeight})")
 
                 binding.gestureZone.visibility = View.VISIBLE
 
@@ -688,9 +695,7 @@ class HomeFragment : Fragment() {
                 }
 
             } else {
-                // FULL MODE: 100% / 0%
-                scrollParams.weight = 1f
-                gestureParams.weight = 0f
+                // FULL MODE
                 binding.gestureZone.visibility = View.GONE
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
@@ -704,6 +709,8 @@ class HomeFragment : Fragment() {
                     }
                 }
                 wasInSplitMode = false
+
+                // applyScrollViewBorder()
 
                 // ScrollView MUSS das Abfangen von Touches verhindern
                 customScrollView.allowIntercept = false
