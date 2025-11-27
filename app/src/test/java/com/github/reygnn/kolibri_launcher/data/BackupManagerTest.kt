@@ -1339,6 +1339,98 @@ class BackupManagerTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
     }
 
+    // ========== SPEZIAL-TESTS: THEME RESTORE MIT VERSCHIEDENEN VERSIONEN ==========
+
+    @Test
+    fun `importFromJson - theme only - older backup version - imports correctly`() = runTest {
+        // Szenario 1: Älteres Backup (v0.5.0) wird in aktuelle App importiert.
+        // Erwartung: Theme wird übernommen, fehlende neue Keys werden ignoriert/auf Standard gesetzt.
+
+        fakeSettingsRepo.color = Color.BLACK
+        fakeSettingsRepo.doubleTap = false // Gesture Setting (sollte ignoriert werden)
+
+        val backup = createTestBackup(
+            appVersion = "0.5.0", // Ältere Version
+            textColor = Color.RED,
+            chipBackgroundColor = Color.YELLOW,
+            // Ein Setting, das NICHT Theme ist, um Isolation zu testen
+            doubleTapToLockEnabled = true
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(
+            importThemeSettings = true,
+            // Alle anderen explizit false
+            importFavorites = false,
+            importGestureSettings = false
+        )
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Check: Theme wurde übernommen
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.YELLOW)
+
+        // Check: Anderes Setting wurde NICHT übernommen (Isolation)
+        Truth.assertThat(fakeSettingsRepo.doubleTap).isFalse()
+    }
+
+    @Test
+    fun `importFromJson - theme only - current backup version - imports correctly`() = runTest {
+        // Szenario 2: Aktuelles Backup (v1.0.0) mit aktueller Launcher Version.
+        // Erwartung: Standard Erfolgsfall.
+
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            appVersion = "1.0.0", // Gleiche Version
+            textColor = Color.BLUE,
+            chipBackgroundColor = Color.MAGENTA
+        )
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(importThemeSettings = true)
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
+    }
+
+    @Test
+    fun `importFromJson - theme only - newer backup version - imports known keys`() = runTest {
+        // Szenario 3: Neueres Backup (v2.0.0) in ältere App Version.
+        // Erwartung: Solange die Schema-Version (BackupData.version) kompatibel ist,
+        // sollte der Import funktionieren. Unbekannte Keys (neue Features der Zukunft)
+        // werden durch Json { ignoreUnknownKeys = true } ignoriert.
+
+        fakeSettingsRepo.color = Color.BLACK
+
+        val backup = createTestBackup(
+            appVersion = "2.0.0", // Neuere Version (z.B. Beta)
+            textColor = Color.GREEN,
+            chipBackgroundColor = Color.CYAN
+        )
+        // Hinweis: Wenn wir hier manuell JSON bauen würden mit einem unbekannten Key "holographicMode = true",
+        // würde der Test prüfen, ob der Parser nicht abstürzt. Da wir das Objekt serialisieren,
+        // testen wir hier primär, dass die Versionsnummer den Import nicht blockiert.
+
+        val jsonString = json.encodeToString(backup)
+
+        val options = ImportOptions(importThemeSettings = true)
+
+        val result = backupManager.importFromJson(jsonString, options)
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
+        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
+    }
+
 
     // ========== HELPER METHODS ==========
 
@@ -1352,7 +1444,8 @@ class BackupManagerTest {
     }
 
     private fun createTestBackup(
-        version: String = "1.0.0",
+        version: String = "1.0.0", // Schema Version
+        appVersion: String = "1.0.0",  // App-Version für den unitTest. nicht anpassen.
         timestamp: Long = System.currentTimeMillis(),
         favorites: Set<String> = emptySet(),
         order: List<String> = emptyList(),
@@ -1378,7 +1471,7 @@ class BackupManagerTest {
         return BackupData(
             version = version,
             timestamp = timestamp,
-            appVersion = "1.0.0",
+            appVersion = appVersion,
             settings = LauncherSettings(
                 favoriteComponents = favorites,
                 favoritesOrder = order,
