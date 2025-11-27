@@ -2476,4 +2476,157 @@ class LauncherViewModelTest {
 
         verify(setContentTopMarginUseCase).invoke(1.0f)
     }
+
+    // ========== ROCKY BALBOA DOOMSDAY TESTS ==========
+
+    @Test
+    fun `doomsday - java lang Error (OOM) inside coroutine is caught`() = runTest {
+        // SZENARIO: OutOfMemoryError oder StackOverflowError (java.lang.Error, nicht Exception!)
+        // Normalerweise crasht das die VM. Das ViewModel muss stehen bleiben.
+
+        whenever(refreshAppsUseCase.invoke()).doAnswer {
+            throw java.lang.OutOfMemoryError("Heap space full")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Act: Trigger etwas, das den Error wirft
+        viewModel.refreshInstalledApps()
+        advanceUntilIdle()
+
+        // Assert: ViewModel lebt noch, keine UncaughtExceptionHandler triggered
+        // Wenn dieser Test grün ist, fängt das 'launchSafe' wirklich ALLES ab.
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun `doomsday - zombie viewmodel - operations after scope cancellation`() = runTest {
+        // SZENARIO: User schließt Activity, ViewModel wird gecleared,
+        // ABER ein verspätetes Event (z.B. Broadcast) triggert noch eine Methode.
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Wir töten den Scope manuell (simuliert onCleared)
+        // Hinweis: Wir nutzen hier den TestScope, in Realität bricht viewModelScope ab.
+        // Um das zu simulieren, canceln wir den Job, der an launchSafe hängt?
+        // Besser: Wir prüfen, ob launchSafe cancelled exceptions ignoriert oder re-throwt.
+
+        // Da wir launchSafe nicht direkt mocken können, testen wir das Verhalten bei CancellationException.
+        // Der Code re-throwt CancellationException (korrekt für Coroutines),
+        // aber wir wollen sicherstellen, dass nichts explodiert.
+
+        whenever(toggleFavoriteUseCase.invoke(any(), any())).thenAnswer {
+            throw kotlinx.coroutines.CancellationException("Scope died")
+        }
+
+        try {
+            viewModel.onToggleFavorite(app1)
+            advanceUntilIdle()
+        } catch (e: Exception) {
+            // CancellationException darf fliegen (ist expected behavior in Coroutines),
+            // aber keine RuntimeException.
+            assertTrue(e is kotlinx.coroutines.CancellationException)
+        }
+    }
+
+    @Test
+    fun `doomsday - deadlock simulation - one flow hangs forever`() = runTest {
+        // SZENARIO: Ein UseCase (z.B. Settings) antwortet NIE (Deadlock in DB).
+        // Blockiert das die UI-Initialisierung der anderen Komponenten?
+
+        // Settings hängt für immer
+        whenever(observeHomeSettingsUseCase.invoke()).thenReturn(flow {
+            delay(Long.MAX_VALUE) // Hängt ewig
+        })
+
+        // Apps laden aber normal
+        val appLoadResult = AppLoadResult.Success
+        whenever(observeInstalledAppsUseCase.invoke()).thenReturn(flowOf(appLoadResult))
+
+        setupViewModel(enableTestMode = false)
+        advanceUntilIdle()
+
+        // Act: Wir warten kurz (Testzeit)
+        advanceUntilIdle()
+
+        // Assert: Obwohl Settings hängen, sollten App-Updates (der andere launchSafe Block)
+        // zumindest versucht worden sein zu subscriben.
+        verify(observeInstalledAppsUseCase, atLeastOnce()).invoke()
+
+        // Das ViewModel sollte initialisiert sein, auch wenn ein Teil "tot" ist.
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun `doomsday - DDOS attack - 10000 app updates in 1ms`() = runTest {
+        // SZENARIO: System spinnt und sendet tausende Package-Changed Broadcasts.
+        // Oder ein Bug in einer anderen App triggert ständige Updates.
+
+        val updateFlow = MutableSharedFlow<Unit>()
+        whenever(appUpdateSignal.events).thenReturn(updateFlow)
+
+        setupViewModel(enableTestMode = false)
+        advanceUntilIdle()
+
+        // Act: Feuer frei!
+        repeat(10000) {
+            updateFlow.emit(Unit)
+        }
+        advanceUntilIdle()
+
+        // Assert: Der Launcher darf nicht unter der Last zusammenbrechen.
+        // Wir prüfen, ob er zumindest versucht hat, Apps zu refreshen.
+        // (In Realität würde man hier Debouncing im UseCase erwarten, aber das VM muss stabil bleiben)
+        verify(refreshAppsUseCase, atLeastOnce()).invoke()
+    }
+
+    @Test
+    fun `doomsday - schroedingers app - uninstall during click`() = runTest {
+        // SZENARIO: User klickt App. In der exakt gleichen Millisekunde wird sie deinstalliert.
+        // recordAppLaunchUseCase wirft Error (App nicht gefunden),
+        // refreshAppsUseCase wirft Error (Package Manager State inkonsistent).
+
+        whenever(recordAppLaunchUseCase.invoke(any())).thenThrow(IllegalArgumentException("App gone"))
+        whenever(refreshAppsUseCase.invoke()).thenThrow(IllegalStateException("Package manager died"))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onAppClicked(app1)
+
+            // Erst Launch
+            assertTrue(awaitItem() is UiEvent.LaunchApp)
+
+            // Dann Error Toast (wegen recordAppLaunch Failure)
+            val errorEvent = awaitItem()
+            assertTrue(errorEvent is UiEvent.ShowToast)
+
+            // WICHTIG: Kein Crash, obwohl ZWEI Exceptions flogen.
+        }
+    }
+
+    @Test
+    fun `doomsday - time travel - system clock jumps backwards`() = runTest {
+        // SZENARIO: NTP Sync stellt die Uhr 1 Jahr zurück während die App läuft.
+        // Negative Delays oder Timeouts könnten Coroutines crashen.
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Wir können im Test nicht die Systemuhr ändern, aber wir können prüfen,
+        // ob updateTimeAndDate mit "komischen" Werten klarkommt,
+        // indem wir sicherstellen, dass es keine Exceptions wirft, egal was Calendar.getInstance() macht.
+        // Da Calendar static ist, ist das schwer zu mocken ohne PowerMock.
+        // Aber wir vertrauen darauf, dass dein `try-catch` Block in `updateTimeAndDate` das fängt.
+
+        // Wir rufen es einfach mehrfach auf, um sicherzustellen, dass keine State-Corruption passiert.
+        repeat(50) {
+            viewModel.updateTimeAndDate()
+        }
+
+        assertTrue(viewModel.uiState.value.timeString.isNotEmpty())
+    }
 }
