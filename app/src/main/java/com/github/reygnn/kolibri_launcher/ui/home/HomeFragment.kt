@@ -86,6 +86,8 @@ class HomeFragment : Fragment() {
     private val layoutCalculator = LayoutCalculator()
     private val topMarginCalculator = TopMarginCalculator()
     private val splitWeightCalculator = SplitWeightCalculator()
+    private val chipBackgroundCalculator = ChipBackgroundCalculator()
+
 
 
     private var gestureDetector: GestureDetector? = null
@@ -1111,16 +1113,10 @@ class HomeFragment : Fragment() {
             chip.maxWidth = chipMaxWidth
             chip.isSingleLine = true
 
-            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                Color.argb(
-                    40,
-                    Color.red(colors.textColor),
-                    Color.green(colors.textColor),
-                    Color.blue(colors.textColor)
-                )
-            } else {
-                colors.chipBackgroundColor
-            }
+            val finalChipBgColor = chipBackgroundCalculator.calculate(
+                chipBackgroundColor = colors.chipBackgroundColor,
+                textColorInt = colors.textColor
+            )
             chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
 
             chip.setTextColor(colors.textColor)
@@ -1138,16 +1134,10 @@ class HomeFragment : Fragment() {
 
     private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
         try {
-            val finalChipBgColor = if (colors.chipBackgroundColor == 0) {
-                Color.argb(
-                    40,
-                    Color.red(colors.textColor),
-                    Color.green(colors.textColor),
-                    Color.blue(colors.textColor)
-                )
-            } else {
-                colors.chipBackgroundColor
-            }
+            val finalChipBgColor = chipBackgroundCalculator.calculate(
+                chipBackgroundColor = colors.chipBackgroundColor,
+                textColorInt = colors.textColor
+            )
             chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
             chip.setTextColor(colors.textColor)
             chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
