@@ -15,6 +15,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Process
 import android.util.Log
+import com.github.anrwatchdog.ANRWatchDog
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
@@ -100,6 +101,7 @@ class KolibriLauncherApp : Application() {
                     }
 
                     reportContent = listOf(
+                        // ReportField.ANR_TRACE,
                         ReportField.PACKAGE_NAME,
                         ReportField.ANDROID_VERSION,
                         ReportField.APP_VERSION_CODE,
@@ -186,6 +188,8 @@ class KolibriLauncherApp : Application() {
                 Timber.e(e, "Error setting up StrictMode")
             }
         }
+
+        setupANRWatchDog()
 
         // Receiver registration
         try {
@@ -313,23 +317,48 @@ class KolibriLauncherApp : Application() {
     }
 
     private fun setupStrictMode() {
+        // WICHTIG: StrictMode darf NUR im Debug-Modus laufen!
+        // Im Release kostet das Performance und nervt den User.
+        if (!BuildConfig.DEBUG) return
+
         try {
             android.os.StrictMode.setThreadPolicy(
                 android.os.StrictMode.ThreadPolicy.Builder()
-                    .detectAll()
-                    .penaltyLog()
+                    .detectAll() // Erkennt Disk I/O, Network im Main Thread
+                    .penaltyLog() // Schreibt in den Logcat
+                    .penaltyFlashScreen()
+                    // .penaltyDeath()
                     .build()
             )
 
             android.os.StrictMode.setVmPolicy(
                 android.os.StrictMode.VmPolicy.Builder()
-                    .detectAll()
+                    .detectAll() // Erkennt Leaked SqlLite, Closable Objects, Activity Leaks
                     .penaltyLog()
+                    // .penaltyDeath() // Optional: App hart crashen lassen bei Leaks (sehr strikt!)
                     .build()
             )
+
+            Timber.Forest.d("StrictMode initialized successfully")
+
         } catch (e: Throwable) {
-            Timber.e(e, "Error setting up StrictMode")
+            // Sollte eigentlich nie passieren, aber gut für Defensive Programming
+            Timber.Forest.e(e, "Error setting up StrictMode")
         }
+    }
+
+    private fun setupANRWatchDog() {
+        // Der Watchdog läuft immer, auch im Release.
+        // Er ist extrem leichtgewichtig.
+
+        ANRWatchDog(5000) // 5000ms = 5 Sekunden (Standard Android ANR Zeit)
+            .setReportMainThreadOnly() // Wir wollen nur wissen, warum UI hängt
+            .setANRListener { error ->
+                // Hier übergeben wir den ANR an ACRA
+                Timber.Forest.e(error, "ANR detected!")
+                ACRA.errorReporter.handleException(error)
+            }
+            .start()
     }
 
     override fun onTerminate() {

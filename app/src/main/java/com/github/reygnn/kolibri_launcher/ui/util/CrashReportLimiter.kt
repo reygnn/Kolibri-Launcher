@@ -3,6 +3,9 @@ package com.github.reygnn.kolibri_launcher.ui.util
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
@@ -32,16 +35,27 @@ object CrashReportLimiter {
      * Initialize the limiter with application context.
      * Should be called once during app startup.
      */
+    /**
+     * Async initialization to avoid StrictMode violations on startup.
+     */
     fun init(context: Context) {
         try {
-            synchronized(lock) {
-                if (prefs == null) {
-                    prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    performCleanupIfNeeded()
+            // WICHTIG: Startet im Hintergrund. Kein Blockieren des Main Threads mehr!
+            CoroutineScope(Dispatchers.IO).launch {
+                synchronized(lock) {
+                    if (prefs == null) {
+                        try {
+                            // Disk Read passiert jetzt hier im Hintergrund
+                            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            performCleanupIfNeeded()
+                        } catch (e: Exception) {
+                            Timber.Forest.e(e, "Failed to load preferences in background")
+                        }
+                    }
                 }
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Failed to initialize CrashReportLimiter")
+            Timber.Forest.e(e, "Failed to launch init coroutine")
         }
     }
 

@@ -94,13 +94,13 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `isFirstLaunch - returns true when version is old`() {
+    fun `isFirstLaunch - returns true when version is old`() = runTest {
         whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(0)
         Assert.assertTrue(dataMigrationManager.isFirstLaunch())
     }
 
     @Test
-    fun `isFirstLaunch - returns false when version is current`() {
+    fun `isFirstLaunch - returns false when version is current`() = runTest {
         whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION)
         Assert.assertFalse(dataMigrationManager.isFirstLaunch())
     }
@@ -162,7 +162,7 @@ class DataMigrationManagerTest {
                 eq(KEY_DATA_VERSION),
                 ArgumentMatchers.anyInt()
             )
-        ).thenReturn(-1)  // ✅ Alte Version, nicht 0!
+        ).thenReturn(-1)  // Alte Version, nicht 0!
         fakeDataStore.makeCancellable()
 
         assertFailsWith<CancellationException> {
@@ -171,7 +171,7 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `isFirstLaunch - when SharedPreferences throws exception - returns true`() {
+    fun `isFirstLaunch - when SharedPreferences throws exception - returns true`() = runTest {
         whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).doAnswer {
             throw RuntimeException("Cannot read preferences")
         }
@@ -183,7 +183,7 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `isFirstLaunch - when SharedPreferences is null - returns true`() {
+    fun `isFirstLaunch - when SharedPreferences is null - returns true`() = runTest {
         whenever(context.getSharedPreferences(eq(VERSION_PREFS_NAME), ArgumentMatchers.anyInt())).thenReturn(null)
         val managerWithNullPrefs = DataMigrationManager(context, fakeDataStore)
 
@@ -238,14 +238,14 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `isFirstLaunch - with version equals to target - returns false`() {
+    fun `isFirstLaunch - with version equals to target - returns false`() = runTest {
         whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION)
 
         Assert.assertFalse(dataMigrationManager.isFirstLaunch())
     }
 
     @Test
-    fun `isFirstLaunch - with version higher than target - returns false`() {
+    fun `isFirstLaunch - with version higher than target - returns false`() = runTest {
         whenever(sharedPreferences.getInt(eq(KEY_DATA_VERSION), ArgumentMatchers.anyInt())).thenReturn(TARGET_DATA_VERSION + 1)
 
         Assert.assertFalse(dataMigrationManager.isFirstLaunch())

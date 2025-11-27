@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Process
@@ -113,6 +112,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
+        private var leaker: Context? = null
     }
 
     private val onboardingLauncher = registerForActivityResult(
@@ -149,6 +149,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
 
         super.onCreate(savedInstanceState)
+
+//        // BÖSE: Wir weisen die aktuelle Activity-Instanz der statischen Variable zu.
+//        // Wenn du jetzt das Handy drehst oder "Zurück" drückst, bleibt 'this'
+//        // hier gespeichert und kann nicht gelöscht werden.
+//        if (leaker == null) {
+//            leaker = this
+//        }
 
         if (!setupMainContent()) {
             return

@@ -79,57 +79,53 @@ object CrashReportConsent {
      * @param onResult A callback that provides the new consent result.
      */
     suspend fun forceShowConsentDialog(context: Context, onResult: (Boolean) -> Unit) {
-        // Dialog creation and presentation MUST be on the Main thread.
         withContext(Dispatchers.Main) {
+            // 1. Safety Check: Ohne Activity kein Dialog -> Absturz verhindern
+            if (context !is android.app.Activity) {
+                Timber.Forest.e("Cannot show dialog: Context is not an Activity (is ${context::class.java.simpleName})")
+                onResult(false) // Fallback: Ablehnen
+                return@withContext
+            }
+
             try {
-                // Schritt 1: Den String aus den Ressourcen als HTML parsen, um den Link zu erstellen.
                 val messageWithLink = HtmlCompat.fromHtml(
                     context.getString(R.string.crash_report_dialog_message),
                     HtmlCompat.FROM_HTML_MODE_LEGACY
                 )
 
-                // Schritt 2: Den Dialog erstellen.
                 val dialog = AlertDialog.Builder(context)
                     .setTitle(R.string.crash_report_dialog_title)
                     .setMessage(messageWithLink)
                     .setPositiveButton(R.string.crash_report_button_accept) { dialog, _ ->
-                        // Speichern der Entscheidung im Hintergrund.
-                        CoroutineScope(Dispatchers.IO).launch { saveConsent(context, true) }
+                        // Leak-Safe: Application Context für Hintergrund-Operation
+                        val appContext = context.applicationContext
+                        CoroutineScope(Dispatchers.IO).launch { saveConsent(appContext, true) }
+
                         onResult(true)
                         dialog.dismiss()
                     }
                     .setNegativeButton(R.string.crash_report_button_decline) { dialog, _ ->
-                        CoroutineScope(Dispatchers.IO).launch { saveConsent(context, false) }
+                        val appContext = context.applicationContext
+                        CoroutineScope(Dispatchers.IO).launch { saveConsent(appContext, false) }
+
                         onResult(false)
                         dialog.dismiss()
                     }
                     .setCancelable(false)
                     .create()
 
-                // Schritt 3: Den Dialog anzeigen.
                 dialog.show()
 
-                // Schritt 4: UI-Anpassungen NACH .show() vornehmen.
+                // WICHTIG: Das muss NACH .show() kommen, damit Links klickbar sind
                 dialog.findViewById<TextView>(android.R.id.message)?.apply {
-                    // Macht den HTML-Link im Text klickbar.
                     movementMethod = LinkMovementMethod.getInstance()
-
-                    // Stellt sicher, dass der Text auf kleinen Geräten scrollbar ist.
-                    maxLines = Int.MAX_VALUE
-                    isVerticalScrollBarEnabled = true
                 }
+
             } catch (e: CancellationException) {
-                throw e // Wichtig: Cancellation-Signale immer weiterwerfen.
-            } catch (e: WindowManager.BadTokenException) {
-                Timber.Forest.e(
-                    e,
-                    "Failed to show consent dialog: context (Activity) might be gone."
-                )
-                // Fallback auf den alten Wert, da der Dialog nicht angezeigt werden konnte.
-                onResult(hasConsent(context))
+                throw e
             } catch (e: Exception) {
-                Timber.Forest.e(e, "An unexpected error occurred while showing the consent dialog.")
-                // Sicherster Fallback: annehmen, dass keine Zustimmung erteilt wurde.
+                // Fangnetz für alle UI-Fehler
+                Timber.Forest.e(e, "Error showing consent dialog")
                 onResult(false)
             }
         }

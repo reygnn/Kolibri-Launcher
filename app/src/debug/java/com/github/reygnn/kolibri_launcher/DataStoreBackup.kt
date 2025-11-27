@@ -1,48 +1,71 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.core.AppConstants
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.cancellation.CancellationException
 
+// ---------------------------------------------------------
+// AKTIVE KLASSE (STILLGELEGT / STUB)
+// ---------------------------------------------------------
 @Singleton
 class DataStoreBackup @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
-    private val dataStoreName = AppConstants.SETTINGS_DATASTORE_NAME
+    /**
+     * Creates a backup of the DataStore.
+     * LOGIC DISABLED
+     */
+    suspend fun createBackup() {
+        Timber.d("DataStoreBackup: createBackup was called but is disabled.")
+    }
+
+    /**
+     * Restores a backup.
+     * LOGIC DISABLED
+     */
+    suspend fun restoreFromBackup() {
+        Timber.d("DataStoreBackup: restoreFromBackup was called but is disabled.")
+    }
+
+    suspend fun isBackupPresent(): Boolean {
+        // Immer false zurückgeben, damit die UI nicht denkt, es gäbe ein Backup.
+        return false
+    }
+}
+
+// ---------------------------------------------------------
+// ALTE KLASSE (KOMPLETT DEAKTIVIERT)
+// ---------------------------------------------------------
+/*
+HINWEIS: Dieser Code ist auskommentiert, damit Hilt ihn ignoriert und keine
+Abstürze durch die File-Initialisierung verursacht werden.
+ALSO: NICHT LÖSCHEN !!!
+*/
+
+/*
+@Singleton
+class OrigDataStoreBackup @Inject constructor(
+    @param:ApplicationContext private val context: Context
+) {
+    private val dataStoreName = com.github.reygnn.kolibri_launcher.core.AppConstants.SETTINGS_DATASTORE_NAME
 
     companion object {
         private const val BACKUP_DIR = "KolibriLauncherBackup"
         private const val BACKUP_FILE_NAME = "kolibri_settings.backup"
     }
 
-    private val dataStoreDir = File(context.filesDir, "datastore")
-    private val dataStoreFile = File(dataStoreDir, "$dataStoreName.preferences_pb")
+    private val dataStoreDir = java.io.File(context.filesDir, "datastore")
+    private val dataStoreFile = java.io.File(dataStoreDir, "$dataStoreName.preferences_pb")
 
-    /**
-     * HINWEIS: Diese Implementierung verwendet die veraltete `getExternalStoragePublicDirectory`-API.
-     * Sie funktioniert auf vielen physischen Geräten für Debug-Zwecke, schlägt aber auf
-     * modernen Emulatoren und strikten Android-Versionen aufgrund von Scoped Storage fehl.
-     * Dies ist für den aktuellen Entwicklungs-Workflow beabsichtigt.
-     * Für eine Veröffentlichung im Play Store müsste dies durch das Storage Access Framework (SAF)
-     * ersetzt werden.
-     */
     @Suppress("DEPRECATION")
-    private val backupDir = File(android.os.Environment.getExternalStoragePublicDirectory(
+    private val backupDir = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(
         android.os.Environment.DIRECTORY_DOWNLOADS), BACKUP_DIR)
-    private val backupFile = File(backupDir, BACKUP_FILE_NAME)
+    private val backupFile = java.io.File(backupDir, BACKUP_FILE_NAME)
 
-    /**
-     * Creates a backup of the DataStore.
-     */
     suspend fun createBackup() {
-        withContext(Dispatchers.IO) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             if (!dataStoreFile.exists()) {
                 Timber.w("DataStore file not found, cannot create backup.")
                 return@withContext
@@ -51,32 +74,23 @@ class DataStoreBackup @Inject constructor(
                 if (!backupDir.exists()) {
                     backupDir.mkdirs()
                 }
-
-                // Prüfen, ob die Backup-Datei existiert und versuchen, sie zu löschen.
                 if (backupFile.exists()) {
                     if (!backupFile.delete()) {
                         Timber.w("Could not delete existing backup file at: ${backupFile.absolutePath}")
                     }
                 }
-
-                // Jetzt die neue Datei kopieren. overwrite=true ist jetzt eine zusätzliche Absicherung.
                 dataStoreFile.copyTo(backupFile, overwrite = true)
                 Timber.i("DataStore successfully backed up to ${backupFile.absolutePath}")
 
             } catch (e: Exception) {
-                if (e is CancellationException) {
-                    throw e
-                }
+                if (e is kotlin.coroutines.cancellation.CancellationException) throw e
                 Timber.w("Error while creating DataStore backup.")
             }
         }
     }
 
-    /**
-     * Restores a backup.
-     */
     suspend fun restoreFromBackup() {
-        withContext(Dispatchers.IO) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 if (backupFile.exists()) {
                     if (!dataStoreDir.exists()) {
@@ -88,28 +102,18 @@ class DataStoreBackup @Inject constructor(
                     Timber.d("No backup file found, skipping restore.")
                 }
             } catch (e: Exception) {
-                if (e is CancellationException) {
-                    throw e
-                }
+                if (e is kotlin.coroutines.cancellation.CancellationException) throw e
                 Timber.w("Error while restoring DataStore backup.")
             }
         }
     }
 
-
-    /**
-     * Checks if a backup file exists by checking the filesystem.
-     * @return `true` if a backup exists, `false` otherwise.
-     */
-    suspend fun isBackupPresent(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isBackupPresent(): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
             backupFile.exists()
         } catch (_: Exception) {
-            if (BuildConfig.DEBUG) {
-                Timber.d("Could not check backup presence")
-            }
             false
         }
     }
-
 }
+*/

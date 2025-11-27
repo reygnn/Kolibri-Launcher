@@ -208,6 +208,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
 
 // Utilities
+    implementation("com.github.anrwatchdog:anrwatchdog:1.4.0")
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -224,6 +225,8 @@ dependencies {
     implementation("ch.acra:acra-core:$acraVersion")
     //noinspection NewerVersionAvailable
     implementation("ch.acra:acra-http:$acraVersion")
+
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 
 // --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
     //noinspection NewerVersionAvailable
