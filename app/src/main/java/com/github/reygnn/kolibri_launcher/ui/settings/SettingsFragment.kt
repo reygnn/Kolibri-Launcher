@@ -110,9 +110,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         try {
-            setPreferencesFromResource(R.xml.preferences, rootKey)
+            // 1. Alte Policy merken
+            val oldPolicy = android.os.StrictMode.getThreadPolicy()
+
+            // 2. Disk Reads erlauben (nur für diesen Thread und Moment)
+            android.os.StrictMode.setThreadPolicy(
+                android.os.StrictMode.ThreadPolicy.Builder(oldPolicy)
+                    .permitDiskReads()
+                    .build()
+            )
+
+            try {
+                // 3. Hier passiert der Zugriff auf die XML/Disk
+                setPreferencesFromResource(R.xml.preferences, rootKey)
+            } finally {
+                // 4. WICHTIG: Alte Policy wiederherstellen, egal was passiert
+                android.os.StrictMode.setThreadPolicy(oldPolicy)
+            }
 
             setupPreferenceListeners()
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onCreatePreferences")
         }
