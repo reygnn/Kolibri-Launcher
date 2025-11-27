@@ -109,6 +109,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
 
         // Reset Button Listener
         binding.btnReset.setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
             safeRun("btnReset.onClick") {
                 viewModel.onResetLayoutSettings()
             }
@@ -118,6 +119,47 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             safeRun("sliderTopMargin.onChange") {
                 if (fromUser) viewModel.onSetContentTopMargin(value)
             }
+        }
+
+        setupFadeOnTouch(binding.sliderTextSize)
+        setupFadeOnTouch(binding.sliderPadding)
+        setupFadeOnTouch(binding.sliderTopMargin)
+    }
+
+// ==================== UX Animationen ====================
+
+    /**
+     * Setzt den Fade-Effekt für Slider auf.
+     */
+    private fun setupFadeOnTouch(slider: com.google.android.material.slider.Slider) {
+        slider.addOnSliderTouchListener(object : com.google.android.material.slider.Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                // User berührt Slider -> Dialog transparent (20%)
+                animateDialogAlpha(0.2f)
+            }
+
+            override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                /// VISUELL: Sichtbar machen
+                animateDialogAlpha(1.0f)
+
+                // TAKTIL: Bestätigung, dass der Wert übernommen wurde
+                slider.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            }
+        })
+    }
+
+    /**
+     * Die eigentliche Animations-Logik.
+     * Nutzt ViewPropertyAnimator für Performance und Interpolator für "Smoothness".
+     */
+    private fun animateDialogAlpha(targetAlpha: Float) {
+        // Sicherstellen, dass Binding existiert
+        _binding?.cardRoot?.animate()?.apply {
+            alpha(targetAlpha)
+            duration = 200
+            // Decelerate lässt es "weich" einrasten
+            interpolator = android.view.animation.DecelerateInterpolator()
+            start()
         }
     }
 
@@ -175,6 +217,13 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                     MotionEvent.ACTION_DOWN -> {
                         initialY = layoutParams.y
                         initialTouchY = event.rawY
+
+                        // VISUELL: Transparenz
+                        animateDialogAlpha(0.5f)
+
+                        // TAKTIL: Kurzes "Tock"
+                        dragHandle.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -182,10 +231,17 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                         window.attributes = layoutParams
                         true
                     }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        // WICHTIG: Wenn losgelassen wird, wieder voll sichtbar machen
+                        animateDialogAlpha(1.0f)
+                        true
+                    }
                     else -> false
                 }
             } catch (e: Throwable) {
                 Timber.e(e, "Error in drag handling")
+                // Fallback: Sicherstellen, dass Dialog sichtbar ist, falls was schiefgeht
+                animateDialogAlpha(1.0f)
                 false
             }
         }
