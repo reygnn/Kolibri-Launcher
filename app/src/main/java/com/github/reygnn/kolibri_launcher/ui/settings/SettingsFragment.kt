@@ -110,6 +110,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         try {
+            // "Ich weiss, dass das schlecht ist, aber die Library lässt mir keine Wahl!"
+
+            /** Workaround for an internal issue in the AndroidX Preference library:
+             ** setPreferencesFromResource triggers a synchronous disk read on the main thread.
+             ** We cannot offload this to a background dispatcher because it also initializes
+             ** View objects, which must be done on the main thread. **/
+
             // 1. Alte Policy merken
             val oldPolicy = android.os.StrictMode.getThreadPolicy()
 
@@ -137,7 +144,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         try {
             calendarSwitchPreference = findPreference("show_calendar_event")
 
