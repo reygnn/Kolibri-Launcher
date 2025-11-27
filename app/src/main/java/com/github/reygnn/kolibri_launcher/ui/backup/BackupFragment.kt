@@ -23,6 +23,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,6 +72,8 @@ class BackupFragment : Fragment() {
     ) { uri ->
         uri?.let {
             try {
+                viewModel.resetBackupState()
+
                 viewModel.previewBackup(it.toString())
                 showImportOptionsDialog(it.toString())
             } catch (e: Exception) {
@@ -121,14 +124,19 @@ class BackupFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             try {
-                // 1. ERST Preview laden (blockierend warten)
-                val preview = viewModel.backupPreview.first { it != null }!!
+                val preview = withTimeoutOrNull(2000) {
+                    viewModel.backupPreview.first { it != null }
+                }
 
-                // 2. Fragment-State nochmal prüfen (könnte sich geändert haben)
-                if (!isAdded || _binding == null) {
-                    Timber.Forest.w("Fragment detached while loading preview")
+                // Wenn preview null ist (Timeout) oder Fragment weg ist -> Abbruch
+                if (preview == null) {
+                    Timber.Forest.e("Preview timeout or loading failed")
+                    hideLoading()
+                    showError(getString(R.string.error_generic))
                     return@launch
                 }
+
+                if (!isAdded || _binding == null) return@launch
 
                 hideLoading()
 

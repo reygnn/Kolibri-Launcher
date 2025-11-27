@@ -1448,6 +1448,499 @@ class BackupManagerTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
     }
 
+    @Test
+    fun `terminator - extremely long string in component name`() = runTest {
+        // 10MB String als Package Name
+        val hugeString = "a".repeat(10_000_000)
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["$hugeString/MainActivity"],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        // Sollte nicht crashen, egal ob Success oder Error
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `terminator - negative color value`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "textColor": -999999999,
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Farbe sollte trotzdem gesetzt werden (negative Werte sind valide für Android Colors)
+    }
+
+    @Test
+    fun `terminator - MAX_LONG timestamp`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": ${Long.MAX_VALUE},
+            "settings": {
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions())
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+    }
+
+    @Test
+    fun `alien - NaN float value`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "layoutScale": "NaN",
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
+        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `alien - Infinity float value`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "layoutScale": 1e309,
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
+        // Entweder InvalidFormat oder Success mit gecapptem Wert
+        if (result is ImportResult.Success) {
+            Truth.assertThat(fakeSettingsRepo.layoutScale).isFinite()
+            Truth.assertThat(fakeSettingsRepo.layoutScale).isAtMost(AppConstants.LAYOUT_SCALE_MAX)
+        }
+    }
+
+    @Test
+    fun `alien - array instead of object for customAppNames`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "customAppNames": ["not", "an", "object"],
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importCustomNames = true))
+        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `alien - object instead of array for favorites`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": {"not": "an array"},
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `alien - null inside favorites array`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["com.app1/Activity", null, "com.app2/Activity"],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `predator - unicode injection in package name`() = runTest {
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("com.app1", "com.app1.MainActivity")
+        )
+
+        // Zero-Width-Joiner und andere unsichtbare Zeichen
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["com.app1\u200B/com.app1.MainActivity"],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Der manipulierte String sollte NICHT matchen
+        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
+    }
+
+    @Test
+    fun `predator - null byte injection`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["com.app1\u0000/MainActivity"],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        // Sollte nicht crashen
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `predator - deeply nested JSON (stack overflow attempt)`() = runTest {
+        // 1000 Level tiefe Verschachtelung
+        val openBrackets = "{\"a\":".repeat(1000)
+        val closeBrackets = "}".repeat(1000)
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": [],
+                "customAppNames": $openBrackets"deep"$closeBrackets
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importCustomNames = true))
+        // Sollte entweder InvalidFormat oder Error sein, aber nicht crashen
+        Truth.assertThat(result).isAnyOf(ImportResult.InvalidFormat, ImportResult.Error::class.java)
+    }
+
+    @Test
+    fun `predator - JSON with BOM (Byte Order Mark)`() = runTest {
+        val bom = "\uFEFF"
+        val toxicJson = bom + """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions())
+        // Sollte trotzdem funktionieren oder graceful failen
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `predator - duplicate keys in JSON`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "version": "999.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "splitModeThreshold": 42,
+                "splitModeThreshold": 999,
+                "favoriteComponents": [],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
+        // Verhalten ist JSON-Parser abhängig, sollte aber nicht crashen
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `apocalypse - combined attack`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0\u0000injected",
+            "timestamp": -1,
+            "settings": {
+                "favoriteComponents": ["${"x".repeat(10000)}/Activity", null],
+                "favoritesOrder": {"not": "array"},
+                "hiddenComponents": [],
+                "customAppNames": [],
+                "textColor": "not a color",
+                "layoutScale": 1e999,
+                "splitModeThreshold": 99999999999999999999
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions())
+        // Der einzige akzeptable Outcome: KEIN CRASH
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `doomsday - type confusion - boolean as string - blocked by validator`() = runTest {
+        // SZENARIO: autoShowKeyboard erwartet Boolean, bekommt aber String "true"
+        // (Manche Parser sind hier zu tolerant, wir wollen strikt sein)
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "autoShowKeyboard": "not_a_boolean", 
+                "textColor": -1
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importQualityOfLife = true))
+
+        // Erwartung: Der Validator (validateJsonTypes) erkennt, dass das kein Boolean ist.
+        // parseBackupData returns null -> ImportResult.InvalidFormat
+        Truth.assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
+    }
+
+    @Test
+    fun `doomsday - integer overflow - color values larger than max int`() = runTest {
+        // SZENARIO: ARGB Farbe Weiss ist 0xFFFFFFFF.
+        // Als vorzeichenbehafteter 32-Bit Int ist das -1.
+        // Als "reine Zahl" im JSON ist das 4294967295.
+        // Standard getInt() würde hier crashen.
+
+        val hugeColorValue = 4294967295L // 0xFFFFFFFF unsigned
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "textColor": $hugeColorValue
+            }
+        }
+    """.trimIndent()
+
+        fakeSettingsRepo.color = 0 // Reset
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // WICHTIG: Erwartet wird -1 (Color.WHITE), nicht ein Crash oder 0
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(-1)
+    }
+
+    @Test
+    fun `doomsday - phantom data - settings fields are explicitly null`() = runTest {
+        // SZENARIO: Ein JSON-Generator hat "null" geschrieben statt das Feld wegzulassen.
+        fakeSettingsRepo.splitModeThreshold = 50 // Alter Wert
+
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "splitModeThreshold": null,
+                "textColor": null
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Erwartung: Der alte Wert (50) bleibt erhalten.
+        // Der "null"-Wert im JSON überschreibt NICHT den Default/Backup Wert.
+        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(50)
+    }
+
+    @Test
+    fun `doomsday - structure mismatch - favorites is an object instead of list`() = runTest {
+        // SZENARIO: favoriteComponents sollte ["a", "b"] sein, ist aber {}
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": { "bad": "structure" }
+            }
+        }
+    """.trimIndent()
+
+        // Hier wird kotlinx crashen.
+        // Dann übernimmt parseStrictly.
+        // getStrictStringList versucht getJSONArray. Das wird fehlschlagen (JSONException).
+        // parseStrictly fängt JSONException -> null.
+        // importFromJson -> InvalidFormat.
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
+    }
+
+    @Test
+    fun `doomsday - physics violation - extreme float values`() = runTest {
+        // SZENARIO: Layout Scale ist viel zu groß.
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "layoutScale": 9999.99
+            }
+        }
+    """.trimIndent()
+
+        fakeSettingsRepo.layoutScale = 1.0f
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Erwartung: Der Wert wurde auf MAX_SCALE (wahrscheinlich 2.0f oder ähnlich) gecapped.
+        Truth.assertThat(fakeSettingsRepo.layoutScale).isEqualTo(AppConstants.LAYOUT_SCALE_MAX)
+    }
+
+    @Test
+    fun `doomsday - empty shell - valid json but missing content`() = runTest {
+        val toxicJson = "{}"
+
+        // validateJsonTypes prüft auf "settings". Fehlt -> return true (erstmal ok).
+        // kotlinx decoded ein Default-Objekt (da encodeDefaults=true/params optional).
+        // ABER: parseStrictly würde bei fehlendem "settings" meckern.
+        // Da kotlinx hier wahrscheinlich erfolgreich decoded (mit leeren Defaults),
+        // müssen wir schauen, was passiert.
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+
+        // Kotlinx Serialization macht aus "{}" ein BackupData mit Default-Werten.
+        // Settings ist required in BackupData?
+        // Wenn in BackupData `val settings: LauncherSettings` steht, schlägt kotlinx fehl (MissingFieldException).
+        // Dann greift StrictParsing -> wirft "Missing required field: settings".
+        // Ergebnis -> InvalidFormat.
+
+        Truth.assertThat(result).isInstanceOf(ImportResult.InvalidFormat::class.java)
+    }
+
+    @Test
+    fun `doomsday - empty strings everywhere`() = runTest {
+        val toxicJson = """
+        {
+            "version": "",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["", "/", "com.app1/"],
+                "favoritesOrder": [],
+                "hiddenComponents": [],
+                "swipeLeftApp": ""
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions())
+        // Leere Version sollte als unsupported gelten oder InvalidFormat
+        Truth.assertThat(result).isNotNull()
+    }
+
+    @Test
+    fun `doomsday - scientific notation in integers`() = runTest {
+        // Manche JSON-Generatoren schreiben große Zahlen als 1e5
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 1e10,
+            "settings": {
+                "splitModeThreshold": 1e2,
+                "textColor": -1
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
+
+        if (result is ImportResult.Success) {
+            // 1e2 = 100, sollte akzeptiert werden
+            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
+        }
+    }
+
+    @Test
+    fun `doomsday - whitespace and control characters in strings`() = runTest {
+        val toxicJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 123456,
+            "settings": {
+                "favoriteComponents": ["com.app1/\t\n\rMainActivity"],
+                "favoritesOrder": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
+        Truth.assertThat(result).isNotNull()
+    }
+
+
+
     // Helper für manuelles JSON bauen
     private fun createJsonWithThreshold(value: Int): String {
         return """
