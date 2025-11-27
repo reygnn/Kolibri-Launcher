@@ -81,6 +81,8 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
     private val favoritesScrollView get() = binding.favoritesScrollView
 
+    private val splitModeCalculator = SplitModeCalculator()
+    private val scrollStateVerifier = ScrollStateVerifier()
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
     private var currentDialog: DialogFragment? = null
@@ -178,44 +180,28 @@ class HomeFragment : Fragment() {
 
             val scrollView = binding.favoritesScrollView
             val threshold = viewModel.splitModeThreshold.value
+            val childView = scrollView.getChildAt(0)
 
-            val shouldSplit: Boolean
+            val shouldSplit = splitModeCalculator.shouldSplit(
+                threshold = threshold,
+                canScrollDown = scrollView.canScrollVertically(1),
+                canScrollUp = scrollView.canScrollVertically(-1),
+                contentHeight = childView?.height ?: 0,
+                containerHeight = scrollView.height
+            )
 
-            if (threshold == 0) {
-                // 1. STANDARD MODUS: Android entscheidet (Fail-Safe)
-                // "canScrollVertically" ist die zuverlässigste Methode für Standard-User
-                val canScrollDown = scrollView.canScrollVertically(1)
-                val canScrollUp = scrollView.canScrollVertically(-1)
-                shouldSplit = canScrollDown || canScrollUp
-
-                // Debug Log nur bei Änderung, um Spam zu vermeiden
-                if (_needsSplit.value != shouldSplit) {
-                    Timber.d("Scroll check (Auto): canScrollDown=$canScrollDown, canScrollUp=$canScrollUp -> split=$shouldSplit")
-                }
-
-            } else {
-                // 2. POWER USER MODUS: Benutzerdefinierter Pixel-Threshold
-                // Wir berechnen die physische Höhe des Inhalts vs. Höhe des Containers
-
-                val childView = scrollView.getChildAt(0)
-                if (childView != null) {
-                    val contentHeight = childView.height
-                    val scrollViewHeight = scrollView.height
-                    val scrollablePixels = (contentHeight - scrollViewHeight).coerceAtLeast(0)
-
-                    shouldSplit = scrollablePixels > threshold
-
-                    if (_needsSplit.value != shouldSplit) {
-                        Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
-                    }
-                } else {
-                    // Fallback: Wenn kein Child da ist, brauchen wir keinen Split
-                    shouldSplit = false
-                }
-            }
-
-            // State Update nur bei Änderung (Deduping)
+            // Debug Log nur bei Änderung
             if (_needsSplit.value != shouldSplit) {
+                if (threshold == 0) {
+                    Timber.d("Scroll check (Auto): split=$shouldSplit")
+                } else {
+                    val scrollablePixels = splitModeCalculator.calculateScrollablePixels(
+                        childView?.height ?: 0,
+                        scrollView.height
+                    )
+                    Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
+                }
+
                 _needsSplit.value = shouldSplit
 
                 // Reset scroll position wenn kein Split Mode
@@ -1660,30 +1646,29 @@ class HomeFragment : Fragment() {
         try {
             if (_binding == null || !isAdded) return
 
-            val currentSplitState = _needsSplit.value
             val customScrollView = binding.favoritesScrollView
 
-            // If we're in full mode but allowIntercept is true, something went wrong
-            if (!currentSplitState && customScrollView.allowIntercept) {
-                Timber.w("Scroll state mismatch detected - fixing...")
-                customScrollView.allowIntercept = false
-                customScrollView.scrollTo(0, 0)
-            }
+            val result = scrollStateVerifier.verify(
+                currentSplitState = _needsSplit.value,
+                allowIntercept = customScrollView.allowIntercept,
+                canScrollDown = customScrollView.canScrollVertically(1),
+                canScrollUp = customScrollView.canScrollVertically(-1)
+            )
 
-            // If we're in split mode but can't scroll, re-check state
-            if (currentSplitState && !customScrollView.allowIntercept) {
-                Timber.w("Split mode but intercept disabled - fixing...")
-                customScrollView.allowIntercept = true
-            }
-
-            // Verify we can scroll if in split mode
-            if (currentSplitState) {
-                val canScrollDown = binding.favoritesScrollView.canScrollVertically(1)
-                val canScrollUp = binding.favoritesScrollView.canScrollVertically(-1)
-
-                if (!canScrollDown && !canScrollUp) {
-                    // We think we need split but can't actually scroll
-                    // Re-evaluate the state
+            when (result) {
+                is ScrollStateVerifier.VerifyResult.Consistent -> {
+                    // Alles gut, nichts tun
+                }
+                is ScrollStateVerifier.VerifyResult.FixFullMode -> {
+                    Timber.w("Scroll state mismatch detected - fixing...")
+                    customScrollView.allowIntercept = false
+                    customScrollView.scrollTo(0, 0)
+                }
+                is ScrollStateVerifier.VerifyResult.FixSplitMode -> {
+                    Timber.w("Split mode but intercept disabled - fixing...")
+                    customScrollView.allowIntercept = true
+                }
+                is ScrollStateVerifier.VerifyResult.ReEvaluateNeeded -> {
                     Timber.w("Split mode active but no scroll capability - re-evaluating...")
                     checkAndEmitScrollState()
                 }
