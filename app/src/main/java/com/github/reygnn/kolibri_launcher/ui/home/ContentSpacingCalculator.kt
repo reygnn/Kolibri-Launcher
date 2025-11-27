@@ -1,16 +1,19 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import kotlin.math.max
+
 /**
- * Berechnet den dynamischen Abstand (Margin) für den Content-Bereich,
- * basierend auf der User-Einstellung und der Sichtbarkeit von Elementen.
+ * Berechnet den dynamischen oberen Abstand (Margin) für den Favoriten-Container.
+ * Ziel: Wenn Chips sichtbar sind, soll ihre Höhe von der Margin abgezogen werden,
+ * damit das Gesamtbild stabil bleibt und nicht unnötig springt.
  */
 class ContentSpacingCalculator {
 
     /**
-     * @param userPreferredMarginPx Die Margin, die der User eingestellt hat (in Pixeln).
-     * @param chipsHeightPx Die tatsächliche Höhe der Chips-View (in Pixeln).
-     * @param areChipsVisible Ob die Chips aktuell angezeigt werden.
-     * @param minGapPx (Optional) Ein Mindestabstand, damit Text nicht direkt an den Chips klebt (z.B. 4dp).
+     * @param userPreferredMarginPx Der Abstand, den der User in den Settings gewählt hat (als "Basis").
+     * @param chipsHeightPx Die aktuelle Höhe der Chips-View (inkl. Padding).
+     * @param areChipsVisible Ob die Chips aktuell sichtbar sind.
+     * @param minGapPx Ein Mindestabstand (Sicherheitsabstand), falls die Chips größer sind als die Margin.
      */
     fun calculateFavoritesTopMargin(
         userPreferredMarginPx: Int,
@@ -18,22 +21,21 @@ class ContentSpacingCalculator {
         areChipsVisible: Boolean,
         minGapPx: Int = 0
     ): Int {
-        // Fall 1: Keine Chips sichtbar.
-        // Wir nutzen einfach den vollen Abstand, den der User wollte.
+        // Fall 1: Chips sind nicht da. Wir nehmen den vollen Abstand.
         if (!areChipsVisible || chipsHeightPx <= 0) {
             return userPreferredMarginPx
         }
 
-        // Fall 2: Chips sind sichtbar.
-        // Wir ziehen die Höhe der Chips von der gewünschten Margin ab.
-        // Idee: Die Chips "füllen" den Leerraum auf.
+        // Fall 2: Chips sind da.
+        // Wir ziehen die Höhe der Chips vom gewünschten Abstand ab.
+        // Beispiel: User will 24px Platz. Chips sind 16px hoch.
+        // Neuer Margin = 8px.
+        // Visuell: Time -> [16px Chip] -> [8px Margin] -> Favorites. Summe = 24px.
         val remainingMargin = userPreferredMarginPx - chipsHeightPx
 
-        // Fall 2a: Die Chips sind kleiner als die Margin (z.B. Chips 16px, Margin 24px -> Rest 8px).
-        // Fall 2b: Die Chips sind größer als die Margin (z.B. Chips 50px, Margin 10px -> Rest -40px).
-        // Wir wollen keine negative Margin (Überlappung), sondern mindestens 'minGapPx'.
-        // Das bedeutet im Fall 2b verschieben sich die Favoriten zwangsläufig nach unten,
-        // was aber physikalisch notwendig ist.
-        return maxOf(remainingMargin, minGapPx)
+        // Fall 3: Die Chips sind grösser als der gewünschte Abstand (z.B. Chips 50px, Margin 10px).
+        // 10 - 50 = -40. Negative Margins können zu Clipping führen.
+        // Wir nutzen stattdessen den minGapPx (z.B. 4px), damit es nicht klebt.
+        return max(remainingMargin, minGapPx)
     }
 }

@@ -87,6 +87,7 @@ class HomeFragment : Fragment() {
     private val topMarginCalculator = TopMarginCalculator()
     private val splitWeightCalculator = SplitWeightCalculator()
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
+    private val contentSpacingCalculator = ContentSpacingCalculator()
     private val swipeAnalyzer = SwipeGestureAnalyzer()
     private val timeFormatter = TimeEventFormatter()
 
@@ -109,6 +110,8 @@ class HomeFragment : Fragment() {
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
+
+    private var currentUserPreferredMarginPx: Int = 0
 
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -559,25 +562,73 @@ class HomeFragment : Fragment() {
                 resources.getDimensionPixelSize(R.dimen.spacing_medium)
             } catch (e: Exception) { 16 }
 
-            val newTopMargin = topMarginCalculator.calculate(
+            // 1. Berechne, was der User (basierend auf Settings/Scale) eigentlich will
+            val calculatedUserMargin = topMarginCalculator.calculate(
                 scale = scale,
                 baseMarginPx = baseMargin,
                 screenHeightPx = resources.displayMetrics.heightPixels
             )
 
-            val params = binding.favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
-
-            if (params != null && params.topMargin != newTopMargin) {
-                params.topMargin = newTopMargin
-                binding.favoritesContainer.layoutParams = params
-
-                checkScrollStateAfterNextLayout("Top margin changed")
-                safePost { scheduleScrollVerification() }
+            // 2. Speichere das für später (falls Chips an/aus gehen)
+            if (currentUserPreferredMarginPx != calculatedUserMargin) {
+                currentUserPreferredMarginPx = calculatedUserMargin
+                // 3. Trigger die dynamische Berechnung
+                updateDynamicSpacing()
             }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error applying top margin")
         }
     }
+
+    /**
+     * Berechnet den finalen Margin basierend auf User-Wunsch UND Chips-Status.
+     * Sollte aufgerufen werden, wenn sich:
+     * 1. Der User-Margin ändert (Settings)
+     * 2. Die Chips ändern (Events geladen)
+     */
+    private fun updateDynamicSpacing() {
+        if (_binding == null) return
+
+        val chipsContainer = binding.calendarEventsScroll
+        val favoritesContainer = binding.favoritesContainer
+
+        // Sind die Chips gerade sichtbar?
+        val areChipsVisible = chipsContainer.visibility == View.VISIBLE
+
+        // Wir nutzen 'post', um sicherzustellen, dass wir die echte Höhe bekommen,
+        // falls die View gerade erst sichtbar geschaltet wurde.
+        favoritesContainer.post {
+            if (_binding == null) return@post
+
+            val chipsHeight = if (areChipsVisible) chipsContainer.height else 0
+
+            // Kleiner Sicherheitsabstand (z.B. halbes "small" spacing), damit Text nie klebt
+            val minGap = try {
+                resources.getDimensionPixelSize(R.dimen.spacing_small) / 2
+            } catch (e: Exception) { 4 }
+
+            // RECHNEN
+            val newTopMargin = contentSpacingCalculator.calculateFavoritesTopMargin(
+                userPreferredMarginPx = currentUserPreferredMarginPx,
+                chipsHeightPx = chipsHeight,
+                areChipsVisible = areChipsVisible,
+                minGapPx = minGap
+            )
+
+            // ANWENDEN
+            val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
+            if (params != null && params.topMargin != newTopMargin) {
+                params.topMargin = newTopMargin
+                favoritesContainer.layoutParams = params
+
+                // Da sich die Position ändert, müssen wir prüfen, ob Scrollen noch nötig ist
+                checkScrollStateAfterNextLayout("Dynamic spacing applied: $newTopMargin")
+                safePost { scheduleScrollVerification() }
+            }
+        }
+    }
+
 
     /**
      * Wendet die berechneten Cache-Werte auf die existierenden Views an.
@@ -1067,6 +1118,7 @@ class HomeFragment : Fragment() {
             binding.calendarChipsContainer.removeAllViews()
 
             if (events.isEmpty()) {
+                updateDynamicSpacing()
                 return
             }
 
@@ -1098,6 +1150,7 @@ class HomeFragment : Fragment() {
             }
 
             binding.calendarEventsScroll.visibility = View.VISIBLE
+            updateDynamicSpacing()
 
             // Warte bis Layout wirklich fertig ist!
             checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
