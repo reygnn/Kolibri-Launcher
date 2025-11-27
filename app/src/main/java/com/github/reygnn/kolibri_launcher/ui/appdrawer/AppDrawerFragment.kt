@@ -63,6 +63,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
 
+    private val appSearchFilter = AppSearchFilter()
     private lateinit var appDrawerAdapter: AppDrawerAdapter
     private var masterAppList: List<AppInfo> = emptyList()
     private var longClickedApp: AppInfo? = null
@@ -385,57 +386,41 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private fun displayFilteredApps(query: String) {
         val currentBinding = _binding
-        if (currentBinding == null || !isAdded) {
-            Timber.Forest.w("Cannot display filtered apps - binding is null or fragment not added")
-            return
-        }
+        if (currentBinding == null || !isAdded) return
 
-        try {
-            val filteredList = try {
-                if (query.isEmpty()) {
-                    masterAppList
-                } else {
-                    masterAppList.filter { app ->
-                        try {
-                            app.displayName.contains(query, ignoreCase = true)
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error filtering app: ${app.packageName}")
-                            false
-                        }
+        viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
+            try {
+                // 1. Setting holen (Suspend call safe im ViewModel)
+                val isAutoLaunchEnabled = try {
+                    viewModel.isAutoLaunchEnabled()
+                } catch (e: Throwable) {
+                    false // Fallback
+                }
+
+                // 2. PURE LOGIC aufrufen (Crash-Safe calculation)
+                val result = appSearchFilter.filterAndDecide(
+                    allApps = masterAppList,
+                    query = query,
+                    isAutoLaunchEnabled = isAutoLaunchEnabled
+                )
+
+                // 3. UI Update basierend auf Ergebnis (Sealed Interface = Exhaustive when)
+                when (result) {
+                    is AppSearchFilter.FilterResult.ShowList -> {
+                        submitListToAdapter(result.apps)
+                    }
+                    is AppSearchFilter.FilterResult.AutoLaunch -> {
+                        viewModel.onAppClicked(result.app)
+                        hideKeyboard()
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error filtering apps")
-                masterAppList
+                TimberWrapper.silentError(e, "Error in displayFilteredApps logic")
+                // Fallback: Einfach alles anzeigen
+                submitListToAdapter(masterAppList)
             }
-
-            if (query.isNotEmpty() && filteredList.size == 1) {
-
-                viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
-                    try {
-                        // *** DAS IST DIE KORRIGIERTE STELLE ***
-                        // Greift auf die saubere Methode im ViewModel zu
-                        val autoLaunchApp = viewModel.isAutoLaunchEnabled()
-
-                        if (autoLaunchApp) {
-                            viewModel.onAppClicked(filteredList.first())
-                            hideKeyboard()
-                        } else {
-                            submitListToAdapter(filteredList)
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error checking auto-launch setting")
-                        submitListToAdapter(filteredList) // Fallback
-                    }
-                }
-                return
-            }
-            submitListToAdapter(filteredList)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error in displayFilteredApps")
         }
     }
 

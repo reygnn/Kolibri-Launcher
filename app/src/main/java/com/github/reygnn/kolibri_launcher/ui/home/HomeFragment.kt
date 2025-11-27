@@ -87,6 +87,8 @@ class HomeFragment : Fragment() {
     private val topMarginCalculator = TopMarginCalculator()
     private val splitWeightCalculator = SplitWeightCalculator()
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
+    private val swipeAnalyzer = SwipeGestureAnalyzer()
+    private val timeFormatter = TimeEventFormatter()
 
 
 
@@ -1156,32 +1158,32 @@ class HomeFragment : Fragment() {
         return try {
             Chip(context).apply {
                 try {
+                    // 1. Kontext-abhängige Info holen
                     val is24Hour = DateFormat.is24HourFormat(context)
-                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
 
-                    val calendar = Calendar.getInstance()
-                    calendar.timeInMillis = event.triggerTimeMillis
+                    // 2. PURE LOGIC DELEGATION:
+                    // Die Berechnung passiert jetzt isoliert und getestet im Formatter.
+                    // Wir übergeben nur Rohdaten.
+                    val timeString = timeFormatter.formatAlarmTime(
+                        triggerTimeMillis = event.triggerTimeMillis,
+                        is24Hour = is24Hour
+                        // locale nutzen wir default vom Device, optional hier übergeben
+                    )
 
-                    if (calendar.get(Calendar.SECOND) > 0 || calendar.get(Calendar.MILLISECOND) > 0) {
-                        calendar.add(Calendar.MINUTE, 1)
-                    }
-                    calendar.set(Calendar.SECOND, 0)
-                    calendar.set(Calendar.MILLISECOND, 0)
+                    // 3. UI Zusammensetzung
+                    text = "$timeString ${event.title}"
 
-                    val displayTime = calendar.timeInMillis
-                    val alarmTime = timeFormat.format(Date(displayTime))
-
-                    text = "$alarmTime ${event.title}"
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting alarm")
+                    // Fallback, falls Formatierung wider Erwarten crasht
+                    TimberWrapper.silentError(e, "Error formatting alarm time string")
                     text = event.title
                 }
 
+                // 4. Visuelles Styling (existierende Methode)
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating alarm chip")
+            TimberWrapper.silentError(e, "Error creating alarm chip instance")
             null
         }
     }
@@ -1196,20 +1198,23 @@ class HomeFragment : Fragment() {
             Chip(context).apply {
                 try {
                     val is24Hour = DateFormat.is24HourFormat(context)
-                    val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-                    val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-                    val eventTime = timeFormat.format(Date(event.triggerTimeMillis))
 
-                    text = "$eventTime ${event.title}"
+                    // PURE LOGIC DELEGATION:
+                    val timeString = timeFormatter.formatCalendarTime(
+                        triggerTimeMillis = event.triggerTimeMillis,
+                        is24Hour = is24Hour
+                    )
+
+                    text = "$timeString ${event.title}"
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting calendar")
+                    TimberWrapper.silentError(e, "Error formatting calendar time string")
                     text = event.title
                 }
 
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating calendar chip")
+            TimberWrapper.silentError(e, "Error creating calendar chip instance")
             null
         }
     }
@@ -1262,49 +1267,24 @@ class HomeFragment : Fragment() {
             }
         }
 
-        override fun onFling(
-            e1: MotionEvent?,
-            e2: MotionEvent,
-            vX: Float,
-            vY: Float
-        ): Boolean {
+        override fun onFling(e1: MotionEvent?, e2: MotionEvent, vX: Float, vY: Float): Boolean {
             if (e1 == null) return false
-
             return try {
-                val diffY = e2.y - e1.y
-                val diffX = e2.x - e1.x
+                val result = swipeAnalyzer.analyze(
+                    diffX = e2.x - e1.x,
+                    diffY = e2.y - e1.y,
+                    velocityX = vX,
+                    velocityY = vY
+                )
 
-                if (abs(diffX) > abs(diffY)) {
-                    if (abs(diffX) > AppConstants.SWIPE_THRESHOLD && abs(vX) > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
-                        if (diffX > 0) {
-                            viewModel.onFlingLeft()
-                            true
-                        } else {
-                            viewModel.onFlingRight()
-                            true
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    if (abs(diffY) > AppConstants.SWIPE_THRESHOLD &&
-                        abs(vY) > AppConstants.SWIPE_VELOCITY_THRESHOLD
-                    ) {
-                        if (diffY < 0) {
-                            viewModel.onFlingUp()
-                            true
-                        } else if (diffY > 0) {
-                            viewModel.onFlingDown()
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
+                when (result) {
+                    SwipeGestureAnalyzer.SwipeResult.LEFT -> { viewModel.onFlingLeft(); true }
+                    SwipeGestureAnalyzer.SwipeResult.RIGHT -> { viewModel.onFlingRight(); true }
+                    SwipeGestureAnalyzer.SwipeResult.UP -> { viewModel.onFlingUp(); true }
+                    SwipeGestureAnalyzer.SwipeResult.DOWN -> { viewModel.onFlingDown(); true }
+                    SwipeGestureAnalyzer.SwipeResult.IGNORED -> false
                 }
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in fling")
                 false
             }
         }
