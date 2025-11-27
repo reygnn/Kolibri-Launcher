@@ -571,4 +571,92 @@ class SplitModeCalculatorTest {
         // Auto-Modus: canScroll entscheidet, nicht Pixel
         assertFalse(result)
     }
+
+    // ========== ULTRA-PARANOID: CONFLICT RESOLUTION ==========
+
+    @Test
+    fun `paranoid - conflict - android says NO scroll but content is huge`() {
+        // SZENARIO: Bug im Android Framework meldet "kann nicht scrollen",
+        // aber wir haben riesigen Content (z.B. 2000px in 500px Container).
+        // ERWARTUNG: Pixel-Mathematik gewinnt im Power-User Modus.
+        // Der User muss scrollen können, auch wenn Android Flags lügen.
+
+        val result = calculator.shouldSplit(
+            threshold = 100,
+            canScrollDown = false, // Android lügt
+            canScrollUp = false,   // Android lügt
+            contentHeight = 2000,
+            containerHeight = 500  // 1500px overflow > 100px threshold
+        )
+        assertTrue("Muss splitten basierend auf Pixeln, ignoriere falsche Flags", result)
+    }
+
+    @Test
+    fun `paranoid - conflict - android says YES scroll but content fits exactly`() {
+        // SZENARIO: "Ghost Scroll". Android meldet Scrollbarkeit (z.B. wegen Padding-Bug),
+        // aber rechnerisch passt der Content perfekt (0px Overflow).
+        // ERWARTUNG: Wir vertrauen der Mathematik. Kein Split, kein wackeliger Screen.
+
+        val result = calculator.shouldSplit(
+            threshold = 50,
+            canScrollDown = true, // Android lügt
+            canScrollUp = true,   // Android lügt
+            contentHeight = 1000,
+            containerHeight = 1000 // 0px overflow
+        )
+        assertFalse("Darf nicht splitten wenn mathematisch kein Overflow existiert", result)
+    }
+
+    // ========== ULTRA-PARANOID: INTEGER BOUNDARIES ==========
+
+    @Test
+    fun `paranoid - max int threshold minus one vs max int overflow`() {
+        // Testet die Grenzen von > vs >= bei extremen Werten.
+        // Threshold: MAX_VALUE - 1
+        // Overflow:  MAX_VALUE
+        // Ergebnis:  MAX_VALUE > (MAX_VALUE - 1) -> TRUE
+
+        val result = calculator.shouldSplit(
+            threshold = Int.MAX_VALUE - 1,
+            canScrollDown = false,
+            canScrollUp = false,
+            contentHeight = Int.MAX_VALUE,
+            containerHeight = 0
+        )
+        assertTrue("Sollte splitten bei MAX_VALUE overflow gegen (MAX_VALUE-1) threshold", result)
+    }
+
+    @Test
+    fun `paranoid - double negative input logic`() {
+        // Testet die Reihenfolge der "coerceAtLeast" Aufrufe.
+        // FALSCHE LOGIK wäre: (content - container).coerceAtLeast(0)
+        // -> (-50) - (-100) = 50 -> Wäre ein Split! (Falsch)
+        //
+        // KORREKTE LOGIK (Deine): content.coerce(0) - container.coerce(0)
+        // -> 0 - 0 = 0 -> Kein Split. (Richtig)
+
+        val result = calculator.shouldSplit(
+            threshold = 10,
+            canScrollDown = false,
+            canScrollUp = false,
+            contentHeight = -50,
+            containerHeight = -100
+        )
+        assertFalse("Negative inputs müssen VOR der Subtraktion auf 0 gesetzt werden", result)
+    }
+
+    @Test
+    fun `paranoid - extreme coordinates - texture size simulation`() {
+        // Simuliert extrem grosse, aber valide Integer Werte (z.B. virtuelle Canvas Koordinaten).
+        // 1 Milliarde Pixel Content in 2000 Pixel Container.
+
+        val result = calculator.shouldSplit(
+            threshold = 2000,
+            canScrollDown = false,
+            canScrollUp = false,
+            contentHeight = 1_000_000_000,
+            containerHeight = 2_000
+        )
+        assertTrue(result)
+    }
 }

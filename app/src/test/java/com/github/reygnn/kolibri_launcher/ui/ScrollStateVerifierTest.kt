@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.ui.home.ScrollStateVerifier
 import org.junit.Before
+import kotlin.test.DefaultAsserter.assertTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -213,5 +214,98 @@ class ScrollStateVerifierTest {
             canScrollUp = false
         )
         assertEquals(ScrollStateVerifier.VerifyResult.FixSplitMode, result)
+    }
+
+    // ========== ULTRA-PARANOID: GRENZÜBERSCHREITUNG VERMEIDEN ==========
+
+    @Test
+    fun `paranoid - verifier does NOT act as calculator - full mode with scrollable content`() {
+        // KRITISCHER TEST:
+        // Wir sind im Full-Mode, aber der Content ist eigentlich zu lang (canScroll = true).
+        // Der Verifier darf hier NICHT "Fix" oder "ReEvaluate" schreien!
+        // Warum? Weil der Calculator vielleicht entschieden hat, dass der Threshold noch nicht
+        // erreicht ist. Der Verifier prüft nur technische Integrität, nicht Business Logic.
+
+        val result = verifier.verify(
+            currentSplitState = false, // Full Mode
+            allowIntercept = false,    // Korrekt für Full Mode
+            canScrollDown = true,      // "Eigentlich" scrollbar
+            canScrollUp = true
+        )
+
+        // Muss Consistent bleiben! Eine Änderung hier würde die Hoheit des Calculators verletzen.
+        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+    }
+
+    // ========== ULTRA-PARANOID: PARTIAL SCROLL STATES ==========
+
+    @Test
+    fun `paranoid - split mode at the very bottom - still consistent`() {
+        // User hat ganz nach unten gescrollt.
+        // canScrollDown = false, canScrollUp = true.
+        // Das darf NICHT als "ReEvaluateNeeded" (beide false) gewertet werden.
+
+        val result = verifier.verify(
+            currentSplitState = true,
+            allowIntercept = true,
+            canScrollDown = false, // Unten angekommen
+            canScrollUp = true     // Kann noch hoch
+        )
+
+        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+    }
+
+    @Test
+    fun `paranoid - split mode at the very top - still consistent`() {
+        // User ist ganz oben.
+        // canScrollDown = true, canScrollUp = false.
+
+        val result = verifier.verify(
+            currentSplitState = true,
+            allowIntercept = true,
+            canScrollDown = true,  // Kann runter
+            canScrollUp = false    // Oben angekommen
+        )
+
+        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+    }
+
+    // ========== ULTRA-PARANOID: TRUTH TABLE VALIDATION ==========
+
+    @Test
+    fun `paranoid - object identity check - singletons are used`() {
+        // Sicherstellen, dass wir keine neuen Instanzen erzeugen (Memory),
+        // sondern die Singleton-Objects verwenden.
+
+        val result1 = verifier.verify(false, false, false, false)
+        val result2 = verifier.verify(false, false, true, true)
+
+        // Referenz-Gleichheit (===) prüfen
+        assertTrue("Muss exakt dieselbe Instanz sein", result1 === ScrollStateVerifier.VerifyResult.Consistent)
+        assertTrue("Muss exakt dieselbe Instanz sein", result1 === result2)
+    }
+
+    @Test
+    fun `paranoid - re-evaluate triggers ONLY when completely stuck`() {
+        // ReEvaluateNeeded ist teuer (Layout pass).
+        // Es darf NUR passieren, wenn der User WIRKLICH eingesperrt ist (Split Mode aber 0px Bewegung möglich).
+
+        // 1. Fall: Nur unten blockiert -> Consistent
+        assertEquals(
+            ScrollStateVerifier.VerifyResult.Consistent,
+            verifier.verify(true, true, canScrollDown = false, canScrollUp = true)
+        )
+
+        // 2. Fall: Nur oben blockiert -> Consistent
+        assertEquals(
+            ScrollStateVerifier.VerifyResult.Consistent,
+            verifier.verify(true, true, canScrollDown = true, canScrollUp = false)
+        )
+
+        // 3. Fall: Beide blockiert -> RE-EVALUATE
+        assertEquals(
+            ScrollStateVerifier.VerifyResult.ReEvaluateNeeded,
+            verifier.verify(true, true, canScrollDown = false, canScrollUp = false)
+        )
     }
 }
