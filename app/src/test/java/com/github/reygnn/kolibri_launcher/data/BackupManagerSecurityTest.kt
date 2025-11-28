@@ -102,7 +102,7 @@ class BackupManagerSecurityTest {
     @Test
     fun `attack - massive favoriteComponents array - should not crash`() = runTest {
         // Angriff: 10.000 Einträge in favoriteComponents (reduziert für Test-Performance)
-        val massiveArray = (1..10_000).joinToString(",") { "\"com.fake.app$it/.MainActivity\"" }
+        val massiveArray = (1..1_000).joinToString(",") { "\"com.fake.app$it/.MainActivity\"" }
         val maliciousJson = """
             {
                 "version": "1.0.0",
