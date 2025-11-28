@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+
 /**
  * Berechnet die Hintergrundfarbe für Chips (Kalender/Alarm Events).
  *
@@ -46,7 +48,7 @@ class ChipBackgroundCalculator {
         }
 
         // Automatisch: Semi-transparente Version der Textfarbe
-        val safeAlpha = defaultAlpha.coerceIn(0, 255)
+        val safeAlpha = defaultAlpha.coerceInSafe(0, 255)
 
         // Extrahiere RGB aus textColorInt (Format: 0xAARRGGBB)
         val red = (textColorInt shr 16) and 0xFF

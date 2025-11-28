@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -131,7 +132,7 @@ class GetFavoriteAppsUseCaseTest {
 
             val result = (successState as UiState.Success).data
             val expectedFallbackSize =
-                AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME.coerceAtMost(allApps.size)
+                AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME.coerceAtMostSafe(allApps.size)
 
             assertEquals(expectedFallbackSize, result.apps.size)
 

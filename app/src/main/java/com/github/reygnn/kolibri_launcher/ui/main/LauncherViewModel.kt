@@ -22,6 +22,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.di.MainDispatcher
@@ -499,7 +500,7 @@ class LauncherViewModel @Inject constructor(
             throw e
         } catch (e: Throwable) {
             // Hier landet der Fehler aus recordAppLaunchUseCase
-            TimberWrapper.silentError(e, "Error handling app click for ${app.packageName}")
+            TimberWrapper.silentError(e, "Error handling app click")
 
             // Und HIER wird der Toast gesendet, auf den dein Test wartet!
             sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
@@ -523,11 +524,11 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun onSetLayoutScale(scale: Float) = launchSafe {
-        setLayoutScaleUseCase(scale.coerceIn(0f, 1.0f))
+        setLayoutScaleUseCase(scale.coerceInSafe(0f, 1.0f))
     }
 
     fun onSetVerticalPadding(factor: Float) = launchSafe {
-        setVerticalPaddingUseCase(factor.coerceIn(0f, 1.0f))
+        setVerticalPaddingUseCase(factor.coerceInSafe(0f, 1.0f))
     }
 
     fun onSetFontBold(isBold: Boolean) = launchSafe {
@@ -535,7 +536,7 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun onSetContentTopMargin(scale: Float) = launchSafe {
-        setContentTopMarginUseCase(scale.coerceIn(0f, 1.0f))
+        setContentTopMarginUseCase(scale.coerceInSafe(0f, 1.0f))
     }
 
     fun onResetLayoutSettings() = launchSafe {
@@ -691,10 +692,14 @@ class LauncherViewModel @Inject constructor(
 
     fun updateBatteryLevelFromIntent(intent: Intent?) {
         try {
-            intent?.let {
-                val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (intent != null) {
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                 updateBatteryLevel(level, scale)
+            } else {
+                _uiState.update {
+                    it.copy(batteryString = DEFAULT_BATTERY)
+                }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to update battery level from intent")

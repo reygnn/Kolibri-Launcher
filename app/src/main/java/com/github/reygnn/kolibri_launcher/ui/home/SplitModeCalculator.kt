@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
+
 /**
  * SAFETY-CRITICAL COMPONENT - Split-Mode Decision Logic
  *
@@ -79,12 +81,12 @@ class SplitModeCalculator {
         // INPUT SANITIZATION:
         // View dimensions can be -1 or negative during layout passes or initialization.
         // We coerce them to at least 0 to prevent "double negative" additions (e.g., -50 - -100).
-        val safeContent = contentHeight.coerceAtLeast(0)
-        val safeContainer = containerHeight.coerceAtLeast(0)
+        val safeContent = contentHeight.coerceAtLeastSafe(0)
+        val safeContainer = containerHeight.coerceAtLeastSafe(0)
 
         // CALCULATION:
         // 1. Subtract container from content to get raw overflow.
         // 2. Coerce to at least 0 (we don't care about "underflow" / empty space).
-        return (safeContent - safeContainer).coerceAtLeast(0)
+        return (safeContent - safeContainer).coerceAtLeastSafe(0)
     }
 }

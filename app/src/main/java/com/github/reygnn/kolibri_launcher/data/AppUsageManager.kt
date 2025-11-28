@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -172,20 +174,20 @@ class AppUsageManager @Inject constructor(
                     val timeDifferenceMs = currentTime - launchTime
                     if (timeDifferenceMs < 0) return@sumOf 0.0 // Zukunfts-Timestamp
 
-                    val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeast(0.0)
+                    val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeastSafe(0.0)
                     val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
 
                     // Overflow-Schutz
                     when {
                         exponent < -100.0 -> 0.0
                         exponent > 100.0 -> 1.0
-                        else -> exp(exponent).coerceIn(0.0, 1.0)
+                        else -> exp(exponent).coerceInSafe(0.0, 1.0)
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error calculating score for timestamp: $launchTime")
                     0.0
                 }
-            }.coerceAtLeast(0.0)
+            }.coerceAtLeastSafe(0.0)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in calculateTimeWeightedScore")
             0.0

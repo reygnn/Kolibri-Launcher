@@ -4,6 +4,7 @@ import android.app.WallpaperColors
 import android.graphics.Color
 import androidx.core.graphics.ColorUtils
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -72,26 +73,23 @@ class ObserveUiColorsUseCase @Inject constructor(
         }
     }
 
-    // Die private Helper-Funktion 1:1 aus dem ViewModel kopieren:
     private fun calculateTonalShadowColor(baseColor: Int): Int {
         return try {
             val luminance = ColorUtils.calculateLuminance(baseColor).toDouble()
-            // ... (Simple lerp function) ...
             fun lerp(start: Double, stop: Double, fraction: Double): Double {
-                return (start + fraction * (stop - start)).coerceIn(0.0, 1.0)
+                return (start + fraction * (stop - start)).coerceInSafe(0.0, 1.0)
             }
-            // ... (restliche when-Logik 1:1 kopieren) ...
             when {
                 luminance < 0.1 -> Color.argb(204, 255, 255, 255)
                 luminance < 0.5 -> {
-                    val fraction = ((luminance - 0.1) / 0.4).coerceIn(0.0, 1.0)
+                    val fraction = ((luminance - 0.1) / 0.4).coerceInSafe(0.0, 1.0)
                     val alpha = lerp(0.75, 0.4, fraction)
-                    Color.argb((alpha * 255).toInt().coerceIn(0, 255), 255, 255, 255)
+                    Color.argb((alpha * 255).toInt().coerceInSafe(0, 255), 255, 255, 255)
                 }
                 luminance < 0.9 -> {
-                    val fraction = ((luminance - 0.5) / 0.4).coerceIn(0.0, 1.0)
+                    val fraction = ((luminance - 0.5) / 0.4).coerceInSafe(0.0, 1.0)
                     val alpha = lerp(0.3, 0.6, fraction)
-                    Color.argb((alpha * 255).toInt().coerceIn(0, 255), 0, 0, 0)
+                    Color.argb((alpha * 255).toInt().coerceInSafe(0, 255), 0, 0, 0)
                 }
                 else -> Color.argb(153, 0, 0, 0)
             }

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.di.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -198,7 +199,7 @@ open class FavoritesOrderManager private constructor(
                     try {
                         val jsonArray = JSONArray(orderString)
                         // Mit Limit für Sicherheit
-                        val size = jsonArray.length().coerceAtMost(MAX_ORDER_LIST_SIZE)
+                        val size = jsonArray.length().coerceAtMostSafe(MAX_ORDER_LIST_SIZE)
                         List(size) { i -> jsonArray.getString(i) }
                     } catch (e: JSONException) {
                         TimberWrapper.silentError(e, "Error parsing favorites order JSON")

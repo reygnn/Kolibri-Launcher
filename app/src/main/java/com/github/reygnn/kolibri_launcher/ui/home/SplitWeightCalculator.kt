@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
 import android.content.res.Configuration
+import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
 
 /**
  * Berechnet die Layout-Gewichtungen für Split-Mode vs Full-Mode.
@@ -49,14 +50,14 @@ class SplitWeightCalculator {
 
         return if (isLandscape) {
             LayoutWeights(
-                scrollViewWeight = landscapeScrollWeight.coerceAtLeast(0f),
-                gestureZoneWeight = landscapeGestureWeight.coerceAtLeast(0f),
+                scrollViewWeight = landscapeScrollWeight.coerceAtLeastSafe(0f),
+                gestureZoneWeight = landscapeGestureWeight.coerceAtLeastSafe(0f),
                 gestureZoneVisible = true
             )
         } else {
             LayoutWeights(
-                scrollViewWeight = portraitScrollWeight.coerceAtLeast(0f),
-                gestureZoneWeight = portraitGestureWeight.coerceAtLeast(0f),
+                scrollViewWeight = portraitScrollWeight.coerceAtLeastSafe(0f),
+                gestureZoneWeight = portraitGestureWeight.coerceAtLeastSafe(0f),
                 gestureZoneVisible = true
             )
         }

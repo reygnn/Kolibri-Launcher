@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -127,7 +128,7 @@ class FakeSettingsRepository : SettingsRepository {
     var splitModeThreshold: Int
         get() = splitModeThresholdFlowState.value
         set(value) {
-            splitModeThresholdFlowState.value = value.coerceIn(0, 512)
+            splitModeThresholdFlowState.value = value.coerceInSafe(0, 512)
         }
 
     var currentSortOrder: SortOrder

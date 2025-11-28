@@ -68,6 +68,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
@@ -1500,30 +1502,38 @@ class LauncherViewModelTest {
 
     @Test
     fun `refreshDynamicUiData - updates time but preserves battery state`() = runTest {
+        // 1. Arrange: Wir simulieren einen System-Intent mit 88% Akku
+        val batteryIntent = mock(Intent::class.java)
+        `when`(batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)).thenReturn(88)
+        `when`(batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)).thenReturn(100)
+
+        // WICHTIG: Wenn das ViewModel den Context fragt, muss dieser Intent zurückkommen!
+        // Wir nutzen anyOrNull() für den Receiver und any() für Filter/Flags
+        `when`(context.registerReceiver(
+            org.mockito.kotlin.anyOrNull(),
+            any(),
+            any()
+        )).thenReturn(batteryIntent)
+
+        // ViewModel setup
         setupViewModel()
 
-        // 1. Setze einen Batterie-Status
+        // 2. Initialen Status setzen
         viewModel.updateBatteryLevel(88, 100)
         advanceUntilIdle()
 
         val stateBefore = viewModel.uiState.value
         assertEquals("88%", stateBefore.batteryString)
 
-        // Merke alte Zeit (könnte leer sein am Anfang im Test)
-        val oldTime = stateBefore.timeString
-
-        // Act: Simuliere System-Tick (Minute vergangen)
-        // Wir warten kurz, damit System.currentTimeMillis() sich unterscheidet (in Tests oft irrelevant,
-        // aber wir wollen sichergehen, dass die Methode triggert)
+        // 3. Act: Refresh aufrufen
+        // Das VM fragt jetzt den Context -> bekommt batteryIntent -> liest 88% -> setzt 88%
         viewModel.refreshDynamicUiData()
         advanceUntilIdle()
 
         val stateAfter = viewModel.uiState.value
 
-        // Assert:
-        // 1. Batterie ist immer noch da (wurde nicht überschrieben)
+        // 4. Assert
         assertEquals("88%", stateAfter.batteryString)
-        // 2. Zeitstring ist vorhanden (Logik wurde ausgeführt)
         assertNotNull(stateAfter.timeString)
     }
 

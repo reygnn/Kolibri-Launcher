@@ -5,6 +5,7 @@ import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupException
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
@@ -547,13 +548,13 @@ class BackupManager @Inject constructor(
             backup.settings.isFontBold?.let { settingsManager.setFontBold(it) }
 
             backup.settings.layoutScale?.let {
-                settingsManager.setLayoutScale(it.coerceIn(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
+                settingsManager.setLayoutScale(it.coerceInSafe(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
             }
             backup.settings.verticalPaddingScale?.let {
-                settingsManager.setVerticalPadding(it.coerceIn(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))
+                settingsManager.setVerticalPadding(it.coerceInSafe(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))
             }
             backup.settings.contentTopMarginScale?.let {
-                settingsManager.setContentTopMarginScale(it.coerceIn(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
+                settingsManager.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
             }
         }
 
@@ -572,7 +573,7 @@ class BackupManager @Inject constructor(
         // ===== PHASE 10: Import Power-User Settings =====
         if (options.importPowerUserSettings) {
             backup.settings.splitModeThreshold?.let { threshold ->
-                settingsManager.setSplitModeThreshold(threshold.coerceIn(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
+                settingsManager.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
             }
         }
 

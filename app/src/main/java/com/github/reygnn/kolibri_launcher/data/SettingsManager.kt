@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -281,13 +282,13 @@ class SettingsManager @Inject constructor(
         .map { preferences ->
             val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD] ?: 0
             // Validierung: Stelle sicher, dass der Wert im gültigen Bereich liegt
-            threshold.coerceIn(0, 512)
+            threshold.coerceInSafe(0, 512)
         }
 
     override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
         try {
             // Validiere Input (0-512)
-            val validThreshold = thresholdPixels.coerceIn(0, 512)
+            val validThreshold = thresholdPixels.coerceInSafe(0, 512)
 
             dataStore.edit { settings ->
                 settings[PreferenceKeys.SPLIT_MODE_THRESHOLD] = validThreshold
