@@ -21,7 +21,9 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.json.JSONException
@@ -543,15 +545,13 @@ class BackupManager @Inject constructor(
         return list
     }
 
-    override suspend fun saveBackupToFile(uriString: String): Boolean {
-        return try {
-            // 1. Validiere URI-String
+    override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
+        try {
             if (uriString.isBlank()) {
                 Timber.Forest.e("Empty URI string provided")
                 throw BackupException("Invalid file location")
             }
 
-            // 2. Parse URI mit expliziter Exception-Behandlung
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
@@ -559,23 +559,21 @@ class BackupManager @Inject constructor(
                 throw BackupException("Invalid file location format", e)
             }
 
-            // 3. Prüfe URI-Scheme
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf("content", "file")) {
                 Timber.Forest.e("Unsupported URI scheme: $scheme")
                 throw BackupException("Unsupported file location type")
             }
 
-            // 4. Exportiere Backup-Daten
+            // Wir rufen exportToJson auf. Da dies "nur" CPU/Memory ist, ist es hier im IO Block auch okay.
             val jsonString = exportToJson()
 
-            // 5. Prüfe Backup-Größe (optional, aber empfohlen)
             val backupSizeBytes = jsonString.toByteArray().size
-            if (backupSizeBytes > 10 * 1024 * 1024) { // 10 MB Limit
+            if (backupSizeBytes > 10 * 1024 * 1024) {
                 Timber.Forest.w("Backup size is very large: ${backupSizeBytes / 1024 / 1024} MB")
             }
 
-            // 6. Schreibe zu File
+            // CRITICAL I/O OPERATION
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 output.write(jsonString.toByteArray())
                 Timber.Forest.i("Backup saved successfully to: $uri (${backupSizeBytes / 1024} KB)")
@@ -601,18 +599,20 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult {
-        return try {
-            if (uriString.isBlank()) return ImportResult.Error("Invalid file location")
-            val uri = try { uriString.toUri() } catch (e: Exception) { return ImportResult.Error("Invalid format") }
+    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(Dispatchers.IO) {
+        try {
+            if (uriString.isBlank()) return@withContext ImportResult.Error("Invalid file location")
+            val uri = try { uriString.toUri() } catch (e: Exception) { return@withContext ImportResult.Error("Invalid format") }
 
+            // CRITICAL I/O OPERATION
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
-            } ?: return ImportResult.Error("Cannot read from selected location")
+            } ?: return@withContext ImportResult.Error("Cannot read from selected location")
 
-            if (jsonString.length > 10 * 1024 * 1024) return ImportResult.Error("Backup file is too large")
-            if (!jsonString.trim().startsWith("{")) return ImportResult.InvalidFormat
+            if (jsonString.length > 10 * 1024 * 1024) return@withContext ImportResult.Error("Backup file is too large")
+            if (!jsonString.trim().startsWith("{")) return@withContext ImportResult.InvalidFormat
 
+            // importFromJson ist suspend, wir rufen es hier auf.
             importFromJson(jsonString, options)
 
         } catch (e: CancellationException) {
@@ -623,62 +623,56 @@ class BackupManager @Inject constructor(
         }
     }
 
-    override suspend fun previewBackup(uriString: String): BackupPreview? {
-        return try {
-            // 1. Validiere URI-String
+    override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
+        try {
             if (uriString.isBlank()) {
                 Timber.Forest.e("Empty URI string provided for preview")
-                return null
+                return@withContext null
             }
 
-            // 2. Parse URI
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
                 Timber.Forest.e(e, "Invalid URI format for preview: $uriString")
-                return null
+                return@withContext null
             }
 
-            // 3. Prüfe URI-Scheme
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf("content", "file")) {
                 Timber.Forest.e("Unsupported URI scheme for preview: $scheme")
-                return null
+                return@withContext null
             }
 
-            // 4. Lese File
+            // CRITICAL I/O OPERATION (Das verursachte deinen Stacktrace)
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                // Limitiere Preview auf erste 1 MB (für Performance)
                 val maxPreviewSize = 1024 * 1024
                 val buffer = ByteArray(maxPreviewSize)
+                // Hier passiert das eigentliche Lesen von der Disk/Provider
                 val bytesRead = input.read(buffer)
 
                 if (bytesRead < 0) {
                     Timber.Forest.e("Empty file for preview")
-                    return null
+                    return@withContext null
                 }
 
                 String(buffer, 0, bytesRead)
             } ?: run {
                 Timber.Forest.e("Failed to open input stream for preview")
-                return null
+                return@withContext null
             }
 
-            // 5. Validiere JSON-Format (basic)
             if (!jsonString.trim().startsWith("{")) {
                 Timber.Forest.e("File does not appear to be valid JSON")
-                return null
+                return@withContext null
             }
 
-            // 6. Parse Backup
             val backup = try {
                 json.decodeFromString<BackupData>(jsonString)
             } catch (e: SerializationException) {
                 Timber.Forest.e(e, "Failed to parse backup file for preview")
-                return null
+                return@withContext null
             }
 
-            // 7. Erstelle Preview
             val preview = BackupPreview(
                 version = backup.version,
                 timestamp = backup.timestamp,
@@ -705,13 +699,9 @@ class BackupManager @Inject constructor(
             )
 
             Timber.Forest.i(
-                "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, " +
-                        "swipes=L:${preview.hasSwipeLeft}/R:${preview.hasSwipeRight}, " +
-                        "theme=${preview.hasThemeSettings}, gestures=${preview.hasGestureSettings}, " +
-                        "timeEvents=${preview.hasTimeBasedEvents}, qol=${preview.hasQualityOfLife}, " +
-                        "powerUser=${preview.hasPowerUserSettings}"
+                "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}..."
             )
-            preview
+            return@withContext preview
 
         } catch (e: SecurityException) {
             Timber.Forest.e(e, "Permission denied for preview")
