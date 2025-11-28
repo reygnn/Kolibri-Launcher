@@ -28,6 +28,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -591,7 +592,7 @@ class HomeFragment : Fragment() {
 
         val chipsContainer = binding.calendarEventsScroll
         val favoritesContainer = binding.favoritesContainer
-        val areChipsVisible = chipsContainer.visibility == View.VISIBLE
+        val areChipsVisible = chipsContainer.isVisible
 
         favoritesContainer.post {
             if (_binding == null) return@post
@@ -723,7 +724,7 @@ class HomeFragment : Fragment() {
 
                 Timber.d("Split mode: ${if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"} (${weights.scrollViewWeight}/${weights.gestureZoneWeight})")
 
-                binding.gestureZone.visibility = View.VISIBLE
+                binding.gestureZone.isVisible = true
 
                 // ScrollView darf Touches abfangen (zum Scrollen)
                 customScrollView.allowIntercept = true
@@ -742,7 +743,7 @@ class HomeFragment : Fragment() {
 
             } else {
                 // FULL MODE
-                binding.gestureZone.visibility = View.GONE
+                binding.gestureZone.isVisible = false
                 binding.favoritesScrollView.background = null
                 binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
@@ -1733,49 +1734,22 @@ class HomeFragment : Fragment() {
 
     override fun onDestroyView() {
         try {
-            // 1. Laufende Jobs sofort stoppen
-            // Verhindert, dass verifyAndFixScrollState aufgerufen wird, während der View stirbt.
+            // 1. Laufende Jobs stoppen (WICHTIG!)
+            // Verhindert Abstürze durch nachträgliche UI-Updates
             verifyJob?.cancel()
             verifyJob = null
 
             // 2. Dialog sicher schliessen
             ContextMenuHelper.dismiss(childFragmentManager)
 
-            // 3. Member-Referenzen aufräumen
+            // 3. Eigene Referenzen aufräumen
+            // Das ist wichtig, weil 'gestureDetector' eine Variable in der HomeFragment Klasse ist
             gestureDetector = null
             longClickedApp = null
             contentSpacingCalculator.cleanup()
 
-            // 4. WICHTIG: View-Hierarchie & Listener manuell leeren
-            // Das durchbricht den Zyklus: Fragment -> Layout -> Button -> Listener -> Fragment
-            if (_binding != null) {
-                try {
-                    // Entfernt alle App-Buttons und ihre Listener
-                    binding.appList.removeAllViews()
-
-                    // Entfernt alle Chips und ihre Listener
-                    binding.calendarChipsContainer.removeAllViews()
-
-                    // Touch-Listener entfernen (brechen Referenzen auf "gestureDetector" und "this")
-                    binding.favoritesScrollView.setOnTouchListener(null)
-                    binding.gestureZone.setOnTouchListener(null)
-                    binding.rootLayout.setOnTouchListener(null)
-
-                    // Scroll Listener / Layout Listener entfernen
-                    // (Wird zwar meist im GlobalLayoutListener handled, aber sicher ist sicher)
-                    binding.favoritesScrollView.viewTreeObserver?.let { vto ->
-                        if (vto.isAlive) {
-                            // Da wir keine Referenz auf den anonymen Listener haben,
-                            // können wir ihn hier nicht explizit removen,
-                            // aber da wir _binding nullen, greift der Safety-Check im Listener.
-                        }
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing view hierarchy")
-                }
-            }
-
-            // 5. Binding nullen (Der Todesstoss für den View-Zugriff)
+            // 4. Binding nullen - Der "Golden Hammer"
+            // Durchbricht den Fragment-View-Zyklus.
             _binding = null
 
         } catch (e: Throwable) {
