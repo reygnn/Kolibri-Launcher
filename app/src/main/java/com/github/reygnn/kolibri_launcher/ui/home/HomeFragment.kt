@@ -28,7 +28,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -63,11 +62,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import kotlin.math.abs
 
 // ============================================================================
 // REACTIVE SPLIT MODE FLOW - HOW IT WORKS
@@ -495,7 +489,7 @@ class HomeFragment : Fragment() {
                             if (_binding == null) return@collect
 
                             try {
-                                // 1. Cache für Textgröße/Padding neu berechnen
+                                // 1. Cache für Textgrösse/Padding neu berechnen
                                 recalculateLayoutCache(
                                     config.scale,
                                     config.paddingFactor,
@@ -505,7 +499,7 @@ class HomeFragment : Fragment() {
                                 // 2. Den neuen Abstand (Margin) anwenden
                                 applyTopMargin(config.marginScale)
 
-                                // 3. Alle existierenden Buttons aktualisieren (Textgröße etc.)
+                                // 3. Alle existierenden Buttons aktualisieren (Textgrösse etc.)
                                 applyLayoutToExistingViews()
 
                             } catch (e: CancellationException) {
@@ -1739,14 +1733,51 @@ class HomeFragment : Fragment() {
 
     override fun onDestroyView() {
         try {
+            // 1. Laufende Jobs sofort stoppen
+            // Verhindert, dass verifyAndFixScrollState aufgerufen wird, während der View stirbt.
+            verifyJob?.cancel()
+            verifyJob = null
+
+            // 2. Dialog sicher schliessen
             ContextMenuHelper.dismiss(childFragmentManager)
 
+            // 3. Member-Referenzen aufräumen
             gestureDetector = null
             longClickedApp = null
-
             contentSpacingCalculator.cleanup()
 
+            // 4. WICHTIG: View-Hierarchie & Listener manuell leeren
+            // Das durchbricht den Zyklus: Fragment -> Layout -> Button -> Listener -> Fragment
+            if (_binding != null) {
+                try {
+                    // Entfernt alle App-Buttons und ihre Listener
+                    binding.appList.removeAllViews()
+
+                    // Entfernt alle Chips und ihre Listener
+                    binding.calendarChipsContainer.removeAllViews()
+
+                    // Touch-Listener entfernen (brechen Referenzen auf "gestureDetector" und "this")
+                    binding.favoritesScrollView.setOnTouchListener(null)
+                    binding.gestureZone.setOnTouchListener(null)
+                    binding.rootLayout.setOnTouchListener(null)
+
+                    // Scroll Listener / Layout Listener entfernen
+                    // (Wird zwar meist im GlobalLayoutListener handled, aber sicher ist sicher)
+                    binding.favoritesScrollView.viewTreeObserver?.let { vto ->
+                        if (vto.isAlive) {
+                            // Da wir keine Referenz auf den anonymen Listener haben,
+                            // können wir ihn hier nicht explizit removen,
+                            // aber da wir _binding nullen, greift der Safety-Check im Listener.
+                        }
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing view hierarchy")
+                }
+            }
+
+            // 5. Binding nullen (Der Todesstoss für den View-Zugriff)
             _binding = null
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
