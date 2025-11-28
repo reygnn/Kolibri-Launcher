@@ -85,8 +85,8 @@ class FavoritesSortFragment : Fragment() {
     @MainDispatcher
     lateinit var mainDispatcher: CoroutineDispatcher
 
-    private lateinit var adapter: FavoritesAdapter
-    private lateinit var itemTouchHelper: ItemTouchHelper
+    private var adapter: FavoritesAdapter? = null
+    private var itemTouchHelper: ItemTouchHelper? = null
     private var originalOrder: List<AppInfo> = emptyList()
 
     companion object {
@@ -158,14 +158,14 @@ class FavoritesSortFragment : Fragment() {
             binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
             try {
-                adapter.submitList(originalOrder)
+                adapter?.submitList(originalOrder)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting initial list")
             }
 
             val callback = createItemTouchHelperCallback()
             itemTouchHelper = ItemTouchHelper(callback)
-            itemTouchHelper.attachToRecyclerView(binding.recyclerView)
+            itemTouchHelper?.attachToRecyclerView(binding.recyclerView)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up RecyclerView")
         }
@@ -189,7 +189,7 @@ class FavoritesSortFragment : Fragment() {
                         toPosition == RecyclerView.NO_POSITION) {
                         false
                     } else {
-                        adapter.moveItem(fromPosition, toPosition)
+                        adapter?.moveItem(fromPosition, toPosition)
                         true
                     }
                 } catch (e: Throwable) {
@@ -223,7 +223,7 @@ class FavoritesSortFragment : Fragment() {
                 try {
                     super.clearView(recyclerView, viewHolder)
                     viewHolder.itemView.alpha = 1.0f
-                    adapter.onMoveFinished()
+                    adapter?.onMoveFinished()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in clearView")
                 }
@@ -259,15 +259,17 @@ class FavoritesSortFragment : Fragment() {
 
     private fun sortFavoritesAlphabetically() {
         try {
+            val currentAdapter = adapter ?: return
+
             val sortedList = try {
-                adapter.currentList.sortedBy { it.displayName.lowercase() }
+                currentAdapter.currentList.sortedBy { it.displayName.lowercase() }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error sorting alphabetically")
-                adapter.currentList
+                currentAdapter.currentList
             }
 
             try {
-                adapter.submitList(sortedList)
+                currentAdapter.submitList(sortedList)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting sorted list")
             }
@@ -282,7 +284,7 @@ class FavoritesSortFragment : Fragment() {
     private fun resetToOriginalOrder() {
         try {
             try {
-                adapter.submitList(originalOrder)
+                adapter?.submitList(originalOrder)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error submitting original order")
             }

@@ -77,7 +77,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDragListener() {
         val dragHandle = binding.dragHandle
-        val window = dialog?.window ?: return
 
         var initialX = 0
         var initialY = 0
@@ -85,7 +84,10 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         var initialTouchY = 0f
 
         dragHandle.setOnTouchListener { v, event ->
-            val layoutParams = window.attributes
+            // BESSER: Window hier holen
+            val currentWindow = dialog?.window ?: return@setOnTouchListener false
+            val layoutParams = currentWindow.attributes
+
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = layoutParams.x
@@ -97,7 +99,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
                 MotionEvent.ACTION_MOVE -> {
                     layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
                     layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
-                    window.attributes = layoutParams
+                    currentWindow.attributes = layoutParams // Setzen
                     true
                 }
                 else -> false
@@ -242,9 +244,24 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+        // 1. Manuelle Referenzen auf Views löschen
+        // Das ist wichtig, weil die Maps Views halten, die wiederum Listener auf 'this' haben.
         textSwatchViews.clear()
         chipBgSwatchViews.clear()
+
+        // 2. Listener vom DragHandle entfernen (optional, aber sauber)
+        // Verhindert, dass der Listener noch Events feuert, während der View stirbt.
+        if (_binding != null) {
+            binding.dragHandle.setOnTouchListener(null)
+
+            // Container leeren hilft dem GC zusätzlich
+            binding.colorPaletteContainer.removeAllViews()
+            binding.chipBgPaletteContainer.removeAllViews()
+        }
+
+        // 3. Binding nullen
+        _binding = null
+
+        super.onDestroyView()
     }
 }

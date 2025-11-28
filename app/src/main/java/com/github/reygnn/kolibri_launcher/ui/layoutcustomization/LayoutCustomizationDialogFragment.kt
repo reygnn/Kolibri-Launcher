@@ -62,8 +62,32 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+        try {
+            if (_binding != null) {
+                // GC-Optimization: Listener entfernen
+                // Das durchbricht Referenz-Zyklen sofort
+                binding.sliderTextSize.clearOnChangeListeners()
+                binding.sliderTextSize.clearOnSliderTouchListeners()
+
+                binding.sliderPadding.clearOnChangeListeners()
+                binding.sliderPadding.clearOnSliderTouchListeners()
+
+                binding.sliderTopMargin.clearOnChangeListeners()
+                binding.sliderTopMargin.clearOnSliderTouchListeners()
+
+                binding.dragHandle.setOnTouchListener(null)
+
+                // Switch Listener nullen
+                binding.switchBoldText.setOnCheckedChangeListener(null)
+            }
+
+            _binding = null
+
+        } catch (e: Throwable) {
+            Timber.e(e, "Error in onDestroyView")
+        } finally {
+            super.onDestroyView()
+        }
     }
 
     // ==================== Window Configuration ====================
@@ -205,14 +229,14 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDragListener() {
         val dragHandle = binding.dragHandle
-        val window = dialog?.window ?: return
 
         var initialY = 0
         var initialTouchY = 0f
 
         dragHandle.setOnTouchListener { _, event ->
             try {
-                val layoutParams = window.attributes
+                val currentWindow = dialog?.window ?: return@setOnTouchListener false
+                val layoutParams = currentWindow.attributes
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         initialY = layoutParams.y
@@ -228,7 +252,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                     }
                     MotionEvent.ACTION_MOVE -> {
                         layoutParams.y = initialY - (event.rawY - initialTouchY).toInt()
-                        window.attributes = layoutParams
+                        currentWindow.attributes = layoutParams
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

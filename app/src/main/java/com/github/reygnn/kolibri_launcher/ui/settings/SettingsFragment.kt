@@ -1042,4 +1042,27 @@ class SettingsFragment : PreferenceFragmentCompat() {
             TimberWrapper.silentError(e, "Cannot show factory reset dialog")
         }
     }
+
+    override fun onDestroyView() {
+        try {
+            // 1. Listener entfernen (bricht zyklische Referenzen)
+            calendarSwitchPreference?.onPreferenceChangeListener = null
+            alarmSwitchPreference?.onPreferenceChangeListener = null
+            autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
+            autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
+            splitModeThresholdPreference?.onPreferenceChangeListener = null
+
+            // 2. Referenzen nullen (damit der GC aufräumen kann)
+            calendarSwitchPreference = null
+            alarmSwitchPreference = null
+            autoKeyboardSwitchPreference = null
+            autoLaunchAppSwitchPreference = null
+            splitModeThresholdPreference = null
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onDestroyView")
+        } finally {
+            super.onDestroyView()
+        }
+    }
 }

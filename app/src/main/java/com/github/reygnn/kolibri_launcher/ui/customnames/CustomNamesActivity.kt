@@ -109,13 +109,26 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
     override fun onDestroy() {
         try {
-            // CRASH-SAFE: Dialog schließen bevor Activity destroyed wird
+            // CRASH-SAFE: Dialog schließen
             currentDialog?.dismiss()
             currentDialog = null
 
-            // Cleanup in richtiger Reihenfolge
+            // GC-OPTIMIERUNG: Views leeren, um Listener-Referenzen zu kappen
+            if (_binding != null) {
+                try {
+                    // Entfernt alle Chips und deren Listener
+                    binding.appNameChipGroup.removeAllViews()
+
+                    // Entfernt Listener vom EditText (indirekt durch Null-Setzen des Bindings, aber explizit schadet nicht)
+                    // binding.searchEditText.addTextChangedListener(null) // Geht leider nicht so einfach bei doOnTextChanged
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing views")
+                }
+            }
+
             adapter = null
             _binding = null
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
@@ -266,16 +279,25 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     }
 
     private fun showRenameDialog(app: AppInfo) {
-        // CRASH-SAFE: Schließe vorherigen Dialog falls noch offen
-        currentDialog?.dismiss()
+        // 1. CRASH-SAFE: Vorherigen Dialog sicher schließen
+        try {
+            currentDialog?.dismiss()
+        } catch (e: Throwable) {
+            // Ignorieren, falls Dialog schon weg ist
+        }
+        currentDialog = null
 
         try {
+            // 2. EditText vorbereiten
             val editText = EditText(this).apply {
                 setText(app.displayName)
                 setSelection(app.displayName.length)
                 hint = getString(R.string.rename_hint)
+                // Optional: InputType explizit setzen für bessere Tastatur-Steuerung
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             }
 
+            // 3. Dialog bauen
             currentDialog = AlertDialog.Builder(this)
                 .setTitle(getString(R.string.rename_dialog_title, app.originalName))
                 .setView(editText)
@@ -284,13 +306,13 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
                         val newName = editText.text.toString().trim()
                         handleRename(app, newName)
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error handling rename")
+                        TimberWrapper.silentError(e, "Error handling rename click")
                         showError(getString(R.string.error_generic))
                     }
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .setOnDismissListener {
-                    // CRASH-SAFE: Referenz löschen wenn Dialog dismissed wird
+                    // WICHTIG: Referenz sofort löschen
                     if (currentDialog?.isShowing == false) {
                         currentDialog = null
                     }
@@ -299,20 +321,28 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
             currentDialog?.show()
 
-            // Fokus und Tastatur
-            try {
-                editText.requestFocus()
-                editText.postDelayed({
-                    try {
+            // 4. GC & LIFECYCLE SAFE: Fokus & Tastatur setzen
+            // Statt 'postDelayed' nutzen wir eine Coroutine, die automatisch stirbt,
+            // wenn die Activity stirbt. Das verhindert Leaks und Crashes.
+            lifecycleScope.launch {
+                try {
+                    // Warte kurz, bis Dialog-Animation fertig ist
+                    kotlinx.coroutines.delay(100)
+
+                    // WICHTIG: Prüfen ob alles noch existiert!
+                    if (currentDialog?.isShowing == true && editText.isAttachedToWindow) {
+                        editText.requestFocus()
                         val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
                         imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error showing keyboard")
                     }
-                }, 100)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting focus")
+                } catch (e: CancellationException) {
+                    // Job wurde gecancelt (Activity zerstört) -> Alles gut.
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing keyboard in dialog")
+                }
             }
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating rename dialog")
             showError(getString(R.string.error_generic))

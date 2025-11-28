@@ -111,9 +111,25 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
 
     override fun onDestroy() {
         try {
-            // CRASH-SAFE: Cleanup in richtiger Reihenfolge
+            if (_binding != null) {
+                try {
+                    // GC-OPTIMIERUNG: Chips und deren Listener entfernen
+                    // (Hält Referenz auf 'viewModel' und 'app')
+                    binding.selectionChipGroup.removeAllViews()
+
+                    // Adapter vom RecyclerView trennen
+                    binding.allAppsRecyclerView.adapter = null
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing views")
+                }
+            }
+
+            // Referenz auf Adapter (und damit den Callback-Lambda) löschen
             appSelectionAdapter = null
+
+            // Binding nullen (Kappt Verbindung Activity <-> View)
             _binding = null
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {

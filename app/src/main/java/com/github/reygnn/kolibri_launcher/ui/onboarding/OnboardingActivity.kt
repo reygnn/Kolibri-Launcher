@@ -127,11 +127,31 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
         }
     }
 
+    /**
+     * ULTRA-CLEAN DESTROY
+     * Sorgt für sofortige Freigabe von Listenern und View-Referenzen.
+     */
     override fun onDestroy() {
         try {
-            // CRASH-SAFE: Cleanup in richtiger Reihenfolge
+            if (_binding != null) {
+                try {
+                    // 1. GC-OPTIMIERUNG: Dynamische Views und Listener entfernen
+                    // (Chips halten Referenzen auf ViewModel via Listener)
+                    binding.selectionChipGroup.removeAllViews()
+
+                    // 2. Adapter vom RecyclerView trennen
+                    binding.allAppsRecyclerView.adapter = null
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error clearing views")
+                }
+            }
+
+            // 3. Eigene Referenzen aufräumen
             allAppsAdapter = null
+
+            // 4. Binding nullen (Kappt Verbindung Activity <-> View)
             _binding = null
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
