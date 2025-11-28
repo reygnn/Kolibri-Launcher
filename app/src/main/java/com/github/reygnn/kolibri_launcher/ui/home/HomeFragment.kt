@@ -95,7 +95,6 @@ class HomeFragment : Fragment() {
 
     private var gestureDetector: GestureDetector? = null
     private var longClickedApp: AppInfo? = null
-    private var currentDialog: DialogFragment? = null
 
     // REACTIVE: Scroll state determines split mode
     private val _needsSplit = MutableStateFlow(false)
@@ -169,6 +168,11 @@ class HomeFragment : Fragment() {
 
         try {
             Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
+
+            // 1. SICHERHEIT: Cache leeren.
+            // Damit garantieren wir, dass beim nächsten Layout-Pass
+            // auf jeden Fall neu gerechnet und der Margin neu gesetzt wird.
+            contentSpacingCalculator.cleanup()
 
             // Den Orientation-State sofort aktualisieren
             _orientationState.value = newConfig.orientation
@@ -592,37 +596,29 @@ class HomeFragment : Fragment() {
 
         val chipsContainer = binding.calendarEventsScroll
         val favoritesContainer = binding.favoritesContainer
-
-        // Sind die Chips gerade sichtbar?
         val areChipsVisible = chipsContainer.visibility == View.VISIBLE
 
-        // Wir nutzen 'post', um sicherzustellen, dass wir die echte Höhe bekommen,
-        // falls die View gerade erst sichtbar geschaltet wurde.
         favoritesContainer.post {
             if (_binding == null) return@post
 
-            val chipsHeight = if (areChipsVisible) chipsContainer.height else 0
+            // Aktuelle Werte holen
+            val currentChipsHeight = if (areChipsVisible) chipsContainer.height else 0
 
-            // Kleiner Sicherheitsabstand (z.B. halbes "small" spacing), damit Text nie klebt
-            val minGap = try {
-                resources.getDimensionPixelSize(R.dimen.spacing_small) / 2
-            } catch (e: Exception) { 4 }
-
-            // RECHNEN
-            val newTopMargin = contentSpacingCalculator.calculateFavoritesTopMargin(
+            // RECHNEN LASSEN
+            // Die Klasse gibt NULL zurück, wenn wir nichts tun müssen!
+            val newTopMargin = contentSpacingCalculator.calculate(
                 userPreferredMarginPx = currentUserPreferredMarginPx,
-                chipsHeightPx = chipsHeight,
+                chipsHeightPx = currentChipsHeight,
                 areChipsVisible = areChipsVisible,
-                minGapPx = minGap
-            )
+                // minGapPx ist optional, default ist 0
+            ) ?: return@post // <--- HIER ABBRUCH WENN NULL (Optimierung)
 
-            // ANWENDEN
+            // ANWENDEN (nur wenn wir hier ankommen, hat sich was geändert)
             val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
-            if (params != null && params.topMargin != newTopMargin) {
+            if (params != null) {
                 params.topMargin = newTopMargin
                 favoritesContainer.layoutParams = params
 
-                // Da sich die Position ändert, müssen wir prüfen, ob Scrollen noch nötig ist
                 checkScrollStateAfterNextLayout("Dynamic spacing applied: $newTopMargin")
                 safePost { scheduleScrollVerification() }
             }
@@ -1529,19 +1525,38 @@ class HomeFragment : Fragment() {
         }
     }
 
+    /**
+     * Sucht im FragmentManager nach dem Dialog und schliesst ihn sicher.
+     * Ersetzt die leak-anfällige 'currentDialog' Variable.
+     */
+    private fun dismissCurrentContextMenu() {
+        try {
+            val existingFragment = childFragmentManager.findFragmentByTag(AppContextMenuDialogFragment.TAG)
+            if (existingFragment is DialogFragment) {
+                existingFragment.dismissAllowingStateLoss()
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error dismissing dialog")
+        }
+    }
+
     private fun showAppContextMenu(app: AppInfo) {
         try {
-            currentDialog?.dismissAllowingStateLoss()
-            currentDialog = null
+            // 1. Aufräumen (ohne Variable!)
+            dismissCurrentContextMenu()
 
             longClickedApp = app
+
+            // 2. Neuen Dialog erstellen
             val dialog = AppContextMenuDialogFragment.newInstance(
                 app,
                 MenuContext.HOME_SCREEN,
                 false
             )
-            currentDialog = dialog
+
+            // 3. Anzeigen (mit TAG, damit wir ihn später wiederfinden)
             dialog.show(childFragmentManager, AppContextMenuDialogFragment.TAG)
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing context menu")
         }
@@ -1749,11 +1764,12 @@ class HomeFragment : Fragment() {
 
     override fun onDestroyView() {
         try {
-            currentDialog?.dismissAllowingStateLoss()
-            currentDialog = null
+            dismissCurrentContextMenu()
 
             gestureDetector = null
             longClickedApp = null
+
+            contentSpacingCalculator.cleanup()
 
             _binding = null
         } catch (e: Throwable) {
