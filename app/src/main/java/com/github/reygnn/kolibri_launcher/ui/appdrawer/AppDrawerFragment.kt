@@ -16,6 +16,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.doOnLayout
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
@@ -32,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
+import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -64,10 +66,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private val binding get() = _binding!!
 
     private val appSearchFilter = AppSearchFilter()
-    private lateinit var appDrawerAdapter: AppDrawerAdapter
+    private var appDrawerAdapter: AppDrawerAdapter? = null
     private var masterAppList: List<AppInfo> = emptyList()
     private var longClickedApp: AppInfo? = null
-    private var currentDialog: DialogFragment? = null
     private var searchJob: Job? = null
     private var shouldScrollToTop = false
 
@@ -157,9 +158,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                             if (_binding == null || !isAdded) return@collect
 
                             try {
-                                if (::appDrawerAdapter.isInitialized) {
-                                    appDrawerAdapter.setUiColors(colors.textColor, colors.shadowColor)
-                                }
+                                    appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating adapter colors")
                                 // Keep old colors - not critical
@@ -429,8 +428,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
      */
     private fun submitListToAdapter(list: List<AppInfo>) {
         try {
-            if (::appDrawerAdapter.isInitialized && _binding != null && isAdded) {
-                appDrawerAdapter.submitList(list.toList()) {
+            if (_binding != null && isAdded) {
+                appDrawerAdapter?.submitList(list.toList()) {
                     try {
                         if (shouldScrollToTop && _binding != null && isAdded) {
                             binding.appsRecyclerView.scrollToPosition(0)
@@ -450,43 +449,27 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     }
 
     private fun showAppContextMenu(app: AppInfo) {
-        try {
-            currentDialog?.dismissAllowingStateLoss()
-            currentDialog = null
+         longClickedApp = app
 
-            longClickedApp = app
-
-            viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
-                try {
-                    val hasUsage = try {
-                        viewModel.hasUsageData(app.packageName)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error checking usage data for ${app.packageName}")
-                        false  // Safe fallback
-                    }
-
-                    if (!isAdded || isDetached) {
-                        Timber.Forest.d("Fragment not added, skipping dialog show")
-                        return@launch
-                    }
-
-                    val dialog = AppContextMenuDialogFragment.Companion.newInstance(
-                        app,
-                        MenuContext.APP_DRAWER,
-                        hasUsage
-                    )
-                    currentDialog = dialog
-                    dialog.show(childFragmentManager, AppContextMenuDialogFragment.Companion.TAG)
-                } catch (e: CancellationException) {
-                    throw e
+        viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
+            try {
+                val hasUsage = try {
+                    viewModel.hasUsageData(app.packageName)
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing context menu for ${app.packageName}")
+                    false
                 }
+
+                if (!isAdded || isDetached) return@launch
+                ContextMenuHelper.show(
+                    fragmentManager = childFragmentManager,
+                    app = app,
+                    menuContext = MenuContext.APP_DRAWER,
+                    hasUsage = hasUsage
+                )
+
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in showAppContextMenu")
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in showAppContextMenu for ${app.packageName}")
         }
     }
 
@@ -587,21 +570,21 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     }
 
     private fun showKeyboard() {
-        // Wir nutzen post(), um sicherzustellen, dass die View
-        // (und ihr Window-Token) verfügbar ist, bevor wir die Tastatur anfordern.
-        binding.searchEditText.post {
+        // Statt post() nehmen wir eine Coroutine im View-Lifecycle.
+        // Wenn der View stirbt, wird dieser Block NICHT mehr ausgeführt (oder abgebrochen).
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
-                if (!isAdded) return@post
+                // Wartet, bis der View gezeichnet ist (besser als post delay)
+                binding.searchEditText.doOnLayout {
+                    if (!isAdded) return@doOnLayout
 
-                val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-
-                // Setze den Fokus auf das Suchfeld
-                if (binding.searchEditText.requestFocus()) {
-                    // Zeige die Tastatur an
-                    imm?.showSoftInput(binding.searchEditText, InputMethodManager.SHOW_IMPLICIT)
+                    val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    if (binding.searchEditText.requestFocus()) {
+                        imm?.showSoftInput(binding.searchEditText, InputMethodManager.SHOW_IMPLICIT)
+                    }
                 }
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error showing keyboard")
+                // Ignorieren
             }
         }
     }
@@ -626,8 +609,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             searchJob?.cancel()
             searchJob = null
 
-            currentDialog?.dismissAllowingStateLoss()
-            currentDialog = null
+            ContextMenuHelper.dismiss(childFragmentManager)
 
             try {
                 if (_binding != null) {
@@ -644,6 +626,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
+            appDrawerAdapter = null
             super.onDestroyView()
         }
     }

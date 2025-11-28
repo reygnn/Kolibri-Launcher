@@ -45,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
+import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.chip.Chip
@@ -1525,41 +1526,15 @@ class HomeFragment : Fragment() {
         }
     }
 
-    /**
-     * Sucht im FragmentManager nach dem Dialog und schliesst ihn sicher.
-     * Ersetzt die leak-anfällige 'currentDialog' Variable.
-     */
-    private fun dismissCurrentContextMenu() {
-        try {
-            val existingFragment = childFragmentManager.findFragmentByTag(AppContextMenuDialogFragment.TAG)
-            if (existingFragment is DialogFragment) {
-                existingFragment.dismissAllowingStateLoss()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error dismissing dialog")
-        }
-    }
-
     private fun showAppContextMenu(app: AppInfo) {
-        try {
-            // 1. Aufräumen (ohne Variable!)
-            dismissCurrentContextMenu()
+        longClickedApp = app
 
-            longClickedApp = app
-
-            // 2. Neuen Dialog erstellen
-            val dialog = AppContextMenuDialogFragment.newInstance(
-                app,
-                MenuContext.HOME_SCREEN,
-                false
-            )
-
-            // 3. Anzeigen (mit TAG, damit wir ihn später wiederfinden)
-            dialog.show(childFragmentManager, AppContextMenuDialogFragment.TAG)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing context menu")
-        }
+        ContextMenuHelper.show(
+            fragmentManager = childFragmentManager,
+            app = app,
+            menuContext = MenuContext.HOME_SCREEN,
+            hasUsage = false // Oder true, falls du es hier auch lädst
+        )
     }
 
     // ============================================================================
@@ -1764,7 +1739,7 @@ class HomeFragment : Fragment() {
 
     override fun onDestroyView() {
         try {
-            dismissCurrentContextMenu()
+            ContextMenuHelper.dismiss(childFragmentManager)
 
             gestureDetector = null
             longClickedApp = null
