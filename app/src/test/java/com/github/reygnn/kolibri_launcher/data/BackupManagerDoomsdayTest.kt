@@ -34,7 +34,7 @@ import org.mockito.Mockito
  */
 
 @ExperimentalCoroutinesApi
-class BackupManagerTest {
+class BackupManagerDoomsdayTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -1385,8 +1385,8 @@ class BackupManagerTest {
                 "version": "1.0.0",
                 "timestamp": 123456,
                 "settings": {
-                    "splitModeThreshold": "THIS IS TEXT NOT A NUMBER",
-                    "textColor": 0
+                    "split_mode_threshold": "THIS IS TEXT NOT A NUMBER",
+                    "text_color": 0
                 }
             }
         """.trimIndent()
@@ -1514,7 +1514,7 @@ class BackupManagerTest {
             "version": "1.0.0",
             "timestamp": 123456,
             "settings": {
-                "layoutScale": "NaN",
+                "layout_scale": "NaN",
                 "favoriteComponents": [],
                 "favoritesOrder": [],
                 "hiddenComponents": []
@@ -1587,21 +1587,25 @@ class BackupManagerTest {
     }
 
     @Test
-    fun `alien - null inside favorites array`() = runTest {
+    fun `alien - null inside favorites array - should skip nulls gracefully`() = runTest {
         val toxicJson = """
-        {
-            "version": "1.0.0",
-            "timestamp": 123456,
-            "settings": {
-                "favoriteComponents": ["com.app1/Activity", null, "com.app2/Activity"],
-                "favoritesOrder": [],
-                "hiddenComponents": []
-            }
+    {
+        "version": "1.0.0",
+        "timestamp": 123456,
+        "settings": {
+            "favoriteComponents": ["com.app1/Activity", null, "com.app2/Activity"],
+            "favoritesOrder": [],
+            "hiddenComponents": [],
+            "customAppNames": {}
         }
+    }
     """.trimIndent()
 
         val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
-        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+
+        // Tolerantes Verhalten: null wird übersprungen, valide Strings werden verarbeitet
+        // Die 2 Apps sind nicht installiert → landen in skippedCount/missingApps
+        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
     }
 
     @Test
@@ -1745,8 +1749,8 @@ class BackupManagerTest {
             "version": "1.0.0",
             "timestamp": 123456,
             "settings": {
-                "autoShowKeyboard": "not_a_boolean", 
-                "textColor": -1
+                "auto_show_keyboard": "not_a_boolean", 
+                "text_color": -1
             }
         }
     """.trimIndent()
@@ -1771,7 +1775,7 @@ class BackupManagerTest {
             "version": "1.0.0",
             "timestamp": 123456,
             "settings": {
-                "textColor": $hugeColorValue
+                "text_color": $hugeColorValue
             }
         }
     """.trimIndent()
@@ -1843,7 +1847,7 @@ class BackupManagerTest {
             "version": "1.0.0",
             "timestamp": 123456,
             "settings": {
-                "layoutScale": 9999.99
+                "layout_scale": 9999.99
             }
         }
     """.trimIndent()
@@ -1907,8 +1911,8 @@ class BackupManagerTest {
             "version": "1.0.0",
             "timestamp": 1e10,
             "settings": {
-                "splitModeThreshold": 1e2,
-                "textColor": -1
+                "split_mode_threshold": 1e2,
+                "text_color": -1
             }
         }
     """.trimIndent()
@@ -1949,7 +1953,7 @@ class BackupManagerTest {
                 "timestamp": 123456,
                 "appVersion": "1.0.0",
                 "settings": {
-                    "splitModeThreshold": $value
+                    "split_mode_threshold": $value
                 }
             }
         """.trimIndent()

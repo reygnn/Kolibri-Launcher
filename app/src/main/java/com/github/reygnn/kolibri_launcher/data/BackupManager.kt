@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
@@ -41,6 +42,12 @@ import javax.inject.Singleton
  * - Primär: kotlinx.serialization für rückwärtskompatibles Parsing
  * - Fallback: org.json für striktes Parsing bei manuell erstellten/korrupten JSONs
  * - Validierung: Strikte Wertprüfung nach dem Parsing
+ *
+ * Security-Hardened Version mit Fixes für:
+ * - OOM Protection (Dateigröße vor Lesen prüfen)
+ * - Type Confusion Attacks (validateJsonTypes)
+ * - Integer Overflow (korrekte ARGB-Farb-Behandlung)
+ * - Float Infinity/NaN (zusätzliche Validierung)
  */
 @Singleton
 class BackupManager @Inject constructor(
@@ -53,6 +60,13 @@ class BackupManager @Inject constructor(
     private val settingsManager: SettingsRepository,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
+
+    companion object {
+        // Limits für DoS-Schutz
+        private const val MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024L  // 10 MB
+        private const val MAX_PREVIEW_SIZE_BYTES = 1 * 1024 * 1024L  // 1 MB für Preview
+        private const val MAX_ARRAY_ELEMENTS = 10_000  // Max Elemente pro Array
+    }
 
     // Wird für Export und Preview genutzt
     private val json = Json {
@@ -153,18 +167,15 @@ class BackupManager @Inject constructor(
     }
 
     /**
-     * Hybrid-Parsing mit Fallback und Typ-Validierung.
-     *
-     * 1. kotlinx.serialization für normale Backups
-     * 2. Fallback auf org.json für minimale/manuelle JSONs
-     * 3. Typ-Validierung für Doomsday-Schutz
-     */
-    /**
      * Hybrid-Parsing: kotlinx.serialization für Struktur, org.json für primitive Werte.
+     *
+     * WICHTIG: validateJsonTypes() wird BEIBEHALTEN als Schutz gegen Type Confusion Attacks.
      */
     private fun parseBackupData(jsonString: String): BackupData? {
-        // PHASE 1: Typ-Validierung (Doomsday-Schutz)
+        // PHASE 1: Typ-Validierung (Doomsday-Schutz gegen Type Confusion)
+        // Dies verhindert Attacken wie: "textColor": "hackerstring"
         if (!validateJsonTypes(jsonString)) {
+            Timber.Forest.w("Type validation failed - rejecting malformed backup")
             return null
         }
 
@@ -196,8 +207,7 @@ class BackupManager @Inject constructor(
     }
 
     /**
-     * Merged org.json Werte mit kotlinx.serialization Werten.
-     * org.json Wert wird nur genommen wenn er nicht null ist, sonst bleibt der Original-Wert.
+     * Merged org.json Werte (snake_case) mit kotlinx.serialization Objekten.
      */
     private fun mergeWithStrictValues(backup: BackupData, jsonString: String): BackupData {
         return try {
@@ -206,22 +216,29 @@ class BackupManager @Inject constructor(
             val settings = root.getJSONObject("settings")
 
             val enrichedSettings = backup.settings.copy(
-                swipeLeftApp = settings.getStrictString("swipeLeftApp") ?: backup.settings.swipeLeftApp,
-                swipeRightApp = settings.getStrictString("swipeRightApp") ?: backup.settings.swipeRightApp,
-                textColor = settings.getStrictInt("textColor") ?: backup.settings.textColor,
-                chipBackgroundColor = settings.getStrictInt("chipBackgroundColor") ?: backup.settings.chipBackgroundColor,
-                splitModeThreshold = settings.getStrictInt("splitModeThreshold") ?: backup.settings.splitModeThreshold,
-                layoutScale = settings.getStrictFloat("layoutScale") ?: backup.settings.layoutScale,
-                verticalPaddingScale = settings.getStrictFloat("verticalPaddingScale") ?: backup.settings.verticalPaddingScale,
-                contentTopMarginScale = settings.getStrictFloat("contentTopMarginScale") ?: backup.settings.contentTopMarginScale,
-                isFontBold = settings.getStrictBool("isFontBold") ?: backup.settings.isFontBold,
-                textShadowEnabled = settings.getStrictBool("textShadowEnabled") ?: backup.settings.textShadowEnabled,
-                showCalendarEvent = settings.getStrictBool("showCalendarEvent") ?: backup.settings.showCalendarEvent,
-                showAlarm = settings.getStrictBool("showAlarm") ?: backup.settings.showAlarm,
-                doubleTapToLockEnabled = settings.getStrictBool("doubleTapToLockEnabled") ?: backup.settings.doubleTapToLockEnabled,
-                swipeDownToNotificationsEnabled = settings.getStrictBool("swipeDownToNotificationsEnabled") ?: backup.settings.swipeDownToNotificationsEnabled,
-                autoShowKeyboard = settings.getStrictBool("autoShowKeyboard") ?: backup.settings.autoShowKeyboard,
-                autoLaunchApp = settings.getStrictBool("autoLaunchApp") ?: backup.settings.autoLaunchApp
+                // Strings
+                swipeLeftApp = settings.getStrictString("swipe_left_app") ?: backup.settings.swipeLeftApp,
+                swipeRightApp = settings.getStrictString("swipe_right_app") ?: backup.settings.swipeRightApp,
+
+                // Ints
+                textColor = settings.getStrictInt("text_color") ?: backup.settings.textColor,
+                chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: backup.settings.chipBackgroundColor,
+                splitModeThreshold = settings.getStrictInt("split_mode_threshold") ?: backup.settings.splitModeThreshold,
+
+                // Floats
+                layoutScale = settings.getStrictFloat("layout_scale") ?: backup.settings.layoutScale,
+                verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
+                contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
+
+                // Booleans
+                isFontBold = settings.getStrictBool("is_font_bold") ?: backup.settings.isFontBold,
+                textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
+                showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: backup.settings.showCalendarEvent,
+                showAlarm = settings.getStrictBool("show_alarm") ?: backup.settings.showAlarm,
+                doubleTapToLockEnabled = settings.getStrictBool("double_tap_to_lock_enabled") ?: backup.settings.doubleTapToLockEnabled,
+                swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: backup.settings.swipeDownToNotificationsEnabled,
+                autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: backup.settings.autoShowKeyboard,
+                autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: backup.settings.autoLaunchApp
             )
 
             backup.copy(settings = enrichedSettings)
@@ -233,20 +250,22 @@ class BackupManager @Inject constructor(
 
     /**
      * Validiert kritische Felder auf korrekte JSON-Typen.
-     * Verhindert, dass Strings als Integers akzeptiert werden, etc.
+     * Verhindert Type Confusion Attacks (z.B. "text_color": "hackerstring").
+     *
+     * WICHTIG: Nutzt snake_case Keys ("text_color"), da diese im JSON stehen.
      */
     private fun validateJsonTypes(jsonString: String): Boolean {
         return try {
             val root = JSONObject(jsonString)
 
             if (!root.has("settings")) {
-                return true // Wird später als Fehler behandelt
+                return true // Wird später als Fehler behandelt (Missing Field)
             }
 
             val settings = root.getJSONObject("settings")
 
-            // Validiere Integer-Felder: Wenn vorhanden und nicht null, muss es eine Zahl sein
-            val intFields = listOf("textColor", "chipBackgroundColor", "splitModeThreshold")
+            // 1. Integer-Felder (snake_case)
+            val intFields = listOf("text_color", "chip_bg_color", "split_mode_threshold")
             for (field in intFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
@@ -257,8 +276,8 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // Validiere Float-Felder
-            val floatFields = listOf("layoutScale", "verticalPaddingScale", "contentTopMarginScale")
+            // 2. Float-Felder (snake_case)
+            val floatFields = listOf("layout_scale", "vertical_padding_scale", "top_margin_scale")
             for (field in floatFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
@@ -266,14 +285,20 @@ class BackupManager @Inject constructor(
                         Timber.Forest.w("Type validation failed: $field is not a number")
                         return false
                     }
+                    // Infinity/NaN Check
+                    val doubleVal = (value as Number).toDouble()
+                    if (!doubleVal.isFinite()) {
+                        Timber.Forest.w("Type validation failed: $field is Infinity or NaN")
+                        return false
+                    }
                 }
             }
 
-            // Validiere Boolean-Felder
+            // 3. Boolean-Felder (snake_case)
             val boolFields = listOf(
-                "isFontBold", "textShadowEnabled", "showCalendarEvent", "showAlarm",
-                "doubleTapToLockEnabled", "swipeDownToNotificationsEnabled",
-                "autoShowKeyboard", "autoLaunchApp"
+                "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
+                "double_tap_to_lock_enabled", "swipe_down_to_notifications_enabled",
+                "auto_show_keyboard", "auto_launch_app"
             )
             for (field in boolFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -285,21 +310,66 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // 4. String-Felder (Swipe Apps) (snake_case)
+            val stringFields = listOf("swipe_left_app", "swipe_right_app")
+            for (field in stringFields) {
+                if (settings.has(field) && !settings.isNull(field)) {
+                    if (settings.get(field) !is String) {
+                        Timber.Forest.w("Type validation failed: $field is not a string")
+                        return false
+                    }
+                }
+            }
+
+            // 5. Array-Felder (camelCase, da KEIN @SerialName in LauncherSettings)
+            val arrayFields = listOf("favoriteComponents", "favoritesOrder", "hiddenComponents")
+            for (field in arrayFields) {
+                if (settings.has(field) && !settings.isNull(field)) {
+                    val value = settings.get(field)
+                    if (value !is JSONArray) {
+                        Timber.Forest.w("Type validation failed: $field is not an array")
+                        return false
+                    }
+                    // DoS-Schutz
+                    if ((value as JSONArray).length() > MAX_ARRAY_ELEMENTS) {
+                        Timber.Forest.w("Array size limit exceeded for $field")
+                        return false
+                    }
+                }
+            }
+
+            // 6. Map-Feld (camelCase)
+            if (settings.has("customAppNames") && !settings.isNull("customAppNames")) {
+                val value = settings.get("customAppNames")
+                if (value !is JSONObject) {
+                    Timber.Forest.w("Type validation failed: customAppNames is not an object")
+                    return false
+                }
+                if ((value as JSONObject).length() > MAX_ARRAY_ELEMENTS) {
+                    Timber.Forest.w("Map size limit exceeded for customAppNames")
+                    return false
+                }
+            }
+
             true
         } catch (e: JSONException) {
-            TimberWrapper.silentError(e, "JSON validation failed")
+            TimberWrapper.silentError(e, "JSON validation failed - malformed JSON")
             false
         }
     }
 
     /**
      * Striktes Parsing mit org.json für Doomsday-Resilience.
-     * Fängt korrupte Datentypen und Integer Overflows sicher ab.
+     * Mappt snake_case JSON Keys auf camelCase Konstruktor-Parameter.
      */
     private fun parseStrictly(jsonString: String): BackupData {
         val root = JSONObject(jsonString)
 
-        val version = if (root.has("version")) root.getString("version") else "1.0.0"
+        val version = if (root.has("version") && !root.isNull("version")) {
+            root.getString("version")
+        } else {
+            "1.0.0"
+        }
         val timestamp = root.optLong("timestamp", System.currentTimeMillis())
 
         if (!root.has("settings")) {
@@ -307,12 +377,12 @@ class BackupManager @Inject constructor(
         }
         val settingsJson = root.getJSONObject("settings")
 
-        // Manuelle Extraktion der Listen
+        // Manuelle Extraktion der Listen (camelCase Keys bleiben hier gleich)
         val favoriteComponents = settingsJson.getStrictStringList("favoriteComponents").toSet()
         val favoritesOrder = settingsJson.getStrictStringList("favoritesOrder")
         val hiddenComponents = settingsJson.getStrictStringList("hiddenComponents").toSet()
 
-        // Manuelle Extraktion der Map (Custom Names)
+        // Manuelle Extraktion der Map (camelCase)
         val customAppNames = mutableMapOf<String, String>()
         if (settingsJson.has("customAppNames") && !settingsJson.isNull("customAppNames")) {
             val namesObj = settingsJson.getJSONObject("customAppNames")
@@ -326,22 +396,27 @@ class BackupManager @Inject constructor(
             favoritesOrder = favoritesOrder,
             hiddenComponents = hiddenComponents,
             customAppNames = customAppNames,
-            swipeLeftApp = settingsJson.getStrictString("swipeLeftApp"),
-            swipeRightApp = settingsJson.getStrictString("swipeRightApp"),
-            textColor = settingsJson.getStrictInt("textColor"),
-            chipBackgroundColor = settingsJson.getStrictInt("chipBackgroundColor"),
-            splitModeThreshold = settingsJson.getStrictInt("splitModeThreshold"),
-            layoutScale = settingsJson.getStrictFloat("layoutScale"),
-            verticalPaddingScale = settingsJson.getStrictFloat("verticalPaddingScale"),
-            contentTopMarginScale = settingsJson.getStrictFloat("contentTopMarginScale"),
-            isFontBold = settingsJson.getStrictBool("isFontBold"),
-            textShadowEnabled = settingsJson.getStrictBool("textShadowEnabled"),
-            showCalendarEvent = settingsJson.getStrictBool("showCalendarEvent"),
-            showAlarm = settingsJson.getStrictBool("showAlarm"),
-            doubleTapToLockEnabled = settingsJson.getStrictBool("doubleTapToLockEnabled"),
-            swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipeDownToNotificationsEnabled"),
-            autoShowKeyboard = settingsJson.getStrictBool("autoShowKeyboard"),
-            autoLaunchApp = settingsJson.getStrictBool("autoLaunchApp")
+
+            // Primitive Werte mapping (snake_case -> property)
+            swipeLeftApp = settingsJson.getStrictString("swipe_left_app"),
+            swipeRightApp = settingsJson.getStrictString("swipe_right_app"),
+
+            textColor = settingsJson.getStrictInt("text_color"),
+            chipBackgroundColor = settingsJson.getStrictInt("chip_bg_color"),
+            splitModeThreshold = settingsJson.getStrictInt("split_mode_threshold"),
+
+            layoutScale = settingsJson.getStrictFloat("layout_scale"),
+            verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
+            contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),
+
+            isFontBold = settingsJson.getStrictBool("is_font_bold"),
+            textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
+            showCalendarEvent = settingsJson.getStrictBool("show_calendar_event"),
+            showAlarm = settingsJson.getStrictBool("show_alarm"),
+            doubleTapToLockEnabled = settingsJson.getStrictBool("double_tap_to_lock_enabled"),
+            swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipe_down_to_notifications_enabled"),
+            autoShowKeyboard = settingsJson.getStrictBool("auto_show_keyboard"),
+            autoLaunchApp = settingsJson.getStrictBool("auto_launch_app")
         )
 
         return BackupData(
@@ -512,37 +587,75 @@ class BackupManager @Inject constructor(
 
     private fun JSONObject.getStrictString(key: String): String? {
         if (!this.has(key) || this.isNull(key)) return null
-        return this.getString(key)
+        return try {
+            this.getString(key)
+        } catch (e: JSONException) {
+            null
+        }
     }
 
+    /**
+     * Liest einen Int-Wert aus JSON.
+     *
+     * WICHTIG: Wir lesen als Long und casten zu Int.
+     * Warum? ARGB-Farben wie 0xFFFFFFFF (weiß) = 4294967295 als unsigned.
+     * getLong() liest das korrekt, und .toInt() konvertiert es zu -1 (signed).
+     */
     private fun JSONObject.getStrictInt(key: String): Int? {
         if (!this.has(key) || this.isNull(key)) return null
-        // TRICK: Wir lesen als Long und casten zu Int.
-        // Warum? Manche JSON-Generatoren schreiben Farben (0xFFFFFFFF) als große positive Zahl.
-        // getInt() wirft bei > 2.1 Mrd eine Exception. getLong() schluckt es, und .toInt() macht daraus korrekt -1.
-        return this.getLong(key).toInt()
+        return try {
+            // Für Farben korrekt: 4294967295L.toInt() = -1 (0xFFFFFFFF als signed)
+            this.getLong(key).toInt()
+        } catch (e: JSONException) {
+            null
+        }
     }
 
+    /**
+     * Liest einen Float-Wert aus JSON mit Infinity/NaN-Schutz.
+     */
     private fun JSONObject.getStrictFloat(key: String): Float? {
         if (!this.has(key) || this.isNull(key)) return null
-        // getDouble ist robuster für Zahlenformate (1 vs 1.0)
-        return this.getDouble(key).toFloat()
+        return try {
+            val doubleVal = this.getDouble(key)
+            // FIX: Infinity und NaN ablehnen
+            if (!doubleVal.isFinite()) {
+                Timber.Forest.w("Rejected non-finite float for $key: $doubleVal")
+                null
+            } else {
+                doubleVal.toFloat()
+            }
+        } catch (e: JSONException) {
+            null
+        }
     }
 
     private fun JSONObject.getStrictBool(key: String): Boolean? {
         if (!this.has(key) || this.isNull(key)) return null
-        return this.getBoolean(key)
+        return try {
+            this.getBoolean(key)
+        } catch (e: JSONException) {
+            null
+        }
     }
 
     private fun JSONObject.getStrictStringList(key: String): List<String> {
         if (!this.has(key) || this.isNull(key)) return emptyList()
 
-        val jsonArray = this.getJSONArray(key)
-        val list = mutableListOf<String>()
-        for (i in 0 until jsonArray.length()) {
-            list.add(jsonArray.getString(i))
+        return try {
+            val jsonArray = this.getJSONArray(key)
+            val list = mutableListOf<String>()
+            for (i in 0 until minOf(jsonArray.length(), MAX_ARRAY_ELEMENTS)) {
+                // Nur Strings hinzufügen, andere Typen überspringen
+                val item = jsonArray.opt(i)
+                if (item is String) {
+                    list.add(item)
+                }
+            }
+            list
+        } catch (e: JSONException) {
+            emptyList()
         }
-        return list
     }
 
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
@@ -569,7 +682,7 @@ class BackupManager @Inject constructor(
             val jsonString = exportToJson()
 
             val backupSizeBytes = jsonString.toByteArray().size
-            if (backupSizeBytes > 10 * 1024 * 1024) {
+            if (backupSizeBytes > MAX_BACKUP_SIZE_BYTES) {
                 Timber.Forest.w("Backup size is very large: ${backupSizeBytes / 1024 / 1024} MB")
             }
 
@@ -599,17 +712,46 @@ class BackupManager @Inject constructor(
         }
     }
 
+    /**
+     * FIX 1: OOM Protection - Dateigröße prüfen VOR dem Lesen.
+     */
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) return@withContext ImportResult.Error("Invalid file location")
-            val uri = try { uriString.toUri() } catch (e: Exception) { return@withContext ImportResult.Error("Invalid format") }
+
+            val uri = try {
+                uriString.toUri()
+            } catch (e: Exception) {
+                return@withContext ImportResult.Error("Invalid format")
+            }
+
+            // FIX 1: OOM Protection - Dateigröße prüfen VOR dem Lesen
+            val fileSize = try {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    pfd.statSize
+                } ?: 0L
+            } catch (e: Exception) {
+                Timber.Forest.w(e, "Could not determine file size, proceeding with caution")
+                0L  // Bei Fehler trotzdem versuchen zu lesen (aber mit Limit)
+            }
+
+            if (fileSize > MAX_BACKUP_SIZE_BYTES) {
+                Timber.Forest.e("File too large: $fileSize bytes (max: $MAX_BACKUP_SIZE_BYTES)")
+                return@withContext ImportResult.Error("Backup file is too large (>${MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
+            }
 
             // CRITICAL I/O OPERATION
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return@withContext ImportResult.Error("Cannot read from selected location")
 
-            if (jsonString.length > 10 * 1024 * 1024) return@withContext ImportResult.Error("Backup file is too large")
+            // Zusätzlicher Check falls statSize nicht funktioniert hat
+            if (jsonString.length > MAX_BACKUP_SIZE_BYTES) {
+                return@withContext ImportResult.Error("Backup file is too large")
+            }
+
+            // Leere Strings und offensichtlich ungültiges JSON abfangen
+            if (jsonString.isBlank()) return@withContext ImportResult.InvalidFormat
             if (!jsonString.trim().startsWith("{")) return@withContext ImportResult.InvalidFormat
 
             // importFromJson ist suspend, wir rufen es hier auf.
@@ -619,10 +761,13 @@ class BackupManager @Inject constructor(
             throw e
         } catch (e: Exception) {
             Timber.Forest.e(e, "Error loading backup")
-            ImportResult.Error("Failed to load backup")
+            ImportResult.Error("Failed to load backup: ${e.message}")
         }
     }
 
+    /**
+     * FIX 4: Preview mit Dateigrösse-Check VOR dem Lesen.
+     */
     override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
@@ -643,19 +788,25 @@ class BackupManager @Inject constructor(
                 return@withContext null
             }
 
-            // CRITICAL I/O OPERATION (Das verursachte deinen Stacktrace)
+            // FIX 4: Dateigröße prüfen VOR dem Lesen (verhindert Memory Spike)
+            val fileSize = try {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    pfd.statSize
+                } ?: 0L
+            } catch (e: Exception) {
+                Timber.Forest.w(e, "Could not determine file size for preview")
+                0L
+            }
+
+            if (fileSize > MAX_PREVIEW_SIZE_BYTES) {
+                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $MAX_PREVIEW_SIZE_BYTES)")
+                // Für sehr große Dateien: Minimal-Preview mit Warnung
+                return@withContext null
+            }
+
+            // Jetzt sicher lesen
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                val maxPreviewSize = 1024 * 1024
-                val buffer = ByteArray(maxPreviewSize)
-                // Hier passiert das eigentliche Lesen von der Disk/Provider
-                val bytesRead = input.read(buffer)
-
-                if (bytesRead < 0) {
-                    Timber.Forest.e("Empty file for preview")
-                    return@withContext null
-                }
-
-                String(buffer, 0, bytesRead)
+                input.bufferedReader().readText()
             } ?: run {
                 Timber.Forest.e("Failed to open input stream for preview")
                 return@withContext null

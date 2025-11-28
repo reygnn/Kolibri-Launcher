@@ -6,7 +6,7 @@ import java.io.IOException
 class FakeCustomNamesRepository : CustomNamesRepository {
     private val customNames = mutableMapOf<String, String>()
 
-    // Für AppNamesViewModelTest
+    // Für CustomNamesViewModelTest
     var onUpdateTrigger: (suspend () -> Unit)? = null
     var shouldFailOnSet = false
 
