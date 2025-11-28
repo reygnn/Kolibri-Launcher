@@ -90,6 +90,16 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
 
     override fun onDestroy() {
         try {
+            if (_binding != null) {
+                // Listener entfernen (Referenz auf ViewModel kappen)
+                binding.leftSlotChip.setOnCheckedChangeListener(null)
+                binding.rightSlotChip.setOnCheckedChangeListener(null)
+                binding.leftSlotChip.setOnCloseIconClickListener(null)
+                binding.rightSlotChip.setOnCloseIconClickListener(null)
+
+                binding.allAppsRecyclerView.adapter = null
+            }
+
             appSelectionAdapter = null
             _binding = null
         } catch (e: Throwable) {
@@ -257,24 +267,31 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
         if (_binding == null) return
 
         try {
-            // Setze den Text für den "Left" Chip
+            // Text setzen
             val leftText = state.appForLeft?.displayName ?: getString(R.string.swipe_slot_empty)
             binding.leftSlotChip.text = getString(R.string.swipe_slot_left_format, leftText)
 
-            // Setze den Text für den "Right" Chip
             val rightText = state.appForRight?.displayName ?: getString(R.string.swipe_slot_empty)
             binding.rightSlotChip.text = getString(R.string.swipe_slot_right_format, rightText)
 
-            // Setze, welcher Chip aktiv (checked) ist
-            // Wichtig: Deaktiviere kurz die Listener, um Endlosschleifen zu vermeiden
+            // State setzen OHNE den Listener zu triggern
+            // Trick: Listener kurz entfernen, setzen, Listener wieder dran.
+            // ABER: Wir rufen NICHT setupClickListeners() auf (das setzt ALLE Listener neu).
+            // Wir definieren kleine Helper für die spezifischen Listener.
+
             binding.leftSlotChip.setOnCheckedChangeListener(null)
             binding.rightSlotChip.setOnCheckedChangeListener(null)
 
             binding.leftSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.LEFT
             binding.rightSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.RIGHT
 
-            // Aktiviere die Listener wieder
-            setupClickListeners()
+            // Listener wiederherstellen (nur diese beiden!)
+            binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) viewModel.onSlotSelected(SwipeSlot.LEFT)
+            }
+            binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) viewModel.onSlotSelected(SwipeSlot.RIGHT)
+            }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating selection chips")
