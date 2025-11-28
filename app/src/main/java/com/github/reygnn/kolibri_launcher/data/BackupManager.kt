@@ -66,7 +66,7 @@ class BackupManager @Inject constructor(
         // Limits für DoS-Schutz
         private const val MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024L  // 10 MB
         private const val MAX_PREVIEW_SIZE_BYTES = 1 * 1024 * 1024L  // 1 MB für Preview
-        private const val MAX_ARRAY_ELEMENTS = 10_000  // Max Elemente pro Array
+        private const val MAX_ARRAY_ELEMENTS = 1_000  // Max Elemente pro Array
     }
 
     // Wird für Export und Preview genutzt
