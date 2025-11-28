@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.GetOnboardingAppsUseCaseRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map

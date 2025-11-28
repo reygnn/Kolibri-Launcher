@@ -10,10 +10,8 @@ import androidx.core.view.WindowInsetsCompat
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.ui.settings.SettingsFragment
-import com.github.reygnn.kolibri_launcher.ui.settings.SettingsViewModel
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 

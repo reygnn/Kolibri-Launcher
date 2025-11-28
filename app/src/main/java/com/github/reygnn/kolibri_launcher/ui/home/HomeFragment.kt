@@ -39,9 +39,9 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment

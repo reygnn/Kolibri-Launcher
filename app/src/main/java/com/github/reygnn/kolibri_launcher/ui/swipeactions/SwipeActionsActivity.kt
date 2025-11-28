@@ -14,12 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivitySwipeActionsBinding
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsAppListAdapter
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsUiState
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsViewModel
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview

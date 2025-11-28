@@ -10,13 +10,13 @@ import android.text.format.DateUtils
 import androidx.core.content.ContextCompat
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.CalendarEvent
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

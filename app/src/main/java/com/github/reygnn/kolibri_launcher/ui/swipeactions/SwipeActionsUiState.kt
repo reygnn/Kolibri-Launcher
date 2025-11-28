@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.ui.swipeactions
 import androidx.annotation.StringRes
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 
 /**
  * Definiert den gesamten UI-Zustand für den SwipeActionsActivity-Bildschirm.

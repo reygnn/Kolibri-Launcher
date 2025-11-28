@@ -33,11 +33,11 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
-import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
+import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.google.android.material.dialog.MaterialAlertDialogBuilder

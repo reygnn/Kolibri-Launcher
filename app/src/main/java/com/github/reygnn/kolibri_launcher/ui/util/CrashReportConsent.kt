@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.util
 
 import android.content.Context
 import android.text.method.LinkMovementMethod
-import android.view.WindowManager
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.edit

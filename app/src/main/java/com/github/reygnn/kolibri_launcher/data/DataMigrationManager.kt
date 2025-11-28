@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences

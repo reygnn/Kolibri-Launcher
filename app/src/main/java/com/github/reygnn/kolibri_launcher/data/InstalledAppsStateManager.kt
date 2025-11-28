@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Central state manager for installed applications with fail-safe caching.

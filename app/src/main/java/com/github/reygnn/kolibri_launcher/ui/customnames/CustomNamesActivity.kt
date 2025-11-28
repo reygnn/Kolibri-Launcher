@@ -20,8 +20,8 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivityCustomNamesBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

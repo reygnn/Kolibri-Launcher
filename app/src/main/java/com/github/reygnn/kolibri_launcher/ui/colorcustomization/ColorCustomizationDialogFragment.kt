@@ -24,7 +24,6 @@ import com.github.reygnn.kolibri_launcher.databinding.ItemColorSwatchBinding
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint

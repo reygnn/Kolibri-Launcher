@@ -3,14 +3,13 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.di.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.di.DefaultDispatcher
-import com.github.reygnn.kolibri_launcher.domain.repository.GetDrawerAppsUseCaseRepository
-import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
