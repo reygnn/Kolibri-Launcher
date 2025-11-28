@@ -45,9 +45,6 @@ fun Int.coerceAtMostSafe(max: Int): Int {
 }
 
 fun Float.coerceAtMostSafe(max: Float): Float {
-    // Bei NaN nehmen wir max, da wir "höchstens max" wollen.
-    // Man könnte auch 0f oder min nehmen, aber max ist oft sicherer für Layout-Begrenzungen.
-    // Eine übliche Strategie bei UI ist: Wenn NaN, nimm den Grenzwert.
     return if (this.isNaN()) max else this.coerceAtMost(max)
 }
 
