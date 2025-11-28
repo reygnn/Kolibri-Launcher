@@ -69,6 +69,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private var navController: NavController? = null
     private var isReceiverRegistered = false
+    private var currentDialog: androidx.appcompat.app.AlertDialog? = null
 
     // Idempotency flags
     private var isInitialized = false
@@ -387,6 +388,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     override fun onDestroy() {
         try {
+            currentDialog?.dismiss()
+            currentDialog = null
+
             if (isReceiverRegistered) {
                 try {
                     unregisterReceiver(systemEventReceiver)
@@ -548,16 +552,27 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
     }
 
+    private fun showDialog(builder: MaterialAlertDialogBuilder) {
+        try {
+            currentDialog?.dismiss()
+            currentDialog = builder.show()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing dialog")
+        }
+    }
+
     private fun showAccessibilityDialog() {
         try {
-            MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            val builder = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.accessibility_service_title))
                 .setMessage(getString(R.string.accessibility_service_explanation))
                 .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
                     startActivitySafely(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
                 .setNegativeButton(getString(R.string.cancel), null)
-                .show()
+
+            showDialog(builder)
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing accessibility dialog")
         }
@@ -565,42 +580,59 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private fun showCustomizationOptionsDialog() {
         try {
+            // 1. WICHTIG: Vorherigen Dialog schließen
+            // Verhindert Stapeln von Dialogen und stellt sicher, dass wir sauber starten
+            currentDialog?.dismiss()
+            currentDialog = null
+
             val options = arrayOf(
                 getString(R.string.customize_colors_and_shadow),
                 getString(R.string.customize_layout_title),
                 getString(R.string.more_settings)
             )
 
-            MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            // 2. Dialog bauen und Referenz speichern
+            currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.customize_title))
                 .setItems(options) { _, which ->
-                    when (which) {
-                        0 -> {
-                            try {
-                                ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error showing color customization")
+                    try {
+                        when (which) {
+                            0 -> {
+                                try {
+                                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                                } catch (e: Throwable) {
+                                    TimberWrapper.silentError(e, "Error showing color customization")
+                                }
+                            }
+                            1 -> {
+                                try {
+                                    LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
+                                } catch (e: Throwable) {
+                                    TimberWrapper.silentError(e, "Error showing layout customization")
+                                }
+                            }
+                            2 -> {
+                                try {
+                                    val intent = Intent(this, SettingsActivity::class.java)
+                                    startActivity(intent)
+                                } catch (e: Throwable) {
+                                    TimberWrapper.silentError(e, "[MAIN] Error starting settings")
+                                }
                             }
                         }
-                        1 -> {
-                            try {
-                                LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error showing layout customization")
-                            }
-                        }
-                        2 -> {
-                            try {
-                                val intent = Intent(this, SettingsActivity::class.java)
-                                startActivity(intent)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "[MAIN] Error starting settings")
-                            }
-                        }
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error handling dialog selection")
                     }
                 }
                 .setNegativeButton(R.string.cancel, null)
-                .show()
+                .setOnDismissListener {
+                    // GC-CLEANUP: Wenn der User den Dialog normal schliesst, Referenz löschen
+                    if (currentDialog == it) {
+                        currentDialog = null
+                    }
+                }
+                .show() // Zeigt den Dialog und gibt die Instanz zurück
+
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing customization options dialog")
         }
