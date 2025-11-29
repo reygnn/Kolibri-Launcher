@@ -40,9 +40,11 @@ object AppConstants {
 
     // Layout Defaults
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
+
     const val DEFAULT_LAYOUT_SCALE = 0.05f
     const val DEFAULT_VERTICAL_PADDING_FACTOR = 0.6f
     const val DEFAULT_FONT_BOLD = true
+    const val DEFAULT_TOP_MARGIN = 0f
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"

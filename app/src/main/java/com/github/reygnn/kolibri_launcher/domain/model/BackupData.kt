@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class BackupData(
@@ -12,46 +12,54 @@ data class BackupData(
     val settings: LauncherSettings
 )
 
+// Legacy backup compatibility: @JsonNames allows deserialization of old snake_case
+// keys while new exports use camelCase (the property name) by default.
 @Serializable
 data class LauncherSettings(
+    // @JsonNames allows users to write backup files in either camelCase or snake_case.
+    // Exports always use camelCase (the property name).
+    @JsonNames("favorite_components")
     val favoriteComponents: Set<String> = emptySet(),
+    @JsonNames("favorites_order")
     val favoritesOrder: List<String> = emptyList(),
+    @JsonNames("hidden_components")
     val hiddenComponents: Set<String> = emptySet(),
+    @JsonNames("custom_app_names")
     val customAppNames: Map<String, String> = emptyMap(),
 
-    @SerialName("swipe_left_app")
+    @JsonNames("swipe_left_app")
     val swipeLeftApp: String? = null,
-    @SerialName("swipe_right_app")
+    @JsonNames("swipe_right_app")
     val swipeRightApp: String? = null,
 
-    @SerialName("text_color")
+    @JsonNames("text_color")
     val textColor: Int? = null,
-    @SerialName("chip_bg_color")
+    @JsonNames("chip_bg_color")
     val chipBackgroundColor: Int? = null,
-    @SerialName("text_shadow_enabled")
+    @JsonNames("text_shadow_enabled")
     val textShadowEnabled: Boolean? = null,
-    @SerialName("layout_scale")
+    @JsonNames("layout_scale")
     val layoutScale: Float? = null,
-    @SerialName("vertical_padding_scale")
+    @JsonNames("vertical_padding_scale")
     val verticalPaddingScale: Float? = null,
-    @SerialName("is_font_bold")
+    @JsonNames("is_font_bold")
     val isFontBold: Boolean? = null,
-    @SerialName("top_margin_scale")
+    @JsonNames("top_margin_scale")
     val contentTopMarginScale: Float? = null,
 
-    @SerialName("show_calendar_event")
+    @JsonNames("show_calendar_event")
     val showCalendarEvent: Boolean? = null,
-    @SerialName("show_alarm")
+    @JsonNames("show_alarm")
     val showAlarm: Boolean? = null,
-    @SerialName("double_tap_to_lock_enabled")
+    @JsonNames("double_tap_to_lock_enabled")
     val doubleTapToLockEnabled: Boolean? = null,
-    @SerialName("swipe_down_to_notifications_enabled")
+    @JsonNames("swipe_down_to_notifications_enabled")
     val swipeDownToNotificationsEnabled: Boolean? = null,
-    @SerialName("auto_show_keyboard")
+    @JsonNames("auto_show_keyboard")
     val autoShowKeyboard: Boolean? = null,
-    @SerialName("auto_launch_app")
+    @JsonNames("auto_launch_app")
     val autoLaunchApp: Boolean? = null,
-    @SerialName("split_mode_threshold")
+    @JsonNames("split_mode_threshold")
     val splitModeThreshold: Int? = null
 
 )

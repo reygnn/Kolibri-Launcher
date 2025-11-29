@@ -102,6 +102,7 @@ class HomeFragment : Fragment() {
     private var verifyJob: Job? = null
     private val showBorder = false
     private var wasInSplitMode = false
+
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD

@@ -543,7 +543,7 @@ class LauncherViewModel @Inject constructor(
         setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
         setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
-        setContentTopMarginUseCase(0f)
+        setContentTopMarginUseCase(AppConstants.DEFAULT_TOP_MARGIN)
     }
 
     fun onAppInfoError() = launchSafe {

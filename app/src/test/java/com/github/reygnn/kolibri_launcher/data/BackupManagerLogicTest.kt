@@ -88,8 +88,9 @@ class BackupManagerLogicTest {
         val jsonString = backupManager.exportToJson()
 
         // ASSERT: Prüfen, ob das JSON die Werte enthält
-        assertThat(jsonString).contains("\"text_color\": -123456")
-        assertThat(jsonString).contains("\"split_mode_threshold\": 42")
+        // 2025-11-29: Standard ist neu camelCase.
+        assertThat(jsonString).contains("\"textColor\": -123456")
+        assertThat(jsonString).contains("\"splitModeThreshold\": 42")
         assertThat(jsonString).contains("\"com.test.app\": \"My Cool App\"")
         assertThat(jsonString).contains("com.test.app/.MainActivity")
         assertThat(jsonString).contains("\"version\": \"1.0.0\"")
