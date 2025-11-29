@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable
 data class BackupData(
@@ -14,6 +15,7 @@ data class BackupData(
 
 // Legacy backup compatibility: @JsonNames allows deserialization of old snake_case
 // keys while new exports use camelCase (the property name) by default.
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class LauncherSettings(
     // @JsonNames allows users to write backup files in either camelCase or snake_case.
