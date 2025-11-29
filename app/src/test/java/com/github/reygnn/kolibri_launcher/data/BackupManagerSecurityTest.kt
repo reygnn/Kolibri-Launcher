@@ -103,7 +103,7 @@ class BackupManagerSecurityTest {
 
     @Test
     fun `attack - massive favoriteComponents array - should not crash`() = runTest {
-        val massiveArray = (1..(AppConstants.MAX_ARRAY_ELEMENTS*2)).joinToString(",")
+        val massiveArray = (1..AppConstants.MAX_ARRAY_ELEMENTS).joinToString(",")
         {
             "\"com.fake.app$it/.MainActivity\""
         }
@@ -125,6 +125,39 @@ class BackupManagerSecurityTest {
         // Sollte nicht crashen - entweder LimitExceeded oder Success (mit 0 imports, da keine Apps installiert)
         assertThat(result).isNotNull()
         assertThat(result).isNotEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `attack - array exceeding limit - should be rejected as InvalidFormat`() = runTest {
+        // 1. Wir erzeugen genau EIN Element mehr als erlaubt
+        val tooManyItems = AppConstants.MAX_ARRAY_ELEMENTS + 1
+
+        // Erstelle den riesigen String (Komma-separierte Liste von Strings)
+        val massiveArray = (1..tooManyItems).joinToString(",") { i ->
+            "\"com.fake.app$i/.MainActivity\""
+        }
+
+        val maliciousJson = """
+        {
+            "version": "1.0.0",
+            "timestamp": 1234567890,
+            "settings": {
+                "favoriteComponents": [$massiveArray],
+                "favoritesOrder": [],
+                "hiddenComponents": [],
+                "customAppNames": {}
+            }
+        }
+    """.trimIndent()
+
+        // 2. Import durchführen
+        val result = backupManager.importFromJson(maliciousJson, ImportOptions())
+
+        // 3. Assert: Das System muss den Import verweigern!
+        // Grund: validateJsonTypes() erkennt die Überlänge und gibt false zurück.
+        // parseBackupData() gibt daraufhin null zurück.
+        // importFromJson() wandelt null in InvalidFormat um.
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
     }
 
     @Test

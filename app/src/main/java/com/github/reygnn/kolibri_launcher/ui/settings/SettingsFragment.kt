@@ -212,11 +212,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-            splitModeThresholdPreference = findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
+            splitModeThresholdPreference =
+                findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
             splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
-                    val thresholdString = newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
-                    val threshold = thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
+                    val thresholdString =
+                        newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
+                    val threshold =
+                        thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
 
                     if (threshold !in AppConstants.SPLIT_MODE_THRESHOLD_MIN..AppConstants.SPLIT_MODE_THRESHOLD_MAX) {
                         Toast.makeText(
@@ -596,7 +599,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             val builder = CustomTabsIntent.Builder()
             val colorSchemeParams = CustomTabColorSchemeParams.Builder()
-                .setToolbarColor(getThemeColor(context, com.google.android.material.R.attr.colorSurface))
+                .setToolbarColor(
+                    getThemeColor(
+                        context,
+                        com.google.android.material.R.attr.colorSurface
+                    )
+                )
                 .build()
             builder.setDefaultColorSchemeParams(colorSchemeParams)
 
@@ -616,7 +624,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private suspend fun updateCrashReportSummary() {
         withContext(Dispatchers.Main) {
             try {
-                val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS) ?: return@withContext
+                val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)
+                    ?: return@withContext
                 val isEnabled = CrashReportConsent.hasConsent(requireContext())
 
                 if (isEnabled) {
@@ -642,8 +651,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             try {
                                 Timber.Forest.d("[Fragment] Collected ${apps.size} apps")
 
-                                val sortFavoritesPref = findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
-                                val hiddenAppsPref = findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
+                                val sortFavoritesPref =
+                                    findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
+                                val hiddenAppsPref =
+                                    findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
 
                                 val isAppListReady = apps.isNotEmpty()
 
@@ -670,7 +681,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 // gespeicherten Wert im DataStore
                                 calendarSwitchPreference?.isChecked = isEnabled
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating calendar switch preference")
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating calendar switch preference"
+                                )
                             }
                         }
                     } catch (e: CancellationException) {
@@ -688,7 +702,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             try {
                                 alarmSwitchPreference?.isChecked = isEnabled
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating alarm switch preference")
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating alarm switch preference"
+                                )
                             }
                         }
                     } catch (e: CancellationException) {
@@ -746,7 +763,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             try {
                                 autoKeyboardSwitchPreference?.isChecked = isEnabled
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating autoKeyboard switch preference")
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating autoKeyboard switch preference"
+                                )
                             }
                         }
                     } catch (e: CancellationException) {
@@ -763,7 +783,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             try {
                                 autoLaunchAppSwitchPreference?.isChecked = isEnabled
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating autoLaunchApp switch preference")
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating autoLaunchApp switch preference"
+                                )
                             }
                         }
                     } catch (e: CancellationException) {
@@ -783,12 +806,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                     text = threshold.toString()
 
                                     val description = when {
-                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(R.string.split_mode_threshold_desc_auto)
-                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(R.string.split_mode_threshold_desc_max)
+                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(
+                                            R.string.split_mode_threshold_desc_auto
+                                        )
+
+                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(
+                                            R.string.split_mode_threshold_desc_max
+                                        )
+
                                         threshold in (AppConstants.SPLIT_MODE_THRESHOLD_MIN + 1)..AppConstants.SPLIT_MODE_TINKERING_LIMIT ->
                                             getString(R.string.split_mode_threshold_desc_tinkering)
+
                                         else ->
-                                            getString(R.string.split_mode_threshold_desc_custom, threshold)
+                                            getString(
+                                                R.string.split_mode_threshold_desc_custom,
+                                                threshold
+                                            )
                                     }
 
                                     summary = getString(
@@ -798,7 +831,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                     )
                                 }
                             } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating split-mode threshold preference")
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating split-mode threshold preference"
+                                )
                             }
                         }
                     } catch (e: CancellationException) {
@@ -926,7 +962,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private fun updateDefaultLauncherStatus() {
         try {
-            val setDefaultLauncherPref = findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
+            val setDefaultLauncherPref =
+                findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
             if (setDefaultLauncherPref == null) {
                 Timber.Forest.w("Default launcher preference not found")
                 return

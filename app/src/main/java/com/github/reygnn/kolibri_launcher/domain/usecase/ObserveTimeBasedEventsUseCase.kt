@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
@@ -34,6 +35,7 @@ class ObserveTimeBasedEventsUseCase @Inject constructor(
      * Gibt einen Flow von Kalender-Events zurück, der automatisch aktualisiert wird,
      * wenn sich die Einstellungen (showAlarm/showCalendar) ändern.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     operator fun invoke(maxCount: Int = 5): Flow<List<TimeBasedEvent>> {
         // 1. Kombiniere die Einstellungs-Flows (Logik aus 'observeEventSettings')
         return combine(

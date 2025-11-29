@@ -169,7 +169,7 @@ class LauncherViewModel @Inject constructor(
         }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
             initialValue = 0
         )
 
@@ -263,7 +263,7 @@ class LauncherViewModel @Inject constructor(
             // 3. EIGENE Coroutine für App-Updates (Der "Motor")
             launchSafe {
                 try {
-                    delay(100) // Kleiner Start-Delay
+                    delay(AppConstants.INITIAL_APP_LOAD_DELAY_MS) // Kleiner Start-Delay
                     observeInstalledAppsUseCase().collect { result ->
                         if (result is AppLoadResult.Error) {
                             sendEvent(UiEvent.ShowToast(result.messageResId))
@@ -548,11 +548,21 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun onSetLayoutScale(scale: Float) = launchSafe {
-        setLayoutScaleUseCase(scale.coerceInSafe(0f, 1.0f))
+        setLayoutScaleUseCase(
+            scale.coerceInSafe(
+                AppConstants.LAYOUT_SCALE_MIN,
+                AppConstants.LAYOUT_SCALE_MAX
+            )
+        )
     }
 
     fun onSetVerticalPadding(factor: Float) = launchSafe {
-        setVerticalPaddingUseCase(factor.coerceInSafe(0f, 1.0f))
+        setVerticalPaddingUseCase(
+            factor.coerceInSafe(
+                AppConstants.VERTICAL_PADDING_SCALE_MIN,
+                AppConstants.VERTICAL_PADDING_SCALE_MAX
+            )
+        )
     }
 
     fun onSetFontBold(isBold: Boolean) = launchSafe {
@@ -560,7 +570,12 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun onSetContentTopMargin(scale: Float) = launchSafe {
-        setContentTopMarginUseCase(scale.coerceInSafe(0f, 1.0f))
+        setContentTopMarginUseCase(
+            scale.coerceInSafe(
+                AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN,
+                AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX
+            )
+        )
     }
 
     fun onResetLayoutSettings() = launchSafe {
@@ -640,6 +655,37 @@ class LauncherViewModel @Inject constructor(
      */
     suspend fun isAutoLaunchEnabled(): Boolean {
         return getAutoLaunchSettingUseCase()
+    }
+
+    /**
+     * Stellt die 'textShadowEnabled'-Einstellung für Fragments bereit.
+     */
+    suspend fun isTextShadowEnabled(): Boolean {
+        return getTextShadowEnabledUseCase()
+    }
+
+    /**
+     * Wird vom AppDrawerFragment aufgerufen, wenn sich der Suchtext ändert.
+     */
+    fun onAppDrawerSearchQueryChanged(query: String) {
+        // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
+        _appDrawerSearchQuery.value = query
+    }
+
+    /**
+     * Wird vom AppDrawerFragment aufgerufen, wenn es geschlossen wird,
+     * um die Suchanfrage zurückzusetzen.
+     */
+    fun onAppDrawerClosed() {
+        _appDrawerSearchQuery.value = ""
+    }
+
+    /**
+     * Emits a scroll-to-top intent for the AppDrawer.
+     * Call this after triggering actions that reorder the list.
+     */
+    private fun requestAppDrawerScrollToTop() {
+        _appDrawerScrollIntent.tryEmit(AppDrawerScrollIntent.ScrollToTop)
     }
 
     // --- PRIVATE/INTERNAL LOGIC ---
@@ -758,36 +804,5 @@ class LauncherViewModel @Inject constructor(
 
     suspend fun isAutoShowKeyboardEnabled(): Boolean {
         return getAutoShowKeyboardSettingUseCase()
-    }
-
-    /**
-     * Stellt die 'textShadowEnabled'-Einstellung für Fragments bereit.
-     */
-    suspend fun isTextShadowEnabled(): Boolean {
-        return getTextShadowEnabledUseCase()
-    }
-
-    /**
-     * Wird vom AppDrawerFragment aufgerufen, wenn sich der Suchtext ändert.
-     */
-    fun onAppDrawerSearchQueryChanged(query: String) {
-        // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
-        _appDrawerSearchQuery.value = query
-    }
-
-    /**
-     * Wird vom AppDrawerFragment aufgerufen, wenn es geschlossen wird,
-     * um die Suchanfrage zurückzusetzen.
-     */
-    fun onAppDrawerClosed() {
-        _appDrawerSearchQuery.value = ""
-    }
-
-    /**
-     * Emits a scroll-to-top intent for the AppDrawer.
-     * Call this after triggering actions that reorder the list.
-     */
-    private fun requestAppDrawerScrollToTop() {
-        _appDrawerScrollIntent.tryEmit(AppDrawerScrollIntent.ScrollToTop)
     }
 }
