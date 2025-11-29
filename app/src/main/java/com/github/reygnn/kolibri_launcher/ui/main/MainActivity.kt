@@ -114,7 +114,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
-        private var leaker: Context? = null
+        // private var leaker: Context? = null
     }
 
     private val onboardingLauncher = registerForActivityResult(

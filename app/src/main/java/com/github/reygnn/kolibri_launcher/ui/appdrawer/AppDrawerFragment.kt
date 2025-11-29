@@ -68,7 +68,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private var masterAppList: List<AppInfo> = emptyList()
     private var longClickedApp: AppInfo? = null
     private var searchJob: Job? = null
-    private var shouldScrollToTop = false
 
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -202,13 +201,48 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for search query")
             }
+
+            // Observer 5: Scroll intents (one-shot events)
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+                try {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        viewModel.appDrawerScrollIntent.collect { intent ->
+                            if (_binding == null || !isAdded) return@collect
+
+                            try {
+                                when (intent) {
+                                    is AppDrawerScrollIntent.ScrollToTop -> {
+                                        // Wait for any pending list updates to complete,
+                                        // then scroll. Using post() ensures we're after the
+                                        // current layout pass.
+                                        binding.appsRecyclerView.post {
+                                            if (_binding != null && isAdded) {
+                                                binding.appsRecyclerView.scrollToPosition(0)
+                                                Timber.d("Executed scroll-to-top intent")
+                                            }
+                                        }
+                                    }
+                                    // Future intents would be handled here
+                                }
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error executing scroll intent")
+                            }
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in scroll intent observer")
+                }
+            }
+
         }
     }
 
     private fun setupFragmentResultListener() {
         try {
             childFragmentManager.setFragmentResultListener(
-                AppContextMenuDialogFragment.Companion.REQUEST_KEY,
+                AppContextMenuDialogFragment.REQUEST_KEY,
                 viewLifecycleOwner
             ) { _, bundle ->
                 try {
@@ -311,7 +345,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private fun resetAppUsage(app: AppInfo) {
         try {
-            shouldScrollToTop = true
             viewModel.onResetAppUsage(app)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error resetting app usage for ${app.packageName}")
@@ -369,7 +402,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             binding.fabSort.setOnClickListener {
                 try {
-                    shouldScrollToTop = true
                     viewModel.toggleSortOrder()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error toggling sort order")
@@ -427,19 +459,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private fun submitListToAdapter(list: List<AppInfo>) {
         try {
             if (_binding != null && isAdded) {
-                appDrawerAdapter?.submitList(list.toList()) {
-                    try {
-                        if (shouldScrollToTop && _binding != null && isAdded) {
-                            binding.appsRecyclerView.scrollToPosition(0)
-                            shouldScrollToTop = false
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error scrolling to top")
-                        shouldScrollToTop = false
-                    }
-                }
+                appDrawerAdapter?.submitList(list.toList())
             } else {
-                Timber.Forest.w("Adapter not initialized or fragment not added, cannot submit list")
+                Timber.w("Adapter not initialized or fragment not added")
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error submitting list to adapter")
@@ -477,7 +499,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 resources.getDimensionPixelSize(R.dimen.spacing_large)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting fab margin")
-                16  // Safe fallback in dp
+                16  // Safe fallback in px
             }
 
             val initialContentPadding = try {

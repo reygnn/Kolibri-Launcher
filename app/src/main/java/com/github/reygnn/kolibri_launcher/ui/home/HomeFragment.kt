@@ -64,10 +64,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-// ============================================================================
-// REACTIVE SPLIT MODE FLOW - HOW IT WORKS
-// ============================================================================
-
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
@@ -221,38 +217,6 @@ class HomeFragment : Fragment() {
                 if (!shouldSplit) {
                     scrollView.scrollTo(0, 0)
                 }
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error checking scroll state")
-            // Fail-Safe: Im Zweifel split mode aktivieren (sicherer)
-            if (!_needsSplit.value) {
-                Timber.w("Error checking scroll - enabling split as safety fallback")
-                _needsSplit.value = true
-            }
-        }
-    }
-
-    private fun origCheckAndEmitScrollState() {
-        try {
-            if (_binding == null || !isAdded) return
-
-            val scrollView = binding.favoritesScrollView
-
-            // Android entscheidet - funktioniert auf ALLEN Devices!
-            val canScrollDown = scrollView.canScrollVertically(1)
-            val canScrollUp = scrollView.canScrollVertically(-1)
-            val canScroll = canScrollDown || canScrollUp
-
-            // State Update nur bei Änderung
-            if (_needsSplit.value != canScroll) {
-                Timber.d("checkAndEmitScrollState: splitMode = $canScroll")
-                _needsSplit.value = canScroll
-            }
-
-            // Reset scroll position wenn kein Split Mode
-            if (!canScroll) {
-                scrollView.scrollTo(0, 0)
             }
 
         } catch (e: Throwable) {
