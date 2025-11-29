@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.base
 
 import android.os.Bundle
+import android.os.StrictMode
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
@@ -202,12 +203,33 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
     /**
      * Shows a toast with additional error handling.
      * Even Toast.makeText can throw exceptions in rare cases.
+     *
+     * Includes workaround for Samsung devices triggering StrictMode DiskRead violations
+     * during Toast IPC calls.
      */
     private fun showToastSafe(message: String, duration: Int) {
         try {
-            Toast.makeText(this, message, duration).show()
+            // Samsung workaround: Temporarily allow disk reads on main thread
+            // because Samsung checks 'isSpeg' and EDM policies via IPC/DB on UI thread.
+            runWithStrictModeDisabled {
+                Toast.makeText(this, message, duration).show()
+            }
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error showing toast")
+        }
+    }
+
+    /**
+     * Executes the block with StrictMode disabled (LAX policy) and restores
+     * the original policy afterwards.
+     */
+    private inline fun <T> runWithStrictModeDisabled(block: () -> T): T {
+        val oldPolicy = StrictMode.getThreadPolicy()
+        StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX)
+        try {
+            return block()
+        } finally {
+            StrictMode.setThreadPolicy(oldPolicy)
         }
     }
 }

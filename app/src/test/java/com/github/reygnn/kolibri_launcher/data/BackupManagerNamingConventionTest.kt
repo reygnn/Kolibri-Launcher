@@ -302,6 +302,39 @@ class BackupManagerNamingConventionTest {
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-222)
     }
 
+    @Test
+    fun `importFromJson ignores malformed mixed case keys`() = runTest {
+        // Initiale Werte setzen
+        fakeSettingsRepo.setSplitModeThreshold(42)
+        fakeSettingsRepo.setTextColor(-111)
+        fakeSettingsRepo.setChipBackgroundColor(-222)
+
+        val mixedCaseJson = """
+        {
+          "version": "1.0.0",
+          "settings": {
+            "split_modeThreshold": 99,
+            "text_Color": -123456,
+            "chipBackground_color": -654321,
+            "favoriteComponents": [],
+            "hiddenComponents": []
+          }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            mixedCaseJson,
+            ImportOptions(importThemeSettings = true, importPowerUserSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+
+        // Werte sollten UNVERÄNDERT sein (malformed keys ignoriert)
+        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(42)
+        assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111)
+        assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-222)
+    }
+
     // --- Helper ---
 
     private fun createTestAppInfo(packageName: String) =

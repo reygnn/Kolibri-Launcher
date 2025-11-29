@@ -226,4 +226,124 @@ class BackupManagerMalformedTest {
 
         assertThat(result).isEqualTo(ImportResult.InvalidFormat)
     }
+
+    @Test
+    fun `importFromJson handles JSON array instead of object`() = runTest(testDispatcher) {
+        // Root ist Array statt Object
+        val arrayJson = """["version", "1.0.0"]"""
+
+        val result = backupManager.importFromJson(arrayJson, aggressiveOptions)
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `importFromJson handles wrong type for settings (array instead of object)`() = runTest(testDispatcher) {
+        val wrongTypeJson = """
+        {
+          "version": "1.0.0",
+          "settings": ["text_color", -1]
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(wrongTypeJson, aggressiveOptions)
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `importFromJson handles wrong type for value (string instead of int)`() = runTest(testDispatcher) {
+        val wrongValueType = """
+        {
+          "version": "1.0.0",
+          "settings": {
+            "textColor": "not a number",
+            "favoriteComponents": [],
+            "hiddenComponents": []
+          }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(wrongValueType, aggressiveOptions)
+
+        // Je nach Implementierung: InvalidFormat oder wird ignoriert
+        assertThat(result).isAnyOf(
+            ImportResult.InvalidFormat,
+            ImportResult.Success(0, 0, emptySet())
+        )
+    }
+
+    @Test
+    fun `importFromJson handles null values`() = runTest(testDispatcher) {
+        val nullValues = """
+        {
+          "version": "1.0.0",
+          "settings": null
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(nullValues, aggressiveOptions)
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `importFromJson handles only whitespace`() = runTest(testDispatcher) {
+        val whitespace = "   \n\t\r\n   "
+
+        val result = backupManager.importFromJson(whitespace, aggressiveOptions)
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `importFromJson handles deeply nested structure`() = runTest(testDispatcher) {
+        // Potentieller Stack Overflow
+        val deep = "{".repeat(1000) + "}".repeat(1000)
+
+        val result = backupManager.importFromJson(deep, aggressiveOptions)
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
+
+    @Test
+    fun `importFromJson handles missing version field gracefully`() = runTest(testDispatcher) {
+        // Version ist optional für Backward-Compatibility
+        val noVersion = """
+        {
+          "settings": {
+            "textColor": -1,
+            "favoriteComponents": [],
+            "hiddenComponents": []
+          }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(noVersion, aggressiveOptions)
+
+        // Akzeptiert auch ohne Version
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+    }
+
+    @Test
+    fun `importFromJson handles BOM prefix`() = runTest(testDispatcher) {
+        // UTF-8 BOM (Windows Notepad fügt das gerne ein)
+        val bomJson = "\uFEFF" + """
+        {
+          "version": "1.0.0",
+          "settings": {
+            "favoriteComponents": [],
+            "hiddenComponents": []
+          }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(bomJson, aggressiveOptions)
+
+        // BOM sollte entweder ignoriert werden (Success) oder sauber failen
+        assertThat(result).isAnyOf(
+            ImportResult.InvalidFormat,
+            ImportResult.Success(0, 0, emptySet())
+        )
+    }
 }
