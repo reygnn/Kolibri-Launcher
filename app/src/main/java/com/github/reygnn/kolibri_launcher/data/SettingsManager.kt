@@ -28,116 +28,116 @@ class SettingsManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : SettingsRepository {
 
+    /**
+     * Definition der DataStore Keys.
+     * Die Strings entsprechen den Keys, die auch in der settings.xml oder intern verwendet werden.
+     */
     private object PreferenceKeys {
-        val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
-        val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
-        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey("swipe_down_to_notifications_enabled")
-        val READABILITY_MODE = stringPreferencesKey("text_readability_mode")
-        val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
-        val TEXT_SHADOW_ENABLED = booleanPreferencesKey("text_shadow_enabled")
-        val TEXT_COLOR = intPreferencesKey("text_color")
-        val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
-        val SHOW_ALARM = booleanPreferencesKey("show_alarm")
-        val CHIP_BACKGROUND_COLOR = intPreferencesKey("chip_background_color")
-        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey("content_top_margin_scale")
-        val LAYOUT_SCALE = floatPreferencesKey("layout_scale")
-        val VERTICAL_PADDING_SCALE = floatPreferencesKey("vertical_padding_scale")
-        val IS_FONT_BOLD = booleanPreferencesKey("is_font_bold")
-        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard_drawer")
-        val AUTO_LAUNCH_APP = booleanPreferencesKey("auto_launch_app")
-        val SPLIT_MODE_THRESHOLD = intPreferencesKey("split_mode_threshold")
+        // String Keys
+        val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
+        val READABILITY_MODE = stringPreferencesKey(AppConstants.PrefKeys.READABILITY_MODE)
+
+        // Boolean Keys
+        val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
+        val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
+        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
+        val TEXT_SHADOW_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.TEXT_SHADOW_ENABLED)
+        val IS_FONT_BOLD = booleanPreferencesKey(AppConstants.PrefKeys.IS_FONT_BOLD)
+        val SHOW_CALENDAR_EVENT = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
+        val SHOW_ALARM = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_ALARM)
+        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
+        val AUTO_LAUNCH_APP = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
+
+        // Int Keys
+        val TEXT_COLOR = intPreferencesKey(AppConstants.PrefKeys.TEXT_COLOR)
+        val CHIP_BACKGROUND_COLOR = intPreferencesKey(AppConstants.PrefKeys.CHIP_BACKGROUND_COLOR)
+        val SPLIT_MODE_THRESHOLD = intPreferencesKey(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
+
+        // Float Keys
+        val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
+        val VERTICAL_PADDING_SCALE = floatPreferencesKey(AppConstants.PrefKeys.VERTICAL_PADDING_SCALE)
+        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey(AppConstants.PrefKeys.CONTENT_TOP_MARGIN_SCALE)
     }
 
+    // --- HELPER ---
+
     /**
-     * ROCKY BALBOA HELPER:
-     * Fängt ALLE Exceptions ab (nicht nur IOException), damit die App niemals crasht,
-     * selbst wenn DataStore korrupt ist, Rechte fehlen oder Typen falsch sind.
+     * Schützt vor DataStore-Korruption beim Lesen.
+     * Falls die Datei kaputt ist, wird ein leeres Preferences-Objekt emittiert,
+     * was dazu führt, dass unten alle Defaults greifen.
      */
     private val Flow<Preferences>.safeData: Flow<Preferences>
         get() = this.catch { e ->
             if (e is Exception) {
-                TimberWrapper.silentError(e, "SafeDataStore: Fallback to empty prefs")
+                TimberWrapper.silentError(e, "SafeDataStore: Fallback to empty prefs due to read error")
                 emit(emptyPreferences())
             } else {
-                throw e // Nur fatale Errors (OOM etc.) durchlassen
+                throw e
             }
         }
 
+    /**
+     * Schützt vor Fehlern beim Schreiben und reduziert Boilerplate.
+     * Re-throwt CancellationException korrekt für Coroutines.
+     */
+    private suspend fun safeEdit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(block)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating settings in DataStore")
+        }
+    }
+
+    // --- IMPLEMENTATION ---
+
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data.safeData
         .map { preferences ->
-            val sortName = preferences[PreferenceKeys.SORT_ORDER_KEY] ?: SortOrder.TIME_WEIGHTED_USAGE.name
+            val sortName = preferences[PreferenceKeys.SORT_ORDER_KEY]
+            // Default ist TIME_WEIGHTED_USAGE
+            if (sortName == null) return@map SortOrder.TIME_WEIGHTED_USAGE
+
             try {
                 SortOrder.valueOf(sortName)
-            } catch (e: IllegalArgumentException) {
-                TimberWrapper.silentError(e, "Invalid sort order value: $sortName, using default")
-                SortOrder.TIME_WEIGHTED_USAGE
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Unexpected error parsing sort order")
+                // Fallback bei Parsing-Fehler
                 SortOrder.TIME_WEIGHTED_USAGE
             }
         }
 
     override suspend fun setSortOrder(sortOrder: SortOrder) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.SORT_ORDER_KEY] = sortOrder.name
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting sort order: $sortOrder")
-        }
+        safeEdit { it[PreferenceKeys.SORT_ORDER_KEY] = sortOrder.name }
     }
 
     override val doubleTapToLockEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] ?: false
+            preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED]
+                ?: AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK
         }
 
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting double tap to lock: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] = isEnabled }
     }
 
     override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] ?: false
+            preferences[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED]
+                ?: AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS
         }
 
     override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting swipe down to notifications: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] = isEnabled }
     }
 
     override val readabilityModeFlow: Flow<String> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.READABILITY_MODE] ?: "smart_contrast"
+            preferences[PreferenceKeys.READABILITY_MODE]
+                ?: AppConstants.DEFAULT_READABILITY_MODE
         }
 
     override suspend fun setReadabilityMode(mode: String) {
-        try {
-            dataStore.edit { preferences ->
-                preferences[PreferenceKeys.READABILITY_MODE] = mode
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting readability mode: $mode")
-        }
+        safeEdit { it[PreferenceKeys.READABILITY_MODE] = mode }
     }
 
     override val onboardingCompletedFlow: Flow<Boolean> = dataStore.data.safeData
@@ -146,248 +146,165 @@ class SettingsManager @Inject constructor(
         }
 
     override suspend fun setOnboardingCompleted() {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.ONBOARDING_COMPLETED] = true
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting onboarding completed")
-        }
+        safeEdit { it[PreferenceKeys.ONBOARDING_COMPLETED] = true }
     }
 
     override val textShadowEnabledFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.TEXT_SHADOW_ENABLED] ?: true
+            preferences[PreferenceKeys.TEXT_SHADOW_ENABLED]
+                ?: AppConstants.DEFAULT_TEXT_SHADOW_ENABLED
         }
 
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.TEXT_SHADOW_ENABLED] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting text shadow enabled: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.TEXT_SHADOW_ENABLED] = isEnabled }
     }
 
     override val textColorFlow: Flow<Int> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.TEXT_COLOR] ?: 0
+            preferences[PreferenceKeys.TEXT_COLOR]
+                ?: AppConstants.DEFAULT_TEXT_COLOR
         }
 
     override suspend fun setTextColor(color: Int) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.TEXT_COLOR] = color
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting text color: $color")
+        safeEdit { it[PreferenceKeys.TEXT_COLOR] = color }
+    }
+
+    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data.safeData
+        .map { preferences ->
+            preferences[PreferenceKeys.CHIP_BACKGROUND_COLOR]
+                ?: AppConstants.DEFAULT_CHIP_BG_COLOR
         }
+
+    override suspend fun setChipBackgroundColor(color: Int) {
+        safeEdit { it[PreferenceKeys.CHIP_BACKGROUND_COLOR] = color }
     }
 
     override val showCalendarEventFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.SHOW_CALENDAR_EVENT] ?: false
+            preferences[PreferenceKeys.SHOW_CALENDAR_EVENT]
+                ?: AppConstants.DEFAULT_SHOW_CALENDAR
         }
 
-    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data.safeData
-        .map { preferences ->
-            // 0 = Auto (was dem alten halb-transparenten Look entspricht)
-            preferences[PreferenceKeys.CHIP_BACKGROUND_COLOR] ?: 0
-        }
-
-    override suspend fun setChipBackgroundColor(color: Int) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.CHIP_BACKGROUND_COLOR] = color
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting chip background color: $color")
-        }
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
+        safeEdit { it[PreferenceKeys.SHOW_CALENDAR_EVENT] = isEnabled }
     }
 
     override val showAlarmFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.SHOW_ALARM] ?: false
+            preferences[PreferenceKeys.SHOW_ALARM]
+                ?: AppConstants.DEFAULT_SHOW_ALARM
         }
 
     override suspend fun setShowAlarm(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.SHOW_ALARM] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting show alarm: $isEnabled")
-        }
-    }
-
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.SHOW_CALENDAR_EVENT] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting show calendar event: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.SHOW_ALARM] = isEnabled }
     }
 
     override val autoShowKeyboardFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.AUTO_SHOW_KEYBOARD] ?: false // Standardwert
+            preferences[PreferenceKeys.AUTO_SHOW_KEYBOARD]
+                ?: AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
         }
 
     override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.AUTO_SHOW_KEYBOARD] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting auto show keyboard: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.AUTO_SHOW_KEYBOARD] = isEnabled }
     }
 
     override val autoLaunchAppFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.AUTO_LAUNCH_APP] ?: false // Standardwert false
+            preferences[PreferenceKeys.AUTO_LAUNCH_APP]
+                ?: AppConstants.DEFAULT_AUTO_LAUNCH_APP
         }
 
     override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
-        try {
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.AUTO_LAUNCH_APP] = isEnabled
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting auto launch app: $isEnabled")
-        }
+        safeEdit { it[PreferenceKeys.AUTO_LAUNCH_APP] = isEnabled }
     }
 
     override val splitModeThresholdFlow: Flow<Int> = dataStore.data.safeData
         .map { preferences ->
-            val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD] ?: 0
-            // Validierung: Stelle sicher, dass der Wert im gültigen Bereich liegt
-            threshold.coerceInSafe(0, 512)
+            val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD]
+                ?: AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD
+
+            // Validierung auch beim Lesen, falls manipulierte Daten vorliegen
+            threshold.coerceInSafe(
+                AppConstants.SPLIT_MODE_THRESHOLD_MIN,
+                AppConstants.SPLIT_MODE_THRESHOLD_MAX
+            )
         }
 
     override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
-        try {
-            // Validiere Input (0-512)
-            val validThreshold = thresholdPixels.coerceInSafe(0, 512)
-
-            dataStore.edit { settings ->
-                settings[PreferenceKeys.SPLIT_MODE_THRESHOLD] = validThreshold
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting split mode threshold: $thresholdPixels")
-        }
+        val validThreshold = thresholdPixels.coerceInSafe(
+            AppConstants.SPLIT_MODE_THRESHOLD_MIN,
+            AppConstants.SPLIT_MODE_THRESHOLD_MAX
+        )
+        safeEdit { it[PreferenceKeys.SPLIT_MODE_THRESHOLD] = validThreshold }
     }
 
     override val layoutScaleStateFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.LAYOUT_SCALE] ?: AppConstants.DEFAULT_LAYOUT_SCALE
+            preferences[PreferenceKeys.LAYOUT_SCALE]
+                ?: AppConstants.DEFAULT_LAYOUT_SCALE
         }
 
     override suspend fun setLayoutScale(scale: Float) {
-        try {
-            dataStore.edit { it[PreferenceKeys.LAYOUT_SCALE] = scale }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting layout scale")
-        }
+        safeEdit { it[PreferenceKeys.LAYOUT_SCALE] = scale }
     }
 
     override val verticalPaddingStateFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.VERTICAL_PADDING_SCALE] ?: AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
+            preferences[PreferenceKeys.VERTICAL_PADDING_SCALE]
+                ?: AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
         }
 
     override suspend fun setVerticalPadding(scale: Float) {
-        try {
-            dataStore.edit { it[PreferenceKeys.VERTICAL_PADDING_SCALE] = scale }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting vertical padding")
-        }
+        safeEdit { it[PreferenceKeys.VERTICAL_PADDING_SCALE] = scale }
     }
 
     override val isFontBoldStateFlow: Flow<Boolean> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.IS_FONT_BOLD] ?: AppConstants.DEFAULT_FONT_BOLD
+            preferences[PreferenceKeys.IS_FONT_BOLD]
+                ?: AppConstants.DEFAULT_FONT_BOLD
         }
 
     override suspend fun setFontBold(isBold: Boolean) {
-        try {
-            dataStore.edit { it[PreferenceKeys.IS_FONT_BOLD] = isBold }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting font bold")
-        }
+        safeEdit { it[PreferenceKeys.IS_FONT_BOLD] = isBold }
     }
 
     override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
-            preferences[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] ?: 0.0f
+            preferences[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE]
+                ?: AppConstants.DEFAULT_TOP_MARGIN
         }
 
     override suspend fun setContentTopMarginScale(scale: Float) {
-        try {
-            dataStore.edit { it[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] = scale }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error setting content top margin")
-        }
+        safeEdit { it[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] = scale }
     }
 
+    /**
+     * Setzt die Einstellungen auf Werkzustand zurück, indem die Keys gelöscht werden.
+     * Dadurch greifen beim nächsten Lesen (Flow Update) automatisch die Defaults in `AppConstants`.
+     * * AUSNAHME: Onboarding Status bleibt erhalten.
+     */
     override suspend fun purgeRepository() {
-        try {
-            dataStore.edit { preferences ->
-                // App Drawer
-                preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+        safeEdit { preferences ->
+            preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+            preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
+            preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
+            preferences.remove(PreferenceKeys.READABILITY_MODE)
+            preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
+            preferences.remove(PreferenceKeys.TEXT_COLOR)
+            preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
+            preferences.remove(PreferenceKeys.LAYOUT_SCALE)
+            preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
+            preferences.remove(PreferenceKeys.IS_FONT_BOLD)
+            preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)
+            preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
+            preferences.remove(PreferenceKeys.SHOW_ALARM)
+            preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
+            preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
+            preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
 
-                // Gestures
-                preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
-                preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
-
-                // Onboarding nicht resetten.
-                // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)
-
-                // Theme / Appearance
-                preferences.remove(PreferenceKeys.READABILITY_MODE)
-                preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
-                preferences.remove(PreferenceKeys.TEXT_COLOR)
-                preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
-                preferences.remove(PreferenceKeys.LAYOUT_SCALE)
-                preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
-                preferences.remove(PreferenceKeys.IS_FONT_BOLD)
-                preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)
-
-                // Home Screen Events
-                preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
-                preferences.remove(PreferenceKeys.SHOW_ALARM)
-
-                preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
-                preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
-
-                // Power-User Settings
-                preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to purge SettingsManager repository")
+            // WICHTIG: Onboarding Status wird NICHT gelöscht
+            // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)
         }
     }
 }

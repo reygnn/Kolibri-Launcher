@@ -6,7 +6,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 
 /**
  * ============================================================================
@@ -43,35 +42,40 @@ import kotlinx.coroutines.flow.flowOf
  *   - TestRepositoryModule.kt für Hilt-Konfiguration (nur androidTest)
  *
  * ============================================================================
- */
+*/
 
 class FakeSettingsRepository : SettingsRepository {
 
-    private val shadowFlow = MutableStateFlow(true)
-    private val colorFlow = MutableStateFlow(0)
-    private val chipBgColorFlow = MutableStateFlow(0)
+    // Visual Settings Defaults
+    private val shadowFlow = MutableStateFlow(AppConstants.DEFAULT_TEXT_SHADOW_ENABLED)
+    private val colorFlow = MutableStateFlow(AppConstants.DEFAULT_TEXT_COLOR)
+    private val chipBgColorFlow = MutableStateFlow(AppConstants.DEFAULT_CHIP_BG_COLOR)
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-    private val contentTopMarginFlow = MutableStateFlow(0f)
+    private val contentTopMarginFlow = MutableStateFlow(AppConstants.DEFAULT_TOP_MARGIN)
 
-    private val calendarFlow = MutableStateFlow(false)
-    private val alarmFlow = MutableStateFlow(false)
-    private val doubleTapFlow = MutableStateFlow(false)
-    private val swipeDownFlow = MutableStateFlow(false)
-    private val autoShowKeyboardFlowState = MutableStateFlow(false)
-    private val autoLaunchAppFlowState = MutableStateFlow(false)
-    private val splitModeThresholdFlowState = MutableStateFlow(0)
+    // Feature Toggles Defaults
+    private val calendarFlow = MutableStateFlow(AppConstants.DEFAULT_SHOW_CALENDAR)
+    private val alarmFlow = MutableStateFlow(AppConstants.DEFAULT_SHOW_ALARM)
+    private val doubleTapFlow = MutableStateFlow(AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
+    private val swipeDownFlow = MutableStateFlow(AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
+    private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
+    private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
+    private val splitModeThresholdFlowState = MutableStateFlow(AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD)
 
-    private val readabilityModeState = MutableStateFlow("smart_contrast")
+    // Mode Defaults
+    private val readabilityModeState = MutableStateFlow(AppConstants.DEFAULT_READABILITY_MODE)
 
     override val readabilityModeFlow: Flow<String> = readabilityModeState
 
-    private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE)
+    private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE) // Enum Default ist okay
     override val sortOrderFlow: Flow<SortOrder> = sortOrderState
 
-    private val onboardingCompletedState = MutableStateFlow(false)
+    private val onboardingCompletedState = MutableStateFlow(false) // Onboarding ist per Default immer false (neu)
     override val onboardingCompletedFlow: Flow<Boolean> = onboardingCompletedState
+
+    // --- Properties & Setters ---
 
     var shadow: Boolean
         get() = shadowFlow.value
@@ -128,7 +132,11 @@ class FakeSettingsRepository : SettingsRepository {
     var splitModeThreshold: Int
         get() = splitModeThresholdFlowState.value
         set(value) {
-            splitModeThresholdFlowState.value = value.coerceInSafe(0, 512)
+            // FIX: Magic Numbers 0 und 512 ersetzt
+            splitModeThresholdFlowState.value = value.coerceInSafe(
+                AppConstants.SPLIT_MODE_THRESHOLD_MIN,
+                AppConstants.SPLIT_MODE_THRESHOLD_MAX
+            )
         }
 
     var currentSortOrder: SortOrder
@@ -139,6 +147,8 @@ class FakeSettingsRepository : SettingsRepository {
         get() = onboardingCompletedState.value
         private set(value) { onboardingCompletedState.value = value }
 
+    // --- Interface Implementation Flow Exports ---
+
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
     override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
@@ -146,7 +156,16 @@ class FakeSettingsRepository : SettingsRepository {
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
     override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
     override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
+    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
+    override val showAlarmFlow: Flow<Boolean> = alarmFlow
+    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
+    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
+    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
 
+
+    // --- Interface Implementation Methods ---
 
     override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
         shadow = isEnabled
@@ -176,12 +195,10 @@ class FakeSettingsRepository : SettingsRepository {
         contentTopMargin = scale
     }
 
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
     override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
         doubleTap = isEnabled
     }
 
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
     override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
         swipeDown = isEnabled
     }
@@ -189,31 +206,26 @@ class FakeSettingsRepository : SettingsRepository {
     override suspend fun setReadabilityMode(mode: String) {
         readabilityModeState.value = mode
     }
+
     fun setReadabilityModeBlocking(mode: String) {
         readabilityModeState.value = mode
     }
 
-    override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         showCalendar = isEnabled
     }
 
-    override val showAlarmFlow: Flow<Boolean> = alarmFlow
     override suspend fun setShowAlarm(isEnabled: Boolean) {
         showAlarm = isEnabled
     }
 
-    override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
     override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
         autoShowKeyboard = isEnabled
     }
 
-    override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
     override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
         autoLaunchApp = isEnabled
     }
-
-    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
 
     override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
         splitModeThreshold = thresholdPixels
@@ -227,22 +239,28 @@ class FakeSettingsRepository : SettingsRepository {
         onboardingCompletedState.value = true
     }
 
+    /**
+     * Resets the repository to default values defined in AppConstants.
+     */
     override suspend fun purgeRepository() {
-        color = 0
-        shadow = true
-        chipBgColor = 0
+        color = AppConstants.DEFAULT_TEXT_COLOR
+        shadow = AppConstants.DEFAULT_TEXT_SHADOW_ENABLED
+        chipBgColor = AppConstants.DEFAULT_CHIP_BG_COLOR
+
         layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
         verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
         isFontBold = AppConstants.DEFAULT_FONT_BOLD
-        contentTopMargin = 0f
+        contentTopMargin = AppConstants.DEFAULT_TOP_MARGIN
 
-        showCalendar = false
-        showAlarm = false
-        doubleTap = false
-        swipeDown = false
-        autoShowKeyboard = false
-        autoLaunchApp = false
-        splitModeThreshold = 0
+        showCalendar = AppConstants.DEFAULT_SHOW_CALENDAR
+        showAlarm = AppConstants.DEFAULT_SHOW_ALARM
+        doubleTap = AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK
+        swipeDown = AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS
+        autoShowKeyboard = AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
+        autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
+        splitModeThreshold = AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD
+
+        readabilityModeState.value = AppConstants.DEFAULT_READABILITY_MODE
     }
 
     // HELPER

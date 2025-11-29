@@ -1,5 +1,10 @@
 package com.github.reygnn.kolibri_launcher.core
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+
 /**
  * Zentrale Konstanten für die gesamte Anwendung
  * Ersetzt Magic Numbers und hardcoded Values
@@ -111,32 +116,115 @@ object AppConstants {
     // UI Limits
     const val MAX_MISSING_APPS_IN_SNACKBAR = 5
 
+    const val BACKUP_VERSION = "1.0.0"
+    const val MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024L  // 10 MB
+    const val MAX_PREVIEW_SIZE_BYTES = 1 * 1024 * 1024L  // 1 MB
+    const val MAX_ARRAY_ELEMENTS = 512
+
+    // File System Constants
+    const val SCHEME_CONTENT = "content"
+    const val SCHEME_FILE = "file"
+    const val MODE_READ_ONLY = "r"
+
     /**
-     * Keys für Preferences (müssen mit res/xml/preferences.xml übereinstimmen)
+     * Preference Keys (Strings).
+     * Diese müssen exakt mit den Schlüsseln in res/xml/preferences.xml übereinstimmen!
      */
     object PrefKeys {
+        // Core
+        const val SORT_ORDER = "app_drawer_sort_order"
+        const val ONBOARDING_COMPLETED = "onboarding_completed"
+
+        // Visuals
+        const val TEXT_COLOR = "text_color"
+        const val CHIP_BACKGROUND_COLOR = "chip_background_color"
+        const val TEXT_SHADOW_ENABLED = "text_shadow_enabled"
+        const val IS_FONT_BOLD = "is_font_bold"
+
+        // Layout & Scaling
+        const val LAYOUT_SCALE = "layout_scale"
+        const val VERTICAL_PADDING_SCALE = "vertical_padding_scale"
+        const val CONTENT_TOP_MARGIN_SCALE = "content_top_margin_scale"
+
+        // Home Screen Features
         const val SHOW_CALENDAR_EVENT = "show_calendar_event"
         const val SHOW_ALARM = "show_alarm"
+
+        // Quality of Life
         const val AUTO_SHOW_KEYBOARD = "auto_show_keyboard_drawer"
         const val AUTO_LAUNCH_APP = "auto_launch_app"
+
+        // Power User
         const val SPLIT_MODE_THRESHOLD = "split_mode_threshold"
 
+        // Gestures
+        const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
+        const val SWIPE_DOWN_TO_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
+
+        // Appearance Mode
+        const val READABILITY_MODE = "text_readability_mode"
+
+        // Keys, die nur für Klicks/Intents im Fragment genutzt werden (kein DataStore Value)
         const val SYSTEM_WALLPAPER = "system_wallpaper"
         const val EDIT_FAVORITES = "edit_favorites"
         const val SORT_FAVORITES = "sort_favorites"
         const val HIDDEN_APPS = "hidden_apps"
         const val CUSTOM_APP_NAMES = "custom_app_names"
-
         const val BACKUP_RESTORE = "backup_restore"
         const val FACTORY_RESET = "factory_reset"
-
         const val APP_INFO = "app_info"
         const val ACCESSIBILITY = "accessibility"
         const val SET_DEFAULT_LAUNCHER = "set_default_launcher"
-
-        const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
-        const val SWIPE_DOWN_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
         const val SWIPE_ACTIONS = "swipe_actions"
         const val CRASH_REPORTS = "crash_reports"
     }
+
+    /**
+     * Interne Mapping-Tabelle: String (aus AppConstants) -> Typisierter Key (für DataStore)
+     */
+    private object PreferenceKeys {
+        // String Keys
+        val SORT_ORDER_KEY = stringPreferencesKey(PrefKeys.SORT_ORDER)
+        val READABILITY_MODE = stringPreferencesKey(PrefKeys.READABILITY_MODE)
+
+        // Boolean Keys
+        val ONBOARDING_COMPLETED = booleanPreferencesKey(PrefKeys.ONBOARDING_COMPLETED)
+        val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey(PrefKeys.DOUBLE_TAP_TO_LOCK)
+        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey(PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
+        val TEXT_SHADOW_ENABLED = booleanPreferencesKey(PrefKeys.TEXT_SHADOW_ENABLED)
+        val IS_FONT_BOLD = booleanPreferencesKey(PrefKeys.IS_FONT_BOLD)
+        val SHOW_CALENDAR_EVENT = booleanPreferencesKey(PrefKeys.SHOW_CALENDAR_EVENT)
+        val SHOW_ALARM = booleanPreferencesKey(PrefKeys.SHOW_ALARM)
+        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(PrefKeys.AUTO_SHOW_KEYBOARD)
+        val AUTO_LAUNCH_APP = booleanPreferencesKey(PrefKeys.AUTO_LAUNCH_APP)
+
+        // Int Keys
+        val TEXT_COLOR = intPreferencesKey(PrefKeys.TEXT_COLOR)
+        val CHIP_BACKGROUND_COLOR = intPreferencesKey(PrefKeys.CHIP_BACKGROUND_COLOR)
+        val SPLIT_MODE_THRESHOLD = intPreferencesKey(PrefKeys.SPLIT_MODE_THRESHOLD)
+
+        // Float Keys
+        val LAYOUT_SCALE = floatPreferencesKey(PrefKeys.LAYOUT_SCALE)
+        val VERTICAL_PADDING_SCALE = floatPreferencesKey(PrefKeys.VERTICAL_PADDING_SCALE)
+        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey(PrefKeys.CONTENT_TOP_MARGIN_SCALE)
+    }
+
+    // Default Values für Settings
+    const val DEFAULT_TEXT_COLOR = 0 // 0 = Transparent/Nicht gesetzt
+    const val DEFAULT_CHIP_BG_COLOR = 0
+    const val DEFAULT_TEXT_SHADOW_ENABLED = true
+
+    const val DEFAULT_SHOW_CALENDAR = false
+    const val DEFAULT_SHOW_ALARM = false
+    const val DEFAULT_DOUBLE_TAP_TO_LOCK = false
+    const val DEFAULT_SWIPE_DOWN_NOTIFICATIONS = false
+    const val DEFAULT_AUTO_SHOW_KEYBOARD = false
+    const val DEFAULT_AUTO_LAUNCH_APP = false
+
+    const val DEFAULT_SPLIT_MODE_THRESHOLD = 0
+
+    // Readability Modes
+    const val READABILITY_MODE_SMART_CONTRAST = "smart_contrast"
+    const val READABILITY_MODE_STANDARD = "standard"
+    const val DEFAULT_READABILITY_MODE = READABILITY_MODE_SMART_CONTRAST
 }

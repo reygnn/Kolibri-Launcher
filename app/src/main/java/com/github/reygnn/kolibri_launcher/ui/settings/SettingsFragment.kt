@@ -493,7 +493,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Swipe Down for Notifications
         try {
             val swipeDownPreference =
-                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_NOTIFICATIONS)
+                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
             swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is Boolean) {
@@ -725,7 +725,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             if (!isAdded || isDetached) return@collect
 
                             try {
-                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_NOTIFICATIONS)?.isChecked =
+                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)?.isChecked =
                                     isChecked
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating swipe down preference")

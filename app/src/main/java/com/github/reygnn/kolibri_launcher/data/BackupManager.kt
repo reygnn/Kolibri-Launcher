@@ -62,13 +62,6 @@ class BackupManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
-    companion object {
-        // Limits für DoS-Schutz
-        private const val MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024L  // 10 MB
-        private const val MAX_PREVIEW_SIZE_BYTES = 1 * 1024 * 1024L  // 1 MB für Preview
-        private const val MAX_ARRAY_ELEMENTS = 1_000  // Max Elemente pro Array
-    }
-
     // Wird für Export und Preview genutzt
     private val json = Json {
         prettyPrint = true
@@ -126,7 +119,7 @@ class BackupManager @Inject constructor(
             )
 
             val backup = BackupData(
-                version = "1.0.0",
+                version = AppConstants.BACKUP_VERSION,
                 timestamp = System.currentTimeMillis(),
                 appVersion = BuildConfig.VERSION_NAME,
                 settings = settings
@@ -332,7 +325,7 @@ class BackupManager @Inject constructor(
                         return false
                     }
                     // DoS-Schutz
-                    if ((value as JSONArray).length() > MAX_ARRAY_ELEMENTS) {
+                    if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                         Timber.Forest.w("Array size limit exceeded for $field")
                         return false
                     }
@@ -346,7 +339,7 @@ class BackupManager @Inject constructor(
                     Timber.Forest.w("Type validation failed: customAppNames is not an object")
                     return false
                 }
-                if ((value as JSONObject).length() > MAX_ARRAY_ELEMENTS) {
+                if ((value as JSONObject).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                     Timber.Forest.w("Map size limit exceeded for customAppNames")
                     return false
                 }
@@ -646,7 +639,7 @@ class BackupManager @Inject constructor(
         return try {
             val jsonArray = this.getJSONArray(key)
             val list = mutableListOf<String>()
-            for (i in 0 until minOf(jsonArray.length(), MAX_ARRAY_ELEMENTS)) {
+            for (i in 0 until minOf(jsonArray.length(), AppConstants.MAX_ARRAY_ELEMENTS)) {
                 // Nur Strings hinzufügen, andere Typen überspringen
                 val item = jsonArray.opt(i)
                 if (item is String) {
@@ -674,7 +667,7 @@ class BackupManager @Inject constructor(
             }
 
             val scheme = uri.scheme
-            if (scheme == null || scheme !in listOf("content", "file")) {
+            if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
                 Timber.Forest.e("Unsupported URI scheme: $scheme")
                 throw BackupException("Unsupported file location type")
             }
@@ -683,7 +676,7 @@ class BackupManager @Inject constructor(
             val jsonString = exportToJson()
 
             val backupSizeBytes = jsonString.toByteArray().size
-            if (backupSizeBytes > MAX_BACKUP_SIZE_BYTES) {
+            if (backupSizeBytes > AppConstants.MAX_BACKUP_SIZE_BYTES) {
                 Timber.Forest.w("Backup size is very large: ${backupSizeBytes / 1024 / 1024} MB")
             }
 
@@ -728,7 +721,7 @@ class BackupManager @Inject constructor(
 
             // FIX 1: OOM Protection - Dateigröße prüfen VOR dem Lesen
             val fileSize = try {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { pfd ->
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
@@ -736,9 +729,9 @@ class BackupManager @Inject constructor(
                 0L  // Bei Fehler trotzdem versuchen zu lesen (aber mit Limit)
             }
 
-            if (fileSize > MAX_BACKUP_SIZE_BYTES) {
-                Timber.Forest.e("File too large: $fileSize bytes (max: $MAX_BACKUP_SIZE_BYTES)")
-                return@withContext ImportResult.Error("Backup file is too large (>${MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
+            if (fileSize > AppConstants.MAX_BACKUP_SIZE_BYTES) {
+                Timber.Forest.e("File too large: $fileSize bytes (max: $AppConstants.MAX_BACKUP_SIZE_BYTES)")
+                return@withContext ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
             }
 
             // CRITICAL I/O OPERATION
@@ -747,7 +740,7 @@ class BackupManager @Inject constructor(
             } ?: return@withContext ImportResult.Error("Cannot read from selected location")
 
             // Zusätzlicher Check falls statSize nicht funktioniert hat
-            if (jsonString.length > MAX_BACKUP_SIZE_BYTES) {
+            if (jsonString.length > AppConstants.MAX_BACKUP_SIZE_BYTES) {
                 return@withContext ImportResult.Error("Backup file is too large")
             }
 
@@ -784,7 +777,7 @@ class BackupManager @Inject constructor(
             }
 
             val scheme = uri.scheme
-            if (scheme == null || scheme !in listOf("content", "file")) {
+            if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
                 Timber.Forest.e("Unsupported URI scheme for preview: $scheme")
                 return@withContext null
             }
@@ -799,8 +792,8 @@ class BackupManager @Inject constructor(
                 0L
             }
 
-            if (fileSize > MAX_PREVIEW_SIZE_BYTES) {
-                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $MAX_PREVIEW_SIZE_BYTES)")
+            if (fileSize > AppConstants.MAX_PREVIEW_SIZE_BYTES) {
+                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $AppConstants.MAX_PREVIEW_SIZE_BYTES)")
                 // Für sehr große Dateien: Minimal-Preview mit Warnung
                 return@withContext null
             }
@@ -865,6 +858,6 @@ class BackupManager @Inject constructor(
     }
 
     private fun isVersionSupported(version: String): Boolean {
-        return version == "1.0.0"
+        return version == AppConstants.BACKUP_VERSION
     }
 }

@@ -2,6 +2,8 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.ContentResolver
 import android.content.Context
+import androidx.navigation.ui.AppBarConfiguration
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
@@ -101,8 +103,10 @@ class BackupManagerSecurityTest {
 
     @Test
     fun `attack - massive favoriteComponents array - should not crash`() = runTest {
-        // Angriff: 10.000 Einträge in favoriteComponents (reduziert für Test-Performance)
-        val massiveArray = (1..1_000).joinToString(",") { "\"com.fake.app$it/.MainActivity\"" }
+        val massiveArray = (1..(AppConstants.MAX_ARRAY_ELEMENTS*2)).joinToString(",")
+        {
+            "\"com.fake.app$it/.MainActivity\""
+        }
         val maliciousJson = """
             {
                 "version": "1.0.0",
