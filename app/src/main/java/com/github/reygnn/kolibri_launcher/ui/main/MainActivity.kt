@@ -24,7 +24,9 @@ import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.github.reygnn.kolibri_launcher.BuildConfig
@@ -152,7 +154,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         super.onCreate(savedInstanceState)
 
 //        // BÖSE: Wir weisen die aktuelle Activity-Instanz der statischen Variable zu.
-//        // Wenn du jetzt das Handy drehst oder "Zurück" drückst, bleibt 'this'
+//        // Wenn man jetzt das Handy dreht oder "Zurück" drückt, bleibt 'this'
 //        // hier gespeichert und kann nicht gelöscht werden.
 //        if (leaker == null) {
 //            leaker = this
@@ -165,7 +167,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // Only run initial setup on first creation (not on config changes)
         if (savedInstanceState == null) {
             lifecycleScope.launch(mainActivityExceptionHandler) {
-                handleInitialSetup()
+                // FIX: BackgroundActivityLaunchViolation
+                // Wir warten, bis die Activity im Status STARTED (sichtbar) ist.
+                // Das garantiert uns das Recht, eine neue Activity zu starten,
+                // auch wenn der DataStore-Check vorher etwas dauert.
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    handleInitialSetup()
+                }
             }
         } else {
             // After config change: restore flags
