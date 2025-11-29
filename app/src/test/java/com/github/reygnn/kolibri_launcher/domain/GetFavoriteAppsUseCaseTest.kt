@@ -332,7 +332,9 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - with very large favorites list - handles efficiently`() = runTest {
-        val largeFavoritesList = (1..300).map {
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val exceededCount = limit + 1
+        val largeFavoritesList = (1..exceededCount).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 
@@ -443,7 +445,9 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when fallback size exceeds MAX_FAVORITES - limits correctly`() = runTest {
-        val manyApps = (1..300).map {
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val exceededCount = limit + 1
+        val manyApps = (1..exceededCount).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 

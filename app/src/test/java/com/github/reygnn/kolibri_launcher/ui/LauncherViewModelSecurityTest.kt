@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
@@ -149,72 +150,152 @@ class LauncherViewModelSecurityTest {
     // SECTION 1: FLOAT ATTACKS (NaN, Infinity)
     // ========================================================================
 
-    @Test
-    fun `attack - NaN layoutScale - should be coerced to valid range or handled`() = runTest {
-        val nanValue = Float.NaN
-        viewModel.onSetLayoutScale(nanValue)
-        advanceUntilIdle()
-
-        // Float.NaN.coerceIn(0f, 1f) resultiert in NaN. Wir prüfen, dass der UseCase
-        // trotzdem aufgerufen wird und die App nicht crasht.
-        verify(setLayoutScaleUseCase).invoke(any())
-    }
-
+    // CONTENT TOP MARGIN ATTACKS
 
     @Test
-    fun `attack - Negative Infinity layoutScale - should be coerced to min`() = runTest {
-        viewModel.onSetLayoutScale(Float.NEGATIVE_INFINITY)
-        advanceUntilIdle()
-
-        // (-Infinity).coerceIn(0f, 1f) = 0f
-        verify(setLayoutScaleUseCase).invoke(0.0f)
-    }
-
-    @Test
-    fun `attack - NaN verticalPadding - should handle gracefully`() = runTest {
-        viewModel.onSetVerticalPadding(Float.NaN)
-        advanceUntilIdle()
-        verify(setVerticalPaddingUseCase).invoke(any())
-    }
-
-    @Test
-    fun `attack - NaN contentTopMargin - should handle gracefully`() = runTest {
+    fun `attack - NaN contentTopMargin - should be coerced to min value`() = runTest {
         viewModel.onSetContentTopMargin(Float.NaN)
         advanceUntilIdle()
-        verify(setContentTopMarginUseCase).invoke(any())
+        verify(setContentTopMarginUseCase).invoke(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN)
     }
 
     @Test
-    fun `attack - extremely small float - should be coerced to min`() = runTest {
-        viewModel.onSetLayoutScale(-Float.MAX_VALUE)
+    fun `attack - Negative Infinity contentTopMargin - should be coerced to min`() = runTest {
+        viewModel.onSetContentTopMargin(Float.NEGATIVE_INFINITY)
         advanceUntilIdle()
-        verify(setLayoutScaleUseCase).invoke(0.0f)
+        verify(setContentTopMarginUseCase).invoke(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN)
     }
 
     @Test
-    fun `attack - extremely large float - should be coerced to max`() = runTest {
-        viewModel.onSetLayoutScale(Float.MAX_VALUE)
+    fun `attack - extremely small float contentTopMargin - should be coerced to min`() = runTest {
+        viewModel.onSetContentTopMargin(-Float.MAX_VALUE)
         advanceUntilIdle()
-        verify(setLayoutScaleUseCase).invoke(1.0f)
+        verify(setContentTopMarginUseCase).invoke(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN)
     }
 
     @Test
-    fun `attack - Positive Infinity layoutScale - should be coerced to max`() = runTest {
-        viewModel.onSetLayoutScale(Float.POSITIVE_INFINITY)
+    fun `attack - extremely large float contentTopMargin - should be coerced to max`() = runTest {
+        viewModel.onSetContentTopMargin(Float.MAX_VALUE)
         advanceUntilIdle()
-
-        // Prüfen, ob wirklich 1.0f ankommt
-        verify(setLayoutScaleUseCase).invoke(1.0f)
+        verify(setContentTopMarginUseCase).invoke(AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX)
     }
+
+    @Test
+    fun `attack - Positive Infinity contentTopMargin - should be coerced to max`() = runTest {
+        viewModel.onSetContentTopMargin(Float.POSITIVE_INFINITY)
+        advanceUntilIdle()
+        verify(setContentTopMarginUseCase).invoke(AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX)
+    }
+
+    // SECTION: VERTICAL PADDING ATTACKS
+
+    @Test
+    fun `attack - NaN verticalPadding - should be coerced to min value`() = runTest {
+        viewModel.onSetVerticalPadding(Float.NaN)
+        advanceUntilIdle()
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.VERTICAL_PADDING_SCALE_MIN)
+    }
+
+    @Test
+    fun `attack - Negative Infinity verticalPadding - should be coerced to min`() = runTest {
+        viewModel.onSetVerticalPadding(Float.NEGATIVE_INFINITY)
+        advanceUntilIdle()
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.VERTICAL_PADDING_SCALE_MIN)
+    }
+
+    @Test
+    fun `attack - extremely small float verticalPadding - should be coerced to min`() = runTest {
+        viewModel.onSetVerticalPadding(-Float.MAX_VALUE)
+        advanceUntilIdle()
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.VERTICAL_PADDING_SCALE_MIN)
+    }
+
+    @Test
+    fun `attack - extremely large float verticalPadding - should be coerced to max`() = runTest {
+        viewModel.onSetVerticalPadding(Float.MAX_VALUE)
+        advanceUntilIdle()
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.VERTICAL_PADDING_SCALE_MAX)
+    }
+
+    @Test
+    fun `attack - Positive Infinity verticalPadding - should be coerced to max`() = runTest {
+        viewModel.onSetVerticalPadding(Float.POSITIVE_INFINITY)
+        advanceUntilIdle()
+        verify(setVerticalPaddingUseCase).invoke(AppConstants.VERTICAL_PADDING_SCALE_MAX)
+    }
+
+    // SECTION: LAYOUT SCALE ATTACKS
 
     @Test
     fun `attack - NaN layoutScale - should be coerced to min value`() = runTest {
         val nanValue = Float.NaN
         viewModel.onSetLayoutScale(nanValue)
         advanceUntilIdle()
-
-        verify(setLayoutScaleUseCase).invoke(0.0f)
+        verify(setLayoutScaleUseCase).invoke(AppConstants.LAYOUT_SCALE_MIN)
     }
+
+    @Test
+    fun `attack - Negative Infinity layoutScale - should be coerced to min`() = runTest {
+        viewModel.onSetLayoutScale(Float.NEGATIVE_INFINITY)
+        advanceUntilIdle()
+        verify(setLayoutScaleUseCase).invoke(AppConstants.LAYOUT_SCALE_MIN)
+    }
+
+    @Test
+    fun `attack - extremely small float - should be coerced to min`() = runTest {
+        viewModel.onSetLayoutScale(-Float.MAX_VALUE)
+        advanceUntilIdle()
+        verify(setLayoutScaleUseCase).invoke(AppConstants.LAYOUT_SCALE_MIN)
+    }
+
+    @Test
+    fun `attack - extremely large float - should be coerced to max`() = runTest {
+        viewModel.onSetLayoutScale(Float.MAX_VALUE)
+        advanceUntilIdle()
+        verify(setLayoutScaleUseCase).invoke(AppConstants.LAYOUT_SCALE_MAX)
+    }
+
+    @Test
+    fun `attack - Positive Infinity layoutScale - should be coerced to max`() = runTest {
+        viewModel.onSetLayoutScale(Float.POSITIVE_INFINITY)
+        advanceUntilIdle()
+        verify(setLayoutScaleUseCase).invoke(AppConstants.LAYOUT_SCALE_MAX)
+    }
+
+    // ========================================================================
+    // SECTION 1.1: HAPPY PATH (Valid Inputs)
+    // ========================================================================
+
+    @Test
+    fun `valid input - layoutScale inside range - should pass through unchanged`() = runTest {
+        val validValue = (AppConstants.LAYOUT_SCALE_MIN + AppConstants.LAYOUT_SCALE_MAX) / 2
+
+        viewModel.onSetLayoutScale(validValue)
+        advanceUntilIdle()
+
+        verify(setLayoutScaleUseCase).invoke(validValue)
+    }
+
+    @Test
+    fun `valid input - verticalPadding inside range - should pass through unchanged`() = runTest {
+        val validValue = (AppConstants.VERTICAL_PADDING_SCALE_MIN + AppConstants.VERTICAL_PADDING_SCALE_MAX) / 2
+
+        viewModel.onSetVerticalPadding(validValue)
+        advanceUntilIdle()
+
+        verify(setVerticalPaddingUseCase).invoke(validValue)
+    }
+
+    @Test
+    fun `valid input - contentTopMargin inside range - should pass through unchanged`() = runTest {
+        val validValue = (AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN + AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX) / 2
+
+        viewModel.onSetContentTopMargin(validValue)
+        advanceUntilIdle()
+
+        verify(setContentTopMarginUseCase).invoke(validValue)
+    }
+
 
     // ========================================================================
     // SECTION 2: INTEGER / BATTERY ATTACKS

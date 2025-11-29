@@ -773,7 +773,14 @@ class BackupManagerDoomsdayTest {
 
     @Test
     fun `importFromJson - exceeds package limit - returns LimitExceeded`() = runTest {
-        val appInfos = (1..300).map { createAppInfo("com.app$it", "com.app$it.MainActivity") }
+        // 1. Wir definieren das Ziel basierend auf der Konstante (+1 um das Limit zu sprengen)
+        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val exceededCount = limit + 1
+
+        // 2. Wir generieren dynamisch genau so viele Apps, wie nötig sind
+        val appInfos = (1..exceededCount).map {
+            createAppInfo("com.app$it", "com.app$it.MainActivity")
+        }
         fakeInstalledAppsRepo.installedApps = appInfos
 
         val appNames = appInfos.map { it.componentName }.toSet()
@@ -782,12 +789,17 @@ class BackupManagerDoomsdayTest {
 
         val options = ImportOptions(importFavorites = true)
 
+        // Action
         val result = backupManager.importFromJson(jsonString, options)
 
+        // Assertions
         Truth.assertThat(result).isInstanceOf(ImportResult.LimitExceeded::class.java)
         val limitExceeded = result as ImportResult.LimitExceeded
-        Truth.assertThat(limitExceeded.packageCount).isEqualTo(300)
-        Truth.assertThat(limitExceeded.limit).isEqualTo(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+
+        // Prüfen, ob die gemeldete Anzahl mit unserer generierten Anzahl übereinstimmt
+        Truth.assertThat(limitExceeded.packageCount).isEqualTo(exceededCount)
+        // Prüfen, ob das Limit korrekt aus der Konstante gemeldet wird
+        Truth.assertThat(limitExceeded.limit).isEqualTo(limit)
     }
 
     @Test
