@@ -91,4 +91,52 @@ object AppConstants {
      * Flow bleibt 5 Sekunden nach letztem Collector aktiv.
      */
     const val FLOW_SHARING_TIMEOUT_MS = 5000L
+
+    // Split Mode Logic
+    const val SPLIT_MODE_TINKERING_LIMIT = 200 // Grenze für "Bastler"-Beschreibung
+
+    // URLs
+    const val URL_ABOUT_PAGE = "https://docs.kolibri-launcher.ch/about.html"
+
+    // Backup & Restore Constants
+    const val BACKUP_PREVIEW_TIMEOUT_MS = 2000L
+    const val MIME_TYPE_JSON = "application/json"
+    const val BACKUP_FILE_PREFIX = "kolibri_backup_"
+    const val BACKUP_FILE_EXTENSION = ".json"
+
+    // Date Formats
+    const val DATE_FORMAT_BACKUP_FILENAME = "yyyyMMdd_HHmmss"
+    const val DATE_FORMAT_DISPLAY = "dd.MM.yyyy HH:mm"
+
+    // UI Limits
+    const val MAX_MISSING_APPS_IN_SNACKBAR = 5
+
+    /**
+     * Keys für Preferences (müssen mit res/xml/preferences.xml übereinstimmen)
+     */
+    object PrefKeys {
+        const val SHOW_CALENDAR_EVENT = "show_calendar_event"
+        const val SHOW_ALARM = "show_alarm"
+        const val AUTO_SHOW_KEYBOARD = "auto_show_keyboard_drawer"
+        const val AUTO_LAUNCH_APP = "auto_launch_app"
+        const val SPLIT_MODE_THRESHOLD = "split_mode_threshold"
+
+        const val SYSTEM_WALLPAPER = "system_wallpaper"
+        const val EDIT_FAVORITES = "edit_favorites"
+        const val SORT_FAVORITES = "sort_favorites"
+        const val HIDDEN_APPS = "hidden_apps"
+        const val CUSTOM_APP_NAMES = "custom_app_names"
+
+        const val BACKUP_RESTORE = "backup_restore"
+        const val FACTORY_RESET = "factory_reset"
+
+        const val APP_INFO = "app_info"
+        const val ACCESSIBILITY = "accessibility"
+        const val SET_DEFAULT_LAUNCHER = "set_default_launcher"
+
+        const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
+        const val SWIPE_DOWN_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
+        const val SWIPE_ACTIONS = "swipe_actions"
+        const val CRASH_REPORTS = "crash_reports"
+    }
 }

@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
@@ -54,7 +55,7 @@ class BackupFragment : Fragment() {
     }
 
     private val exportLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_JSON)
     ) { uri ->
         uri?.let {
             try {
@@ -100,14 +101,14 @@ class BackupFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.buttonExportBackup.setOnClickListener {
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+            val timestamp = SimpleDateFormat("AppConstants.DATE_FORMAT_BACKUP_FILENAME", Locale.getDefault())
                 .format(Date())
-            val filename = "kolibri_backup_$timestamp.json"
+            val filename = "${AppConstants.BACKUP_FILE_PREFIX}$timestamp${AppConstants.BACKUP_FILE_EXTENSION}"
             exportLauncher.launch(filename)
         }
 
         binding.buttonImportBackup.setOnClickListener {
-            importLauncher.launch(arrayOf("application/json"))
+            importLauncher.launch(arrayOf(AppConstants.MIME_TYPE_JSON))
         }
     }
 
@@ -123,7 +124,7 @@ class BackupFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             try {
-                val preview = withTimeoutOrNull(2000) {
+                val preview = withTimeoutOrNull(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS) {
                     viewModel.backupPreview.first { it != null }
                 }
 
@@ -144,7 +145,7 @@ class BackupFragment : Fragment() {
 
                 // Preview-Daten sofort setzen (nicht asynchron!)
                 val dateText = if (preview.timestamp > 0L) {
-                    SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                    SimpleDateFormat(AppConstants.DATE_FORMAT_DISPLAY, Locale.getDefault())
                         .format(Date(preview.timestamp))
                 } else {
                     getString(R.string.backup_preview_date_unknown)
@@ -368,11 +369,12 @@ class BackupFragment : Fragment() {
     private fun showImportSuccess(message: String, missingApps: Set<String>) {
         _binding?.let {
             val displayMessage = if (missingApps.isNotEmpty()) {
-                val appList = missingApps.take(5).joinToString("\n") { app ->
+                val appList = missingApps.take(AppConstants.MAX_MISSING_APPS_IN_SNACKBAR).joinToString("\n") { app ->
                     app.split("/")[0]
                 }
-                val moreText = if (missingApps.size > 5) {
-                    "\n... ${getString(R.string.backup_and_more, missingApps.size - 5)}"
+
+                val moreText = if (missingApps.size > AppConstants.MAX_MISSING_APPS_IN_SNACKBAR) {
+                    "\n... ${getString(R.string.backup_and_more, missingApps.size - AppConstants.MAX_MISSING_APPS_IN_SNACKBAR)}"
                 } else {
                     ""
                 }

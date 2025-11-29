@@ -28,6 +28,7 @@ import androidx.preference.SwitchPreferenceCompat
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -145,8 +146,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         try {
-            calendarSwitchPreference = findPreference("show_calendar_event")
-
+            calendarSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
             calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     val shouldEnable = newValue as? Boolean ?: false
@@ -170,7 +170,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-            alarmSwitchPreference = findPreference("show_alarm")
+            alarmSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_ALARM)
             alarmSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     val shouldEnable = newValue as? Boolean ?: true
@@ -184,7 +184,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-            autoKeyboardSwitchPreference = findPreference("auto_show_keyboard_drawer")
+            autoKeyboardSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
             autoKeyboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     val shouldEnable = newValue as? Boolean ?: false
@@ -198,7 +198,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-            autoLaunchAppSwitchPreference = findPreference("auto_launch_app")
+            autoLaunchAppSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
             autoLaunchAppSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     val shouldEnable = newValue as? Boolean ?: false
@@ -212,14 +212,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-            splitModeThresholdPreference = findPreference("split_mode_threshold")
+            splitModeThresholdPreference = findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
             splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
-                    val thresholdString = newValue as? String ?: "0"
-                    val threshold = thresholdString.toIntOrNull() ?: 0
+                    val thresholdString = newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
+                    val threshold = thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
 
-                    // Validierung: 0-512 Pixel
-                    if (threshold !in 0..512) {
+                    if (threshold !in AppConstants.SPLIT_MODE_THRESHOLD_MIN..AppConstants.SPLIT_MODE_THRESHOLD_MAX) {
                         Toast.makeText(
                             requireContext(),
                             R.string.split_mode_threshold_invalid,
@@ -276,7 +275,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun setupPreferenceListeners() {
         // Wallpaper
         try {
-            findPreference<Preference>("system_wallpaper")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.SYSTEM_WALLPAPER)?.setOnPreferenceClickListener {
                 try {
                     openSystemWallpaperPicker()
                     true
@@ -291,7 +290,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Edit Favorites
         try {
-            findPreference<Preference>("edit_favorites")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.EDIT_FAVORITES)?.setOnPreferenceClickListener {
                 try {
                     val intent = Intent(requireActivity(), OnboardingActivity::class.java).apply {
                         putExtra(
@@ -312,7 +311,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Sort Favorites
         try {
-            findPreference<Preference>("sort_favorites")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)?.setOnPreferenceClickListener {
                 try {
                     if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
 
@@ -341,7 +340,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Hidden Apps
         try {
-            findPreference<Preference>("hidden_apps")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)?.setOnPreferenceClickListener {
                 try {
                     if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
 
@@ -362,7 +361,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Custom App Names
         try {
-            findPreference<Preference>("custom_app_names")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.CUSTOM_APP_NAMES)?.setOnPreferenceClickListener {
                 try {
                     val intent = Intent(requireActivity(), CustomNamesActivity::class.java)
                     startActivity(intent)
@@ -378,7 +377,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Backup & Restore
         try {
-            findPreference<Preference>("backup_restore")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.BACKUP_RESTORE)?.setOnPreferenceClickListener {
                 try {
                     if (!isAdded || isStateSaved || isDetached) {
                         Timber.Forest.w("Cannot show backup - invalid fragment state")
@@ -400,7 +399,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
 
             try {
-                findPreference<Preference>("factory_reset")?.setOnPreferenceClickListener {
+                findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
                     try {
                         showFactoryResetDialog()
                         true
@@ -418,11 +417,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // App Info
         try {
-            findPreference<Preference>("app_info")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.APP_INFO)?.setOnPreferenceClickListener {
                 try {
                     openUrlInCustomTab(
                         requireContext(),
-                        "https://docs.kolibri-launcher.ch/about.html"
+                        AppConstants.URL_ABOUT_PAGE
                     )
                     true
                 } catch (e: Throwable) {
@@ -436,7 +435,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Accessibility
         try {
-            findPreference<Preference>("accessibility")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.ACCESSIBILITY)?.setOnPreferenceClickListener {
                 try {
                     openAccessibilitySettings()
                     true
@@ -451,7 +450,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Default Launcher
         try {
-            findPreference<Preference>("set_default_launcher")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
                 try {
                     openDefaultLauncherSettings()
                     true
@@ -467,7 +466,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Double Tap to Lock
         try {
             val doubleTapPreference =
-                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")
+                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
             doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is Boolean) {
@@ -494,7 +493,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Swipe Down for Notifications
         try {
             val swipeDownPreference =
-                findPreference<SwitchPreferenceCompat>("swipe_down_to_notifications_enabled")
+                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_NOTIFICATIONS)
             swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
                 try {
                     if (newValue is Boolean) {
@@ -523,7 +522,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Swipe Actions
         try {
-            findPreference<Preference>("swipe_actions")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.SWIPE_ACTIONS)?.setOnPreferenceClickListener {
                 try {
                     val intent = Intent(requireContext(), SwipeActionsActivity::class.java)
                     startActivity(intent)
@@ -539,7 +538,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // Crash Reports
         try {
-            findPreference<Preference>("crash_reports")?.setOnPreferenceClickListener {
+            findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)?.setOnPreferenceClickListener {
                 try {
                     viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                         val activityContext = activity ?: return@launch
@@ -617,7 +616,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private suspend fun updateCrashReportSummary() {
         withContext(Dispatchers.Main) {
             try {
-                val preference = findPreference<Preference>("crash_reports") ?: return@withContext
+                val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS) ?: return@withContext
                 val isEnabled = CrashReportConsent.hasConsent(requireContext())
 
                 if (isEnabled) {
@@ -643,8 +642,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             try {
                                 Timber.Forest.d("[Fragment] Collected ${apps.size} apps")
 
-                                val sortFavoritesPref = findPreference<Preference>("sort_favorites")
-                                val hiddenAppsPref = findPreference<Preference>("hidden_apps")
+                                val sortFavoritesPref = findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
+                                val hiddenAppsPref = findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
 
                                 val isAppListReady = apps.isNotEmpty()
 
@@ -706,7 +705,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             if (!isAdded || isDetached) return@collect
 
                             try {
-                                findPreference<SwitchPreferenceCompat>("double_tap_to_lock_enabled")?.isChecked =
+                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)?.isChecked =
                                     isChecked
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating double tap preference")
@@ -726,7 +725,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             if (!isAdded || isDetached) return@collect
 
                             try {
-                                findPreference<SwitchPreferenceCompat>("swipe_down_to_notifications_enabled")?.isChecked =
+                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_NOTIFICATIONS)?.isChecked =
                                     isChecked
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating swipe down preference")
@@ -784,10 +783,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                     text = threshold.toString()
 
                                     val description = when {
-                                        threshold == 0 -> getString(R.string.split_mode_threshold_desc_auto)
-                                        threshold == 512 -> getString(R.string.split_mode_threshold_desc_max)
-                                        threshold in 1..200 -> getString(R.string.split_mode_threshold_desc_tinkering)
-                                        else -> getString(R.string.split_mode_threshold_desc_custom, threshold)
+                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(R.string.split_mode_threshold_desc_auto)
+                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(R.string.split_mode_threshold_desc_max)
+                                        threshold in (AppConstants.SPLIT_MODE_THRESHOLD_MIN + 1)..AppConstants.SPLIT_MODE_TINKERING_LIMIT ->
+                                            getString(R.string.split_mode_threshold_desc_tinkering)
+                                        else ->
+                                            getString(R.string.split_mode_threshold_desc_custom, threshold)
                                     }
 
                                     summary = getString(
@@ -925,7 +926,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private fun updateDefaultLauncherStatus() {
         try {
-            val setDefaultLauncherPref = findPreference<Preference>("set_default_launcher")
+            val setDefaultLauncherPref = findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
             if (setDefaultLauncherPref == null) {
                 Timber.Forest.w("Default launcher preference not found")
                 return
