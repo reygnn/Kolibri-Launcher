@@ -24,9 +24,8 @@ import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.withStarted
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.github.reygnn.kolibri_launcher.BuildConfig
@@ -167,13 +166,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // Only run initial setup on first creation (not on config changes)
         if (savedInstanceState == null) {
             lifecycleScope.launch(mainActivityExceptionHandler) {
-                // FIX: BackgroundActivityLaunchViolation
-                // Wir warten, bis die Activity im Status STARTED (sichtbar) ist.
-                // Das garantiert uns das Recht, eine neue Activity zu starten,
-                // auch wenn der DataStore-Check vorher etwas dauert.
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    handleInitialSetup()
-                }
+                // Launch setup immediately to fetch DataStore in parallel with UI startup.
+                // The lifecycle check happens internally only if we need to launch an Activity.
+                handleInitialSetup()
             }
         } else {
             // After config change: restore flags
@@ -217,14 +212,21 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
 
         try {
+            // 1. Fetch data immediately (Async IO) - Don't wait for UI
             val onboardingCompleted = settingsRepository.onboardingCompletedFlow.first()
             val backupPresent = dataStoreBackup.isBackupPresent()
 
             onboardingCheckCompleted = true
 
             if (!onboardingCompleted && !backupPresent) {
-                launchOnboardingActivity()
+                // 2. Wait for STARTED state, then launch ONCE
+                // This prevents BackgroundActivityLaunchViolation on Pixel/Android 14+
+                // Using withStarted is cleaner than repeatOnLifecycle + cancel
+                lifecycle.withStarted {
+                    launchOnboardingActivity()
+                }
             } else {
+                // 3. Normal Start - Initialize immediately (no wait needed)
                 initializeMainApp()
             }
         } catch (e: CancellationException) {
