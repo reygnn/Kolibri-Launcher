@@ -227,4 +227,20 @@ object AppConstants {
     const val READABILITY_MODE_SMART_CONTRAST = "smart_contrast"
     const val READABILITY_MODE_STANDARD = "standard"
     const val DEFAULT_READABILITY_MODE = READABILITY_MODE_SMART_CONTRAST
+
+    // Chip Styling Constants
+    const val CHIP_MAX_WIDTH_FACTOR = 0.80 // 80% der Bildschirmbreite
+    const val CHIP_TEXT_SIZE_SP = 12f
+    const val CHIP_STROKE_WIDTH = 1f
+
+    // Timing Constants
+    const val SCROLL_VERIFICATION_DELAY_MS = 50L
+
+    // Fallback Values für Ressourcen-Zugriffe (catch blocks)
+    const val FALLBACK_DIMEN_PX = 16
+    const val FALLBACK_BORDER_WIDTH_PX = 4
+    const val FALLBACK_CORNER_RADIUS_PX = 16f
+
+    // Border Styling (Falls Border genutzt wird)
+    const val BORDER_ALPHA = 51 // ca. 20%
 }

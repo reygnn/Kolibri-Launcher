@@ -525,7 +525,7 @@ class HomeFragment : Fragment() {
 
             val baseMargin = try {
                 resources.getDimensionPixelSize(R.dimen.spacing_medium)
-            } catch (e: Exception) { 16 }
+            } catch (e: Exception) { AppConstants.FALLBACK_DIMEN_PX }
 
             // 1. Berechne, was der User (basierend auf Settings/Scale) eigentlich will
             val calculatedUserMargin = topMarginCalculator.calculate(
@@ -594,7 +594,7 @@ class HomeFragment : Fragment() {
         try {
             val horizPadding = try {
                 resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-            } catch (e: Exception) { 16 }
+            } catch (e: Exception) { AppConstants.FALLBACK_DIMEN_PX }
 
             val targetTypeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
 
@@ -751,7 +751,7 @@ class HomeFragment : Fragment() {
     private fun applyScrollViewBorder(textColor: Int) {
         try {
             val frameColor = Color.argb(
-                51,
+                AppConstants.BORDER_ALPHA,
                 Color.red(textColor),
                 Color.green(textColor),
                 Color.blue(textColor)
@@ -763,14 +763,14 @@ class HomeFragment : Fragment() {
                 val strokeWidth = try {
                     resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
                 } catch (e: Throwable) {
-                    4
+                    AppConstants.FALLBACK_BORDER_WIDTH_PX
                 }
                 setStroke(strokeWidth, frameColor)
 
                 val cornerRadius = try {
                     resources.getDimension(R.dimen.split_screen_corner_radius)
                 } catch (e: Throwable) {
-                    16f
+                    AppConstants.FALLBACK_CORNER_RADIUS_PX
                 }
                 setCornerRadius(cornerRadius)
             }
@@ -780,7 +780,7 @@ class HomeFragment : Fragment() {
             val borderPadding = try {
                 resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
             } catch (e: Throwable) {
-                16
+                AppConstants.FALLBACK_DIMEN_PX
             }
 
             binding.favoritesScrollView.setPadding(
@@ -973,7 +973,7 @@ class HomeFragment : Fragment() {
                         resources.getDimensionPixelSize(R.dimen.touch_target_padding)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error getting padding dimension")
-                        16 // Fallback
+                        AppConstants.FALLBACK_DIMEN_PX // Fallback
                     }
                     setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
 
@@ -1089,7 +1089,7 @@ class HomeFragment : Fragment() {
             }
 
             val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
-            val chipMaxWidth = (availableWidth * 0.80).toInt()
+            val chipMaxWidth = (availableWidth * AppConstants.CHIP_MAX_WIDTH_FACTOR).toInt()
 
             for (event in events) {
                 try {
@@ -1134,9 +1134,9 @@ class HomeFragment : Fragment() {
             chip.setTextColor(colors.textColor)
             chip.isCloseIconVisible = false
             chip.isCheckable = false
-            chip.chipStrokeWidth = 1f
+            chip.chipStrokeWidth = AppConstants.CHIP_STROKE_WIDTH
             chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, AppConstants.CHIP_TEXT_SIZE_SP)
             chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
 
         } catch (e: Throwable) {
@@ -1595,7 +1595,7 @@ class HomeFragment : Fragment() {
     private fun scheduleScrollVerification() {
         verifyJob?.cancel()
         verifyJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(50) // 50ms debounce
+            delay(AppConstants.SCROLL_VERIFICATION_DELAY_MS) // debounce
             try {
                 verifyAndFixScrollState()
             } catch (e: Throwable) {
