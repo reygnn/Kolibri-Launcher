@@ -2257,14 +2257,16 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onSetLayoutScale - coerces value above 1 to 1`() = runTest {
+    fun `onSetLayoutScale - coerces value above limit to limit`() = runTest {
+        val limit = AppConstants.LAYOUT_SCALE_MAX
+        val exceededCount = limit + 0.1f
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.onSetLayoutScale(1.5f)
+        viewModel.onSetLayoutScale(exceededCount)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(1.0f)
+        verify(setLayoutScaleUseCase).invoke(limit)
     }
 
     @Test
@@ -2312,14 +2314,16 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onSetVerticalPadding - coerces value above 1 to 1`() = runTest {
+    fun `onSetVerticalPadding - coerces value above limit to limit`() = runTest {
+        val limit = AppConstants.LAYOUT_SCALE_MAX
+        val exceededCount = limit + 0.1f
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.onSetVerticalPadding(2.0f)
+        viewModel.onSetVerticalPadding(exceededCount)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(1.0f)
+        verify(setVerticalPaddingUseCase).invoke(limit)
     }
 
     @Test
