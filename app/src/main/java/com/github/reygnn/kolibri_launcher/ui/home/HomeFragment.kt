@@ -512,9 +512,9 @@ class HomeFragment : Fragment() {
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error calculating layout cache")
-            currentTextSizePx = 48f
-            currentVerticalPaddingPx = 16
-            isCurrentFontBold = false
+            currentTextSizePx = AppConstants.FALLBACK_TEXT_SIZE_PX
+            currentVerticalPaddingPx = AppConstants.FALLBACK_VERTICAL_PADDING_PX
+            isCurrentFontBold = AppConstants.FALLBACK_FONT_BOLD
         }
     }
 
