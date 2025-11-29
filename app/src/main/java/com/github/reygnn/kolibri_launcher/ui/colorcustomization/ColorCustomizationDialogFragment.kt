@@ -19,6 +19,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogColorCustomizationBinding
 import com.github.reygnn.kolibri_launcher.databinding.ItemColorSwatchBinding
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -155,7 +156,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             val cardView = swatchBinding.colorSwatchCard
             val autoIcon = swatchBinding.autoIcon
 
-            if (color == 0) { // "Auto"-Knopf
+            if (color == AppConstants.DEFAULT_TEXT_COLOR) { // "Auto"-Knopf
                 autoIcon.isVisible = true
                 val backgroundColor = requireContext().getColor(R.color.material_dynamic_neutral90)
                 cardView.setCardBackgroundColor(backgroundColor)
@@ -213,7 +214,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         val colors = mutableListOf<Int>()
 
         // 1. Automatisch (Reset-Button)
-        colors.add(0)
+        colors.add(AppConstants.DEFAULT_TEXT_COLOR)
 
         // 2. Material You-Farben aus dem App-Theme
         val themeColors = listOf(

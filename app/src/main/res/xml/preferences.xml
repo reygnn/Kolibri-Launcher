@@ -7,9 +7,9 @@
         android:title="@string/category_apps_title"
         app:iconSpaceReserved="false">
         <Preference
-            app:key="edit_favorites"
-            app:title="@string/settings_select_favorites_title"
-            app:summary="@string/settings_select_favorites_summary"
+            android:key="edit_favorites"
+            android:title="@string/settings_select_favorites_title"
+            android:summary="@string/settings_select_favorites_summary"
             app:iconSpaceReserved="false" />
 
         <!-- Favoriten sortieren -->

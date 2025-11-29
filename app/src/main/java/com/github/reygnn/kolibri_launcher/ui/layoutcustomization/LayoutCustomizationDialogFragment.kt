@@ -14,6 +14,7 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -117,27 +118,51 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     // ==================== Controls Setup ====================
 
     private fun setupControls() {
-        // Slider Listener
-        binding.sliderTextSize.addOnChangeListener { _, value, fromUser ->
-            safeRun("sliderTextSize.onChange") {
-                if (fromUser) viewModel.onSetLayoutScale(value)
+        // 1. Text Size Slider konfigurieren (SSOT: AppConstants)
+        binding.sliderTextSize.apply {
+            valueFrom = AppConstants.LAYOUT_SCALE_MIN
+            valueTo = AppConstants.LAYOUT_SCALE_MAX
+
+            // Listener für Änderungen
+            addOnChangeListener { _, value, fromUser ->
+                safeRun("sliderTextSize.onChange") {
+                    if (fromUser) viewModel.onSetLayoutScale(value)
+                }
             }
         }
 
-        binding.sliderPadding.addOnChangeListener { _, value, fromUser ->
-            safeRun("sliderPadding.onChange") {
-                if (fromUser) viewModel.onSetVerticalPadding(value)
+        // 2. Padding Slider konfigurieren
+        binding.sliderPadding.apply {
+            valueFrom = AppConstants.VERTICAL_PADDING_SCALE_MIN
+            valueTo = AppConstants.VERTICAL_PADDING_SCALE_MAX
+
+            addOnChangeListener { _, value, fromUser ->
+                safeRun("sliderPadding.onChange") {
+                    if (fromUser) viewModel.onSetVerticalPadding(value)
+                }
             }
         }
 
-        // Switch Listener
+        // 3. Top Margin Slider konfigurieren
+        binding.sliderTopMargin.apply {
+            valueFrom = AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN
+            valueTo = AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX
+
+            addOnChangeListener { _, value, fromUser ->
+                safeRun("sliderTopMargin.onChange") {
+                    if (fromUser) viewModel.onSetContentTopMargin(value)
+                }
+            }
+        }
+
+        // 4. Switch Listener
         binding.switchBoldText.setOnCheckedChangeListener { _, isChecked ->
             safeRun("switchBoldText.onChange") {
                 viewModel.onSetFontBold(isChecked)
             }
         }
 
-        // Reset Button Listener
+        // 5. Reset Button
         binding.btnReset.setOnClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
             safeRun("btnReset.onClick") {
@@ -145,12 +170,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             }
         }
 
-        binding.sliderTopMargin.addOnChangeListener { _, value, fromUser ->
-            safeRun("sliderTopMargin.onChange") {
-                if (fromUser) viewModel.onSetContentTopMargin(value)
-            }
-        }
-
+        // UX: Fade-Effekte
         setupFadeOnTouch(binding.sliderTextSize)
         setupFadeOnTouch(binding.sliderPadding)
         setupFadeOnTouch(binding.sliderTopMargin)
