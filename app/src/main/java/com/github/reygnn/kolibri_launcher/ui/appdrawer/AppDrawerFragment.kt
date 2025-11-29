@@ -25,6 +25,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -182,7 +183,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                         searchJob?.cancel()
                         searchJob = launch {
                             try {
-                                delay(300)
+                                delay(AppConstants.SEARCH_DEBOUNCE_DELAY_MS)
                                 displayFilteredApps(query)
                             } catch (e: CancellationException) {
                             } catch (e: Throwable) {
@@ -260,7 +261,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     }
 
                     when (action) {
-                        "launch_shortcut" -> handleShortcutLaunch(bundle)
+                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(bundle)
                         AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
                         AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
                         AppContextMenuAction.Companion.ACTION_ID_HIDE_APP -> hideApp(app)
@@ -499,7 +500,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 resources.getDimensionPixelSize(R.dimen.spacing_large)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting fab margin")
-                16  // Safe fallback in px
+                AppConstants.FALLBACK_DIMEN_PX
             }
 
             val initialContentPadding = try {

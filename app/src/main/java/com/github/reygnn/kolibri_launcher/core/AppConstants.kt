@@ -241,6 +241,12 @@ object AppConstants {
     const val FALLBACK_BORDER_WIDTH_PX = 4
     const val FALLBACK_CORNER_RADIUS_PX = 16f
 
-    // Border Styling (Falls Border genutzt wird)
+    // Border Styling
     const val BORDER_ALPHA = 51 // ca. 20%
+
+    // Search Configuration
+    const val SEARCH_DEBOUNCE_DELAY_MS = 300L
+
+    // Action Keys
+    const val ACTION_LAUNCH_SHORTCUT = "launch_shortcut"
 }
