@@ -282,6 +282,26 @@ class BackupManagerNamingConventionTest {
             .contains(componentName)
     }
 
+    @Test
+    fun `import - when both camelCase and snake_case present - last value wins`() = runTest {
+        val json = """
+        {
+            "version": "1.0.0",
+            "settings": {
+                "textColor": -111,
+                "text_color": -222,
+                "favoriteComponents": [],
+                "hiddenComponents": []
+            }
+        }
+    """.trimIndent()
+
+        val result = backupManager.importFromJson(json, ImportOptions(importThemeSettings = true))
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-222)
+    }
+
     // --- Helper ---
 
     private fun createTestAppInfo(packageName: String) =
