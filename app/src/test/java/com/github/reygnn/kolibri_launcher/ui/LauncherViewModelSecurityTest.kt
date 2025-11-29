@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
@@ -123,6 +124,7 @@ class LauncherViewModelSecurityTest {
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
             appUpdateSignal = appUpdateSignal,
+            SavedStateHandle(),
             context = context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
             testMode = testMode

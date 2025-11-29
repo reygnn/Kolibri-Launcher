@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.asLiveData
 import app.cash.turbine.test
@@ -55,6 +56,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -254,6 +256,7 @@ class LauncherViewModelTest {
             setFontBoldUseCase,
             setContentTopMarginUseCase,
             appUpdateSignal,
+            SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
@@ -2864,5 +2867,57 @@ class LauncherViewModelTest {
         // Should have received intents without crashing
         assertTrue(receivedIntents.isNotEmpty())
         assertTrue(receivedIntents.all { it is AppDrawerScrollIntent.ScrollToTop })
+    }
+
+    @Test
+    fun `process death - verifies state restoration`() = runTest {
+        val keySearchQuery = "KEY_SEARCH_QUERY"
+        val savedQuery = "Vor dem Crash"
+
+        val savedState = SavedStateHandle().apply {
+            set(keySearchQuery, savedQuery)
+        }
+
+        // 2. ACT: ViewModel "frisch" initialisieren (Simulierter Neustart nach Kill)
+        val restoredViewModel = LauncherViewModel(
+            getFavoriteAppsUseCase = getFavoriteAppsUseCase,
+            getDrawerAppsUseCase = getDrawerAppsUseCase,
+            hideAppUseCase = hideAppUseCase,
+            toggleFavoriteUseCase = toggleFavoriteUseCase,
+            requestLockUseCase = requestLockUseCase,
+            requestNotificationsUseCase = requestNotificationsUseCase,
+            recordAppLaunchUseCase = recordAppLaunchUseCase,
+            refreshAppsUseCase = refreshAppsUseCase,
+            resetAppUsageUseCase = resetAppUsageUseCase,
+            showAppUseCase = showAppUseCase,
+            toggleSortOrderUseCase = toggleSortOrderUseCase,
+            handleSwipeActionUseCase = handleSwipeActionUseCase,
+            observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
+            observeUiColorsUseCase = observeUiColorsUseCase,
+            setTextColorUseCase = setTextColorUseCase,
+            setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
+            setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
+            observeInstalledAppsUseCase = observeInstalledAppsUseCase,
+            getAutoLaunchSettingUseCase = getAutoLaunchSettingUseCase,
+            observeHomeSettingsUseCase = observeHomeSettingsUseCase,
+            checkAppUsageUseCase = checkAppUsageUseCase,
+            getAutoShowKeyboardSettingUseCase = getAutoShowKeyboardSettingUseCase,
+            getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
+            getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
+            getLayoutSettingsUseCase = getLayoutSettingsUseCase,
+            setLayoutScaleUseCase = setLayoutScaleUseCase,
+            setVerticalPaddingUseCase = setVerticalPaddingUseCase,
+            setFontBoldUseCase = setFontBoldUseCase,
+            setContentTopMarginUseCase = setContentTopMarginUseCase,
+            appUpdateSignal = appUpdateSignal,
+            savedStateHandle = savedState,
+            context = context,
+            mainDispatcher = mainDispatcherRule.testDispatcher,
+            testMode = TestMode(isEnabled = true)
+        )
+
+        // 3. ASSERT: Prüfen, ob der Flow sofort den alten Wert hat
+        // Das beweist, dass der String den "Tod" des Prozesses überlebt hat.
+        assertThat(restoredViewModel.appDrawerSearchQuery.value).isEqualTo(savedQuery)
     }
 }

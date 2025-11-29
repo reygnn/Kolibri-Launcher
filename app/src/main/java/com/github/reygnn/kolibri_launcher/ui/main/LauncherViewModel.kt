@@ -17,6 +17,7 @@ import android.graphics.Color
 import android.os.BatteryManager
 import android.text.format.DateFormat
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
@@ -134,6 +135,7 @@ class LauncherViewModel @Inject constructor(
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
+    private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
@@ -158,8 +160,10 @@ class LauncherViewModel @Inject constructor(
 
     private val wallpaperColorsFlow = MutableStateFlow<WallpaperColors?>(null)
 
-    private val _appDrawerSearchQuery = MutableStateFlow("")
-    val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
+    //    private val _appDrawerSearchQuery = MutableStateFlow("")
+//    val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
+    val appDrawerSearchQuery: StateFlow<String> =
+        savedStateHandle.getStateFlow("KEY_SEARCH_QUERY", "")
 
     // Default 0 = Automatik (Android entscheidet)
     val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
@@ -222,7 +226,8 @@ class LauncherViewModel @Inject constructor(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    val appDrawerScrollIntent: SharedFlow<AppDrawerScrollIntent> = _appDrawerScrollIntent.asSharedFlow()
+    val appDrawerScrollIntent: SharedFlow<AppDrawerScrollIntent> =
+        _appDrawerScrollIntent.asSharedFlow()
 
 
     private var fallbackToastShown = false
@@ -669,7 +674,8 @@ class LauncherViewModel @Inject constructor(
      */
     fun onAppDrawerSearchQueryChanged(query: String) {
         // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
-        _appDrawerSearchQuery.value = query
+        // Wir schreiben direkt in den Handle. Der StateFlow oben aktualisiert sich automatisch!
+        savedStateHandle["KEY_SEARCH_QUERY"] = query
     }
 
     /**
@@ -677,7 +683,7 @@ class LauncherViewModel @Inject constructor(
      * um die Suchanfrage zurückzusetzen.
      */
     fun onAppDrawerClosed() {
-        _appDrawerSearchQuery.value = ""
+        savedStateHandle["KEY_SEARCH_QUERY"] = ""
     }
 
     /**

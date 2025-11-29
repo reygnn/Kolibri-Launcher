@@ -212,6 +212,7 @@ dependencies {
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
     testImplementation("org.robolectric:robolectric:${robolectricVersion}")
 
 // Hilt
