@@ -49,7 +49,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerScrollIntent
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
