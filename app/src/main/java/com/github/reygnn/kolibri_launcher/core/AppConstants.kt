@@ -250,4 +250,7 @@ object AppConstants {
     const val ACTION_LAUNCH_SHORTCUT = "launch_shortcut"
 
     const val INITIAL_APP_LOAD_DELAY_MS = 100L
+
+    // SavedStateHandle Keys
+    const val KEY_SEARCH_QUERY = "KEY_SEARCH_QUERY"
 }

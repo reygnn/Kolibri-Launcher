@@ -163,7 +163,7 @@ class LauncherViewModel @Inject constructor(
     //    private val _appDrawerSearchQuery = MutableStateFlow("")
 //    val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
     val appDrawerSearchQuery: StateFlow<String> =
-        savedStateHandle.getStateFlow("KEY_SEARCH_QUERY", "")
+        savedStateHandle.getStateFlow(AppConstants.KEY_SEARCH_QUERY, "")
 
     // Default 0 = Automatik (Android entscheidet)
     val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
@@ -675,7 +675,7 @@ class LauncherViewModel @Inject constructor(
     fun onAppDrawerSearchQueryChanged(query: String) {
         // Speichere einfach den rohen Text. Das Fragment kümmert sich um Debouncing.
         // Wir schreiben direkt in den Handle. Der StateFlow oben aktualisiert sich automatisch!
-        savedStateHandle["KEY_SEARCH_QUERY"] = query
+        savedStateHandle[AppConstants.KEY_SEARCH_QUERY] = query
     }
 
     /**
@@ -683,7 +683,7 @@ class LauncherViewModel @Inject constructor(
      * um die Suchanfrage zurückzusetzen.
      */
     fun onAppDrawerClosed() {
-        savedStateHandle["KEY_SEARCH_QUERY"] = ""
+        savedStateHandle[AppConstants.KEY_SEARCH_QUERY] = ""
     }
 
     /**
