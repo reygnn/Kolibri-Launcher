@@ -6,7 +6,7 @@ This document tracks known `StrictMode` violations that are caused by the Androi
 
 ## 1. Samsung Framework: IdsController & SharedPreferences
 
-**Status:** Ignored / Unavoidable
+**Status:** 🔴 Ignored / Unavoidable
 **Context:** App Resume (`handleResumeActivity`)
 **Affected Devices:** Samsung (OneUI)
 
