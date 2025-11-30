@@ -60,7 +60,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerScrollIntent
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -210,25 +209,6 @@ class LauncherViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
-
-    /**
-     * One-shot scroll commands for the AppDrawer.
-     *
-     * Uses SharedFlow with replay=0 and extraBufferCapacity=1 to ensure:
-     * - Events are NOT replayed to new collectors (one-shot semantics)
-     * - Events are NOT dropped if emitted while no one is collecting (buffer of 1)
-     * - Slow collectors don't block the emitter (DROP_OLDEST policy)
-     *
-     * The Fragment collects this flow and executes the scroll, then the event is gone.
-     */
-    private val _appDrawerScrollIntent = MutableSharedFlow<AppDrawerScrollIntent>(
-        replay = 0,
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val appDrawerScrollIntent: SharedFlow<AppDrawerScrollIntent> =
-        _appDrawerScrollIntent.asSharedFlow()
-
 
     private var fallbackToastShown = false
     private var enableLockToastShown = false
@@ -504,7 +484,6 @@ class LauncherViewModel @Inject constructor(
                     context.getString(R.string.usage_data_reset_success, app.displayName)
                 )
             )
-            requestAppDrawerScrollToTop()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -601,7 +580,6 @@ class LauncherViewModel @Inject constructor(
     fun toggleSortOrder() = launchSafe {
         try {
             toggleSortOrderUseCase()
-            requestAppDrawerScrollToTop()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -684,14 +662,6 @@ class LauncherViewModel @Inject constructor(
      */
     fun onAppDrawerClosed() {
         savedStateHandle[AppConstants.KEY_SEARCH_QUERY] = ""
-    }
-
-    /**
-     * Emits a scroll-to-top intent for the AppDrawer.
-     * Call this after triggering actions that reorder the list.
-     */
-    private fun requestAppDrawerScrollToTop() {
-        _appDrawerScrollIntent.tryEmit(AppDrawerScrollIntent.ScrollToTop)
     }
 
     // --- PRIVATE/INTERNAL LOGIC ---

@@ -70,6 +70,32 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private var longClickedApp: AppInfo? = null
     private var searchJob: Job? = null
 
+    /**
+     * Controls post-update scrolling behavior.
+     *
+     * WHY THIS "OLD-SCHOOL" FLAG BEATS A "SEXY" FLOW:
+     *
+     * Modern Android architecture often suggests using `SharedFlow` or `Channels` (One-Shot Events)
+     * in the ViewModel to trigger UI actions like scrolling. However, in the context of
+     * `ListAdapter` and `AsyncListDiffer`, that approach introduces a critical race condition.
+     *
+     * The Problem with Flows:
+     * A Flow emits the "Scroll" event immediately when the data changes. The Fragment receives this
+     * instantly and calls `scrollToPosition(0)`. However, the Adapter calculates the DiffUtil
+     * on a background thread. As a result, the RecyclerView tries to scroll *before* the new
+     * items are actually bound and laid out. This results in scrolling the *old* list,
+     * inconsistent positioning, or no visible effect at all.
+     *
+     * The Solution (The "Magic"):
+     * By setting this flag to true and checking it inside the `submitList(list) { ... }`
+     * commit callback, we guarantee that the scroll command executes strictly *after*
+     * the RecyclerView has finished its layout pass with the new data.
+     *
+     * It may not look like modern "Reactive" code, but it provides frame-perfect UI timing
+     * that a decoupled Flow simply cannot guarantee without ugly `postDelayed` hacks.
+     */
+    private var shouldScrollToTop = false
+
     // Ultra Paranoia: Coroutine exception handler
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
@@ -156,7 +182,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                             if (_binding == null || !isAdded) return@collect
 
                             try {
-                                    appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
+                                appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
                             } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error updating adapter colors")
                                 // Keep old colors - not critical
@@ -191,7 +217,10 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                                 try {
                                     displayFilteredApps(query)
                                 } catch (fallbackError: Throwable) {
-                                    TimberWrapper.silentError(fallbackError, "Error in search fallback")
+                                    TimberWrapper.silentError(
+                                        fallbackError,
+                                        "Error in search fallback"
+                                    )
                                 }
                             }
                         }
@@ -202,41 +231,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for search query")
             }
-
-            // Observer 5: Scroll intents (one-shot events)
-            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-                try {
-                    repeatOnLifecycle(Lifecycle.State.STARTED) {
-                        viewModel.appDrawerScrollIntent.collect { intent ->
-                            if (_binding == null || !isAdded) return@collect
-
-                            try {
-                                when (intent) {
-                                    is AppDrawerScrollIntent.ScrollToTop -> {
-                                        // Wait for any pending list updates to complete,
-                                        // then scroll. Using post() ensures we're after the
-                                        // current layout pass.
-                                        binding.appsRecyclerView.post {
-                                            if (_binding != null && isAdded) {
-                                                binding.appsRecyclerView.scrollToPosition(0)
-                                                Timber.d("Executed scroll-to-top intent")
-                                            }
-                                        }
-                                    }
-                                    // Future intents would be handled here
-                                }
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error executing scroll intent")
-                            }
-                        }
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in scroll intent observer")
-                }
-            }
-
         }
     }
 
@@ -263,7 +257,10 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     when (action) {
                         AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(bundle)
                         AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
-                        AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
+                        AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(
+                            app
+                        )
+
                         AppContextMenuAction.Companion.ACTION_ID_HIDE_APP -> hideApp(app)
                         AppContextMenuAction.Companion.ACTION_ID_RESET_USAGE -> resetAppUsage(app)
                     }
@@ -346,6 +343,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     private fun resetAppUsage(app: AppInfo) {
         try {
+            shouldScrollToTop = true
             viewModel.onResetAppUsage(app)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error resetting app usage for ${app.packageName}")
@@ -403,6 +401,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         try {
             binding.fabSort.setOnClickListener {
                 try {
+                    shouldScrollToTop = true
                     viewModel.toggleSortOrder()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error toggling sort order")
@@ -439,6 +438,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     is AppSearchFilter.FilterResult.ShowList -> {
                         submitListToAdapter(result.apps)
                     }
+
                     is AppSearchFilter.FilterResult.AutoLaunch -> {
                         viewModel.onAppClicked(result.app)
                         hideKeyboard()
@@ -454,15 +454,28 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
     }
 
-    /**
+    /*
      * Extrahiert, um Codeduplizierung zu vermeiden. Sendet die Liste sicher an den Adapter.
      */
     private fun submitListToAdapter(list: List<AppInfo>) {
         try {
             if (_binding != null && isAdded) {
-                appDrawerAdapter?.submitList(list.toList())
+                appDrawerAdapter?.submitList(list.toList()) {
+                    try {
+                        if (shouldScrollToTop) {
+                            // Checken ob Binding noch da ist, um Crash beim schnellen Wechsel zu vermeiden
+                            if (_binding != null) {
+                                binding.appsRecyclerView.scrollToPosition(0)
+                            }
+                            shouldScrollToTop = false
+                        }
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error scrolling to top after submit")
+                        shouldScrollToTop = false
+                    }
+                }
             } else {
-                Timber.w("Adapter not initialized or fragment not added")
+                Timber.Forest.w("Adapter not initialized or fragment not added")
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error submitting list to adapter")
@@ -470,7 +483,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     }
 
     private fun showAppContextMenu(app: AppInfo) {
-         longClickedApp = app
+        longClickedApp = app
 
         viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
             try {
@@ -531,7 +544,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     }
 
                     try {
-                        val fabLayoutParams = binding.fabSort.layoutParams as? CoordinatorLayout.LayoutParams
+                        val fabLayoutParams =
+                            binding.fabSort.layoutParams as? CoordinatorLayout.LayoutParams
                         if (fabLayoutParams != null) {
                             fabLayoutParams.bottomMargin = systemBars.bottom + fabMargin
                             binding.fabSort.layoutParams = fabLayoutParams
@@ -599,7 +613,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 binding.searchEditText.doOnLayout {
                     if (!isAdded) return@doOnLayout
 
-                    val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    val imm =
+                        context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                     if (binding.searchEditText.requestFocus()) {
                         imm?.showSoftInput(binding.searchEditText, InputMethodManager.SHOW_IMPLICIT)
                     }
