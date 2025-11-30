@@ -25,12 +25,14 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * CRASH-SAFE VERSION
+ * CRASH-SAFE VERSION + SAMSUNG FIX
  *
  * Crash safety through:
  * - Try-catch around all suspend operations
@@ -39,6 +41,7 @@ import javax.inject.Inject
  * - Defensive null checks
  * - Safe fragment result handling
  * - Proper cleanup
+ * - Dispatchers.IO for loading actions (Fixes Samsung Knox StrictMode violation)
  */
 @AndroidEntryPoint
 class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
@@ -143,10 +146,15 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 EspressoIdlingResource.increment()
             }
 
-            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
+            // Starts on Main, but we switch inside
+            viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    val actions = loadActions()
+                    // FIX: Move heavy lifting (and Samsung DB reads) to IO thread
+                    val actions = withContext(Dispatchers.IO) {
+                        loadActions()
+                    }
 
+                    // Back on Main Thread here
                     if (!isAdded || isDetached) {
                         if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                         return@launch
@@ -178,11 +186,15 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
+    /**
+     * Loads actions. Now safe to be called on IO thread as it only uses data and resources, no Views.
+     */
     private suspend fun loadActions(): List<AppContextMenuAction> {
         val actions = mutableListOf<AppContextMenuAction>()
 
         // CRASH-SAFE: Load shortcuts with error handling
         try {
+            // This is where Samsung triggers the DiskRead
             val shortcuts = try {
                 shortcutManager.getShortcutsForPackage(appInfo.packageName)
             } catch (e: CancellationException) {
@@ -361,7 +373,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                             return
                         }
                         AppContextMenuAction.Companion.ACTION_ID_RESTORE_NAME -> {
-                            viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
+                            viewLifecycleOwner.lifecycleScope.launch {
                                 try {
                                     appNamesManager.removeCustomNameForPackage(appInfo.packageName)
                                     dismiss()
@@ -420,7 +432,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                     try {
                         val newName = editText.text.toString().trim()
 
-                        viewLifecycleOwner.lifecycleScope.launch {  // ← KEIN Dispatchers.Main
+                        viewLifecycleOwner.lifecycleScope.launch {
                             try {
                                 if (newName.isNotBlank() && newName != appInfo.originalName) {
                                     appNamesManager.setCustomNameForPackage(
