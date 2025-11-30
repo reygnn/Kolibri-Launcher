@@ -6,9 +6,9 @@ This document tracks known `StrictMode` violations that are caused by the Androi
 
 ## 1. Samsung Framework: IdsController & SharedPreferences
 
-**Status:** 🔴 Ignored / Unavoidable
-**Context:** App Resume (`handleResumeActivity`)
-**Affected Devices:** Samsung (OneUI)
+- **Status:** 🔴 Ignored / Unavoidable
+- **Context:** App Resume (`handleResumeActivity`)
+- **Affected Devices:** Samsung (OneUI)
 
 ### Explanation
 These violations are caused by internal Android framework components and OEM (Samsung) specific lifecycle hooks, specifically `android.app.IdsController`.
@@ -46,7 +46,9 @@ StrictMode policy violation; ~duration=3 ms: android.os.strictmode.DiskReadViola
 
 ## 2. Samsung Knox: ResolveActivity Hijacking
 
-Status: 🟢 Mitigated (Workaround applied) Context: AppContextMenu -> ShortcutManager -> resolveActivity Affected Devices: Samsung (Knox-enabled devices)
+- Status: 🟢 Mitigated (Workaround applied)
+- Context: AppContextMenu -> ShortcutManager -> resolveActivity
+- Affected Devices: Samsung (Knox-enabled devices)
 
 ### Explanation
 
