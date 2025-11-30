@@ -46,9 +46,9 @@ StrictMode policy violation; ~duration=3 ms: android.os.strictmode.DiskReadViola
 
 ## 2. Samsung Knox: ResolveActivity Hijacking
 
-- Status: 🟢 Mitigated (Workaround applied)
-- Context: AppContextMenu -> ShortcutManager -> resolveActivity
-- Affected Devices: Samsung (Knox-enabled devices)
+- **Status:** 🟢 Mitigated (Workaround applied)
+- **Context:** AppContextMenu -> ShortcutManager -> resolveActivity
+- **Affected Devices:** Samsung (Knox-enabled devices)
 
 ### Explanation
 
