@@ -114,6 +114,17 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private val orientationSynchronizer by lazy {
+        OrientationSynchronizer(
+            getSystemOrientation = { resources.configuration.orientation },
+            onUpdateNeeded = { newOrientation ->
+                Timber.d("⟳ Orientation mismatch detected! Correcting to $newOrientation")
+                _orientationState.value = newOrientation
+            },
+            onCleanupNeeded = { contentSpacingCalculator.cleanup() }
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -132,6 +143,8 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        orientationSynchronizer.verifyAndSync(_orientationState.value)
 
         try {
             recalculateLayoutCache(
@@ -1665,6 +1678,8 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         try {
+            orientationSynchronizer.verifyAndSync(_orientationState.value)
+
             hideStatusBar()
             verifyAndFixScrollState()
         } catch (e: Throwable) {
