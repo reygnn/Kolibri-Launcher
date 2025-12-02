@@ -1298,6 +1298,12 @@ class HomeFragment : Fragment() {
 
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vX: Float, vY: Float): Boolean {
             if (e1 == null) return false
+
+            if (viewModel.isLockingInProgress.value) {
+                Timber.d("🚫 Ignoring swipe during lock animation")
+                return true // Konsumiert = ignoriert
+            }
+
             return try {
                 val result = swipeAnalyzer.analyze(
                     diffX = e2.x - e1.x,

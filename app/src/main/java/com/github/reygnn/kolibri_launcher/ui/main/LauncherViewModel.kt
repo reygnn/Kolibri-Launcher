@@ -149,6 +149,9 @@ class LauncherViewModel @Inject constructor(
     private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
 
+    private val _isLockingInProgress = MutableStateFlow(false)
+    val isLockingInProgress: StateFlow<Boolean> = _isLockingInProgress.asStateFlow()
+
     private val _homeSettings = MutableStateFlow(HomeSettings())
     val sortOrder: LiveData<SortOrder> = _homeSettings
         .map { it.sortOrder }
@@ -412,6 +415,9 @@ class LauncherViewModel @Inject constructor(
         when (requestLockUseCase()) {
 
             is RequestLockUseCase.Result.Success -> {
+                _isLockingInProgress.value = true
+                delay(AppConstants.LOCK_GESTURE_BLOCK_DURATION_MS)
+                _isLockingInProgress.value = false
             }
 
             is RequestLockUseCase.Result.ErrorAccessibility -> {
