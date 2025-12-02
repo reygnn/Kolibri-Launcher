@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.ui.home.ScrollStateVerifier
+import com.github.reygnn.kolibri_launcher.ui.home.VerifyResult
 import org.junit.Before
 import kotlin.test.DefaultAsserter.assertTrue
 import kotlin.test.Test
@@ -25,7 +26,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     @Test
@@ -36,7 +37,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     @Test
@@ -47,7 +48,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = true
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     @Test
@@ -58,7 +59,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,
             canScrollUp = true
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     // ========== INKONSISTENZ: FULL MODE MIT INTERCEPT ==========
@@ -71,7 +72,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixFullMode, result)
+        assertEquals(VerifyResult.FixFullMode, result)
     }
 
     @Test
@@ -83,7 +84,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,  // Wird ignoriert
             canScrollUp = true
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixFullMode, result)
+        assertEquals(VerifyResult.FixFullMode, result)
     }
 
     // ========== INKONSISTENZ: SPLIT MODE OHNE INTERCEPT ==========
@@ -96,7 +97,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixSplitMode, result)
+        assertEquals(VerifyResult.FixSplitMode, result)
     }
 
     @Test
@@ -109,7 +110,7 @@ class ScrollStateVerifierTest {
             canScrollUp = false
         )
         // FixSplitMode hat Priorität vor ReEvaluateNeeded
-        assertEquals(ScrollStateVerifier.VerifyResult.FixSplitMode, result)
+        assertEquals(VerifyResult.FixSplitMode, result)
     }
 
     // ========== RE-EVALUATE NEEDED ==========
@@ -122,7 +123,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,  // ← Kann nicht scrollen!
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.ReEvaluateNeeded, result)
+        assertEquals(VerifyResult.ReEvaluateNeeded, result)
     }
 
     // ========== PRIORITÄTS-TESTS ==========
@@ -136,7 +137,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,
             canScrollUp = true
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixFullMode, result)
+        assertEquals(VerifyResult.FixFullMode, result)
     }
 
     @Test
@@ -149,7 +150,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixSplitMode, result)
+        assertEquals(VerifyResult.FixSplitMode, result)
     }
 
     // ========== EDGE CASES ==========
@@ -163,7 +164,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,  // Theoretisch scrollbar
             canScrollUp = true
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     // ========== REAL-WORLD SZENARIEN ==========
@@ -177,7 +178,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,      // Aber kann nicht mehr scrollen
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.ReEvaluateNeeded, result)
+        assertEquals(VerifyResult.ReEvaluateNeeded, result)
     }
 
     @Test
@@ -189,7 +190,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.ReEvaluateNeeded, result)
+        assertEquals(VerifyResult.ReEvaluateNeeded, result)
     }
 
     @Test
@@ -201,7 +202,7 @@ class ScrollStateVerifierTest {
             canScrollDown = false,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixFullMode, result)
+        assertEquals(VerifyResult.FixFullMode, result)
     }
 
     @Test
@@ -213,7 +214,7 @@ class ScrollStateVerifierTest {
             canScrollDown = true,
             canScrollUp = false
         )
-        assertEquals(ScrollStateVerifier.VerifyResult.FixSplitMode, result)
+        assertEquals(VerifyResult.FixSplitMode, result)
     }
 
     // ========== ULTRA-PARANOID: GRENZÜBERSCHREITUNG VERMEIDEN ==========
@@ -234,7 +235,7 @@ class ScrollStateVerifierTest {
         )
 
         // Muss Consistent bleiben! Eine Änderung hier würde die Hoheit des Calculators verletzen.
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     // ========== ULTRA-PARANOID: PARTIAL SCROLL STATES ==========
@@ -252,7 +253,7 @@ class ScrollStateVerifierTest {
             canScrollUp = true     // Kann noch hoch
         )
 
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     @Test
@@ -267,7 +268,7 @@ class ScrollStateVerifierTest {
             canScrollUp = false    // Oben angekommen
         )
 
-        assertEquals(ScrollStateVerifier.VerifyResult.Consistent, result)
+        assertEquals(VerifyResult.Consistent, result)
     }
 
     // ========== ULTRA-PARANOID: TRUTH TABLE VALIDATION ==========
@@ -281,7 +282,7 @@ class ScrollStateVerifierTest {
         val result2 = verifier.verify(false, false, true, true)
 
         // Referenz-Gleichheit (===) prüfen
-        assertTrue("Muss exakt dieselbe Instanz sein", result1 === ScrollStateVerifier.VerifyResult.Consistent)
+        assertTrue("Muss exakt dieselbe Instanz sein", result1 === VerifyResult.Consistent)
         assertTrue("Muss exakt dieselbe Instanz sein", result1 === result2)
     }
 
@@ -292,19 +293,19 @@ class ScrollStateVerifierTest {
 
         // 1. Fall: Nur unten blockiert -> Consistent
         assertEquals(
-            ScrollStateVerifier.VerifyResult.Consistent,
+            VerifyResult.Consistent,
             verifier.verify(true, true, canScrollDown = false, canScrollUp = true)
         )
 
         // 2. Fall: Nur oben blockiert -> Consistent
         assertEquals(
-            ScrollStateVerifier.VerifyResult.Consistent,
+            VerifyResult.Consistent,
             verifier.verify(true, true, canScrollDown = true, canScrollUp = false)
         )
 
         // 3. Fall: Beide blockiert -> RE-EVALUATE
         assertEquals(
-            ScrollStateVerifier.VerifyResult.ReEvaluateNeeded,
+            VerifyResult.ReEvaluateNeeded,
             verifier.verify(true, true, canScrollDown = false, canScrollUp = false)
         )
     }
