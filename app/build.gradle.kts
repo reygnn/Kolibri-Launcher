@@ -80,7 +80,7 @@ android {
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 36 // DO NOT CHANGE !!!
         versionCode = 53
-        versionName = "0.99.48.3 rc19.3"
+        versionName = "0.99.48.3.1 rc19.3.1"
 
         // BuildConfig-Felder erstellen
         buildConfigField(

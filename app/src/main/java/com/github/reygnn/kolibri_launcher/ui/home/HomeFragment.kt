@@ -80,6 +80,7 @@ class HomeFragment : Fragment() {
     private val splitWeightCalculator = SplitWeightCalculator()
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
+    private var lastSpacingInput: SpacingInput? = null
     private val swipeAnalyzer = SwipeGestureAnalyzer()
     private val timeFormatter = TimeEventFormatter()
 
@@ -115,14 +116,7 @@ class HomeFragment : Fragment() {
     }
 
     private val orientationSynchronizer by lazy {
-        OrientationSynchronizer(
-            getSystemOrientation = { resources.configuration.orientation },
-            onUpdateNeeded = { newOrientation ->
-                Timber.d("⟳ Orientation mismatch detected! Correcting to $newOrientation")
-                _orientationState.value = newOrientation
-            },
-            onCleanupNeeded = { contentSpacingCalculator.cleanup() }
-        )
+        OrientationSynchronizer { resources.configuration.orientation }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -144,9 +138,9 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        orientationSynchronizer.verifyAndSync(_orientationState.value)
-
         try {
+            checkAndSyncOrientation()
+
             recalculateLayoutCache(
                 viewModel.layoutScaleState.value,
                 viewModel.verticalPaddingState.value,
@@ -178,7 +172,7 @@ class HomeFragment : Fragment() {
             // 1. SICHERHEIT: Cache leeren.
             // Damit garantieren wir, dass beim nächsten Layout-Pass
             // auf jeden Fall neu gerechnet und der Margin neu gesetzt wird.
-            contentSpacingCalculator.cleanup()
+            lastSpacingInput = null
 
             // Den Orientation-State sofort aktualisieren
             _orientationState.value = newConfig.orientation
@@ -575,29 +569,41 @@ class HomeFragment : Fragment() {
         favoritesContainer.post {
             if (_binding == null) return@post
 
-            // Aktuelle Werte holen
             val currentChipsHeight = if (areChipsVisible) chipsContainer.height else 0
 
-            // RECHNEN LASSEN
-            // Die Klasse gibt NULL zurück, wenn wir nichts tun müssen!
-            val newTopMargin = contentSpacingCalculator.calculate(
+            // 1. Input-Objekt bauen
+            val input = SpacingInput(
                 userPreferredMarginPx = currentUserPreferredMarginPx,
                 chipsHeightPx = currentChipsHeight,
-                areChipsVisible = areChipsVisible,
-                // minGapPx ist optional, default ist 0
-            ) ?: return@post // <--- HIER ABBRUCH WENN NULL (Optimierung)
+                areChipsVisible = areChipsVisible
+            )
 
-            // ANWENDEN (nur wenn wir hier ankommen, hat sich was geändert)
+            // 2. Cache-Check (data class equals macht den Vergleich)
+            if (input == lastSpacingInput) return@post
+
+            // 3. Berechnung (pure function)
+            val newMargin = contentSpacingCalculator.calculate(
+                input.userPreferredMarginPx,
+                input.chipsHeightPx,
+                input.areChipsVisible
+            )
+
+            // 4. Cache aktualisieren
+            lastSpacingInput = input
+
+            // 5. Anwenden
             val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
             if (params != null) {
-                params.topMargin = newTopMargin
+                Timber.d("📏 Spacing: ${params.topMargin} → $newMargin (chips=${input.chipsHeightPx}px)")
+                params.topMargin = newMargin
                 favoritesContainer.layoutParams = params
 
-                checkScrollStateAfterNextLayout("Dynamic spacing applied: $newTopMargin")
+                checkScrollStateAfterNextLayout("Dynamic spacing applied: $newMargin")
                 safePost { scheduleScrollVerification() }
             }
         }
     }
+
 
 
     /**
@@ -1671,6 +1677,31 @@ class HomeFragment : Fragment() {
         }
     }
 
+    /**
+     * Prüft, ob der gespeicherte Orientierungs-State mit der System-Wirklichkeit übereinstimmt.
+     * Falls nicht, wird der State aktualisiert und die Caches geleert.
+     */
+    private fun checkAndSyncOrientation() {
+        val result = orientationSynchronizer.check(_orientationState.value)
+
+        when (result) {
+            is SyncResult.CorrectionNeeded -> {
+                Timber.d("⟳ Orientation mismatch detected: ${result.oldOrientation} -> ${result.newOrientation}. Syncing...")
+
+                // 1. State korrigieren (löst Flow-Updates aus)
+                _orientationState.value = result.newOrientation
+
+                // 2. Caches leeren (damit Layout-Berechnungen frisch starten)
+                lastSpacingInput = null
+            }
+
+            is SyncResult.UpToDate -> {
+                // Optional: Verbose log
+                // Timber.v("Orientation check passed. State is consistent.")
+            }
+        }
+    }
+
     // ============================================================================
     // LIFECYCLE
     // ============================================================================
@@ -1678,7 +1709,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         try {
-            orientationSynchronizer.verifyAndSync(_orientationState.value)
+            checkAndSyncOrientation()
 
             hideStatusBar()
             verifyAndFixScrollState()
@@ -1726,7 +1757,7 @@ class HomeFragment : Fragment() {
             // Das ist wichtig, weil 'gestureDetector' eine Variable in der HomeFragment Klasse ist
             gestureDetector = null
             longClickedApp = null
-            contentSpacingCalculator.cleanup()
+            lastSpacingInput = null
 
             // 4. Binding nullen - Der "Golden Hammer"
             // Durchbricht den Fragment-View-Zyklus.
