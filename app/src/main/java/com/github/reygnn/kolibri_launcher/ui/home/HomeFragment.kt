@@ -1655,19 +1655,19 @@ class HomeFragment : Fragment() {
             )
 
             when (result) {
-                is ScrollStateVerifier.VerifyResult.Consistent -> {
+                VerifyResult.Consistent -> {
                     // Alles gut, nichts tun
                 }
-                is ScrollStateVerifier.VerifyResult.FixFullMode -> {
+                VerifyResult.FixFullMode -> {
                     Timber.w("Scroll state mismatch detected - fixing...")
                     customScrollView.allowIntercept = false
                     customScrollView.scrollTo(0, 0)
                 }
-                is ScrollStateVerifier.VerifyResult.FixSplitMode -> {
+                VerifyResult.FixSplitMode -> {
                     Timber.w("Split mode but intercept disabled - fixing...")
                     customScrollView.allowIntercept = true
                 }
-                is ScrollStateVerifier.VerifyResult.ReEvaluateNeeded -> {
+                VerifyResult.ReEvaluateNeeded -> {
                     Timber.w("Split mode active but no scroll capability - re-evaluating...")
                     checkAndEmitScrollState()
                 }

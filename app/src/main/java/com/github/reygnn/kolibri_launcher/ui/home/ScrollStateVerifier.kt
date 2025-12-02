@@ -37,58 +37,22 @@ class ScrollStateVerifier {
     ): VerifyResult {
 
         // CASE 1: Full-Mode Integrity Violation
-        // Logic says "Full Mode" (Static), but the View is trying to intercept touches.
-        // DANGER: This makes the UI feel broken/unresponsive. Must disable intercept immediately.
         if (!currentSplitState && allowIntercept) {
             return VerifyResult.FixFullMode
         }
 
         // CASE 2: Split-Mode Integrity Violation
-        // Logic says "Split Mode" (Scrollable), but the View has disabled intercept.
-        // CRITICAL DANGER: User cannot reach their apps. This is a "Jail" state.
-        // Must enable intercept immediately to free the user.
         if (currentSplitState && !allowIntercept) {
             return VerifyResult.FixSplitMode
         }
 
         // CASE 3: Stale State Detection (Re-Evaluation)
-        // Logic says "Split Mode", inputs are correct, BUT the View reports it cannot move anywhere.
-        // Causes: Content was removed, screen rotated, or layout changed.
-        // Action: Trigger a full re-calculation via SplitModeCalculator.
         if (currentSplitState && !canScrollDown && !canScrollUp) {
             return VerifyResult.ReEvaluateNeeded
         }
 
         // CASE 4: Consistent State
-        // All flags are aligned with the logical state. No action required.
         return VerifyResult.Consistent
     }
-
-    /**
-     * Represents the required corrective action to restore state integrity.
-     */
-    sealed class VerifyResult {
-        /**
-         * State is healthy. No action needed.
-         */
-        object Consistent : VerifyResult()
-
-        /**
-         * CORRECTION: Force `allowIntercept = false`.
-         * Ensures the view behaves statically (Full Mode).
-         */
-        object FixFullMode : VerifyResult()
-
-        /**
-         * CORRECTION: Force `allowIntercept = true`.
-         * Ensures the view accepts touch events (Split Mode).
-         */
-        object FixSplitMode : VerifyResult()
-
-        /**
-         * CORRECTION: The current state might be obsolete.
-         * The UI should ask `SplitModeCalculator` for a fresh decision.
-         */
-        object ReEvaluateNeeded : VerifyResult()
-    }
 }
+
