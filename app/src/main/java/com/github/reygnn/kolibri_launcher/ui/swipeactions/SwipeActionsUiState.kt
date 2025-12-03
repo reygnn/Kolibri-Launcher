@@ -22,5 +22,5 @@ data class SwipeActionsUiState(
     val selectableApps: List<SwipeActionSelectableApp> = emptyList(),
     val appForLeft: AppInfo? = null,
     val appForRight: AppInfo? = null,
-    val currentSlotBeingAssigned: SwipeSlot = SwipeSlot.LEFT // Standardmäßig ist "Links" aktiv
+    val currentSlotBeingAssigned: SwipeSlot = SwipeSlot.SWIPE_FROM_LEFT // Standardmäßig ist "Links" aktiv
 )

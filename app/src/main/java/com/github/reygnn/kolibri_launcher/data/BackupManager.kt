@@ -506,10 +506,10 @@ class BackupManager @Inject constructor(
             val leftApp = backup.settings.swipeLeftApp
             if (leftApp != null) {
                 if (leftApp in installedComponentsSet) {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, leftApp)
+                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, leftApp)
                     swipeImportedCount++
                 } else {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.LEFT, null)
+                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, null)
                     missingApps.add(leftApp)
                 }
             }
@@ -517,10 +517,10 @@ class BackupManager @Inject constructor(
             val rightApp = backup.settings.swipeRightApp
             if (rightApp != null) {
                 if (rightApp in installedComponentsSet) {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, rightApp)
+                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT, rightApp)
                     swipeImportedCount++
                 } else {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.RIGHT, null)
+                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT, null)
                     missingApps.add(rightApp)
                 }
             }

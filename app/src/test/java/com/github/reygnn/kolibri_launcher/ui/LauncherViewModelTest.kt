@@ -55,7 +55,6 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
-import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -668,37 +667,37 @@ class LauncherViewModelTest {
 
     @Test
     fun `onFlingLeft - when UseCase returns LaunchApp - launches app`() = runTest {
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.LEFT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
             .thenReturn(HandleSwipeActionUseCase.Result.LaunchApp(app1))
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onFlingLeft()
+            viewModel.onSwipeTowardsLeft()
             advanceUntilIdle()
 
             val event = awaitItem()
             assertTrue(event is UiEvent.LaunchApp)
             assertEquals(app1, event.app)
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
     }
 
     @Test
     fun `onFlingRight - when UseCase returns NoAction - does nothing`() = runTest {
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.RIGHT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onFlingRight()
+            viewModel.onSwipeTowardsRight()
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.RIGHT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
     }
 
     @Test
@@ -755,35 +754,35 @@ class LauncherViewModelTest {
     @Test
     fun `onFlingLeft - when app assigned but not installed - UseCase returns NoAction`() = runTest {
         // Der UseCase gibt NoAction zurück wenn die App nicht installiert ist
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.LEFT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onFlingLeft()
+            viewModel.onSwipeTowardsLeft()
             advanceUntilIdle()
             expectNoEvents()  // Kein Event sollte emitted werden
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
     }
 
     @Test
     fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() =
         runTest {
-            whenever(handleSwipeActionUseCase.invoke(SwipeSlot.RIGHT))
+            whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
                 .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
             setupViewModel()
             advanceUntilIdle()
 
             viewModel.event.test {
-                viewModel.onFlingRight()
+                viewModel.onSwipeTowardsRight()
                 advanceUntilIdle()
                 expectNoEvents()
             }
-            verify(handleSwipeActionUseCase).invoke(SwipeSlot.RIGHT)
+            verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
         }
 
     @Test

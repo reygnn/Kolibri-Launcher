@@ -88,7 +88,7 @@ class SwipeActionsViewModelTest {
         assertNull(state.appForRight)
 
         // App A should be marked as assigned to LEFT in the list
-        assertEquals(SwipeSlot.LEFT, state.selectableApps.find { it.appInfo == appA }?.assignedSlot)
+        assertEquals(SwipeSlot.SWIPE_FROM_LEFT, state.selectableApps.find { it.appInfo == appA }?.assignedSlot)
         assertEquals(SwipeSlot.NONE, state.selectableApps.find { it.appInfo == appB }?.assignedSlot)
     }
 
@@ -114,17 +114,17 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Default is LEFT
-        assertEquals(SwipeSlot.LEFT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertEquals(SwipeSlot.SWIPE_FROM_LEFT, viewModel.uiState.value.currentSlotBeingAssigned)
 
         // Select RIGHT
-        viewModel.onSlotSelected(SwipeSlot.RIGHT)
+        viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT)
         advanceUntilIdle()
-        assertEquals(SwipeSlot.RIGHT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertEquals(SwipeSlot.SWIPE_FROM_RIGHT, viewModel.uiState.value.currentSlotBeingAssigned)
 
         // Select LEFT back
-        viewModel.onSlotSelected(SwipeSlot.LEFT)
+        viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT)
         advanceUntilIdle()
-        assertEquals(SwipeSlot.LEFT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertEquals(SwipeSlot.SWIPE_FROM_LEFT, viewModel.uiState.value.currentSlotBeingAssigned)
     }
 
     // ========== APP ASSIGNMENT LOGIC ==========
@@ -186,7 +186,7 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Switch active slot to RIGHT
-        viewModel.onSlotSelected(SwipeSlot.RIGHT)
+        viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT)
         advanceUntilIdle()
 
         // Act: Select App A
@@ -208,7 +208,7 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Act
-        viewModel.onSlotCleared(SwipeSlot.LEFT)
+        viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_LEFT)
         advanceUntilIdle()
 
         // Assert
@@ -240,9 +240,9 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Set Left = A, Right = B
-        viewModel.onSlotSelected(SwipeSlot.LEFT)
+        viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT)
         viewModel.onAppSelected(appA)
-        viewModel.onSlotSelected(SwipeSlot.RIGHT)
+        viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT)
         viewModel.onAppSelected(appB)
         advanceUntilIdle()
 
@@ -251,8 +251,8 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Assert: Verify UseCase calls
-        verify(setSwipeActionUseCase).invoke(SwipeSlot.LEFT, appA.componentName)
-        verify(setSwipeActionUseCase).invoke(SwipeSlot.RIGHT, appB.componentName)
+        verify(setSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT, appA.componentName)
+        verify(setSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT, appB.componentName)
 
         // Verify Navigation
         viewModel.event.test {

@@ -32,7 +32,7 @@ class SwipeGestureAnalyzer {
             // Horizontaler Swipe
             if (absDiffX > AppConstants.SWIPE_THRESHOLD &&
                 absVelX > AppConstants.SWIPE_VELOCITY_THRESHOLD) {
-                return if (diffX > 0) SwipeResult.RIGHT else SwipeResult.LEFT
+                return if (diffX > 0) SwipeResult.TOWARDS_RIGHT else SwipeResult.TOWARDS_LEFT
             }
         } else {
             // Vertikaler Swipe
@@ -47,6 +47,6 @@ class SwipeGestureAnalyzer {
     }
 
     enum class SwipeResult {
-        LEFT, RIGHT, UP, DOWN, IGNORED
+        TOWARDS_LEFT, TOWARDS_RIGHT, UP, DOWN, IGNORED
     }
 }

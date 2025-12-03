@@ -519,10 +519,10 @@ class LauncherViewModelSecurityTest {
         whenever(handleSwipeActionUseCase.invoke(any())).thenThrow(RuntimeException("Crash"))
 
         // Hier erwarten wir keinen Toast, nur dass es nicht abstürzt
-        viewModel.onFlingLeft()
+        viewModel.onSwipeTowardsLeft()
         advanceUntilIdle()
 
-        viewModel.onFlingRight()
+        viewModel.onSwipeTowardsRight()
         advanceUntilIdle()
     }
 

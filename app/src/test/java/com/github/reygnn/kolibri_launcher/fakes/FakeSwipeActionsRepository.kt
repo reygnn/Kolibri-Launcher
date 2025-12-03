@@ -25,8 +25,8 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
 
     override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
         when (slot) {
-            SwipeSlot.LEFT -> swipeLeftApp = componentName
-            SwipeSlot.RIGHT -> swipeRightApp = componentName
+            SwipeSlot.SWIPE_FROM_LEFT -> swipeLeftApp = componentName
+            SwipeSlot.SWIPE_FROM_RIGHT -> swipeRightApp = componentName
             SwipeSlot.NONE -> {}
         }
     }

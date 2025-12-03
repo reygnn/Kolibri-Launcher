@@ -36,7 +36,7 @@ class SwipeActionsViewModel @Inject constructor(
     private val allAppsMasterList = MutableStateFlow<List<AppInfo>>(emptyList())
 
     // Welcher Slot ist gerade für die Zuweisung aktiv?
-    private val currentSlotBeingAssigned = MutableStateFlow(SwipeSlot.LEFT)
+    private val currentSlotBeingAssigned = MutableStateFlow(SwipeSlot.SWIPE_FROM_LEFT)
 
     // Die ComponentNames der zugewiesenen Apps
     private val swipeLeftComponent = MutableStateFlow<String?>(null)
@@ -67,8 +67,8 @@ class SwipeActionsViewModel @Inject constructor(
                 // 3. Erstelle die "Selectable" Liste für den Adapter
                 val selectableList = filteredApps.map { app ->
                     val assignedSlot = when (app.componentName) {
-                        leftComp -> SwipeSlot.LEFT
-                        rightComp -> SwipeSlot.RIGHT
+                        leftComp -> SwipeSlot.SWIPE_FROM_LEFT
+                        rightComp -> SwipeSlot.SWIPE_FROM_RIGHT
                         else -> SwipeSlot.NONE
                     }
                     SwipeActionSelectableApp(appInfo = app, assignedSlot = assignedSlot)
@@ -135,7 +135,7 @@ class SwipeActionsViewModel @Inject constructor(
             val currentLeft = swipeLeftComponent.value
             val currentRight = swipeRightComponent.value
 
-            if (activeSlot == SwipeSlot.LEFT) {
+            if (activeSlot == SwipeSlot.SWIPE_FROM_LEFT) {
                 // App dem "Left"-Slot zuweisen
                 val newLeft = if (currentLeft == component) null else component
                 swipeLeftComponent.value = newLeft
@@ -158,8 +158,8 @@ class SwipeActionsViewModel @Inject constructor(
     fun onSlotCleared(slot: SwipeSlot) {
         executeSafe {
             when (slot) {
-                SwipeSlot.LEFT -> swipeLeftComponent.value = null
-                SwipeSlot.RIGHT -> swipeRightComponent.value = null
+                SwipeSlot.SWIPE_FROM_LEFT -> swipeLeftComponent.value = null
+                SwipeSlot.SWIPE_FROM_RIGHT -> swipeRightComponent.value = null
                 SwipeSlot.NONE -> {}
             }
         }
@@ -169,8 +169,8 @@ class SwipeActionsViewModel @Inject constructor(
         launchSafe {
             try {
                 // Speichere via UseCase
-                setSwipeActionUseCase(SwipeSlot.LEFT, swipeLeftComponent.value)
-                setSwipeActionUseCase(SwipeSlot.RIGHT, swipeRightComponent.value)
+                setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT, swipeLeftComponent.value)
+                setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT, swipeRightComponent.value)
 
                 sendEvent(UiEvent.NavigateUp)
             } catch (e: CancellationException) {

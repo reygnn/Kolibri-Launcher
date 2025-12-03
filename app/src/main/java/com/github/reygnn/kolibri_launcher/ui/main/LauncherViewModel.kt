@@ -70,14 +70,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -361,9 +357,10 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
-    fun onFlingLeft() = launchSafe {
+    // Swipe nach LINKS → App vom RECHTEN Rand (ich "ziehe" von rechts herein)
+    fun onSwipeTowardsLeft() = launchSafe {
         try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.LEFT)) {
+            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT)) {
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
@@ -374,13 +371,14 @@ class LauncherViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onFlingLeft")
+            TimberWrapper.silentError(e, "Error in onSwipeTowardsLeft")
         }
     }
 
-    fun onFlingRight() = launchSafe {
+    // Swipe nach RECHTS → App vom LINKEN Rand (ich "ziehe" von links herein)
+    fun onSwipeTowardsRight() = launchSafe {
         try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.RIGHT)) {
+            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT)) {
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
@@ -391,7 +389,7 @@ class LauncherViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onFlingRight")
+            TimberWrapper.silentError(e, "Error in onSwipeTowardsRight")
         }
     }
 

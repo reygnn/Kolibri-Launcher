@@ -24,7 +24,7 @@ class SwipeGestureAnalyzerTest {
             velocityX = 51f,
             velocityY = 0f
         )
-        assertEquals(SwipeResult.RIGHT, result)
+        assertEquals(SwipeResult.TOWARDS_RIGHT, result)
     }
 
     @Test
@@ -67,7 +67,7 @@ class SwipeGestureAnalyzerTest {
     @Test
     fun `analyze - clear swipe LEFT`() {
         val result = analyzer.analyze(-60f, 0f, 60f, 0f)
-        assertEquals(SwipeResult.LEFT, result)
+        assertEquals(SwipeResult.TOWARDS_LEFT, result)
     }
 
     @Test
@@ -85,7 +85,7 @@ class SwipeGestureAnalyzerTest {
             velocityX = 100f,
             velocityY = 100f
         )
-        assertEquals(SwipeResult.RIGHT, result)
+        assertEquals(SwipeResult.TOWARDS_RIGHT, result)
     }
 
     @Test

@@ -6,7 +6,7 @@ package com.github.reygnn.kolibri_launcher.ui.swipeactions
  * dass gerade kein Slot zur Zuweisung aktiv ist.
  */
 enum class SwipeSlot {
-    LEFT,
-    RIGHT,
+    SWIPE_FROM_LEFT,     // Swipe nach rechts → linker Chip
+    SWIPE_FROM_RIGHT,    // Swipe nach links → rechter Chip
     NONE
 }

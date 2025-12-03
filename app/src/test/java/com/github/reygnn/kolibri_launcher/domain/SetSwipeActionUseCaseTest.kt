@@ -27,7 +27,7 @@ class SetSwipeActionUseCaseTest {
 
     @Test
     fun `invoke - calls setSwipeAction on repository`() = runTest {
-        val slot = SwipeSlot.LEFT
+        val slot = SwipeSlot.SWIPE_FROM_LEFT
         val component = "com.test/App"
 
         useCase(slot, component)
