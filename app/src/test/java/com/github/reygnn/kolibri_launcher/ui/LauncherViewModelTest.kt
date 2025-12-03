@@ -667,7 +667,8 @@ class LauncherViewModelTest {
 
     @Test
     fun `onFlingLeft - when UseCase returns LaunchApp - launches app`() = runTest {
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
+        // Swipe nach LINKS → zieht von RECHTS
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
             .thenReturn(HandleSwipeActionUseCase.Result.LaunchApp(app1))
 
         setupViewModel()
@@ -681,12 +682,13 @@ class LauncherViewModelTest {
             assertTrue(event is UiEvent.LaunchApp)
             assertEquals(app1, event.app)
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
     }
 
     @Test
     fun `onFlingRight - when UseCase returns NoAction - does nothing`() = runTest {
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
+        // Swipe nach RECHTS → zieht von LINKS
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
@@ -697,7 +699,7 @@ class LauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
     }
 
     @Test
@@ -753,8 +755,8 @@ class LauncherViewModelTest {
 
     @Test
     fun `onFlingLeft - when app assigned but not installed - UseCase returns NoAction`() = runTest {
-        // Der UseCase gibt NoAction zurück wenn die App nicht installiert ist
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
+        // Swipe nach LINKS → zieht von RECHTS
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
@@ -763,27 +765,27 @@ class LauncherViewModelTest {
         viewModel.event.test {
             viewModel.onSwipeTowardsLeft()
             advanceUntilIdle()
-            expectNoEvents()  // Kein Event sollte emitted werden
+            expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
     }
 
     @Test
-    fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() =
-        runTest {
-            whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
-                .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+    fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() = runTest {
+        // Swipe nach RECHTS → zieht von LINKS
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
+            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
-            setupViewModel()
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onSwipeTowardsRight()
             advanceUntilIdle()
-
-            viewModel.event.test {
-                viewModel.onSwipeTowardsRight()
-                advanceUntilIdle()
-                expectNoEvents()
-            }
-            verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
+            expectNoEvents()
         }
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
+    }
 
     @Test
     fun `init - when calendar enabled with alarm - shows alarm first chronologically`() = runTest {

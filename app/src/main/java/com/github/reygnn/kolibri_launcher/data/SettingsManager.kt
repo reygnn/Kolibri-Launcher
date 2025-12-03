@@ -96,13 +96,13 @@ class SettingsManager @Inject constructor(
         .map { preferences ->
             val sortName = preferences[PreferenceKeys.SORT_ORDER_KEY]
             // Default ist TIME_WEIGHTED_USAGE
-            if (sortName == null) return@map SortOrder.TIME_WEIGHTED_USAGE
+            if (sortName == null) return@map AppConstants.DEFAULT_SORT_ORDER
 
             try {
                 SortOrder.valueOf(sortName)
             } catch (e: Throwable) {
                 // Fallback bei Parsing-Fehler
-                SortOrder.TIME_WEIGHTED_USAGE
+                AppConstants.DEFAULT_SORT_ORDER
             }
         }
 

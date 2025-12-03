@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 
 /**
  * Zentrale Konstanten für die gesamte Anwendung
@@ -54,6 +55,7 @@ object AppConstants {
     const val FALLBACK_TEXT_SIZE_PX = 48f
     const val FALLBACK_VERTICAL_PADDING_PX = 16
     const val FALLBACK_FONT_BOLD = DEFAULT_FONT_BOLD
+    val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"

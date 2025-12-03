@@ -1,42 +1,53 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+// TIMESTAMP 2025-12-03 19:13
+
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class FakeFavoritesRepository : FavoritesRepository, Purgeable {
-    val favoritesState: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet())
-    override val favoriteComponentsFlow: Flow<Set<String>> = favoritesState
-    val favorites: Set<String> get() = favoritesState.value
-    override suspend fun isFavoriteComponent(componentName: String?): Boolean =
-        componentName != null && favoritesState.value.contains(componentName)
+class FakeFavoritesRepository : FavoritesRepository {
+    private val flow = MutableStateFlow(setOf<String>())
 
-    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
-        favoritesState.value = favoritesState.value.intersect(installedComponentNames.toSet())
-    }
+    var favorites: Set<String>
+        get() = flow.value
+        set(value) {
+            flow.value = value
+        }
 
-    override suspend fun toggleFavoriteComponent(componentName: String): Boolean {
-        val isFavorite = favoritesState.value.contains(componentName); if (isFavorite) {
-            removeFavoriteComponent(componentName)
-        } else {
-            addFavoriteComponent(componentName)
-        }; return !isFavorite
-    }
+    override val favoriteComponentsFlow = flow
+
+    override suspend fun isFavoriteComponent(componentName: String?) = componentName in favorites
 
     override suspend fun addFavoriteComponent(componentName: String): Boolean {
-        favoritesState.value = favoritesState.value + componentName; return true
+        if (componentName.isBlank()) return false
+        favorites = favorites + componentName
+        return true
     }
 
     override suspend fun removeFavoriteComponent(componentName: String): Boolean {
-        favoritesState.value = favoritesState.value - componentName; return true
+        if (componentName.isBlank()) return false
+        favorites = favorites - componentName
+        return true
+    }
+
+    override suspend fun toggleFavoriteComponent(componentName: String): Boolean {
+        return if (componentName in favorites) {
+            removeFavoriteComponent(componentName)
+            false
+        } else {
+            addFavoriteComponent(componentName)
+        }
+    }
+
+    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
+        favorites = favorites.intersect(installedComponentNames.toSet())
     }
 
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {
-        favoritesState.value = componentNames.toSet()
+        favorites = componentNames.toSet()
     }
 
     override suspend fun purgeRepository() {
-        favoritesState.value = emptySet()
+        favorites = emptySet()
     }
 }

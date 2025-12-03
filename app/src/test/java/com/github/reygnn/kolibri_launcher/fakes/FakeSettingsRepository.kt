@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+// TIMESTAMP 2025-12-03 19:13
+
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -243,6 +245,8 @@ class FakeSettingsRepository : SettingsRepository {
      * Resets the repository to default values defined in AppConstants.
      */
     override suspend fun purgeRepository() {
+        val wasOnboardingCompleted = onboardingCompletedState.value
+
         color = AppConstants.DEFAULT_TEXT_COLOR
         shadow = AppConstants.DEFAULT_TEXT_SHADOW_ENABLED
         chipBgColor = AppConstants.DEFAULT_CHIP_BG_COLOR
@@ -261,6 +265,9 @@ class FakeSettingsRepository : SettingsRepository {
         splitModeThreshold = AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD
 
         readabilityModeState.value = AppConstants.DEFAULT_READABILITY_MODE
+        sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
+
+        onboardingCompletedState.value = wasOnboardingCompleted
     }
 
     // HELPER
