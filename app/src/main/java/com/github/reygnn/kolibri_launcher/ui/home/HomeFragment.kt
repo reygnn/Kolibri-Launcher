@@ -1313,8 +1313,8 @@ class HomeFragment : Fragment() {
                 )
 
                 when (result) {
-                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> { viewModel.onSwipeTowardsLeft(); true }
-                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> { viewModel.onSwipeTowardsRight(); true }
+                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> { viewModel.onSwipeFromRightToLeft(); true }
+                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> { viewModel.onSwipeFromLeftToRight(); true }
                     SwipeGestureAnalyzer.SwipeResult.UP -> { viewModel.onFlingUp(); true }
                     SwipeGestureAnalyzer.SwipeResult.DOWN -> { viewModel.onFlingDown(); true }
                     SwipeGestureAnalyzer.SwipeResult.IGNORED -> false

@@ -183,20 +183,20 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
             // Listener für die Slot-Auswahl-Chips (welcher ist aktiv?)
             binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
-                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT)
+                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
                 }
             }
 
             binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
-                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT)
+                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
                 }
             }
 
             // Listener für das "Löschen"-Icon (X) auf den Chips
             binding.leftSlotChip.setOnCloseIconClickListener {
                 try {
-                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_LEFT)
+                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error clearing left slot")
                 }
@@ -204,7 +204,7 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
 
             binding.rightSlotChip.setOnCloseIconClickListener {
                 try {
-                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_RIGHT)
+                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error clearing right slot")
                 }
@@ -278,15 +278,15 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
             binding.leftSlotChip.setOnCheckedChangeListener(null)
             binding.rightSlotChip.setOnCheckedChangeListener(null)
 
-            binding.leftSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_LEFT
-            binding.rightSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_RIGHT
+            binding.leftSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT
+            binding.rightSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT
 
             // Listener wiederherstellen (nur diese beiden!)
             binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT)
+                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
             }
             binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT)
+                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
             }
 
         } catch (e: Throwable) {

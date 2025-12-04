@@ -668,38 +668,38 @@ class LauncherViewModelTest {
     @Test
     fun `onFlingLeft - when UseCase returns LaunchApp - launches app`() = runTest {
         // Swipe nach LINKS → zieht von RECHTS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
             .thenReturn(HandleSwipeActionUseCase.Result.LaunchApp(app1))
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onSwipeTowardsLeft()
+            viewModel.onSwipeFromRightToLeft()
             advanceUntilIdle()
 
             val event = awaitItem()
             assertTrue(event is UiEvent.LaunchApp)
             assertEquals(app1, event.app)
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
     }
 
     @Test
     fun `onFlingRight - when UseCase returns NoAction - does nothing`() = runTest {
         // Swipe nach RECHTS → zieht von LINKS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onSwipeTowardsRight()
+            viewModel.onSwipeFromLeftToRight()
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
     }
 
     @Test
@@ -756,35 +756,35 @@ class LauncherViewModelTest {
     @Test
     fun `onFlingLeft - when app assigned but not installed - UseCase returns NoAction`() = runTest {
         // Swipe nach LINKS → zieht von RECHTS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onSwipeTowardsLeft()
+            viewModel.onSwipeFromRightToLeft()
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
     }
 
     @Test
     fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() = runTest {
         // Swipe nach RECHTS → zieht von LINKS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT))
+        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
             .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
 
         setupViewModel()
         advanceUntilIdle()
 
         viewModel.event.test {
-            viewModel.onSwipeTowardsRight()
+            viewModel.onSwipeFromLeftToRight()
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT)
+        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
     }
 
     @Test

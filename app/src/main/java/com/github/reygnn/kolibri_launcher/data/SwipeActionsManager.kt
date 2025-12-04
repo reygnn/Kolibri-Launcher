@@ -138,8 +138,8 @@ open class SwipeActionsManager private constructor(
 
     override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
         val key = when (slot) {
-            SwipeSlot.SWIPE_FROM_LEFT -> PreferencesKeys.SWIPE_LEFT_APP_COMPONENT
-            SwipeSlot.SWIPE_FROM_RIGHT -> PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT
+            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> PreferencesKeys.SWIPE_LEFT_APP_COMPONENT
+            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT
             SwipeSlot.NONE -> {
                 Timber.Forest.w("setSwipeAction called with NONE, ignoring.")
                 return // Keine Aktion für "NONE"

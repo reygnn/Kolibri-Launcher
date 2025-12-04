@@ -23,7 +23,7 @@ class HandleSwipeActionUseCase @Inject constructor(
     }
 
     suspend operator fun invoke(slot: SwipeSlot): Result {
-        val componentName = if (slot == SwipeSlot.SWIPE_FROM_LEFT) {
+        val componentName = if (slot == SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) {
             swipeActionsRepository.swipeLeftAppFlow.first()
         } else {
             swipeActionsRepository.swipeRightAppFlow.first()

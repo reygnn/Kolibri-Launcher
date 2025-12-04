@@ -78,7 +78,7 @@ class SwipeActionsManagerTest {
         val componentName = "com.new.app/LeftActivity"
 
         // Act
-        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, componentName)
+        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, componentName)
         advanceUntilIdle()
 
         // Assert DataStore
@@ -95,7 +95,7 @@ class SwipeActionsManagerTest {
         val componentName = "com.new.app/RightActivity"
 
         // Act
-        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT, componentName)
+        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, componentName)
         advanceUntilIdle()
 
         // Assert DataStore
@@ -114,7 +114,7 @@ class SwipeActionsManagerTest {
         advanceUntilIdle()
 
         // Act
-        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, null)
+        manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
         advanceUntilIdle()
 
         // Assert
@@ -167,7 +167,7 @@ class SwipeActionsManagerTest {
 
         // Manager re-throws so ViewModel can handle UI feedback
         assertFailsWith<IOException> {
-            manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, "com.fail/App")
+            manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, "com.fail/App")
         }
     }
 
@@ -177,7 +177,7 @@ class SwipeActionsManagerTest {
         val manager = createManager(backgroundScope)
 
         assertFailsWith<CancellationException> {
-            manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT, "com.cancel/App")
+            manager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, "com.cancel/App")
         }
     }
 

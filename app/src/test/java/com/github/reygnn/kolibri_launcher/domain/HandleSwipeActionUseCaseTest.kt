@@ -56,7 +56,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = testApp.componentName
 
         // Act
-        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(result).isInstanceOf(HandleSwipeActionUseCase.Result.LaunchApp::class.java)
@@ -70,7 +70,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = testApp.componentName
 
         // Act
-        useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(appUsageRepository.launchedPackages).contains(testApp.packageName)
@@ -83,7 +83,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = testApp.componentName
 
         // Act
-        useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(installedAppsRepository.triggerUpdateCallCount).isEqualTo(1)
@@ -100,7 +100,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeRightApp = testApp2.componentName
 
         // Act
-        val result = useCase(SwipeSlot.SWIPE_FROM_RIGHT)
+        val result = useCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 
         // Assert
         assertThat(result).isInstanceOf(HandleSwipeActionUseCase.Result.LaunchApp::class.java)
@@ -117,7 +117,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = null
 
         // Act
-        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
@@ -129,7 +129,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeRightApp = null
 
         // Act
-        val result = useCase(SwipeSlot.SWIPE_FROM_RIGHT)
+        val result = useCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 
         // Assert
         assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
@@ -141,7 +141,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = null
 
         // Act
-        useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(appUsageRepository.launchedPackages).isEmpty()
@@ -158,7 +158,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
-        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
@@ -171,7 +171,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
-        useCase(SwipeSlot.SWIPE_FROM_LEFT)
+        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
         assertThat(swipeActionsRepository.swipeLeftApp).isNull()
@@ -184,7 +184,7 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository.swipeRightApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
-        useCase(SwipeSlot.SWIPE_FROM_RIGHT)
+        useCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 
         // Assert
         assertThat(swipeActionsRepository.swipeRightApp).isNull()

@@ -358,9 +358,9 @@ class LauncherViewModel @Inject constructor(
     }
 
     // Swipe nach LINKS → App vom RECHTEN Rand (ich "ziehe" von rechts herein)
-    fun onSwipeTowardsLeft() = launchSafe {
+    fun onSwipeFromRightToLeft() = launchSafe {
         try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT)) {
+            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)) {
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }
@@ -376,9 +376,9 @@ class LauncherViewModel @Inject constructor(
     }
 
     // Swipe nach RECHTS → App vom LINKEN Rand (ich "ziehe" von links herein)
-    fun onSwipeTowardsRight() = launchSafe {
+    fun onSwipeFromLeftToRight() = launchSafe {
         try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT)) {
+            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)) {
                 is HandleSwipeActionUseCase.Result.LaunchApp -> {
                     sendEvent(UiEvent.LaunchApp(result.app))
                 }

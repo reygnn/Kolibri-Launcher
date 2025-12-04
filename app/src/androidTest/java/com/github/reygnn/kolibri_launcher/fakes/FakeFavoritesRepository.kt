@@ -1,20 +1,21 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
-// TIMESTAMP 2025-12-03 19:13
+// TIMESTAMP 2025-12-04 05:01
 
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeFavoritesRepository : FavoritesRepository {
-    private val flow = MutableStateFlow(setOf<String>())
+    val favoritesState = MutableStateFlow(setOf<String>())
 
     var favorites: Set<String>
-        get() = flow.value
+        get() = favoritesState.value
         set(value) {
-            flow.value = value
+            favoritesState.value = value
         }
 
-    override val favoriteComponentsFlow = flow
+    override val favoriteComponentsFlow: Flow<Set<String>> = favoritesState
 
     override suspend fun isFavoriteComponent(componentName: String?) = componentName in favorites
 

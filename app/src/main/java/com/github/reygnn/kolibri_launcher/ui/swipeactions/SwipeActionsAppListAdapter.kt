@@ -47,11 +47,11 @@ class SwipeActionsAppListAdapter(
 
             // Setze das korrekte Icon basierend auf dem zugewiesenen Slot
             when (item.assignedSlot) {
-                SwipeSlot.SWIPE_FROM_LEFT -> {
+                SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> {
                     binding.slotIndicatorIcon.visibility = View.VISIBLE
                     binding.slotIndicatorIcon.setImageResource(R.drawable.ic_arrow_left)
                 }
-                SwipeSlot.SWIPE_FROM_RIGHT -> {
+                SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> {
                     binding.slotIndicatorIcon.visibility = View.VISIBLE
                     binding.slotIndicatorIcon.setImageResource(R.drawable.ic_arrow_right)
                 }
