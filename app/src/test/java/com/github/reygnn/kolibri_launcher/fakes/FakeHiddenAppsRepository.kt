@@ -1,22 +1,37 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeHiddenAppsRepository : HiddenAppsRepository {
-    private val flow = MutableStateFlow(setOf<String>())
+    val hiddenAppsState = MutableStateFlow(setOf<String>())
 
     var hiddenApps: Set<String>
-        get() = flow.value
+        get() = hiddenAppsState.value
         set(value) {
-            flow.value = value
+            hiddenAppsState.value = value
         }
 
-    override val hiddenAppsFlow = flow
+    override val hiddenAppsFlow: Flow<Set<String>> = hiddenAppsState
 
-    override suspend fun isComponentHidden(componentName: String?) = componentName in hiddenApps
-    override suspend fun hideComponent(componentName: String?) = true
-    override suspend fun showComponent(componentName: String?) = true
+    override suspend fun isComponentHidden(componentName: String?): Boolean {
+        if (componentName.isNullOrBlank()) return false
+        return componentName in hiddenApps
+    }
+
+    override suspend fun hideComponent(componentName: String?): Boolean {
+        if (componentName.isNullOrBlank()) return false
+        hiddenApps = hiddenApps + componentName
+        return true
+    }
+
+    override suspend fun showComponent(componentName: String?): Boolean {
+        if (componentName.isNullOrBlank()) return false
+        hiddenApps = hiddenApps - componentName
+        return true
+    }
+
     override suspend fun updateComponentVisibilities(
         componentsToHide: Set<String>,
         componentsToShow: Set<String>
