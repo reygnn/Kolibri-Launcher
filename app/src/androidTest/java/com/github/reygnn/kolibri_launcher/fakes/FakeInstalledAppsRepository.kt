@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+// 2025-12-04 20:13
+
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
