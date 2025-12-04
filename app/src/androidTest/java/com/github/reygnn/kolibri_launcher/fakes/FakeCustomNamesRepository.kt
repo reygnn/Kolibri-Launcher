@@ -1,5 +1,8 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+// NUR FÜR androidTest !!!
+// TIMESTAMP 2025-12-04 19:22
+
 import com.github.reygnn.kolibri_launcher.data.TestDataSource
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
@@ -20,7 +23,11 @@ class FakeCustomNamesRepository(
     }
 
     override suspend fun setCustomNameForPackage(packageName: String, customName: String): Boolean {
-        TestDataSource.setCustomName(packageName, customName)
+        if (customName.isBlank()) {
+            TestDataSource.removeCustomName(packageName)
+        } else {
+            TestDataSource.setCustomName(packageName, customName.trim())
+        }
         onNameChanged()
         return true
     }
@@ -40,8 +47,14 @@ class FakeCustomNamesRepository(
     }
 
     override suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean {
+        if (names.isEmpty()) {
+            return true
+        }
+
         names.forEach { (packageName, customName) ->
-            TestDataSource.setCustomName(packageName, customName)
+            if (customName.isNotBlank()) {
+                TestDataSource.setCustomName(packageName, customName.trim())
+            }
         }
         onNameChanged()
         return true

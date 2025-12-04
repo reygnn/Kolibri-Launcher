@@ -65,7 +65,7 @@ object TestRepositoryModule {
 
     @Provides
     @Singleton
-    fun provideAppNamesRepository(
+    fun provideCustomNamesRepository(
         // Hilt injiziert hier die Singleton-Instanz von oben.
         installedAppsRepo: InstalledAppsRepository
     ): CustomNamesRepository {

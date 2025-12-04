@@ -1,5 +1,8 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+// NUR FÜR unitTest !!!
+// TIMESTAMP 2025-12-04 19:22
+
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import java.io.IOException
 
@@ -22,7 +25,13 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         if (shouldFailOnSet) {
             throw IOException("Simulated failure")
         }
-        customNames[packageName] = customName
+
+        if (customName.isBlank()) {
+            customNames.remove(packageName)
+        } else {
+            customNames[packageName] = customName.trim()
+        }
+
         triggerCustomNameUpdate()
         return true
     }
@@ -53,11 +62,15 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         }
 
         if (names.isEmpty()) {
-            return true // Empty batch is success, but NO batchSetCalled
+            return true
         }
 
-        batchSetCalled = true  // ← NUR wenn nicht leer!
-        customNames.putAll(names)
+        batchSetCalled = true
+        names.forEach { (packageName, customName) ->
+            if (customName.isNotBlank()) {
+                customNames[packageName] = customName.trim()
+            }
+        }
         triggerCustomNameUpdate()
         return true
     }
