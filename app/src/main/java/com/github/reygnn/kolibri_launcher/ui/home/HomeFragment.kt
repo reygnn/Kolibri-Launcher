@@ -147,6 +147,9 @@ class HomeFragment : Fragment() {
                 viewModel.isFontBoldState.value
             )
 
+            applyTopMargin(viewModel.contentTopMarginState.value)
+            applyLayoutToExistingViews()
+
             hideStatusBar()
             setupBackPressHandler()
             setupGestures()
@@ -525,6 +528,10 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // ============================================================================
+    // LAYOUT & MARGIN CALCULATION (OPTIMIERT)
+    // ============================================================================
+
     // Margin berechnen und anwenden
     private fun applyTopMargin(scale: Float) {
         try {
@@ -534,17 +541,19 @@ class HomeFragment : Fragment() {
                 resources.getDimensionPixelSize(R.dimen.spacing_medium)
             } catch (e: Exception) { AppConstants.FALLBACK_DIMEN_PX }
 
-            // 1. Berechne, was der User (basierend auf Settings/Scale) eigentlich will
             val calculatedUserMargin = topMarginCalculator.calculate(
                 scale = scale,
                 baseMarginPx = baseMargin,
                 screenHeightPx = resources.displayMetrics.heightPixels
             )
 
-            // 2. Speichere das für später (falls Chips an/aus gehen)
             if (currentUserPreferredMarginPx != calculatedUserMargin) {
                 currentUserPreferredMarginPx = calculatedUserMargin
-                // 3. Trigger die dynamische Berechnung
+                updateDynamicSpacing()
+            } else {
+                // Fallback: Auch wenn sich der User-Wert nicht geändert hat,
+                // wollen wir beim Initial-Start sicherstellen, dass updateDynamicSpacing einmal läuft
+                // um den Margin am View tatsächlich zu setzen (falls er im XML anders ist).
                 updateDynamicSpacing()
             }
 
@@ -559,48 +568,63 @@ class HomeFragment : Fragment() {
      * 1. Der User-Margin ändert (Settings)
      * 2. Die Chips ändern (Events geladen)
      */
+    /**
+     * ELEGANT FIXED: Kein unnötiges 'post', wenn wir noch gar nicht sichtbar waren.
+     */
     private fun updateDynamicSpacing() {
         if (_binding == null) return
 
         val chipsContainer = binding.calendarEventsScroll
         val favoritesContainer = binding.favoritesContainer
-        val areChipsVisible = chipsContainer.isVisible
 
-        favoritesContainer.post {
-            if (_binding == null) return@post
+        // Logik in eine lokale Funktion kapseln, damit wir sie direkt oder via post rufen können
+        fun applySpacing() {
+            if (_binding == null) return
 
+            val areChipsVisible = chipsContainer.isVisible
             val currentChipsHeight = if (areChipsVisible) chipsContainer.height else 0
 
-            // 1. Input-Objekt bauen
             val input = SpacingInput(
                 userPreferredMarginPx = currentUserPreferredMarginPx,
                 chipsHeightPx = currentChipsHeight,
                 areChipsVisible = areChipsVisible
             )
 
-            // 2. Cache-Check (data class equals macht den Vergleich)
-            if (input == lastSpacingInput) return@post
+            // Cache-Check
+            if (input == lastSpacingInput) return
 
-            // 3. Berechnung (pure function)
             val newMargin = contentSpacingCalculator.calculate(
                 input.userPreferredMarginPx,
                 input.chipsHeightPx,
                 input.areChipsVisible
             )
 
-            // 4. Cache aktualisieren
             lastSpacingInput = input
 
-            // 5. Anwenden
             val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
             if (params != null) {
-                Timber.d("📏 Spacing: ${params.topMargin} → $newMargin (chips=${input.chipsHeightPx}px)")
-                params.topMargin = newMargin
-                favoritesContainer.layoutParams = params
+                if (params.topMargin != newMargin) {
+                    Timber.d("📏 Spacing applied: ${params.topMargin} → $newMargin")
+                    params.topMargin = newMargin
+                    favoritesContainer.layoutParams = params
 
-                checkScrollStateAfterNextLayout("Dynamic spacing applied: $newMargin")
-                safePost { scheduleScrollVerification() }
+                    // Nur Layout-Checks triggern, wenn wir wirklich etwas geändert haben
+                    checkScrollStateAfterNextLayout("Dynamic spacing applied: $newMargin")
+                    safePost { scheduleScrollVerification() }
+                }
             }
+        }
+
+        // DER CRITICAL FIX:
+        // Wenn der View noch nicht "laid out" ist (z.B. beim Starten des Fragments),
+        // setzen wir die Params SOFORT. Das Layout-System nutzt diese Werte dann für den allerersten Pass.
+        // Kein Post = Kein Frame Delay = Kein Flackern.
+        if (!favoritesContainer.isLaidOut || favoritesContainer.isInLayout) {
+            applySpacing()
+        } else {
+            // Wenn der View schon steht und wir z.B. auf eine Höhenänderung der Chips warten müssen,
+            // ist post() weiterhin sicherer, um die neuen Masse abzugreifen.
+            favoritesContainer.post { applySpacing() }
         }
     }
 
