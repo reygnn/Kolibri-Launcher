@@ -136,42 +136,52 @@ class LauncherViewModel @Inject constructor(
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    // ===========================================
+    // COMPANION OBJECT - DEFAULTS
+    // ===========================================
+
+    companion object {
+        private const val DEFAULT_TIME = "--:--"
+        private const val DEFAULT_DATE = "---"
+        private const val DEFAULT_BATTERY = "---%"
+    }
+
+    // ===========================================
+    // UI STATE - HOME SCREEN
+    // ===========================================
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
+    val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
+
+    val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
+
+    // ===========================================
+    // UI STATE - COLORS & THEMING
+    // ===========================================
 
     private val _uiColorsState = MutableStateFlow(UiColorsState())
     val uiColorsState: StateFlow<UiColorsState> = _uiColorsState.asStateFlow()
 
-    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-    val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
+    private val wallpaperColorsFlow = MutableStateFlow<WallpaperColors?>(null)
 
-    private val _isLockingInProgress = MutableStateFlow(false)
-    val isLockingInProgress: StateFlow<Boolean> = _isLockingInProgress.asStateFlow()
+    // ===========================================
+    // SETTINGS - HOME SCREEN
+    // ===========================================
 
     private val _homeSettings = MutableStateFlow(HomeSettings())
     val sortOrder: LiveData<SortOrder> = _homeSettings
         .map { it.sortOrder }
         .asLiveData(viewModelScope.coroutineContext)
 
-    private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
-    val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
+    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+    val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
 
-    private val wallpaperColorsFlow = MutableStateFlow<WallpaperColors?>(null)
-
-    val appDrawerSearchQuery: StateFlow<String> =
-        savedStateHandle.getStateFlow(AppConstants.KEY_SEARCH_QUERY, "")
-
-    // Default 0 = Automatik (Android entscheidet)
-    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
-        .catch { e ->
-            TimberWrapper.silentError(e, "Error observing split mode threshold")
-            emit(0)
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-            initialValue = 0
-        )
+    // ===========================================
+    // SETTINGS - LAYOUT
+    // ===========================================
 
     val layoutScaleState: StateFlow<Float> = getLayoutSettingsUseCase.layoutScale
         .catch { e ->
@@ -185,11 +195,7 @@ class LauncherViewModel @Inject constructor(
             TimberWrapper.silentError(e, "Error observing vertical padding")
             emit(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
-        )
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
 
     val isFontBoldState: StateFlow<Boolean> = getLayoutSettingsUseCase.isFontBold
         .catch { e ->
@@ -201,23 +207,50 @@ class LauncherViewModel @Inject constructor(
     val contentTopMarginState: StateFlow<Float> = getLayoutSettingsUseCase.contentTopMargin
         .catch { e ->
             TimberWrapper.silentError(e, "Error observing content top margin")
-            emit(0f) // Default 0.0
+            emit(0f)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
-    val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
+    // ===========================================
+    // SETTINGS - SPLIT MODE
+    // ===========================================
+
+    /** 0 = Automatik (Android entscheidet) */
+    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing split mode threshold")
+            emit(0)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            initialValue = 0
+        )
+
+    // ===========================================
+    // SYSTEM STATE - SCREEN LOCK
+    // ===========================================
+
+    private val _isLockingInProgress = MutableStateFlow(false)
+    val isLockingInProgress: StateFlow<Boolean> = _isLockingInProgress.asStateFlow()
+
+    // ===========================================
+    // SEARCH & NAVIGATION
+    // ===========================================
+
+    val appDrawerSearchQuery: StateFlow<String> =
+        savedStateHandle.getStateFlow(AppConstants.KEY_SEARCH_QUERY, "")
+
+    // ===========================================
+    // ONE-TIME TOAST FLAGS
+    // ===========================================
 
     private var enableLockToastShown = false
     private var enableSwipeDownToastShown = false
 
-    companion object {
-        private const val DEFAULT_TEXT_COLOR = Color.WHITE
-        private const val DEFAULT_SHADOW_COLOR = Color.BLACK
-        private const val DEFAULT_CHIP_BG_COLOR = 0
-        private const val DEFAULT_TIME = "--:--"
-        private const val DEFAULT_DATE = "---"
-        private const val DEFAULT_BATTERY = "---%"
-    }
+    // ===========================================
+    // INIT
+    // ===========================================
 
     init {
         // Initialize with safe defaults
