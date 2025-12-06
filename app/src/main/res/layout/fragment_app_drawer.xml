@@ -9,7 +9,6 @@
     android:clickable="true" 
     android:focusable="true"> 
 
-    <!-- Dies ist der Hauptcontainer für den sichtbaren Inhalt des Drawers -->
     <LinearLayout
         android:id="@+id/content_container"
         android:layout_width="match_parent"
@@ -34,7 +33,6 @@
                 android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
 
-
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/apps_recycler_view"
             android:layout_width="match_parent"
@@ -42,11 +40,9 @@
             android:layout_weight="1"
             android:clipToPadding="false"
             android:overScrollMode="never"
-            android:scrollbars="vertical"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            android:scrollbars="none"  
             tools:listitem="@layout/item_app_drawer" />
-
-    </LinearLayout>
+            </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_sort"

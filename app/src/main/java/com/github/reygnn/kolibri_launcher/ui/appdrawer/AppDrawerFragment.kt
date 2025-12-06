@@ -355,7 +355,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             appDrawerAdapter = AppDrawerAdapter(
                 onAppClicked = { app ->
                     try {
-                        Timber.Forest.d("AppDrawerFragment lambda called for ${app.displayName}")
+                        // Timber log removed for brevity if needed, or keep it
                         viewModel.onAppClicked(app)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in app click for ${app.packageName}")
@@ -365,10 +365,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     try {
                         showAppContextMenu(app)
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(
-                            e,
-                            "Error in app long click for ${app.packageName}"
-                        )
+                        TimberWrapper.silentError(e, "Error in app long click")
                     }
                 }
             )
@@ -376,8 +373,15 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             binding.appsRecyclerView.apply {
                 adapter = appDrawerAdapter
                 layoutManager = LinearLayoutManager(requireContext())
-                // CRASH-SAFE: Disable animations to prevent IllegalStateException
+
+                // CRASH-SAFE: Animationen aus (verhindert Bugs bei schnellen Updates)
                 itemAnimator = null
+
+                // PERFORMANCE (Monk Approved):
+                // Da der Drawer den Screen füllt (match_parent), ändert sich die
+                // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
+                // bei jedem einzelnen Tastenanschlag in der Suche!
+                setHasFixedSize(true)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error setting up RecyclerView")

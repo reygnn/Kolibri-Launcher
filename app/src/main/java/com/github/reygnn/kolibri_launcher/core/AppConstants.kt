@@ -251,7 +251,7 @@ object AppConstants {
     const val BORDER_ALPHA = 51 // ca. 20%
 
     // Search Configuration
-    const val SEARCH_DEBOUNCE_DELAY_MS = 300L
+    const val SEARCH_DEBOUNCE_DELAY_MS = 150L
 
     // Action Keys
     const val ACTION_LAUNCH_SHORTCUT = "launch_shortcut"
