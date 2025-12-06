@@ -158,8 +158,6 @@ class LauncherViewModel @Inject constructor(
 
     private val wallpaperColorsFlow = MutableStateFlow<WallpaperColors?>(null)
 
-    //    private val _appDrawerSearchQuery = MutableStateFlow("")
-//    val appDrawerSearchQuery: StateFlow<String> = _appDrawerSearchQuery.asStateFlow()
     val appDrawerSearchQuery: StateFlow<String> =
         savedStateHandle.getStateFlow(AppConstants.KEY_SEARCH_QUERY, "")
 
@@ -209,7 +207,6 @@ class LauncherViewModel @Inject constructor(
 
     val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
 
-    private var fallbackToastShown = false
     private var enableLockToastShown = false
     private var enableSwipeDownToastShown = false
 
@@ -273,14 +270,16 @@ class LauncherViewModel @Inject constructor(
                 }
             }
 
-            // 5. EIGENE Coroutine für Favoriten (Endlich wird sie gestartet!)
             launchSafe {
                 try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
                         try {
                             _favoriteAppsState.value = state
-                            if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
-                                fallbackToastShown = true
+
+                            val toastAlreadyShown = savedStateHandle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true
+
+                            if (state is UiState.Success && state.data.isFallback && !toastAlreadyShown) {
+                                savedStateHandle[AppConstants.KEY_FALLBACK_TOAST_SHOWN] = true
                                 sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
                             }
                         } catch (e: CancellationException) {
@@ -306,8 +305,9 @@ class LauncherViewModel @Inject constructor(
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
                         try {
                             _favoriteAppsState.value = state
-                            if (state is UiState.Success && state.data.isFallback && !fallbackToastShown) {
-                                fallbackToastShown = true
+                            val toastAlreadyShown = savedStateHandle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true
+
+                            if (state is UiState.Success && state.data.isFallback && !toastAlreadyShown) {
                                 sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
                             }
                         } catch (e: CancellationException) {

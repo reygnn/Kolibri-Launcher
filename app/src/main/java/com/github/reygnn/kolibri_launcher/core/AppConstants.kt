@@ -260,4 +260,5 @@ object AppConstants {
 
     // SavedStateHandle Keys
     const val KEY_SEARCH_QUERY = "KEY_SEARCH_QUERY"
+    const val KEY_FALLBACK_TOAST_SHOWN = "key_fallback_toast_shown"
 }
