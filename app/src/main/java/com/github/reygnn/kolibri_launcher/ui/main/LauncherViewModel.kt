@@ -270,23 +270,11 @@ class LauncherViewModel @Inject constructor(
                 }
             }
 
+            // 5. Coroutine für Favoriten
             launchSafe {
                 try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
-                        try {
-                            _favoriteAppsState.value = state
-
-                            val toastAlreadyShown = savedStateHandle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true
-
-                            if (state is UiState.Success && state.data.isFallback && !toastAlreadyShown) {
-                                savedStateHandle[AppConstants.KEY_FALLBACK_TOAST_SHOWN] = true
-                                sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error processing favorite apps state")
-                        }
+                        handleFavoriteAppsState(state)
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -303,21 +291,7 @@ class LauncherViewModel @Inject constructor(
             launchSafe {
                 try {
                     getFavoriteAppsUseCase.favoriteApps.collect { state ->
-                        try {
-                            _favoriteAppsState.value = state
-                            val toastAlreadyShown = savedStateHandle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true
-
-                            if (state is UiState.Success && state.data.isFallback && !toastAlreadyShown) {
-                                sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(
-                                e,
-                                "Error processing favorite apps state in test mode"
-                            )
-                        }
+                        handleFavoriteAppsState(state)
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -325,6 +299,22 @@ class LauncherViewModel @Inject constructor(
                     TimberWrapper.silentError(e, "Error observing favorite apps in test mode")
                 }
             }
+        }
+    }
+
+    private suspend fun handleFavoriteAppsState(state: UiState<FavoriteAppsResult>) {
+        try {
+            _favoriteAppsState.value = state
+
+            val toastAlreadyShown = savedStateHandle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true
+            if (state is UiState.Success && state.data.isFallback && !toastAlreadyShown) {
+                savedStateHandle[AppConstants.KEY_FALLBACK_TOAST_SHOWN] = true
+                sendEvent(UiEvent.ShowToast(R.string.welcome_toast_fallback_favorites))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error processing favorite apps state")
         }
     }
 
