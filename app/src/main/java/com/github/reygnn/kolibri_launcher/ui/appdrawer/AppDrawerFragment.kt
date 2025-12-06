@@ -59,15 +59,37 @@ import timber.log.Timber
  */
 @AndroidEntryPoint
 class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
+
+    // ===========================================
+    // VIEWMODEL
+    // ===========================================
+
     private val viewModel: LauncherViewModel by activityViewModels()
+
+    // ===========================================
+    // VIEW BINDING
+    // ===========================================
 
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
 
-    private val appSearchFilter = AppSearchFilter()
+    // ===========================================
+    // ADAPTER & DATA
+    // ===========================================
+
     private var appDrawerAdapter: AppDrawerAdapter? = null
     private var masterAppList: List<AppInfo> = emptyList()
+
+    // ===========================================
+    // CONTEXT MENU STATE
+    // ===========================================
+
     private var longClickedApp: AppInfo? = null
+
+    // ===========================================
+    // SEARCH STATE
+    // ===========================================
+
     private var searchJob: Job? = null
 
     /**
@@ -96,7 +118,10 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
      */
     private var shouldScrollToTop = false
 
-    // Ultra Paranoia: Coroutine exception handler
+    // ===========================================
+    // COROUTINE MANAGEMENT
+    // ===========================================
+
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in AppDrawerFragment")
@@ -105,14 +130,16 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+    // ===========================================
+    // HELPER CLASSES
+    // ===========================================
+
+    private val appSearchFilter = AppSearchFilter()
+
+
+    // ===========================================
+    // LIFECYCLE
+    // ===========================================
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
