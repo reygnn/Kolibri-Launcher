@@ -63,22 +63,9 @@ class AppDrawerAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
-        return try {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_app_drawer, parent, false)
-            AppViewHolder(view)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error creating ViewHolder, creating fallback")
-            // Fallback: Erstelle einen einfachen TextView
-            val fallbackView = TextView(parent.context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                setPadding(16, 16, 16, 16)
-            }
-            AppViewHolder(fallbackView)
-        }
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_app_drawer, parent, false)
+        return AppViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
