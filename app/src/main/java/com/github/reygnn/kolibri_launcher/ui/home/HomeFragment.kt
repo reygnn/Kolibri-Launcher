@@ -25,6 +25,7 @@ import android.view.ViewTreeObserver
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -105,6 +106,8 @@ class HomeFragment : Fragment() {
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
 
     private var currentUserPreferredMarginPx: Int = 0
+    // Cache für das Drawable, damit wir es nicht jedes Mal neu erstellen ("allocaten") müssen.
+    private var cachedBorderDrawable: GradientDrawable? = null
 
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -765,7 +768,7 @@ class HomeFragment : Fragment() {
                 }
                 wasInSplitMode = false
 
-                // applyScrollViewBorder()
+                // applyScrollViewBorder()   // TODO: Später reaktivieren – Code intakt, bitte behalten.
 
                 // ScrollView MUSS das Abfangen von Touches verhindern
                 customScrollView.allowIntercept = false
@@ -778,7 +781,7 @@ class HomeFragment : Fragment() {
                 customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
-                removeScrollViewBorder()
+                // removeScrollViewBorder()   // TODO: Später reaktivieren – Code intakt, bitte behalten.
 
                 Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
             }
@@ -791,8 +794,15 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun applyScrollViewBorder(textColor: Int) {
+    // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
+    // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
+    // Er ist Teil einer geplanter Funktionalität (Future Implementation).
+    // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
+    // -> applyScrollViewBorder() behalten!
+/*
+    private fun applyScrollViewBorder(textColor: Int) {   // DO NOT DELETE !!!
         try {
+            // 1. Farbe berechnen (das ist billig, primitives int)
             val frameColor = Color.argb(
                 AppConstants.BORDER_ALPHA,
                 Color.red(textColor),
@@ -800,14 +810,22 @@ class HomeFragment : Fragment() {
                 Color.blue(textColor)
             )
 
-            val drawable = GradientDrawable().apply {
-                setColor(Color.TRANSPARENT)
+            // 2. MONK-OPTIMIERUNG: Instanz wiederverwenden!
+            // Wir erstellen das Objekt nur, wenn es noch null ist.
+            if (cachedBorderDrawable == null) {
+                cachedBorderDrawable = GradientDrawable().apply {
+                    setColor(Color.TRANSPARENT) // Muss nur einmal gesetzt werden
+                }
+            }
 
+            // 3. Eigenschaften auf der *existierenden* Instanz aktualisieren
+            cachedBorderDrawable?.apply {
                 val strokeWidth = try {
                     resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
                 } catch (e: Throwable) {
                     AppConstants.FALLBACK_BORDER_WIDTH_PX
                 }
+                // Hier ändern wir nur den State des existierenden Objekts -> 0 Allocation
                 setStroke(strokeWidth, frameColor)
 
                 val cornerRadius = try {
@@ -818,7 +836,11 @@ class HomeFragment : Fragment() {
                 setCornerRadius(cornerRadius)
             }
 
-            binding.favoritesScrollView.background = drawable
+            // 4. Nur neu zuweisen, wenn es nicht schon der Hintergrund ist
+            // (Vermeidet unnötige Invalidation-Calls im View)
+            if (binding.favoritesScrollView.background !== cachedBorderDrawable) {
+                binding.favoritesScrollView.background = cachedBorderDrawable
+            }
 
             val borderPadding = try {
                 resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
@@ -847,6 +869,11 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
+    // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
+    // Er ist Teil einer geplanter Funktionalität (Future Implementation).
+    // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
+    // -> removeScrollViewBorder() behalten!
     private fun removeScrollViewBorder() {
         try {
             if (_binding == null) return
@@ -866,6 +893,7 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error removing border")
         }
     }
+*/
 
     private fun clearAllViews() {
         try {
@@ -926,7 +954,7 @@ class HomeFragment : Fragment() {
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-/*        if (_needsSplit.value) {
+/*        if (_needsSplit.value) {   // TODO: Später reaktivieren – Code intakt, bitte behalten.
             try {
                 applyScrollViewBorder(textColor)
             } catch (e: Throwable) {
@@ -954,6 +982,12 @@ class HomeFragment : Fragment() {
         }
     }
 
+    /**
+     * Aktualisiert die Farben aller existierenden Buttons.
+     * Wird aufgerufen, wenn sich das Theme ändert ODER wenn das Fragment
+     * neu sichtbar wird (z.B. Rückkehr vom App Drawer), da der Flow neu emittiert.
+     * WICHTIG: Muss createSubtlePressColor() nutzen, um den Klick-Effekt nicht zu zerstören!
+     */
     private fun updateFavoriteButtonColors(textColor: Int, shadowColor: Int) {
         if (_binding == null) return
 
@@ -966,7 +1000,7 @@ class HomeFragment : Fragment() {
                     val button = wrapper?.getChildAt(0) as? Button
 
                     if (button != null) {
-                        button.setTextColor(textColor)
+                        button.setTextColor(createSubtlePressColor(textColor))
                         button.setShadowLayer(
                             AppConstants.SHADOW_RADIUS_APPS,
                             AppConstants.SHADOW_DX,
@@ -1023,7 +1057,8 @@ class HomeFragment : Fragment() {
                     typeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
 
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                    setTextColor(textColor)
+
+                    setTextColor(createSubtlePressColor(textColor))
 
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -1104,6 +1139,28 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error creating wrapper for ${app.packageName}")
             null
         }
+    }
+
+    /**
+     * Generates a ColorStateList that slightly reduces text opacity when pressed.
+     * This provides immediate visual feedback to the user without the visual clutter
+     * of a traditional ripple effect or background change.
+     */
+    private fun createSubtlePressColor(normalColor: Int): ColorStateList {
+        // 255 = Komplett sichtbar
+        // 180 = Leicht transparent (ca. 70%) -> Wirkt sehr hochwertig und ruhig
+        val pressedColor = ColorUtils.setAlphaComponent(normalColor, AppConstants.PRESSED_STATE_ALPHA)
+
+        return ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_pressed), // Wenn gedrückt...
+                intArrayOf()                              // Sonst...
+            ),
+            intArrayOf(
+                pressedColor, // ... nimm die leicht transparente Farbe
+                normalColor   // ... nimm die normale Farbe
+            )
+        )
     }
 
     // ============================================================================
@@ -1788,6 +1845,7 @@ class HomeFragment : Fragment() {
             gestureDetector = null
             longClickedApp = null
             lastSpacingInput = null
+            cachedBorderDrawable = null
 
             // 4. Binding nullen - Der "Golden Hammer"
             // Durchbricht den Fragment-View-Zyklus.

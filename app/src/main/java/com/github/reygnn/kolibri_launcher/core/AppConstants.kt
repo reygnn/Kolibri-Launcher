@@ -33,6 +33,10 @@ object AppConstants {
     const val SHADOW_DX_SMALL = 1f         // X-Offset für Datum und Batterie
     const val SHADOW_DY_SMALL = 1f         // Y-Offset für Datum und Batterie
 
+    // Alpha-Wert für den gedrückten Zustand der Favoriten Buttons (0-255).
+    // 180 = ~70% Sichtbarkeit. Subtiles Feedback ("Breathing"), kein harter Blitz.
+    const val PRESSED_STATE_ALPHA = 180
+
     // Layout Defaults
     const val LAYOUT_SCALE_MIN = 0.0f
     const val LAYOUT_SCALE_MAX = 2.0f
