@@ -141,11 +141,19 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     // LIFECYCLE
     // ===========================================
 
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         try {
-            setupWindowInsets(view)
             setupRecyclerView()
             setupSearch()
             setupSortFab()
@@ -408,7 +416,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 // Da der Drawer den Screen füllt (match_parent), ändert sich die
                 // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
                 // bei jedem einzelnen Tastenanschlag in der Suche!
-                setHasFixedSize(true)
+                setHasFixedSize(false)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error setting up RecyclerView")
@@ -535,65 +543,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in showAppContextMenu")
             }
-        }
-    }
-
-    private fun setupWindowInsets(view: View) {
-        try {
-            val fabMargin = try {
-                resources.getDimensionPixelSize(R.dimen.spacing_large)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting fab margin")
-                AppConstants.FALLBACK_DIMEN_PX
-            }
-
-            val initialContentPadding = try {
-                Rect(
-                    binding.contentContainer.paddingLeft,
-                    binding.contentContainer.paddingTop,
-                    binding.contentContainer.paddingRight,
-                    binding.contentContainer.paddingBottom
-                )
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting initial padding")
-                Rect(0, 0, 0, 0)
-            }
-
-            ViewCompat.setOnApplyWindowInsetsListener(binding.appDrawerRoot) { _, insets ->
-                try {
-                    val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
-                    try {
-                        binding.contentContainer.setPadding(
-                            initialContentPadding.left,
-                            initialContentPadding.top + systemBars.top,
-                            initialContentPadding.right,
-                            initialContentPadding.bottom + systemBars.bottom
-                        )
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error setting content padding")
-                    }
-
-                    try {
-                        val fabLayoutParams =
-                            binding.fabSort.layoutParams as? CoordinatorLayout.LayoutParams
-                        if (fabLayoutParams != null) {
-                            fabLayoutParams.bottomMargin = systemBars.bottom + fabMargin
-                            binding.fabSort.layoutParams = fabLayoutParams
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error setting fab margin")
-                    }
-
-                    insets
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error applying window insets")
-                    insets  // Return original insets
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up window insets")
-            // Window insets won't work, but drawer still functional
         }
     }
 

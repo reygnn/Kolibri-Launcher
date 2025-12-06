@@ -1835,11 +1835,28 @@ class HomeFragment : Fragment() {
     // LIFECYCLE
     // ============================================================================
 
+    override fun onStart() {
+        super.onStart()
+        try {
+            // 1. UPDATE: Daten sofort aktualisieren
+            viewModel.refreshTimeNow()
+
+            // 2. Daten sofort schreiben (Pixel Injection)
+            // Das überbrückt die Millisekunden, bis der Flow anläuft.
+            // Damit ist der erste Frame, den die App selbst zeichnet, garantiert korrekt.
+            val state = viewModel.uiState.value
+            binding.timeText.text = state.timeString
+            binding.dateText.text = state.dateString
+            binding.batteryText.text = state.batteryString
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in onStart")
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         try {
             checkAndSyncOrientation()
-
             hideStatusBar()
             verifyAndFixScrollState()
         } catch (e: Throwable) {

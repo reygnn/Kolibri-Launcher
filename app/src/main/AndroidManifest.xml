@@ -48,7 +48,7 @@
             android:clearTaskOnLaunch="true"
             android:stateNotNeeded="true"
             android:resumeWhilePausing="false"
-            android:windowSoftInputMode="adjustPan"
+            android:windowSoftInputMode="stateHidden|adjustResize"
             android:excludeFromRecents="false"
             android:documentLaunchMode="never"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"

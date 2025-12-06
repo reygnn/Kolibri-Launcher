@@ -101,9 +101,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         override fun onReceive(context: Context?, intent: Intent?) {
             try {
                 when (intent?.action) {
-                    Intent.ACTION_TIME_TICK,
-                    Intent.ACTION_TIME_CHANGED,
-                    Intent.ACTION_TIMEZONE_CHANGED -> viewModel.updateTimeAndDate()
                     Intent.ACTION_BATTERY_CHANGED -> viewModel.updateBatteryLevelFromIntent(intent)
                 }
             } catch (e: Throwable) {
@@ -315,9 +312,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         super.onResume()
         try {
             val intentFilter = IntentFilter().apply {
-                addAction(Intent.ACTION_TIME_TICK)
-                addAction(Intent.ACTION_TIME_CHANGED)
-                addAction(Intent.ACTION_TIMEZONE_CHANGED)
                 addAction(Intent.ACTION_BATTERY_CHANGED)
             }
             registerReceiver(systemEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)

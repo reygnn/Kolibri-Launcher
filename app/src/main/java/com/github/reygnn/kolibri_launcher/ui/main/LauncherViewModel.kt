@@ -16,7 +16,10 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.os.BatteryManager
 import android.text.format.DateFormat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
@@ -70,6 +73,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -249,12 +253,33 @@ class LauncherViewModel @Inject constructor(
     private var enableSwipeDownToastShown = false
 
     // ===========================================
+    // APP LIFECYCLE OBSERVER
+    // ===========================================
+
+    private val appLifecycleObserver = LifecycleEventObserver { _, event ->
+        if (event == Lifecycle.Event.ON_START) {
+            updateTimeAndDate()
+        }
+    }
+
+    // ===========================================
     // INIT
     // ===========================================
 
     init {
-        // Initialize with safe defaults
+        // SYNC: Zeit sofort beim Kaltstart
         updateTimeAndDate()
+
+        // APP-LEVEL: Zeit aktualisieren wenn App in Vordergrund kommt
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+
+        // ASYNC: Minuten-Ticks während App läuft
+        launchSafe {
+            observeSystemTimeChanges().collect {
+                updateTimeAndDate()
+            }
+        }
+
         getInitialBatteryState()
         updateUiColors()
 
@@ -335,6 +360,15 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
+    // ===========================================
+    // CLEANUP
+    // ===========================================
+
+    override fun onCleared() {
+        super.onCleared()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
+    }
+
     private suspend fun handleFavoriteAppsState(state: UiState<FavoriteAppsResult>) {
         try {
             _favoriteAppsState.value = state
@@ -348,6 +382,84 @@ class LauncherViewModel @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error processing favorite apps state")
+        }
+    }
+
+    // ===========================================
+    // TIME MANAGEMENT (CLEAN FLOW VERSION)
+    // ===========================================
+
+    /**
+     * CLEAN & ELEGANT:
+     * Erstellt einen Flow, der auf System-Events hört.
+     * Feuert exakt dann, wenn die System-Uhr umspringt.
+     */
+    private fun observeSystemTimeChanges() = kotlinx.coroutines.flow.callbackFlow {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                // Ein Signal senden (Unit), der Inhalt ist egal
+                trySend(Unit)
+            }
+        }
+
+        // Wir hören auf Minuten-Ticks, manuelle Zeitänderungen und Zeitzonenwechsel
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+
+        // Receiver registrieren
+        context.registerReceiver(receiver, filter)
+
+        // WICHTIG: Einmal sofort feuern, damit beim Starten direkt eine Zeit da ist
+        trySend(Unit)
+
+        // Cleanup: Wird automatisch aufgerufen, wenn der Scope (ViewModel) stirbt
+        awaitClose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
+    /**
+     * Public Methode für das Fragment (für onResume)
+     */
+    fun refreshTimeNow() {
+        updateTimeAndDate()
+    }
+
+    /**
+     * Die eigentliche Update-Logik (unverändert zur vorherigen Version)
+     */
+    fun updateTimeAndDate() {
+        try {
+            val now = System.currentTimeMillis()
+            val is24Hour = DateFormat.is24HourFormat(context)
+
+            val timeFormat = if (is24Hour) {
+                SimpleDateFormat("HH:mm", Locale.getDefault())
+            } else {
+                SimpleDateFormat("h:mm a", Locale.getDefault())
+            }
+            val dateFormat = SimpleDateFormat("E, d MMM", Locale.getDefault())
+
+            val newTimeString = timeFormat.format(now)
+            val newDateString = dateFormat.format(now)
+
+            // Smart Update: Nur emittieren, wenn sich wirklich was geändert hat
+            _uiState.update { current ->
+                if (current.timeString == newTimeString && current.dateString == newDateString) {
+                    current
+                } else {
+                    current.copy(timeString = newTimeString, dateString = newDateString)
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to update time and date")
+            // Fallback
+            if (_uiState.value.timeString == DEFAULT_TIME) {
+                _uiState.update { it.copy(timeString = DEFAULT_TIME, dateString = DEFAULT_DATE) }
+            }
         }
     }
 
@@ -721,7 +833,7 @@ class LauncherViewModel @Inject constructor(
         }
     }
 
-    fun updateTimeAndDate() {
+/*    fun updateTimeAndDate() {
         try {
             val currentTime = Calendar.getInstance().time
             val is24Hour = DateFormat.is24HourFormat(context)
@@ -745,7 +857,7 @@ class LauncherViewModel @Inject constructor(
                 )
             }
         }
-    }
+    }*/
 
     fun getInitialBatteryState() {
         try {

@@ -79,8 +79,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 36 // DO NOT CHANGE !!!
-        versionCode = 58
-        versionName = "0.99.48.8 rc19.8"
+        versionCode = 59
+        versionName = "0.99.48.9 rc19.9"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
@@ -213,6 +213,7 @@ dependencies {
     implementation("com.jakewharton.timber:timber:$timberVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     testImplementation("org.robolectric:robolectric:${robolectricVersion}")
 
 // Hilt
