@@ -68,47 +68,71 @@ import timber.log.Timber
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
+    // ===========================================
+    // VIEWMODEL
+    // ===========================================
+
     private val viewModel: LauncherViewModel by activityViewModels()
+
+    // ===========================================
+    // VIEW BINDING
+    // ===========================================
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
     private val favoritesScrollView get() = binding.favoritesScrollView
 
-    private val splitModeCalculator = SplitModeCalculator()
-    private val scrollStateVerifier = ScrollStateVerifier()
-    private val layoutCalculator = LayoutCalculator()
-    private val topMarginCalculator = TopMarginCalculator()
-    private val splitWeightCalculator = SplitWeightCalculator()
-    private val chipBackgroundCalculator = ChipBackgroundCalculator()
-    private val contentSpacingCalculator = ContentSpacingCalculator()
-    private var lastSpacingInput: SpacingInput? = null
-    private val swipeAnalyzer = SwipeGestureAnalyzer()
-    private val timeFormatter = TimeEventFormatter()
+    // ===========================================
+    // REACTIVE STATE - SCROLL & ORIENTATION
+    // ===========================================
 
-
-
-    private var gestureDetector: GestureDetector? = null
-    private var longClickedApp: AppInfo? = null
-
-    // REACTIVE: Scroll state determines split mode
     private val _needsSplit = MutableStateFlow(false)
     private val needsSplit: StateFlow<Boolean> = _needsSplit.asStateFlow()
 
     private lateinit var _orientationState: MutableStateFlow<Int>
     val orientationState: StateFlow<Int> get() = _orientationState.asStateFlow()
 
-    private var verifyJob: Job? = null
-    private val showBorder = false
-    private var wasInSplitMode = false
+    // ===========================================
+    // LAYOUT CACHE - COMPUTED VALUES
+    // ===========================================
 
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
-
     private var currentUserPreferredMarginPx: Int = 0
-    // Cache für das Drawable, damit wir es nicht jedes Mal neu erstellen ("allocaten") müssen.
+    private var lastSpacingInput: SpacingInput? = null
+
+    // ===========================================
+    // UI CACHE - DRAWABLES
+    // ===========================================
+
+    /** Reused to avoid allocations on every border update */
     private var cachedBorderDrawable: GradientDrawable? = null
 
+    // ===========================================
+    // SPLIT MODE TRACKING
+    // ===========================================
+
+    private var wasInSplitMode = false
+    private val showBorder = false  // TODO: Feature flag for future border implementation
+
+    // ===========================================
+    // GESTURE HANDLING
+    // ===========================================
+
+    private var gestureDetector: GestureDetector? = null
+
+    // ===========================================
+    // CONTEXT MENU STATE
+    // ===========================================
+
+    private var longClickedApp: AppInfo? = null
+
+    // ===========================================
+    // COROUTINE MANAGEMENT
+    // ===========================================
+
+    private var verifyJob: Job? = null
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
@@ -118,9 +142,27 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // ===========================================
+    // HELPER / CALCULATOR CLASSES
+    // ===========================================
+
+    private val splitModeCalculator = SplitModeCalculator()
+    private val scrollStateVerifier = ScrollStateVerifier()
+    private val layoutCalculator = LayoutCalculator()
+    private val topMarginCalculator = TopMarginCalculator()
+    private val splitWeightCalculator = SplitWeightCalculator()
+    private val chipBackgroundCalculator = ChipBackgroundCalculator()
+    private val contentSpacingCalculator = ContentSpacingCalculator()
+    private val swipeAnalyzer = SwipeGestureAnalyzer()
+    private val timeFormatter = TimeEventFormatter()
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }
     }
+
+
+    // ===========================================
+    // LIFECYCLE
+    // ===========================================
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
