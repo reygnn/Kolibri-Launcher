@@ -68,4 +68,7 @@ interface SettingsRepository : Purgeable {
      *                        2-200 = Typische Power-User Werte
      */
     suspend fun setSplitModeThreshold(thresholdPixels: Int)
+
+    val secureWindowFlow: Flow<Boolean>
+    suspend fun setSecureWindow(isEnabled: Boolean)
 }

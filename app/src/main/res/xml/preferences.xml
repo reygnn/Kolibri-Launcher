@@ -169,7 +169,14 @@
             android:dialogTitle="@string/split_mode_threshold_dialog_title"
             android:dialogMessage="@string/split_mode_threshold_dialog_message"
             app:iconSpaceReserved="false"
-            app:useSimpleSummaryProvider="false" />    
+            app:useSimpleSummaryProvider="false" />
+            
+        <SwitchPreferenceCompat
+            android:key="secure_window"
+            android:title="@string/secure_window_title"
+            android:summary="@string/secure_window_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
 </PreferenceScreen>

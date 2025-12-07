@@ -317,11 +317,28 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             registerReceiver(systemEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
 
-            // Update wallpaper colors here (runs on every resume)
             updateWallpaperColors()
+            updateSecureFlag()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error registering system event receiver")
             isReceiverRegistered = false
+        }
+    }
+
+    private fun updateSecureFlag() {
+        lifecycleScope.launch(mainActivityExceptionHandler) {
+            try {
+                val isSecure = settingsRepository.secureWindowFlow.first()
+                if (isSecure) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error updating FLAG_SECURE")
+            }
         }
     }
 

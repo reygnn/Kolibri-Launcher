@@ -39,14 +39,18 @@ class SettingsManager @Inject constructor(
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
-        val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
-        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
+        val DOUBLE_TAP_TO_LOCK_ENABLED =
+            booleanPreferencesKey(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
+        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED =
+            booleanPreferencesKey(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.TEXT_SHADOW_ENABLED)
         val IS_FONT_BOLD = booleanPreferencesKey(AppConstants.PrefKeys.IS_FONT_BOLD)
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
         val SHOW_ALARM = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_ALARM)
         val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
         val AUTO_LAUNCH_APP = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
+        val SECURE_WINDOW = booleanPreferencesKey(AppConstants.PrefKeys.SECURE_WINDOW)
+
 
         // Int Keys
         val TEXT_COLOR = intPreferencesKey(AppConstants.PrefKeys.TEXT_COLOR)
@@ -55,8 +59,10 @@ class SettingsManager @Inject constructor(
 
         // Float Keys
         val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
-        val VERTICAL_PADDING_SCALE = floatPreferencesKey(AppConstants.PrefKeys.VERTICAL_PADDING_SCALE)
-        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey(AppConstants.PrefKeys.CONTENT_TOP_MARGIN_SCALE)
+        val VERTICAL_PADDING_SCALE =
+            floatPreferencesKey(AppConstants.PrefKeys.VERTICAL_PADDING_SCALE)
+        val CONTENT_TOP_MARGIN_SCALE =
+            floatPreferencesKey(AppConstants.PrefKeys.CONTENT_TOP_MARGIN_SCALE)
     }
 
     // --- HELPER ---
@@ -69,7 +75,10 @@ class SettingsManager @Inject constructor(
     private val Flow<Preferences>.safeData: Flow<Preferences>
         get() = this.catch { e ->
             if (e is Exception) {
-                TimberWrapper.silentError(e, "SafeDataStore: Fallback to empty prefs due to read error")
+                TimberWrapper.silentError(
+                    e,
+                    "SafeDataStore: Fallback to empty prefs due to read error"
+                )
                 emit(emptyPreferences())
             } else {
                 throw e
@@ -279,6 +288,20 @@ class SettingsManager @Inject constructor(
         safeEdit { it[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] = scale }
     }
 
+    override val secureWindowFlow: Flow<Boolean> = dataStore.data.safeData
+        .map { preferences ->
+            preferences[PreferenceKeys.SECURE_WINDOW]
+                ?: AppConstants.DEFAULT_SECURE_WINDOW
+        }
+
+
+
+    override suspend fun setSecureWindow(isEnabled: Boolean) {
+        safeEdit {
+            it[PreferenceKeys.SECURE_WINDOW] = isEnabled
+        }
+    }
+
     /**
      * Setzt die Einstellungen auf Werkzustand zurück, indem die Keys gelöscht werden.
      * Dadurch greifen beim nächsten Lesen (Flow Update) automatisch die Defaults in `AppConstants`.
@@ -302,6 +325,7 @@ class SettingsManager @Inject constructor(
             preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
             preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
             preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
+            preferences.remove(PreferenceKeys.SECURE_WINDOW)
 
             // WICHTIG: Onboarding Status wird NICHT gelöscht
             // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)

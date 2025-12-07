@@ -185,6 +185,19 @@ abstract class SettingsRepositoryContractTest {
         // Onboarding sollte NICHT zurückgesetzt werden
         assertTrue(repo.onboardingCompletedFlow.first())
     }
+
+    @Test
+    fun `boolean settings - all follow same pattern`() = runTest {
+        val repo = createRepository()
+
+        // secureWindow
+        repo.setSecureWindow(true)
+        assertTrue(repo.secureWindowFlow.first())
+        repo.setSecureWindow(false)
+        assertFalse(repo.secureWindowFlow.first())
+
+        // Weitere Boolean-Settings könnten hier ergänzt werden
+    }
 }
 
 /**

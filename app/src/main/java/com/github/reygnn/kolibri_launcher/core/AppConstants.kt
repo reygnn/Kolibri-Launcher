@@ -183,36 +183,7 @@ object AppConstants {
         const val SET_DEFAULT_LAUNCHER = "set_default_launcher"
         const val SWIPE_ACTIONS = "swipe_actions"
         const val CRASH_REPORTS = "crash_reports"
-    }
-
-    /**
-     * Interne Mapping-Tabelle: String (aus AppConstants) -> Typisierter Key (für DataStore)
-     */
-    private object PreferenceKeys {
-        // String Keys
-        val SORT_ORDER_KEY = stringPreferencesKey(PrefKeys.SORT_ORDER)
-        val READABILITY_MODE = stringPreferencesKey(PrefKeys.READABILITY_MODE)
-
-        // Boolean Keys
-        val ONBOARDING_COMPLETED = booleanPreferencesKey(PrefKeys.ONBOARDING_COMPLETED)
-        val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey(PrefKeys.DOUBLE_TAP_TO_LOCK)
-        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED = booleanPreferencesKey(PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
-        val TEXT_SHADOW_ENABLED = booleanPreferencesKey(PrefKeys.TEXT_SHADOW_ENABLED)
-        val IS_FONT_BOLD = booleanPreferencesKey(PrefKeys.IS_FONT_BOLD)
-        val SHOW_CALENDAR_EVENT = booleanPreferencesKey(PrefKeys.SHOW_CALENDAR_EVENT)
-        val SHOW_ALARM = booleanPreferencesKey(PrefKeys.SHOW_ALARM)
-        val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(PrefKeys.AUTO_SHOW_KEYBOARD)
-        val AUTO_LAUNCH_APP = booleanPreferencesKey(PrefKeys.AUTO_LAUNCH_APP)
-
-        // Int Keys
-        val TEXT_COLOR = intPreferencesKey(PrefKeys.TEXT_COLOR)
-        val CHIP_BACKGROUND_COLOR = intPreferencesKey(PrefKeys.CHIP_BACKGROUND_COLOR)
-        val SPLIT_MODE_THRESHOLD = intPreferencesKey(PrefKeys.SPLIT_MODE_THRESHOLD)
-
-        // Float Keys
-        val LAYOUT_SCALE = floatPreferencesKey(PrefKeys.LAYOUT_SCALE)
-        val VERTICAL_PADDING_SCALE = floatPreferencesKey(PrefKeys.VERTICAL_PADDING_SCALE)
-        val CONTENT_TOP_MARGIN_SCALE = floatPreferencesKey(PrefKeys.CONTENT_TOP_MARGIN_SCALE)
+        const val SECURE_WINDOW = "secure_window"
     }
 
     // Default Values für Settings
@@ -226,6 +197,7 @@ object AppConstants {
     const val DEFAULT_SWIPE_DOWN_NOTIFICATIONS = false
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
+    const val DEFAULT_SECURE_WINDOW = false
 
     const val DEFAULT_SPLIT_MODE_THRESHOLD = 0
 

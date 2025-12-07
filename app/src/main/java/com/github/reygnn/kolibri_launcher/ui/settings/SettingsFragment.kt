@@ -85,6 +85,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
     private var splitModeThresholdPreference: EditTextPreference? = null
+    private var secureWindowSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -252,6 +253,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     false
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in split-mode threshold change listener")
+                    false
+                }
+            }
+
+            // Secure Window / Anti-Ghosting
+            secureWindowSwitchPreference = findPreference(AppConstants.PrefKeys.SECURE_WINDOW)
+            secureWindowSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setSecureWindow(shouldEnable)
+
+                        // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
+                        if (shouldEnable) {
+                            Toast.makeText(requireContext(), "Screenshots disabled", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in secure window change listener")
                     false
                 }
             }
@@ -844,6 +865,27 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
+                // Observer für Secure Window Setting
+                launch {
+                    try {
+                        settingsManager.secureWindowFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                secureWindowSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(
+                                    e,
+                                    "Error updating secure window preference"
+                                )
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in secure window flow collection")
+                    }
+                }
+
             }
         }
     }
@@ -1089,6 +1131,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
             autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
             splitModeThresholdPreference?.onPreferenceChangeListener = null
+            secureWindowSwitchPreference?.onPreferenceChangeListener = null
 
             // 2. Referenzen nullen (damit der GC aufräumen kann)
             calendarSwitchPreference = null
@@ -1096,6 +1139,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             autoKeyboardSwitchPreference = null
             autoLaunchAppSwitchPreference = null
             splitModeThresholdPreference = null
+            secureWindowSwitchPreference = null
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")

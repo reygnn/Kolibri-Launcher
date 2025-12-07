@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
-// TIMESTAMP 2025-12-03 19:13
+// TIMESTAMP 2025-12-07 12:59
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
@@ -65,6 +65,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
     private val splitModeThresholdFlowState = MutableStateFlow(AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD)
+    private val secureWindowFlowState = MutableStateFlow(AppConstants.DEFAULT_SECURE_WINDOW)
 
     // Mode Defaults
     private val readabilityModeState = MutableStateFlow(AppConstants.DEFAULT_READABILITY_MODE)
@@ -149,6 +150,10 @@ class FakeSettingsRepository : SettingsRepository {
         get() = onboardingCompletedState.value
         private set(value) { onboardingCompletedState.value = value }
 
+    var secureWindow: Boolean
+        get() = secureWindowFlowState.value
+        set(value) { secureWindowFlowState.value = value }
+
     // --- Interface Implementation Flow Exports ---
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
@@ -165,6 +170,7 @@ class FakeSettingsRepository : SettingsRepository {
     override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
     override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
     override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
+    override val secureWindowFlow: Flow<Boolean> = secureWindowFlowState
 
 
     // --- Interface Implementation Methods ---
@@ -241,6 +247,10 @@ class FakeSettingsRepository : SettingsRepository {
         onboardingCompletedState.value = true
     }
 
+    override suspend fun setSecureWindow(isEnabled: Boolean) {
+        secureWindow = isEnabled
+    }
+
     /**
      * Resets the repository to default values defined in AppConstants.
      */
@@ -266,6 +276,8 @@ class FakeSettingsRepository : SettingsRepository {
 
         readabilityModeState.value = AppConstants.DEFAULT_READABILITY_MODE
         sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
+
+        secureWindow = AppConstants.DEFAULT_SECURE_WINDOW
 
         onboardingCompletedState.value = wasOnboardingCompleted
     }

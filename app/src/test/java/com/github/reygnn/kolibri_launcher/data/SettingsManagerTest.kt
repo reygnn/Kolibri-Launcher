@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -652,5 +654,71 @@ class SettingsManagerTest {
         // Hinweis: Im echten DataStore garantiert 'edit' die Reihenfolge.
         // Der Fake sollte das auch tun.
         assertFalse("Final state should be false after odd number of toggles", finalValue)
+    }
+
+    private val SECURE_WINDOW = booleanPreferencesKey(AppConstants.PrefKeys.SECURE_WINDOW)
+
+// ========== SECURE WINDOW TESTS ==========
+
+    @Test
+    fun `secureWindowFlow - when no value is set - returns default false`() = runTest {
+        val result = settingsManager.secureWindowFlow.first()
+        assertFalse(result)
+    }
+
+    @Test
+    fun `setSecureWindow - correctly saves true`() = runTest {
+        settingsManager.setSecureWindow(true)
+
+        val savedValue = fakeDataStore.data.first()[SECURE_WINDOW]
+        assertTrue(savedValue ?: false)
+    }
+
+    @Test
+    fun `setSecureWindow - correctly saves false`() = runTest {
+        settingsManager.setSecureWindow(false)
+
+        val savedValue = fakeDataStore.data.first()[SECURE_WINDOW]
+        assertFalse(savedValue ?: true)
+    }
+
+    @Test
+    fun `setSecureWindow - when DataStore edit fails - does not crash`() = runTest {
+        fakeDataStore.makeEditFail()
+
+        settingsManager.setSecureWindow(true)
+
+        assertFalse(settingsManager.secureWindowFlow.first())
+    }
+
+    @Test
+    fun `setSecureWindow - when CancellationException - propagates it`() = runTest {
+        fakeDataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> {
+            settingsManager.setSecureWindow(true)
+        }
+    }
+
+    @Test
+    fun `secureWindowFlow - when DataStore read fails - returns default false`() = runTest {
+        fakeDataStore.makeReadFail()
+
+        val result = settingsManager.secureWindowFlow.first()
+
+        assertFalse(result)
+    }
+
+    @Test
+    fun `secureWindowFlow - emits new values when changed`() = runTest {
+        settingsManager.secureWindowFlow.test {
+            assertEquals(false, awaitItem())  // Default
+
+            settingsManager.setSecureWindow(true)
+            assertEquals(true, awaitItem())
+
+            settingsManager.setSecureWindow(false)
+            assertEquals(false, awaitItem())
+        }
     }
 }
