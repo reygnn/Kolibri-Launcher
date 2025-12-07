@@ -300,4 +300,23 @@
     <string name="secure_window_title">Sicherer Fenstermodus</string>
 <string name="secure_window_summary">Verhindert Screenshots und Bildschirmaufnahmen. Behebt zudem die Anzeige einer veralteten Uhrzeit beim Entsperren des Geräts.</string>
 
+<!-- Usage Export -->
+<string name="pref_usage_export_summary">App-Nutzungsstatistiken exportieren &amp; importieren</string>
+<string name="usage_export_title">Nutzungsdaten</string>
+<string name="usage_export_description">Exportiere und importiere deine App-Nutzungsstatistiken. So bleibt deine personalisierte App-Sortierung auch nach einer Neuinstallation erhalten.</string>
+<string name="usage_export_button">Exportieren</string>
+<string name="usage_import_button">Importieren</string>
+<string name="usage_export_success">Nutzungsdaten exportiert</string>
+<string name="usage_export_error">Export fehlgeschlagen</string>
+<string name="usage_export_failed">Export fehlgeschlagen: %1$s</string>
+<string name="usage_import_success">%1$d Apps mit %2$d Datenpunkten importiert</string>
+<string name="usage_import_error">Import fehlgeschlagen</string>
+<string name="usage_import_failed">Import fehlgeschlagen: %1$s</string>
+<string name="usage_import_invalid_format">Ungültiges Dateiformat</string>
+<string name="usage_import_unsupported_version">Nicht unterstützte Version: %1$s</string>
+<string name="usage_import_mode_title">Import-Modus</string>
+<string name="usage_import_mode_message">Zusammenführen kombiniert vorhandene mit importierten Daten. Ersetzen überschreibt alle vorhandenen Daten.</string>
+<string name="usage_import_merge">Zusammenführen</string>
+<string name="usage_import_replace">Ersetzen</string>
+
 </resources>

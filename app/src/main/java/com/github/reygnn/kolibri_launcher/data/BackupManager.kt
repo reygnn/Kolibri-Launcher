@@ -93,6 +93,7 @@ class BackupManager @Inject constructor(
             val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
             val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
             val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
+            val secureWindow = settingsManager.secureWindowFlow.first()
 
 
             val settings = LauncherSettings(
@@ -115,7 +116,8 @@ class BackupManager @Inject constructor(
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,
                 autoLaunchApp = autoLaunchApp,
-                splitModeThreshold = splitModeThreshold
+                splitModeThreshold = splitModeThreshold,
+                secureWindow = secureWindow
             )
 
             val backup = BackupData(
@@ -232,7 +234,8 @@ class BackupManager @Inject constructor(
                 doubleTapToLockEnabled = settings.getStrictBool("double_tap_to_lock_enabled") ?: backup.settings.doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: backup.settings.swipeDownToNotificationsEnabled,
                 autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: backup.settings.autoShowKeyboard,
-                autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: backup.settings.autoLaunchApp
+                autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: backup.settings.autoLaunchApp,
+                secureWindow = settings.getStrictBool("secure_window") ?: backup.settings.secureWindow
             )
 
             backup.copy(settings = enrichedSettings)
@@ -292,7 +295,7 @@ class BackupManager @Inject constructor(
             val boolFields = listOf(
                 "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
                 "double_tap_to_lock_enabled", "swipe_down_to_notifications_enabled",
-                "auto_show_keyboard", "auto_launch_app"
+                "auto_show_keyboard", "auto_launch_app", "secure_window"
             )
             for (field in boolFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -410,7 +413,8 @@ class BackupManager @Inject constructor(
             doubleTapToLockEnabled = settingsJson.getStrictBool("double_tap_to_lock_enabled"),
             swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipe_down_to_notifications_enabled"),
             autoShowKeyboard = settingsJson.getStrictBool("auto_show_keyboard"),
-            autoLaunchApp = settingsJson.getStrictBool("auto_launch_app")
+            autoLaunchApp = settingsJson.getStrictBool("auto_launch_app"),
+            secureWindow = settingsJson.getStrictBool("secure_window")
         )
 
         return BackupData(
@@ -568,6 +572,7 @@ class BackupManager @Inject constructor(
             backup.settings.splitModeThreshold?.let { threshold ->
                 settingsManager.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
             }
+            backup.settings.secureWindow?.let { settingsManager.setSecureWindow(it) }
         }
 
         return ImportResult.Success(
@@ -840,7 +845,8 @@ class BackupManager @Inject constructor(
                         backup.settings.swipeDownToNotificationsEnabled != null,
                 hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
                         backup.settings.autoLaunchApp != null,
-                hasPowerUserSettings = backup.settings.splitModeThreshold != null
+                hasPowerUserSettings = backup.settings.splitModeThreshold != null ||
+                        backup.settings.secureWindow != null
             )
 
             Timber.Forest.i(

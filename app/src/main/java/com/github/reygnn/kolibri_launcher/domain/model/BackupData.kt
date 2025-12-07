@@ -62,7 +62,9 @@ data class LauncherSettings(
     @JsonNames("auto_launch_app")
     val autoLaunchApp: Boolean? = null,
     @JsonNames("split_mode_threshold")
-    val splitModeThreshold: Int? = null
+    val splitModeThreshold: Int? = null,
+    @JsonNames("secure_window")
+    val secureWindow: Boolean? = null
 
 )
 

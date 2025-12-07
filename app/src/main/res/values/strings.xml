@@ -311,4 +311,24 @@
     <string name="layout_top_margin">Top offset</string>
     <string name="secure_window_title">Secure Window Mode</string>
 <string name="secure_window_summary">Prevents screenshots and screen recording. Also fixes the issue where an outdated time is briefly displayed when unlocking the device.</string>
+
+<!-- Usage Export -->
+<string name="pref_usage_export_summary">Export &amp; import app usage statistics</string>
+<string name="usage_export_title">Usage Data</string>
+<string name="usage_export_description">Export and import your app usage statistics. This preserves your personalized app sorting even after reinstalling.</string>
+<string name="usage_export_button">Export</string>
+<string name="usage_import_button">Import</string>
+<string name="usage_export_success">Usage data exported</string>
+<string name="usage_export_error">Export failed</string>
+<string name="usage_export_failed">Export failed: %1$s</string>
+<string name="usage_import_success">Imported %1$d apps with %2$d data points</string>
+<string name="usage_import_error">Import failed</string>
+<string name="usage_import_failed">Import failed: %1$s</string>
+<string name="usage_import_invalid_format">Invalid file format</string>
+<string name="usage_import_unsupported_version">Unsupported version: %1$s</string>
+<string name="usage_import_mode_title">Import Mode</string>
+<string name="usage_import_mode_message">Merge combines existing data with imported data. Replace overwrites all existing data.</string>
+<string name="usage_import_merge">Merge</string>
+<string name="usage_import_replace">Replace</string>
+
 </resources>

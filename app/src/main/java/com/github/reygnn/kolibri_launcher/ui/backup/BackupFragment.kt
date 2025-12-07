@@ -101,7 +101,7 @@ class BackupFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.buttonExportBackup.setOnClickListener {
-            val timestamp = SimpleDateFormat("AppConstants.DATE_FORMAT_BACKUP_FILENAME", Locale.getDefault())
+            val timestamp = SimpleDateFormat(AppConstants.DATE_FORMAT_BACKUP_FILENAME, Locale.getDefault())
                 .format(Date())
             val filename = "${AppConstants.BACKUP_FILE_PREFIX}$timestamp${AppConstants.BACKUP_FILE_EXTENSION}"
             exportLauncher.launch(filename)

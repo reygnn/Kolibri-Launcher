@@ -39,6 +39,12 @@
             app:iconSpaceReserved="false" />
             
         <Preference
+            android:key="usage_export"
+            android:title="@string/usage_export_title"
+            android:summary="@string/pref_usage_export_summary"
+            app:iconSpaceReserved="false" />
+            
+        <Preference
             android:key="factory_reset"
             android:title="@string/factory_reset_title"
             android:summary="@string/factory_reset_summary"

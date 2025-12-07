@@ -177,6 +177,7 @@ object AppConstants {
         const val HIDDEN_APPS = "hidden_apps"
         const val CUSTOM_APP_NAMES = "custom_app_names"
         const val BACKUP_RESTORE = "backup_restore"
+        const val USAGE_EXPORT = "usage_export"
         const val FACTORY_RESET = "factory_reset"
         const val APP_INFO = "app_info"
         const val ACCESSIBILITY = "accessibility"

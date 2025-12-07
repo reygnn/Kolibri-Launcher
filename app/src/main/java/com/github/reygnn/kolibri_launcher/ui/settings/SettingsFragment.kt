@@ -42,6 +42,7 @@ import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
+import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -437,6 +438,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting backup listener")
+        }
+
+        // Usage Export
+        try {
+            findPreference<Preference>(AppConstants.PrefKeys.USAGE_EXPORT)?.setOnPreferenceClickListener {
+                try {
+                    if (!isAdded || isStateSaved || isDetached) {
+                        Timber.Forest.w("Cannot show usage export - invalid fragment state")
+                        return@setOnPreferenceClickListener false
+                    }
+
+                    val fragment = UsageExportFragment()
+
+                    parentFragmentManager.beginTransaction()
+                        .replace(android.R.id.content, fragment)
+                        .addToBackStack(null)
+                        .commitAllowingStateLoss()
+
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing usage export fragment")
+                    false
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting usage export listener")
         }
 
         // App Info
