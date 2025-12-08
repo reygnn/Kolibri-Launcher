@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -38,6 +39,8 @@ class BackupManagerDoomsdayTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     // Mocks und Fakes
     private lateinit var mockContext: Context

@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -13,12 +14,16 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertFailsWith
 
 @ExperimentalCoroutinesApi
 class SwipeActionsManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var fakeDataStore: FakeDataStore
 

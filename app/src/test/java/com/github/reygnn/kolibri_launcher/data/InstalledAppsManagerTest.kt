@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
@@ -25,6 +26,9 @@ import java.io.IOException
 import kotlin.test.assertFailsWith
 
 class InstalledAppsManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()

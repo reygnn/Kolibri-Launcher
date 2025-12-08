@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,10 +18,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ObserveInstalledAppsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var installedAppsRepository: FakeInstalledAppsRepository
     private lateinit var installedAppsStateRepository: FakeInstalledAppsStateRepository

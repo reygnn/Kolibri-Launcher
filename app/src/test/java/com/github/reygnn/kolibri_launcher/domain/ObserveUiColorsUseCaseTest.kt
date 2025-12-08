@@ -5,17 +5,22 @@ import android.graphics.Color
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ObserveUiColorsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var useCase: ObserveUiColorsUseCase

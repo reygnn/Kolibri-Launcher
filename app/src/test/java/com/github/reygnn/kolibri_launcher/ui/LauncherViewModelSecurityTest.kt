@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.*
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -48,9 +49,10 @@ class LauncherViewModelSecurityTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     // Mocked UseCases
     @Mock lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase

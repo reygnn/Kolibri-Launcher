@@ -9,12 +9,14 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
@@ -30,6 +32,9 @@ import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetFavoriteAppsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var installedAppsStateRepository: InstalledAppsStateRepository

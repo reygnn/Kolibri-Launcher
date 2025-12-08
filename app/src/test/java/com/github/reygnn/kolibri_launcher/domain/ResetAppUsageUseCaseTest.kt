@@ -2,9 +2,11 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
@@ -14,6 +16,9 @@ import kotlin.test.assertFailsWith
 
 @ExperimentalCoroutinesApi
 class ResetAppUsageUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var appUsageRepository: AppUsageRepository

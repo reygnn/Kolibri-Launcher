@@ -1,10 +1,12 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.junit.MockitoJUnitRunner
@@ -12,6 +14,9 @@ import org.mockito.junit.MockitoJUnitRunner
 @ExperimentalCoroutinesApi
 @RunWith(MockitoJUnitRunner::class)
 class InstalledAppsStateManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var stateManager: InstalledAppsStateManager
 

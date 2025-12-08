@@ -1,11 +1,16 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import java.util.Calendar
 import java.util.Locale
 
 class TimeEventFormatterTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private val formatter = TimeEventFormatter()
 

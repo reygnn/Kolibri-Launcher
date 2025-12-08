@@ -1,11 +1,16 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.SwipeGestureAnalyzer
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import com.github.reygnn.kolibri_launcher.ui.home.SwipeGestureAnalyzer.SwipeResult
+import org.junit.Rule
 
 class SwipeGestureAnalyzerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private val analyzer = SwipeGestureAnalyzer()
 

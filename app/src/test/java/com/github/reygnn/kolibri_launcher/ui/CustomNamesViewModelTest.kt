@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.ReactiveFakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,8 @@ class CustomNamesViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeCustomNamesRepository: FakeCustomNamesRepository

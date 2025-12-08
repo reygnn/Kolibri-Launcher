@@ -1,12 +1,17 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppSearchFilter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 class AppSearchFilterTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private val filter = AppSearchFilter()
 

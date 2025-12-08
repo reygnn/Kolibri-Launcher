@@ -3,14 +3,19 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeScreenLockRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RequestNotificationsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var screenLockRepository: FakeScreenLockRepository

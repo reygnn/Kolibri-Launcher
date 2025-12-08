@@ -10,10 +10,12 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -26,6 +28,9 @@ import org.mockito.kotlin.whenever
 @ExperimentalCoroutinesApi
 @RunWith(MockitoJUnitRunner::class)
 class ResetManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     // Alle Repositories mocken
     @Mock private lateinit var favoritesRepository: FavoritesRepository

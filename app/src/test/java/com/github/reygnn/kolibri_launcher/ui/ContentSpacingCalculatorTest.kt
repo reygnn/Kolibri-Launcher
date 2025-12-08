@@ -1,10 +1,15 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.ContentSpacingCalculator
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 
 class ContentSpacingCalculatorTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private val calculator = ContentSpacingCalculator()
 

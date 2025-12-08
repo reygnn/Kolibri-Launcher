@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingEvent
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingViewModel
@@ -41,9 +42,10 @@ class OnboardingViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     // UseCases als Mocks
     @Mock

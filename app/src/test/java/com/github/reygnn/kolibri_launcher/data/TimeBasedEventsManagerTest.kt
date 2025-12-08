@@ -8,6 +8,7 @@ import android.database.Cursor
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
@@ -35,6 +37,9 @@ import kotlin.test.assertFailsWith
 @ExperimentalCoroutinesApi
 @RunWith(MockitoJUnitRunner::class)
 class TimeBasedEventsManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var mockContext: Context

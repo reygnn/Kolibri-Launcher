@@ -2,10 +2,12 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.Mockito.verify
@@ -13,6 +15,9 @@ import org.mockito.MockitoAnnotations
 
 @ExperimentalCoroutinesApi
 class SetSwipeActionUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var repository: SwipeActionsRepository

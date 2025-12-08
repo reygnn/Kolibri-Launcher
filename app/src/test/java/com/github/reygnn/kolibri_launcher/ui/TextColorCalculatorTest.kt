@@ -4,7 +4,9 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import com.github.reygnn.kolibri_launcher.core.TextColorCalculator
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import org.junit.Assert
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
@@ -13,6 +15,9 @@ import org.mockito.kotlin.whenever
 import kotlin.test.assertNotNull
 
 class TextColorCalculatorTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     // ========== EXISTING TESTS ==========
 

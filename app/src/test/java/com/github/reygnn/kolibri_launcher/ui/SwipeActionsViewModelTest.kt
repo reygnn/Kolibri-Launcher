@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeLeftAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeRightAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
@@ -33,6 +34,8 @@ class SwipeActionsViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var getInstalledAppsUseCase: GetInstalledAppsUseCase

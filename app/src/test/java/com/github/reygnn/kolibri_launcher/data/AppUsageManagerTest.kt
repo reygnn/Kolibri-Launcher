@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -23,6 +24,8 @@ class AppUsageManagerTest {
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var mockContext: Context

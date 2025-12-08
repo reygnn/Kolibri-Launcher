@@ -49,6 +49,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -84,9 +85,10 @@ class LauncherViewModelDoomsdayTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase

@@ -1,11 +1,16 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.OrientationSynchronizer
 import com.github.reygnn.kolibri_launcher.ui.home.SyncResult
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 
 class OrientationSynchronizerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Test
     fun `check returns CorrectionNeeded when states differ`() {

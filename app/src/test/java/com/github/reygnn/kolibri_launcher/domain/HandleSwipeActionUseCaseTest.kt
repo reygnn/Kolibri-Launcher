@@ -8,15 +8,20 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HandleSwipeActionUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var swipeActionsRepository: FakeSwipeActionsRepository
     private lateinit var installedAppsStateRepository: FakeInstalledAppsStateRepository

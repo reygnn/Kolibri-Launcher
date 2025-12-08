@@ -5,15 +5,20 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ToggleFavoriteUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var favoritesRepository: TestToggleFavoritesRepository
     private lateinit var useCase: ToggleFavoriteUseCase

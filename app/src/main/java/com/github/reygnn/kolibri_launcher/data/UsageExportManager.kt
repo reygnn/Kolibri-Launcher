@@ -23,6 +23,10 @@ import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +35,11 @@ import javax.inject.Singleton
  *
  * Ermöglicht das Sichern und Wiederherstellen von Usage-Timestamps,
  * sodass diese bei Neuinstallation oder Gerätewechsel erhalten bleiben.
+ *
+ * **Human-Readable Format:**
+ * Timestamps werden als ISO 8601 Datum exportiert (z.B. "2024-12-08T14:30:00Z"),
+ * was manuelles Editieren ermöglicht. Beim Import werden sowohl ISO 8601
+ * als auch rohe Millisekunden-Timestamps akzeptiert (Rückwärtskompatibilität).
  *
  * **Merge-Verhalten:**
  * Beim Import mit `mergeWithExisting = true` werden Timestamps intelligent gemergt:
@@ -57,6 +66,41 @@ class UsageExportManager @Inject constructor(
 
     companion object {
         private const val USAGE_EXPORT_VERSION = "1.0.0"
+
+        // ISO 8601 Format mit UTC
+        private val isoFormatter: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
+
+        // Für lokale Zeitzone-Anzeige (optional, falls gewünscht)
+        private val localFormatter: DateTimeFormatter = DateTimeFormatter
+            .ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+            .withZone(ZoneId.systemDefault())
+    }
+
+    /**
+     * Konvertiert Millisekunden-Timestamp zu ISO 8601 String.
+     */
+    private fun formatTimestamp(millis: Long): String {
+        return try {
+            Instant.ofEpochMilli(millis).toString()  // z.B. "2024-12-08T14:30:00.000Z"
+        } catch (e: Throwable) {
+            millis.toString()  // Fallback auf raw value
+        }
+    }
+
+    /**
+     * Parst ISO 8601 String oder rohen Millisekunden-Wert zu Long.
+     * Unterstützt beide Formate für Rückwärtskompatibilität.
+     */
+    private fun parseTimestamp(value: String): Long? {
+        // Versuch 1: Als ISO 8601 parsen
+        try {
+            return Instant.parse(value).toEpochMilli()
+        } catch (e: DateTimeParseException) {
+            // Nicht ISO 8601, versuche als Zahl
+        }
+
+        // Versuch 2: Als rohe Millisekunden parsen (Rückwärtskompatibilität)
+        return value.toLongOrNull()
     }
 
     override suspend fun exportToJson(): String {
@@ -64,7 +108,7 @@ class UsageExportManager @Inject constructor(
             val preferences = dataStore.data.first()
             val currentTime = System.currentTimeMillis()
 
-            val usageData = mutableMapOf<String, List<Long>>()
+            val usageData = mutableMapOf<String, List<String>>()
 
             preferences.asMap().forEach { (key, value) ->
                 if (key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)) {
@@ -75,6 +119,7 @@ class UsageExportManager @Inject constructor(
                         ?.mapNotNull { it.toLongOrNull() }
                         ?.filter { isValidTimestamp(it, currentTime) }
                         ?.sortedDescending()
+                        ?.map { formatTimestamp(it) }  // Konvertiere zu ISO 8601
                         ?: emptyList()
 
                     if (timestamps.isNotEmpty()) {
@@ -83,14 +128,8 @@ class UsageExportManager @Inject constructor(
                 }
             }
 
-            val exportData = UsageExportData(
-                version = USAGE_EXPORT_VERSION,
-                exportTimestamp = currentTime,
-                appVersion = BuildConfig.VERSION_NAME,
-                usageData = usageData
-            )
-
-            json.encodeToString(exportData)
+            // Manuelles JSON bauen, da UsageExportData jetzt List<String> statt List<Long> hat
+            buildExportJson(usageData, currentTime)
 
         } catch (e: CancellationException) {
             throw e
@@ -98,6 +137,26 @@ class UsageExportManager @Inject constructor(
             TimberWrapper.silentError(e, "Error exporting usage data")
             throw IOException("Export failed: ${e.message}", e)
         }
+    }
+
+    private fun buildExportJson(usageData: Map<String, List<String>>, exportTimestamp: Long): String {
+        val sb = StringBuilder()
+        sb.appendLine("{")
+        sb.appendLine("    \"version\": \"$USAGE_EXPORT_VERSION\",")
+        sb.appendLine("    \"export_timestamp\": ${JSONObject.quote(formatTimestamp(exportTimestamp))},")
+        sb.appendLine("    \"app_version\": ${JSONObject.quote(BuildConfig.VERSION_NAME)},")
+        sb.appendLine("    \"usage_data\": {")
+
+        val entries = usageData.entries.toList()
+        entries.forEachIndexed { index, (packageName, timestamps) ->
+            val timestampList = timestamps.joinToString(", ") { JSONObject.quote(it) }
+            val comma = if (index < entries.size - 1) "," else ""
+            sb.appendLine("        ${JSONObject.quote(packageName)}: [$timestampList]$comma")
+        }
+
+        sb.appendLine("    }")
+        sb.appendLine("}")
+        return sb.toString()
     }
 
     override suspend fun importFromJson(jsonString: String, mergeWithExisting: Boolean): UsageImportResult {
@@ -112,20 +171,20 @@ class UsageExportManager @Inject constructor(
             }
 
             // Phase 2: Parse
-            val exportData = try {
-                json.decodeFromString<UsageExportData>(jsonString)
-            } catch (e: SerializationException) {
+            val (version, usageData) = try {
+                parseUsageData(jsonString)
+            } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Failed to parse usage export")
                 return UsageImportResult.InvalidFormat
             }
 
-            // Phase 3: Version Check
-            if (exportData.version != USAGE_EXPORT_VERSION) {
-                return UsageImportResult.UnsupportedVersion(exportData.version)
+            // Phase 3: Version Check (akzeptiere 1.0.0 und 1.1.0)
+            if (version != USAGE_EXPORT_VERSION && version != "1.0.0") {
+                return UsageImportResult.UnsupportedVersion(version)
             }
 
             // Phase 4: Import
-            performImport(exportData, mergeWithExisting)
+            performImport(usageData, mergeWithExisting)
 
         } catch (e: CancellationException) {
             throw e
@@ -135,8 +194,46 @@ class UsageExportManager @Inject constructor(
         }
     }
 
+    /**
+     * Parst das JSON und extrahiert Version + Usage-Daten.
+     * Unterstützt sowohl ISO 8601 Strings als auch rohe Long-Werte.
+     */
+    private fun parseUsageData(jsonString: String): Pair<String, Map<String, List<Long>>> {
+        val root = JSONObject(jsonString)
+        val version = root.optString("version", "1.0.0")
+
+        val usageData = mutableMapOf<String, List<Long>>()
+
+        if (root.has("usage_data")) {
+            val usageObj = root.getJSONObject("usage_data")
+            val keys = usageObj.keys()
+
+            while (keys.hasNext()) {
+                val packageName = keys.next()
+                val timestampsArray = usageObj.getJSONArray(packageName)
+                val timestamps = mutableListOf<Long>()
+
+                for (i in 0 until timestampsArray.length()) {
+                    val value = timestampsArray.get(i)
+                    val parsed: Long? = when (value) {
+                        is Number -> value.toLong()
+                        is String -> parseTimestamp(value)
+                        else -> null
+                    }
+                    parsed?.let { timestamps.add(it) }
+                }
+
+                if (timestamps.isNotEmpty()) {
+                    usageData[packageName] = timestamps
+                }
+            }
+        }
+
+        return Pair(version, usageData)
+    }
+
     private suspend fun performImport(
-        exportData: UsageExportData,
+        usageData: Map<String, List<Long>>,
         mergeWithExisting: Boolean
     ): UsageImportResult {
         val currentTime = System.currentTimeMillis()
@@ -146,7 +243,7 @@ class UsageExportManager @Inject constructor(
 
         try {
             dataStore.edit { preferences ->
-                exportData.usageData.forEach { (packageName, importedTimestamps) ->
+                usageData.forEach { (packageName, importedTimestamps) ->
                     if (packageName.isBlank()) {
                         packagesSkipped++
                         return@forEach
@@ -205,6 +302,7 @@ class UsageExportManager @Inject constructor(
 
     /**
      * Validiert die JSON-Struktur gegen Type Confusion Attacks.
+     * Akzeptiert jetzt sowohl Number als auch String für Timestamps.
      */
     private fun validateJsonStructure(jsonString: String): Boolean {
         return try {
@@ -216,10 +314,13 @@ class UsageExportManager @Inject constructor(
                 return false
             }
 
-            // export_timestamp muss Number sein
-            if (root.has("export_timestamp") && root.get("export_timestamp") !is Number) {
-                Timber.Forest.w("Type validation failed: export_timestamp is not a number")
-                return false
+            // export_timestamp kann String (ISO) oder Number sein
+            if (root.has("export_timestamp") && !root.isNull("export_timestamp")) {
+                val value = root.get("export_timestamp")
+                if (value !is Number && value !is String) {
+                    Timber.Forest.w("Type validation failed: export_timestamp is not a number or string")
+                    return false
+                }
             }
 
             // usage_data muss Object sein
@@ -237,7 +338,7 @@ class UsageExportManager @Inject constructor(
                     return false
                 }
 
-                // Jeder Wert muss ein Array von Numbers sein
+                // Jeder Wert muss ein Array von Numbers oder Strings sein
                 val keys = usageObj.keys()
                 while (keys.hasNext()) {
                     val key = keys.next()
@@ -255,8 +356,10 @@ class UsageExportManager @Inject constructor(
                     }
 
                     for (i in 0 until array.length()) {
-                        if (array.get(i) !is Number) {
-                            Timber.Forest.w("Type validation failed: timestamp at $key[$i] is not a number")
+                        val item = array.get(i)
+                        // Akzeptiere Number (alt) oder String (neu)
+                        if (item !is Number && item !is String) {
+                            Timber.Forest.w("Type validation failed: timestamp at $key[$i] is not a number or string")
                             return false
                         }
                     }

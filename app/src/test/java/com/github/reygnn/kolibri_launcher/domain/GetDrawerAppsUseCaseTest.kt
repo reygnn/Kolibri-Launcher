@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -36,9 +37,10 @@ class GetDrawerAppsUseCaseTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var installedAppsStateRepository: InstalledAppsStateRepository

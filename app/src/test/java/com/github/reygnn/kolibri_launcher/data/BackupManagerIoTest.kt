@@ -7,12 +7,14 @@ import android.os.ParcelFileDescriptor
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.*
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Ignore
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
@@ -50,6 +52,9 @@ class BackupManagerIoTest {
             )
         }
     }
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var mockContext: Context

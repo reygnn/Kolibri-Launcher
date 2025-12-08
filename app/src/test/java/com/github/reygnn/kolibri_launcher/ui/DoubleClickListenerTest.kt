@@ -1,12 +1,17 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import android.view.View
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.HomeFragment
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
 
 class DoubleClickListenerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     // Helper Klasse um Zeit zu simulieren
     private class TestableDoubleClickListener(

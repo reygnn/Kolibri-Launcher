@@ -4,14 +4,19 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetOnboardingAppsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var installedAppsRepository: FakeInstalledAppsRepository
     private lateinit var useCase: GetOnboardingAppsUseCase

@@ -11,10 +11,12 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -29,6 +31,9 @@ import org.mockito.junit.MockitoJUnitRunner
  */
 @RunWith(MockitoJUnitRunner::class)
 class BackupManagerMalformedTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     // Fakes (Minimal setup, da wir erwarten, dass das Parsing fehlschlägt bevor Repos angefasst werden)
     private lateinit var favoritesRepo: FakeFavoritesRepository

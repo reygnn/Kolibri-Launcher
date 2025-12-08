@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
@@ -32,6 +33,8 @@ class CustomNamesManagerTest {
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var mockDataStore: DataStore<Preferences>

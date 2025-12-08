@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -27,6 +28,9 @@ import java.io.IOException
 import kotlin.test.assertFailsWith
 
 class HiddenAppsManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()

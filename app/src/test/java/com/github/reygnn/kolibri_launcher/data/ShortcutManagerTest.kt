@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
@@ -28,6 +29,8 @@ class ShortcutManagerTest {
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var context: Context

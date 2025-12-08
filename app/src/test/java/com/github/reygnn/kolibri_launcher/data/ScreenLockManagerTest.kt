@@ -1,15 +1,20 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 @ExperimentalCoroutinesApi
 class ScreenLockManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var screenLockManager: ScreenLockManager
 

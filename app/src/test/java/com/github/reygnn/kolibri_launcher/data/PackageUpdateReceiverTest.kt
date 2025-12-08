@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -26,6 +27,8 @@ class PackageUpdateReceiverTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var mockContext: Context

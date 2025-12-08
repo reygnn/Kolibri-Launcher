@@ -6,10 +6,12 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.*
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -23,6 +25,9 @@ import org.mockito.Mockito.`when`
  * - Funktioniert die Filterung nicht-installierter Apps?
  */
 class BackupManagerLogicTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var backupManager: BackupManager
 

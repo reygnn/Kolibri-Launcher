@@ -4,10 +4,12 @@ import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.*
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -18,6 +20,9 @@ import org.mockito.Mockito.`when`
  * - Import accepts both camelCase AND snake_case (via @JsonNames for backward compatibility)
  */
 class BackupManagerNamingConventionTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var backupManager: BackupManager
     private lateinit var fakeSettingsRepo: FakeSettingsRepository

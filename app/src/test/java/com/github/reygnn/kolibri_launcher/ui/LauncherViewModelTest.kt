@@ -89,15 +89,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 
 @ExperimentalCoroutinesApi
 class LauncherViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     @Mock
     private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase

@@ -13,11 +13,13 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -36,6 +38,9 @@ import org.junit.Test
  * - Unicode/Encoding Attacks
  */
 class BackupManagerSecurityTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var backupManager: BackupManager
 

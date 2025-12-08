@@ -10,6 +10,7 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import kotlinx.coroutines.CancellationException
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -34,6 +36,9 @@ import kotlin.test.assertTrue
 @ExperimentalCoroutinesApi
 @RunWith(MockitoJUnitRunner::class)
 class SettingsManagerTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var settingsManager: SettingsManager

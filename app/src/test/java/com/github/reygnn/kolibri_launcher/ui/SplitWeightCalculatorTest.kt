@@ -1,12 +1,17 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import android.content.res.Configuration
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.SplitWeightCalculator
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class SplitWeightCalculatorTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var calculator: SplitWeightCalculator
 

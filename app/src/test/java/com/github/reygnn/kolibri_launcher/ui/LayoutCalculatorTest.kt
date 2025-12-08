@@ -1,12 +1,17 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.LayoutCalculator
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class LayoutCalculatorTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var calculator: LayoutCalculator
 

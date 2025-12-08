@@ -2,14 +2,19 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CheckAppUsageUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var appUsageRepository: FakeAppUsageRepository
     private lateinit var useCase: CheckAppUsageUseCase

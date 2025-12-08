@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ExportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.PreviewBackupUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeBackupRepository
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupState
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupViewModel
 import com.google.common.truth.Truth
@@ -23,6 +24,8 @@ class BackupViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var fakeBackupRepository: FakeBackupRepository
     private lateinit var viewModel: BackupViewModel

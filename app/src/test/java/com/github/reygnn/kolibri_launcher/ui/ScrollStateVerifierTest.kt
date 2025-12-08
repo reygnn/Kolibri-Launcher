@@ -1,13 +1,18 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.ScrollStateVerifier
 import com.github.reygnn.kolibri_launcher.ui.home.VerifyResult
 import org.junit.Before
+import org.junit.Rule
 import kotlin.test.DefaultAsserter.assertTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ScrollStateVerifierTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var verifier: ScrollStateVerifier
 

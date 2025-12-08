@@ -1,13 +1,18 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.SplitModeCalculator
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import kotlin.test.Test
 
 class SplitModeCalculatorTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
 
     private lateinit var calculator: SplitModeCalculator
 
