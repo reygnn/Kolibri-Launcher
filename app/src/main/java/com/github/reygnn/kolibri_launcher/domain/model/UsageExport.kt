@@ -1,33 +1,21 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+//import kotlinx.serialization.Serializable
+//import kotlinx.serialization.json.JsonNames
+//import kotlinx.serialization.ExperimentalSerializationApi
 
-/**
- * Exportdaten für App-Nutzungsstatistiken.
- */
-@Serializable
-data class UsageExportData(
-    val version: String,
-    @SerialName("export_timestamp")
-    val exportTimestamp: Long,
-    @SerialName("app_version")
-    val appVersion: String,
-    @SerialName("usage_data")
-    val usageData: Map<String, List<Long>>  // packageName -> timestamps (neueste zuerst)
-)
+///**
+// * Exportdaten für App-Nutzungsstatistiken.
+// */
+//@OptIn(ExperimentalSerializationApi::class)
+//@Serializable
+//data class UsageExportData(
+//    val version: String,
+//    @JsonNames("export_timestamp")
+//    val exportTimestamp: Long,
+//    @JsonNames("app_version")
+//    val appVersion: String,
+//    @JsonNames("usage_data")
+//    val usageData: Map<String, List<Long>>
+//)
 
-/**
- * Ergebnis eines Usage-Imports.
- */
-sealed class UsageImportResult {
-    data class Success(
-        val packagesImported: Int,
-        val timestampsImported: Int,
-        val packagesSkipped: Int = 0
-    ) : UsageImportResult()
-
-    data object InvalidFormat : UsageImportResult()
-    data class UnsupportedVersion(val version: String) : UsageImportResult()
-    data class Error(val message: String) : UsageImportResult()
-}

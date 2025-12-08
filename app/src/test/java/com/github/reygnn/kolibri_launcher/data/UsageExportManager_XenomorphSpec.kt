@@ -1,14 +1,10 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.test.runTest
-import org.json.JSONObject
-import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule

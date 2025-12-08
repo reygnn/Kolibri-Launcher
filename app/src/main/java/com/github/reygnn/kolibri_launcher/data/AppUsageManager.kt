@@ -169,19 +169,22 @@ class AppUsageManager @Inject constructor(
         if (timestamps.isEmpty()) return 0.0
 
         return try {
-            timestamps.sumOf { launchTime ->
+            // PARANOID MODE: .distinct() verhindert Score-Inflation durch Duplikate
+            timestamps.distinct().sumOf { launchTime ->
                 try {
                     val timeDifferenceMs = currentTime - launchTime
-                    if (timeDifferenceMs < 0) return@sumOf 0.0 // Zukunfts-Timestamp
+
+                    // Zukunfts-Schutz: Ignoriere Timestamps aus der Zukunft (Uhr umgestellt?)
+                    if (timeDifferenceMs < 0) return@sumOf 0.0
 
                     val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeastSafe(0.0)
                     val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
 
-                    // Overflow-Schutz
+                    // Overflow-Schutz für exp()
                     when {
-                        exponent < -100.0 -> 0.0
-                        exponent > 100.0 -> 1.0
-                        else -> exp(exponent).coerceInSafe(0.0, 1.0)
+                        exponent < -100.0 -> 0.0 // Zu alt, Score ist praktisch 0
+                        exponent > 100.0 -> 1.0  // Sollte mathematisch bei negativem Lambda nicht passieren, aber sicher ist sicher
+                        else -> kotlin.math.exp(exponent).coerceInSafe(0.0, 1.0)
                     }
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error calculating score for timestamp: $launchTime")

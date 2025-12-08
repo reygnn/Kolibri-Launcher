@@ -480,32 +480,35 @@ class AppUsageManagerTest {
     // ========== NEW TESTS: LIMITS & CLEANUP ==========
 
     @Test
-    fun `recordPackageLaunch - enforces max timestamps limit`() = runTest {
+    fun `recordPackageLaunch - enforces max timestamps limit and keeps NEWEST`() = runTest {
         // Arrange
         val packageName = "com.limit.test"
-        // Wir simulieren, dass das Limit bereits erreicht ist
         val limit = AppConstants.MAX_TIMESTAMPS_PER_APP
-
         val currentTime = System.currentTimeMillis()
-        // Erzeuge eine Liste von validen Timestamps (z.B. letzte 150 Sekunden),
-        // damit sie nicht vom Manager als "zu alt" gefiltert werden.
-        val existingTimestamps = (1..limit).map {
-            (currentTime - (it * 1000)).toString()
+
+        // Wir füllen den Speicher mit alten Werten
+        val oldTimestamps = (1..limit).map {
+            (currentTime - TimeUnit.DAYS.toMillis(it.toLong())).toString()
         }.toSet()
 
         val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
-        fakeDataStore.setInitialData(preferencesOf(usageKey to existingTimestamps))
+        fakeDataStore.setInitialData(preferencesOf(usageKey to oldTimestamps))
 
-        // Act - Neuer Launch hinzufügen (Limit + 1)
+        // Act - Neuer Launch JETZT
         appUsageManager.recordPackageLaunch(packageName)
 
         // Assert
-        // Wir müssen prüfen, ob die Anzahl der Einträge nicht gewachsen ist (oder zumindest das Limit nicht überschreitet)
-        // Hinweis: Das setzt voraus, dass wir den FakeDataStore inspizieren können oder die Logik indirekt testen.
         val prefs = fakeDataStore.data.first()
         val storedTimestamps = prefs[usageKey] ?: emptySet()
 
         Assert.assertEquals(limit, storedTimestamps.size)
+
+        // CHECK: Ist der Timestamp von 'jetzt' (bzw. sehr neu) dabei?
+        // Da recordPackageLaunch intern System.currentTimeMillis() nutzt,
+        // ist der exakte String schwer zu raten, aber wir können prüfen,
+        // ob ein Wert existiert, der neuer ist als die alten.
+        val newestStored = storedTimestamps.maxOfOrNull { it.toLong() } ?: 0L
+        Assert.assertTrue("Newest timestamp should be kept", newestStored > (currentTime - 10000))
     }
 
     @Test
