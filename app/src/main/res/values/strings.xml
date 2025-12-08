@@ -221,6 +221,7 @@
     <string name="backup_summary">Export and restore your settings</string>
 
 <!-- Backup & Restore -->
+<string name="backup_title">Settings Backup &amp; Restore</string>
 <string name="backup_export_success">Backup successfully exported</string>
 <string name="backup_import_success_simple">%1$d apps imported</string>
 <string name="backup_import_success_with_skipped">%1$d apps imported\n%2$d apps skipped (not installed)</string>
@@ -229,7 +230,6 @@
 <string name="backup_invalid_format">Invalid backup format</string>
 <string name="backup_missing_apps">Missing apps</string>
 <string name="backup_and_more">and %1$d more</string>
-<string name="backup_title">Backup &amp; Restore</string>
 <string name="backup_description">Export your favorites and settings or restore them from a backup.</string>
 <string name="backup_button_export">Export Settings</string>
 <string name="backup_button_import">Restore Settings</string>
@@ -313,8 +313,8 @@
 <string name="secure_window_summary">Prevents screenshots and screen recording. Also fixes the issue where an outdated time is briefly displayed when unlocking the device.</string>
 
 <!-- Usage Export -->
+<string name="usage_export_title">Usage Profile Backup &amp; Restore</string>
 <string name="pref_usage_export_summary">Export &amp; import app usage statistics</string>
-<string name="usage_export_title">Usage Data</string>
 <string name="usage_export_description">Export and import your app usage statistics. This preserves your personalized app sorting even after reinstalling.</string>
 <string name="usage_export_button">Export</string>
 <string name="usage_import_button">Import</string>

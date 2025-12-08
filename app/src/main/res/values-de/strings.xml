@@ -215,6 +215,7 @@
     <string name="backup_summary">Exportiere und importiere deine Einstellungen</string>
 
 <!-- Backup & Restore -->
+<string name="backup_title">Einstellungen sichern &amp; wiederherstellen</string>
 <string name="backup_export_success">Backup erfolgreich exportiert</string>
 <string name="backup_import_success_simple">%1$d Apps importiert</string>
 <string name="backup_import_success_with_skipped">%1$d Apps importiert\n%2$d Apps übersprungen (nicht installiert)</string>
@@ -223,7 +224,6 @@
 <string name="backup_invalid_format">Ungültiges Backup-Format</string>
 <string name="backup_missing_apps">Fehlende Apps</string>
 <string name="backup_and_more">und %1$d weitere</string>
-<string name="backup_title">Backup &amp; Wiederherstellen</string>
 <string name="backup_description">Exportiere deine Favoriten und Einstellungen oder stelle sie aus einem Backup wieder her.</string>
 <string name="backup_button_export">Einstellungen exportieren</string>
 <string name="backup_button_import">Einstellungen wiederherstellen</string>
@@ -302,7 +302,7 @@
 
 <!-- Usage Export -->
 <string name="pref_usage_export_summary">App-Nutzungsstatistiken exportieren &amp; importieren</string>
-<string name="usage_export_title">Nutzungsdaten</string>
+<string name="usage_export_title">Nutzungsprofil sichern &amp; wiederherstellen</string>
 <string name="usage_export_description">Exportiere und importiere deine App-Nutzungsstatistiken. So bleibt deine personalisierte App-Sortierung auch nach einer Neuinstallation erhalten.</string>
 <string name="usage_export_button">Exportieren</string>
 <string name="usage_import_button">Importieren</string>
