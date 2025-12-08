@@ -54,8 +54,8 @@ class AppUsageExportManagerTest {
 
         // Assert
         assertTrue(json.contains("\"version\""))
-        assertTrue(json.contains("\"export_timestamp\""))
-        assertTrue(json.contains("\"usage_data\""))
+        assertTrue(json.contains("\"exportTimestamp\""))
+        assertTrue(json.contains("\"usageData\""))
     }
 
     @Test

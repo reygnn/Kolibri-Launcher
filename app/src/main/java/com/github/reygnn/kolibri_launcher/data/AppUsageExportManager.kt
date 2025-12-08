@@ -141,9 +141,9 @@ class AppUsageExportManager @Inject constructor(
         val sb = StringBuilder()
         sb.appendLine("{")
         sb.appendLine("    \"version\": \"$USAGE_EXPORT_VERSION\",")
-        sb.appendLine("    \"export_timestamp\": ${JSONObject.quote(formatTimestamp(exportTimestamp))},")
-        sb.appendLine("    \"app_version\": ${JSONObject.quote(BuildConfig.VERSION_NAME)},")
-        sb.appendLine("    \"usage_data\": {")
+        sb.appendLine("    \"exportTimestamp\": ${JSONObject.quote(formatTimestamp(exportTimestamp))},")
+        sb.appendLine("    \"appVersion\": ${JSONObject.quote(BuildConfig.VERSION_NAME)},")
+        sb.appendLine("    \"usageData\": {")
 
         val entries = usageData.entries.toList()
         entries.forEachIndexed { index, (packageName, timestamps) ->
@@ -200,27 +200,24 @@ class AppUsageExportManager @Inject constructor(
         val root = JSONObject(jsonString)
         val version = root.optString("version", "1.0.0")
 
+        // camelCase bevorzugt, snake_case nur als Fallback
+        val usageObj = root.optJSONObject("usageData")
+            ?: root.optJSONObject("usage_data")
+
         val usageData = mutableMapOf<String, List<Long>>()
 
-        if (root.has("usage_data")) {
-            val usageObj = root.getJSONObject("usage_data")
-            val keys = usageObj.keys()
-
+        usageObj?.let { obj ->
+            val keys = obj.keys()
             while (keys.hasNext()) {
                 val packageName = keys.next()
-                val timestampsArray = usageObj.getJSONArray(packageName)
-                val timestamps = mutableListOf<Long>()
-
-                for (i in 0 until timestampsArray.length()) {
-                    val value = timestampsArray.get(i)
-                    val parsed: Long? = when (value) {
+                val timestampsArray = obj.getJSONArray(packageName)
+                val timestamps = (0 until timestampsArray.length()).mapNotNull { i ->
+                    when (val value = timestampsArray.get(i)) {
                         is Number -> value.toLong()
                         is String -> parseTimestamp(value)
                         else -> null
                     }
-                    parsed?.let { timestamps.add(it) }
                 }
-
                 if (timestamps.isNotEmpty()) {
                     usageData[packageName] = timestamps
                 }
@@ -312,50 +309,58 @@ class AppUsageExportManager @Inject constructor(
                 return false
             }
 
-            // export_timestamp kann String (ISO) oder Number sein
-            if (root.has("export_timestamp") && !root.isNull("export_timestamp")) {
-                val value = root.get("export_timestamp")
+            // export_timestamp / exportTimestamp kann String (ISO) oder Number sein
+            val timestampKey = when {
+                root.has("exportTimestamp") -> "exportTimestamp"
+                root.has("export_timestamp") -> "export_timestamp"
+                else -> null
+            }
+            if (timestampKey != null && !root.isNull(timestampKey)) {
+                val value = root.get(timestampKey)
                 if (value !is Number && value !is String) {
-                    Timber.Forest.w("Type validation failed: export_timestamp is not a number or string")
+                    Timber.Forest.w("Type validation failed: $timestampKey is not a number or string")
                     return false
                 }
             }
 
-            // usage_data muss Object sein
-            if (root.has("usage_data")) {
-                val usageData = root.get("usage_data")
+            // usage_data / usageData muss Object sein
+            val usageKey = when {
+                root.has("usageData") -> "usageData"
+                root.has("usage_data") -> "usage_data"
+                else -> null
+            }
+
+            if (usageKey != null) {
+                val usageData = root.get(usageKey)
                 if (usageData !is JSONObject) {
-                    Timber.Forest.w("Type validation failed: usage_data is not an object")
+                    Timber.Forest.w("Type validation failed: $usageKey is not an object")
                     return false
                 }
 
                 // DoS-Schutz: Nicht zu viele Packages
-                val usageObj = usageData as JSONObject
-                if (usageObj.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
-                    Timber.Forest.w("Too many packages in usage_data: ${usageObj.length()}")
+                if (usageData.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
+                    Timber.Forest.w("Too many packages in $usageKey: ${usageData.length()}")
                     return false
                 }
 
                 // Jeder Wert muss ein Array von Numbers oder Strings sein
-                val keys = usageObj.keys()
+                val keys = usageData.keys()
                 while (keys.hasNext()) {
                     val key = keys.next()
-                    val value = usageObj.get(key)
+                    val value = usageData.get(key)
 
                     if (value !is org.json.JSONArray) {
                         Timber.Forest.w("Type validation failed: $key is not an array")
                         return false
                     }
 
-                    val array = value as org.json.JSONArray
-                    if (array.length() > AppConstants.MAX_TIMESTAMPS_PER_APP * 2) {
-                        Timber.Forest.w("Too many timestamps for $key: ${array.length()}")
+                    if (value.length() > AppConstants.MAX_TIMESTAMPS_PER_APP * 2) {
+                        Timber.Forest.w("Too many timestamps for $key: ${value.length()}")
                         return false
                     }
 
-                    for (i in 0 until array.length()) {
-                        val item = array.get(i)
-                        // Akzeptiere Number (alt) oder String (neu)
+                    for (i in 0 until value.length()) {
+                        val item = value.get(i)
                         if (item !is Number && item !is String) {
                             Timber.Forest.w("Type validation failed: timestamp at $key[$i] is not a number or string")
                             return false
