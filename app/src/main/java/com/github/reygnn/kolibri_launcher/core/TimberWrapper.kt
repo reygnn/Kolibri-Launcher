@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.core
 
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Wrapper für Timber mit Build-Type-abhängigem Verhalten.
@@ -16,6 +17,10 @@ import timber.log.Timber
 object TimberWrapper {
 
     const val SILENT_LOG_TAG = "SILENT_ERROR"
+
+    // Ein Schalter für Tests. Standardmässig false (aus).
+    // AtomicBoolean für Thread-Safety, falls Tests parallel laufen.
+    var preventCrashForTesting = AtomicBoolean(false)
 
     /**
      * Loggt einen Fehler, der nur im Logcat erscheinen soll.
@@ -41,6 +46,11 @@ object TimberWrapper {
      * In Release-Builds: Nichts tun (Fehler wurde bereits geloggt).
      */
     private fun crashInDebug(cause: Throwable?, message: String) {
+        // Wenn der Test-Modus aktiv ist, brich hier ab -> Kein Crash!
+        if (preventCrashForTesting.get()) {
+            return
+        }
+
         if (BuildConfig.DEBUG) {
             throw RuntimeException("SILENT_ERROR caught: $message", cause)
         }

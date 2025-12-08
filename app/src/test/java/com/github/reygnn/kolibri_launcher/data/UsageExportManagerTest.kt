@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,8 +18,10 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.junit.MockitoJUnit
 import org.mockito.junit.MockitoRule
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -37,8 +41,14 @@ class UsageExportManagerTest {
 
     @Before
     fun setup() {
+        TimberWrapper.preventCrashForTesting.set(true)
         fakeDataStore = FakeDataStore()
         usageExportManager = UsageExportManager(fakeDataStore, mockContext)
+    }
+
+    @After
+    fun tearDown() {
+        TimberWrapper.preventCrashForTesting.set(false)
     }
 
     // ========== EXPORT TO JSON TESTS ==========
@@ -530,13 +540,13 @@ class UsageExportManagerTest {
 
     @Test
     fun `importFromJson - with malformed JSON - returns InvalidFormat`() = runTest {
-        // Act - wirklich ungültiges JSON (nicht parseBar)
+        // Act
         val result = usageExportManager.importFromJson("{{{{", mergeWithExisting = false)
 
-        // Assert
+        // Assert - Message kommt ZUERST
         assertTrue(
-            result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error,
-            "Expected InvalidFormat or Error, got $result"
+            "Expected InvalidFormat or Error, got $result",
+            result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error
         )
     }
 
@@ -551,7 +561,7 @@ class UsageExportManagerTest {
 
     @Test
     fun `importFromJson - missing version - returns InvalidFormat or UnsupportedVersion`() = runTest {
-        // Arrange - JSON ohne version Feld
+        // Arrange
         val json = """
         {
             "export_timestamp": $currentTime,
@@ -563,12 +573,12 @@ class UsageExportManagerTest {
         // Act
         val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
 
-        // Assert - kotlinx.serialization könnte default nutzen oder fehlschlagen
+        // Assert - Message kommt ZUERST
         assertTrue(
+            "Expected InvalidFormat, UnsupportedVersion or Error, got $result",
             result is UsageImportResult.InvalidFormat ||
                     result is UsageImportResult.UnsupportedVersion ||
-                    result is UsageImportResult.Error,
-            "Expected InvalidFormat, UnsupportedVersion or Error, got $result"
+                    result is UsageImportResult.Error
         )
     }
 
@@ -797,10 +807,10 @@ class UsageExportManagerTest {
         // Act
         val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
 
-        // Assert - kann Error ODER InvalidFormat sein, je nach wo der Fehler auftritt
+        // Assert - Message kommt ZUERST
         assertTrue(
-            result is UsageImportResult.Error || result is UsageImportResult.InvalidFormat,
-            "Expected Error or InvalidFormat, got $result"
+            "Expected Error or InvalidFormat, got $result",
+            result is UsageImportResult.Error || result is UsageImportResult.InvalidFormat
         )
     }
 
