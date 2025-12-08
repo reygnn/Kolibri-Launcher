@@ -45,7 +45,7 @@ object AppConstants {
     const val VERTICAL_PADDING_SCALE_MAX = 2.0f
 
     const val CONTENT_TOP_MARGIN_SCALE_MIN = 0.0f
-    const val CONTENT_TOP_MARGIN_SCALE_MAX = 1.0f
+    const val CONTENT_TOP_MARGIN_SCALE_MAX = 2.0f
 
     const val SPLIT_MODE_THRESHOLD_MIN = 0
     const val SPLIT_MODE_THRESHOLD_MAX = 512

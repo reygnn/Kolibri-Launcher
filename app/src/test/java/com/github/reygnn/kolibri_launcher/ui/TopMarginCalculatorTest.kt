@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.TopMarginCalculator
 import org.junit.Assert.*
@@ -114,13 +115,20 @@ class TopMarginCalculatorTest {
     }
 
     @Test
-    fun `scale above 1 coerced to 1`() {
+    fun `calculate - coerces value above MAX to MAX`() {
+        val maxScale = AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX
+        val invalidScale = maxScale + 0.1f
+
         val result = calculator.calculate(
-            scale = 1.5f,
+            scale = invalidScale,
             baseMarginPx = 16,
             screenHeightPx = 2000
         )
-        assertEquals(616, result)
+
+        // Erwartung: Es wird trotzdem nur mit maxScale gerechnet
+        val expectedAddition = (2000 * TopMarginCalculator.DEFAULT_MAX_ADDITIONAL_FRACTION * maxScale).toInt()
+
+        assertEquals(16 + expectedAddition, result)
     }
 
     @Test

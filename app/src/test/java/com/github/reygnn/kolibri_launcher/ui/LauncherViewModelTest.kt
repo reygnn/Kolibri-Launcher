@@ -2479,14 +2479,19 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onSetContentTopMargin - coerces value above 1 to 1`() = runTest {
+    fun `onSetContentTopMargin - coerces value above MAX to MAX`() = runTest {
         setupViewModel()
         advanceUntilIdle()
 
-        viewModel.onSetContentTopMargin(1.5f)
+        val maxLimit = AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX
+        val invalidValue = maxLimit + 0.1f
+
+        // 2. Aktion
+        viewModel.onSetContentTopMargin(invalidValue)
         advanceUntilIdle()
 
-        verify(setContentTopMarginUseCase).invoke(1.0f)
+        // 3. Erwartung: Es muss auf das MAX gekappt werden.
+        verify(setContentTopMarginUseCase).invoke(maxLimit)
     }
 
     @Test

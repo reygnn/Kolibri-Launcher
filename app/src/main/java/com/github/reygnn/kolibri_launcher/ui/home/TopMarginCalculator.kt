@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 
@@ -31,7 +32,7 @@ class TopMarginCalculator {
         maxAdditionalFraction: Float = DEFAULT_MAX_ADDITIONAL_FRACTION
     ): Int {
         // Defensive: Werte in gültigen Bereich zwingen
-        val safeScale = scale.coerceInSafe(0f, 1f)
+        val safeScale = scale.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX)
         val safeBaseMargin = baseMarginPx.coerceAtLeastSafe(0)
         val safeScreenHeight = screenHeightPx.coerceAtLeastSafe(0)
         val safeFraction = maxAdditionalFraction.coerceInSafe(0f, 1f)
