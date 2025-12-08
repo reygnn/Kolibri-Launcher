@@ -20,7 +20,7 @@ import com.github.reygnn.kolibri_launcher.data.SettingsManager
 import com.github.reygnn.kolibri_launcher.data.ShortcutManager
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
 import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
-import com.github.reygnn.kolibri_launcher.data.UsageExportManager
+import com.github.reygnn.kolibri_launcher.data.AppUsageExportManager
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -138,7 +138,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindUsageExportRepository(
-        usageExportManager: UsageExportManager
+        appUsageExportManager: AppUsageExportManager
     ): UsageExportRepository
 
     @Binds

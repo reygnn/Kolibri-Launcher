@@ -51,7 +51,7 @@ import javax.inject.Singleton
  * - Timestamp-Validierung (nicht in Zukunft, nicht zu alt)
  */
 @Singleton
-class UsageExportManager @Inject constructor(
+class AppUsageExportManager @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @param:ApplicationContext private val context: Context
 ) : UsageExportRepository {

@@ -40,7 +40,7 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE) // Wir brauchen kein Manifest für diesen Unit Test
-class UsageExportManager_DoomsdaySpec {
+class AppUsageExportManager_DoomsdaySpec {
 
     @get:Rule
     val timberRule = TimberRule()
@@ -53,7 +53,7 @@ class UsageExportManager_DoomsdaySpec {
     private lateinit var mockPfd: ParcelFileDescriptor
 
     private lateinit var fakeDataStore: FakeDataStore
-    private lateinit var manager: UsageExportManager
+    private lateinit var manager: AppUsageExportManager
 
     // Eine valide Uri für Tests (Robolectric kann das parsen)
     private val testUriString = "content://com.android.external/file/123"
@@ -71,7 +71,7 @@ class UsageExportManager_DoomsdaySpec {
         `when`(mockPfd.fileDescriptor).thenReturn(FileDescriptor())
 
         fakeDataStore = FakeDataStore()
-        manager = UsageExportManager(fakeDataStore, mockContext)
+        manager = AppUsageExportManager(fakeDataStore, mockContext)
     }
 
     // ============================================================================================

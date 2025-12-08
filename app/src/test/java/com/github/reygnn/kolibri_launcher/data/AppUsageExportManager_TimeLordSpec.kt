@@ -18,21 +18,21 @@ import kotlin.test.assertIs
  * TIME LORD EDITION
  * * Testet temporale Anomalien, Y2K38 Probleme und Zeitzonen-Chaos.
  */
-class UsageExportManager_TimeLordSpec {
+class AppUsageExportManager_TimeLordSpec {
 
     @get:Rule
     val timberRule = TimberRule()
 
     @Mock private lateinit var mockContext: Context
     private lateinit var fakeDataStore: FakeDataStore
-    private lateinit var manager: UsageExportManager
+    private lateinit var manager: AppUsageExportManager
     private val now = System.currentTimeMillis()
 
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
         fakeDataStore = FakeDataStore()
-        manager = UsageExportManager(fakeDataStore, mockContext)
+        manager = AppUsageExportManager(fakeDataStore, mockContext)
     }
 
     @Test

@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
-class UsageExportManagerTest {
+class AppUsageExportManagerTest {
 
     @get:Rule
     val mockitoRule: MockitoRule = MockitoJUnit.rule()
@@ -35,14 +35,14 @@ class UsageExportManagerTest {
     private lateinit var mockContext: Context
 
     private lateinit var fakeDataStore: FakeDataStore
-    private lateinit var usageExportManager: UsageExportManager
+    private lateinit var appUsageExportManager: AppUsageExportManager
 
     private val currentTime = System.currentTimeMillis()
 
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        usageExportManager = UsageExportManager(fakeDataStore, mockContext)
+        appUsageExportManager = AppUsageExportManager(fakeDataStore, mockContext)
     }
 
     // ========== EXPORT TO JSON TESTS (ISO 8601) ==========
@@ -50,7 +50,7 @@ class UsageExportManagerTest {
     @Test
     fun `exportToJson - with empty datastore - returns valid JSON with empty usage data`() = runTest {
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert
         assertTrue(json.contains("\"version\""))
@@ -80,7 +80,7 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(usageData)
 
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert
         assertTrue(json.contains("com.app1"))
@@ -107,7 +107,7 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(usageData)
 
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert
         assertTrue(json.contains(validIso))
@@ -131,7 +131,7 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(usageData)
 
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert
         assertTrue(json.contains(validIso))
@@ -153,7 +153,7 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(usageData)
 
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert
         assertTrue(json.contains("com.valid"))
@@ -178,7 +178,7 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(usageData)
 
         // Act
-        val json = usageExportManager.exportToJson()
+        val json = appUsageExportManager.exportToJson()
 
         // Assert - newest should appear before oldest in JSON string
         val newestIndex = json.indexOf(newestIso)
@@ -209,7 +209,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -241,7 +241,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -265,7 +265,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -292,7 +292,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -325,7 +325,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = true)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -358,7 +358,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -390,7 +390,7 @@ class UsageExportManagerTest {
         """.trimIndent()
 
         // Act
-        val result = usageExportManager.importFromJson(json, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
@@ -406,20 +406,20 @@ class UsageExportManagerTest {
 
     @Test
     fun `importFromJson - with blank string - returns InvalidFormat`() = runTest {
-        val result = usageExportManager.importFromJson("", false)
+        val result = appUsageExportManager.importFromJson("", false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
     @Test
     fun `importFromJson - with malformed JSON - returns InvalidFormat`() = runTest {
-        val result = usageExportManager.importFromJson("{{{{", false)
+        val result = appUsageExportManager.importFromJson("{{{{", false)
         assertTrue(result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error)
     }
 
     @Test
     fun `importFromJson - missing version - returns InvalidFormat or UnsupportedVersion`() = runTest {
         val json = """{ "usage_data": {} }"""
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         // Ohne Version könnte "1.0.0" assumed werden (siehe parseUsageData default), oder Validierung schlägt fehl.
         // Der aktuelle Manager setzt default "1.0.0" beim Parsen, aber validateJsonStructure prüft nur EXISTENZ von Typen.
         assertIs<UsageImportResult.Success>(result) // Da default 1.0.0 im Code gesetzt ist
@@ -435,7 +435,7 @@ class UsageExportManagerTest {
                 "usage_data": {}
             }
         """.trimIndent()
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -449,7 +449,7 @@ class UsageExportManagerTest {
                 "usage_data": {}
             }
         """.trimIndent()
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -461,7 +461,7 @@ class UsageExportManagerTest {
                 "usage_data": [1, 2, 3]
             }
         """.trimIndent()
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -476,7 +476,7 @@ class UsageExportManagerTest {
                 }
             }
         """.trimIndent()
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -495,7 +495,7 @@ class UsageExportManagerTest {
             }
         """.trimIndent()
 
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -513,7 +513,7 @@ class UsageExportManagerTest {
             }
         """.trimIndent()
 
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
@@ -523,7 +523,7 @@ class UsageExportManagerTest {
     fun `exportToJson - when DataStore fails - throws IOException`() = runTest {
         fakeDataStore.makeReadFail()
         val exception = assertFailsWith<IOException> {
-            usageExportManager.exportToJson()
+            appUsageExportManager.exportToJson()
         }
         assertTrue(exception.message?.contains("Export failed") == true)
     }
@@ -532,7 +532,7 @@ class UsageExportManagerTest {
     fun `importFromJson - when DataStore edit fails - returns Error`() = runTest {
         fakeDataStore.makeEditFail()
         val json = """{ "version": "1.0.0", "usage_data": { "com.test": [123] } }"""
-        val result = usageExportManager.importFromJson(json, false)
+        val result = appUsageExportManager.importFromJson(json, false)
         assertTrue(result is UsageImportResult.Error || result is UsageImportResult.InvalidFormat)
     }
 
@@ -550,13 +550,13 @@ class UsageExportManagerTest {
         fakeDataStore.setInitialData(initialData)
 
         // Act - Export (to ISO)
-        val exportedJson = usageExportManager.exportToJson()
+        val exportedJson = appUsageExportManager.exportToJson()
 
         // Clear datastore
         fakeDataStore.reset()
 
         // Import (from ISO back to Long)
-        val result = usageExportManager.importFromJson(exportedJson, mergeWithExisting = false)
+        val result = appUsageExportManager.importFromJson(exportedJson, mergeWithExisting = false)
 
         // Assert
         assertIs<UsageImportResult.Success>(result)

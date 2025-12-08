@@ -18,7 +18,7 @@ import kotlin.test.assertIs
  * * Security Stress Tests für UsageExportManager.
  * Simuliert bösartige Angriffe auf die JSON-Struktur und den Parser.
  */
-class UsageExportManager_XenomorphSpec {
+class AppUsageExportManager_XenomorphSpec {
 
     @get:Rule
     val timberRule = TimberRule()
@@ -26,13 +26,13 @@ class UsageExportManager_XenomorphSpec {
     @Mock
     private lateinit var mockContext: Context
     private lateinit var fakeDataStore: FakeDataStore
-    private lateinit var manager: UsageExportManager
+    private lateinit var manager: AppUsageExportManager
 
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
         fakeDataStore = FakeDataStore()
-        manager = UsageExportManager(fakeDataStore, mockContext)
+        manager = AppUsageExportManager(fakeDataStore, mockContext)
     }
 
     @Test
