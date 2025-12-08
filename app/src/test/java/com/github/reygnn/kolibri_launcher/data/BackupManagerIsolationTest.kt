@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.graphics.Color
-import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
+import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions

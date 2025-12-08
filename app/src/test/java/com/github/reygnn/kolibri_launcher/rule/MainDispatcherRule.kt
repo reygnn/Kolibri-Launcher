@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.kolibri_launcher.rule
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

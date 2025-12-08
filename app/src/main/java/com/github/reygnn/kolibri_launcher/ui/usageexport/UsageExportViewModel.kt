@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
-import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.ExportUsageToFileUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ImportUsageFromFileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class UsageExportViewModel @Inject constructor(
-    private val usageExportRepository: UsageExportRepository
+    private val exportUsageToFileUseCase: ExportUsageToFileUseCase,
+    private val importUsageFromFileUseCase: ImportUsageFromFileUseCase
 ) : ViewModel() {
 
     private val _uiEvent = MutableSharedFlow<UsageExportUiEvent>()
@@ -30,57 +31,53 @@ class UsageExportViewModel @Inject constructor(
     fun exportToFile(uriString: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val success = usageExportRepository.saveToFile(uriString)
-                if (success) {
+
+            exportUsageToFileUseCase(uriString)
+                .onSuccess {
                     _uiEvent.emit(UsageExportUiEvent.ExportSuccess)
-                } else {
-                    _uiEvent.emit(UsageExportUiEvent.ExportError("Could not write file"))
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error exporting usage data")
-                _uiEvent.emit(UsageExportUiEvent.ExportError(e.message ?: "Unknown error"))
-            } finally {
-                _isLoading.value = false
-            }
+                .onFailure { error ->
+                    TimberWrapper.silentError(error, "Export failed in ViewModel")
+                    _uiEvent.emit(UsageExportUiEvent.ExportError(error.message ?: "Unknown error"))
+                }
+
+            _isLoading.value = false
         }
     }
 
     fun importFromFile(uriString: String, mergeWithExisting: Boolean) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                when (val result = usageExportRepository.loadFromFile(uriString, mergeWithExisting)) {
-                    is UsageImportResult.Success -> {
-                        _uiEvent.emit(
-                            UsageExportUiEvent.ImportSuccess(
-                                packagesImported = result.packagesImported,
-                                timestampsImported = result.timestampsImported
-                            )
-                        )
-                    }
 
-                    is UsageImportResult.InvalidFormat -> {
-                        _uiEvent.emit(UsageExportUiEvent.InvalidFormat)
-                    }
+            val result = importUsageFromFileUseCase(uriString, mergeWithExisting)
+            handleImportResult(result)
 
-                    is UsageImportResult.UnsupportedVersion -> {
-                        _uiEvent.emit(UsageExportUiEvent.UnsupportedVersion(result.version))
-                    }
+            _isLoading.value = false
+        }
+    }
 
-                    is UsageImportResult.Error -> {
-                        _uiEvent.emit(UsageExportUiEvent.ImportError(result.message))
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error importing usage data")
-                _uiEvent.emit(UsageExportUiEvent.ImportError(e.message ?: "Unknown error"))
-            } finally {
-                _isLoading.value = false
+    /**
+     * Ausgelagert in private Helper-Funktion für bessere Lesbarkeit von importFromFile
+     */
+    private suspend fun handleImportResult(result: UsageImportResult) {
+        when (result) {
+            is UsageImportResult.Success -> {
+                _uiEvent.emit(
+                    UsageExportUiEvent.ImportSuccess(
+                        packagesImported = result.packagesImported,
+                        timestampsImported = result.timestampsImported
+                    )
+                )
+            }
+            is UsageImportResult.InvalidFormat -> {
+                _uiEvent.emit(UsageExportUiEvent.InvalidFormat)
+            }
+            is UsageImportResult.UnsupportedVersion -> {
+                _uiEvent.emit(UsageExportUiEvent.UnsupportedVersion(result.version))
+            }
+            is UsageImportResult.Error -> {
+                TimberWrapper.silentError("Import error: ${result.message}")
+                _uiEvent.emit(UsageExportUiEvent.ImportError(result.message))
             }
         }
     }

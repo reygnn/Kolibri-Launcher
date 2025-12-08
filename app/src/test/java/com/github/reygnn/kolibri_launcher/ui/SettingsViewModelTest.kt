@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.core.MainDispatcherRule
+import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
