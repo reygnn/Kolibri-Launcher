@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -12,8 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
-import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.doOnLayout
@@ -135,6 +132,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     // ===========================================
 
     private val appSearchFilter = AppSearchFilter()
+    private val keyboardShowCoordinator = KeyboardShowCoordinator()
 
 
     // ===========================================
@@ -549,23 +547,10 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     override fun onResume() {
         super.onResume()
         try {
-            // Wenn AppDrawer sichtbar wird -> Statusleiste explizit einblenden
             showStatusBar()
-
-            viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
-                try {
-                    val autoShowKeyboard = viewModel.isAutoShowKeyboardEnabled()
-                    if (autoShowKeyboard) {
-                        showKeyboard()
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error checking autoShowKeyboard setting")
-                }
-            }
+            handleAutoShowKeyboard()
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onResume showing status bar")
+            TimberWrapper.silentError(e, "Error in onResume")
         }
     }
 
@@ -584,25 +569,115 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         controller.show(WindowInsetsCompat.Type.statusBars())
     }
 
-    private fun showKeyboard() {
-        // Statt post() nehmen wir eine Coroutine im View-Lifecycle.
-        // Wenn der View stirbt, wird dieser Block NICHT mehr ausgeführt (oder abgebrochen).
-        viewLifecycleOwner.lifecycleScope.launch {
+    /**
+     * Koordiniert das automatische Anzeigen des Keyboards beim Öffnen des App Drawers.
+     *
+     * WICHTIG: Diese Methode löst das "doOnLayout wird nie aufgerufen" Problem,
+     * indem sie prüft, ob der View bereits gelayoutet ist.
+     *
+     * @see KeyboardShowCoordinator
+     */
+    private fun handleAutoShowKeyboard() {
+        viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
             try {
-                // Wartet, bis der View gezeichnet ist (besser als post delay)
-                binding.searchEditText.doOnLayout {
-                    if (!isAdded) return@doOnLayout
+                // 1. Setting asynchron laden
+                val isAutoShowEnabled = try {
+                    viewModel.isAutoShowKeyboardEnabled()
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error reading autoShowKeyboard setting")
+                    false // Fail-safe: nicht anzeigen
+                }
 
-                    val imm =
-                        context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                    if (binding.searchEditText.requestFocus()) {
-                        imm?.showSoftInput(binding.searchEditText, InputMethodManager.SHOW_IMPLICIT)
+                // 2. Binding Check (könnte während suspend weg sein)
+                val currentBinding = _binding ?: return@launch
+                val editText = currentBinding.searchEditText
+
+                // 3. Strategie bestimmen (testbare Logik)
+                val strategy = keyboardShowCoordinator.determineStrategy(
+                    isViewLaidOut = editText.isLaidOut,
+                    isViewEffectivelyVisible = editText.canReceiveKeyboardInput(),
+                    isFragmentAdded = isAdded,
+                    isAutoShowEnabled = isAutoShowEnabled
+                )
+
+                // 4. Strategie ausführen
+                when (strategy) {
+                    is KeyboardShowCoordinator.ShowKeyboardStrategy.ShowImmediately -> {
+                        Timber.d("Keyboard: View already laid out → showing immediately")
+                        showKeyboardNow(editText)
+                    }
+
+                    is KeyboardShowCoordinator.ShowKeyboardStrategy.WaitForLayout -> {
+                        Timber.d("Keyboard: Waiting for layout pass")
+                        editText.doOnLayout { view ->
+                            if (isAdded && _binding != null) {
+                                showKeyboardNow(view)
+                            }
+                        }
+                    }
+
+                    is KeyboardShowCoordinator.ShowKeyboardStrategy.Skip -> {
+                        Timber.d("Keyboard: Skipped (${strategy.reason})")
+                        // Nichts tun
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
-                // Ignorieren
+                TimberWrapper.silentError(e, "Error in handleAutoShowKeyboard")
             }
         }
+    }
+
+    /**
+     * Zeigt das Keyboard SOFORT an.
+     * Voraussetzung: View ist bereits gelayoutet und hat Focus-Fähigkeit.
+     *
+     * @param view Der View, der den Fokus erhalten soll (typischerweise EditText)
+     */
+    private fun showKeyboardNow(view: View) {
+        try {
+            if (!isAdded) {
+                Timber.w("showKeyboardNow called but fragment not added")
+                return
+            }
+
+            val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE)
+                    as? InputMethodManager
+
+            if (imm == null) {
+                Timber.w("InputMethodManager not available")
+                return
+            }
+
+            if (view.requestFocus()) {
+                view.isFocusableInTouchMode = true  // Für nachfolgende Touch-Events
+                // SHOW_IMPLICIT: System entscheidet, ob Keyboard passt
+                // Alternative: SHOW_FORCED wäre aggressiver, aber weniger "höflich"
+                val shown = imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+                Timber.d("Keyboard showSoftInput result: $shown")
+            } else {
+                Timber.w("View could not request focus")
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in showKeyboardNow")
+        }
+    }
+
+    /**
+     * Prüft, ob ein View tatsächlich Keyboard-Input empfangen kann.
+     *
+     * Ein View kann `isLaidOut = true` sein, aber trotzdem keinen Input empfangen wenn:
+     * - visibility != VISIBLE (GONE oder INVISIBLE)
+     * - nicht attached zum Window
+     * - das Window selbst nicht sichtbar ist
+     *
+     * @return true wenn der View bereit ist, Keyboard-Input zu empfangen
+     */
+    private fun View.canReceiveKeyboardInput(): Boolean {
+        return isVisible &&
+                isAttachedToWindow &&
+                windowVisibility == View.VISIBLE
     }
 
     private fun hideKeyboard() {
