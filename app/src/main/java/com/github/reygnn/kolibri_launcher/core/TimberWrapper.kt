@@ -20,7 +20,8 @@ object TimberWrapper {
 
     // Ein Schalter für Tests. Standardmässig false (aus).
     // AtomicBoolean für Thread-Safety, falls Tests parallel laufen.
-    var preventCrashForTesting = AtomicBoolean(false)
+    // val reicht, da AtomicBoolean intern mutable ist.
+    val preventCrashForTesting = AtomicBoolean(false)
 
     /**
      * Loggt einen Fehler, der nur im Logcat erscheinen soll.

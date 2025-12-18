@@ -31,6 +31,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
+import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -288,7 +289,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     }
 
                     when (action) {
-                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(bundle)
+                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(bundle, viewModel)
                         AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
                         AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(
                             app
@@ -305,43 +306,6 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up fragment result listener")
-        }
-    }
-
-    private fun handleShortcutLaunch(bundle: Bundle) {
-        try {
-            val shortcut = try {
-                bundle.getParcelable(
-                    AppContextMenuDialogFragment.Companion.RESULT_KEY_SHORTCUT,
-                    ShortcutInfo::class.java
-                )
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting shortcut from bundle")
-                null
-            }
-
-            if (shortcut == null) {
-                viewModel.onAppInfoError()
-                return
-            }
-
-            try {
-                val launcherApps = requireContext()
-                    .getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-
-                if (launcherApps == null) {
-                    TimberWrapper.silentError("LauncherApps service is null")
-                    viewModel.onAppInfoError()
-                    return
-                }
-
-                launcherApps.startShortcut(shortcut, null, null)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error launching shortcut")
-                viewModel.onAppInfoError()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
         }
     }
 
@@ -414,7 +378,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 // Da der Drawer den Screen füllt (match_parent), ändert sich die
                 // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
                 // bei jedem einzelnen Tastenanschlag in der Suche!
-                setHasFixedSize(false)
+                setHasFixedSize(true)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error setting up RecyclerView")

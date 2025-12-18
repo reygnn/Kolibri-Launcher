@@ -3,11 +3,8 @@ package com.github.reygnn.kolibri_launcher.ui.home
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.LauncherApps
-import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -47,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
+import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.chip.Chip
@@ -841,101 +839,101 @@ class HomeFragment : Fragment() {
     // Er ist Teil einer geplanter Funktionalität (Future Implementation).
     // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
     // -> applyScrollViewBorder() behalten!
-/*
-    private fun applyScrollViewBorder(textColor: Int) {   // DO NOT DELETE !!!
-        try {
-            // 1. Farbe berechnen (das ist billig, primitives int)
-            val frameColor = Color.argb(
-                AppConstants.BORDER_ALPHA,
-                Color.red(textColor),
-                Color.green(textColor),
-                Color.blue(textColor)
-            )
+    /*
+        private fun applyScrollViewBorder(textColor: Int) {   // DO NOT DELETE !!!
+            try {
+                // 1. Farbe berechnen (das ist billig, primitives int)
+                val frameColor = Color.argb(
+                    AppConstants.BORDER_ALPHA,
+                    Color.red(textColor),
+                    Color.green(textColor),
+                    Color.blue(textColor)
+                )
 
-            // 2. MONK-OPTIMIERUNG: Instanz wiederverwenden!
-            // Wir erstellen das Objekt nur, wenn es noch null ist.
-            if (cachedBorderDrawable == null) {
-                cachedBorderDrawable = GradientDrawable().apply {
-                    setColor(Color.TRANSPARENT) // Muss nur einmal gesetzt werden
+                // 2. MONK-OPTIMIERUNG: Instanz wiederverwenden!
+                // Wir erstellen das Objekt nur, wenn es noch null ist.
+                if (cachedBorderDrawable == null) {
+                    cachedBorderDrawable = GradientDrawable().apply {
+                        setColor(Color.TRANSPARENT) // Muss nur einmal gesetzt werden
+                    }
                 }
-            }
 
-            // 3. Eigenschaften auf der *existierenden* Instanz aktualisieren
-            cachedBorderDrawable?.apply {
-                val strokeWidth = try {
-                    resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
+                // 3. Eigenschaften auf der *existierenden* Instanz aktualisieren
+                cachedBorderDrawable?.apply {
+                    val strokeWidth = try {
+                        resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
+                    } catch (e: Throwable) {
+                        AppConstants.FALLBACK_BORDER_WIDTH_PX
+                    }
+                    // Hier ändern wir nur den State des existierenden Objekts -> 0 Allocation
+                    setStroke(strokeWidth, frameColor)
+
+                    val cornerRadius = try {
+                        resources.getDimension(R.dimen.split_screen_corner_radius)
+                    } catch (e: Throwable) {
+                        AppConstants.FALLBACK_CORNER_RADIUS_PX
+                    }
+                    setCornerRadius(cornerRadius)
+                }
+
+                // 4. Nur neu zuweisen, wenn es nicht schon der Hintergrund ist
+                // (Vermeidet unnötige Invalidation-Calls im View)
+                if (binding.favoritesScrollView.background !== cachedBorderDrawable) {
+                    binding.favoritesScrollView.background = cachedBorderDrawable
+                }
+
+                val borderPadding = try {
+                    resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
                 } catch (e: Throwable) {
-                    AppConstants.FALLBACK_BORDER_WIDTH_PX
+                    AppConstants.FALLBACK_DIMEN_PX
                 }
-                // Hier ändern wir nur den State des existierenden Objekts -> 0 Allocation
-                setStroke(strokeWidth, frameColor)
 
-                val cornerRadius = try {
-                    resources.getDimension(R.dimen.split_screen_corner_radius)
-                } catch (e: Throwable) {
-                    AppConstants.FALLBACK_CORNER_RADIUS_PX
-                }
-                setCornerRadius(cornerRadius)
-            }
+                binding.favoritesScrollView.setPadding(
+                    0,
+                    borderPadding,
+                    borderPadding,
+                    borderPadding
+                )
 
-            // 4. Nur neu zuweisen, wenn es nicht schon der Hintergrund ist
-            // (Vermeidet unnötige Invalidation-Calls im View)
-            if (binding.favoritesScrollView.background !== cachedBorderDrawable) {
-                binding.favoritesScrollView.background = cachedBorderDrawable
-            }
+                binding.favoritesScrollView.clipToPadding =
+                    true // Behalten, um den Inhalt im Rahmen zu halten
 
-            val borderPadding = try {
-                resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
+                val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+
+                params.setMargins(0, 0, 0, 0)
+
+                binding.favoritesScrollView.layoutParams = params
+
             } catch (e: Throwable) {
-                AppConstants.FALLBACK_DIMEN_PX
+                TimberWrapper.silentError(e, "Error applying border")
             }
-
-            binding.favoritesScrollView.setPadding(
-                0,
-                borderPadding,
-                borderPadding,
-                borderPadding
-            )
-
-            binding.favoritesScrollView.clipToPadding =
-                true // Behalten, um den Inhalt im Rahmen zu halten
-
-            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-
-            params.setMargins(0, 0, 0, 0)
-
-            binding.favoritesScrollView.layoutParams = params
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying border")
         }
-    }
 
-    // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
-    // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
-    // Er ist Teil einer geplanter Funktionalität (Future Implementation).
-    // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
-    // -> removeScrollViewBorder() behalten!
-    private fun removeScrollViewBorder() {
-        try {
-            if (_binding == null) return
+        // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
+        // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
+        // Er ist Teil einer geplanter Funktionalität (Future Implementation).
+        // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
+        // -> removeScrollViewBorder() behalten!
+        private fun removeScrollViewBorder() {
+            try {
+                if (_binding == null) return
 
-            // 1. Hintergrund (Rahmen) entfernen
-            binding.favoritesScrollView.background = null
+                // 1. Hintergrund (Rahmen) entfernen
+                binding.favoritesScrollView.background = null
 
-            // 2. Padding zurücksetzen (falls es für den Rahmen gesetzt wurde)
-            binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+                // 2. Padding zurücksetzen (falls es für den Rahmen gesetzt wurde)
+                binding.favoritesScrollView.setPadding(0, 0, 0, 0)
 
-            // 3. Negative Margins entfernen und auf 0 setzen
-            val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            params.setMargins(0, 0, 0, 0)
-            binding.favoritesScrollView.layoutParams = params
+                // 3. Negative Margins entfernen und auf 0 setzen
+                val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+                params.setMargins(0, 0, 0, 0)
+                binding.favoritesScrollView.layoutParams = params
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error removing border")
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error removing border")
+            }
         }
-    }
-*/
+    */
 
     private fun clearAllViews() {
         try {
@@ -996,13 +994,13 @@ class HomeFragment : Fragment() {
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-/*        if (_needsSplit.value) {   // TODO: Später reaktivieren – Code intakt, bitte behalten.
-            try {
-                applyScrollViewBorder(textColor)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating border color")
-            }
-        }*/
+        /*        if (_needsSplit.value) {   // TODO: Später reaktivieren – Code intakt, bitte behalten.
+                    try {
+                        applyScrollViewBorder(textColor)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error updating border color")
+                    }
+                }*/
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -1155,22 +1153,22 @@ class HomeFragment : Fragment() {
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                            setMargins(0, 0, 0, 0)
-                        }
+                        setMargins(0, 0, 0, 0)
+                    }
 
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.START
 
-/*
-                    // === DEBUG VISUALISIERUNG START ===
-                    // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
-                    val debugBorder = android.graphics.drawable.GradientDrawable().apply {
-                        setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
-                        setStroke(2, android.graphics.Color.RED) // 2px roter Rand
-                    }
-                    background = debugBorder
-                    // === DEBUG VISUALISIERUNG ENDE ===
-*/
+                    /*
+                                        // === DEBUG VISUALISIERUNG START ===
+                                        // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
+                                        val debugBorder = android.graphics.drawable.GradientDrawable().apply {
+                                            setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
+                                            setStroke(2, android.graphics.Color.RED) // 2px roter Rand
+                                        }
+                                        background = debugBorder
+                                        // === DEBUG VISUALISIERUNG ENDE ===
+                    */
 
                     addView(button)
                 } catch (e: Throwable) {
@@ -1558,7 +1556,7 @@ class HomeFragment : Fragment() {
                     }
 
                     when (action) {
-                        "launch_shortcut" -> handleShortcutLaunch(bundle)
+                        "launch_shortcut" -> handleShortcutLaunch(bundle, viewModel)
                         AppContextMenuAction.ACTION_ID_APP_INFO -> showAppInfo(app)
                         AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
                         AppContextMenuAction.ACTION_ID_HIDE_APP -> viewModel.onHideApp(app)
@@ -1572,44 +1570,6 @@ class HomeFragment : Fragment() {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up result listener")
-        }
-    }
-
-    private fun handleShortcutLaunch(bundle: Bundle) {
-        try {
-            val shortcut = try {
-                bundle.getParcelable(
-                    AppContextMenuDialogFragment.RESULT_KEY_SHORTCUT,
-                    ShortcutInfo::class.java
-                )
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting shortcut")
-                null
-            }
-
-            if (shortcut == null) {
-                Timber.w("Shortcut is null")
-                viewModel.onAppInfoError()
-                return
-            }
-
-            try {
-                val launcherApps = requireContext()
-                    .getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
-
-                if (launcherApps == null) {
-                    TimberWrapper.silentError("LauncherApps service is null")
-                    viewModel.onAppInfoError()
-                    return
-                }
-
-                launcherApps.startShortcut(shortcut, null, null)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error launching shortcut")
-                viewModel.onAppInfoError()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
         }
     }
 
