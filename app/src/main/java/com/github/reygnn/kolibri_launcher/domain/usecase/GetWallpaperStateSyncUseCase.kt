@@ -11,5 +11,5 @@ import javax.inject.Inject
 class GetWallpaperStateSyncUseCase @Inject constructor(
     private val repository: WallpaperRepository
 ) {
-    operator fun invoke(): WallpaperState = repository.getWallpaperStateSync()
+    suspend operator fun invoke(): WallpaperState = repository.getWallpaperStateSync()
 }

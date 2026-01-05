@@ -15,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +54,7 @@ class BackupManagerIsolationTest {
     private lateinit var fakeSwipeRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     private lateinit var backupManager: BackupManager
     private lateinit var mockContext: Context
@@ -128,6 +130,8 @@ class BackupManagerIsolationTest {
         fakeSwipeRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
         fakeInstalledAppsRepo = FakeInstalledAppsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
+
 
         // Installiere ALLE Apps (Base und Target), damit Importe nicht gefiltert werden
         fakeInstalledAppsRepo.installedApps = listOf(
@@ -149,6 +153,7 @@ class BackupManagerIsolationTest {
             fakeInstalledAppsRepo,
             fakeSwipeRepo,
             fakeSettingsRepo,
+            fakeWallpaperRepo,
             mockContext
         )
 

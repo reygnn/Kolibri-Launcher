@@ -32,6 +32,7 @@ class BackupManagerNamingConventionTest {
     private lateinit var fakeCustomNamesRepo: FakeCustomNamesRepository
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     @Before
     fun setUp() {
@@ -42,6 +43,7 @@ class BackupManagerNamingConventionTest {
         fakeCustomNamesRepo = FakeCustomNamesRepository()
         fakeInstalledAppsRepo = FakeInstalledAppsRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         val mockContext = mock(Context::class.java)
         `when`(mockContext.contentResolver).thenReturn(mock())
@@ -54,6 +56,7 @@ class BackupManagerNamingConventionTest {
             installedAppsManager = fakeInstalledAppsRepo,
             swipeActionsManager = fakeSwipeActionsRepo,
             settingsManager = fakeSettingsRepo,
+            wallpaperManager = fakeWallpaperRepo,
             context = mockContext
         )
     }

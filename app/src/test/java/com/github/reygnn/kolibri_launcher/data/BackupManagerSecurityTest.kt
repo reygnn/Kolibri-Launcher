@@ -13,6 +13,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import org.mockito.Mockito.mock
@@ -52,6 +53,7 @@ class BackupManagerSecurityTest {
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
     private lateinit var mockContext: Context
 
     @Before
@@ -63,6 +65,7 @@ class BackupManagerSecurityTest {
         fakeInstalledAppsRepo = FakeInstalledAppsRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         mockContext = mock(Context::class.java)
         val mockContentResolver = mock(ContentResolver::class.java)
@@ -76,6 +79,7 @@ class BackupManagerSecurityTest {
             installedAppsManager = fakeInstalledAppsRepo,
             swipeActionsManager = fakeSwipeActionsRepo,
             settingsManager = fakeSettingsRepo,
+            wallpaperManager = fakeWallpaperRepo,
             context = mockContext
         )
     }

@@ -46,6 +46,7 @@ class PreviewBackupUseCaseTest {
             hasSwipeLeft = false,
             hasSwipeRight = false,
             hasThemeSettings = true,
+            hasWallpaper = false,
             hasGestureSettings = false,
             hasTimeBasedEvents = false,
             hasQualityOfLife = false,

@@ -12,6 +12,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -20,6 +21,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +61,7 @@ class BackupManager @Inject constructor(
     private val installedAppsManager: InstalledAppsRepository,
     private val swipeActionsManager: SwipeActionsRepository,
     private val settingsManager: SettingsRepository,
+    private val wallpaperManager: WallpaperRepository,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -86,6 +89,9 @@ class BackupManager @Inject constructor(
             val isFontBold = settingsManager.isFontBoldStateFlow.first()
             val contentTopMarginScale = settingsManager.contentTopMarginScaleFlow.first()
 
+            // Wallpaper Settings
+            val wallpaperState = wallpaperManager.getWallpaperStateSync()
+
             val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
             val showAlarm = settingsManager.showAlarmFlow.first()
             val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
@@ -110,6 +116,11 @@ class BackupManager @Inject constructor(
                 contentTopMarginScale = contentTopMarginScale,
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
+                // Wallpaper - nur speichern wenn vorhanden
+                wallpaperUri = wallpaperState.imageUri?.toString(),
+                wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null,
+                wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null,
+                wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null,
                 showCalendarEvent = showCalendarEvent,
                 showAlarm = showAlarm,
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
@@ -226,6 +237,12 @@ class BackupManager @Inject constructor(
                 verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
                 contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
 
+                // Wallpaper Floats
+                wallpaperUri = settings.getStrictString("wallpaper_uri") ?: backup.settings.wallpaperUri,
+                wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: backup.settings.wallpaperScale,
+                wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: backup.settings.wallpaperTranslateX,
+                wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: backup.settings.wallpaperTranslateY,
+
                 // Booleans
                 isFontBold = settings.getStrictBool("is_font_bold") ?: backup.settings.isFontBold,
                 textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
@@ -273,8 +290,11 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 2. Float-Felder (snake_case)
-            val floatFields = listOf("layout_scale", "vertical_padding_scale", "top_margin_scale")
+            // 2. Float-Felder (snake_case) - inkl. Wallpaper
+            val floatFields = listOf(
+                "layout_scale", "vertical_padding_scale", "top_margin_scale",
+                "wallpaper_scale", "wallpaper_translate_x", "wallpaper_translate_y"
+            )
             for (field in floatFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
@@ -307,8 +327,8 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 4. String-Felder (Swipe Apps) (snake_case)
-            val stringFields = listOf("swipe_left_app", "swipe_right_app")
+            // 4. String-Felder (Swipe Apps + Wallpaper URI) (snake_case)
+            val stringFields = listOf("swipe_left_app", "swipe_right_app", "wallpaper_uri")
             for (field in stringFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     if (settings.get(field) !is String) {
@@ -405,6 +425,12 @@ class BackupManager @Inject constructor(
             layoutScale = settingsJson.getStrictFloat("layout_scale"),
             verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
             contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),
+
+            // Wallpaper
+            wallpaperUri = settingsJson.getStrictString("wallpaper_uri"),
+            wallpaperScale = settingsJson.getStrictFloat("wallpaper_scale"),
+            wallpaperTranslateX = settingsJson.getStrictFloat("wallpaper_translate_x"),
+            wallpaperTranslateY = settingsJson.getStrictFloat("wallpaper_translate_y"),
 
             isFontBold = settingsJson.getStrictBool("is_font_bold"),
             textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
@@ -537,7 +563,7 @@ class BackupManager @Inject constructor(
             backup.settings.swipeDownToNotificationsEnabled?.let { settingsManager.setSwipeDownToNotifications(it) }
         }
 
-        // ===== PHASE 7: Import Theme Settings =====
+        // ===== PHASE 7: Import Theme Settings (inkl. Wallpaper) =====
         if (options.importThemeSettings) {
             backup.settings.textColor?.let { settingsManager.setTextColor(it) }
             backup.settings.chipBackgroundColor?.let { settingsManager.setChipBackgroundColor(it) }
@@ -552,6 +578,35 @@ class BackupManager @Inject constructor(
             }
             backup.settings.contentTopMarginScale?.let {
                 settingsManager.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
+            }
+
+            // Wallpaper Import
+            val wallpaperUri = backup.settings.wallpaperUri
+            if (!wallpaperUri.isNullOrBlank()) {
+                try {
+                    val uri = wallpaperUri.toUri()
+                    // Validiere dass die URI noch zugreifbar ist
+                    val canAccess = try {
+                        context.contentResolver.openInputStream(uri)?.use { true } ?: false
+                    } catch (e: Exception) {
+                        false
+                    }
+
+                    if (canAccess) {
+                        val wallpaperState = WallpaperState(
+                            imageUri = uri,
+                            scale = backup.settings.wallpaperScale ?: 1.0f,
+                            translateX = backup.settings.wallpaperTranslateX ?: 0.0f,
+                            translateY = backup.settings.wallpaperTranslateY ?: 0.0f
+                        )
+                        wallpaperManager.saveWallpaperState(wallpaperState)
+                        Timber.Forest.i("Imported wallpaper settings")
+                    } else {
+                        Timber.Forest.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
+                    }
+                } catch (e: Exception) {
+                    TimberWrapper.silentError(e, "Failed to restore wallpaper")
+                }
             }
         }
 
@@ -839,6 +894,7 @@ class BackupManager @Inject constructor(
                         backup.settings.verticalPaddingScale != null ||
                         backup.settings.isFontBold != null ||
                         backup.settings.contentTopMarginScale != null,
+                hasWallpaper = backup.settings.wallpaperUri != null,
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||

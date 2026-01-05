@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.*
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -84,6 +85,13 @@ class LauncherViewModelSecurityTest {
     @Mock lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
     @Mock lateinit var setFontBoldUseCase: SetFontBoldUseCase
     @Mock lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
+
+    // Wallpaper Mocks
+    @Mock lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
+    @Mock lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
+    @Mock lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
+    @Mock lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
+
     @Mock lateinit var appUpdateSignal: AppUpdateSignal
     @Mock lateinit var context: Context
 
@@ -125,6 +133,10 @@ class LauncherViewModelSecurityTest {
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
+            observeWallpaperStateUseCase = observeWallpaperStateUseCase,
+            saveWallpaperStateUseCase = saveWallpaperStateUseCase,
+            setWallpaperImageUseCase = setWallpaperImageUseCase,
+            clearWallpaperUseCase = clearWallpaperUseCase,
             appUpdateSignal = appUpdateSignal,
             SavedStateHandle(),
             context = context,
@@ -148,6 +160,9 @@ class LauncherViewModelSecurityTest {
 
         `when`(context.getString(any())).thenReturn("Test String")
         `when`(context.getString(any(), any())).thenReturn("Test String with args")
+
+        // Wallpaper Mock
+        `when`(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(WallpaperState.NONE))
     }
 
     // ========================================================================

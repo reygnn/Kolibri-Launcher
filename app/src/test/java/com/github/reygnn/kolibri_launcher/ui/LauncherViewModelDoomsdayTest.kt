@@ -20,7 +20,9 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
@@ -34,11 +36,13 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseC
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
@@ -46,6 +50,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
@@ -182,6 +187,19 @@ class LauncherViewModelDoomsdayTest {
 
     @Mock
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
+
+    // --- WALLPAPER MOCKS ---
+    @Mock
+    private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
+
+    @Mock
+    private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
+
+    @Mock
+    private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
+
+    @Mock
+    private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -214,6 +232,9 @@ class LauncherViewModelDoomsdayTest {
         whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
         whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
         whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(flowOf(0f))
+
+        // Wallpaper Mock-Verhalten
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(WallpaperState.NONE))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -247,6 +268,10 @@ class LauncherViewModelDoomsdayTest {
             setVerticalPaddingUseCase,
             setFontBoldUseCase,
             setContentTopMarginUseCase,
+            observeWallpaperStateUseCase,
+            saveWallpaperStateUseCase,
+            setWallpaperImageUseCase,
+            clearWallpaperUseCase,
             appUpdateSignal,
             SavedStateHandle(),
             context,
@@ -447,6 +472,10 @@ class LauncherViewModelDoomsdayTest {
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
+            observeWallpaperStateUseCase = observeWallpaperStateUseCase,
+            saveWallpaperStateUseCase = saveWallpaperStateUseCase,
+            setWallpaperImageUseCase = setWallpaperImageUseCase,
+            clearWallpaperUseCase = clearWallpaperUseCase,
             appUpdateSignal = appUpdateSignal,
             savedStateHandle = savedState,
             context = context,

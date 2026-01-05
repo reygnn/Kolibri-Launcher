@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -37,6 +38,7 @@ class BackupManagerStrictTest {
     private lateinit var installedAppsRepo: FakeInstalledAppsRepository
     private lateinit var swipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var settingsRepo: FakeSettingsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     // Mocks
     @Mock
@@ -57,6 +59,7 @@ class BackupManagerStrictTest {
         installedAppsRepo = FakeInstalledAppsRepository()
         swipeActionsRepo = FakeSwipeActionsRepository()
         settingsRepo = FakeSettingsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         // 2. Pre-fill Installed Apps
         // Necessary so the Import logic (which filters based on installed apps) works correctly.
@@ -79,6 +82,7 @@ class BackupManagerStrictTest {
             installedAppsManager = installedAppsRepo,
             swipeActionsManager = swipeActionsRepo,
             settingsManager = settingsRepo,
+            wallpaperManager = fakeWallpaperRepo,
             context = mockContext
         )
     }

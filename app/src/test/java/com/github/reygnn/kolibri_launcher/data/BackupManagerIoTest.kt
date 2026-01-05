@@ -96,6 +96,7 @@ class BackupManagerIoTest {
             FakeInstalledAppsRepository(),
             FakeSwipeActionsRepository(),
             fakeRepo,
+            FakeWallpaperRepository(),
             mockContext
         )
     }

@@ -49,6 +49,16 @@ data class LauncherSettings(
     @JsonNames("top_margin_scale")
     val contentTopMarginScale: Float? = null,
 
+    // Wallpaper Settings (Teil der Theme Settings)
+    @JsonNames("wallpaper_uri")
+    val wallpaperUri: String? = null,
+    @JsonNames("wallpaper_scale")
+    val wallpaperScale: Float? = null,
+    @JsonNames("wallpaper_translate_x")
+    val wallpaperTranslateX: Float? = null,
+    @JsonNames("wallpaper_translate_y")
+    val wallpaperTranslateY: Float? = null,
+
     @JsonNames("show_calendar_event")
     val showCalendarEvent: Boolean? = null,
     @JsonNames("show_alarm")
@@ -103,6 +113,7 @@ data class BackupPreview(
     val hasSwipeLeft: Boolean,
     val hasSwipeRight: Boolean,
     val hasThemeSettings: Boolean,
+    val hasWallpaper: Boolean,
     val hasGestureSettings: Boolean,
     val hasTimeBasedEvents: Boolean,
     val hasQualityOfLife: Boolean,

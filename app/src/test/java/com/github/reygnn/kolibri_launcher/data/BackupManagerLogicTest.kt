@@ -39,6 +39,7 @@ class BackupManagerLogicTest {
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     // Mocks
     private lateinit var mockContext: Context
@@ -51,9 +52,10 @@ class BackupManagerLogicTest {
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
         fakeHiddenAppsRepo = FakeHiddenAppsRepository()
         fakeCustomNamesRepo = FakeCustomNamesRepository()
-        fakeInstalledAppsRepo = FakeInstalledAppsRepository() // Dein neues Fake!
+        fakeInstalledAppsRepo = FakeInstalledAppsRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         // Mock Context
         mockContext = mock(Context::class.java)
@@ -68,6 +70,7 @@ class BackupManagerLogicTest {
             installedAppsManager = fakeInstalledAppsRepo,
             swipeActionsManager = fakeSwipeActionsRepo,
             settingsManager = fakeSettingsRepo,
+            wallpaperManager =fakeWallpaperRepo,
             context = mockContext
         )
     }

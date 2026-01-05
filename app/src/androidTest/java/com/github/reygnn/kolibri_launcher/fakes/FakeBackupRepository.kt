@@ -77,6 +77,7 @@ class FakeBackupRepository : BackupRepository, Purgeable {
             hasSwipeLeft = false,
             hasSwipeRight = false,
             hasThemeSettings = false,
+            hasWallpaper = false,
             hasTimeBasedEvents = false,
             hasGestureSettings = false,
             hasQualityOfLife = false,

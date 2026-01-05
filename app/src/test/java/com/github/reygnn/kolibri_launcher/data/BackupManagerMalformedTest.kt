@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -43,6 +44,7 @@ class BackupManagerMalformedTest {
     private lateinit var installedAppsRepo: FakeInstalledAppsRepository
     private lateinit var swipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var settingsRepo: FakeSettingsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     @Mock
     private lateinit var mockContext: Context
@@ -73,6 +75,7 @@ class BackupManagerMalformedTest {
         installedAppsRepo = FakeInstalledAppsRepository()
         swipeActionsRepo = FakeSwipeActionsRepository()
         settingsRepo = FakeSettingsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         // Dummy App, damit Repos nicht leer sind (falls Parsing doch durchkäme)
         val dummyApp = AppInfo("App", "App", "com.test", "cls")
@@ -86,6 +89,7 @@ class BackupManagerMalformedTest {
             installedAppsManager = installedAppsRepo,
             swipeActionsManager = swipeActionsRepo,
             settingsManager = settingsRepo,
+            wallpaperManager = fakeWallpaperRepo,
             context = mockContext
         )
     }

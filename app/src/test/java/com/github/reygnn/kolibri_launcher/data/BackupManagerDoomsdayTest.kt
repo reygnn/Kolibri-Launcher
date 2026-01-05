@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +52,7 @@ class BackupManagerDoomsdayTest {
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
+    private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     private lateinit var backupManager: BackupManager
 
@@ -70,6 +72,7 @@ class BackupManagerDoomsdayTest {
         fakeNamesRepo = FakeCustomNamesRepository()
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
+        fakeWallpaperRepo = FakeWallpaperRepository()
 
         backupManager = BackupManager(
             fakeFavoritesRepo,
@@ -79,6 +82,7 @@ class BackupManagerDoomsdayTest {
             fakeInstalledAppsRepo,
             fakeSwipeActionsRepo,
             fakeSettingsRepo,
+            fakeWallpaperRepo,
             mockContext
         )
     }

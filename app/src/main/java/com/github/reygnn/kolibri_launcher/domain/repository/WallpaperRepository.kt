@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
  * Domain-Layer kennt keine Implementierungsdetails.
  * Ob SharedPreferences, DataStore oder Room – egal.
  */
-interface WallpaperRepository {
+interface WallpaperRepository : Purgeable {
 
     /**
      * Reaktiver Stream des aktuellen Wallpaper-Zustands.
@@ -32,5 +32,5 @@ interface WallpaperRepository {
      * Synchroner Getter für den aktuellen Zustand.
      * Nutzen: Initial-Load beim Fragment-Start.
      */
-    fun getWallpaperStateSync(): WallpaperState
+    suspend fun getWallpaperStateSync(): WallpaperState
 }

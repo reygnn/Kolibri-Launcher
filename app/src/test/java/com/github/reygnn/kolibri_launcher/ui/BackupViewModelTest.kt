@@ -224,6 +224,7 @@ class BackupViewModelTest {
                 hasSwipeLeft = true,
                 hasSwipeRight = false,
                 hasThemeSettings = true,
+                hasWallpaper = true,
                 hasGestureSettings = true,
                 hasTimeBasedEvents = false,
                 hasQualityOfLife = true,
@@ -287,7 +288,20 @@ class BackupViewModelTest {
     fun `resetBackupState - clears preview`() = runTest(mainDispatcherRule.testDispatcher) {
         val mockUriString = "content://fake/backup.json"
         val preview = BackupPreview(
-            "1.0.0", 1L, 1, 1, 1, 1, false, false, true, false, false, false, false
+            "1.0.0",
+            1L,
+            1,
+            1,
+            1,
+            1,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
         )
         fakeBackupRepository.previewResult = preview
         viewModel.previewBackup(mockUriString)

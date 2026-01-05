@@ -89,6 +89,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import android.net.Uri
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 
 @ExperimentalCoroutinesApi
@@ -103,94 +109,72 @@ class LauncherViewModelTest {
 
     @Mock
     private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase
-
     @Mock
     private lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCase
-
     @Mock
     private lateinit var hideAppUseCase: HideAppUseCase
-
     @Mock
     private lateinit var toggleFavoriteUseCase: ToggleFavoriteUseCase
-
     @Mock
     private lateinit var requestLockUseCase: RequestLockUseCase
-
     @Mock
     private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
-
     @Mock
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
-
     @Mock
     private lateinit var refreshAppsUseCase: RefreshAppsUseCase
-
     @Mock
     private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
-
     @Mock
     private lateinit var showAppUseCase: ShowAppUseCase
-
     @Mock
     private lateinit var toggleSortOrderUseCase: ToggleSortOrderUseCase
-
     @Mock
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
-
     @Mock
     private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
-
     @Mock
     private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
-
     @Mock
     private lateinit var setTextColorUseCase: SetTextColorUseCase
-
     @Mock
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-
     @Mock
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
-
     @Mock
     private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
-
     @Mock
     private lateinit var getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase
-
     @Mock
     private lateinit var getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase
-
     @Mock
     private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
-
     @Mock
     private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
-
     @Mock
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
-
     @Mock
     private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
-
+    @Mock
+    private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
+    @Mock
+    private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
+    @Mock
+    private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
+    @Mock
+    private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
     @Mock
     private lateinit var appUpdateSignal: AppUpdateSignal
-
     @Mock
     private lateinit var context: Context
-
     @Mock
     private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
-
     @Mock
     private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
-
     @Mock
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
-
     @Mock
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
-
     @Mock
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
     // --- ENDE DER MOCKS ---
@@ -225,6 +209,8 @@ class LauncherViewModelTest {
         whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
         whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
         whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(flowOf(0f))
+
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(WallpaperState.NONE))
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -258,6 +244,10 @@ class LauncherViewModelTest {
             setVerticalPaddingUseCase,
             setFontBoldUseCase,
             setContentTopMarginUseCase,
+            observeWallpaperStateUseCase,
+            saveWallpaperStateUseCase,
+            setWallpaperImageUseCase,
+            clearWallpaperUseCase,
             appUpdateSignal,
             SavedStateHandle(),
             context,
@@ -2614,5 +2604,259 @@ class LauncherViewModelTest {
 
         // Workaround für Test: Wir vertrauen darauf, dass callbackFlow korrekt implementiert ist.
         // (Mocking von unregisterReceiver ist schwer zu verifizieren, da onCleared protected ist).
+    }
+
+    // ========== WALLPAPER TESTS ==========
+
+    @Test
+    fun `wallpaperState - default is NONE`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.wallpaperState.test {
+            val state = awaitItem()
+            assertFalse(state.hasWallpaper)
+        }
+    }
+
+    @Test
+    fun `wallpaperState - reflects value from UseCase`() = runTest {
+        val testUri = Uri.parse("content://media/external/images/123")
+        val wallpaperState = WallpaperState(
+            imageUri = testUri,
+            scale = 1.5f,
+            translateX = 100f,
+            translateY = 50f
+        )
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.wallpaperState.test {
+            val state = awaitItem()
+            assertTrue(state.hasWallpaper)
+            assertEquals(testUri, state.imageUri)
+            assertEquals(1.5f, state.scale)
+            assertEquals(100f, state.translateX)
+            assertEquals(50f, state.translateY)
+        }
+    }
+
+    @Test
+    fun `wallpaperState - updates dynamically`() = runTest {
+        val stateFlow = MutableStateFlow(WallpaperState.NONE)
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(stateFlow)
+
+        setupViewModel()
+
+        viewModel.wallpaperState.test {
+            assertFalse(awaitItem().hasWallpaper)
+
+            val testUri = Uri.parse("content://media/external/images/456")
+            stateFlow.value = WallpaperState(imageUri = testUri)
+
+            assertTrue(awaitItem().hasWallpaper)
+        }
+    }
+
+    @Test
+    fun `onSetWallpaperImage - calls UseCase with URI`() = runTest {
+        val testUri = Uri.parse("content://media/external/images/789")
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSetWallpaperImage(testUri)
+        advanceUntilIdle()
+
+        verify(setWallpaperImageUseCase).invoke(testUri)
+    }
+
+    @Test
+    fun `onClearWallpaper - calls UseCase`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onClearWallpaper()
+        advanceUntilIdle()
+
+        verify(clearWallpaperUseCase).invoke()
+    }
+
+    @Test
+    fun `onSaveWallpaperTransform - calls UseCase with correct values`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.onSaveWallpaperTransform(2.0f, 150f, 75f)
+        advanceUntilIdle()
+
+        verify(saveWallpaperStateUseCase).invoke(any<WallpaperState>())
+    }
+
+    @Test
+    fun `isWallpaperEditMode - default is false`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.isWallpaperEditMode.test {
+            assertFalse(awaitItem())
+        }
+    }
+
+    @Test
+    fun `onSetWallpaperEditMode - updates state`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.isWallpaperEditMode.test {
+            assertFalse(awaitItem())
+
+            viewModel.onSetWallpaperEditMode(true)
+            assertTrue(awaitItem())
+
+            viewModel.onSetWallpaperEditMode(false)
+            assertFalse(awaitItem())
+        }
+    }
+
+    @Test
+    fun `onToggleWallpaperEditMode - toggles state`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.isWallpaperEditMode.test {
+            assertFalse(awaitItem())
+
+            viewModel.onToggleWallpaperEditMode()
+            assertTrue(awaitItem())
+
+            viewModel.onToggleWallpaperEditMode()
+            assertFalse(awaitItem())
+        }
+    }
+
+    @Test
+    fun `onSetWallpaperImage - when UseCase throws - shows error toast`() = runTest {
+        whenever(setWallpaperImageUseCase.invoke(any())).doAnswer {
+            throw IOException("Cannot save wallpaper")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        val testUri = Uri.parse("content://media/external/images/999")
+
+        viewModel.event.test {
+            viewModel.onSetWallpaperImage(testUri)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `onClearWallpaper - when UseCase throws - shows error toast`() = runTest {
+        whenever(clearWallpaperUseCase.invoke()).doAnswer {
+            throw IOException("Cannot clear wallpaper")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onClearWallpaper()
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `onSaveWallpaperTransform - when UseCase throws - shows error toast`() = runTest {
+        whenever(saveWallpaperStateUseCase.invoke(any<WallpaperState>())).doAnswer {
+            throw IOException("Cannot save transform")
+        }
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.onSaveWallpaperTransform(1.0f, 0f, 0f)
+            advanceUntilIdle()
+
+            val event = awaitItem()
+            assertTrue(event is UiEvent.ShowToast)
+        }
+    }
+
+    @Test
+    fun `wallpaper operations - rapid successive calls - handles gracefully`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        val testUri = Uri.parse("content://media/external/images/123")
+
+        repeat(10) {
+            viewModel.onSetWallpaperImage(testUri)
+            viewModel.onSaveWallpaperTransform(it.toFloat(), it * 10f, it * 5f)
+            viewModel.onToggleWallpaperEditMode()
+        }
+        advanceUntilIdle()
+
+        verify(setWallpaperImageUseCase, times(10)).invoke(testUri)
+        verify(saveWallpaperStateUseCase, times(10)).invoke(any<WallpaperState>())
+    }
+
+    @Test
+    fun `wallpaper - survives UseCase throwing exception on observe`() = runTest {
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flow {
+            throw RuntimeException("Settings corrupted")
+        })
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // ViewModel sollte überleben
+        assertNotNull(viewModel)
+        assertEquals(WallpaperState.NONE, viewModel.wallpaperState.value)
+    }
+
+    @Test
+    fun `wallpaper - edit mode does not persist across ViewModel recreation`() = runTest {
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Edit-Mode aktivieren
+        viewModel.onSetWallpaperEditMode(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.isWallpaperEditMode.value)
+
+        // ViewModel neu erstellen (simuliert Process Death / Recreation)
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Edit-Mode sollte zurückgesetzt sein (ist transient)
+        assertFalse(viewModel.isWallpaperEditMode.value)
+    }
+
+    @Test
+    fun `wallpaper - integration with other layout settings`() = runTest {
+        val testUri = Uri.parse("content://media/external/images/123")
+        val wallpaperState = WallpaperState(imageUri = testUri, scale = 1.2f)
+        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
+
+        val scaleFlow = MutableStateFlow(0.8f)
+        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+
+        setupViewModel()
+        advanceUntilIdle()
+
+        // Beide sollten unabhängig funktionieren
+        assertEquals(0.8f, viewModel.layoutScaleState.value)
+        assertTrue(viewModel.wallpaperState.value.hasWallpaper)
+        assertEquals(1.2f, viewModel.wallpaperState.value.scale)
     }
 }

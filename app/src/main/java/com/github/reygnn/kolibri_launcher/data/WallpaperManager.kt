@@ -1,149 +1,144 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.content.Context
-import android.content.SharedPreferences
-import android.net.Uri
+import androidx.core.net.toUri
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import timber.log.Timber
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * SharedPreferences-basierte Implementierung des WallpaperRepository.
+ * Repository für Wallpaper-Einstellungen mit DataStore-Persistenz.
  *
  * Speichert:
- * - Image URI als String
- * - Scale, TranslateX, TranslateY als Float
+ * - Image URI (Content-Provider URI als String)
+ * - Scale (Zoom-Faktor)
+ * - TranslateX/Y (Pan-Offset)
  *
- * Thread-Safety: Alle Writes auf Dispatchers.IO
+ * Alle Schreiboperationen sind crash-safe und loggen Fehler still.
+ * CancellationException wird immer re-thrown für korrektes Coroutine-Verhalten.
  */
 @Singleton
 class WallpaperManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val dataStore: DataStore<Preferences>
 ) : WallpaperRepository {
 
     companion object {
-        private const val PREFS_NAME = "kolibri_wallpaper_prefs"
-        private const val KEY_IMAGE_URI = "wallpaper_image_uri"
-        private const val KEY_SCALE = "wallpaper_scale"
-        private const val KEY_TRANSLATE_X = "wallpaper_translate_x"
-        private const val KEY_TRANSLATE_Y = "wallpaper_translate_y"
+        // Keys für DataStore
+        private val KEY_WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
+        private val KEY_WALLPAPER_SCALE = floatPreferencesKey("wallpaper_scale")
+        private val KEY_WALLPAPER_TRANSLATE_X = floatPreferencesKey("wallpaper_translate_x")
+        private val KEY_WALLPAPER_TRANSLATE_Y = floatPreferencesKey("wallpaper_translate_y")
+
+        // Defaults
+        private const val DEFAULT_SCALE = 1.0f
+        private const val DEFAULT_TRANSLATE = 0.0f
     }
 
-    private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
+    override val wallpaperState: Flow<WallpaperState> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                TimberWrapper.silentError(exception, "Error reading wallpaper preferences")
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            try {
+                val uriString = preferences[KEY_WALLPAPER_URI]
 
-    // =========================================================================
-    // REACTIVE STREAM
-    // =========================================================================
-
-    override val wallpaperState: Flow<WallpaperState> = callbackFlow {
-        // Initial emit
-        trySend(loadFromPrefs())
-
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key in listOf(KEY_IMAGE_URI, KEY_SCALE, KEY_TRANSLATE_X, KEY_TRANSLATE_Y)) {
-                trySend(loadFromPrefs())
+                if (uriString.isNullOrBlank()) {
+                    WallpaperState.NONE
+                } else {
+                    WallpaperState(
+                        imageUri = uriString.toUri(),
+                        scale = preferences[KEY_WALLPAPER_SCALE] ?: DEFAULT_SCALE,
+                        translateX = preferences[KEY_WALLPAPER_TRANSLATE_X] ?: DEFAULT_TRANSLATE,
+                        translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE
+                    )
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error parsing wallpaper state")
+                WallpaperState.NONE
             }
         }
 
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-
-        awaitClose {
-            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    override suspend fun getWallpaperStateSync(): WallpaperState {
+        return try {
+            wallpaperState.first()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error getting wallpaper state sync")
+            WallpaperState.NONE
         }
-    }.distinctUntilChanged()
-
-    // =========================================================================
-    // WRITE OPERATIONS
-    // =========================================================================
+    }
 
     override suspend fun saveWallpaperState(state: WallpaperState) {
-        withContext(Dispatchers.IO) {
-            try {
-                val persistState = state.forPersistence()
-
-                prefs.edit().apply {
-                    if (persistState.imageUri != null) {
-                        putString(KEY_IMAGE_URI, persistState.imageUri.toString())
-                    } else {
-                        remove(KEY_IMAGE_URI)
-                    }
-                    putFloat(KEY_SCALE, persistState.scale)
-                    putFloat(KEY_TRANSLATE_X, persistState.translateX)
-                    putFloat(KEY_TRANSLATE_Y, persistState.translateY)
-                    apply()
+        try {
+            dataStore.edit { preferences ->
+                if (state.imageUri != null) {
+                    preferences[KEY_WALLPAPER_URI] = state.imageUri.toString()
+                    preferences[KEY_WALLPAPER_SCALE] = state.scale
+                    preferences[KEY_WALLPAPER_TRANSLATE_X] = state.translateX
+                    preferences[KEY_WALLPAPER_TRANSLATE_Y] = state.translateY
+                } else {
+                    // Kein Wallpaper = alle Keys entfernen
+                    preferences.remove(KEY_WALLPAPER_URI)
+                    preferences.remove(KEY_WALLPAPER_SCALE)
+                    preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
+                    preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
                 }
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error saving wallpaper state")
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error saving wallpaper state")
         }
     }
 
     override suspend fun clearWallpaper() {
-        withContext(Dispatchers.IO) {
-            try {
-                prefs.edit().apply {
-                    remove(KEY_IMAGE_URI)
-                    putFloat(KEY_SCALE, WallpaperState.DEFAULT_SCALE)
-                    putFloat(KEY_TRANSLATE_X, 0f)
-                    putFloat(KEY_TRANSLATE_Y, 0f)
-                    apply()
-                }
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error clearing wallpaper")
+        try {
+            dataStore.edit { preferences ->
+                preferences.remove(KEY_WALLPAPER_URI)
+                preferences.remove(KEY_WALLPAPER_SCALE)
+                preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
+                preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error clearing wallpaper")
         }
     }
 
-    // =========================================================================
-    // READ OPERATIONS
-    // =========================================================================
-
-    override fun getWallpaperStateSync(): WallpaperState {
-        return try {
-            loadFromPrefs()
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error loading wallpaper state sync")
-            WallpaperState.NONE
-        }
-    }
-
-    // =========================================================================
-    // INTERNAL
-    // =========================================================================
-
-    private fun loadFromPrefs(): WallpaperState {
-        return try {
-            val uriString = prefs.getString(KEY_IMAGE_URI, null)
-            val uri = uriString?.let {
-                try {
-                    Uri.parse(it)
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error parsing wallpaper URI")
-                    null
-                }
+    override suspend fun purgeRepository() {
+        try {
+            dataStore.edit { preferences ->
+                preferences.remove(KEY_WALLPAPER_URI)
+                preferences.remove(KEY_WALLPAPER_SCALE)
+                preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
+                preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
             }
-
-            WallpaperState(
-                imageUri = uri,
-                scale = prefs.getFloat(KEY_SCALE, WallpaperState.DEFAULT_SCALE),
-                translateX = prefs.getFloat(KEY_TRANSLATE_X, 0f),
-                translateY = prefs.getFloat(KEY_TRANSLATE_Y, 0f),
-                isEditMode = false
-            )
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error loading wallpaper from prefs")
-            WallpaperState.NONE
+            Timber.d("Wallpaper data purged successfully")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error purging wallpaper data")
         }
     }
 }

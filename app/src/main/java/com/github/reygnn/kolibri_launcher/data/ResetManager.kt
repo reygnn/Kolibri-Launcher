@@ -12,6 +12,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import javax.inject.Inject
@@ -30,6 +31,7 @@ class ResetManager @Inject constructor(
     private val appUsageRepository: AppUsageRepository, // mit purgeRepository
     private val favoritesOrderRepository: FavoritesOrderRepository, // mit purgeRepository
     private val swipeActionsRepository: SwipeActionsRepository, // mit purgeRepository
+    private val wallpaperRepository: WallpaperRepository, // mit purgeRepository
 
     // Settings Repository
     private val settingsRepository: SettingsRepository, // mit purgeRepository
@@ -130,6 +132,17 @@ class ResetManager @Inject constructor(
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error purging swipe actions")
+                allSuccessful = false
+            }
+
+            // Wallpaper
+            try {
+                wallpaperRepository.purgeRepository()
+                Timber.d("Wallpaper purged successfully")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error purging wallpaper")
                 allSuccessful = false
             }
 

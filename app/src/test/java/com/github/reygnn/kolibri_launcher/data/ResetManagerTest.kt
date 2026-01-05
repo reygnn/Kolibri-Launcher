@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.rules.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -39,6 +40,7 @@ class ResetManagerTest {
     @Mock private lateinit var appUsageRepository: AppUsageRepository
     @Mock private lateinit var favoritesOrderRepository: FavoritesOrderRepository
     @Mock private lateinit var swipeActionsRepository: SwipeActionsRepository
+    @Mock private lateinit var wallpaperRepository: WallpaperRepository
     @Mock private lateinit var settingsRepository: SettingsRepository
     @Mock private lateinit var screenLockRepository: ScreenLockRepository
     @Mock private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
@@ -55,6 +57,7 @@ class ResetManagerTest {
             appUsageRepository,
             favoritesOrderRepository,
             swipeActionsRepository,
+            wallpaperRepository,
             settingsRepository,
             screenLockRepository,
             installedAppsStateRepository,
@@ -76,6 +79,7 @@ class ResetManagerTest {
         verify(hiddenAppsRepository).purgeRepository()
         verify(customNamesRepository).purgeRepository()
         verify(swipeActionsRepository).purgeRepository()
+        verify(wallpaperRepository).purgeRepository()
         verify(installedAppsStateRepository).purgeRepository()
         verify(screenLockRepository).purgeRepository()
         verify(timeBasedEventsRepository).purgeRepository()
