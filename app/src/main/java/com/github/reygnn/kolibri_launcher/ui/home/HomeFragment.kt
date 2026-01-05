@@ -213,17 +213,7 @@ class HomeFragment : Fragment() {
             setupDoubleTapActions()
             setupFragmentResultListener()
             setupHomeWindowInsets()
-
-            ViewCompat.setOnApplyWindowInsetsListener(binding.wallpaperEditButtons) { view, insets ->
-                val navBarInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-                view.setPadding(
-                    view.paddingLeft,
-                    view.paddingTop,
-                    view.paddingRight,
-                    resources.getDimensionPixelSize(R.dimen.layout_padding) + navBarInsets.bottom
-                )
-                insets
-            }
+            setupWallpaperEditButtonsInsets()
 
             observeViewModel()
             observeLayoutChanges()
@@ -1750,6 +1740,34 @@ class HomeFragment : Fragment() {
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error applying window insets")
+        }
+    }
+
+
+    /**
+     * Wendet WindowInsets auf die Wallpaper Edit-Buttons an.
+     * Stellt sicher, dass die Buttons über der Navigation Bar sichtbar bleiben.
+     */
+    private fun setupWallpaperEditButtonsInsets() {
+        try {
+            ViewCompat.setOnApplyWindowInsetsListener(binding.wallpaperEditButtons) { view, insets ->
+                val navBarInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                val basePadding = try {
+                    resources.getDimensionPixelSize(R.dimen.layout_padding)
+                } catch (e: Throwable) {
+                    16 // Fallback 16dp in pixels (ungefähr)
+                }
+
+                view.setPadding(
+                    view.paddingLeft,
+                    view.paddingTop,
+                    view.paddingRight,
+                    basePadding + navBarInsets.bottom
+                )
+                insets
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting up wallpaper edit buttons insets")
         }
     }
 
