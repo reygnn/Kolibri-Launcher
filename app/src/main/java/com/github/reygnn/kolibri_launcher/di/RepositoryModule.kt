@@ -1,11 +1,5 @@
 package com.github.reygnn.kolibri_launcher.di
 
-//import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
-//import com.github.reygnn.kolibri_launcher.domain.repository.GetDrawerAppsUseCaseRepository
-//import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
-//import com.github.reygnn.kolibri_launcher.domain.repository.GetFavoriteAppsUseCaseRepository
-//import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
-//import com.github.reygnn.kolibri_launcher.domain.repository.GetOnboardingAppsUseCaseRepository
 import com.github.reygnn.kolibri_launcher.data.AppUsageManager
 import com.github.reygnn.kolibri_launcher.data.BackupManager
 import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
@@ -21,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.data.ShortcutManager
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
 import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
 import com.github.reygnn.kolibri_launcher.data.AppUsageExportManager
+import com.github.reygnn.kolibri_launcher.data.WallpaperManager
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
@@ -37,6 +32,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
 import dagger.Module
@@ -47,24 +43,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-
-//    @Binds
-//    @Singleton
-//    abstract fun bindGetOnboardingAppsUseCase(
-//        impl: GetOnboardingAppsUseCase
-//    ): GetOnboardingAppsUseCaseRepository
-//
-//    @Binds
-//    @Singleton
-//    abstract fun bindGetDrawerAppsUseCaseRepository(
-//        impl: GetDrawerAppsUseCase
-//    ): GetDrawerAppsUseCaseRepository
-//
-//    @Binds
-//    @Singleton
-//    abstract fun bindGetFavoriteAppsUseCaseRepository(
-//        impl: GetFavoriteAppsUseCase
-//    ): GetFavoriteAppsUseCaseRepository
 
     @Binds
     @Singleton
@@ -161,4 +139,9 @@ abstract class RepositoryModule {
         impl: ShortcutLauncherServiceImpl
     ): ShortcutLauncherService
 
+    @Binds
+    @Singleton
+    abstract fun bindWallpaperRepository(
+        impl: WallpaperManager
+    ): WallpaperRepository
 }

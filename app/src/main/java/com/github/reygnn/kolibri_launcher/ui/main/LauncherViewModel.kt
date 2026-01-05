@@ -62,6 +62,12 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import android.net.Uri
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -130,6 +136,10 @@ class LauncherViewModel @Inject constructor(
     private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     private val setFontBoldUseCase: SetFontBoldUseCase,
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase,
+    private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
+    private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
+    private val setWallpaperImageUseCase: SetWallpaperImageUseCase,
+    private val clearWallpaperUseCase: ClearWallpaperUseCase,
 
     private val appUpdateSignal: AppUpdateSignal,
     private val savedStateHandle: SavedStateHandle,
@@ -212,6 +222,17 @@ class LauncherViewModel @Inject constructor(
             emit(0f)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+
+    // ===========================================
+    // WALLPAPER STATE
+    // ===========================================
+
+    private val _wallpaperState = MutableStateFlow(WallpaperState.NONE)
+    val wallpaperState: StateFlow<WallpaperState> = _wallpaperState.asStateFlow()
+
+    /** Separater Edit-Mode State (UI-only, nicht persistiert) */
+    private val _isWallpaperEditMode = MutableStateFlow(false)
+    val isWallpaperEditMode: StateFlow<Boolean> = _isWallpaperEditMode.asStateFlow()
 
     // ===========================================
     // SETTINGS - SPLIT MODE
@@ -336,6 +357,13 @@ class LauncherViewModel @Inject constructor(
                     throw e
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error observing favorite apps")
+                }
+            }
+
+            // Wallpaper State beobachten
+            launchSafe {
+                observeWallpaperStateUseCase().collect { state ->
+                    _wallpaperState.value = state
                 }
             }
 
@@ -801,6 +829,78 @@ class LauncherViewModel @Inject constructor(
         savedStateHandle[AppConstants.KEY_SEARCH_QUERY] = ""
     }
 
+
+    // ===========================================
+    // WALLPAPER FUNCTIONS
+    // ===========================================
+
+    /**
+     * Setzt ein neues Wallpaper-Bild.
+     * Wird aufgerufen, nachdem der User ein Bild aus der Galerie gewählt hat.
+     */
+    fun onSetWallpaperImage(imageUri: Uri) = launchSafe {
+        try {
+            setWallpaperImageUseCase(imageUri)
+            sendEvent(UiEvent.ShowToast(R.string.wallpaper_set_success))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting wallpaper image")
+            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+        }
+    }
+
+    /**
+     * Speichert die aktuelle Wallpaper-Transformation (Zoom/Pan).
+     * Wird aufgerufen, wenn der User den Edit-Mode verlässt.
+     */
+    fun onSaveWallpaperTransform(scale: Float, translateX: Float, translateY: Float) = launchSafe {
+        try {
+            val currentState = _wallpaperState.value
+            if (currentState.hasWallpaper) {
+                saveWallpaperStateUseCase.updateTransform(
+                    currentState = currentState,
+                    scale = scale,
+                    translateX = translateX,
+                    translateY = translateY
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error saving wallpaper transform")
+        }
+    }
+
+    /**
+     * Entfernt das Custom Wallpaper.
+     */
+    fun onClearWallpaper() = launchSafe {
+        try {
+            clearWallpaperUseCase()
+            sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error clearing wallpaper")
+            sendEvent(UiEvent.ShowToast(R.string.error_generic))
+        }
+    }
+
+    /**
+     * Aktiviert/Deaktiviert den Wallpaper Edit-Mode.
+     */
+    fun onSetWallpaperEditMode(enabled: Boolean) {
+        _isWallpaperEditMode.value = enabled
+    }
+
+    /**
+     * Toggle für den Edit-Mode (für Menu-Button).
+     */
+    fun onToggleWallpaperEditMode() {
+        _isWallpaperEditMode.value = !_isWallpaperEditMode.value
+    }
+
     // --- PRIVATE/INTERNAL LOGIC ---
 
     fun refreshInstalledApps() = launchSafe {
@@ -830,32 +930,6 @@ class LauncherViewModel @Inject constructor(
             TimberWrapper.silentError(e, "Error listening for app updates")
         }
     }
-
-/*    fun updateTimeAndDate() {
-        try {
-            val currentTime = Calendar.getInstance().time
-            val is24Hour = DateFormat.is24HourFormat(context)
-            val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
-            val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-            val dateFormat = SimpleDateFormat("E, d MMM", Locale.getDefault())
-
-            _uiState.update {
-                it.copy(
-                    timeString = timeFormat.format(currentTime),
-                    dateString = dateFormat.format(currentTime)
-                )
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to update time and date")
-            // Safe fallback
-            _uiState.update {
-                it.copy(
-                    timeString = DEFAULT_TIME,
-                    dateString = DEFAULT_DATE
-                )
-            }
-        }
-    }*/
 
     fun getInitialBatteryState() {
         try {

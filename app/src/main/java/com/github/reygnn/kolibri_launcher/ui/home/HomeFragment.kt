@@ -44,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
@@ -491,6 +492,60 @@ class HomeFragment : Fragment() {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error observing threshold")
+            }
+        }
+
+        // Observer 7: Wallpaper State
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        viewModel.wallpaperState.collect { wallpaperState ->
+                            if (_binding == null) return@collect
+
+                            try {
+                                updateWallpaper(wallpaperState)
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating wallpaper")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error collecting wallpaper state")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for wallpaper")
+            }
+        }
+
+        // Observer 8: Wallpaper Edit Mode
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    try {
+                        viewModel.isWallpaperEditMode.collect { isEditMode ->
+                            if (_binding == null) return@collect
+
+                            try {
+                                updateWallpaperEditMode(isEditMode)
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error collecting wallpaper edit mode")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for wallpaper edit mode")
             }
         }
 
@@ -1411,9 +1466,22 @@ class HomeFragment : Fragment() {
     private fun createGestureListener() = object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean = true
 
-        override fun onLongPress(e: MotionEvent) {
+/*        override fun onLongPress(e: MotionEvent) {
             try {
                 viewModel.onLongPress()
+            } catch (ex: Throwable) {
+                TimberWrapper.silentError(ex, "Error in long press")
+            }
+        }*/
+
+        override fun onLongPress(e: MotionEvent) {
+            try {
+                if (viewModel.isWallpaperEditMode.value) {
+                    // Edit-Mode beenden
+                    viewModel.onSetWallpaperEditMode(false)
+                } else {
+                    viewModel.onLongPress()
+                }
             } catch (ex: Throwable) {
                 TimberWrapper.silentError(ex, "Error in long press")
             }
@@ -1807,6 +1875,105 @@ class HomeFragment : Fragment() {
         }
     }
 
+
+    // ============================================================================
+    // WALLPAPER HANDLING
+    // ============================================================================
+
+    /**
+     * Aktualisiert das Wallpaper basierend auf dem State.
+     */
+    private fun updateWallpaper(state: WallpaperState) {
+        if (_binding == null) return
+
+        try {
+            val wallpaperView = binding.wallpaperView
+
+            if (state.hasWallpaper && state.imageUri != null) {
+                // Bild laden
+                try {
+                    wallpaperView.setImageURI(state.imageUri)
+                    wallpaperView.visibility = View.VISIBLE
+
+                    // Transformation anwenden (nach dem Layout)
+                    wallpaperView.post {
+                        try {
+                            if (state.isTransformed) {
+                                wallpaperView.applyTransform(
+                                    state.scale,
+                                    state.translateX,
+                                    state.translateY
+                                )
+                            } else {
+                                // Erstes Mal: Center-Crop
+                                wallpaperView.centerCrop()
+                            }
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error applying wallpaper transform")
+                        }
+                    }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error loading wallpaper image")
+                    wallpaperView.visibility = View.GONE
+                }
+            } else {
+                // Kein Wallpaper
+                wallpaperView.setImageDrawable(null)
+                wallpaperView.visibility = View.GONE
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error in updateWallpaper")
+        }
+    }
+
+    /**
+     * Aktiviert/Deaktiviert den Edit-Mode für das Wallpaper.
+     */
+    private fun updateWallpaperEditMode(isEditMode: Boolean) {
+        if (_binding == null) return
+
+        try {
+            val wallpaperView = binding.wallpaperView
+            val editOverlay = binding.wallpaperEditOverlay
+
+            wallpaperView.isEditMode = isEditMode
+
+            if (isEditMode) {
+                // Overlay fängt Touches ab und leitet sie weiter
+                editOverlay.visibility = View.VISIBLE
+                editOverlay.setOnTouchListener { _, event ->
+                    wallpaperView.onTouchEvent(event)
+                }
+
+                // Leichte Transparenz – Content bleibt erkennbar
+                binding.rootLayout.alpha = 0.7f
+
+                wallpaperView.onTransformChanged = { _, _, _ ->
+                    // Optional: Live-Feedback
+                }
+            } else {
+                // Edit-Mode beendet
+                editOverlay.visibility = View.GONE
+                editOverlay.setOnTouchListener(null)
+                binding.rootLayout.alpha = 1.0f
+
+                // Transformation speichern
+                if (viewModel.wallpaperState.value.hasWallpaper) {
+                    viewModel.onSaveWallpaperTransform(
+                        wallpaperView.currentScale,
+                        wallpaperView.currentTranslateX,
+                        wallpaperView.currentTranslateY
+                    )
+                }
+                wallpaperView.onTransformChanged = null
+            }
+
+            Timber.d("Wallpaper edit mode: $isEditMode")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
+        }
+    }
+
     // ============================================================================
     // LIFECYCLE
     // ============================================================================
@@ -1881,6 +2048,13 @@ class HomeFragment : Fragment() {
             longClickedApp = null
             lastSpacingInput = null
             cachedBorderDrawable = null
+
+            // Wallpaper Callback aufräumen
+            try {
+                binding.wallpaperView.onTransformChanged = null
+            } catch (e: Throwable) {
+                // Ignore
+            }
 
             // 4. Binding nullen - Der "Golden Hammer"
             // Durchbricht den Fragment-View-Zyklus.

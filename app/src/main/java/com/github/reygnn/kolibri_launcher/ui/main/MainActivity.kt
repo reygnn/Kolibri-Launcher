@@ -139,6 +139,29 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
     }
 
+    private val wallpaperPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        try {
+            if (uri != null) {
+                // Persistente Berechtigung holen (wichtig für App-Neustart!)
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: SecurityException) {
+                    TimberWrapper.silentError(e, "Could not persist URI permission")
+                    // Trotzdem versuchen – funktioniert evtl. für die Session
+                }
+                viewModel.onSetWallpaperImage(uri)
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error handling wallpaper picker result")
+            Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         try {
             installSplashScreen()
@@ -522,6 +545,23 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     showAccessibilityDialog()
                 }
 
+                is UiEvent.OpenWallpaperPicker -> {
+                    try {
+                        wallpaperPickerLauncher.launch(arrayOf("image/*"))
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error launching wallpaper picker")
+                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                is UiEvent.EnterWallpaperEditMode -> {
+                    viewModel.onSetWallpaperEditMode(true)
+                }
+
+                is UiEvent.ExitWallpaperEditMode -> {
+                    viewModel.onSetWallpaperEditMode(false)
+                }
+
                 is UiEvent.ShowToast,
                 is UiEvent.ShowToastFromString,
                 is UiEvent.NavigateUp,
@@ -601,58 +641,91 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private fun showCustomizationOptionsDialog() {
         try {
-            // 1. WICHTIG: Vorherigen Dialog schließen
-            // Verhindert Stapeln von Dialogen und stellt sicher, dass wir sauber starten
+            // 1. Vorherigen Dialog schließen
             currentDialog?.dismiss()
             currentDialog = null
 
-            val options = arrayOf(
-                getString(R.string.customize_colors_and_shadow),
-                getString(R.string.customize_layout_title),
-                getString(R.string.more_settings)
-            )
+            val hasWallpaper = viewModel.wallpaperState.value.hasWallpaper
+            val isEditMode = viewModel.isWallpaperEditMode.value
 
-            // 2. Dialog bauen und Referenz speichern
+            // Dynamische Optionen basierend auf Wallpaper-Status
+            val options = mutableListOf<String>()
+            val actions = mutableListOf<() -> Unit>()
+
+            // Wallpaper Optionen (immer zuerst, da kontextabhängig)
+            if (isEditMode) {
+                // Im Edit-Mode: Option zum Beenden
+                options.add(getString(R.string.wallpaper_save))
+                actions.add {
+                    viewModel.onSetWallpaperEditMode(false)
+                }
+            } else {
+                // Normal: Wallpaper wählen
+                options.add(getString(R.string.wallpaper_choose))
+                actions.add {
+                    wallpaperPickerLauncher.launch(arrayOf("image/*"))
+                }
+
+                // Falls Wallpaper vorhanden: Edit & Remove Optionen
+                if (hasWallpaper) {
+                    options.add(getString(R.string.wallpaper_edit_mode))
+                    actions.add {
+                        viewModel.onSetWallpaperEditMode(true)
+                    }
+
+                    options.add(getString(R.string.wallpaper_remove))
+                    actions.add {
+                        viewModel.onClearWallpaper()
+                    }
+                }
+            }
+
+            // Bestehende Optionen
+            options.add(getString(R.string.customize_colors_and_shadow))
+            actions.add {
+                try {
+                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing color customization")
+                }
+            }
+
+            options.add(getString(R.string.customize_layout_title))
+            actions.add {
+                try {
+                    LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing layout customization")
+                }
+            }
+
+            options.add(getString(R.string.more_settings))
+            actions.add {
+                try {
+                    val intent = Intent(this, SettingsActivity::class.java)
+                    startActivity(intent)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "[MAIN] Error starting settings")
+                }
+            }
+
+            // 2. Dialog bauen
             currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.customize_title))
-                .setItems(options) { _, which ->
+                .setItems(options.toTypedArray()) { _, which ->
                     try {
-                        when (which) {
-                            0 -> {
-                                try {
-                                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error showing color customization")
-                                }
-                            }
-                            1 -> {
-                                try {
-                                    LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error showing layout customization")
-                                }
-                            }
-                            2 -> {
-                                try {
-                                    val intent = Intent(this, SettingsActivity::class.java)
-                                    startActivity(intent)
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "[MAIN] Error starting settings")
-                                }
-                            }
-                        }
+                        actions.getOrNull(which)?.invoke()
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error handling dialog selection")
                     }
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .setOnDismissListener {
-                    // GC-CLEANUP: Wenn der User den Dialog normal schliesst, Referenz löschen
                     if (currentDialog == it) {
                         currentDialog = null
                     }
                 }
-                .show() // Zeigt den Dialog und gibt die Instanz zurück
+                .show()
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing customization options dialog")

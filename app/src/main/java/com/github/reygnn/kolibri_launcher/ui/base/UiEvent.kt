@@ -21,4 +21,8 @@ sealed class UiEvent {
     object RefreshAppDrawer : UiEvent()
     data object ShowCustomizationOptions : UiEvent()
     data object ShowColorPickerDialog : UiEvent()
+
+    data object OpenWallpaperPicker : UiEvent()
+    data object EnterWallpaperEditMode : UiEvent()
+    data object ExitWallpaperEditMode : UiEvent()
 }
