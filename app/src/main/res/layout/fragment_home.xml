@@ -120,14 +120,63 @@
 
     </LinearLayout>
 
-    <!-- Layer 2: Edit-Mode Overlay (optional, für spätere UI-Controls) -->
+    <!-- Layer 2: Edit-Mode Overlay -->
     <FrameLayout
         android:id="@+id/wallpaperEditOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone">
 
-        <!-- Hier können später Save/Cancel Buttons hin -->
+        <!-- Touch-Interceptor (unsichtbar, leitet an WallpaperView) -->
+        <View
+            android:id="@+id/wallpaperTouchInterceptor"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Hint oben -->
+        <TextView
+            android:id="@+id/wallpaperEditHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="48dp"
+            android:text="@string/wallpaper_edit_hint"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:background="@drawable/bg_hint_rounded"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:elevation="4dp" />
+
+        <!-- Button-Leiste unten -->
+        <LinearLayout
+                android:id="@+id/wallpaperEditButtons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
+                android:gravity="end">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperCancel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wallpaper_cancel"
+                android:textColor="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperSave"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/wallpaper_save" />
+
+        </LinearLayout>
 
     </FrameLayout>
 

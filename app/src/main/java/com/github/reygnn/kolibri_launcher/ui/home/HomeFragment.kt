@@ -169,6 +169,7 @@ class HomeFragment : Fragment() {
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }
     }
+    private var wallpaperStateBeforeEdit: Triple<Float, Float, Float>? = null
 
 
     // ===========================================
@@ -212,6 +213,17 @@ class HomeFragment : Fragment() {
             setupDoubleTapActions()
             setupFragmentResultListener()
             setupHomeWindowInsets()
+
+            ViewCompat.setOnApplyWindowInsetsListener(binding.wallpaperEditButtons) { view, insets ->
+                val navBarInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                view.setPadding(
+                    view.paddingLeft,
+                    view.paddingTop,
+                    view.paddingRight,
+                    resources.getDimensionPixelSize(R.dimen.layout_padding) + navBarInsets.bottom
+                )
+                insets
+            }
 
             observeViewModel()
             observeLayoutChanges()
@@ -1926,6 +1938,7 @@ class HomeFragment : Fragment() {
         }
     }
 
+
     /**
      * Aktiviert/Deaktiviert den Edit-Mode für das Wallpaper.
      */
@@ -1935,40 +1948,77 @@ class HomeFragment : Fragment() {
         try {
             val wallpaperView = binding.wallpaperView
             val editOverlay = binding.wallpaperEditOverlay
+            val touchInterceptor = binding.wallpaperTouchInterceptor
 
             wallpaperView.isEditMode = isEditMode
 
             if (isEditMode) {
-                // Overlay fängt Touches ab und leitet sie weiter
+                // Zustand VOR Edit speichern (für Cancel)
+                wallpaperStateBeforeEdit = Triple(
+                    wallpaperView.currentScale,
+                    wallpaperView.currentTranslateX,
+                    wallpaperView.currentTranslateY
+                )
+
+                // Overlay anzeigen
                 editOverlay.visibility = View.VISIBLE
-                editOverlay.setOnTouchListener { _, event ->
+
+                // Touch-Interceptor leitet an WallpaperView weiter
+                touchInterceptor.setOnTouchListener { _, event ->
                     wallpaperView.onTouchEvent(event)
                 }
 
                 // Leichte Transparenz – Content bleibt erkennbar
                 binding.rootLayout.alpha = 0.7f
 
-                wallpaperView.onTransformChanged = { _, _, _ ->
-                    // Optional: Live-Feedback
+                // Save Button
+                binding.btnWallpaperSave.setOnClickListener {
+                    try {
+                        // Transformation speichern
+                        if (viewModel.wallpaperState.value.hasWallpaper) {
+                            viewModel.onSaveWallpaperTransform(
+                                wallpaperView.currentScale,
+                                wallpaperView.currentTranslateX,
+                                wallpaperView.currentTranslateY
+                            )
+                        }
+                        viewModel.onSetWallpaperEditMode(false)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error saving wallpaper")
+                    }
                 }
+
+                // Cancel Button
+                binding.btnWallpaperCancel.setOnClickListener {
+                    try {
+                        // Transformation zurücksetzen auf Zustand VOR Edit
+                        wallpaperStateBeforeEdit?.let { (scale, transX, transY) ->
+                            wallpaperView.applyTransform(scale, transX, transY)
+                        }
+                        viewModel.onSetWallpaperEditMode(false)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error canceling wallpaper edit")
+                    }
+                }
+
+                Timber.d("Wallpaper edit mode: ON")
+
             } else {
                 // Edit-Mode beendet
                 editOverlay.visibility = View.GONE
-                editOverlay.setOnTouchListener(null)
+                touchInterceptor.setOnTouchListener(null)
                 binding.rootLayout.alpha = 1.0f
 
-                // Transformation speichern
-                if (viewModel.wallpaperState.value.hasWallpaper) {
-                    viewModel.onSaveWallpaperTransform(
-                        wallpaperView.currentScale,
-                        wallpaperView.currentTranslateX,
-                        wallpaperView.currentTranslateY
-                    )
-                }
-                wallpaperView.onTransformChanged = null
+                // Button-Listener aufräumen
+                binding.btnWallpaperSave.setOnClickListener(null)
+                binding.btnWallpaperCancel.setOnClickListener(null)
+
+                // Gespeicherten Zustand löschen
+                wallpaperStateBeforeEdit = null
+
+                Timber.d("Wallpaper edit mode: OFF")
             }
 
-            Timber.d("Wallpaper edit mode: $isEditMode")
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
         }
@@ -2048,6 +2098,16 @@ class HomeFragment : Fragment() {
             longClickedApp = null
             lastSpacingInput = null
             cachedBorderDrawable = null
+
+            wallpaperStateBeforeEdit = null
+
+            try {
+                binding.wallpaperTouchInterceptor.setOnTouchListener(null)
+                binding.btnWallpaperSave.setOnClickListener(null)
+                binding.btnWallpaperCancel.setOnClickListener(null)
+            } catch (e: Throwable) {
+                // Ignore
+            }
 
             // Wallpaper Callback aufräumen
             try {

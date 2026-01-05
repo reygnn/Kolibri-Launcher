@@ -652,14 +652,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             val options = mutableListOf<String>()
             val actions = mutableListOf<() -> Unit>()
 
-            // Wallpaper Optionen (immer zuerst, da kontextabhängig)
+            // Im Edit-Mode: Dialog nicht öffnen (Buttons sind sichtbar)
             if (isEditMode) {
-                // Im Edit-Mode: Option zum Beenden
-                options.add(getString(R.string.wallpaper_save))
-                actions.add {
-                    viewModel.onSetWallpaperEditMode(false)
-                }
-            } else {
+                return
+            }
+
+            // Wallpaper Optionen
+            run {
                 // Normal: Wallpaper wählen
                 options.add(getString(R.string.wallpaper_choose))
                 actions.add {
