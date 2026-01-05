@@ -49,7 +49,7 @@ val coreTestingVersion = "2.2.0"  // DO NOT CHANGE !!!
 val turbineVersion = "1.2.1"  // OK to upgrade
 val androidxTestJunitVersion = "1.2.1"  // DO NOT CHANGE !!!
 val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beachten!
-val jsonVersion = "20250517"
+val jsonVersion = "20251224"
 val androidxTestVersion = "1.6.1"
 val androidxTestCoreVersion = "1.6.1"
 val robolectricVersion = "4.16"  // OK to upgrade
@@ -190,7 +190,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'MaterialYou' mit
-    implementation("androidx.activity:activity:1.11.0")
+    implementation("androidx.activity:activity:1.12.2")
     //noinspection NewerVersionAvailable
     implementation("androidx.fragment:fragment-ktx:$fragmentVersion")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
@@ -203,7 +203,7 @@ dependencies {
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
 // Data & Async
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
+    implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
 

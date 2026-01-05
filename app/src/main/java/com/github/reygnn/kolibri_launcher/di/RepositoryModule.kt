@@ -21,6 +21,7 @@ import com.github.reygnn.kolibri_launcher.data.ShortcutManager
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
 import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
 import com.github.reygnn.kolibri_launcher.data.AppUsageExportManager
+import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -36,6 +37,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
+import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -152,5 +154,11 @@ abstract class RepositoryModule {
     abstract fun bindResetRepository(
         resetManager: ResetManager
     ): ResetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindShortcutLauncherService(
+        impl: ShortcutLauncherServiceImpl
+    ): ShortcutLauncherService
 
 }

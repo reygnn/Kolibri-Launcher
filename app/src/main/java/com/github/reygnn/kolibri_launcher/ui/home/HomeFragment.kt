@@ -3,8 +3,11 @@ package com.github.reygnn.kolibri_launcher.ui.home
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -46,6 +49,7 @@ import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialog
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
+import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
@@ -62,9 +66,17 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
+
+    // ===========================================
+    // INJECTED DEPENDENCIES
+    // ===========================================
+
+    @Inject
+    lateinit var launchShortcutUseCase: LaunchShortcutUseCase
 
     // ===========================================
     // VIEWMODEL
@@ -1556,7 +1568,11 @@ class HomeFragment : Fragment() {
                     }
 
                     when (action) {
-                        "launch_shortcut" -> handleShortcutLaunch(bundle, viewModel)
+                        "launch_shortcut" -> handleShortcutLaunch(
+                            bundle,
+                            viewModel,
+                            launchShortcutUseCase
+                        )
                         AppContextMenuAction.ACTION_ID_APP_INFO -> showAppInfo(app)
                         AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
                         AppContextMenuAction.ACTION_ID_HIDE_APP -> viewModel.onHideApp(app)

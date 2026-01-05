@@ -32,6 +32,7 @@ import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
+import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -41,6 +42,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * ULTRA CRASH-SAFE AppDrawerFragment
@@ -57,6 +59,13 @@ import timber.log.Timber
  */
 @AndroidEntryPoint
 class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
+
+    // ===========================================
+    // INJECTED DEPENDENCIES
+    // ===========================================
+
+    @Inject
+    lateinit var launchShortcutUseCase: LaunchShortcutUseCase
 
     // ===========================================
     // VIEWMODEL
@@ -289,7 +298,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                     }
 
                     when (action) {
-                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(bundle, viewModel)
+                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(
+                            bundle,
+                            viewModel,
+                            launchShortcutUseCase
+                        )
                         AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
                         AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(
                             app
