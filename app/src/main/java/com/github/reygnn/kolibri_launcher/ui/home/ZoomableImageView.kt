@@ -124,6 +124,10 @@ class ZoomableImageView @JvmOverloads constructor(
     private var wasAtTopEdge = false
     private var wasAtBottomEdge = false
 
+    // Temporäre Speicher für Edge-Resistance (vermeidet Pair-Allocation im Loop)
+    private var resDx = 0f
+    private var resDy = 0f
+
     // ===========================================
     // INITIALIZATION
     // ===========================================
@@ -269,11 +273,11 @@ class ZoomableImageView @JvmOverloads constructor(
                             startPoint.set(event.x, event.y)
                         }
                     } else {
-                        // Edge Resistance anwenden
-                        val (adjustedDx, adjustedDy) = applyEdgeResistance(dx, dy)
+                        // Edge Resistance berechnen (schreibt in resDx, resDy)
+                        applyEdgeResistance(dx, dy)
 
-                        currentTranslateX += adjustedDx
-                        currentTranslateY += adjustedDy
+                        currentTranslateX += resDx
+                        currentTranslateY += resDy
                         rebuildMatrix()
 
                         // Startpunkt für nächsten Move updaten
@@ -322,25 +326,29 @@ class ZoomableImageView @JvmOverloads constructor(
     // ===========================================
 
     /**
-     * Berechnet gedämpfte Translation mit progressivem Widerstand.
-     * Je weiter das Bild über die Kante gezogen wird, desto stärker die Dämpfung.
+     * Berechnet gedämpfte Translation und speichert das Ergebnis in [resDx] und [resDy].
+     * (Kein Return-Value, um Allocations zu vermeiden)
      *
      * @param dx Gewünschte horizontale Translation
      * @param dy Gewünschte vertikale Translation
-     * @return Pair(adjustedDx, adjustedDy) - die gedämpften Werte
      */
-    private fun applyEdgeResistance(dx: Float, dy: Float): Pair<Float, Float> {
-        val drawable = drawable ?: return dx to dy
+    private fun applyEdgeResistance(dx: Float, dy: Float) {
+        val drawable = drawable
+        if (drawable == null) {
+            resDx = dx
+            resDy = dy
+            return
+        }
 
         val scaledWidth = drawable.intrinsicWidth * currentScale
         val scaledHeight = drawable.intrinsicHeight * currentScale
 
-        var adjustedDx = dx
-        var adjustedDy = dy
+        // Default: Keine Dämpfung
+        resDx = dx
+        resDy = dy
 
         // === Horizontale Achse ===
         if (scaledWidth >= width) {
-            // Aktuelle Überschreitung berechnen
             val leftOvershoot = maxOf(0f, currentTranslateX)
             val rightOvershoot = maxOf(0f, width - (currentTranslateX + scaledWidth))
 
@@ -348,13 +356,13 @@ class ZoomableImageView @JvmOverloads constructor(
                 // Nach rechts ziehen UND linke Kante sichtbar/würde sichtbar
                 dx > 0 && (leftOvershoot > 0 || currentTranslateX + dx > 0) -> {
                     val overshoot = maxOf(leftOvershoot, currentTranslateX + dx)
-                    adjustedDx = dx * rubberBandFactor(overshoot)
+                    resDx = dx * rubberBandFactor(overshoot)
                     handleEdgeHaptic(isLeft = true)
                 }
                 // Nach links ziehen UND rechte Kante sichtbar/würde sichtbar
                 dx < 0 && (rightOvershoot > 0 || currentTranslateX + scaledWidth + dx < width) -> {
                     val overshoot = maxOf(rightOvershoot, width - (currentTranslateX + scaledWidth + dx))
-                    adjustedDx = dx * rubberBandFactor(overshoot)
+                    resDx = dx * rubberBandFactor(overshoot)
                     handleEdgeHaptic(isLeft = false)
                 }
                 else -> {
@@ -373,13 +381,13 @@ class ZoomableImageView @JvmOverloads constructor(
                 // Nach unten ziehen UND obere Kante sichtbar/würde sichtbar
                 dy > 0 && (topOvershoot > 0 || currentTranslateY + dy > 0) -> {
                     val overshoot = maxOf(topOvershoot, currentTranslateY + dy)
-                    adjustedDy = dy * rubberBandFactor(overshoot)
+                    resDy = dy * rubberBandFactor(overshoot)
                     handleEdgeHaptic(isTop = true)
                 }
                 // Nach oben ziehen UND untere Kante sichtbar/würde sichtbar
                 dy < 0 && (bottomOvershoot > 0 || currentTranslateY + scaledHeight + dy < height) -> {
                     val overshoot = maxOf(bottomOvershoot, height - (currentTranslateY + scaledHeight + dy))
-                    adjustedDy = dy * rubberBandFactor(overshoot)
+                    resDy = dy * rubberBandFactor(overshoot)
                     handleEdgeHaptic(isTop = false)
                 }
                 else -> {
@@ -388,8 +396,6 @@ class ZoomableImageView @JvmOverloads constructor(
                 }
             }
         }
-
-        return adjustedDx to adjustedDy
     }
 
     /**
