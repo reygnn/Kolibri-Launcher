@@ -320,11 +320,10 @@
 <string name="usage_import_replace">Ersetzen</string>
 
 
+<string name="wallpaper_choose">Hintergrund wählen</string>
 <string name="wallpaper_set_success">Hintergrund gesetzt</string>
-<string name="wallpaper_removed">Hintergrund entfernt</string>
 <string name="wallpaper_edit_mode">Hintergrund bearbeiten</string>
-<string name="wallpaper_choose">Bild wählen</string>
 <string name="wallpaper_remove">Hintergrund entfernen</string>
-
+<string name="wallpaper_removed">Hintergrund entfernt</string>
 
 </resources>
