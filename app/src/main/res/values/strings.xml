@@ -339,5 +339,6 @@
 <string name="wallpaper_edit_hint">Pinch to zoom, drag to pan</string>
 <string name="wallpaper_save">Save</string>
 <string name="wallpaper_cancel">Cancel</string>
+<string name="wallpaper_snap_toggle">Snap on/off</string>
 
 </resources>

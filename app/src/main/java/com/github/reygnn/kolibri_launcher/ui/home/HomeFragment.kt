@@ -1468,13 +1468,13 @@ class HomeFragment : Fragment() {
     private fun createGestureListener() = object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean = true
 
-/*        override fun onLongPress(e: MotionEvent) {
-            try {
-                viewModel.onLongPress()
-            } catch (ex: Throwable) {
-                TimberWrapper.silentError(ex, "Error in long press")
-            }
-        }*/
+        /*        override fun onLongPress(e: MotionEvent) {
+                    try {
+                        viewModel.onLongPress()
+                    } catch (ex: Throwable) {
+                        TimberWrapper.silentError(ex, "Error in long press")
+                    }
+                }*/
 
         override fun onLongPress(e: MotionEvent) {
             try {
@@ -2019,6 +2019,17 @@ class HomeFragment : Fragment() {
                     }
                 }
 
+                // Snap-Toggle Button (Magnet)
+                updateSnapButtonIcon(wallpaperView.isSnapEnabled)
+                binding.btnWallpaperSnap.setOnClickListener {
+                    try {
+                        wallpaperView.isSnapEnabled = !wallpaperView.isSnapEnabled
+                        updateSnapButtonIcon(wallpaperView.isSnapEnabled)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error toggling snap mode")
+                    }
+                }
+
                 Timber.d("Wallpaper edit mode: ON")
 
             } else {
@@ -2030,6 +2041,10 @@ class HomeFragment : Fragment() {
                 // Button-Listener aufräumen
                 binding.btnWallpaperSave.setOnClickListener(null)
                 binding.btnWallpaperCancel.setOnClickListener(null)
+                binding.btnWallpaperSnap.setOnClickListener(null)
+
+                // Snap beim Verlassen wieder aktivieren (Default-Zustand)
+                wallpaperView.isSnapEnabled = true
 
                 // Gespeicherten Zustand löschen
                 wallpaperStateBeforeEdit = null
@@ -2040,6 +2055,15 @@ class HomeFragment : Fragment() {
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
         }
+    }
+
+    /**
+     * Aktualisiert das Magnet-Icon basierend auf dem Snap-Status.
+     */
+    private fun updateSnapButtonIcon(isSnapEnabled: Boolean) {
+        if (_binding == null) return
+        val iconRes = if (isSnapEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
+        binding.btnWallpaperSnap.setIconResource(iconRes)
     }
 
     // ============================================================================
@@ -2123,6 +2147,7 @@ class HomeFragment : Fragment() {
                 binding.wallpaperTouchInterceptor.setOnTouchListener(null)
                 binding.btnWallpaperSave.setOnClickListener(null)
                 binding.btnWallpaperCancel.setOnClickListener(null)
+                binding.btnWallpaperSnap.setOnClickListener(null)
             } catch (e: Throwable) {
                 // Ignore
             }

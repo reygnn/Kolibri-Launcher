@@ -325,5 +325,6 @@
 <string name="wallpaper_edit_mode">Hintergrund bearbeiten</string>
 <string name="wallpaper_remove">Hintergrund entfernen</string>
 <string name="wallpaper_removed">Hintergrund entfernt</string>
+<string name="wallpaper_snap_toggle">Snap an/aus</string>
 
 </resources>

@@ -80,6 +80,13 @@ class ZoomableImageView @JvmOverloads constructor(
     var isEditMode = false
 
     /**
+     * Snap-Modus: Wenn true, werden Edge Resistance (Rubber-Band),
+     * Snap-Back-Animation und Kanten-Haptics aktiviert.
+     * Wenn false, kann das Bild frei ohne Einschränkungen bewegt werden.
+     */
+    var isSnapEnabled = true
+
+    /**
      * Callback wenn sich die Transformation ändert.
      * Nützlich für Live-Preview oder "Save"-Button Aktivierung.
      */
@@ -273,11 +280,15 @@ class ZoomableImageView @JvmOverloads constructor(
                             startPoint.set(event.x, event.y)
                         }
                     } else {
-                        // Edge Resistance berechnen (schreibt in resDx, resDy)
-                        applyEdgeResistance(dx, dy)
-
-                        currentTranslateX += resDx
-                        currentTranslateY += resDy
+                        // Edge Resistance nur wenn Snap aktiviert
+                        if (isSnapEnabled) {
+                            applyEdgeResistance(dx, dy)
+                            currentTranslateX += resDx
+                            currentTranslateY += resDy
+                        } else {
+                            currentTranslateX += dx
+                            currentTranslateY += dy
+                        }
                         rebuildMatrix()
 
                         // Startpunkt für nächsten Move updaten
@@ -293,10 +304,14 @@ class ZoomableImageView @JvmOverloads constructor(
                 resetEdgeState()
                 extractValuesFromMatrix()
 
-                // Snap-Back falls nötig
-                val snapTarget = calculateSnapBackTarget()
-                if (snapTarget != null) {
-                    animateSnapBack(snapTarget.first, snapTarget.second)
+                // Snap-Back nur wenn aktiviert
+                if (isSnapEnabled) {
+                    val snapTarget = calculateSnapBackTarget()
+                    if (snapTarget != null) {
+                        animateSnapBack(snapTarget.first, snapTarget.second)
+                    } else {
+                        notifyTransformChanged()
+                    }
                 } else {
                     notifyTransformChanged()
                 }
@@ -606,10 +621,14 @@ class ZoomableImageView @JvmOverloads constructor(
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             savedMatrix.set(imageMatrix)
 
-            // Nach Zoom auch Snap-Back prüfen
-            val snapTarget = calculateSnapBackTarget()
-            if (snapTarget != null) {
-                animateSnapBack(snapTarget.first, snapTarget.second)
+            // Nach Zoom Snap-Back nur wenn aktiviert
+            if (isSnapEnabled) {
+                val snapTarget = calculateSnapBackTarget()
+                if (snapTarget != null) {
+                    animateSnapBack(snapTarget.first, snapTarget.second)
+                } else {
+                    notifyTransformChanged()
+                }
             } else {
                 notifyTransformChanged()
             }

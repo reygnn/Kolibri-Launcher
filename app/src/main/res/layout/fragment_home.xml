@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/wallpaperContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -158,8 +159,26 @@
                 android:paddingHorizontal="16dp"
                 android:paddingTop="16dp"
                 android:paddingBottom="16dp"
-                android:gravity="end">
+                android:gravity="center_vertical">
 
+            <!-- Snap-Toggle links -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperSnap"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/wallpaper_snap_toggle"
+                app:icon="@drawable/ic_magnet_on"
+                app:iconTint="@android:color/white"
+                app:iconSize="24dp" />
+
+            <!-- Spacer -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Cancel + Save rechts -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWallpaperCancel"
                 style="@style/Widget.Material3.Button.TextButton"
