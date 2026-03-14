@@ -4,20 +4,16 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="?attr/colorControlNormal">
-    <!-- Rectangle border with corner accents -->
+    <!-- Left edge bar -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M3,3h18v18H3V3zM5,5v14h14V5H5z" />
+        android:pathData="M2,5h2v14H2z" />
+    <!-- Right edge bar -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M3,3h4v4H3z" />
+        android:pathData="M20,5h2v14h-2z" />
+    <!-- Horizontal double arrow (←→) -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M17,3h4v4h-4z" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M3,17h4v4H3z" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M17,17h4v4h-4z" />
+        android:pathData="M7,12l3,-3v2h4v-2l3,3 -3,3v-2h-4v2z" />
 </vector>

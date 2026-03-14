@@ -2038,28 +2038,31 @@ class HomeFragment : Fragment() {
                             ZoomableImageView.SnapMode.CENTER -> ZoomableImageView.SnapMode.EDGE
                         }
                         updateSnapModeButtonIcon(wallpaperView.snapMode)
+                        // Achsen-Icons müssen sich mitändern
+                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
+                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error toggling snap mode")
                     }
                 }
 
                 // 3. Horizontal Snap Toggle
-                updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled)
+                updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
                 binding.btnWallpaperHSnap.setOnClickListener {
                     try {
                         wallpaperView.isHorizontalSnapEnabled = !wallpaperView.isHorizontalSnapEnabled
-                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled)
+                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error toggling horizontal snap")
                     }
                 }
 
                 // 4. Vertical Snap Toggle
-                updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled)
+                updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
                 binding.btnWallpaperVSnap.setOnClickListener {
                     try {
                         wallpaperView.isVerticalSnapEnabled = !wallpaperView.isVerticalSnapEnabled
-                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled)
+                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error toggling vertical snap")
                     }
@@ -2115,17 +2118,27 @@ class HomeFragment : Fragment() {
         )
     }
 
-    private fun updateHorizontalSnapButtonIcon(isEnabled: Boolean) {
+    private fun updateHorizontalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
         binding.btnWallpaperHSnap.setIconResource(
-            if (isEnabled) R.drawable.ic_horizontal_on else R.drawable.ic_horizontal_off
+            when (mode) {
+                ZoomableImageView.SnapMode.EDGE ->
+                    if (isEnabled) R.drawable.ic_horizontal_edge_on else R.drawable.ic_horizontal_edge_off
+                ZoomableImageView.SnapMode.CENTER ->
+                    if (isEnabled) R.drawable.ic_horizontal_center_on else R.drawable.ic_horizontal_center_off
+            }
         )
     }
 
-    private fun updateVerticalSnapButtonIcon(isEnabled: Boolean) {
+    private fun updateVerticalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
         binding.btnWallpaperVSnap.setIconResource(
-            if (isEnabled) R.drawable.ic_vertical_on else R.drawable.ic_vertical_off
+            when (mode) {
+                ZoomableImageView.SnapMode.EDGE ->
+                    if (isEnabled) R.drawable.ic_vertical_edge_on else R.drawable.ic_vertical_edge_off
+                ZoomableImageView.SnapMode.CENTER ->
+                    if (isEnabled) R.drawable.ic_vertical_center_on else R.drawable.ic_vertical_center_off
+            }
         )
     }
 
