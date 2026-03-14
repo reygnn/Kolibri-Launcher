@@ -327,5 +327,7 @@
 <string name="wallpaper_removed">Hintergrund entfernt</string>
 <string name="wallpaper_snap_toggle">Snap an/aus</string>
 <string name="wallpaper_snap_mode_toggle">Snap-Modus wechseln</string>
+<string name="wallpaper_horizontal_snap_toggle">Horizontaler Snap ein/aus</string>
+<string name="wallpaper_vertical_snap_toggle">Vertikaler Snap ein/aus</string>
 
 </resources>

@@ -341,5 +341,7 @@
 <string name="wallpaper_cancel">Cancel</string>
 <string name="wallpaper_snap_toggle">Snap on/off</string>
 <string name="wallpaper_snap_mode_toggle">Toggle snap-mode</string>
+<string name="wallpaper_horizontal_snap_toggle">Horizontal snap on/off</string>
+<string name="wallpaper_vertical_snap_toggle">Vertical snap on/off</string>
 
 </resources>

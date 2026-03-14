@@ -2009,7 +2009,6 @@ class HomeFragment : Fragment() {
                 // Cancel Button
                 binding.btnWallpaperCancel.setOnClickListener {
                     try {
-                        // Transformation zurücksetzen auf Zustand VOR Edit
                         wallpaperStateBeforeEdit?.let { (scale, transX, transY) ->
                             wallpaperView.applyTransform(scale, transX, transY)
                         }
@@ -2019,7 +2018,7 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                // Snap On/Off Toggle (Magnet)
+                // 1. Snap On/Off Toggle (Magnet)
                 updateSnapButtonIcon(wallpaperView.isSnapEnabled)
                 binding.btnWallpaperSnap.setOnClickListener {
                     try {
@@ -2030,7 +2029,7 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                // Snap-Modus Toggle (Edge ↔ Center)
+                // 2. Snap-Modus Toggle (Edge ↔ Center)
                 updateSnapModeButtonIcon(wallpaperView.snapMode)
                 binding.btnWallpaperSnapMode.setOnClickListener {
                     try {
@@ -2041,6 +2040,28 @@ class HomeFragment : Fragment() {
                         updateSnapModeButtonIcon(wallpaperView.snapMode)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error toggling snap mode")
+                    }
+                }
+
+                // 3. Horizontal Snap Toggle
+                updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled)
+                binding.btnWallpaperHSnap.setOnClickListener {
+                    try {
+                        wallpaperView.isHorizontalSnapEnabled = !wallpaperView.isHorizontalSnapEnabled
+                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error toggling horizontal snap")
+                    }
+                }
+
+                // 4. Vertical Snap Toggle
+                updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled)
+                binding.btnWallpaperVSnap.setOnClickListener {
+                    try {
+                        wallpaperView.isVerticalSnapEnabled = !wallpaperView.isVerticalSnapEnabled
+                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error toggling vertical snap")
                     }
                 }
 
@@ -2057,10 +2078,14 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperCancel.setOnClickListener(null)
                 binding.btnWallpaperSnap.setOnClickListener(null)
                 binding.btnWallpaperSnapMode.setOnClickListener(null)
+                binding.btnWallpaperHSnap.setOnClickListener(null)
+                binding.btnWallpaperVSnap.setOnClickListener(null)
 
                 // Snap-State auf Default zurücksetzen
                 wallpaperView.isSnapEnabled = true
                 wallpaperView.snapMode = ZoomableImageView.SnapMode.EDGE
+                wallpaperView.isHorizontalSnapEnabled = true
+                wallpaperView.isVerticalSnapEnabled = true
 
                 // Gespeicherten Zustand löschen
                 wallpaperStateBeforeEdit = null
@@ -2073,25 +2098,35 @@ class HomeFragment : Fragment() {
         }
     }
 
-    /**
-     * Aktualisiert das Snap On/Off Icon (Magnet).
-     */
     private fun updateSnapButtonIcon(isEnabled: Boolean) {
         if (_binding == null) return
-        val iconRes = if (isEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
-        binding.btnWallpaperSnap.setIconResource(iconRes)
+        binding.btnWallpaperSnap.setIconResource(
+            if (isEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
+        )
     }
 
-    /**
-     * Aktualisiert das Snap-Modus Icon (Edge ↔ Center).
-     */
     private fun updateSnapModeButtonIcon(mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
-        val iconRes = when (mode) {
-            ZoomableImageView.SnapMode.EDGE -> R.drawable.ic_rectangle_on
-            ZoomableImageView.SnapMode.CENTER -> R.drawable.ic_center_on
-        }
-        binding.btnWallpaperSnapMode.setIconResource(iconRes)
+        binding.btnWallpaperSnapMode.setIconResource(
+            when (mode) {
+                ZoomableImageView.SnapMode.EDGE -> R.drawable.ic_rectangle_on
+                ZoomableImageView.SnapMode.CENTER -> R.drawable.ic_center_on
+            }
+        )
+    }
+
+    private fun updateHorizontalSnapButtonIcon(isEnabled: Boolean) {
+        if (_binding == null) return
+        binding.btnWallpaperHSnap.setIconResource(
+            if (isEnabled) R.drawable.ic_horizontal_on else R.drawable.ic_horizontal_off
+        )
+    }
+
+    private fun updateVerticalSnapButtonIcon(isEnabled: Boolean) {
+        if (_binding == null) return
+        binding.btnWallpaperVSnap.setIconResource(
+            if (isEnabled) R.drawable.ic_vertical_on else R.drawable.ic_vertical_off
+        )
     }
 
     // ============================================================================
@@ -2177,6 +2212,8 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperCancel.setOnClickListener(null)
                 binding.btnWallpaperSnap.setOnClickListener(null)
                 binding.btnWallpaperSnapMode.setOnClickListener(null)
+                binding.btnWallpaperHSnap.setOnClickListener(null)
+                binding.btnWallpaperVSnap.setOnClickListener(null)
             } catch (e: Throwable) {
                 // Ignore
             }

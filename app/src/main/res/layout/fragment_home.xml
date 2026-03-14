@@ -157,7 +157,7 @@
                 android:paddingBottom="16dp"
                 android:gravity="center_vertical">
 
-            <!-- Snap On/Off (Magnet) -->
+            <!-- 1. Snap On/Off (Magnet) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWallpaperSnap"
                 style="@style/Widget.Material3.Button.IconButton"
@@ -168,7 +168,7 @@
                 app:iconTint="@android:color/white"
                 app:iconSize="24dp" />
 
-            <!-- Snap-Modus (Edge ↔ Center) -->
+            <!-- 2. Snap-Modus (Edge ↔ Center) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWallpaperSnapMode"
                 style="@style/Widget.Material3.Button.IconButton"
@@ -176,6 +176,28 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_snap_mode_toggle"
                 app:icon="@drawable/ic_rectangle_on"
+                app:iconTint="@android:color/white"
+                app:iconSize="24dp" />
+
+            <!-- 3. Horizontal Snap -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperHSnap"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/wallpaper_horizontal_snap_toggle"
+                app:icon="@drawable/ic_horizontal_on"
+                app:iconTint="@android:color/white"
+                app:iconSize="24dp" />
+
+            <!-- 4. Vertical Snap -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperVSnap"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/wallpaper_vertical_snap_toggle"
+                app:icon="@drawable/ic_vertical_on"
                 app:iconTint="@android:color/white"
                 app:iconSize="24dp" />
 
