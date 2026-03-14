@@ -92,7 +92,6 @@
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <!-- ScrollView (Breite dynamisch: 100% oder 50%) -->
             <com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView
                 android:id="@+id/favoritesScrollView"
                 android:layout_width="0dp"
@@ -108,7 +107,6 @@
                     android:orientation="vertical" />
             </com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView>
 
-            <!-- Rechte Hälfte für Gesten (nur sichtbar wenn Split-Mode) -->
             <View
                 android:id="@+id/gestureZone"
                 android:layout_width="0dp"
@@ -128,13 +126,11 @@
         android:layout_height="match_parent"
         android:visibility="gone">
 
-        <!-- Touch-Interceptor (unsichtbar, leitet an WallpaperView) -->
         <View
             android:id="@+id/wallpaperTouchInterceptor"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- Hint oben -->
         <TextView
             android:id="@+id/wallpaperEditHint"
             android:layout_width="wrap_content"
@@ -161,7 +157,7 @@
                 android:paddingBottom="16dp"
                 android:gravity="center_vertical">
 
-            <!-- Snap-Toggle links -->
+            <!-- Snap On/Off (Magnet) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWallpaperSnap"
                 style="@style/Widget.Material3.Button.IconButton"
@@ -169,6 +165,17 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_snap_toggle"
                 app:icon="@drawable/ic_magnet_on"
+                app:iconTint="@android:color/white"
+                app:iconSize="24dp" />
+
+            <!-- Snap-Modus (Edge ↔ Center) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWallpaperSnapMode"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/wallpaper_snap_mode_toggle"
+                app:icon="@drawable/ic_rectangle_on"
                 app:iconTint="@android:color/white"
                 app:iconSize="24dp" />
 

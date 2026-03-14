@@ -2019,12 +2019,26 @@ class HomeFragment : Fragment() {
                     }
                 }
 
-                // Snap-Toggle Button (Magnet)
+                // Snap On/Off Toggle (Magnet)
                 updateSnapButtonIcon(wallpaperView.isSnapEnabled)
                 binding.btnWallpaperSnap.setOnClickListener {
                     try {
                         wallpaperView.isSnapEnabled = !wallpaperView.isSnapEnabled
                         updateSnapButtonIcon(wallpaperView.isSnapEnabled)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error toggling snap")
+                    }
+                }
+
+                // Snap-Modus Toggle (Edge ↔ Center)
+                updateSnapModeButtonIcon(wallpaperView.snapMode)
+                binding.btnWallpaperSnapMode.setOnClickListener {
+                    try {
+                        wallpaperView.snapMode = when (wallpaperView.snapMode) {
+                            ZoomableImageView.SnapMode.EDGE -> ZoomableImageView.SnapMode.CENTER
+                            ZoomableImageView.SnapMode.CENTER -> ZoomableImageView.SnapMode.EDGE
+                        }
+                        updateSnapModeButtonIcon(wallpaperView.snapMode)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error toggling snap mode")
                     }
@@ -2042,9 +2056,11 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperSave.setOnClickListener(null)
                 binding.btnWallpaperCancel.setOnClickListener(null)
                 binding.btnWallpaperSnap.setOnClickListener(null)
+                binding.btnWallpaperSnapMode.setOnClickListener(null)
 
-                // Snap beim Verlassen wieder aktivieren (Default-Zustand)
+                // Snap-State auf Default zurücksetzen
                 wallpaperView.isSnapEnabled = true
+                wallpaperView.snapMode = ZoomableImageView.SnapMode.EDGE
 
                 // Gespeicherten Zustand löschen
                 wallpaperStateBeforeEdit = null
@@ -2058,12 +2074,24 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Aktualisiert das Magnet-Icon basierend auf dem Snap-Status.
+     * Aktualisiert das Snap On/Off Icon (Magnet).
      */
-    private fun updateSnapButtonIcon(isSnapEnabled: Boolean) {
+    private fun updateSnapButtonIcon(isEnabled: Boolean) {
         if (_binding == null) return
-        val iconRes = if (isSnapEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
+        val iconRes = if (isEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
         binding.btnWallpaperSnap.setIconResource(iconRes)
+    }
+
+    /**
+     * Aktualisiert das Snap-Modus Icon (Edge ↔ Center).
+     */
+    private fun updateSnapModeButtonIcon(mode: ZoomableImageView.SnapMode) {
+        if (_binding == null) return
+        val iconRes = when (mode) {
+            ZoomableImageView.SnapMode.EDGE -> R.drawable.ic_rectangle_on
+            ZoomableImageView.SnapMode.CENTER -> R.drawable.ic_center_on
+        }
+        binding.btnWallpaperSnapMode.setIconResource(iconRes)
     }
 
     // ============================================================================
@@ -2148,6 +2176,7 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperSave.setOnClickListener(null)
                 binding.btnWallpaperCancel.setOnClickListener(null)
                 binding.btnWallpaperSnap.setOnClickListener(null)
+                binding.btnWallpaperSnapMode.setOnClickListener(null)
             } catch (e: Throwable) {
                 // Ignore
             }

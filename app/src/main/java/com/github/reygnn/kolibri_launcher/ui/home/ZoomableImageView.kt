@@ -80,11 +80,24 @@ class ZoomableImageView @JvmOverloads constructor(
     var isEditMode = false
 
     /**
-     * Snap-Modus: Wenn true, werden Edge Resistance (Rubber-Band),
-     * Snap-Back-Animation und Kanten-Haptics aktiviert.
-     * Wenn false, kann das Bild frei ohne Einschränkungen bewegt werden.
+     * Snap-Modi für das Bild-Verhalten beim Loslassen.
+     */
+    enum class SnapMode {
+        /** Snap an Kanten: Bild aligniert zur nächsten Displaykante */
+        EDGE,
+        /** Snap zur Mitte: Bild wird immer zentriert */
+        CENTER
+    }
+
+    /**
+     * Master-Schalter: Wenn false, kein Snap, kein Rubber-Band, kein Haptic.
      */
     var isSnapEnabled = true
+
+    /**
+     * Snap-Modus: EDGE oder CENTER, unabhängig von der Bildgrösse.
+     */
+    var snapMode = SnapMode.EDGE
 
     /**
      * Callback wenn sich die Transformation ändert.
@@ -280,7 +293,6 @@ class ZoomableImageView @JvmOverloads constructor(
                             startPoint.set(event.x, event.y)
                         }
                     } else {
-                        // Edge Resistance nur wenn Snap aktiviert
                         if (isSnapEnabled) {
                             applyEdgeResistance(dx, dy)
                             currentTranslateX += resDx
@@ -304,7 +316,6 @@ class ZoomableImageView @JvmOverloads constructor(
                 resetEdgeState()
                 extractValuesFromMatrix()
 
-                // Snap-Back nur wenn aktiviert
                 if (isSnapEnabled) {
                     val snapTarget = calculateSnapBackTarget()
                     if (snapTarget != null) {
@@ -344,6 +355,10 @@ class ZoomableImageView @JvmOverloads constructor(
      * Berechnet gedämpfte Translation und speichert das Ergebnis in [resDx] und [resDy].
      * (Kein Return-Value, um Allocations zu vermeiden)
      *
+     * Modus-aware und grössenunabhängig:
+     * - EDGE: Rubber-Band wenn Bild über den gültigen Kanten-Bereich hinausgeht
+     * - CENTER: Rubber-Band proportional zur Distanz vom Zentrum
+     *
      * @param dx Gewünschte horizontale Translation
      * @param dy Gewünschte vertikale Translation
      */
@@ -358,57 +373,71 @@ class ZoomableImageView @JvmOverloads constructor(
         val scaledWidth = drawable.intrinsicWidth * currentScale
         val scaledHeight = drawable.intrinsicHeight * currentScale
 
-        // Default: Keine Dämpfung
         resDx = dx
         resDy = dy
 
-        // === Horizontale Achse ===
-        if (scaledWidth >= width) {
-            val leftOvershoot = maxOf(0f, currentTranslateX)
-            val rightOvershoot = maxOf(0f, width - (currentTranslateX + scaledWidth))
+        when (snapMode) {
+            SnapMode.EDGE -> {
+                // Gültiger Bereich: [minX, maxX]
+                // Gross: minX = width-scaledWidth (negativ), maxX = 0
+                // Klein: minX = 0, maxX = width-scaledWidth (positiv)
+                val minX = minOf(0f, width - scaledWidth)
+                val maxX = maxOf(0f, width - scaledWidth)
 
-            when {
-                // Nach rechts ziehen UND linke Kante sichtbar/würde sichtbar
-                dx > 0 && (leftOvershoot > 0 || currentTranslateX + dx > 0) -> {
-                    val overshoot = maxOf(leftOvershoot, currentTranslateX + dx)
-                    resDx = dx * rubberBandFactor(overshoot)
-                    handleEdgeHaptic(isLeft = true)
+                val overshootRight = maxOf(0f, currentTranslateX - maxX)
+                val overshootLeft = maxOf(0f, minX - currentTranslateX)
+
+                when {
+                    dx > 0 && (overshootRight > 0 || currentTranslateX + dx > maxX) -> {
+                        val overshoot = maxOf(overshootRight, currentTranslateX + dx - maxX)
+                        resDx = dx * rubberBandFactor(overshoot)
+                        handleEdgeHaptic(isLeft = true)
+                    }
+                    dx < 0 && (overshootLeft > 0 || currentTranslateX + dx < minX) -> {
+                        val overshoot = maxOf(overshootLeft, minX - (currentTranslateX + dx))
+                        resDx = dx * rubberBandFactor(overshoot)
+                        handleEdgeHaptic(isLeft = false)
+                    }
+                    else -> {
+                        wasAtLeftEdge = false
+                        wasAtRightEdge = false
+                    }
                 }
-                // Nach links ziehen UND rechte Kante sichtbar/würde sichtbar
-                dx < 0 && (rightOvershoot > 0 || currentTranslateX + scaledWidth + dx < width) -> {
-                    val overshoot = maxOf(rightOvershoot, width - (currentTranslateX + scaledWidth + dx))
-                    resDx = dx * rubberBandFactor(overshoot)
-                    handleEdgeHaptic(isLeft = false)
-                }
-                else -> {
-                    wasAtLeftEdge = false
-                    wasAtRightEdge = false
+
+                val minY = minOf(0f, height - scaledHeight)
+                val maxY = maxOf(0f, height - scaledHeight)
+
+                val overshootBottom = maxOf(0f, currentTranslateY - maxY)
+                val overshootTop = maxOf(0f, minY - currentTranslateY)
+
+                when {
+                    dy > 0 && (overshootBottom > 0 || currentTranslateY + dy > maxY) -> {
+                        val overshoot = maxOf(overshootBottom, currentTranslateY + dy - maxY)
+                        resDy = dy * rubberBandFactor(overshoot)
+                        handleEdgeHaptic(isTop = true)
+                    }
+                    dy < 0 && (overshootTop > 0 || currentTranslateY + dy < minY) -> {
+                        val overshoot = maxOf(overshootTop, minY - (currentTranslateY + dy))
+                        resDy = dy * rubberBandFactor(overshoot)
+                        handleEdgeHaptic(isTop = false)
+                    }
+                    else -> {
+                        wasAtTopEdge = false
+                        wasAtBottomEdge = false
+                    }
                 }
             }
-        }
 
-        // === Vertikale Achse ===
-        if (scaledHeight >= height) {
-            val topOvershoot = maxOf(0f, currentTranslateY)
-            val bottomOvershoot = maxOf(0f, height - (currentTranslateY + scaledHeight))
+            SnapMode.CENTER -> {
+                val centerX = (width - scaledWidth) / 2f
+                val centerY = (height - scaledHeight) / 2f
 
-            when {
-                // Nach unten ziehen UND obere Kante sichtbar/würde sichtbar
-                dy > 0 && (topOvershoot > 0 || currentTranslateY + dy > 0) -> {
-                    val overshoot = maxOf(topOvershoot, currentTranslateY + dy)
-                    resDy = dy * rubberBandFactor(overshoot)
-                    handleEdgeHaptic(isTop = true)
-                }
-                // Nach oben ziehen UND untere Kante sichtbar/würde sichtbar
-                dy < 0 && (bottomOvershoot > 0 || currentTranslateY + scaledHeight + dy < height) -> {
-                    val overshoot = maxOf(bottomOvershoot, height - (currentTranslateY + scaledHeight + dy))
-                    resDy = dy * rubberBandFactor(overshoot)
-                    handleEdgeHaptic(isTop = false)
-                }
-                else -> {
-                    wasAtTopEdge = false
-                    wasAtBottomEdge = false
-                }
+                // Rubber-Band proportional zur Distanz vom Zentrum
+                val distX = Math.abs(currentTranslateX + dx - centerX)
+                resDx = dx * rubberBandFactor(distX)
+
+                val distY = Math.abs(currentTranslateY + dy - centerY)
+                resDy = dy * rubberBandFactor(distY)
             }
         }
     }
@@ -472,8 +501,13 @@ class ZoomableImageView @JvmOverloads constructor(
     // ===========================================
 
     /**
-     * Berechnet die korrigierte Position, damit keine Bildkanten sichtbar sind.
+     * Berechnet die korrigierte Position basierend auf dem aktuellen [snapMode].
      * Gibt null zurück wenn keine Korrektur nötig.
+     *
+     * EDGE: Snap zur nächsten Displaykante (für alle Bildgrössen).
+     *   - Grosses Bild: Kein Displayrand darf sichtbar sein.
+     *   - Kleines Bild: Bildkante aligniert an nächste Displaykante.
+     * CENTER: Bild wird immer zentriert (für alle Bildgrössen).
      */
     private fun calculateSnapBackTarget(): Pair<Float, Float>? {
         val drawable = drawable ?: return null
@@ -485,51 +519,64 @@ class ZoomableImageView @JvmOverloads constructor(
         var targetY = currentTranslateY
         var needsSnap = false
 
-        // === Horizontale Korrektur ===
-        if (scaledWidth >= width) {
-            // Bild ist breiter als View
-            when {
-                currentTranslateX > 0 -> {
-                    // Linke Kante sichtbar → an linken Rand snappen
-                    targetX = 0f
-                    needsSnap = true
-                }
-                currentTranslateX + scaledWidth < width -> {
-                    // Rechte Kante sichtbar → an rechten Rand snappen
-                    targetX = width - scaledWidth
-                    needsSnap = true
-                }
-            }
-        } else {
-            // Bild ist schmaler als View → zentrieren
-            val centered = (width - scaledWidth) / 2f
-            if (currentTranslateX != centered) {
-                targetX = centered
-                needsSnap = true
-            }
-        }
+        when (snapMode) {
+            SnapMode.EDGE -> {
+                // Gültiger Bereich: [minX, maxX]
+                val minX = minOf(0f, width - scaledWidth)
+                val maxX = maxOf(0f, width - scaledWidth)
 
-        // === Vertikale Korrektur ===
-        if (scaledHeight >= height) {
-            // Bild ist höher als View
-            when {
-                currentTranslateY > 0 -> {
-                    // Obere Kante sichtbar → an oberen Rand snappen
-                    targetY = 0f
-                    needsSnap = true
+                when {
+                    currentTranslateX < minX -> {
+                        targetX = minX
+                        needsSnap = true
+                    }
+                    currentTranslateX > maxX -> {
+                        targetX = maxX
+                        needsSnap = true
+                    }
+                    scaledWidth < width -> {
+                        // Kleines Bild im gültigen Bereich → nächste Kante
+                        val distToLeft = currentTranslateX  // Distanz zu 0
+                        val distToRight = maxX - currentTranslateX  // Distanz zu width-scaledWidth
+                        targetX = if (distToLeft <= distToRight) 0f else maxX
+                        if (currentTranslateX != targetX) needsSnap = true
+                    }
+                    // Grosses Bild im gültigen Bereich → kein Snap nötig
                 }
-                currentTranslateY + scaledHeight < height -> {
-                    // Untere Kante sichtbar → an unteren Rand snappen
-                    targetY = height - scaledHeight
-                    needsSnap = true
+
+                val minY = minOf(0f, height - scaledHeight)
+                val maxY = maxOf(0f, height - scaledHeight)
+
+                when {
+                    currentTranslateY < minY -> {
+                        targetY = minY
+                        needsSnap = true
+                    }
+                    currentTranslateY > maxY -> {
+                        targetY = maxY
+                        needsSnap = true
+                    }
+                    scaledHeight < height -> {
+                        val distToTop = currentTranslateY
+                        val distToBottom = maxY - currentTranslateY
+                        targetY = if (distToTop <= distToBottom) 0f else maxY
+                        if (currentTranslateY != targetY) needsSnap = true
+                    }
                 }
             }
-        } else {
-            // Bild ist kürzer als View → zentrieren
-            val centered = (height - scaledHeight) / 2f
-            if (currentTranslateY != centered) {
-                targetY = centered
-                needsSnap = true
+
+            SnapMode.CENTER -> {
+                val centeredX = (width - scaledWidth) / 2f
+                val centeredY = (height - scaledHeight) / 2f
+
+                if (currentTranslateX != centeredX) {
+                    targetX = centeredX
+                    needsSnap = true
+                }
+                if (currentTranslateY != centeredY) {
+                    targetY = centeredY
+                    needsSnap = true
+                }
             }
         }
 
@@ -621,7 +668,6 @@ class ZoomableImageView @JvmOverloads constructor(
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             savedMatrix.set(imageMatrix)
 
-            // Nach Zoom Snap-Back nur wenn aktiviert
             if (isSnapEnabled) {
                 val snapTarget = calculateSnapBackTarget()
                 if (snapTarget != null) {
