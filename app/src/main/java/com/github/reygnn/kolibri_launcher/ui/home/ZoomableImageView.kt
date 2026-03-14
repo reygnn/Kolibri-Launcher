@@ -738,8 +738,19 @@ class ZoomableImageView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        // View-Grösse hat sich geändert – Matrix neu anwenden
-        // (wichtig bei Rotation)
+
+        // Nach Rotation können alte Koordinaten ungültig sein
+        // → Position korrigieren bevor die Matrix gebaut wird
+        if (isSnapEnabled && oldw > 0 && oldh > 0) {
+            val snapTarget = calculateSnapBackTarget()
+            if (snapTarget != null) {
+                currentTranslateX = snapTarget.first
+                currentTranslateY = snapTarget.second
+                notifyTransformChanged()
+            }
+        }
+
+        // Matrix genau einmal neu bauen
         rebuildMatrix()
     }
 
