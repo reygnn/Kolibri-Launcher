@@ -329,5 +329,9 @@
 <string name="wallpaper_snap_mode_toggle">Snap-Modus wechseln</string>
 <string name="wallpaper_horizontal_snap_toggle">Horizontaler Snap ein/aus</string>
 <string name="wallpaper_vertical_snap_toggle">Vertikaler Snap ein/aus</string>
+<string name="wallpaper_add_layer">Layer hinzufügen</string>
+<string name="wallpaper_delete_layer">Layer löschen</string>
+<string name="wallpaper_move_layer_up">Layer nach vorne</string>
+<string name="wallpaper_move_layer_down">Layer nach hinten</string>
 
 </resources>

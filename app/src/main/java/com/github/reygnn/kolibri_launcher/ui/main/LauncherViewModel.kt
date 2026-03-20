@@ -33,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
@@ -899,6 +900,185 @@ class LauncherViewModel @Inject constructor(
      */
     fun onToggleWallpaperEditMode() {
         _isWallpaperEditMode.value = !_isWallpaperEditMode.value
+    }
+
+    // =============================================================================
+// WALLPAPER MULTI-LAYER METHODS
+// Die bestehenden Methoden (onSetWallpaperImage, onSaveWallpaperTransform,
+// onClearWallpaper, onSetWallpaperEditMode, onToggleWallpaperEditMode)
+// bleiben UNVERÄNDERT – sie funktionieren weiter für Single-Layer.
+// =============================================================================
+
+    // --- LAYER MANAGEMENT ---
+
+    /**
+     * Fügt ein neues Layer hinzu.
+     * Beim ersten Aufruf: Bestehender Single-Layer wird automatisch migriert.
+     */
+    fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) = launchSafe {
+        try {
+            val current = _wallpaperState.value
+
+            // Migration: Single → Multi beim ersten addLayer
+            val base = if (!current.isMultiLayer && current.hasWallpaper) {
+                current.toMultiLayer()
+            } else {
+                current
+            }
+
+            val newLayer = WallpaperLayerState(
+                imageUri = imageUri,
+                label = label ?: "Layer ${base.layerCount + 1}"
+            )
+
+            val newState = base.withAddedLayer(newLayer)
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error adding wallpaper layer")
+        }
+    }
+
+    /**
+     * Entfernt ein Layer. Wenn das letzte Layer entfernt wird,
+     * wird der Wallpaper-State komplett geleert.
+     */
+    fun onRemoveWallpaperLayer(layerIndex: Int) = launchSafe {
+        try {
+            val current = _wallpaperState.value
+            val newState = current.withRemovedLayer(layerIndex)
+
+            // Letztes Layer entfernt? → Clear
+            if (newState.layers.isEmpty() && !newState.hasWallpaper) {
+                clearWallpaperUseCase()
+            } else {
+                _wallpaperState.value = newState
+                saveWallpaperStateUseCase(newState.forPersistence())
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error removing wallpaper layer")
+        }
+    }
+
+    /**
+     * Tauscht die Z-Order zweier Layer.
+     */
+    fun onSwapWallpaperLayers(indexA: Int, indexB: Int) = launchSafe {
+        try {
+            val newState = _wallpaperState.value.withSwappedLayers(indexA, indexB)
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error swapping wallpaper layers")
+        }
+    }
+
+    // --- LAYER TRANSFORM ---
+
+    /**
+     * Speichert die Transformation eines bestimmten Layers.
+     * Wird aufgerufen wenn der User im Edit-Mode "Save" drückt.
+     */
+    fun onSaveLayerTransform(
+        layerIndex: Int,
+        scale: Float,
+        translateX: Float,
+        translateY: Float
+    ) = launchSafe {
+        try {
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(scale = scale, translateX = translateX, translateY = translateY)
+            }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error saving layer transform")
+        }
+    }
+
+    /**
+     * Speichert ALLE Layer-Transforms auf einmal.
+     * Nützlich wenn der User mehrere Layer bearbeitet hat.
+     */
+    fun onSaveAllLayerTransforms(
+        transforms: List<Triple<Float, Float, Float>>  // (scale, tx, ty) pro Layer
+    ) = launchSafe {
+        try {
+            var state = _wallpaperState.value
+            transforms.forEachIndexed { index, (scale, tx, ty) ->
+                state = state.withUpdatedLayer(index) {
+                    it.copy(scale = scale, translateX = tx, translateY = ty)
+                }
+            }
+            _wallpaperState.value = state
+            saveWallpaperStateUseCase(state.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error saving all layer transforms")
+        }
+    }
+
+    // --- LAYER PROPERTIES ---
+
+    /**
+     * Setzt die Deckkraft eines Layers.
+     */
+    fun onSetLayerAlpha(layerIndex: Int, alpha: Float) = launchSafe {
+        try {
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(alpha = alpha.coerceIn(0f, 1f))
+            }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting layer alpha")
+        }
+    }
+
+    /**
+     * Setzt den Blend-Modus eines Layers.
+     * @param blendModeName Name des BlendMode (z.B. "MULTIPLY") oder null für Normal
+     */
+    fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) = launchSafe {
+        try {
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(blendModeName = blendModeName)
+            }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting layer blend mode")
+        }
+    }
+
+    /**
+     * Setzt die Sichtbarkeit eines Layers.
+     */
+    fun onSetLayerVisibility(layerIndex: Int, isVisible: Boolean) = launchSafe {
+        try {
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(isVisible = isVisible)
+            }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState.forPersistence())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error setting layer visibility")
+        }
     }
 
     // --- PRIVATE/INTERNAL LOGIC ---

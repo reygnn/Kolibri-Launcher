@@ -5,30 +5,43 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Matrix
-import android.graphics.PointF
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.net.Uri
+import android.os.Build
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.animation.DecelerateInterpolator
 import androidx.appcompat.widget.AppCompatImageView
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Custom ImageView mit Pinch-to-Zoom und Pan-Funktionalität.
+ * Drop-in Replacement für ZoomableImageView mit optionalem Multi-Layer Support.
  *
- * Design-Prinzipien:
- * - Zwei Modi: EDIT (Gesten aktiv) und DISPLAY (Touch-transparent)
- * - Alle Transformationen via Matrix (kein scaleX/Y auf dem View)
- * - Werte jederzeit auslesbar für Persistierung
- * - Crash-safe: Alle Touch-Events in try-catch
- * - Edge Resistance: Progressive Dämpfung wenn Bildkanten sichtbar werden (Rubber-Band)
- * - Snap-Back: Animiert zurück zur Kante beim Loslassen
+ * == BACKWARD COMPATIBILITY ==
+ * Ohne Aufruf von addLayer() verhält sich dieser View IDENTISCH zum
+ * originalen ZoomableImageView:
+ * - setImageDrawable / setImageURI / setImageBitmap → setzt Layer 0
+ * - applyTransform(scale, tx, ty) → transformiert Layer 0
+ * - centerCrop() → Center-Crop auf Layer 0
+ * - currentScale / currentTranslateX / currentTranslateY → liest Layer 0
+ * - onTransformChanged → Callback mit (scale, tx, ty)
+ * - isEditMode, isSnapEnabled, snapMode, etc. → unverändert
  *
- * Usage:
+ * == MULTI-LAYER MODE (Folien-Modell) ==
+ * Sobald addLayer() aufgerufen wird, wechselt der View in den Multi-Layer-Modus:
+ * - Mehrere Bitmaps als Folien übereinander (transparente Bereiche = durchsichtig)
+ * - Per-Layer Alpha (Deckkraft) und BlendMode (Mischverhalten)
+ * - Jedes Layer individuell zoom-/pannbar
+ * - Tap selektiert Layer, aktives Layer empfängt Gesten
+ * - Transparenter Hintergrund möglich → System-Wallpaper scheint durch
+ * - composeToBitmap() exportiert alles als ein Wallpaper
+ *
  * ```xml
  * <ZoomableImageView
  *     android:id="@+id/wallpaperView"
@@ -37,10 +50,27 @@ import kotlin.math.sqrt
  *     android:scaleType="matrix" />
  * ```
  *
+ * Single-Layer (wie bisher):
  * ```kotlin
  * wallpaperView.setImageURI(uri)
- * wallpaperView.isEditMode = true  // Aktiviert Gesten
- * wallpaperView.applyTransform(scale, transX, transY)  // Restore from prefs
+ * wallpaperView.isEditMode = true
+ * wallpaperView.applyTransform(scale, transX, transY)
+ * ```
+ *
+ * Multi-Layer (Folien):
+ * ```kotlin
+ * // Transparent → System-Wallpaper scheint durch
+ * wallpaperView.layerBackgroundColor = Color.TRANSPARENT
+ *
+ * wallpaperView.addLayer(bitmapTop, label = "Oben")
+ * wallpaperView.addLayer(bitmapBottom, label = "Unten")
+ *
+ * // Per-Layer Alpha und BlendMode
+ * wallpaperView.getLayer(1)?.alpha = 0.85f
+ * wallpaperView.getLayer(1)?.blendMode = BlendMode.MULTIPLY
+ *
+ * wallpaperView.isEditMode = true
+ * wallpaperView.activeLayerIndex = 0
  * ```
  */
 class ZoomableImageView @JvmOverloads constructor(
@@ -58,105 +88,197 @@ class ZoomableImageView @JvmOverloads constructor(
         private const val MAX_SCALE = 5.0f
         private const val DEFAULT_SCALE = 1.0f
 
-        // Drag-Schwellwert: Verhindert versehentliches Verschieben bei Tap
+        // Multi-Layer erlaubt kleinere Scales (Bilder können Teil des Screens sein)
+        private const val MULTI_LAYER_MIN_SCALE = 0.1f
+        private const val MULTI_LAYER_MAX_SCALE = 10.0f
+
+        // Relativer Zoom-Faktor bezogen auf den CenterCrop-Scale (Base Scale).
+        // Erlaubt Rein-/Rauszoomen unabhängig von der absoluten Bildgröße.
+        // z.B. bei einem 50x50 Bild mit baseScale=40: maxScale = 40 * 3 = 120
+        private const val ZOOM_IN_MULTIPLIER = 3.0f   // Max 3x über Cover hinaus
+        private const val ZOOM_OUT_MULTIPLIER = 0.25f  // Min 25% des Cover-Scales
+
         private const val DRAG_THRESHOLD_PX = 10f
-
-        // Edge Resistance: Progressive Dämpfung (Rubber-Band Effekt)
-        // Je kleiner der Wert, desto stärker der Widerstand
         private const val EDGE_RESISTANCE_STRENGTH = 0.015f
-
-        // Snap-Back Animation Dauer
         private const val SNAP_BACK_DURATION_MS = 250L
+
+        // Tap Detection
+        private const val TAP_MAX_DISTANCE_PX = 15f
+        private const val TAP_MAX_DURATION_MS = 300L
+
+        // Selection Highlight
+        private const val SELECTION_BORDER_WIDTH = 3f
+        private const val SELECTION_BORDER_COLOR = 0x99FFFFFF.toInt()
+        private const val SELECTION_CORNER_RADIUS = 4f
     }
 
     // ===========================================
-    // STATE
+    // MODE DETECTION
     // ===========================================
 
     /**
-     * Edit-Modus: Wenn true, werden Touch-Events verarbeitet.
-     * Wenn false, werden alle Touches durchgereicht (return false).
+     * True wenn Multi-Layer-Modus aktiv ist (mindestens ein explizites Layer).
+     * Im Single-Layer-Modus wird das ImageView-Drawable direkt genutzt.
      */
+    val isMultiLayerMode: Boolean
+        get() = layers.isNotEmpty()
+
+    // Effektive Scale-Grenzen: Dynamisch basierend auf dem Base-Scale.
+    // Der Base-Scale ist der CenterCrop-Scale (Bild füllt den Screen).
+    // Damit funktioniert Zoom für jede Bildgröße – winzig bis riesig.
+    private var _singleBaseScale = DEFAULT_SCALE
+
+    private val effectiveMinScale: Float
+        get() {
+            val baseScale = if (isMultiLayerMode) {
+                activeLayer?.let { computeLayerBaseScale(it) } ?: MULTI_LAYER_MIN_SCALE
+            } else {
+                _singleBaseScale
+            }
+            return minOf(
+                if (isMultiLayerMode) MULTI_LAYER_MIN_SCALE else MIN_SCALE,
+                baseScale * ZOOM_OUT_MULTIPLIER
+            )
+        }
+
+    private val effectiveMaxScale: Float
+        get() {
+            val baseScale = if (isMultiLayerMode) {
+                activeLayer?.let { computeLayerBaseScale(it) } ?: MULTI_LAYER_MAX_SCALE
+            } else {
+                _singleBaseScale
+            }
+            return maxOf(
+                if (isMultiLayerMode) MULTI_LAYER_MAX_SCALE else MAX_SCALE,
+                baseScale * ZOOM_IN_MULTIPLIER
+            )
+        }
+
+    /**
+     * Berechnet den CenterCrop-Scale für ein Layer (= "Base Scale").
+     * Das ist der Scale, bei dem das Bild den View exakt ausfüllt.
+     */
+    private fun computeLayerBaseScale(layer: WallpaperLayer): Float {
+        val bmp = layer.bitmap ?: return 1f
+        if (width == 0 || height == 0) return 1f
+        return max(width.toFloat() / bmp.width, height.toFloat() / bmp.height)
+    }
+
+    // ===========================================
+    // STATE: SINGLE-LAYER (Original-API)
+    // ===========================================
+
     var isEditMode = false
+        set(value) {
+            field = value
+            if (isMultiLayerMode) invalidate()
+        }
 
-    /**
-     * Snap-Modi für das Bild-Verhalten beim Loslassen.
-     */
-    enum class SnapMode {
-        /** Snap an Kanten: Bild aligniert zur nächsten Displaykante */
-        EDGE,
-        /** Snap zur Mitte: Bild wird immer zentriert */
-        CENTER
-    }
+    enum class SnapMode { EDGE, CENTER }
 
-    /**
-     * Master-Schalter: Wenn false, kein Snap, kein Rubber-Band, kein Haptic.
-     */
     var isSnapEnabled = true
-
-    /**
-     * Snap-Modus: EDGE oder CENTER, unabhängig von der Bildgrösse.
-     */
     var snapMode = SnapMode.EDGE
-
-    /**
-     * Horizontaler Snap: Rubber-Band und Snap-Back auf der X-Achse.
-     */
     var isHorizontalSnapEnabled = true
-
-    /**
-     * Vertikaler Snap: Rubber-Band und Snap-Back auf der Y-Achse.
-     */
     var isVerticalSnapEnabled = true
 
     /**
-     * Callback wenn sich die Transformation ändert.
-     * Nützlich für Live-Preview oder "Save"-Button Aktivierung.
+     * Original-Callback: Wird in BEIDEN Modi aufgerufen (für das aktive Layer).
      */
     var onTransformChanged: ((scale: Float, translateX: Float, translateY: Float) -> Unit)? = null
 
-    // Aktuelle Transformationswerte (auslesbar für Persistierung)
-    var currentScale = DEFAULT_SCALE
-        private set
-    var currentTranslateX = 0f
-        private set
-    var currentTranslateY = 0f
-        private set
+    // Aktuelle Werte – im Multi-Layer-Modus lesen diese vom aktiven Layer
+    var currentScale: Float
+        get() = if (isMultiLayerMode) (activeLayer?.scale ?: DEFAULT_SCALE) else _singleScale
+        private set(value) { _singleScale = value }
+
+    var currentTranslateX: Float
+        get() = if (isMultiLayerMode) (activeLayer?.translateX ?: 0f) else _singleTranslateX
+        private set(value) { _singleTranslateX = value }
+
+    var currentTranslateY: Float
+        get() = if (isMultiLayerMode) (activeLayer?.translateY ?: 0f) else _singleTranslateY
+        private set(value) { _singleTranslateY = value }
+
+    // Interne Single-Layer Werte
+    private var _singleScale = DEFAULT_SCALE
+    private var _singleTranslateX = 0f
+    private var _singleTranslateY = 0f
 
     // ===========================================
-    // MATRIX & GESTURE STATE
+    // STATE: MULTI-LAYER
+    // ===========================================
+
+    private val layers = mutableListOf<WallpaperLayer>()
+
+    /** Index des aktiven Layers (-1 = keins) */
+    var activeLayerIndex: Int = -1
+        set(value) {
+            field = value.coerceIn(-1, layers.size - 1)
+            invalidate()
+            onActiveLayerChanged?.invoke(field, activeLayer)
+        }
+
+    val activeLayer: WallpaperLayer?
+        get() = layers.getOrNull(activeLayerIndex)
+
+    /** Hintergrundfarbe im Multi-Layer-Modus. Default: TRANSPARENT (System-Wallpaper scheint durch) */
+    var layerBackgroundColor: Int = Color.TRANSPARENT
+        set(value) {
+            field = value
+            if (isMultiLayerMode) invalidate()
+        }
+
+    // Multi-Layer Callbacks (optional, zusätzlich zu onTransformChanged)
+    var onLayerTransformChanged: ((layerIndex: Int, scale: Float, translateX: Float, translateY: Float) -> Unit)? = null
+    var onActiveLayerChanged: ((index: Int, layer: WallpaperLayer?) -> Unit)? = null
+    var onLayerTapped: ((index: Int, layer: WallpaperLayer) -> Unit)? = null
+
+    // ===========================================
+    // GESTURE STATE (geteilt zwischen beiden Modi)
     // ===========================================
 
     private val imageMatrix = Matrix()
     private val savedMatrix = Matrix()
-
-    // Für Pan-Geste
     private val startPoint = PointF()
     private var isDragging = false
     private var hasDraggedBeyondThreshold = false
 
-    // Für Pinch-Zoom
     private val scaleDetector: ScaleGestureDetector
-
-    // Matrix-Werte Cache (um Allocations zu vermeiden)
     private val matrixValues = FloatArray(9)
-
-    // Snap-Back Animator (für Cancellation)
     private var snapBackAnimator: ValueAnimator? = null
 
-    // ===========================================
-    // EDGE RESISTANCE STATE
-    // ===========================================
+    // Tap Detection (Multi-Layer)
+    private var tapStartTime = 0L
+    private val tapStartPoint = PointF()
 
-    // Tracking ob wir bereits an einer Kante waren (für Haptic Feedback)
+    // Edge Resistance
     private var wasAtLeftEdge = false
     private var wasAtRightEdge = false
     private var wasAtTopEdge = false
     private var wasAtBottomEdge = false
-
-    // Temporäre Speicher für Edge-Resistance (vermeidet Pair-Allocation im Loop)
     private var resDx = 0f
     private var resDy = 0f
+
+    // ===========================================
+    // PAINT OBJECTS (Multi-Layer Rendering)
+    // ===========================================
+
+    private val bgPaint = Paint().apply { style = Paint.Style.FILL }
+
+    private val bitmapPaint = Paint().apply {
+        isAntiAlias = true
+        isFilterBitmap = true
+    }
+
+    private val selectionPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = SELECTION_BORDER_WIDTH
+        color = SELECTION_BORDER_COLOR
+        isAntiAlias = true
+        pathEffect = DashPathEffect(floatArrayOf(12f, 8f), 0f)
+    }
+
+    private val drawMatrix = Matrix()
 
     // ===========================================
     // INITIALIZATION
@@ -166,95 +288,413 @@ class ZoomableImageView @JvmOverloads constructor(
         scaleType = ScaleType.MATRIX
 
         scaleDetector = ScaleGestureDetector(context, ScaleListener())
-
-        // Deaktiviert den "Quick Scale" (Doppeltap-and-drag zum Zoomen)
-        // Das könnte mit unserem Drag-Handling kollidieren
         scaleDetector.isQuickScaleEnabled = false
     }
 
     // ===========================================
-    // PUBLIC API
+    // PUBLIC API: ORIGINAL (Backward Compatible)
     // ===========================================
 
     /**
      * Wendet eine gespeicherte Transformation an.
-     * Aufrufen nach setImageURI/setImageDrawable.
+     * Single-Layer: Transformiert das Drawable.
+     * Multi-Layer: Transformiert das aktive Layer.
      */
     fun applyTransform(scale: Float, translateX: Float, translateY: Float) {
         try {
             cancelSnapBackAnimation()
-            currentScale = scale.coerceIn(MIN_SCALE, MAX_SCALE)
-            currentTranslateX = translateX
-            currentTranslateY = translateY
 
-            rebuildMatrix()
+            if (isMultiLayerMode) {
+                val layer = activeLayer ?: return
+                layer.scale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
+                layer.translateX = translateX
+                layer.translateY = translateY
+                invalidate()
+            } else {
+                // Base Scale aktualisieren bevor wir clampen
+                updateSingleBaseScale()
+                _singleScale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
+                _singleTranslateX = translateX
+                _singleTranslateY = translateY
+                rebuildSingleMatrix()
+            }
         } catch (e: Exception) {
-            // Fallback: Reset auf Default
             resetTransform()
         }
     }
 
-    /**
-     * Setzt die Transformation auf Default zurück.
-     */
     fun resetTransform() {
         cancelSnapBackAnimation()
-        currentScale = DEFAULT_SCALE
-        currentTranslateX = 0f
-        currentTranslateY = 0f
-        rebuildMatrix()
+
+        if (isMultiLayerMode) {
+            val layer = activeLayer ?: return
+            layer.scale = DEFAULT_SCALE
+            layer.translateX = 0f
+            layer.translateY = 0f
+            invalidate()
+        } else {
+            _singleScale = DEFAULT_SCALE
+            _singleTranslateX = 0f
+            _singleTranslateY = 0f
+            rebuildSingleMatrix()
+        }
     }
 
-    /**
-     * Zentriert das Bild im View mit "Cover"-Verhalten.
-     * Das Bild wird so skaliert, dass es den View komplett ausfüllt.
-     * Aufrufen nachdem das Drawable gesetzt UND der View gemessen wurde.
-     */
     fun centerCrop() {
+        if (isMultiLayerMode) {
+            val idx = activeLayerIndex
+            if (idx >= 0) centerCropLayer(idx)
+            return
+        }
+
         val drawable = drawable ?: return
         if (width == 0 || height == 0) return
 
         try {
             cancelSnapBackAnimation()
-
             val dWidth = drawable.intrinsicWidth.toFloat()
             val dHeight = drawable.intrinsicHeight.toFloat()
             val vWidth = width.toFloat()
             val vHeight = height.toFloat()
-
-            // Scale to cover (wie centerCrop)
             val scale = max(vWidth / dWidth, vHeight / dHeight)
 
-            // Zentrieren
-            val translateX = (vWidth - dWidth * scale) / 2f
-            val translateY = (vHeight - dHeight * scale) / 2f
-
-            currentScale = scale
-            currentTranslateX = translateX
-            currentTranslateY = translateY
-
-            rebuildMatrix()
+            _singleBaseScale = scale  // Base Scale merken für dynamische Zoom-Grenzen
+            _singleScale = scale
+            _singleTranslateX = (vWidth - dWidth * scale) / 2f
+            _singleTranslateY = (vHeight - dHeight * scale) / 2f
+            rebuildSingleMatrix()
         } catch (e: Exception) {
             resetTransform()
         }
     }
 
     // ===========================================
-    // TOUCH HANDLING
+    // PUBLIC API: MULTI-LAYER
+    // ===========================================
+
+    /**
+     * Fügt ein Layer (Folie) hinzu und aktiviert den Multi-Layer-Modus.
+     * Beim ersten Aufruf: Das native Drawable wird deaktiviert.
+     *
+     * @param bitmap Das Bild für diese Folie
+     * @param label Optionaler Name (z.B. "Oben", "Unten")
+     * @param centerCrop Wenn true, wird das Bild automatisch auf Cover skaliert
+     * @param alpha Deckkraft der Folie (0.0–1.0, Default: 1.0 = voll deckend)
+     * @param blendMode Wie sich die Folie mit darunterliegenden mischt (null = normal)
+     * @param sourceUri Source URI für Persistierung
+     * @return Index des neuen Layers
+     */
+    fun addLayer(
+        bitmap: Bitmap,
+        label: String? = null,
+        centerCrop: Boolean = true,
+        alpha: Float = 1.0f,
+        blendMode: BlendMode? = null,
+        sourceUri: Uri? = null
+    ): Int {
+        // Beim ersten Layer: Native Drawable entfernen
+        if (layers.isEmpty()) {
+            super.setImageDrawable(null)
+        }
+
+        val layer = WallpaperLayer(
+            sourceUri = sourceUri,
+            bitmap = bitmap,
+            intrinsicWidth = bitmap.width,
+            intrinsicHeight = bitmap.height,
+            alpha = alpha.coerceIn(0f, 1f),
+            blendMode = blendMode,
+            label = label
+        )
+
+        if (centerCrop && width > 0 && height > 0) {
+            layer.applyCenterCrop(width, height)
+        }
+
+        layers.add(layer)
+        val index = layers.size - 1
+
+        if (layers.size == 1) {
+            activeLayerIndex = 0
+        }
+
+        invalidate()
+        return index
+    }
+
+    fun removeLayer(index: Int): Boolean {
+        if (index !in layers.indices) return false
+        layers.removeAt(index)
+
+        when {
+            layers.isEmpty() -> activeLayerIndex = -1
+            activeLayerIndex >= layers.size -> activeLayerIndex = layers.size - 1
+            activeLayerIndex > index -> activeLayerIndex--
+        }
+
+        invalidate()
+        return true
+    }
+
+    /**
+     * Entfernt alle Layer und kehrt zum Single-Layer-Modus zurück.
+     */
+    fun clearLayers() {
+        layers.clear()
+        activeLayerIndex = -1
+        invalidate()
+    }
+
+    fun swapLayers(indexA: Int, indexB: Int): Boolean {
+        if (indexA !in layers.indices || indexB !in layers.indices) return false
+        val temp = layers[indexA]
+        layers[indexA] = layers[indexB]
+        layers[indexB] = temp
+
+        when (activeLayerIndex) {
+            indexA -> activeLayerIndex = indexB
+            indexB -> activeLayerIndex = indexA
+        }
+
+        invalidate()
+        return true
+    }
+
+    fun moveLayerUp(index: Int): Boolean {
+        if (index >= layers.size - 1) return false
+        return swapLayers(index, index + 1)
+    }
+
+    fun moveLayerDown(index: Int): Boolean {
+        if (index <= 0) return false
+        return swapLayers(index, index - 1)
+    }
+
+    fun getLayers(): List<WallpaperLayer> = layers.toList()
+    val layerCount: Int get() = layers.size
+    fun getLayer(index: Int): WallpaperLayer? = layers.getOrNull(index)
+
+    // ===========================================
+    // PUBLIC API: LAYER PROPERTIES (Folie)
+    // ===========================================
+
+    /**
+     * Setzt die Deckkraft eines Layers.
+     * @param layerIndex Index des Layers
+     * @param alpha 0.0 (transparent) bis 1.0 (deckend)
+     */
+    fun setLayerAlpha(layerIndex: Int, alpha: Float) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        layer.alpha = alpha.coerceIn(0f, 1f)
+        invalidate()
+    }
+
+    /**
+     * Setzt den Blend-Modus eines Layers.
+     * Verfügbare Modi: siehe [WallpaperLayer.AVAILABLE_BLEND_MODES]
+     * null = Normal (SRC_OVER)
+     */
+    fun setLayerBlendMode(layerIndex: Int, blendMode: BlendMode?) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        layer.blendMode = blendMode
+        invalidate()
+    }
+
+    /**
+     * Setzt Sichtbarkeit eines Layers.
+     */
+    fun setLayerVisible(layerIndex: Int, visible: Boolean) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        layer.isVisible = visible
+        invalidate()
+    }
+
+    /**
+     * Transformation auf ein bestimmtes Layer (per Index).
+     */
+    fun applyTransform(layerIndex: Int, scale: Float, translateX: Float, translateY: Float) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        cancelSnapBackAnimation()
+
+        // Scale-Grenzen basierend auf DIESEM Layer (nicht dem aktiven)
+        val baseScale = computeLayerBaseScale(layer)
+        val minS = minOf(MULTI_LAYER_MIN_SCALE, baseScale * ZOOM_OUT_MULTIPLIER)
+        val maxS = maxOf(MULTI_LAYER_MAX_SCALE, baseScale * ZOOM_IN_MULTIPLIER)
+
+        layer.scale = scale.coerceIn(minS, maxS)
+        layer.translateX = translateX
+        layer.translateY = translateY
+        invalidate()
+    }
+
+    fun centerCropLayer(layerIndex: Int) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        if (width == 0 || height == 0) return
+        cancelSnapBackAnimation()
+        layer.applyCenterCrop(width, height)
+        invalidate()
+    }
+
+    fun centerCropAll() {
+        if (width == 0 || height == 0) return
+        cancelSnapBackAnimation()
+        layers.forEach { it.applyCenterCrop(width, height) }
+        invalidate()
+    }
+
+    /**
+     * Exportiert alle sichtbaren Layer als ein einzelnes Bitmap.
+     */
+    fun composeToBitmap(
+        targetWidth: Int = width,
+        targetHeight: Int = height
+    ): Bitmap? {
+        if (targetWidth <= 0 || targetHeight <= 0) return null
+
+        return try {
+            val result = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(result)
+
+            // Hintergrund (transparent bleibt transparent im Bitmap)
+            if (layerBackgroundColor != Color.TRANSPARENT) {
+                canvas.drawColor(layerBackgroundColor)
+            }
+
+            val scaleX = targetWidth.toFloat() / width
+            val scaleY = targetHeight.toFloat() / height
+
+            // Export-Paint (eigene Instanz, Thread-safe)
+            val exportPaint = Paint().apply {
+                isAntiAlias = true
+                isFilterBitmap = true
+            }
+
+            if (isMultiLayerMode) {
+                for (layer in layers) {
+                    if (!layer.isVisible) continue
+                    val bmp = layer.bitmap ?: continue
+
+                    // Alpha
+                    exportPaint.alpha = layer.alphaInt
+
+                    // BlendMode (API 29+)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        exportPaint.blendMode = layer.blendMode
+                    }
+
+                    drawMatrix.reset()
+                    drawMatrix.set(layer.buildMatrix())
+                    if (scaleX != 1f || scaleY != 1f) {
+                        val outputScale = Matrix()
+                        outputScale.setScale(scaleX, scaleY)
+                        drawMatrix.postConcat(outputScale)
+                    }
+                    canvas.drawBitmap(bmp, drawMatrix, exportPaint)
+
+                    // Reset für nächstes Layer
+                    exportPaint.alpha = 255
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        exportPaint.blendMode = null
+                    }
+                }
+            } else {
+                // Single-Layer: Drawable rendern
+                val d = drawable
+                if (d != null) {
+                    drawMatrix.reset()
+                    drawMatrix.postScale(_singleScale * scaleX, _singleScale * scaleY)
+                    drawMatrix.postTranslate(_singleTranslateX * scaleX, _singleTranslateY * scaleY)
+
+                    if (d is BitmapDrawable && d.bitmap != null) {
+                        canvas.drawBitmap(d.bitmap, drawMatrix, exportPaint)
+                    } else {
+                        canvas.save()
+                        canvas.concat(drawMatrix)
+                        d.setBounds(0, 0, d.intrinsicWidth, d.intrinsicHeight)
+                        d.draw(canvas)
+                        canvas.restore()
+                    }
+                }
+            }
+
+            result
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // ===========================================
+    // DRAWING
+    // ===========================================
+
+    override fun onDraw(canvas: Canvas) {
+        if (!isMultiLayerMode) {
+            // Single-Layer: Original AppCompatImageView Rendering
+            super.onDraw(canvas)
+            return
+        }
+
+        // Multi-Layer: Custom Rendering (Folien-Modell)
+        // Hintergrund nur zeichnen wenn nicht komplett transparent
+        if (layerBackgroundColor != Color.TRANSPARENT) {
+            bgPaint.color = layerBackgroundColor
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+        }
+
+        for ((index, layer) in layers.withIndex()) {
+            if (!layer.isVisible) continue
+            val bmp = layer.bitmap ?: continue
+
+            // Alpha auf den Paint anwenden
+            bitmapPaint.alpha = layer.alphaInt
+
+            // BlendMode (API 29+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                bitmapPaint.blendMode = layer.blendMode
+            }
+
+            drawMatrix.reset()
+            drawMatrix.set(layer.buildMatrix())
+            canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
+
+            // Paint zurücksetzen für nächstes Layer
+            bitmapPaint.alpha = 255
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                bitmapPaint.blendMode = null
+            }
+
+            if (isEditMode && index == activeLayerIndex) {
+                drawSelectionHighlight(canvas, layer)
+            }
+        }
+    }
+
+    private fun drawSelectionHighlight(canvas: Canvas, layer: WallpaperLayer) {
+        val bounds = layer.getTransformedBounds() ?: return
+        val inset = SELECTION_BORDER_WIDTH / 2f
+        bounds.inset(inset, inset)
+        canvas.drawRoundRect(
+            bounds,
+            SELECTION_CORNER_RADIUS,
+            SELECTION_CORNER_RADIUS,
+            selectionPaint
+        )
+    }
+
+    // ===========================================
+    // TOUCH HANDLING (Modus-aware)
     // ===========================================
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Nicht im Edit-Modus? Touch durchreichen.
         if (!isEditMode) return false
-
-        // Kein Bild? Nichts zu transformieren.
-        if (drawable == null) return false
+        if (!isMultiLayerMode && drawable == null) return false
+        if (isMultiLayerMode && layers.isEmpty()) return false
 
         return try {
-            handleTouchEvent(event)
+            if (isMultiLayerMode) handleMultiLayerTouch(event)
+            else handleSingleLayerTouch(event)
         } catch (e: Exception) {
-            // Bei jedem Fehler: Geste abbrechen, aber nicht crashen
             isDragging = false
             hasDraggedBeyondThreshold = false
             resetEdgeState()
@@ -262,15 +702,14 @@ class ZoomableImageView @JvmOverloads constructor(
         }
     }
 
-    private fun handleTouchEvent(event: MotionEvent): Boolean {
-        // Scale-Detector bekommt ALLE Events (auch während Drag)
+    // --- Single-Layer Touch (Original-Logik, 1:1) ---
+
+    private fun handleSingleLayerTouch(event: MotionEvent): Boolean {
         scaleDetector.onTouchEvent(event)
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // Laufende Snap-Back Animation abbrechen
                 cancelSnapBackAnimation()
-
                 savedMatrix.set(imageMatrix)
                 startPoint.set(event.x, event.y)
                 isDragging = true
@@ -279,77 +718,59 @@ class ZoomableImageView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
-                // Zweiter Finger: Wir wechseln zu Zoom
-                // Speichere aktuelle Matrix für den Zoom-Start
                 savedMatrix.set(imageMatrix)
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (scaleDetector.isInProgress) {
-                    // Zoom läuft – Pan ignorieren
-                    return true
-                }
+                if (scaleDetector.isInProgress) return true
 
                 if (isDragging && event.pointerCount == 1) {
                     val dx = event.x - startPoint.x
                     val dy = event.y - startPoint.y
 
-                    // Schwellwert-Check
                     if (!hasDraggedBeyondThreshold) {
-                        val distance = sqrt(dx * dx + dy * dy)
-                        if (distance > DRAG_THRESHOLD_PX) {
+                        if (sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
                             hasDraggedBeyondThreshold = true
-                            // Startpunkt neu setzen, damit der Sprung nicht sichtbar ist
                             startPoint.set(event.x, event.y)
                         }
                     } else {
-                        if (isSnapEnabled) {
-                            applyEdgeResistance(dx, dy)
-                            currentTranslateX += resDx
-                            currentTranslateY += resDy
-                        } else {
-                            currentTranslateX += dx
-                            currentTranslateY += dy
-                        }
-                        rebuildMatrix()
+                        val rawDx = event.x - startPoint.x
+                        val rawDy = event.y - startPoint.y
 
-                        // Startpunkt für nächsten Move updaten
+                        if (isSnapEnabled) {
+                            applySingleEdgeResistance(rawDx, rawDy)
+                            _singleTranslateX += resDx
+                            _singleTranslateY += resDy
+                        } else {
+                            _singleTranslateX += rawDx
+                            _singleTranslateY += rawDy
+                        }
+                        rebuildSingleMatrix()
                         startPoint.set(event.x, event.y)
                     }
                 }
             }
 
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 isDragging = false
                 hasDraggedBeyondThreshold = false
                 resetEdgeState()
-                extractValuesFromMatrix()
 
                 if (isSnapEnabled) {
-                    val snapTarget = calculateSnapBackTarget()
-                    if (snapTarget != null) {
-                        animateSnapBack(snapTarget.first, snapTarget.second)
-                    } else {
-                        notifyTransformChanged()
-                    }
+                    val snap = calculateSingleSnapBack()
+                    if (snap != null) animateSingleSnapBack(snap.first, snap.second)
+                    else notifySingleTransformChanged()
                 } else {
-                    notifyTransformChanged()
+                    notifySingleTransformChanged()
                 }
             }
 
             MotionEvent.ACTION_POINTER_UP -> {
-                // Ein Finger losgelassen: Matrix-State sichern
                 savedMatrix.set(imageMatrix)
-                extractValuesFromMatrix()
-
-                // Falls nur noch ein Finger übrig: Startpunkt neu setzen
+                extractSingleValuesFromMatrix()
                 val remainingIndex = if (event.actionIndex == 0) 1 else 0
                 if (event.pointerCount > remainingIndex) {
-                    startPoint.set(
-                        event.getX(remainingIndex),
-                        event.getY(remainingIndex)
-                    )
+                    startPoint.set(event.getX(remainingIndex), event.getY(remainingIndex))
                 }
             }
         }
@@ -357,139 +778,528 @@ class ZoomableImageView @JvmOverloads constructor(
         return true
     }
 
-    // ===========================================
-    // EDGE RESISTANCE (RUBBER-BAND)
-    // ===========================================
+    // --- Multi-Layer Touch ---
 
-    /**
-     * Berechnet gedämpfte Translation und speichert das Ergebnis in [resDx] und [resDy].
-     * (Kein Return-Value, um Allocations zu vermeiden)
-     *
-     * Modus-aware, grössenunabhängig, achsenunabhängig:
-     * - Deaktivierte Achsen bekommen dx/dy ungefiltert
-     * - EDGE: Rubber-Band wenn Bild über den gültigen Kanten-Bereich hinausgeht
-     * - CENTER: Rubber-Band proportional zur Distanz vom Zentrum
-     */
-    private fun applyEdgeResistance(dx: Float, dy: Float) {
-        val drawable = drawable
-        if (drawable == null) {
-            resDx = dx
-            resDy = dy
-            return
+    private fun handleMultiLayerTouch(event: MotionEvent): Boolean {
+        scaleDetector.onTouchEvent(event)
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                cancelSnapBackAnimation()
+                startPoint.set(event.x, event.y)
+                tapStartPoint.set(event.x, event.y)
+                tapStartTime = System.currentTimeMillis()
+                isDragging = true
+                hasDraggedBeyondThreshold = false
+                resetEdgeState()
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (scaleDetector.isInProgress) return true
+
+                val layer = activeLayer ?: return true
+
+                if (isDragging && event.pointerCount == 1) {
+                    val dx = event.x - startPoint.x
+                    val dy = event.y - startPoint.y
+
+                    if (!hasDraggedBeyondThreshold) {
+                        if (sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+                            hasDraggedBeyondThreshold = true
+                            startPoint.set(event.x, event.y)
+                        }
+                    } else {
+                        val rawDx = event.x - startPoint.x
+                        val rawDy = event.y - startPoint.y
+
+                        if (isSnapEnabled) {
+                            applyLayerEdgeResistance(layer, rawDx, rawDy)
+                            layer.translateX += resDx
+                            layer.translateY += resDy
+                        } else {
+                            layer.translateX += rawDx
+                            layer.translateY += rawDy
+                        }
+                        invalidate()
+                        startPoint.set(event.x, event.y)
+                    }
+                }
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (event.actionMasked == MotionEvent.ACTION_UP) {
+                    val tapDuration = System.currentTimeMillis() - tapStartTime
+                    val tapDist = sqrt(
+                        (event.x - tapStartPoint.x).let { it * it } +
+                                (event.y - tapStartPoint.y).let { it * it }
+                    )
+                    if (tapDuration < TAP_MAX_DURATION_MS && tapDist < TAP_MAX_DISTANCE_PX) {
+                        handleLayerTap(event.x, event.y)
+                    }
+                }
+
+                isDragging = false
+                hasDraggedBeyondThreshold = false
+                resetEdgeState()
+
+                val layer = activeLayer
+                if (layer != null && isSnapEnabled) {
+                    val snap = calculateLayerSnapBack(layer)
+                    if (snap != null) animateLayerSnapBack(layer, snap.first, snap.second)
+                    else notifyMultiTransformChanged()
+                } else {
+                    notifyMultiTransformChanged()
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_UP -> {
+                val remainingIndex = if (event.actionIndex == 0) 1 else 0
+                if (event.pointerCount > remainingIndex) {
+                    startPoint.set(event.getX(remainingIndex), event.getY(remainingIndex))
+                }
+            }
         }
 
-        val scaledWidth = drawable.intrinsicWidth * currentScale
-        val scaledHeight = drawable.intrinsicHeight * currentScale
+        return true
+    }
 
-        // Default: ungefiltert
+    private fun handleLayerTap(x: Float, y: Float) {
+        for (i in layers.indices.reversed()) {
+            val layer = layers[i]
+            if (!layer.isVisible) continue
+            val bounds = layer.getTransformedBounds() ?: continue
+            if (bounds.contains(x, y)) {
+                if (activeLayerIndex != i) {
+                    activeLayerIndex = i
+                    triggerHaptic()
+                }
+                onLayerTapped?.invoke(i, layer)
+                return
+            }
+        }
+    }
+
+    // ===========================================
+    // SINGLE-LAYER: MATRIX HELPERS
+    // ===========================================
+
+    private fun rebuildSingleMatrix() {
+        imageMatrix.reset()
+        imageMatrix.postScale(_singleScale, _singleScale)
+        imageMatrix.postTranslate(_singleTranslateX, _singleTranslateY)
+        setImageMatrix(imageMatrix)
+    }
+
+    private fun extractSingleValuesFromMatrix() {
+        imageMatrix.getValues(matrixValues)
+        _singleScale = matrixValues[Matrix.MSCALE_X]
+        _singleTranslateX = matrixValues[Matrix.MTRANS_X]
+        _singleTranslateY = matrixValues[Matrix.MTRANS_Y]
+    }
+
+    /**
+     * Berechnet den Base-Scale (CenterCrop-Scale) aus dem aktuellen Drawable.
+     * Wird aufgerufen bevor Scale-Grenzen benötigt werden (applyTransform, onSizeChanged).
+     */
+    private fun updateSingleBaseScale() {
+        val d = drawable ?: return
+        if (width == 0 || height == 0) return
+        val dw = d.intrinsicWidth.toFloat()
+        val dh = d.intrinsicHeight.toFloat()
+        if (dw <= 0f || dh <= 0f) return
+        _singleBaseScale = max(width / dw, height / dh)
+    }
+
+    private fun notifySingleTransformChanged() {
+        onTransformChanged?.invoke(_singleScale, _singleTranslateX, _singleTranslateY)
+    }
+
+    private fun notifyMultiTransformChanged() {
+        val layer = activeLayer ?: return
+        val idx = activeLayerIndex
+
+        // Original-Callback (backward compatible)
+        onTransformChanged?.invoke(layer.scale, layer.translateX, layer.translateY)
+
+        // Erweiterter Callback
+        onLayerTransformChanged?.invoke(idx, layer.scale, layer.translateX, layer.translateY)
+    }
+
+    // ===========================================
+    // SINGLE-LAYER: EDGE RESISTANCE
+    // ===========================================
+
+    private fun applySingleEdgeResistance(dx: Float, dy: Float) {
+        val d = drawable
+        if (d == null) { resDx = dx; resDy = dy; return }
+
+        val scaledW = d.intrinsicWidth * _singleScale
+        val scaledH = d.intrinsicHeight * _singleScale
+
         resDx = dx
         resDy = dy
 
         when (snapMode) {
             SnapMode.EDGE -> {
-                // === Horizontale Achse ===
                 if (isHorizontalSnapEnabled) {
-                    val minX = minOf(0f, width - scaledWidth)
-                    val maxX = maxOf(0f, width - scaledWidth)
-
-                    val overshootRight = maxOf(0f, currentTranslateX - maxX)
-                    val overshootLeft = maxOf(0f, minX - currentTranslateX)
+                    val minX = minOf(0f, width - scaledW)
+                    val maxX = maxOf(0f, width - scaledW)
+                    val osR = maxOf(0f, _singleTranslateX - maxX)
+                    val osL = maxOf(0f, minX - _singleTranslateX)
 
                     when {
-                        dx > 0 && (overshootRight > 0 || currentTranslateX + dx > maxX) -> {
-                            val overshoot = maxOf(overshootRight, currentTranslateX + dx - maxX)
-                            resDx = dx * rubberBandFactor(overshoot)
+                        dx > 0 && (osR > 0 || _singleTranslateX + dx > maxX) -> {
+                            resDx = dx * rubberBandFactor(maxOf(osR, _singleTranslateX + dx - maxX))
                             handleEdgeHaptic(isLeft = true)
                         }
-                        dx < 0 && (overshootLeft > 0 || currentTranslateX + dx < minX) -> {
-                            val overshoot = maxOf(overshootLeft, minX - (currentTranslateX + dx))
-                            resDx = dx * rubberBandFactor(overshoot)
+                        dx < 0 && (osL > 0 || _singleTranslateX + dx < minX) -> {
+                            resDx = dx * rubberBandFactor(maxOf(osL, minX - (_singleTranslateX + dx)))
                             handleEdgeHaptic(isLeft = false)
                         }
-                        else -> {
-                            wasAtLeftEdge = false
-                            wasAtRightEdge = false
-                        }
+                        else -> { wasAtLeftEdge = false; wasAtRightEdge = false }
                     }
                 }
 
-                // === Vertikale Achse ===
                 if (isVerticalSnapEnabled) {
-                    val minY = minOf(0f, height - scaledHeight)
-                    val maxY = maxOf(0f, height - scaledHeight)
-
-                    val overshootBottom = maxOf(0f, currentTranslateY - maxY)
-                    val overshootTop = maxOf(0f, minY - currentTranslateY)
+                    val minY = minOf(0f, height - scaledH)
+                    val maxY = maxOf(0f, height - scaledH)
+                    val osB = maxOf(0f, _singleTranslateY - maxY)
+                    val osT = maxOf(0f, minY - _singleTranslateY)
 
                     when {
-                        dy > 0 && (overshootBottom > 0 || currentTranslateY + dy > maxY) -> {
-                            val overshoot = maxOf(overshootBottom, currentTranslateY + dy - maxY)
-                            resDy = dy * rubberBandFactor(overshoot)
+                        dy > 0 && (osB > 0 || _singleTranslateY + dy > maxY) -> {
+                            resDy = dy * rubberBandFactor(maxOf(osB, _singleTranslateY + dy - maxY))
                             handleEdgeHaptic(isTop = true)
                         }
-                        dy < 0 && (overshootTop > 0 || currentTranslateY + dy < minY) -> {
-                            val overshoot = maxOf(overshootTop, minY - (currentTranslateY + dy))
-                            resDy = dy * rubberBandFactor(overshoot)
+                        dy < 0 && (osT > 0 || _singleTranslateY + dy < minY) -> {
+                            resDy = dy * rubberBandFactor(maxOf(osT, minY - (_singleTranslateY + dy)))
                             handleEdgeHaptic(isTop = false)
                         }
-                        else -> {
-                            wasAtTopEdge = false
-                            wasAtBottomEdge = false
-                        }
+                        else -> { wasAtTopEdge = false; wasAtBottomEdge = false }
                     }
                 }
             }
 
             SnapMode.CENTER -> {
-                val centerX = (width - scaledWidth) / 2f
-                val centerY = (height - scaledHeight) / 2f
+                val cX = (width - scaledW) / 2f
+                val cY = (height - scaledH) / 2f
+                if (isHorizontalSnapEnabled) resDx = dx * rubberBandFactor(abs(_singleTranslateX + dx - cX))
+                if (isVerticalSnapEnabled) resDy = dy * rubberBandFactor(abs(_singleTranslateY + dy - cY))
+            }
+        }
+    }
 
+    // ===========================================
+    // SINGLE-LAYER: SNAP-BACK
+    // ===========================================
+
+    private fun calculateSingleSnapBack(): Pair<Float, Float>? {
+        val d = drawable ?: return null
+        val scaledW = d.intrinsicWidth * _singleScale
+        val scaledH = d.intrinsicHeight * _singleScale
+
+        var tX = _singleTranslateX
+        var tY = _singleTranslateY
+        var needsSnap = false
+
+        when (snapMode) {
+            SnapMode.EDGE -> {
                 if (isHorizontalSnapEnabled) {
-                    val distX = Math.abs(currentTranslateX + dx - centerX)
-                    resDx = dx * rubberBandFactor(distX)
+                    val minX = minOf(0f, width - scaledW)
+                    val maxX = maxOf(0f, width - scaledW)
+                    when {
+                        _singleTranslateX < minX -> { tX = minX; needsSnap = true }
+                        _singleTranslateX > maxX -> { tX = maxX; needsSnap = true }
+                        scaledW < width -> {
+                            val dL = _singleTranslateX
+                            val dR = maxX - _singleTranslateX
+                            tX = if (dL <= dR) 0f else maxX
+                            if (_singleTranslateX != tX) needsSnap = true
+                        }
+                    }
+                }
+                if (isVerticalSnapEnabled) {
+                    val minY = minOf(0f, height - scaledH)
+                    val maxY = maxOf(0f, height - scaledH)
+                    when {
+                        _singleTranslateY < minY -> { tY = minY; needsSnap = true }
+                        _singleTranslateY > maxY -> { tY = maxY; needsSnap = true }
+                        scaledH < height -> {
+                            val dT = _singleTranslateY
+                            val dB = maxY - _singleTranslateY
+                            tY = if (dT <= dB) 0f else maxY
+                            if (_singleTranslateY != tY) needsSnap = true
+                        }
+                    }
+                }
+            }
+            SnapMode.CENTER -> {
+                if (isHorizontalSnapEnabled) {
+                    val cX = (width - scaledW) / 2f
+                    if (_singleTranslateX != cX) { tX = cX; needsSnap = true }
+                }
+                if (isVerticalSnapEnabled) {
+                    val cY = (height - scaledH) / 2f
+                    if (_singleTranslateY != cY) { tY = cY; needsSnap = true }
+                }
+            }
+        }
+
+        return if (needsSnap) tX to tY else null
+    }
+
+    private fun animateSingleSnapBack(targetX: Float, targetY: Float) {
+        val startX = _singleTranslateX
+        val startY = _singleTranslateY
+
+        snapBackAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = SNAP_BACK_DURATION_MS
+            interpolator = DecelerateInterpolator(2f)
+            addUpdateListener { anim ->
+                val p = anim.animatedValue as Float
+                _singleTranslateX = startX + (targetX - startX) * p
+                _singleTranslateY = startY + (targetY - startY) * p
+                rebuildSingleMatrix()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    snapBackAnimator = null
+                    notifySingleTransformChanged()
+                }
+                override fun onAnimationCancel(animation: Animator) {
+                    snapBackAnimator = null
+                }
+            })
+            start()
+        }
+    }
+
+    // ===========================================
+    // MULTI-LAYER: EDGE RESISTANCE
+    // ===========================================
+
+    private fun applyLayerEdgeResistance(layer: WallpaperLayer, dx: Float, dy: Float) {
+        val bmp = layer.bitmap
+        if (bmp == null) { resDx = dx; resDy = dy; return }
+
+        val scaledW = bmp.width * layer.scale
+        val scaledH = bmp.height * layer.scale
+
+        resDx = dx
+        resDy = dy
+
+        when (snapMode) {
+            SnapMode.EDGE -> {
+                if (isHorizontalSnapEnabled) {
+                    val minX = minOf(0f, width - scaledW)
+                    val maxX = maxOf(0f, width - scaledW)
+                    val osR = maxOf(0f, layer.translateX - maxX)
+                    val osL = maxOf(0f, minX - layer.translateX)
+
+                    when {
+                        dx > 0 && (osR > 0 || layer.translateX + dx > maxX) -> {
+                            resDx = dx * rubberBandFactor(maxOf(osR, layer.translateX + dx - maxX))
+                            handleEdgeHaptic(isLeft = true)
+                        }
+                        dx < 0 && (osL > 0 || layer.translateX + dx < minX) -> {
+                            resDx = dx * rubberBandFactor(maxOf(osL, minX - (layer.translateX + dx)))
+                            handleEdgeHaptic(isLeft = false)
+                        }
+                        else -> { wasAtLeftEdge = false; wasAtRightEdge = false }
+                    }
                 }
 
                 if (isVerticalSnapEnabled) {
-                    val distY = Math.abs(currentTranslateY + dy - centerY)
-                    resDy = dy * rubberBandFactor(distY)
+                    val minY = minOf(0f, height - scaledH)
+                    val maxY = maxOf(0f, height - scaledH)
+                    val osB = maxOf(0f, layer.translateY - maxY)
+                    val osT = maxOf(0f, minY - layer.translateY)
+
+                    when {
+                        dy > 0 && (osB > 0 || layer.translateY + dy > maxY) -> {
+                            resDy = dy * rubberBandFactor(maxOf(osB, layer.translateY + dy - maxY))
+                            handleEdgeHaptic(isTop = true)
+                        }
+                        dy < 0 && (osT > 0 || layer.translateY + dy < minY) -> {
+                            resDy = dy * rubberBandFactor(maxOf(osT, minY - (layer.translateY + dy)))
+                            handleEdgeHaptic(isTop = false)
+                        }
+                        else -> { wasAtTopEdge = false; wasAtBottomEdge = false }
+                    }
+                }
+            }
+
+            SnapMode.CENTER -> {
+                val cX = (width - scaledW) / 2f
+                val cY = (height - scaledH) / 2f
+                if (isHorizontalSnapEnabled) resDx = dx * rubberBandFactor(abs(layer.translateX + dx - cX))
+                if (isVerticalSnapEnabled) resDy = dy * rubberBandFactor(abs(layer.translateY + dy - cY))
+            }
+        }
+    }
+
+    // ===========================================
+    // MULTI-LAYER: SNAP-BACK
+    // ===========================================
+
+    private fun calculateLayerSnapBack(layer: WallpaperLayer): Pair<Float, Float>? {
+        val bmp = layer.bitmap ?: return null
+        val scaledW = bmp.width * layer.scale
+        val scaledH = bmp.height * layer.scale
+
+        var tX = layer.translateX
+        var tY = layer.translateY
+        var needsSnap = false
+
+        when (snapMode) {
+            SnapMode.EDGE -> {
+                if (isHorizontalSnapEnabled) {
+                    val minX = minOf(0f, width - scaledW)
+                    val maxX = maxOf(0f, width - scaledW)
+                    when {
+                        layer.translateX < minX -> { tX = minX; needsSnap = true }
+                        layer.translateX > maxX -> { tX = maxX; needsSnap = true }
+                        scaledW < width -> {
+                            val dL = layer.translateX
+                            val dR = maxX - layer.translateX
+                            tX = if (dL <= dR) 0f else maxX
+                            if (layer.translateX != tX) needsSnap = true
+                        }
+                    }
+                }
+                if (isVerticalSnapEnabled) {
+                    val minY = minOf(0f, height - scaledH)
+                    val maxY = maxOf(0f, height - scaledH)
+                    when {
+                        layer.translateY < minY -> { tY = minY; needsSnap = true }
+                        layer.translateY > maxY -> { tY = maxY; needsSnap = true }
+                        scaledH < height -> {
+                            val dT = layer.translateY
+                            val dB = maxY - layer.translateY
+                            tY = if (dT <= dB) 0f else maxY
+                            if (layer.translateY != tY) needsSnap = true
+                        }
+                    }
+                }
+            }
+            SnapMode.CENTER -> {
+                if (isHorizontalSnapEnabled) {
+                    val cX = (width - scaledW) / 2f
+                    if (layer.translateX != cX) { tX = cX; needsSnap = true }
+                }
+                if (isVerticalSnapEnabled) {
+                    val cY = (height - scaledH) / 2f
+                    if (layer.translateY != cY) { tY = cY; needsSnap = true }
+                }
+            }
+        }
+
+        return if (needsSnap) tX to tY else null
+    }
+
+    private fun animateLayerSnapBack(layer: WallpaperLayer, targetX: Float, targetY: Float) {
+        val startX = layer.translateX
+        val startY = layer.translateY
+
+        snapBackAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = SNAP_BACK_DURATION_MS
+            interpolator = DecelerateInterpolator(2f)
+            addUpdateListener { anim ->
+                val p = anim.animatedValue as Float
+                layer.translateX = startX + (targetX - startX) * p
+                layer.translateY = startY + (targetY - startY) * p
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    snapBackAnimator = null
+                    notifyMultiTransformChanged()
+                }
+                override fun onAnimationCancel(animation: Animator) {
+                    snapBackAnimator = null
+                }
+            })
+            start()
+        }
+    }
+
+    // ===========================================
+    // SHARED: SCALE GESTURE
+    // ===========================================
+
+    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            return if (isMultiLayerMode) activeLayer != null else drawable != null
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            return try {
+                val sf = detector.scaleFactor
+                val focusX = detector.focusX
+                val focusY = detector.focusY
+
+                if (isMultiLayerMode) {
+                    val layer = activeLayer ?: return false
+                    val newScale = layer.scale * sf
+                    if (newScale < effectiveMinScale || newScale > effectiveMaxScale) return true
+
+                    layer.translateX = focusX - (focusX - layer.translateX) * sf
+                    layer.translateY = focusY - (focusY - layer.translateY) * sf
+                    layer.scale = newScale
+                    invalidate()
+                } else {
+                    val newScale = _singleScale * sf
+                    if (newScale < effectiveMinScale || newScale > effectiveMaxScale) return true
+
+                    imageMatrix.postScale(sf, sf, focusX, focusY)
+                    setImageMatrix(imageMatrix)
+                    extractSingleValuesFromMatrix()
+                }
+
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (isMultiLayerMode) {
+                val layer = activeLayer ?: return
+                if (isSnapEnabled) {
+                    val snap = calculateLayerSnapBack(layer)
+                    if (snap != null) animateLayerSnapBack(layer, snap.first, snap.second)
+                    else notifyMultiTransformChanged()
+                } else {
+                    notifyMultiTransformChanged()
+                }
+            } else {
+                savedMatrix.set(imageMatrix)
+                if (isSnapEnabled) {
+                    val snap = calculateSingleSnapBack()
+                    if (snap != null) animateSingleSnapBack(snap.first, snap.second)
+                    else notifySingleTransformChanged()
+                } else {
+                    notifySingleTransformChanged()
                 }
             }
         }
     }
 
-    /**
-     * Rubber-Band Faktor: Je grösser der Overshoot, desto kleiner der Faktor.
-     * Basiert auf der iOS-typischen logarithmischen Dämpfung.
-     *
-     * Bei overshoot=0: Faktor=1.0 (keine Dämpfung)
-     * Bei overshoot=100px: Faktor≈0.4 (starke Dämpfung)
-     */
+    // ===========================================
+    // SHARED HELPERS
+    // ===========================================
+
     private fun rubberBandFactor(overshoot: Float): Float {
         return 1f / (1f + overshoot * EDGE_RESISTANCE_STRENGTH)
     }
 
-    /**
-     * Haptisches Feedback beim ERSTEN Erreichen einer Kante.
-     * Wird nur einmal pro Kante pro Geste ausgelöst.
-     */
     private fun handleEdgeHaptic(isLeft: Boolean? = null, isTop: Boolean? = null) {
         when {
-            isLeft == true && !wasAtLeftEdge -> {
-                triggerHaptic()
-                wasAtLeftEdge = true
-            }
-            isLeft == false && !wasAtRightEdge -> {
-                triggerHaptic()
-                wasAtRightEdge = true
-            }
-            isTop == true && !wasAtTopEdge -> {
-                triggerHaptic()
-                wasAtTopEdge = true
-            }
-            isTop == false && !wasAtBottomEdge -> {
-                triggerHaptic()
-                wasAtBottomEdge = true
-            }
+            isLeft == true && !wasAtLeftEdge -> { triggerHaptic(); wasAtLeftEdge = true }
+            isLeft == false && !wasAtRightEdge -> { triggerHaptic(); wasAtRightEdge = true }
+            isTop == true && !wasAtTopEdge -> { triggerHaptic(); wasAtTopEdge = true }
+            isTop == false && !wasAtBottomEdge -> { triggerHaptic(); wasAtBottomEdge = true }
         }
     }
 
@@ -500,10 +1310,6 @@ class ZoomableImageView @JvmOverloads constructor(
         )
     }
 
-    /**
-     * Setzt den Edge-State zurück.
-     * Aufrufen bei Gesture-Start und -Ende.
-     */
     private fun resetEdgeState() {
         wasAtLeftEdge = false
         wasAtRightEdge = false
@@ -511,219 +1317,9 @@ class ZoomableImageView @JvmOverloads constructor(
         wasAtBottomEdge = false
     }
 
-    // ===========================================
-    // SNAP-BACK ANIMATION
-    // ===========================================
-
-    /**
-     * Berechnet die korrigierte Position basierend auf [snapMode] und Achsen-Flags.
-     * Gibt null zurück wenn keine Korrektur nötig.
-     *
-     * Deaktivierte Achsen werden nicht korrigiert.
-     */
-    private fun calculateSnapBackTarget(): Pair<Float, Float>? {
-        val drawable = drawable ?: return null
-
-        val scaledWidth = drawable.intrinsicWidth * currentScale
-        val scaledHeight = drawable.intrinsicHeight * currentScale
-
-        var targetX = currentTranslateX
-        var targetY = currentTranslateY
-        var needsSnap = false
-
-        when (snapMode) {
-            SnapMode.EDGE -> {
-                // === Horizontal ===
-                if (isHorizontalSnapEnabled) {
-                    val minX = minOf(0f, width - scaledWidth)
-                    val maxX = maxOf(0f, width - scaledWidth)
-
-                    when {
-                        currentTranslateX < minX -> {
-                            targetX = minX
-                            needsSnap = true
-                        }
-                        currentTranslateX > maxX -> {
-                            targetX = maxX
-                            needsSnap = true
-                        }
-                        scaledWidth < width -> {
-                            val distToLeft = currentTranslateX
-                            val distToRight = maxX - currentTranslateX
-                            targetX = if (distToLeft <= distToRight) 0f else maxX
-                            if (currentTranslateX != targetX) needsSnap = true
-                        }
-                    }
-                }
-
-                // === Vertikal ===
-                if (isVerticalSnapEnabled) {
-                    val minY = minOf(0f, height - scaledHeight)
-                    val maxY = maxOf(0f, height - scaledHeight)
-
-                    when {
-                        currentTranslateY < minY -> {
-                            targetY = minY
-                            needsSnap = true
-                        }
-                        currentTranslateY > maxY -> {
-                            targetY = maxY
-                            needsSnap = true
-                        }
-                        scaledHeight < height -> {
-                            val distToTop = currentTranslateY
-                            val distToBottom = maxY - currentTranslateY
-                            targetY = if (distToTop <= distToBottom) 0f else maxY
-                            if (currentTranslateY != targetY) needsSnap = true
-                        }
-                    }
-                }
-            }
-
-            SnapMode.CENTER -> {
-                if (isHorizontalSnapEnabled) {
-                    val centeredX = (width - scaledWidth) / 2f
-                    if (currentTranslateX != centeredX) {
-                        targetX = centeredX
-                        needsSnap = true
-                    }
-                }
-
-                if (isVerticalSnapEnabled) {
-                    val centeredY = (height - scaledHeight) / 2f
-                    if (currentTranslateY != centeredY) {
-                        targetY = centeredY
-                        needsSnap = true
-                    }
-                }
-            }
-        }
-
-        return if (needsSnap) targetX to targetY else null
-    }
-
-    /**
-     * Animiert das Bild zur Zielposition (Snap-Back).
-     * Verwendet eine DecelerateInterpolator für natürliches Gefühl.
-     */
-    private fun animateSnapBack(targetX: Float, targetY: Float) {
-        val startX = currentTranslateX
-        val startY = currentTranslateY
-
-        snapBackAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = SNAP_BACK_DURATION_MS
-            interpolator = DecelerateInterpolator(2f)
-
-            addUpdateListener { animation ->
-                val progress = animation.animatedValue as Float
-
-                currentTranslateX = startX + (targetX - startX) * progress
-                currentTranslateY = startY + (targetY - startY) * progress
-
-                rebuildMatrix()
-            }
-
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    snapBackAnimator = null
-                    notifyTransformChanged()
-                }
-
-                override fun onAnimationCancel(animation: Animator) {
-                    snapBackAnimator = null
-                }
-            })
-
-            start()
-        }
-    }
-
-    /**
-     * Bricht eine laufende Snap-Back Animation ab.
-     * Wichtig wenn der User während der Animation erneut toucht.
-     */
     private fun cancelSnapBackAnimation() {
         snapBackAnimator?.cancel()
         snapBackAnimator = null
-    }
-
-    // ===========================================
-    // SCALE GESTURE LISTENER
-    // ===========================================
-
-    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-
-        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-            return true
-        }
-
-        override fun onScale(detector: ScaleGestureDetector): Boolean {
-            return try {
-                val scaleFactor = detector.scaleFactor
-
-                // Neuen Scale berechnen und begrenzen
-                val newScale = currentScale * scaleFactor
-                if (newScale < MIN_SCALE || newScale > MAX_SCALE) {
-                    return true
-                }
-
-                // Inkrementell skalieren um den Fokuspunkt
-                imageMatrix.postScale(
-                    scaleFactor,
-                    scaleFactor,
-                    detector.focusX,
-                    detector.focusY
-                )
-
-                applyMatrix()
-                extractValuesFromMatrix()
-
-                true
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-        override fun onScaleEnd(detector: ScaleGestureDetector) {
-            savedMatrix.set(imageMatrix)
-
-            if (isSnapEnabled) {
-                val snapTarget = calculateSnapBackTarget()
-                if (snapTarget != null) {
-                    animateSnapBack(snapTarget.first, snapTarget.second)
-                } else {
-                    notifyTransformChanged()
-                }
-            } else {
-                notifyTransformChanged()
-            }
-        }
-    }
-
-    // ===========================================
-    // MATRIX HELPERS
-    // ===========================================
-
-    private fun rebuildMatrix() {
-        imageMatrix.reset()
-        imageMatrix.postScale(currentScale, currentScale)
-        imageMatrix.postTranslate(currentTranslateX, currentTranslateY)
-        applyMatrix()
-    }
-
-    private fun applyMatrix() {
-        setImageMatrix(imageMatrix)
-    }
-
-    private fun extractValuesFromMatrix() {
-        imageMatrix.getValues(matrixValues)
-        currentScale = matrixValues[Matrix.MSCALE_X]
-        currentTranslateX = matrixValues[Matrix.MTRANS_X]
-        currentTranslateY = matrixValues[Matrix.MTRANS_Y]
-    }
-
-    private fun notifyTransformChanged() {
-        onTransformChanged?.invoke(currentScale, currentTranslateX, currentTranslateY)
     }
 
     // ===========================================
@@ -731,32 +1327,47 @@ class ZoomableImageView @JvmOverloads constructor(
     // ===========================================
 
     override fun setImageDrawable(drawable: Drawable?) {
+        if (isMultiLayerMode) {
+            // Im Multi-Layer-Modus: Drawable ignorieren
+            // (Layer werden über addLayer() verwaltet)
+            return
+        }
         super.setImageDrawable(drawable)
-        // Bei neuem Bild: Transform beibehalten (User könnte URI wechseln)
-        // Falls Reset gewünscht: explizit resetTransform() aufrufen
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
 
-        // Nach Rotation können alte Koordinaten ungültig sein
-        // → Position korrigieren bevor die Matrix gebaut wird
+        // Base Scale neu berechnen bei Größenänderung (z.B. Rotation)
+        if (!isMultiLayerMode) {
+            updateSingleBaseScale()
+        }
+
         if (isSnapEnabled && oldw > 0 && oldh > 0) {
-            val snapTarget = calculateSnapBackTarget()
-            if (snapTarget != null) {
-                currentTranslateX = snapTarget.first
-                currentTranslateY = snapTarget.second
-                notifyTransformChanged()
+            if (isMultiLayerMode) {
+                for (layer in layers) {
+                    val snap = calculateLayerSnapBack(layer)
+                    if (snap != null) {
+                        layer.translateX = snap.first
+                        layer.translateY = snap.second
+                    }
+                }
+            } else {
+                val snap = calculateSingleSnapBack()
+                if (snap != null) {
+                    _singleTranslateX = snap.first
+                    _singleTranslateY = snap.second
+                    notifySingleTransformChanged()
+                }
             }
         }
 
-        // Matrix genau einmal neu bauen
-        rebuildMatrix()
+        if (isMultiLayerMode) invalidate()
+        else rebuildSingleMatrix()
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        // Animation aufräumen um Leaks zu vermeiden
         cancelSnapBackAnimation()
     }
 }
