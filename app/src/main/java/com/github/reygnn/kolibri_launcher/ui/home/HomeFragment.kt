@@ -170,6 +170,8 @@ class HomeFragment : Fragment() {
         OrientationSynchronizer { resources.configuration.orientation }
     }
     private var wallpaperStateBeforeEdit: WallpaperState? = null
+    private var isToolbarDockedTop = false
+
     private var layerPickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
 
 
@@ -2100,6 +2102,11 @@ class HomeFragment : Fragment() {
                 // Zustand VOR Edit speichern (für Cancel)
                 wallpaperStateBeforeEdit = viewModel.wallpaperState.value
 
+                // Snap per Default aus im Edit-Mode
+                wallpaperView.isSnapEnabled = false
+                wallpaperView.isHorizontalSnapEnabled = false
+                wallpaperView.isVerticalSnapEnabled = false
+
                 editOverlay.visibility = View.VISIBLE
                 binding.rootLayout.alpha = 0.7f
 
@@ -2229,17 +2236,37 @@ class HomeFragment : Fragment() {
                     }
                 }
 
+                // 5. Original Size (1:1)
+                binding.btnWallpaperOneToOne.setOnClickListener {
+                    try {
+                        wallpaperView.showOriginalSize()
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing original size")
+                    }
+                }
+
+                // ── Dock Toggle (oben ↔ unten) ──
+                binding.btnToolbarDock.setOnClickListener {
+                    try {
+                        isToolbarDockedTop = !isToolbarDockedTop
+                        dockToolbar(isToolbarDockedTop)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error toggling toolbar dock")
+                    }
+                }
+
                 // ══════════════════════════════════════
-                // LAYER MANAGEMENT BUTTONS (NEU)
+                // LAYER MANAGEMENT BUTTONS
                 // ══════════════════════════════════════
 
-                // Layer-Buttons nur sichtbar wenn Multi-Layer oder wenn Layer hinzugefügt werden kann
                 updateLayerButtonsVisibility()
                 updateLayerIndicator()
 
                 // ── ADD LAYER (+) ──
                 binding.btnLayerAdd.setOnClickListener {
                     try {
+                        // Transforms sichern BEVOR neuer Layer hinzugefügt wird
+                        saveCurrentViewTransforms()
                         layerPickerLauncher?.launch("image/*")
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error launching layer picker")
@@ -2251,6 +2278,8 @@ class HomeFragment : Fragment() {
                     try {
                         val activeIndex = wallpaperView.activeLayerIndex
                         if (activeIndex >= 0 && wallpaperView.layerCount > 0) {
+                            // Transforms der anderen Layer sichern
+                            saveCurrentViewTransforms()
                             viewModel.onRemoveWallpaperLayer(activeIndex)
                         }
                     } catch (e: Throwable) {
@@ -2263,9 +2292,12 @@ class HomeFragment : Fragment() {
                     try {
                         val activeIndex = wallpaperView.activeLayerIndex
                         if (activeIndex < wallpaperView.layerCount - 1) {
+                            // Transforms sichern BEVOR getauscht wird
+                            saveCurrentViewTransforms()
                             wallpaperView.moveLayerUp(activeIndex)
                             viewModel.onSwapWallpaperLayers(activeIndex, activeIndex + 1)
                             updateLayerIndicator()
+                            updateLayerButtonStates()
                         }
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error moving layer up")
@@ -2277,9 +2309,12 @@ class HomeFragment : Fragment() {
                     try {
                         val activeIndex = wallpaperView.activeLayerIndex
                         if (activeIndex > 0) {
+                            // Transforms sichern BEVOR getauscht wird
+                            saveCurrentViewTransforms()
                             wallpaperView.moveLayerDown(activeIndex)
                             viewModel.onSwapWallpaperLayers(activeIndex, activeIndex - 1)
                             updateLayerIndicator()
+                            updateLayerButtonStates()
                         }
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error moving layer down")
@@ -2313,6 +2348,8 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperSnapMode.setOnClickListener(null)
                 binding.btnWallpaperHSnap.setOnClickListener(null)
                 binding.btnWallpaperVSnap.setOnClickListener(null)
+                binding.btnWallpaperOneToOne.setOnClickListener(null)
+                binding.btnToolbarDock.setOnClickListener(null)
 
                 // Layer-Buttons aufräumen
                 binding.btnLayerAdd.setOnClickListener(null)
@@ -2330,6 +2367,7 @@ class HomeFragment : Fragment() {
                 wallpaperView.isVerticalSnapEnabled = true
 
                 wallpaperStateBeforeEdit = null
+                isToolbarDockedTop = false
 
                 Timber.d("Wallpaper edit mode: OFF")
             }
@@ -2346,8 +2384,6 @@ class HomeFragment : Fragment() {
 
     /** Animationsdauer für Toolbar-Dimming */
     private companion object {
-        const val TOOLBAR_DIM_ALPHA = 0.15f
-        const val TOOLBAR_DIM_DURATION_MS = 150L
         const val TOOLBAR_SHOW_DURATION_MS = 200L
     }
 
@@ -2359,18 +2395,98 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         try {
-            val targetAlpha = if (dim) TOOLBAR_DIM_ALPHA else 1.0f
-            val duration = if (dim) TOOLBAR_DIM_DURATION_MS else TOOLBAR_SHOW_DURATION_MS
-
-            binding.wallpaperEditButtons.animate()
-                .alpha(targetAlpha)
-                .setDuration(duration)
-                .start()
+            if (dim) {
+                // Komplett unsichtbar – blockiert keine Touches mehr
+                binding.wallpaperEditButtons.visibility = View.INVISIBLE
+            } else {
+                // Wieder sichtbar mit kurzem Fade-In
+                binding.wallpaperEditButtons.alpha = 0f
+                binding.wallpaperEditButtons.visibility = View.VISIBLE
+                binding.wallpaperEditButtons.animate()
+                    .alpha(1.0f)
+                    .setDuration(TOOLBAR_SHOW_DURATION_MS)
+                    .start()
+            }
         } catch (e: Throwable) {
-            // Fallback: Direkt setzen
             try {
-                binding.wallpaperEditButtons.alpha = if (dim) TOOLBAR_DIM_ALPHA else 1.0f
+                binding.wallpaperEditButtons.visibility = if (dim) View.INVISIBLE else View.VISIBLE
+                binding.wallpaperEditButtons.alpha = 1.0f
             } catch (_: Throwable) {}
+        }
+    }
+
+    private fun dockToolbar(top: Boolean) {
+        if (_binding == null) return
+
+        try {
+            val toolbar = binding.wallpaperEditButtons
+            val params = toolbar.layoutParams as? android.widget.FrameLayout.LayoutParams ?: return
+
+            if (top) {
+                params.gravity = android.view.Gravity.TOP
+                // Padding umdrehen: oben braucht Platz für Status Bar
+                toolbar.setPadding(
+                    toolbar.paddingLeft,
+                    toolbar.paddingBottom,  // Was unten war, kommt nach oben
+                    toolbar.paddingRight,
+                    12  // Minimales Padding unten
+                )
+            } else {
+                params.gravity = android.view.Gravity.BOTTOM
+                // Original-Padding wiederherstellen (Insets werden von setupWallpaperEditButtonsInsets gehandhabt)
+                toolbar.setPadding(
+                    toolbar.paddingLeft,
+                    12,  // Minimales Padding oben
+                    toolbar.paddingRight,
+                    toolbar.paddingTop  // Was oben war, kommt nach unten
+                )
+            }
+
+            toolbar.layoutParams = params
+
+            // Icon wechseln: Zeigt immer die ANDERE Richtung
+            binding.btnToolbarDock.setIconResource(
+                if (top) R.drawable.ic_dock_bottom else R.drawable.ic_dock_top
+            )
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error docking toolbar")
+        }
+    }
+
+    /**
+     * Speichert die aktuellen View-Transforms in den State.
+     * MUSS vor jeder Layer-Operation aufgerufen werden (Add, Delete, Swap),
+     * damit die Live-Transforms nicht verloren gehen wenn updateWallpaper()
+     * die Layer neu aufbaut.
+     */
+    private fun saveCurrentViewTransforms() {
+        if (_binding == null) return
+
+        try {
+            val wallpaperView = binding.wallpaperView
+            val currentState = viewModel.wallpaperState.value
+
+            if (currentState.isMultiLayer && wallpaperView.isMultiLayerMode) {
+                // Multi-Layer: Alle Layer-Transforms speichern
+                val transforms = (0 until wallpaperView.layerCount).map { i ->
+                    val layer = wallpaperView.getLayer(i)
+                    Triple(
+                        layer?.scale ?: 1f,
+                        layer?.translateX ?: 0f,
+                        layer?.translateY ?: 0f
+                    )
+                }
+                viewModel.onSaveAllLayerTransforms(transforms)
+            } else if (currentState.hasWallpaper) {
+                // Single-Layer: Transform speichern
+                viewModel.onSaveWallpaperTransform(
+                    wallpaperView.currentScale,
+                    wallpaperView.currentTranslateX,
+                    wallpaperView.currentTranslateY
+                )
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error saving current view transforms")
         }
     }
 
@@ -2578,10 +2694,12 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperSnapMode.setOnClickListener(null)
                 binding.btnWallpaperHSnap.setOnClickListener(null)
                 binding.btnWallpaperVSnap.setOnClickListener(null)
+                binding.btnWallpaperOneToOne.setOnClickListener(null)
                 binding.btnLayerAdd.setOnClickListener(null)
                 binding.btnLayerDelete.setOnClickListener(null)
                 binding.btnLayerUp.setOnClickListener(null)
                 binding.btnLayerDown.setOnClickListener(null)
+                binding.btnToolbarDock.setOnClickListener(null)
             } catch (e: Throwable) {
                 // Ignore
             }

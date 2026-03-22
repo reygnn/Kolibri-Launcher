@@ -368,6 +368,39 @@ class ZoomableImageView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Zeigt das Bild in Originalgröße (1:1 Pixel) zentriert im View.
+     * Scale = 1.0, Bild wird mittig positioniert.
+     * Im Multi-Layer-Modus wirkt es auf das aktive Layer.
+     */
+    fun showOriginalSize() {
+        if (isMultiLayerMode) {
+            val layer = activeLayer ?: return
+            val bmp = layer.bitmap ?: return
+            if (width == 0 || height == 0) return
+
+            cancelSnapBackAnimation()
+            layer.scale = 1.0f
+            layer.translateX = (width - bmp.width) / 2f
+            layer.translateY = (height - bmp.height) / 2f
+            invalidate()
+            return
+        }
+
+        val drawable = drawable ?: return
+        if (width == 0 || height == 0) return
+
+        try {
+            cancelSnapBackAnimation()
+            _singleScale = 1.0f
+            _singleTranslateX = (width - drawable.intrinsicWidth) / 2f
+            _singleTranslateY = (height - drawable.intrinsicHeight) / 2f
+            rebuildSingleMatrix()
+        } catch (e: Exception) {
+            resetTransform()
+        }
+    }
+
     // ===========================================
     // PUBLIC API: MULTI-LAYER
     // ===========================================

@@ -347,5 +347,7 @@
 <string name="wallpaper_delete_layer">Delete layer</string>
 <string name="wallpaper_move_layer_up">Move layer forward</string>
 <string name="wallpaper_move_layer_down">Move layer backward</string>
+<string name="wallpaper_original_size">Original size (1:1)</string>
+<string name="toolbar_dock_toggle">Move toolbar</string>
 
 </resources>
