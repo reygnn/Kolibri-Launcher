@@ -238,6 +238,15 @@ class HomeFragment : Fragment() {
         ) { uri ->
             if (uri != null) {
                 try {
+                    // Best-effort: Persistable Permission holen (funktioniert nicht immer bei GetContent)
+                    try {
+                        requireContext().contentResolver.takePersistableUriPermission(
+                            uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (e: SecurityException) {
+                        // Nicht kritisch – Bild wird im ViewModel in internen Speicher kopiert
+                        TimberWrapper.silentError(e, "Could not persist URI permission for layer")
+                    }
                     viewModel.onAddWallpaperLayer(uri)
                     Timber.d("Layer added from picker: $uri")
                 } catch (e: Throwable) {
@@ -1976,6 +1985,11 @@ class HomeFragment : Fragment() {
                     }
 
                     wallpaperView.visibility = if (wallpaperView.layerCount > 0) View.VISIBLE else View.GONE
+
+                    // Neues Layer automatisch aktiv setzen (letztes = soeben hinzugefügtes)
+                    if (wallpaperView.layerCount > 0) {
+                        wallpaperView.activeLayerIndex = wallpaperView.layerCount - 1
+                    }
                 }
 
                 // Transforms anwenden (nach Layout)

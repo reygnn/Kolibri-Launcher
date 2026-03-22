@@ -69,6 +69,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import android.net.Uri
+import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
@@ -141,6 +142,7 @@ class LauncherViewModel @Inject constructor(
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
     private val setWallpaperImageUseCase: SetWallpaperImageUseCase,
     private val clearWallpaperUseCase: ClearWallpaperUseCase,
+    private val wallpaperFileManager: WallpaperFileManager,
 
     private val appUpdateSignal: AppUpdateSignal,
     private val savedStateHandle: SavedStateHandle,
@@ -841,7 +843,14 @@ class LauncherViewModel @Inject constructor(
      */
     fun onSetWallpaperImage(imageUri: Uri) = launchSafe {
         try {
-            setWallpaperImageUseCase(imageUri)
+            // Bild in internen Speicher kopieren (überlebt Reinstall)
+            val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+            if (internalUri == null) {
+                TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
+                sendEvent(UiEvent.ShowToast(R.string.error_generic))
+                return@launchSafe
+            }
+            setWallpaperImageUseCase(internalUri)
             sendEvent(UiEvent.ShowToast(R.string.wallpaper_set_success))
         } catch (e: CancellationException) {
             throw e
@@ -878,6 +887,7 @@ class LauncherViewModel @Inject constructor(
      */
     fun onClearWallpaper() = launchSafe {
         try {
+            wallpaperFileManager.clearAll()
             clearWallpaperUseCase()
             sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
         } catch (e: CancellationException) {
@@ -917,6 +927,13 @@ class LauncherViewModel @Inject constructor(
      */
     fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) = launchSafe {
         try {
+            // Bild in internen Speicher kopieren (überlebt Reinstall)
+            val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+            if (internalUri == null) {
+                TimberWrapper.silentError("Failed to copy layer image to internal storage")
+                return@launchSafe
+            }
+
             val current = _wallpaperState.value
 
             // Migration: Single → Multi beim ersten addLayer
@@ -927,7 +944,7 @@ class LauncherViewModel @Inject constructor(
             }
 
             val newLayer = WallpaperLayerState(
-                imageUri = imageUri,
+                imageUri = internalUri,
                 label = label ?: "Layer ${base.layerCount + 1}"
             )
 
@@ -948,6 +965,12 @@ class LauncherViewModel @Inject constructor(
     fun onRemoveWallpaperLayer(layerIndex: Int) = launchSafe {
         try {
             val current = _wallpaperState.value
+
+            // Interne Datei des entfernten Layers löschen
+            current.getLayer(layerIndex)?.imageUri?.let { uri ->
+                wallpaperFileManager.deleteFile(uri)
+            }
+
             val newState = current.withRemovedLayer(layerIndex)
 
             // Letztes Layer entfernt? → Clear

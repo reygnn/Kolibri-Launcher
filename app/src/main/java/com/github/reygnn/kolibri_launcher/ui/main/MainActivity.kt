@@ -19,6 +19,7 @@ import android.provider.CalendarContract
 import android.provider.Settings
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
@@ -140,20 +141,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private val wallpaperPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->
         try {
             if (uri != null) {
-                // Persistente Berechtigung holen (wichtig für App-Neustart!)
-                try {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                } catch (e: SecurityException) {
-                    TimberWrapper.silentError(e, "Could not persist URI permission")
-                    // Trotzdem versuchen – funktioniert evtl. für die Session
-                }
                 viewModel.onSetWallpaperImage(uri)
             }
         } catch (e: Throwable) {
@@ -547,7 +538,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
                 is UiEvent.OpenWallpaperPicker -> {
                     try {
-                        wallpaperPickerLauncher.launch(arrayOf("image/*"))
+                        wallpaperPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error launching wallpaper picker")
                         Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
@@ -662,7 +655,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 // Normal: Wallpaper wählen
                 options.add(getString(R.string.wallpaper_choose))
                 actions.add {
-                    wallpaperPickerLauncher.launch(arrayOf("image/*"))
+                    wallpaperPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
                 }
 
                 // Falls Wallpaper vorhanden: Edit & Remove Optionen

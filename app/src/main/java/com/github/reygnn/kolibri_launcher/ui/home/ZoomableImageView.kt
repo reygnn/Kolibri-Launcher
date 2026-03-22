@@ -96,10 +96,10 @@ class ZoomableImageView @JvmOverloads constructor(
         // Erlaubt Rein-/Rauszoomen unabhängig von der absoluten Bildgröße.
         // z.B. bei einem 50x50 Bild mit baseScale=40: maxScale = 40 * 3 = 120
         private const val ZOOM_IN_MULTIPLIER = 3.0f   // Max 3x über Cover hinaus
-        private const val ZOOM_OUT_MULTIPLIER = 0.25f  // Min 25% des Cover-Scales
+        private const val ZOOM_OUT_MULTIPLIER = 0.05f  // Min 25% des Cover-Scales
 
         private const val DRAG_THRESHOLD_PX = 10f
-        private const val EDGE_RESISTANCE_STRENGTH = 0.015f
+        private const val EDGE_RESISTANCE_STRENGTH = 0.01f
         private const val SNAP_BACK_DURATION_MS = 250L
 
         // Tap Detection
@@ -123,34 +123,44 @@ class ZoomableImageView @JvmOverloads constructor(
     val isMultiLayerMode: Boolean
         get() = layers.isNotEmpty()
 
-    // Effektive Scale-Grenzen: Dynamisch basierend auf dem Base-Scale.
+    // Effektive Scale-Grenzen: Dynamisch basierend auf Base-Scale UND aktuellem Scale.
     // Der Base-Scale ist der CenterCrop-Scale (Bild füllt den Screen).
-    // Damit funktioniert Zoom für jede Bildgröße – winzig bis riesig.
+    // Nach showOriginalSize() kann der aktuelle Scale weit unter dem Base-Scale liegen.
+    // Die Grenzen passen sich an: Man kann immer vom aktuellen Scale aus rein- UND rauszoomen.
     private var _singleBaseScale = DEFAULT_SCALE
 
     private val effectiveMinScale: Float
         get() {
+            val currentScale = if (isMultiLayerMode) (activeLayer?.scale ?: 1f) else _singleScale
             val baseScale = if (isMultiLayerMode) {
                 activeLayer?.let { computeLayerBaseScale(it) } ?: MULTI_LAYER_MIN_SCALE
             } else {
                 _singleBaseScale
             }
+            // Referenz = das kleinere von Base und Current
+            // → Nach 1:1 (current=1.0, base=40.0): Referenz=1.0, Min=0.25
+            // → Nach CenterCrop (current=40.0, base=40.0): Referenz=40.0, Min=10.0
+            val referenceScale = minOf(baseScale, currentScale)
             return minOf(
                 if (isMultiLayerMode) MULTI_LAYER_MIN_SCALE else MIN_SCALE,
-                baseScale * ZOOM_OUT_MULTIPLIER
+                referenceScale * ZOOM_OUT_MULTIPLIER
             )
         }
 
     private val effectiveMaxScale: Float
         get() {
+            val currentScale = if (isMultiLayerMode) (activeLayer?.scale ?: 1f) else _singleScale
             val baseScale = if (isMultiLayerMode) {
                 activeLayer?.let { computeLayerBaseScale(it) } ?: MULTI_LAYER_MAX_SCALE
             } else {
                 _singleBaseScale
             }
+            // Referenz = das grössere von Base und Current
+            // → Erlaubt immer Zoom bis Cover-Grösse UND darüber hinaus
+            val referenceScale = maxOf(baseScale, currentScale)
             return maxOf(
                 if (isMultiLayerMode) MULTI_LAYER_MAX_SCALE else MAX_SCALE,
-                baseScale * ZOOM_IN_MULTIPLIER
+                referenceScale * ZOOM_IN_MULTIPLIER
             )
         }
 

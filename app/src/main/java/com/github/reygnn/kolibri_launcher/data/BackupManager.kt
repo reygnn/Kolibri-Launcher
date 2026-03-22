@@ -12,6 +12,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -46,6 +48,12 @@ import javax.inject.Singleton
  * - Fallback: org.json für striktes Parsing bei manuell erstellten/korrupten JSONs
  * - Validierung: Strikte Wertprüfung nach dem Parsing
  *
+ * Multi-Layer Wallpaper:
+ * - Export: Alle Layer werden in wallpaperLayers[] gespeichert.
+ *   Zusätzlich werden die Single-Layer-Felder mit Layer 0 befüllt (Backward Compat).
+ * - Import: wallpaperLayers[] vorhanden → Multi-Layer Restore.
+ *   Sonst Fallback auf Single-Layer-Felder (alte Backups).
+ *
  * Security-Hardened Version mit Fixes für:
  * - OOM Protection (Dateigröße vor Lesen prüfen)
  * - Type Confusion Attacks (validateJsonTypes)
@@ -62,6 +70,7 @@ class BackupManager @Inject constructor(
     private val swipeActionsManager: SwipeActionsRepository,
     private val settingsManager: SettingsRepository,
     private val wallpaperManager: WallpaperRepository,
+    private val wallpaperFileManager: WallpaperFileManager,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
 
@@ -101,6 +110,34 @@ class BackupManager @Inject constructor(
             val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
             val secureWindow = settingsManager.secureWindowFlow.first()
 
+            // ===== Wallpaper: Multi-Layer Export =====
+            // Strategie:
+            // - Single-Layer-Felder IMMER befüllen (Backward Compat für ältere App-Versionen)
+            // - wallpaperLayers[] nur befüllen wenn Multi-Layer aktiv
+            val wallpaperUri: String?
+            val wallpaperScale: Float?
+            val wallpaperTranslateX: Float?
+            val wallpaperTranslateY: Float?
+            val wallpaperLayers: List<WallpaperLayerBackup>
+
+            if (wallpaperState.isMultiLayer) {
+                // Multi-Layer: Alle Layer exportieren
+                wallpaperLayers = wallpaperState.layers.map { WallpaperLayerBackup.fromLayerState(it) }
+
+                // Single-Layer-Felder mit Layer 0 befüllen (Backward Compat)
+                val firstLayer = wallpaperState.layers.firstOrNull()
+                wallpaperUri = firstLayer?.imageUri?.toString()
+                wallpaperScale = if (firstLayer?.imageUri != null) firstLayer.scale else null
+                wallpaperTranslateX = if (firstLayer?.imageUri != null) firstLayer.translateX else null
+                wallpaperTranslateY = if (firstLayer?.imageUri != null) firstLayer.translateY else null
+            } else {
+                // Single-Layer (wie bisher)
+                wallpaperLayers = emptyList()
+                wallpaperUri = wallpaperState.imageUri?.toString()
+                wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null
+                wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null
+                wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null
+            }
 
             val settings = LauncherSettings(
                 favoriteComponents = favoriteComponents,
@@ -116,11 +153,13 @@ class BackupManager @Inject constructor(
                 contentTopMarginScale = contentTopMarginScale,
                 chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
-                // Wallpaper - nur speichern wenn vorhanden
-                wallpaperUri = wallpaperState.imageUri?.toString(),
-                wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null,
-                wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null,
-                wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null,
+                // Wallpaper Single-Layer (Backward Compat)
+                wallpaperUri = wallpaperUri,
+                wallpaperScale = wallpaperScale,
+                wallpaperTranslateX = wallpaperTranslateX,
+                wallpaperTranslateY = wallpaperTranslateY,
+                // Wallpaper Multi-Layer
+                wallpaperLayers = wallpaperLayers,
                 showCalendarEvent = showCalendarEvent,
                 showAlarm = showAlarm,
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
@@ -222,6 +261,9 @@ class BackupManager @Inject constructor(
             if (!root.has("settings")) return backup
             val settings = root.getJSONObject("settings")
 
+            // Multi-Layer Wallpaper: org.json Parsing
+            val strictLayers = parseWallpaperLayersFromJson(settings)
+
             val enrichedSettings = backup.settings.copy(
                 // Strings
                 swipeLeftApp = settings.getStrictString("swipe_left_app") ?: backup.settings.swipeLeftApp,
@@ -237,11 +279,15 @@ class BackupManager @Inject constructor(
                 verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
                 contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
 
-                // Wallpaper Floats
+                // Wallpaper Single-Layer Floats
                 wallpaperUri = settings.getStrictString("wallpaper_uri") ?: backup.settings.wallpaperUri,
                 wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: backup.settings.wallpaperScale,
                 wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: backup.settings.wallpaperTranslateX,
                 wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: backup.settings.wallpaperTranslateY,
+
+                // Wallpaper Multi-Layer
+                // Bevorzuge org.json Ergebnis wenn vorhanden, sonst kotlinx-Ergebnis
+                wallpaperLayers = if (strictLayers != null) strictLayers else backup.settings.wallpaperLayers,
 
                 // Booleans
                 isFontBold = settings.getStrictBool("is_font_bold") ?: backup.settings.isFontBold,
@@ -260,6 +306,60 @@ class BackupManager @Inject constructor(
             TimberWrapper.silentError(e, "Failed to merge with strict values")
             backup
         }
+    }
+
+    /**
+     * Parsed wallpaperLayers (oder wallpaper_layers) Array aus org.json.
+     * Gibt null zurück wenn das Feld nicht existiert (NICHT emptyList,
+     * damit der Aufrufer weiß: "kein Feld vorhanden" vs. "leeres Array").
+     */
+    private fun parseWallpaperLayersFromJson(settings: JSONObject): List<WallpaperLayerBackup>? {
+        // Beide Keys prüfen (camelCase + snake_case)
+        val key = when {
+            settings.has("wallpaperLayers") -> "wallpaperLayers"
+            settings.has("wallpaper_layers") -> "wallpaper_layers"
+            else -> return null
+        }
+
+        if (settings.isNull(key)) return null
+
+        return try {
+            val jsonArray = settings.getJSONArray(key)
+            val layers = mutableListOf<WallpaperLayerBackup>()
+
+            for (i in 0 until minOf(jsonArray.length(), AppConstants.MAX_ARRAY_ELEMENTS)) {
+                val layerObj = jsonArray.optJSONObject(i) ?: continue
+                layers.add(parseWallpaperLayerFromJson(layerObj))
+            }
+
+            layers
+        } catch (e: JSONException) {
+            TimberWrapper.silentError(e, "Failed to parse wallpaperLayers array")
+            null
+        }
+    }
+
+    /**
+     * Parsed ein einzelnes WallpaperLayerBackup aus einem JSONObject.
+     * Unterstützt sowohl camelCase als auch snake_case Keys.
+     */
+    private fun parseWallpaperLayerFromJson(obj: JSONObject): WallpaperLayerBackup {
+        return WallpaperLayerBackup(
+            id = obj.getStrictString("id"),
+            imageUri = obj.getStrictString("imageUri")
+                ?: obj.getStrictString("image_uri"),
+            scale = obj.getStrictFloat("scale") ?: 1.0f,
+            translateX = obj.getStrictFloat("translateX")
+                ?: obj.getStrictFloat("translate_x") ?: 0f,
+            translateY = obj.getStrictFloat("translateY")
+                ?: obj.getStrictFloat("translate_y") ?: 0f,
+            alpha = obj.getStrictFloat("alpha") ?: 1.0f,
+            blendModeName = obj.getStrictString("blendModeName")
+                ?: obj.getStrictString("blend_mode"),
+            isVisible = obj.getStrictBool("isVisible")
+                ?: obj.getStrictBool("is_visible") ?: true,
+            label = obj.getStrictString("label")
+        )
     }
 
     /**
@@ -347,7 +447,6 @@ class BackupManager @Inject constructor(
                         Timber.Forest.w("Type validation failed: $field is not an array")
                         return false
                     }
-                    // DoS-Schutz
                     if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                         Timber.Forest.w("Array size limit exceeded for $field")
                         return false
@@ -368,11 +467,78 @@ class BackupManager @Inject constructor(
                 }
             }
 
+            // 7. wallpaperLayers Array (camelCase + snake_case)
+            val layersKey = when {
+                settings.has("wallpaperLayers") -> "wallpaperLayers"
+                settings.has("wallpaper_layers") -> "wallpaper_layers"
+                else -> null
+            }
+            if (layersKey != null && !settings.isNull(layersKey)) {
+                val value = settings.get(layersKey)
+                if (value !is JSONArray) {
+                    Timber.Forest.w("Type validation failed: $layersKey is not an array")
+                    return false
+                }
+                if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
+                    Timber.Forest.w("Array size limit exceeded for $layersKey")
+                    return false
+                }
+                // Validiere Felder innerhalb jedes Layers
+                if (!validateWallpaperLayerTypes(value)) {
+                    return false
+                }
+            }
+
             true
         } catch (e: JSONException) {
             TimberWrapper.silentError(e, "JSON validation failed - malformed JSON")
             false
         }
+    }
+
+    /**
+     * Validiert die Typen innerhalb jedes Wallpaper-Layer-Objekts.
+     */
+    private fun validateWallpaperLayerTypes(layersArray: JSONArray): Boolean {
+        val layerFloatFields = listOf("scale", "translateX", "translate_x", "translateY", "translate_y", "alpha")
+        val layerBoolFields = listOf("isVisible", "is_visible")
+        val layerStringFields = listOf("id", "imageUri", "image_uri", "blendModeName", "blend_mode", "label")
+
+        for (i in 0 until layersArray.length()) {
+            val layer = layersArray.optJSONObject(i) ?: continue
+
+            for (field in layerFloatFields) {
+                if (layer.has(field) && !layer.isNull(field)) {
+                    val value = layer.get(field)
+                    if (value !is Number) {
+                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a number")
+                        return false
+                    }
+                    val doubleVal = (value as Number).toDouble()
+                    if (!doubleVal.isFinite()) {
+                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is Infinity or NaN")
+                        return false
+                    }
+                }
+            }
+            for (field in layerBoolFields) {
+                if (layer.has(field) && !layer.isNull(field)) {
+                    if (layer.get(field) !is Boolean) {
+                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a boolean")
+                        return false
+                    }
+                }
+            }
+            for (field in layerStringFields) {
+                if (layer.has(field) && !layer.isNull(field)) {
+                    if (layer.get(field) !is String) {
+                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a string")
+                        return false
+                    }
+                }
+            }
+        }
+        return true
     }
 
     /**
@@ -408,6 +574,9 @@ class BackupManager @Inject constructor(
             }
         }
 
+        // Multi-Layer Wallpaper aus org.json
+        val wallpaperLayers = parseWallpaperLayersFromJson(settingsJson) ?: emptyList()
+
         val settings = LauncherSettings(
             favoriteComponents = favoriteComponents,
             favoritesOrder = favoritesOrder,
@@ -426,11 +595,14 @@ class BackupManager @Inject constructor(
             verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
             contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),
 
-            // Wallpaper
+            // Wallpaper Single-Layer
             wallpaperUri = settingsJson.getStrictString("wallpaper_uri"),
             wallpaperScale = settingsJson.getStrictFloat("wallpaper_scale"),
             wallpaperTranslateX = settingsJson.getStrictFloat("wallpaper_translate_x"),
             wallpaperTranslateY = settingsJson.getStrictFloat("wallpaper_translate_y"),
+
+            // Wallpaper Multi-Layer
+            wallpaperLayers = wallpaperLayers,
 
             isFontBold = settingsJson.getStrictBool("is_font_bold"),
             textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
@@ -580,34 +752,8 @@ class BackupManager @Inject constructor(
                 settingsManager.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
             }
 
-            // Wallpaper Import
-            val wallpaperUri = backup.settings.wallpaperUri
-            if (!wallpaperUri.isNullOrBlank()) {
-                try {
-                    val uri = wallpaperUri.toUri()
-                    // Validiere dass die URI noch zugreifbar ist
-                    val canAccess = try {
-                        context.contentResolver.openInputStream(uri)?.use { true } ?: false
-                    } catch (e: Exception) {
-                        false
-                    }
-
-                    if (canAccess) {
-                        val wallpaperState = WallpaperState(
-                            imageUri = uri,
-                            scale = backup.settings.wallpaperScale ?: 1.0f,
-                            translateX = backup.settings.wallpaperTranslateX ?: 0.0f,
-                            translateY = backup.settings.wallpaperTranslateY ?: 0.0f
-                        )
-                        wallpaperManager.saveWallpaperState(wallpaperState)
-                        Timber.Forest.i("Imported wallpaper settings")
-                    } else {
-                        Timber.Forest.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
-                    }
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Failed to restore wallpaper")
-                }
-            }
+            // ===== Wallpaper Import (Multi-Layer aware) =====
+            importWallpaper(backup.settings)
         }
 
         // ===== PHASE 8: Import Time-Based Events =====
@@ -635,6 +781,108 @@ class BackupManager @Inject constructor(
             skippedCount = skippedCount,
             missingApps = missingApps
         )
+    }
+
+    /**
+     * Importiert Wallpaper Settings.
+     *
+     * Strategie:
+     * 1. wallpaperLayers nicht leer → Multi-Layer Restore (alle Layer mit URI-Validierung)
+     * 2. wallpaperLayers leer → Fallback auf Single-Layer-Felder (Backward Compat)
+     */
+    private suspend fun importWallpaper(settings: LauncherSettings) {
+        if (settings.wallpaperLayers.isNotEmpty()) {
+            // === MULTI-LAYER IMPORT ===
+            importMultiLayerWallpaper(settings.wallpaperLayers)
+        } else {
+            // === SINGLE-LAYER FALLBACK (alte Backups) ===
+            importSingleLayerWallpaper(settings)
+        }
+    }
+
+    /**
+     * Importiert Multi-Layer Wallpaper. Validiert jede URI einzeln.
+     * Layer mit unerreichbarer URI werden übersprungen.
+     */
+    private suspend fun importMultiLayerWallpaper(layerBackups: List<WallpaperLayerBackup>) {
+        val validLayerStates = mutableListOf<WallpaperLayerState>()
+
+        for ((index, layerBackup) in layerBackups.withIndex()) {
+            val uriString = layerBackup.imageUri
+            if (uriString.isNullOrBlank()) {
+                Timber.Forest.w("Wallpaper layer $index has no URI, skipping")
+                continue
+            }
+
+            try {
+                val sourceUri = uriString.toUri()
+                val canAccess = try {
+                    context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
+                } catch (e: Exception) {
+                    false
+                }
+
+                if (canAccess) {
+                    // In internen Speicher kopieren (überlebt Reinstall)
+                    val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
+                    if (internalUri != null) {
+                        validLayerStates.add(layerBackup.toLayerState().copy(imageUri = internalUri))
+                    } else {
+                        Timber.Forest.w("Failed to copy layer $index to internal storage, skipping")
+                    }
+                } else {
+                    Timber.Forest.w("Wallpaper layer $index URI not accessible, skipping: $uriString")
+                }
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Failed to validate wallpaper layer $index URI")
+            }
+        }
+
+        if (validLayerStates.isNotEmpty()) {
+            val wallpaperState = WallpaperState.multiLayer(validLayerStates)
+            wallpaperManager.saveWallpaperState(wallpaperState)
+            Timber.Forest.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers (copied to internal)")
+        } else {
+            Timber.Forest.w("No valid wallpaper layers found, wallpaper not restored")
+        }
+    }
+
+    /**
+     * Importiert Single-Layer Wallpaper (Backward Compat für alte Backups ohne wallpaperLayers).
+     */
+    private suspend fun importSingleLayerWallpaper(settings: LauncherSettings) {
+        val wallpaperUri = settings.wallpaperUri
+        if (wallpaperUri.isNullOrBlank()) return
+
+        try {
+            val sourceUri = wallpaperUri.toUri()
+            val canAccess = try {
+                context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
+            } catch (e: Exception) {
+                false
+            }
+
+            if (canAccess) {
+                // In internen Speicher kopieren (überlebt Reinstall)
+                val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
+                if (internalUri != null) {
+                    val wallpaperState = WallpaperState(
+                        imageUri = internalUri,
+                        scale = settings.wallpaperScale ?: 1.0f,
+                        translateX = settings.wallpaperTranslateX ?: 0.0f,
+                        translateY = settings.wallpaperTranslateY ?: 0.0f
+                    )
+                    wallpaperManager.saveWallpaperState(wallpaperState)
+                    Timber.Forest.i("Imported wallpaper settings (single-layer, copied to internal)")
+                } else {
+                    Timber.Forest.w("Failed to copy wallpaper to internal storage")
+                }
+            } else {
+                Timber.Forest.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
+            }
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Failed to restore wallpaper")
+        }
     }
 
     // --- Helper für Strict Parsing ---
@@ -878,6 +1126,8 @@ class BackupManager @Inject constructor(
                 return@withContext null
             }
 
+            val hasMultiLayer = backup.settings.wallpaperLayers.isNotEmpty()
+
             val preview = BackupPreview(
                 version = backup.version,
                 timestamp = backup.timestamp,
@@ -894,7 +1144,12 @@ class BackupManager @Inject constructor(
                         backup.settings.verticalPaddingScale != null ||
                         backup.settings.isFontBold != null ||
                         backup.settings.contentTopMarginScale != null,
-                hasWallpaper = backup.settings.wallpaperUri != null,
+                hasWallpaper = if (hasMultiLayer) {
+                    backup.settings.wallpaperLayers.any { it.imageUri != null }
+                } else {
+                    backup.settings.wallpaperUri != null
+                },
+                wallpaperLayerCount = if (hasMultiLayer) backup.settings.wallpaperLayers.size else 0,
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                         backup.settings.showAlarm != null,
                 hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
@@ -906,7 +1161,7 @@ class BackupManager @Inject constructor(
             )
 
             Timber.Forest.i(
-                "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}..."
+                "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, wallpaperLayers=${preview.wallpaperLayerCount}..."
             )
             return@withContext preview
 

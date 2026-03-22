@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
@@ -12,6 +13,76 @@ data class BackupData(
     val appVersion: String = BuildConfig.VERSION_NAME,
     val settings: LauncherSettings
 )
+
+/**
+ * Backup-Repräsentation eines einzelnen Wallpaper-Layers.
+ *
+ * Separates Serialisierungsmodell (nicht das Domain-Modell WallpaperLayerState),
+ * damit Backup-Format und Domain-Modell unabhängig evolvieren können.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class WallpaperLayerBackup(
+    val id: String? = null,
+
+    @JsonNames("image_uri")
+    val imageUri: String? = null,
+
+    val scale: Float = 1.0f,
+
+    @JsonNames("translate_x")
+    val translateX: Float = 0f,
+
+    @JsonNames("translate_y")
+    val translateY: Float = 0f,
+
+    val alpha: Float = 1.0f,
+
+    /** BlendMode-Name als String, z.B. "MULTIPLY", "SCREEN". null = Normal (SRC_OVER). */
+    @JsonNames("blend_mode")
+    val blendModeName: String? = null,
+
+    @JsonNames("is_visible")
+    val isVisible: Boolean = true,
+
+    val label: String? = null
+) {
+    /**
+     * Konvertiert in das Domain-Modell WallpaperLayerState.
+     */
+    fun toLayerState(): WallpaperLayerState {
+        return WallpaperLayerState(
+            id = id ?: "layer_${System.currentTimeMillis()}_restored",
+            imageUri = imageUri?.takeIf { it.isNotEmpty() }?.toUri(),
+            scale = scale,
+            translateX = translateX,
+            translateY = translateY,
+            alpha = alpha,
+            blendModeName = blendModeName?.takeIf { it.isNotEmpty() },
+            isVisible = isVisible,
+            label = label?.takeIf { it.isNotEmpty() }
+        )
+    }
+
+    companion object {
+        /**
+         * Erstellt ein Backup-Modell aus einem Domain WallpaperLayerState.
+         */
+        fun fromLayerState(state: WallpaperLayerState): WallpaperLayerBackup {
+            return WallpaperLayerBackup(
+                id = state.id,
+                imageUri = state.imageUri?.toString(),
+                scale = state.scale,
+                translateX = state.translateX,
+                translateY = state.translateY,
+                alpha = state.alpha,
+                blendModeName = state.blendModeName,
+                isVisible = state.isVisible,
+                label = state.label
+            )
+        }
+    }
+}
 
 // Legacy backup compatibility: @JsonNames allows deserialization of old snake_case
 // keys while new exports use camelCase (the property name) by default.
@@ -49,7 +120,8 @@ data class LauncherSettings(
     @JsonNames("top_margin_scale")
     val contentTopMarginScale: Float? = null,
 
-    // Wallpaper Settings (Teil der Theme Settings)
+    // --- Wallpaper Settings (Single-Layer, Backward Compatibility) ---
+
     @JsonNames("wallpaper_uri")
     val wallpaperUri: String? = null,
     @JsonNames("wallpaper_scale")
@@ -58,6 +130,14 @@ data class LauncherSettings(
     val wallpaperTranslateX: Float? = null,
     @JsonNames("wallpaper_translate_y")
     val wallpaperTranslateY: Float? = null,
+
+    // --- Wallpaper Multi-Layer (NEU) ---
+    // Alte Backups ohne dieses Feld → default emptyList() → Single-Layer-Fallback.
+    // Neue Backups mit Layern → wallpaperLayers befüllt.
+    // Die Single-Layer-Felder oben werden ZUSÄTZLICH mit Layer 0 befüllt (Backward Compat).
+
+    @JsonNames("wallpaper_layers")
+    val wallpaperLayers: List<WallpaperLayerBackup> = emptyList(),
 
     @JsonNames("show_calendar_event")
     val showCalendarEvent: Boolean? = null,
@@ -114,6 +194,8 @@ data class BackupPreview(
     val hasSwipeRight: Boolean,
     val hasThemeSettings: Boolean,
     val hasWallpaper: Boolean,
+    /** Anzahl der Wallpaper-Layer im Backup (0 = Single-Layer oder kein Wallpaper) */
+    val wallpaperLayerCount: Int = 0,
     val hasGestureSettings: Boolean,
     val hasTimeBasedEvents: Boolean,
     val hasQualityOfLife: Boolean,
