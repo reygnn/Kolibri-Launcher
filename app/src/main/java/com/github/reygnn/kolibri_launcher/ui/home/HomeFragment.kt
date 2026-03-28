@@ -2087,9 +2087,8 @@ class HomeFragment : Fragment() {
     private fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap? {
         return try {
             val ctx = context ?: return null
-            val inputStream = ctx.contentResolver.openInputStream(uri) ?: return null
-            android.graphics.BitmapFactory.decodeStream(inputStream).also {
-                inputStream.close()
+            ctx.contentResolver.openInputStream(uri)?.use { inputStream ->
+                android.graphics.BitmapFactory.decodeStream(inputStream)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error loading bitmap from $uri")

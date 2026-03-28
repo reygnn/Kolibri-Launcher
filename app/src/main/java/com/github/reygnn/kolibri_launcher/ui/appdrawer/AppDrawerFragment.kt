@@ -58,7 +58,8 @@ import javax.inject.Inject
  * Critical for launcher - without working app drawer, user cannot open apps!
  */
 @AndroidEntryPoint
-class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
+//class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
+class AppDrawerFragment : Fragment() {
 
     // ===========================================
     // INJECTED DEPENDENCIES

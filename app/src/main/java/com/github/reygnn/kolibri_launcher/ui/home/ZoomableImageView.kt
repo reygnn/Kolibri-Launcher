@@ -9,13 +9,14 @@ import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.os.Build
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.animation.DecelerateInterpolator
 import androidx.appcompat.widget.AppCompatImageView
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.withMatrix
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -465,6 +466,8 @@ class ZoomableImageView @JvmOverloads constructor(
         return index
     }
 
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun removeLayer(index: Int): Boolean {
         if (index !in layers.indices) return false
         layers.removeAt(index)
@@ -513,6 +516,8 @@ class ZoomableImageView @JvmOverloads constructor(
         return swapLayers(index, index - 1)
     }
 
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun getLayers(): List<WallpaperLayer> = layers.toList()
     val layerCount: Int get() = layers.size
     fun getLayer(index: Int): WallpaperLayer? = layers.getOrNull(index)
@@ -526,6 +531,8 @@ class ZoomableImageView @JvmOverloads constructor(
      * @param layerIndex Index des Layers
      * @param alpha 0.0 (transparent) bis 1.0 (deckend)
      */
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun setLayerAlpha(layerIndex: Int, alpha: Float) {
         val layer = layers.getOrNull(layerIndex) ?: return
         layer.alpha = alpha.coerceIn(0f, 1f)
@@ -537,6 +544,8 @@ class ZoomableImageView @JvmOverloads constructor(
      * Verfügbare Modi: siehe [WallpaperLayer.AVAILABLE_BLEND_MODES]
      * null = Normal (SRC_OVER)
      */
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun setLayerBlendMode(layerIndex: Int, blendMode: BlendMode?) {
         val layer = layers.getOrNull(layerIndex) ?: return
         layer.blendMode = blendMode
@@ -546,6 +555,8 @@ class ZoomableImageView @JvmOverloads constructor(
     /**
      * Setzt Sichtbarkeit eines Layers.
      */
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun setLayerVisible(layerIndex: Int, visible: Boolean) {
         val layer = layers.getOrNull(layerIndex) ?: return
         layer.isVisible = visible
@@ -578,6 +589,8 @@ class ZoomableImageView @JvmOverloads constructor(
         invalidate()
     }
 
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun centerCropAll() {
         if (width == 0 || height == 0) return
         cancelSnapBackAnimation()
@@ -588,6 +601,8 @@ class ZoomableImageView @JvmOverloads constructor(
     /**
      * Exportiert alle sichtbaren Layer als ein einzelnes Bitmap.
      */
+    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
+    @Suppress("unused")
     fun composeToBitmap(
         targetWidth: Int = width,
         targetHeight: Int = height
@@ -595,7 +610,7 @@ class ZoomableImageView @JvmOverloads constructor(
         if (targetWidth <= 0 || targetHeight <= 0) return null
 
         return try {
-            val result = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+            val result = createBitmap(targetWidth, targetHeight)
             val canvas = Canvas(result)
 
             // Hintergrund (transparent bleibt transparent im Bitmap)
@@ -619,11 +634,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
                     // Alpha
                     exportPaint.alpha = layer.alphaInt
-
-                    // BlendMode (API 29+)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        exportPaint.blendMode = layer.blendMode
-                    }
+                    exportPaint.blendMode = layer.blendMode
 
                     drawMatrix.reset()
                     drawMatrix.set(layer.buildMatrix())
@@ -636,9 +647,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
                     // Reset für nächstes Layer
                     exportPaint.alpha = 255
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        exportPaint.blendMode = null
-                    }
+                    exportPaint.blendMode = null
                 }
             } else {
                 // Single-Layer: Drawable rendern
@@ -651,11 +660,10 @@ class ZoomableImageView @JvmOverloads constructor(
                     if (d is BitmapDrawable && d.bitmap != null) {
                         canvas.drawBitmap(d.bitmap, drawMatrix, exportPaint)
                     } else {
-                        canvas.save()
-                        canvas.concat(drawMatrix)
-                        d.setBounds(0, 0, d.intrinsicWidth, d.intrinsicHeight)
-                        d.draw(canvas)
-                        canvas.restore()
+                        canvas.withMatrix(drawMatrix) {
+                            d.setBounds(0, 0, d.intrinsicWidth, d.intrinsicHeight)
+                            d.draw(this)
+                        }
                     }
                 }
             }
@@ -672,13 +680,19 @@ class ZoomableImageView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         if (!isMultiLayerMode) {
-            // Single-Layer: Original AppCompatImageView Rendering
+            // Guard: Prüfen ob das Bitmap noch gültig ist
+            val d = drawable
+            if (d is BitmapDrawable) {
+                val bmp = d.bitmap
+                if (bmp == null || bmp.isRecycled) {
+                    // Nicht zeichnen — Bitmap ist weg
+                    return
+                }
+            }
             super.onDraw(canvas)
             return
         }
 
-        // Multi-Layer: Custom Rendering (Folien-Modell)
-        // Hintergrund nur zeichnen wenn nicht komplett transparent
         if (layerBackgroundColor != Color.TRANSPARENT) {
             bgPaint.color = layerBackgroundColor
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
@@ -688,23 +702,18 @@ class ZoomableImageView @JvmOverloads constructor(
             if (!layer.isVisible) continue
             val bmp = layer.bitmap ?: continue
 
-            // Alpha auf den Paint anwenden
-            bitmapPaint.alpha = layer.alphaInt
+            // Guard: Recycled Bitmap überspringen
+            if (bmp.isRecycled) continue
 
-            // BlendMode (API 29+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                bitmapPaint.blendMode = layer.blendMode
-            }
+            bitmapPaint.alpha = layer.alphaInt
+            bitmapPaint.blendMode = layer.blendMode
 
             drawMatrix.reset()
             drawMatrix.set(layer.buildMatrix())
             canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
 
-            // Paint zurücksetzen für nächstes Layer
             bitmapPaint.alpha = 255
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                bitmapPaint.blendMode = null
-            }
+            bitmapPaint.blendMode = null
 
             if (isEditMode && index == activeLayerIndex) {
                 drawSelectionHighlight(canvas, layer)
@@ -737,6 +746,7 @@ class ZoomableImageView @JvmOverloads constructor(
         return try {
             if (isMultiLayerMode) handleMultiLayerTouch(event)
             else handleSingleLayerTouch(event)
+            true
         } catch (e: Exception) {
             isDragging = false
             hasDraggedBeyondThreshold = false
@@ -747,7 +757,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
     // --- Single-Layer Touch (Original-Logik, 1:1) ---
 
-    private fun handleSingleLayerTouch(event: MotionEvent): Boolean {
+    private fun handleSingleLayerTouch(event: MotionEvent) {
         scaleDetector.onTouchEvent(event)
 
         when (event.actionMasked) {
@@ -765,7 +775,7 @@ class ZoomableImageView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (scaleDetector.isInProgress) return true
+                if (scaleDetector.isInProgress) return
 
                 if (isDragging && event.pointerCount == 1) {
                     val dx = event.x - startPoint.x
@@ -817,13 +827,11 @@ class ZoomableImageView @JvmOverloads constructor(
                 }
             }
         }
-
-        return true
     }
 
     // --- Multi-Layer Touch ---
 
-    private fun handleMultiLayerTouch(event: MotionEvent): Boolean {
+    private fun handleMultiLayerTouch(event: MotionEvent) {
         scaleDetector.onTouchEvent(event)
 
         when (event.actionMasked) {
@@ -838,9 +846,9 @@ class ZoomableImageView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (scaleDetector.isInProgress) return true
+                if (scaleDetector.isInProgress) return
 
-                val layer = activeLayer ?: return true
+                val layer = activeLayer ?: return
 
                 if (isDragging && event.pointerCount == 1) {
                     val dx = event.x - startPoint.x
@@ -902,8 +910,6 @@ class ZoomableImageView @JvmOverloads constructor(
                 }
             }
         }
-
-        return true
     }
 
     private fun handleLayerTap(x: Float, y: Float) {
@@ -1348,8 +1354,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
     private fun triggerHaptic() {
         performHapticFeedback(
-            HapticFeedbackConstants.CLOCK_TICK,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+            HapticFeedbackConstants.CLOCK_TICK
         )
     }
 
