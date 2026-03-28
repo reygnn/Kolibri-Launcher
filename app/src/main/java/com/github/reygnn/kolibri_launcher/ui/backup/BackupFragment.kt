@@ -55,7 +55,7 @@ class BackupFragment : Fragment() {
     }
 
     private val exportLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_JSON)
+        ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_ZIP)
     ) { uri ->
         uri?.let {
             try {
@@ -108,7 +108,7 @@ class BackupFragment : Fragment() {
         }
 
         binding.buttonImportBackup.setOnClickListener {
-            importLauncher.launch(arrayOf(AppConstants.MIME_TYPE_JSON))
+            importLauncher.launch(arrayOf(AppConstants.MIME_TYPE_JSON, AppConstants.MIME_TYPE_ZIP))
         }
     }
 

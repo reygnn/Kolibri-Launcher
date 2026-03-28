@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -35,24 +36,35 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.CancellationException
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Backup & Restore Manager für Kolibri Launcher Settings.
  *
+ * == BACKUP FORMAT ==
+ * Export: Immer als ZIP-Archiv mit eingebetteten Wallpaper-Bildern.
+ * Import: Erkennt automatisch ZIP (neu) und JSON (alt/legacy).
+ *
+ * ZIP-Struktur:
+ * ├── backup.json          (Settings + Layer-Metadaten)
+ * └── wallpapers/
+ *     ├── layer_0.img      (Bilddaten Layer 0)
+ *     ├── layer_1.img      (Bilddaten Layer 1)
+ *     └── ...
+ *
  * Hybrid Implementation:
  * - Primär: kotlinx.serialization für rückwärtskompatibles Parsing
  * - Fallback: org.json für striktes Parsing bei manuell erstellten/korrupten JSONs
  * - Validierung: Strikte Wertprüfung nach dem Parsing
- *
- * Multi-Layer Wallpaper:
- * - Export: Alle Layer werden in wallpaperLayers[] gespeichert.
- *   Zusätzlich werden die Single-Layer-Felder mit Layer 0 befüllt (Backward Compat).
- * - Import: wallpaperLayers[] vorhanden → Multi-Layer Restore.
- *   Sonst Fallback auf Single-Layer-Felder (alte Backups).
  *
  * Security-Hardened Version mit Fixes für:
  * - OOM Protection (Dateigröße vor Lesen prüfen)
@@ -81,103 +93,13 @@ class BackupManager @Inject constructor(
         encodeDefaults = true
     }
 
+    // ===========================================
+    // EXPORT
+    // ===========================================
+
     override suspend fun exportToJson(): String {
         return try {
-            val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
-            val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
-            val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
-            val customAppNames = appNamesManager.getAllCustomNames()
-            val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
-            val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
-
-            val textColor = settingsManager.textColorFlow.first()
-            val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
-            val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
-            val layoutScale = settingsManager.layoutScaleStateFlow.first()
-            val verticalPaddingScale = settingsManager.verticalPaddingStateFlow.first()
-            val isFontBold = settingsManager.isFontBoldStateFlow.first()
-            val contentTopMarginScale = settingsManager.contentTopMarginScaleFlow.first()
-
-            // Wallpaper Settings
-            val wallpaperState = wallpaperManager.getWallpaperStateSync()
-
-            val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
-            val showAlarm = settingsManager.showAlarmFlow.first()
-            val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
-            val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
-            val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
-            val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
-            val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
-            val secureWindow = settingsManager.secureWindowFlow.first()
-
-            // ===== Wallpaper: Multi-Layer Export =====
-            // Strategie:
-            // - Single-Layer-Felder IMMER befüllen (Backward Compat für ältere App-Versionen)
-            // - wallpaperLayers[] nur befüllen wenn Multi-Layer aktiv
-            val wallpaperUri: String?
-            val wallpaperScale: Float?
-            val wallpaperTranslateX: Float?
-            val wallpaperTranslateY: Float?
-            val wallpaperLayers: List<WallpaperLayerBackup>
-
-            if (wallpaperState.isMultiLayer) {
-                // Multi-Layer: Alle Layer exportieren
-                wallpaperLayers = wallpaperState.layers.map { WallpaperLayerBackup.fromLayerState(it) }
-
-                // Single-Layer-Felder mit Layer 0 befüllen (Backward Compat)
-                val firstLayer = wallpaperState.layers.firstOrNull()
-                wallpaperUri = firstLayer?.imageUri?.toString()
-                wallpaperScale = if (firstLayer?.imageUri != null) firstLayer.scale else null
-                wallpaperTranslateX = if (firstLayer?.imageUri != null) firstLayer.translateX else null
-                wallpaperTranslateY = if (firstLayer?.imageUri != null) firstLayer.translateY else null
-            } else {
-                // Single-Layer (wie bisher)
-                wallpaperLayers = emptyList()
-                wallpaperUri = wallpaperState.imageUri?.toString()
-                wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null
-                wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null
-                wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null
-            }
-
-            val settings = LauncherSettings(
-                favoriteComponents = favoriteComponents,
-                favoritesOrder = favoritesOrder,
-                hiddenComponents = hiddenComponents,
-                customAppNames = customAppNames,
-                swipeLeftApp = swipeLeftApp,
-                swipeRightApp = swipeRightApp,
-                textColor = textColor,
-                layoutScale = layoutScale,
-                verticalPaddingScale = verticalPaddingScale,
-                isFontBold = isFontBold,
-                contentTopMarginScale = contentTopMarginScale,
-                chipBackgroundColor = chipBackgroundColor,
-                textShadowEnabled = textShadowEnabled,
-                // Wallpaper Single-Layer (Backward Compat)
-                wallpaperUri = wallpaperUri,
-                wallpaperScale = wallpaperScale,
-                wallpaperTranslateX = wallpaperTranslateX,
-                wallpaperTranslateY = wallpaperTranslateY,
-                // Wallpaper Multi-Layer
-                wallpaperLayers = wallpaperLayers,
-                showCalendarEvent = showCalendarEvent,
-                showAlarm = showAlarm,
-                doubleTapToLockEnabled = doubleTapToLockEnabled,
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
-                autoShowKeyboard = autoShowKeyboard,
-                autoLaunchApp = autoLaunchApp,
-                splitModeThreshold = splitModeThreshold,
-                secureWindow = secureWindow
-            )
-
-            val backup = BackupData(
-                version = AppConstants.BACKUP_VERSION,
-                timestamp = System.currentTimeMillis(),
-                appVersion = BuildConfig.VERSION_NAME,
-                settings = settings
-            )
-            json.encodeToString(backup)
-
+            json.encodeToString(buildBackupData())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -186,13 +108,105 @@ class BackupManager @Inject constructor(
         }
     }
 
+    /**
+     * Baut das komplette BackupData-Objekt aus allen Repositories.
+     * Wird sowohl von exportToJson() als auch von saveBackupToFile() verwendet.
+     */
+    private suspend fun buildBackupData(): BackupData {
+        val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
+        val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
+        val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
+        val customAppNames = appNamesManager.getAllCustomNames()
+        val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
+        val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
+
+        val textColor = settingsManager.textColorFlow.first()
+        val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
+        val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
+        val layoutScale = settingsManager.layoutScaleStateFlow.first()
+        val verticalPaddingScale = settingsManager.verticalPaddingStateFlow.first()
+        val isFontBold = settingsManager.isFontBoldStateFlow.first()
+        val contentTopMarginScale = settingsManager.contentTopMarginScaleFlow.first()
+
+        val wallpaperState = wallpaperManager.getWallpaperStateSync()
+
+        val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
+        val showAlarm = settingsManager.showAlarmFlow.first()
+        val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
+        val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
+        val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
+        val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
+        val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
+        val secureWindow = settingsManager.secureWindowFlow.first()
+
+        // ===== Wallpaper: Multi-Layer Export =====
+        val wallpaperUri: String?
+        val wallpaperScale: Float?
+        val wallpaperTranslateX: Float?
+        val wallpaperTranslateY: Float?
+        val wallpaperLayers: List<WallpaperLayerBackup>
+
+        if (wallpaperState.isMultiLayer) {
+            wallpaperLayers = wallpaperState.layers.map { WallpaperLayerBackup.fromLayerState(it) }
+            val firstLayer = wallpaperState.layers.firstOrNull()
+            wallpaperUri = firstLayer?.imageUri?.toString()
+            wallpaperScale = if (firstLayer?.imageUri != null) firstLayer.scale else null
+            wallpaperTranslateX = if (firstLayer?.imageUri != null) firstLayer.translateX else null
+            wallpaperTranslateY = if (firstLayer?.imageUri != null) firstLayer.translateY else null
+        } else {
+            wallpaperLayers = emptyList()
+            wallpaperUri = wallpaperState.imageUri?.toString()
+            wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null
+            wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null
+            wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null
+        }
+
+        val settings = LauncherSettings(
+            favoriteComponents = favoriteComponents,
+            favoritesOrder = favoritesOrder,
+            hiddenComponents = hiddenComponents,
+            customAppNames = customAppNames,
+            swipeLeftApp = swipeLeftApp,
+            swipeRightApp = swipeRightApp,
+            textColor = textColor,
+            layoutScale = layoutScale,
+            verticalPaddingScale = verticalPaddingScale,
+            isFontBold = isFontBold,
+            contentTopMarginScale = contentTopMarginScale,
+            chipBackgroundColor = chipBackgroundColor,
+            textShadowEnabled = textShadowEnabled,
+            wallpaperUri = wallpaperUri,
+            wallpaperScale = wallpaperScale,
+            wallpaperTranslateX = wallpaperTranslateX,
+            wallpaperTranslateY = wallpaperTranslateY,
+            wallpaperLayers = wallpaperLayers,
+            showCalendarEvent = showCalendarEvent,
+            showAlarm = showAlarm,
+            doubleTapToLockEnabled = doubleTapToLockEnabled,
+            swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
+            autoShowKeyboard = autoShowKeyboard,
+            autoLaunchApp = autoLaunchApp,
+            splitModeThreshold = splitModeThreshold,
+            secureWindow = secureWindow
+        )
+
+        return BackupData(
+            version = AppConstants.BACKUP_VERSION,
+            timestamp = System.currentTimeMillis(),
+            appVersion = BuildConfig.VERSION_NAME,
+            settings = settings
+        )
+    }
+
+    // ===========================================
+    // IMPORT (JSON)
+    // ===========================================
+
     override suspend fun importFromJson(jsonString: String, options: ImportOptions): ImportResult {
         return try {
-            // === PHASE 1: PARSING (Hybrid-Ansatz) ===
             val backup = parseBackupData(jsonString)
                 ?: return ImportResult.InvalidFormat
 
-            // === PHASE 2: VALIDIERUNG ===
             if (options.importNothing) {
                 return ImportResult.Error("No import options selected")
             }
@@ -201,7 +215,6 @@ class BackupManager @Inject constructor(
                 return ImportResult.UnsupportedVersion(backup.version)
             }
 
-            // === PHASE 3: IMPORT ===
             performImport(backup, options)
 
         } catch (e: CancellationException) {
@@ -212,20 +225,264 @@ class BackupManager @Inject constructor(
         }
     }
 
+    // ===========================================
+    // ZIP FORMAT DETECTION
+    // ===========================================
+
     /**
-     * Hybrid-Parsing: kotlinx.serialization für Struktur, org.json für primitive Werte.
-     *
-     * WICHTIG: validateJsonTypes() wird BEIBEHALTEN als Schutz gegen Type Confusion Attacks.
+     * Prüft ob eine Datei ein ZIP-Archiv ist (Magic Bytes: 0x50 0x4B = "PK").
      */
+    private fun isZipFile(uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val magic = ByteArray(2)
+                val read = input.read(magic)
+                read == 2 && magic[0] == 0x50.toByte() && magic[1] == 0x4B.toByte()
+            } ?: false
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    // ===========================================
+    // ZIP EXPORT
+    // ===========================================
+
+    /**
+     * Schreibt ein ZIP-Backup mit eingebetteten Wallpaper-Bildern.
+     *
+     * 1. Baut BackupData mit imageFileName-Referenzen
+     * 2. Sammelt lokale Bilddateien
+     * 3. Erstellt ZIP mit backup.json + Bilddateien
+     */
+    private fun writeZipBackup(uri: Uri, backupData: BackupData) {
+        // 1. Sammle Bilder und weise Dateinamen zu
+        val imageEntries = mutableListOf<Pair<String, File>>() // (zipEntryName, localFile)
+        val dedupSet = mutableSetOf<String>() // Verhindert doppelte Einträge
+
+        // Multi-Layer: Jedes Layer bekommt einen Dateinamen
+        val layersWithFileNames = backupData.settings.wallpaperLayers.mapIndexed { index, layer ->
+            val imageUriStr = layer.imageUri
+            if (imageUriStr != null) {
+                val file = resolveToLocalFile(imageUriStr)
+                if (file != null && file.exists()) {
+                    val entryName = "wallpapers/layer_$index.img"
+                    if (dedupSet.add(file.absolutePath)) {
+                        imageEntries.add(entryName to file)
+                    }
+                    layer.copy(imageFileName = entryName)
+                } else {
+                    layer
+                }
+            } else {
+                layer
+            }
+        }
+
+        // Single-Layer: Fallback-Bild
+        var singleLayerFileName: String? = null
+        val singleUri = backupData.settings.wallpaperUri
+
+        if (singleUri != null && backupData.settings.wallpaperLayers.isEmpty()) {
+            // Echter Single-Layer Modus
+            val file = resolveToLocalFile(singleUri)
+            if (file != null && file.exists()) {
+                singleLayerFileName = "wallpapers/single.img"
+                if (dedupSet.add(file.absolutePath)) {
+                    imageEntries.add(singleLayerFileName to file)
+                }
+            }
+        } else if (imageEntries.isNotEmpty()) {
+            // Multi-Layer: Single-Layer Feld zeigt auf Layer 0 (gleiche Datei)
+            singleLayerFileName = layersWithFileNames.firstOrNull()?.imageFileName
+        }
+
+        // 2. Finales BackupData mit imageFileName-Referenzen
+        val finalBackup = backupData.copy(
+            settings = backupData.settings.copy(
+                wallpaperLayers = layersWithFileNames,
+                wallpaperImageFileName = singleLayerFileName
+            )
+        )
+
+        val jsonString = json.encodeToString(finalBackup)
+
+        // 3. ZIP schreiben
+        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+            ZipOutputStream(BufferedOutputStream(outputStream)).use { zipOut ->
+                // backup.json
+                zipOut.putNextEntry(ZipEntry("backup.json"))
+                zipOut.write(jsonString.toByteArray(Charsets.UTF_8))
+                zipOut.closeEntry()
+
+                // Bilddateien
+                for ((entryName, file) in imageEntries) {
+                    zipOut.putNextEntry(ZipEntry(entryName))
+                    file.inputStream().use { it.copyTo(zipOut) }
+                    zipOut.closeEntry()
+                }
+            }
+        } ?: throw BackupException("Cannot write to selected location")
+
+        val imageCount = imageEntries.size
+        Timber.Forest.i("ZIP backup saved: ${imageCount} image(s) embedded")
+    }
+
+    /**
+     * Löst einen URI-String in eine lokale Datei auf.
+     * Funktioniert nur für file:// URIs (interne Wallpaper-Dateien).
+     */
+    private fun resolveToLocalFile(uriString: String): File? {
+        return try {
+            val uri = uriString.toUri()
+            if (uri.scheme == "file") {
+                uri.path?.let { File(it) }
+            } else {
+                null
+            }
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    // ===========================================
+    // ZIP IMPORT
+    // ===========================================
+
+    /**
+     * Importiert aus einem ZIP-Backup.
+     *
+     * 1. Extrahiert backup.json und Wallpaper-Bilder
+     * 2. Speichert Bilder in internen Speicher
+     * 3. Löst imageFileName-Referenzen zu internen URIs auf
+     * 4. Führt normalen Import durch
+     */
+    private suspend fun importFromZip(uri: Uri, options: ImportOptions): ImportResult {
+        var jsonString: String? = null
+        val extractedImages = mutableMapOf<String, Uri>() // zipEntryName → internal URI
+
+        // 1. ZIP entpacken
+        try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                ZipInputStream(BufferedInputStream(inputStream)).use { zipIn ->
+                    var entry = zipIn.nextEntry
+                    while (entry != null) {
+                        when {
+                            entry.name == "backup.json" -> {
+                                jsonString = zipIn.readBytes().toString(Charsets.UTF_8)
+                            }
+                            entry.name.startsWith("wallpapers/") && !entry.isDirectory -> {
+                                val internalUri = wallpaperFileManager.copyFromInputStream(zipIn)
+                                if (internalUri != null) {
+                                    extractedImages[entry.name] = internalUri
+                                    Timber.Forest.d("Extracted ${entry.name} → $internalUri")
+                                }
+                            }
+                        }
+                        zipIn.closeEntry()
+                        entry = zipIn.nextEntry
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error extracting ZIP backup")
+            return ImportResult.Error("Failed to extract backup archive")
+        }
+
+        val jsonContent = jsonString
+        if (jsonContent.isNullOrBlank()) {
+            Timber.Forest.e("ZIP backup does not contain backup.json")
+            return ImportResult.InvalidFormat
+        }
+
+        // 2. JSON parsen (bestehende Logik)
+        val backup = parseBackupData(jsonContent)
+            ?: return ImportResult.InvalidFormat
+
+        if (options.importNothing) return ImportResult.Error("No import options selected")
+        if (!isVersionSupported(backup.version)) return ImportResult.UnsupportedVersion(backup.version)
+
+        // 3. Image-Referenzen auflösen: imageFileName → interne URI
+        val resolvedBackup = resolveZipImages(backup, extractedImages)
+
+        // 4. Normalen Import durchführen
+        Timber.Forest.i("ZIP import: ${extractedImages.size} images extracted, starting import")
+        return performImport(resolvedBackup, options)
+    }
+
+    /**
+     * Ersetzt imageFileName-Referenzen im BackupData durch interne URIs
+     * der aus dem ZIP extrahierten Bilder.
+     */
+    private fun resolveZipImages(
+        backup: BackupData,
+        extractedImages: Map<String, Uri>
+    ): BackupData {
+        val settings = backup.settings
+
+        // Multi-Layer: imageFileName → interne URI
+        val resolvedLayers = settings.wallpaperLayers.map { layer ->
+            val fileName = layer.imageFileName
+            val internalUri = if (fileName != null) extractedImages[fileName] else null
+            if (internalUri != null) {
+                layer.copy(imageUri = internalUri.toString())
+            } else {
+                layer // Kein imageFileName oder nicht im ZIP → URI unverändert lassen
+            }
+        }
+
+        // Single-Layer: wallpaperImageFileName → interne URI
+        val singleFileName = settings.wallpaperImageFileName
+        val resolvedSingleUri = if (singleFileName != null) {
+            extractedImages[singleFileName]?.toString()
+        } else {
+            null
+        }
+
+        return backup.copy(
+            settings = settings.copy(
+                wallpaperLayers = resolvedLayers,
+                wallpaperUri = resolvedSingleUri ?: settings.wallpaperUri
+            )
+        )
+    }
+
+    /**
+     * Liest nur die backup.json aus einem ZIP-Archiv (für Preview).
+     */
+    private fun readJsonFromZip(uri: Uri): String? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                ZipInputStream(BufferedInputStream(inputStream)).use { zipIn ->
+                    var entry = zipIn.nextEntry
+                    while (entry != null) {
+                        if (entry.name == "backup.json") {
+                            return@use zipIn.readBytes().toString(Charsets.UTF_8)
+                        }
+                        zipIn.closeEntry()
+                        entry = zipIn.nextEntry
+                    }
+                    null
+                }
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error reading JSON from ZIP")
+            null
+        }
+    }
+
+    // ===========================================
+    // PARSING (Hybrid: kotlinx.serialization + org.json)
+    // ===========================================
+
     private fun parseBackupData(jsonString: String): BackupData? {
-        // PHASE 1: Typ-Validierung (Doomsday-Schutz gegen Type Confusion)
-        // Dies verhindert Attacken wie: "textColor": "hackerstring"
         if (!validateJsonTypes(jsonString)) {
             Timber.Forest.w("Type validation failed - rejecting malformed backup")
             return null
         }
 
-        // PHASE 2: Parse mit kotlinx.serialization
         val backup = try {
             json.decodeFromString<BackupData>(jsonString)
         } catch (e: SerializationException) {
@@ -236,7 +493,6 @@ class BackupManager @Inject constructor(
             return tryStrictParsing(jsonString)
         }
 
-        // PHASE 3: Merge mit org.json Werten (nur überschreiben wenn org.json einen Wert hat)
         return mergeWithStrictValues(backup, jsonString)
     }
 
@@ -252,44 +508,28 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * Merged org.json Werte (snake_case) mit kotlinx.serialization Objekten.
-     */
     private fun mergeWithStrictValues(backup: BackupData, jsonString: String): BackupData {
         return try {
             val root = JSONObject(jsonString)
             if (!root.has("settings")) return backup
             val settings = root.getJSONObject("settings")
 
-            // Multi-Layer Wallpaper: org.json Parsing
             val strictLayers = parseWallpaperLayersFromJson(settings)
 
             val enrichedSettings = backup.settings.copy(
-                // Strings
                 swipeLeftApp = settings.getStrictString("swipe_left_app") ?: backup.settings.swipeLeftApp,
                 swipeRightApp = settings.getStrictString("swipe_right_app") ?: backup.settings.swipeRightApp,
-
-                // Ints
                 textColor = settings.getStrictInt("text_color") ?: backup.settings.textColor,
                 chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: backup.settings.chipBackgroundColor,
                 splitModeThreshold = settings.getStrictInt("split_mode_threshold") ?: backup.settings.splitModeThreshold,
-
-                // Floats
                 layoutScale = settings.getStrictFloat("layout_scale") ?: backup.settings.layoutScale,
                 verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
                 contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
-
-                // Wallpaper Single-Layer Floats
                 wallpaperUri = settings.getStrictString("wallpaper_uri") ?: backup.settings.wallpaperUri,
                 wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: backup.settings.wallpaperScale,
                 wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: backup.settings.wallpaperTranslateX,
                 wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: backup.settings.wallpaperTranslateY,
-
-                // Wallpaper Multi-Layer
-                // Bevorzuge org.json Ergebnis wenn vorhanden, sonst kotlinx-Ergebnis
                 wallpaperLayers = if (strictLayers != null) strictLayers else backup.settings.wallpaperLayers,
-
-                // Booleans
                 isFontBold = settings.getStrictBool("is_font_bold") ?: backup.settings.isFontBold,
                 textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
                 showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: backup.settings.showCalendarEvent,
@@ -308,13 +548,7 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * Parsed wallpaperLayers (oder wallpaper_layers) Array aus org.json.
-     * Gibt null zurück wenn das Feld nicht existiert (NICHT emptyList,
-     * damit der Aufrufer weiß: "kein Feld vorhanden" vs. "leeres Array").
-     */
     private fun parseWallpaperLayersFromJson(settings: JSONObject): List<WallpaperLayerBackup>? {
-        // Beide Keys prüfen (camelCase + snake_case)
         val key = when {
             settings.has("wallpaperLayers") -> "wallpaperLayers"
             settings.has("wallpaper_layers") -> "wallpaper_layers"
@@ -339,15 +573,13 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * Parsed ein einzelnes WallpaperLayerBackup aus einem JSONObject.
-     * Unterstützt sowohl camelCase als auch snake_case Keys.
-     */
     private fun parseWallpaperLayerFromJson(obj: JSONObject): WallpaperLayerBackup {
         return WallpaperLayerBackup(
             id = obj.getStrictString("id"),
             imageUri = obj.getStrictString("imageUri")
                 ?: obj.getStrictString("image_uri"),
+            imageFileName = obj.getStrictString("imageFileName")
+                ?: obj.getStrictString("image_file_name"),
             scale = obj.getStrictFloat("scale") ?: 1.0f,
             translateX = obj.getStrictFloat("translateX")
                 ?: obj.getStrictFloat("translate_x") ?: 0f,
@@ -362,23 +594,20 @@ class BackupManager @Inject constructor(
         )
     }
 
-    /**
-     * Validiert kritische Felder auf korrekte JSON-Typen.
-     * Verhindert Type Confusion Attacks (z.B. "text_color": "hackerstring").
-     *
-     * WICHTIG: Nutzt snake_case Keys ("text_color"), da diese im JSON stehen.
-     */
+    // ===========================================
+    // TYPE VALIDATION
+    // ===========================================
+
     private fun validateJsonTypes(jsonString: String): Boolean {
         return try {
             val root = JSONObject(jsonString)
 
             if (!root.has("settings")) {
-                return true // Wird später als Fehler behandelt (Missing Field)
+                return true
             }
 
             val settings = root.getJSONObject("settings")
 
-            // 1. Integer-Felder (snake_case)
             val intFields = listOf("text_color", "chip_bg_color", "split_mode_threshold")
             for (field in intFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -390,7 +619,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 2. Float-Felder (snake_case) - inkl. Wallpaper
             val floatFields = listOf(
                 "layout_scale", "vertical_padding_scale", "top_margin_scale",
                 "wallpaper_scale", "wallpaper_translate_x", "wallpaper_translate_y"
@@ -402,7 +630,6 @@ class BackupManager @Inject constructor(
                         Timber.Forest.w("Type validation failed: $field is not a number")
                         return false
                     }
-                    // Infinity/NaN Check
                     val doubleVal = (value as Number).toDouble()
                     if (!doubleVal.isFinite()) {
                         Timber.Forest.w("Type validation failed: $field is Infinity or NaN")
@@ -411,7 +638,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 3. Boolean-Felder (snake_case)
             val boolFields = listOf(
                 "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
                 "double_tap_to_lock_enabled", "swipe_down_to_notifications_enabled",
@@ -427,7 +653,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 4. String-Felder (Swipe Apps + Wallpaper URI) (snake_case)
             val stringFields = listOf("swipe_left_app", "swipe_right_app", "wallpaper_uri")
             for (field in stringFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -438,7 +663,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 5. Array-Felder (camelCase, da KEIN @SerialName in LauncherSettings)
             val arrayFields = listOf("favoriteComponents", "favoritesOrder", "hiddenComponents")
             for (field in arrayFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -454,7 +678,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 6. Map-Feld (camelCase)
             if (settings.has("customAppNames") && !settings.isNull("customAppNames")) {
                 val value = settings.get("customAppNames")
                 if (value !is JSONObject) {
@@ -467,7 +690,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 7. wallpaperLayers Array (camelCase + snake_case)
             val layersKey = when {
                 settings.has("wallpaperLayers") -> "wallpaperLayers"
                 settings.has("wallpaper_layers") -> "wallpaper_layers"
@@ -483,7 +705,6 @@ class BackupManager @Inject constructor(
                     Timber.Forest.w("Array size limit exceeded for $layersKey")
                     return false
                 }
-                // Validiere Felder innerhalb jedes Layers
                 if (!validateWallpaperLayerTypes(value)) {
                     return false
                 }
@@ -496,13 +717,10 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * Validiert die Typen innerhalb jedes Wallpaper-Layer-Objekts.
-     */
     private fun validateWallpaperLayerTypes(layersArray: JSONArray): Boolean {
         val layerFloatFields = listOf("scale", "translateX", "translate_x", "translateY", "translate_y", "alpha")
         val layerBoolFields = listOf("isVisible", "is_visible")
-        val layerStringFields = listOf("id", "imageUri", "image_uri", "blendModeName", "blend_mode", "label")
+        val layerStringFields = listOf("id", "imageUri", "image_uri", "imageFileName", "image_file_name", "blendModeName", "blend_mode", "label")
 
         for (i in 0 until layersArray.length()) {
             val layer = layersArray.optJSONObject(i) ?: continue
@@ -541,10 +759,10 @@ class BackupManager @Inject constructor(
         return true
     }
 
-    /**
-     * Striktes Parsing mit org.json für Doomsday-Resilience.
-     * Mappt snake_case JSON Keys auf camelCase Konstruktor-Parameter.
-     */
+    // ===========================================
+    // STRICT PARSING (org.json Fallback)
+    // ===========================================
+
     private fun parseStrictly(jsonString: String): BackupData {
         val root = JSONObject(jsonString)
 
@@ -560,12 +778,10 @@ class BackupManager @Inject constructor(
         }
         val settingsJson = root.getJSONObject("settings")
 
-        // Manuelle Extraktion der Listen (camelCase Keys bleiben hier gleich)
         val favoriteComponents = settingsJson.getStrictStringList("favoriteComponents").toSet()
         val favoritesOrder = settingsJson.getStrictStringList("favoritesOrder")
         val hiddenComponents = settingsJson.getStrictStringList("hiddenComponents").toSet()
 
-        // Manuelle Extraktion der Map (camelCase)
         val customAppNames = mutableMapOf<String, String>()
         if (settingsJson.has("customAppNames") && !settingsJson.isNull("customAppNames")) {
             val namesObj = settingsJson.getJSONObject("customAppNames")
@@ -574,7 +790,6 @@ class BackupManager @Inject constructor(
             }
         }
 
-        // Multi-Layer Wallpaper aus org.json
         val wallpaperLayers = parseWallpaperLayersFromJson(settingsJson) ?: emptyList()
 
         val settings = LauncherSettings(
@@ -582,28 +797,19 @@ class BackupManager @Inject constructor(
             favoritesOrder = favoritesOrder,
             hiddenComponents = hiddenComponents,
             customAppNames = customAppNames,
-
-            // Primitive Werte mapping (snake_case -> property)
             swipeLeftApp = settingsJson.getStrictString("swipe_left_app"),
             swipeRightApp = settingsJson.getStrictString("swipe_right_app"),
-
             textColor = settingsJson.getStrictInt("text_color"),
             chipBackgroundColor = settingsJson.getStrictInt("chip_bg_color"),
             splitModeThreshold = settingsJson.getStrictInt("split_mode_threshold"),
-
             layoutScale = settingsJson.getStrictFloat("layout_scale"),
             verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
             contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),
-
-            // Wallpaper Single-Layer
             wallpaperUri = settingsJson.getStrictString("wallpaper_uri"),
             wallpaperScale = settingsJson.getStrictFloat("wallpaper_scale"),
             wallpaperTranslateX = settingsJson.getStrictFloat("wallpaper_translate_x"),
             wallpaperTranslateY = settingsJson.getStrictFloat("wallpaper_translate_y"),
-
-            // Wallpaper Multi-Layer
             wallpaperLayers = wallpaperLayers,
-
             isFontBold = settingsJson.getStrictBool("is_font_bold"),
             textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
             showCalendarEvent = settingsJson.getStrictBool("show_calendar_event"),
@@ -623,16 +829,14 @@ class BackupManager @Inject constructor(
         )
     }
 
-    /**
-     * Führt den eigentlichen Import durch.
-     * Extrahiert aus der alten importFromJson Methode.
-     */
+    // ===========================================
+    // PERFORM IMPORT
+    // ===========================================
+
     private suspend fun performImport(backup: BackupData, options: ImportOptions): ImportResult {
-        // Hole installierte Apps (einmalig)
         val installedApps = installedAppsManager.getInstalledApps().first()
         val installedComponents = installedApps.map { it.componentName }.toSet()
 
-        // PERFORMANCE-OPTIMIERUNG: Convert zu HashSet für O(1) Lookups
         val installedComponentsSet = installedComponents.toHashSet()
         val installedPackagesSet = installedComponents
             .mapTo(HashSet()) { it.split('/')[0] }
@@ -661,7 +865,6 @@ class BackupManager @Inject constructor(
 
             favoritesManager.saveFavoriteComponents(validFavorites.toList())
             importedCount += validFavorites.size
-
             Timber.Forest.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
         }
 
@@ -704,7 +907,6 @@ class BackupManager @Inject constructor(
         // ===== PHASE 5: Import Swipe Actions =====
         if (options.importSwipeActions) {
             var swipeImportedCount = 0
-            // Import Left Swipe
             val leftApp = backup.settings.swipeLeftApp
             if (leftApp != null) {
                 if (leftApp in installedComponentsSet) {
@@ -715,7 +917,6 @@ class BackupManager @Inject constructor(
                     missingApps.add(leftApp)
                 }
             }
-            // Import Right Swipe
             val rightApp = backup.settings.swipeRightApp
             if (rightApp != null) {
                 if (rightApp in installedComponentsSet) {
@@ -752,7 +953,6 @@ class BackupManager @Inject constructor(
                 settingsManager.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
             }
 
-            // ===== Wallpaper Import (Multi-Layer aware) =====
             importWallpaper(backup.settings)
         }
 
@@ -783,27 +983,18 @@ class BackupManager @Inject constructor(
         )
     }
 
-    /**
-     * Importiert Wallpaper Settings.
-     *
-     * Strategie:
-     * 1. wallpaperLayers nicht leer → Multi-Layer Restore (alle Layer mit URI-Validierung)
-     * 2. wallpaperLayers leer → Fallback auf Single-Layer-Felder (Backward Compat)
-     */
+    // ===========================================
+    // WALLPAPER IMPORT
+    // ===========================================
+
     private suspend fun importWallpaper(settings: LauncherSettings) {
         if (settings.wallpaperLayers.isNotEmpty()) {
-            // === MULTI-LAYER IMPORT ===
             importMultiLayerWallpaper(settings.wallpaperLayers)
         } else {
-            // === SINGLE-LAYER FALLBACK (alte Backups) ===
             importSingleLayerWallpaper(settings)
         }
     }
 
-    /**
-     * Importiert Multi-Layer Wallpaper. Validiert jede URI einzeln.
-     * Layer mit unerreichbarer URI werden übersprungen.
-     */
     private suspend fun importMultiLayerWallpaper(layerBackups: List<WallpaperLayerBackup>) {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
 
@@ -823,7 +1014,6 @@ class BackupManager @Inject constructor(
                 }
 
                 if (canAccess) {
-                    // In internen Speicher kopieren (überlebt Reinstall)
                     val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                     if (internalUri != null) {
                         validLayerStates.add(layerBackup.toLayerState().copy(imageUri = internalUri))
@@ -841,15 +1031,12 @@ class BackupManager @Inject constructor(
         if (validLayerStates.isNotEmpty()) {
             val wallpaperState = WallpaperState.multiLayer(validLayerStates)
             wallpaperManager.saveWallpaperState(wallpaperState)
-            Timber.Forest.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers (copied to internal)")
+            Timber.Forest.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers")
         } else {
             Timber.Forest.w("No valid wallpaper layers found, wallpaper not restored")
         }
     }
 
-    /**
-     * Importiert Single-Layer Wallpaper (Backward Compat für alte Backups ohne wallpaperLayers).
-     */
     private suspend fun importSingleLayerWallpaper(settings: LauncherSettings) {
         val wallpaperUri = settings.wallpaperUri
         if (wallpaperUri.isNullOrBlank()) return
@@ -863,7 +1050,6 @@ class BackupManager @Inject constructor(
             }
 
             if (canAccess) {
-                // In internen Speicher kopieren (überlebt Reinstall)
                 val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                 if (internalUri != null) {
                     val wallpaperState = WallpaperState(
@@ -873,7 +1059,7 @@ class BackupManager @Inject constructor(
                         translateY = settings.wallpaperTranslateY ?: 0.0f
                     )
                     wallpaperManager.saveWallpaperState(wallpaperState)
-                    Timber.Forest.i("Imported wallpaper settings (single-layer, copied to internal)")
+                    Timber.Forest.i("Imported wallpaper settings (single-layer)")
                 } else {
                     Timber.Forest.w("Failed to copy wallpaper to internal storage")
                 }
@@ -885,80 +1071,56 @@ class BackupManager @Inject constructor(
         }
     }
 
-    // --- Helper für Strict Parsing ---
+    // ===========================================
+    // STRICT PARSING HELPERS
+    // ===========================================
 
     private fun JSONObject.getStrictString(key: String): String? {
         if (!this.has(key) || this.isNull(key)) return null
-        return try {
-            this.getString(key)
-        } catch (e: JSONException) {
-            null
-        }
+        return try { this.getString(key) } catch (e: JSONException) { null }
     }
 
-    /**
-     * Liest einen Int-Wert aus JSON.
-     *
-     * WICHTIG: Wir lesen als Long und casten zu Int.
-     * Warum? ARGB-Farben wie 0xFFFFFFFF (weiß) = 4294967295 als unsigned.
-     * getLong() liest das korrekt, und .toInt() konvertiert es zu -1 (signed).
-     */
     private fun JSONObject.getStrictInt(key: String): Int? {
         if (!this.has(key) || this.isNull(key)) return null
-        return try {
-            // Für Farben korrekt: 4294967295L.toInt() = -1 (0xFFFFFFFF als signed)
-            this.getLong(key).toInt()
-        } catch (e: JSONException) {
-            null
-        }
+        return try { this.getLong(key).toInt() } catch (e: JSONException) { null }
     }
 
-    /**
-     * Liest einen Float-Wert aus JSON mit Infinity/NaN-Schutz.
-     */
     private fun JSONObject.getStrictFloat(key: String): Float? {
         if (!this.has(key) || this.isNull(key)) return null
         return try {
             val doubleVal = this.getDouble(key)
-            // FIX: Infinity und NaN ablehnen
             if (!doubleVal.isFinite()) {
                 Timber.Forest.w("Rejected non-finite float for $key: $doubleVal")
                 null
             } else {
                 doubleVal.toFloat()
             }
-        } catch (e: JSONException) {
-            null
-        }
+        } catch (e: JSONException) { null }
     }
 
     private fun JSONObject.getStrictBool(key: String): Boolean? {
         if (!this.has(key) || this.isNull(key)) return null
-        return try {
-            this.getBoolean(key)
-        } catch (e: JSONException) {
-            null
-        }
+        return try { this.getBoolean(key) } catch (e: JSONException) { null }
     }
 
     private fun JSONObject.getStrictStringList(key: String): List<String> {
         if (!this.has(key) || this.isNull(key)) return emptyList()
-
         return try {
             val jsonArray = this.getJSONArray(key)
             val list = mutableListOf<String>()
             for (i in 0 until minOf(jsonArray.length(), AppConstants.MAX_ARRAY_ELEMENTS)) {
-                // Nur Strings hinzufügen, andere Typen überspringen
                 val item = jsonArray.opt(i)
                 if (item is String) {
                     list.add(item)
                 }
             }
             list
-        } catch (e: JSONException) {
-            emptyList()
-        }
+        } catch (e: JSONException) { emptyList() }
     }
+
+    // ===========================================
+    // FILE I/O: SAVE
+    // ===========================================
 
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -980,23 +1142,12 @@ class BackupManager @Inject constructor(
                 throw BackupException("Unsupported file location type")
             }
 
-            // Wir rufen exportToJson auf. Da dies "nur" CPU/Memory ist, ist es hier im IO Block auch okay.
-            val jsonString = exportToJson()
+            // BackupData bauen und als ZIP mit Bildern schreiben
+            val backupData = buildBackupData()
+            writeZipBackup(uri, backupData)
 
-            val backupSizeBytes = jsonString.toByteArray().size
-            if (backupSizeBytes > AppConstants.MAX_BACKUP_SIZE_BYTES) {
-                Timber.Forest.w("Backup size is very large: ${backupSizeBytes / 1024 / 1024} MB")
-            }
-
-            // CRITICAL I/O OPERATION
-            context.contentResolver.openOutputStream(uri)?.use { output ->
-                output.write(jsonString.toByteArray())
-                Timber.Forest.i("Backup saved successfully to: $uri (${backupSizeBytes / 1024} KB)")
-                true
-            } ?: run {
-                Timber.Forest.e("Failed to open output stream for URI: $uri")
-                throw BackupException("Cannot write to selected location")
-            }
+            Timber.Forest.i("Backup saved successfully as ZIP to: $uri")
+            true
 
         } catch (e: CancellationException) {
             throw e
@@ -1014,9 +1165,10 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * FIX 1: OOM Protection - Dateigröße prüfen VOR dem Lesen.
-     */
+    // ===========================================
+    // FILE I/O: LOAD
+    // ===========================================
+
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) return@withContext ImportResult.Error("Invalid file location")
@@ -1027,36 +1179,39 @@ class BackupManager @Inject constructor(
                 return@withContext ImportResult.Error("Invalid format")
             }
 
-            // FIX 1: OOM Protection - Dateigröße prüfen VOR dem Lesen
+            // OOM Protection: Dateigröße prüfen VOR dem Lesen
             val fileSize = try {
                 context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { pfd ->
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
                 Timber.Forest.w(e, "Could not determine file size, proceeding with caution")
-                0L  // Bei Fehler trotzdem versuchen zu lesen (aber mit Limit)
+                0L
             }
 
             if (fileSize > AppConstants.MAX_BACKUP_SIZE_BYTES) {
-                Timber.Forest.e("File too large: $fileSize bytes (max: $AppConstants.MAX_BACKUP_SIZE_BYTES)")
+                Timber.Forest.e("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
                 return@withContext ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
             }
 
-            // CRITICAL I/O OPERATION
+            // Format-Erkennung: ZIP oder JSON?
+            if (isZipFile(uri)) {
+                Timber.Forest.i("Detected ZIP backup format")
+                return@withContext importFromZip(uri, options)
+            }
+
+            // Legacy: Plain JSON
+            Timber.Forest.i("Detected legacy JSON backup format")
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return@withContext ImportResult.Error("Cannot read from selected location")
 
-            // Zusätzlicher Check falls statSize nicht funktioniert hat
             if (jsonString.length > AppConstants.MAX_BACKUP_SIZE_BYTES) {
                 return@withContext ImportResult.Error("Backup file is too large")
             }
-
-            // Leere Strings und offensichtlich ungültiges JSON abfangen
             if (jsonString.isBlank()) return@withContext ImportResult.InvalidFormat
             if (!jsonString.trim().startsWith("{")) return@withContext ImportResult.InvalidFormat
 
-            // importFromJson ist suspend, wir rufen es hier auf.
             importFromJson(jsonString, options)
 
         } catch (e: CancellationException) {
@@ -1067,9 +1222,10 @@ class BackupManager @Inject constructor(
         }
     }
 
-    /**
-     * FIX 4: Preview mit Dateigrösse-Check VOR dem Lesen.
-     */
+    // ===========================================
+    // FILE I/O: PREVIEW
+    // ===========================================
+
     override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
@@ -1090,7 +1246,6 @@ class BackupManager @Inject constructor(
                 return@withContext null
             }
 
-            // FIX 4: Dateigröße prüfen VOR dem Lesen (verhindert Memory Spike)
             val fileSize = try {
                 context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                     pfd.statSize
@@ -1100,17 +1255,27 @@ class BackupManager @Inject constructor(
                 0L
             }
 
-            if (fileSize > AppConstants.MAX_PREVIEW_SIZE_BYTES) {
-                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $AppConstants.MAX_PREVIEW_SIZE_BYTES)")
-                // Für sehr große Dateien: Minimal-Preview mit Warnung
+            val sizeLimit = if (isZipFile(uri)) {
+                AppConstants.MAX_BACKUP_SIZE_BYTES
+            } else {
+                AppConstants.MAX_PREVIEW_SIZE_BYTES
+            }
+            if (fileSize > sizeLimit) {
+                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $sizeLimit)")
                 return@withContext null
             }
 
-            // Jetzt sicher lesen
-            val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().readText()
-            } ?: run {
-                Timber.Forest.e("Failed to open input stream for preview")
+            // Format-Erkennung: ZIP oder JSON?
+            val jsonString = if (isZipFile(uri)) {
+                readJsonFromZip(uri)
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.bufferedReader().readText()
+                }
+            }
+
+            if (jsonString.isNullOrBlank()) {
+                Timber.Forest.e("Could not read backup content for preview")
                 return@withContext null
             }
 
@@ -1145,9 +1310,9 @@ class BackupManager @Inject constructor(
                         backup.settings.isFontBold != null ||
                         backup.settings.contentTopMarginScale != null,
                 hasWallpaper = if (hasMultiLayer) {
-                    backup.settings.wallpaperLayers.any { it.imageUri != null }
+                    backup.settings.wallpaperLayers.any { it.imageUri != null || it.imageFileName != null }
                 } else {
-                    backup.settings.wallpaperUri != null
+                    backup.settings.wallpaperUri != null || backup.settings.wallpaperImageFileName != null
                 },
                 wallpaperLayerCount = if (hasMultiLayer) backup.settings.wallpaperLayers.size else 0,
                 hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||

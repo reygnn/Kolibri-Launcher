@@ -30,7 +30,7 @@ class UsageExportFragment : Fragment() {
     private val viewModel: UsageExportViewModel by viewModels()
 
     private val exportLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let { viewModel.exportToFile(it.toString()) }
     }

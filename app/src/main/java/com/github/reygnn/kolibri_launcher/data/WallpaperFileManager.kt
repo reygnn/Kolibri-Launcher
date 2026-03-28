@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.net.Uri
-import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -10,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,6 +24,7 @@ import javax.inject.Singleton
  *
  * == VERWENDUNG ==
  * - copyToInternal(sourceUri): Kopiert ein Bild → gibt interne URI zurück
+ * - copyFromInputStream(inputStream): Schreibt Bytes aus Stream → interne URI (für ZIP-Import)
  * - deleteFile(uri): Löscht eine interne Datei (z.B. beim Layer-Entfernen)
  * - clearAll(): Löscht alle Wallpaper-Dateien (z.B. beim Wallpaper-Reset)
  * - isInternalUri(uri): Prüft ob eine URI auf unseren internen Speicher zeigt
@@ -50,11 +51,9 @@ class WallpaperFileManager @Inject constructor(
      * @return Die interne file:// URI, oder null bei Fehler.
      *
      * Wenn die URI bereits intern ist (isInternalUri), wird sie unverändert zurückgegeben.
-     * Die Datei wird byte-für-byte kopiert – Format bleibt erhalten.
      */
     suspend fun copyToInternal(sourceUri: Uri): Uri? = withContext(Dispatchers.IO) {
         try {
-            // Bereits intern? Nicht erneut kopieren.
             if (isInternalUri(sourceUri)) {
                 return@withContext sourceUri
             }
@@ -79,6 +78,32 @@ class WallpaperFileManager @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error copying wallpaper to internal storage")
+            null
+        }
+    }
+
+    /**
+     * Schreibt Bytes aus einem InputStream in eine neue interne Datei.
+     * Der InputStream wird NICHT geschlossen (wichtig für ZipInputStream).
+     *
+     * @param inputStream Die Quelle (z.B. ein ZipInputStream-Entry)
+     * @return Die interne file:// URI, oder null bei Fehler.
+     */
+    fun copyFromInputStream(inputStream: InputStream): Uri? {
+        return try {
+            val fileName = "wp_${System.currentTimeMillis()}_${counter++}"
+            val destFile = File(getWallpaperDir(), fileName)
+
+            destFile.outputStream().use { output ->
+                inputStream.copyTo(output)
+            }
+
+            val internalUri = Uri.fromFile(destFile)
+            Timber.d("Wallpaper extracted to internal: ${destFile.name} (${destFile.length() / 1024} KB)")
+            internalUri
+
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error writing wallpaper from input stream")
             null
         }
     }
@@ -131,7 +156,6 @@ class WallpaperFileManager @Inject constructor(
 
     /**
      * Gibt die Gesamtgröße aller internen Wallpaper-Dateien zurück (in Bytes).
-     * Nützlich für Diagnostik / Settings-Anzeige.
      */
     fun getTotalSizeBytes(): Long {
         return try {

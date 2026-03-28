@@ -17,8 +17,13 @@ data class BackupData(
 /**
  * Backup-Repräsentation eines einzelnen Wallpaper-Layers.
  *
- * Separates Serialisierungsmodell (nicht das Domain-Modell WallpaperLayerState),
- * damit Backup-Format und Domain-Modell unabhängig evolvieren können.
+ * == ZIP BACKUP (neu) ==
+ * imageFileName enthält den relativen Pfad im ZIP-Archiv
+ * (z.B. "wallpapers/layer_0.img"). Beim Import wird die Datei
+ * extrahiert und in den internen Speicher kopiert.
+ *
+ * == JSON BACKUP (Legacy) ==
+ * imageFileName ist null. imageUri enthält die direkte URI.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -27,6 +32,10 @@ data class WallpaperLayerBackup(
 
     @JsonNames("image_uri")
     val imageUri: String? = null,
+
+    /** Relativer Pfad der Bilddatei im ZIP-Archiv. null bei Legacy-JSON-Backups. */
+    @JsonNames("image_file_name")
+    val imageFileName: String? = null,
 
     val scale: Float = 1.0f,
 
@@ -38,7 +47,6 @@ data class WallpaperLayerBackup(
 
     val alpha: Float = 1.0f,
 
-    /** BlendMode-Name als String, z.B. "MULTIPLY", "SCREEN". null = Normal (SRC_OVER). */
     @JsonNames("blend_mode")
     val blendModeName: String? = null,
 
@@ -47,9 +55,6 @@ data class WallpaperLayerBackup(
 
     val label: String? = null
 ) {
-    /**
-     * Konvertiert in das Domain-Modell WallpaperLayerState.
-     */
     fun toLayerState(): WallpaperLayerState {
         return WallpaperLayerState(
             id = id ?: "layer_${System.currentTimeMillis()}_restored",
@@ -65,9 +70,6 @@ data class WallpaperLayerBackup(
     }
 
     companion object {
-        /**
-         * Erstellt ein Backup-Modell aus einem Domain WallpaperLayerState.
-         */
         fun fromLayerState(state: WallpaperLayerState): WallpaperLayerBackup {
             return WallpaperLayerBackup(
                 id = state.id,
@@ -84,13 +86,9 @@ data class WallpaperLayerBackup(
     }
 }
 
-// Legacy backup compatibility: @JsonNames allows deserialization of old snake_case
-// keys while new exports use camelCase (the property name) by default.
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class LauncherSettings(
-    // @JsonNames allows users to write backup files in either camelCase or snake_case.
-    // Exports always use camelCase (the property name).
     @JsonNames("favorite_components")
     val favoriteComponents: Set<String> = emptySet(),
     @JsonNames("favorites_order")
@@ -120,7 +118,7 @@ data class LauncherSettings(
     @JsonNames("top_margin_scale")
     val contentTopMarginScale: Float? = null,
 
-    // --- Wallpaper Settings (Single-Layer, Backward Compatibility) ---
+    // --- Wallpaper Single-Layer (Backward Compat) ---
 
     @JsonNames("wallpaper_uri")
     val wallpaperUri: String? = null,
@@ -131,10 +129,11 @@ data class LauncherSettings(
     @JsonNames("wallpaper_translate_y")
     val wallpaperTranslateY: Float? = null,
 
-    // --- Wallpaper Multi-Layer (NEU) ---
-    // Alte Backups ohne dieses Feld → default emptyList() → Single-Layer-Fallback.
-    // Neue Backups mit Layern → wallpaperLayers befüllt.
-    // Die Single-Layer-Felder oben werden ZUSÄTZLICH mit Layer 0 befüllt (Backward Compat).
+    /** Relativer Pfad des Single-Layer Bildes im ZIP. null bei Legacy-JSON. */
+    @JsonNames("wallpaper_image_file")
+    val wallpaperImageFileName: String? = null,
+
+    // --- Wallpaper Multi-Layer ---
 
     @JsonNames("wallpaper_layers")
     val wallpaperLayers: List<WallpaperLayerBackup> = emptyList(),
@@ -155,7 +154,6 @@ data class LauncherSettings(
     val splitModeThreshold: Int? = null,
     @JsonNames("secure_window")
     val secureWindow: Boolean? = null
-
 )
 
 data class ImportOptions(
@@ -194,7 +192,6 @@ data class BackupPreview(
     val hasSwipeRight: Boolean,
     val hasThemeSettings: Boolean,
     val hasWallpaper: Boolean,
-    /** Anzahl der Wallpaper-Layer im Backup (0 = Single-Layer oder kein Wallpaper) */
     val wallpaperLayerCount: Int = 0,
     val hasGestureSettings: Boolean,
     val hasTimeBasedEvents: Boolean,
@@ -208,7 +205,6 @@ sealed class ImportResult {
         val skippedCount: Int,
         val missingApps: Set<String>
     ) : ImportResult()
-
     data class UnsupportedVersion(val version: String) : ImportResult()
     data class LimitExceeded(val packageCount: Int, val limit: Int) : ImportResult()
     object InvalidFormat : ImportResult()

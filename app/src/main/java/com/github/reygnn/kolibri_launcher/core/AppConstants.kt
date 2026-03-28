@@ -111,8 +111,9 @@ object AppConstants {
     // Backup & Restore Constants
     const val BACKUP_PREVIEW_TIMEOUT_MS = 2000L
     const val MIME_TYPE_JSON = "application/json"
+    const val MIME_TYPE_ZIP = "application/zip"
     const val BACKUP_FILE_PREFIX = "kolibri_backup_"
-    const val BACKUP_FILE_EXTENSION = ".json"
+    const val BACKUP_FILE_EXTENSION = ".zip"
 
     // Date Formats
     const val DATE_FORMAT_BACKUP_FILENAME = "yyyyMMdd_HHmmss"
