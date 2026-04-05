@@ -52,7 +52,7 @@ val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beac
 val jsonVersion = "20251224"
 val androidxTestVersion = "1.6.1"
 val androidxTestCoreVersion = "1.6.1"
-val robolectricVersion = "4.16"  // OK to upgrade
+val robolectricVersion = "4.16.1"  // OK to upgrade
 
 
 // Lädt die sensiblen Daten aus der keystore.properties-Datei
@@ -79,8 +79,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 36 // DO NOT CHANGE !!!
-        versionCode = 73
-        versionName = "0.99.55"
+        versionCode = 74
+        versionName = "0.99.56"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
@@ -211,7 +211,7 @@ dependencies {
     implementation("com.github.anrwatchdog:anrwatchdog:1.4.0")
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     testImplementation("org.robolectric:robolectric:${robolectricVersion}")
