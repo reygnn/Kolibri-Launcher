@@ -28,7 +28,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
     id("jacoco")
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21" // DO NOT EVEN THINK ABOUT TO CHANGE !!!
 }
 
 // Version-Konstanten
@@ -196,10 +196,20 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.4.0")
 
 // Lifecycle & Navigation
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.navigation:navigation-fragment-ktx:$navigationVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
 // Data & Async
