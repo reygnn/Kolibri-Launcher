@@ -232,6 +232,8 @@ dependencies {
     debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 
 // --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
+    testImplementation("io.mockk:mockk:1.14.9")
+
     //noinspection NewerVersionAvailable
     testImplementation("junit:junit:$junitVersion")
     //noinspection NewerVersionAvailable
