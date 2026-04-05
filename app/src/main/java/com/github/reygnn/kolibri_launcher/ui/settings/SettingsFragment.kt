@@ -87,6 +87,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
     private var splitModeThresholdPreference: EditTextPreference? = null
     private var secureWindowSwitchPreference: SwitchPreferenceCompat? = null
+    private var rotationLockedSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
     companion object {
@@ -274,6 +275,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in secure window change listener")
+                    false
+                }
+            }
+
+            // Rotation Lock
+            rotationLockedSwitchPreference = findPreference(AppConstants.PrefKeys.ROTATION_LOCKED)
+            rotationLockedSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+                try {
+                    val shouldEnable = newValue as? Boolean ?: false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsManager.setRotationLocked(shouldEnable)
+                    }
+                    true
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error in rotation lock change listener")
                     false
                 }
             }
@@ -913,6 +929,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
+                // Observer für Rotation Lock Setting
+                launch {
+                    try {
+                        settingsManager.rotationLockedFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            try {
+                                rotationLockedSwitchPreference?.isChecked = isEnabled
+                            } catch (e: Throwable) {
+                                TimberWrapper.silentError(e, "Error updating rotation lock preference")
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in rotation lock flow collection")
+                    }
+                }
+
+
             }
         }
     }
@@ -1159,6 +1194,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
             splitModeThresholdPreference?.onPreferenceChangeListener = null
             secureWindowSwitchPreference?.onPreferenceChangeListener = null
+            rotationLockedSwitchPreference?.onPreferenceChangeListener = null
 
             // 2. Referenzen nullen (damit der GC aufräumen kann)
             calendarSwitchPreference = null
@@ -1167,6 +1203,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             autoLaunchAppSwitchPreference = null
             splitModeThresholdPreference = null
             secureWindowSwitchPreference = null
+            rotationLockedSwitchPreference = null
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")

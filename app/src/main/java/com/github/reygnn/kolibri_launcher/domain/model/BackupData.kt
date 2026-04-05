@@ -153,7 +153,9 @@ data class LauncherSettings(
     @JsonNames("split_mode_threshold")
     val splitModeThreshold: Int? = null,
     @JsonNames("secure_window")
-    val secureWindow: Boolean? = null
+    val secureWindow: Boolean? = null,
+    @JsonNames("rotation_locked")
+    val rotationLocked: Boolean? = null
 )
 
 data class ImportOptions(

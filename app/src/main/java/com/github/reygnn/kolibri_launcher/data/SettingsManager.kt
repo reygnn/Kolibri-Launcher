@@ -50,6 +50,7 @@ class SettingsManager @Inject constructor(
         val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
         val AUTO_LAUNCH_APP = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
         val SECURE_WINDOW = booleanPreferencesKey(AppConstants.PrefKeys.SECURE_WINDOW)
+        val ROTATION_LOCKED = booleanPreferencesKey(AppConstants.PrefKeys.ROTATION_LOCKED)
 
 
         // Int Keys
@@ -294,12 +295,20 @@ class SettingsManager @Inject constructor(
                 ?: AppConstants.DEFAULT_SECURE_WINDOW
         }
 
-
-
     override suspend fun setSecureWindow(isEnabled: Boolean) {
         safeEdit {
             it[PreferenceKeys.SECURE_WINDOW] = isEnabled
         }
+    }
+
+    override val rotationLockedFlow: Flow<Boolean> = dataStore.data.safeData
+        .map { preferences ->
+            preferences[PreferenceKeys.ROTATION_LOCKED]
+                ?: AppConstants.DEFAULT_ROTATION_LOCKED
+        }
+
+    override suspend fun setRotationLocked(isEnabled: Boolean) {
+        safeEdit { it[PreferenceKeys.ROTATION_LOCKED] = isEnabled }
     }
 
     /**
@@ -326,6 +335,7 @@ class SettingsManager @Inject constructor(
             preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
             preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
             preferences.remove(PreferenceKeys.SECURE_WINDOW)
+            preferences.remove(PreferenceKeys.ROTATION_LOCKED)
 
             // WICHTIG: Onboarding Status wird NICHT gelöscht
             // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)

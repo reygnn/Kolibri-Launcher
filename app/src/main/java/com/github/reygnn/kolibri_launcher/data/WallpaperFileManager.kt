@@ -118,6 +118,16 @@ class WallpaperFileManager @Inject constructor(
     }
 
     /**
+     * Prüft ob die Datei hinter einer internen URI noch existiert.
+     * Gibt true zurück für nicht-file URIs (können hier nicht geprüft werden).
+     */
+    fun fileExists(uri: Uri): Boolean {
+        if (uri.scheme != "file") return true
+        val path = uri.path ?: return false
+        return File(path).exists()
+    }
+
+    /**
      * Löscht eine interne Wallpaper-Datei.
      * Ignoriert URIs die nicht auf unseren internen Speicher zeigen.
      */

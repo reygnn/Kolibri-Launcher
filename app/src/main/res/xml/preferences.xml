@@ -75,6 +75,7 @@
             android:summary="@string/show_alarm_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -181,6 +182,14 @@
             android:key="secure_window"
             android:title="@string/secure_window_title"
             android:summary="@string/secure_window_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+            
+                    
+        <SwitchPreferenceCompat
+            android:key="rotation_locked"
+            android:title="@string/rotation_lock_title"
+            android:summary="@string/rotation_lock_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>

@@ -9,6 +9,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -333,6 +334,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
             updateWallpaperColors()
             updateSecureFlag()
+            updateRotationLock()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error registering system event receiver")
             isReceiverRegistered = false
@@ -352,6 +354,23 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error updating FLAG_SECURE")
+            }
+        }
+    }
+
+    private fun updateRotationLock() {
+        lifecycleScope.launch(mainActivityExceptionHandler) {
+            try {
+                val locked = settingsRepository.rotationLockedFlow.first()
+                requestedOrientation = if (locked) {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error updating rotation lock")
             }
         }
     }

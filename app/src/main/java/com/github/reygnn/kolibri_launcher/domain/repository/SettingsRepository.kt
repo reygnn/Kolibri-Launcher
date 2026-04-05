@@ -71,4 +71,7 @@ interface SettingsRepository : Purgeable {
 
     val secureWindowFlow: Flow<Boolean>
     suspend fun setSecureWindow(isEnabled: Boolean)
+
+    val rotationLockedFlow: Flow<Boolean>
+    suspend fun setRotationLocked(isEnabled: Boolean)
 }

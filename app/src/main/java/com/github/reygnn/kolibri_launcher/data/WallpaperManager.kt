@@ -46,7 +46,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class WallpaperManager @Inject constructor(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val wallpaperFileManager: WallpaperFileManager
 ) : WallpaperRepository {
 
     companion object {
@@ -93,14 +94,23 @@ class WallpaperManager @Inject constructor(
     private fun parseWallpaperState(preferences: Preferences): WallpaperState {
         val layersJson = preferences[KEY_LAYERS_JSON]
 
-        // ── Multi-Layer: JSON vorhanden ──
         if (!layersJson.isNullOrBlank()) {
             return try {
                 val layers = parseLayersFromJson(layersJson)
                 if (layers.isNotEmpty()) {
-                    WallpaperState(layers = layers)
+                    val validLayers = layers.filter { layer ->
+                        layer.imageUri == null || wallpaperFileManager.fileExists(layer.imageUri)
+                    }
+                    if (validLayers.isEmpty()) {
+                        Timber.w("All layer files missing — resetting wallpaper")
+                        WallpaperState.NONE
+                    } else {
+                        if (validLayers.size < layers.size) {
+                            Timber.w("${layers.size - validLayers.size} layer file(s) missing — removed")
+                        }
+                        WallpaperState(layers = validLayers)
+                    }
                 } else {
-                    // Leeres JSON-Array → Fallback auf Single-Layer
                     parseSingleLayerState(preferences)
                 }
             } catch (e: Throwable) {
@@ -109,7 +119,6 @@ class WallpaperManager @Inject constructor(
             }
         }
 
-        // ── Single-Layer: Legacy Keys ──
         return parseSingleLayerState(preferences)
     }
 
@@ -122,8 +131,13 @@ class WallpaperManager @Inject constructor(
         return if (uriString.isNullOrBlank()) {
             WallpaperState.NONE
         } else {
+            val uri = uriString.toUri()
+            if (!wallpaperFileManager.fileExists(uri)) {
+                Timber.w("Wallpaper file missing: $uri — resetting")
+                return WallpaperState.NONE
+            }
             WallpaperState(
-                imageUri = uriString.toUri(),
+                imageUri = uri,
                 scale = preferences[KEY_WALLPAPER_SCALE] ?: DEFAULT_SCALE,
                 translateX = preferences[KEY_WALLPAPER_TRANSLATE_X] ?: DEFAULT_TRANSLATE,
                 translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE

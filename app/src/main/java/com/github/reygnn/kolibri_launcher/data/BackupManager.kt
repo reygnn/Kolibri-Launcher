@@ -138,6 +138,7 @@ class BackupManager @Inject constructor(
         val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
         val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
         val secureWindow = settingsManager.secureWindowFlow.first()
+        val rotationLocked = settingsManager.rotationLockedFlow.first()
 
         // ===== Wallpaper: Multi-Layer Export =====
         val wallpaperUri: String?
@@ -187,7 +188,8 @@ class BackupManager @Inject constructor(
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
             splitModeThreshold = splitModeThreshold,
-            secureWindow = secureWindow
+            secureWindow = secureWindow,
+            rotationLocked = rotationLocked
         )
 
         return BackupData(
@@ -538,7 +540,8 @@ class BackupManager @Inject constructor(
                 swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: backup.settings.swipeDownToNotificationsEnabled,
                 autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: backup.settings.autoShowKeyboard,
                 autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: backup.settings.autoLaunchApp,
-                secureWindow = settings.getStrictBool("secure_window") ?: backup.settings.secureWindow
+                secureWindow = settings.getStrictBool("secure_window") ?: backup.settings.secureWindow,
+                rotationLocked = settings.getStrictBool("rotation_locked") ?: backup.settings.rotationLocked
             )
 
             backup.copy(settings = enrichedSettings)
@@ -641,7 +644,7 @@ class BackupManager @Inject constructor(
             val boolFields = listOf(
                 "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
                 "double_tap_to_lock_enabled", "swipe_down_to_notifications_enabled",
-                "auto_show_keyboard", "auto_launch_app", "secure_window"
+                "auto_show_keyboard", "auto_launch_app", "secure_window", "rotation_locked"
             )
             for (field in boolFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
@@ -818,7 +821,8 @@ class BackupManager @Inject constructor(
             swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipe_down_to_notifications_enabled"),
             autoShowKeyboard = settingsJson.getStrictBool("auto_show_keyboard"),
             autoLaunchApp = settingsJson.getStrictBool("auto_launch_app"),
-            secureWindow = settingsJson.getStrictBool("secure_window")
+            secureWindow = settingsJson.getStrictBool("secure_window"),
+            rotationLocked = settingsJson.getStrictBool("rotation_locked")
         )
 
         return BackupData(
@@ -974,6 +978,7 @@ class BackupManager @Inject constructor(
                 settingsManager.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
             }
             backup.settings.secureWindow?.let { settingsManager.setSecureWindow(it) }
+            backup.settings.rotationLocked?.let { settingsManager.setRotationLocked(it) }
         }
 
         return ImportResult.Success(
@@ -1322,7 +1327,8 @@ class BackupManager @Inject constructor(
                 hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
                         backup.settings.autoLaunchApp != null,
                 hasPowerUserSettings = backup.settings.splitModeThreshold != null ||
-                        backup.settings.secureWindow != null
+                        backup.settings.secureWindow != null ||
+                        backup.settings.rotationLocked != null
             )
 
             Timber.Forest.i(

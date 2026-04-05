@@ -350,4 +350,7 @@
 <string name="wallpaper_original_size">Original size (1:1)</string>
 <string name="toolbar_dock_toggle">Move toolbar</string>
 
+<string name="rotation_lock_title">Lock screen rotation</string>
+<string name="rotation_lock_summary">Keep the display in portrait orientation</string>
+
 </resources>

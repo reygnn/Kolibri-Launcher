@@ -41,6 +41,7 @@ object AppConstants {
     const val LAYOUT_SCALE_MIN = 0.0f
     const val LAYOUT_SCALE_MAX = 2.0f
 
+
     const val VERTICAL_PADDING_SCALE_MIN = 0.0f
     const val VERTICAL_PADDING_SCALE_MAX = 2.0f
 
@@ -49,7 +50,7 @@ object AppConstants {
 
     const val SPLIT_MODE_THRESHOLD_MIN = 0
     const val SPLIT_MODE_THRESHOLD_MAX = 512
-
+    const val DEFAULT_ROTATION_LOCKED = false
 
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
     const val DEFAULT_LAYOUT_SCALE = 0.05f
@@ -152,6 +153,7 @@ object AppConstants {
         const val LAYOUT_SCALE = "layout_scale"
         const val VERTICAL_PADDING_SCALE = "vertical_padding_scale"
         const val CONTENT_TOP_MARGIN_SCALE = "content_top_margin_scale"
+        const val ROTATION_LOCKED = "rotation_locked"
 
         // Home Screen Features
         const val SHOW_CALENDAR_EVENT = "show_calendar_event"
