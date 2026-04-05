@@ -132,7 +132,7 @@ class AppManagementDelegateTest {
 
     /**
      * Creates a DelegateScope using the same UnconfinedTestDispatcher from MainDispatcherRule.
-     * This matches the pattern used in the working LauncherViewModelTest.
+     * This matches the pattern used in the monolithic LauncherViewModelTest.
      */
     private fun createDelegateScope() = DelegateScope(
         coroutineScope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
