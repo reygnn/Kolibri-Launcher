@@ -843,6 +843,9 @@ class LauncherViewModel @Inject constructor(
      */
     fun onSetWallpaperImage(imageUri: Uri) = launchSafe {
         try {
+            // Dateinamen VOR dem Kopieren extrahieren
+            val displayName = getDisplayName(imageUri)
+
             // Bild in internen Speicher kopieren (überlebt Reinstall)
             val internalUri = wallpaperFileManager.copyToInternal(imageUri)
             if (internalUri == null) {
@@ -851,12 +854,27 @@ class LauncherViewModel @Inject constructor(
                 return@launchSafe
             }
             setWallpaperImageUseCase(internalUri)
-            sendEvent(UiEvent.ShowToast(R.string.wallpaper_set_success))
+
+            // Toast mit Dateinamen
+            val message = displayName ?: context.getString(R.string.wallpaper_set_success)
+            sendEvent(UiEvent.ShowToastFromString(message))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting wallpaper image")
             sendEvent(UiEvent.ShowToast(R.string.error_generic))
+        }
+    }
+
+    private fun getDisplayName(uri: Uri): String? {
+        return try {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(0)
+                } else null
+            }
+        } catch (e: Throwable) {
+            null
         }
     }
 

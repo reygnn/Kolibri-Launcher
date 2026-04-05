@@ -335,6 +335,8 @@
 <string name="wallpaper_move_layer_down">Layer nach hinten</string>
 <string name="wallpaper_original_size">Original Grösse (1:1)</string>
 <string name="toolbar_dock_toggle">Verschiebe Toolbar</string>
+<string name="wallpaper_remove_confirm">Hintergrund und alle Ebenen entfernen? Dies kann nicht rückgängig gemacht werden.</string>
+<string name="wallpaper_remove_yes">Entfernen</string>
 
 <string name="rotation_lock_title">Bildschirmrotation sperren</string>
 <string name="rotation_lock_summary">Display im Hochformat fixieren</string>

@@ -348,6 +348,8 @@
 <string name="wallpaper_move_layer_up">Move layer forward</string>
 <string name="wallpaper_move_layer_down">Move layer backward</string>
 <string name="wallpaper_original_size">Original size (1:1)</string>
+<string name="wallpaper_remove_confirm">Remove wallpaper and all layers? This cannot be undone.</string>
+<string name="wallpaper_remove_yes">Remove</string>
 <string name="toolbar_dock_toggle">Move toolbar</string>
 
 <string name="rotation_lock_title">Lock screen rotation</string>

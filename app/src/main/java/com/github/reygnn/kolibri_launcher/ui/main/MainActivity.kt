@@ -688,7 +688,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
                     options.add(getString(R.string.wallpaper_remove))
                     actions.add {
-                        viewModel.onClearWallpaper()
+                        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+                            .setTitle(getString(R.string.wallpaper_remove))
+                            .setMessage(getString(R.string.wallpaper_remove_confirm))
+                            .setPositiveButton(getString(R.string.wallpaper_remove_yes)) { _, _ ->
+                                viewModel.onClearWallpaper()
+                            }
+                            .setNegativeButton(getString(R.string.cancel), null)
+                            .show()
                     }
                 }
             }

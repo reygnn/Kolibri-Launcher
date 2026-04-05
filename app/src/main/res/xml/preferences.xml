@@ -75,7 +75,6 @@
             android:summary="@string/show_alarm_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
-
     </PreferenceCategory>
 
     <PreferenceCategory
