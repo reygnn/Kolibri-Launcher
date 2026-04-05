@@ -203,7 +203,7 @@ dependencies {
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
 // Data & Async
-    implementation("androidx.datastore:datastore-preferences:1.2.0")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
 
@@ -211,7 +211,8 @@ dependencies {
     implementation("com.github.anrwatchdog:anrwatchdog:1.4.0")
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    //noinspection NewerVersionAvailable
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     testImplementation("org.robolectric:robolectric:${robolectricVersion}")
