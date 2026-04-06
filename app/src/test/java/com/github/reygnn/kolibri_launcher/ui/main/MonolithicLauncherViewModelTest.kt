@@ -68,20 +68,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.ArgumentCaptor
-import org.mockito.Mock
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
-import org.mockito.kotlin.any
-import org.mockito.kotlin.atLeastOnce
-import org.mockito.kotlin.clearInvocations
-import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.eq
-import org.mockito.kotlin.never
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
 import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -90,14 +76,54 @@ import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.net.Uri
+import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
-import com.github.reygnn.kolibri_launcher.rules.TimberRule
-import kotlinx.coroutines.runBlocking
+import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import io.mockk.clearMocks
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.yield
+import org.mockito.kotlin.anyOrNull
+
+/**
+ * ⚠️ LEGACY TEST SUITE — DO NOT EXTEND ⚠️
+ *
+ * This is the original monolithic test suite from before the ViewModel was
+ * refactored into delegates. It is kept as a regression safety net to verify
+ * that the delegate-based LauncherViewModel remains a drop-in replacement
+ * for the old monolithic implementation.
+ *
+ * ALL TESTS HERE PASSED AGAINST THE OLD MONOLITHIC VM.
+ * IF ANY TEST FAILS AFTER A REFACTOR, THE PUBLIC API CONTRACT IS BROKEN.
+ *
+ * Rules:
+ * - Do NOT add new tests here. New tests go into:
+ *     • LauncherViewModelTest (delegate pass-through)
+ *     • LauncherViewModelContractTest (fragment-perspective)
+ *     • LauncherViewModelSecurityTest (input validation)
+ *     • LauncherViewModelDoomsdayTest (stress/edge cases)
+ *     • Individual delegate test classes (*DelegateTest)
+ * - Do NOT delete tests from here.
+ * - DO fix broken mocks if the constructor signature changes (e.g. new parameters).
+ * - If a test fails, investigate whether the ViewModel's public behavior changed —
+ *   that's a regression, not a test problem.
+ *
+ * @since v1.0 (pre-delegate architecture)
+ *
+ * Changelog:
+ * - 2026-04: Wallpaper tests removed. The wallpaper API was fundamentally redesigned
+ *   (multi-layer support, WallpaperFileManager, internal URI copying). The old tests
+ *   no longer reflect the current contract. Wallpaper behavior is fully covered by
+ *   WallpaperDelegateTest and LauncherViewModelContractTest.
+ */
 
 @ExperimentalCoroutinesApi
 class MonolithicLauncherViewModelTest {
@@ -109,76 +135,42 @@ class MonolithicLauncherViewModelTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    @Mock
-    private lateinit var getFavoriteAppsUseCase: GetFavoriteAppsUseCase
-    @Mock
-    private lateinit var getDrawerAppsUseCase: GetDrawerAppsUseCase
-    @Mock
-    private lateinit var hideAppUseCase: HideAppUseCase
-    @Mock
-    private lateinit var toggleFavoriteUseCase: ToggleFavoriteUseCase
-    @Mock
-    private lateinit var requestLockUseCase: RequestLockUseCase
-    @Mock
-    private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
-    @Mock
-    private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
-    @Mock
-    private lateinit var refreshAppsUseCase: RefreshAppsUseCase
-    @Mock
-    private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
-    @Mock
-    private lateinit var showAppUseCase: ShowAppUseCase
-    @Mock
-    private lateinit var toggleSortOrderUseCase: ToggleSortOrderUseCase
-    @Mock
-    private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
-    @Mock
-    private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
-    @Mock
-    private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
-    @Mock
-    private lateinit var setTextColorUseCase: SetTextColorUseCase
-    @Mock
-    private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-    @Mock
-    private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
-    @Mock
-    private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
-    @Mock
-    private lateinit var getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase
-    @Mock
-    private lateinit var getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase
-    @Mock
-    private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
-    @Mock
-    private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
-    @Mock
-    private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
-    @Mock
-    private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
-    @Mock
-    private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
-    @Mock
-    private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
-    @Mock
-    private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
-    @Mock
-    private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
-    @Mock
-    private lateinit var appUpdateSignal: AppUpdateSignal
-    @Mock
-    private lateinit var context: Context
-    @Mock
-    private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
-    @Mock
-    private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
-    @Mock
-    private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
-    @Mock
-    private lateinit var setFontBoldUseCase: SetFontBoldUseCase
-    @Mock
-    private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
+    private val getFavoriteAppsUseCase: GetFavoriteAppsUseCase = mockk(relaxed = true)
+    private val getDrawerAppsUseCase: GetDrawerAppsUseCase = mockk(relaxed = true)
+    private val hideAppUseCase: HideAppUseCase = mockk(relaxed = true)
+    private val toggleFavoriteUseCase: ToggleFavoriteUseCase = mockk(relaxed = true)
+    private val requestLockUseCase: RequestLockUseCase = mockk(relaxed = true)
+    private val requestNotificationsUseCase: RequestNotificationsUseCase = mockk(relaxed = true)
+    private val recordAppLaunchUseCase: RecordAppLaunchUseCase = mockk(relaxed = true)
+    private val refreshAppsUseCase: RefreshAppsUseCase = mockk(relaxed = true)
+    private val resetAppUsageUseCase: ResetAppUsageUseCase = mockk(relaxed = true)
+    private val showAppUseCase: ShowAppUseCase = mockk(relaxed = true)
+    private val toggleSortOrderUseCase: ToggleSortOrderUseCase = mockk(relaxed = true)
+    private val handleSwipeActionUseCase: HandleSwipeActionUseCase = mockk(relaxed = true)
+    private val observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase = mockk(relaxed = true)
+    private val observeUiColorsUseCase: ObserveUiColorsUseCase = mockk(relaxed = true)
+    private val setTextColorUseCase: SetTextColorUseCase = mockk(relaxed = true)
+    private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase = mockk(relaxed = true)
+    private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase = mockk(relaxed = true)
+    private val observeInstalledAppsUseCase: ObserveInstalledAppsUseCase = mockk(relaxed = true)
+    private val getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase = mockk(relaxed = true)
+    private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase = mockk(relaxed = true)
+    private val checkAppUsageUseCase: CheckAppUsageUseCase = mockk(relaxed = true)
+    private val observeHomeSettingsUseCase: ObserveHomeSettingsUseCase = mockk(relaxed = true)
+    private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase = mockk(relaxed = true)
+    private val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase = mockk(relaxed = true)
+    private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+    private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase = mockk(relaxed = true)
+    private val setWallpaperImageUseCase: SetWallpaperImageUseCase = mockk(relaxed = true)
+    private val clearWallpaperUseCase: ClearWallpaperUseCase = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val appUpdateSignal: AppUpdateSignal = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
+    private val getLayoutSettingsUseCase: GetLayoutSettingsUseCase = mockk(relaxed = true)
+    private val setLayoutScaleUseCase: SetLayoutScaleUseCase = mockk(relaxed = true)
+    private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase = mockk(relaxed = true)
+    private val setFontBoldUseCase: SetFontBoldUseCase = mockk(relaxed = true)
+    private val setContentTopMarginUseCase: SetContentTopMarginUseCase = mockk(relaxed = true)
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -189,36 +181,31 @@ class MonolithicLauncherViewModelTest {
 
     @Before
     fun setup() {
-        MockitoAnnotations.openMocks(this)
+        every { context.registerReceiver(any(), any(), any<Int>()) } returns null
+        every { appUpdateSignal.events } returns MutableSharedFlow()
+        every { context.getString(any()) } returns "Test String"
+        every { context.getString(any(), any()) } returns "Test String with args"
 
-        whenever(context.registerReceiver(any(), any(), any())).thenReturn(null)
-        whenever(appUpdateSignal.events).thenReturn(MutableSharedFlow())
-        whenever(context.getString(any())).thenReturn("Test String")
-        whenever(context.getString(any(), any())).thenReturn("Test String with args")
+        every { getFavoriteAppsUseCase.favoriteApps } returns flowOf(UiState.Loading)
+        every { getDrawerAppsUseCase.drawerApps } returns
+                MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns flowOf(emptyList())
+        every { observeUiColorsUseCase.invoke(any()) } returns flowOf(UiColorsState())
+        every { observeInstalledAppsUseCase.invoke() } returns flowOf(AppLoadResult.Success)
 
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(flowOf(UiState.Loading))
-        whenever(getDrawerAppsUseCase.drawerApps).thenReturn(
-            MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()
-        )
-        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(flowOf(emptyList()))
-        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(flowOf(UiColorsState()))
-        whenever(observeInstalledAppsUseCase.invoke()).thenReturn(flowOf(AppLoadResult.Success))
+        every { observeHomeSettingsUseCase.invoke() } returns flowOf(HomeSettings())
+        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
 
-        whenever(observeHomeSettingsUseCase.invoke()).thenReturn(flowOf(HomeSettings()))
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(0))
+        every { getLayoutSettingsUseCase.layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
+        every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        every { getLayoutSettingsUseCase.isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
+        every { getLayoutSettingsUseCase.contentTopMargin } returns flowOf(0f)
 
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flowOf(AppConstants.DEFAULT_LAYOUT_SCALE))
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
-        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
-        whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(flowOf(0f))
+        every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
 
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(WallpaperState.NONE))
-
-        runBlocking {
-            whenever(setWallpaperImageUseCase.invoke(any())).thenReturn(Unit)
-            whenever(clearWallpaperUseCase.invoke()).thenReturn(Unit)
-            whenever(saveWallpaperStateUseCase.updateTransform(any(), any(), any(), any())).thenReturn(Unit)
-        }
+        coEvery { setWallpaperImageUseCase.invoke(any()) } returns Unit
+        coEvery { clearWallpaperUseCase.invoke() } returns Unit
+        coEvery { saveWallpaperStateUseCase.updateTransform(any(), any(), any(), any()) } returns Unit
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
@@ -256,6 +243,7 @@ class MonolithicLauncherViewModelTest {
             saveWallpaperStateUseCase,
             setWallpaperImageUseCase,
             clearWallpaperUseCase,
+            wallpaperFileManager,
             appUpdateSignal,
             SavedStateHandle(),
             context,
@@ -269,9 +257,8 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `init - loads favorite apps and updates state`() = runTest {
         val favoriteApps = FavoriteAppsResult(testApps, isFallback = false)
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(
-            flowOf(UiState.Success(favoriteApps))
-        )
+        every { getFavoriteAppsUseCase.favoriteApps } returns
+                flowOf(UiState.Success(favoriteApps))
 
         setupViewModel()
         advanceUntilIdle()
@@ -288,9 +275,8 @@ class MonolithicLauncherViewModelTest {
     fun `init - with fallback favorites - loads fallback state correctly`() = runTest {
         val fallbackApps = FavoriteAppsResult(testApps, isFallback = true)
 
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(
-            flowOf(UiState.Success(fallbackApps))
-        )
+        every { getFavoriteAppsUseCase.favoriteApps } returns
+                flowOf(UiState.Success(fallbackApps))
 
         setupViewModel(enableTestMode = true)
         advanceUntilIdle()
@@ -368,15 +354,15 @@ class MonolithicLauncherViewModelTest {
         }
 
         // Überprüfe, ob die UseCases aufgerufen wurden
-        verify(recordAppLaunchUseCase).invoke(app1)
-        verify(refreshAppsUseCase).invoke()
+        coVerify { recordAppLaunchUseCase.invoke(app1) }
+        coVerify { refreshAppsUseCase.invoke() }
     }
 
     @Test
     fun `onToggleFavorite - when not favorite - calls UseCase and shows toast`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
-            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
+        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
+                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
 
         setupViewModel()
         advanceUntilIdle()
@@ -389,20 +375,19 @@ class MonolithicLauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
         }
         // Überprüfe den UseCase
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
     }
 
     @Test
     fun `onToggleFavorite - when limit reached - calls UseCase and shows limit message`() =
         runTest {
             // Mocke das ERGEBNIS des UseCase
-            whenever(
+            coEvery {
                 toggleFavoriteUseCase.invoke(
                     app1,
                     AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
                 )
-            )
-                .thenReturn(ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached))
+            } returns ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached)
 
             setupViewModel()
             advanceUntilIdle()
@@ -415,7 +400,7 @@ class MonolithicLauncherViewModelTest {
                 assertTrue(event is UiEvent.ShowToastFromString)
             }
             // Überprüfe den UseCase
-            verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+            coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
         }
 
     @Test
@@ -430,7 +415,7 @@ class MonolithicLauncherViewModelTest {
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToastFromString)
         }
-        verify(hideAppUseCase).invoke(app1)
+        coVerify { hideAppUseCase.invoke(app1) }
     }
 
     @Test
@@ -445,7 +430,7 @@ class MonolithicLauncherViewModelTest {
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToastFromString)
         }
-        verify(showAppUseCase).invoke(app1)
+        coVerify { showAppUseCase.invoke(app1) }
     }
 
     @Test
@@ -460,7 +445,7 @@ class MonolithicLauncherViewModelTest {
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToastFromString)
         }
-        verify(resetAppUsageUseCase).invoke(app1)
+        coVerify { resetAppUsageUseCase.invoke(app1) }
     }
 
     @Test
@@ -471,13 +456,13 @@ class MonolithicLauncherViewModelTest {
         viewModel.toggleSortOrder()
         advanceUntilIdle()
 
-        verify(toggleSortOrderUseCase).invoke()
+        coVerify { toggleSortOrderUseCase.invoke() }
     }
 
     @Test
     fun `onDoubleTapToLock - when enabled and available - calls UseCase`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        whenever(requestLockUseCase.invoke()).thenReturn(RequestLockUseCase.Result.Success)
+        coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.Success
 
         setupViewModel()
         advanceUntilIdle()
@@ -485,14 +470,14 @@ class MonolithicLauncherViewModelTest {
         viewModel.onDoubleTapToLock()
         advanceUntilIdle()
 
-        verify(requestLockUseCase).invoke()
+        coVerify { requestLockUseCase.invoke() }
     }
 
     @Test
     fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() =
         runTest {
             // Mocke das ERGEBNIS des UseCase
-            whenever(requestLockUseCase.invoke()).thenReturn(RequestLockUseCase.Result.ErrorAccessibility)
+            coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.ErrorAccessibility
 
             setupViewModel()
             advanceUntilIdle()
@@ -504,13 +489,13 @@ class MonolithicLauncherViewModelTest {
                 val event = awaitItem()
                 assertTrue(event is UiEvent.ShowAccessibilityDialog)
             }
-            verify(requestLockUseCase).invoke()
+            coVerify { requestLockUseCase.invoke() }
         }
 
     @Test
     fun `onDoubleTapToLock - when disabled - shows enable toast once`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        whenever(requestLockUseCase.invoke()).thenReturn(RequestLockUseCase.Result.ErrorDisabled)
+        coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.ErrorDisabled
 
         setupViewModel()
         advanceUntilIdle()
@@ -528,7 +513,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(requestLockUseCase, times(2)).invoke()
+        coVerify(exactly = 2) { requestLockUseCase.invoke() }
     }
 
     // --- Tests, die gleich bleiben (da sie keine Repos/UseCases aufrufen) ---
@@ -554,7 +539,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `uiColorsState - observes ObserveUiColorsUseCase`() = runTest {
         val testColors = UiColorsState(textColor = Color.RED, shadowColor = Color.BLUE)
-        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(flowOf(testColors))
+        every { observeUiColorsUseCase.invoke(any()) } returns flowOf(testColors)
 
         setupViewModel()
         advanceUntilIdle()
@@ -569,7 +554,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `drawerApps - emits drawer apps from use case`() = runTest {
         val drawerAppsFlow = MutableStateFlow<List<AppInfo>>(testApps)
-        whenever(getDrawerAppsUseCase.drawerApps).thenReturn(drawerAppsFlow.asLiveData())
+        every { getDrawerAppsUseCase.drawerApps } returns drawerAppsFlow.asLiveData()
 
         setupViewModel()
 
@@ -583,7 +568,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `sortOrder - emits sort order from ObserveHomeSettingsUseCase`() = runTest {
         val settings = HomeSettings(sortOrder = SortOrder.TIME_WEIGHTED_USAGE)
-        whenever(observeHomeSettingsUseCase.invoke()).thenReturn(flowOf(settings))
+        every { observeHomeSettingsUseCase.invoke() } returns flowOf(settings)
 
         setupViewModel()
         advanceUntilIdle()
@@ -599,9 +584,8 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `init - when observeInstalledAppsUseCase emits Error - shows toast`() = runTest {
-        whenever(observeInstalledAppsUseCase.invoke()).thenReturn(
-            flowOf(AppLoadResult.Error(R.string.error_app_list_not_loaded))
-        )
+        every { observeInstalledAppsUseCase.invoke() } returns
+                flowOf(AppLoadResult.Error(R.string.error_app_list_not_loaded))
         setupViewModel(enableTestMode = false)
         viewModel.event.test {
             advanceUntilIdle()
@@ -614,9 +598,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onAppClicked - when recordAppLaunchUseCase fails - still launches app and shows error`() =
         runTest {
-            whenever(recordAppLaunchUseCase.invoke(any())).doAnswer {
-                throw IOException("Cannot record")
-            }
+            coEvery { recordAppLaunchUseCase.invoke(any()) } throws IOException("Cannot record")
             setupViewModel()
             advanceUntilIdle()
 
@@ -636,9 +618,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onToggleFavorite - when UseCase throws - emits error`() = runTest {
-        whenever(toggleFavoriteUseCase.invoke(any(), any())).doAnswer {
-            throw IOException("Cannot toggle")
-        }
+        coEvery { toggleFavoriteUseCase.invoke(any(), any()) } throws IOException("Cannot toggle")
 
         setupViewModel()
         advanceUntilIdle()
@@ -653,9 +633,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onHideApp - when UseCase throws - emits error`() = runTest {
-        whenever(hideAppUseCase.invoke(any())).doAnswer {
-            throw IOException("Cannot hide")
-        }
+        coEvery { hideAppUseCase.invoke(any()) } throws IOException("Cannot hide")
 
         setupViewModel()
         advanceUntilIdle()
@@ -671,8 +649,8 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onFlingLeft - when UseCase returns LaunchApp - launches app`() = runTest {
         // Swipe nach LINKS → zieht von RECHTS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
-            .thenReturn(HandleSwipeActionUseCase.Result.LaunchApp(app1))
+        coEvery { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns
+                HandleSwipeActionUseCase.Result.LaunchApp(app1)
 
         setupViewModel()
         advanceUntilIdle()
@@ -685,14 +663,14 @@ class MonolithicLauncherViewModelTest {
             assertTrue(event is UiEvent.LaunchApp)
             assertEquals(app1, event.app)
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
+        coVerify { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) }
     }
 
     @Test
     fun `onFlingRight - when UseCase returns NoAction - does nothing`() = runTest {
         // Swipe nach RECHTS → zieht von LINKS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
-            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+        coEvery { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns
+                HandleSwipeActionUseCase.Result.NoAction
 
         setupViewModel()
         advanceUntilIdle()
@@ -702,7 +680,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        coVerify { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) }
     }
 
     @Test
@@ -714,7 +692,7 @@ class MonolithicLauncherViewModelTest {
         )
         val testEventList = listOf(testEvent)
         // Mocke den UseCase, der die Logik (inkl. Settings) bereits enthält
-        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(flowOf(testEventList))
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns flowOf(testEventList)
 
         setupViewModel()
         advanceUntilIdle()
@@ -727,7 +705,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `init - when calendar disabled - UseCase returns empty list`() = runTest {
         // Der UseCase selbst (dank 'flatMapLatest') wird eine leere Liste ausgeben
-        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(flowOf(emptyList()))
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns flowOf(emptyList())
 
         setupViewModel()
         advanceUntilIdle()
@@ -739,8 +717,8 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
         // Mocke das ERGEBNIS des UseCase für "Remove"
-        whenever(toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
-            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites))
+        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
+                ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites)
 
         setupViewModel()
         advanceUntilIdle()
@@ -753,14 +731,14 @@ class MonolithicLauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
             // Optional: Prüfe dass die Message "removed" enthält
         }
-        verify(toggleFavoriteUseCase).invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
     }
 
     @Test
     fun `onFlingLeft - when app assigned but not installed - UseCase returns NoAction`() = runTest {
         // Swipe nach LINKS → zieht von RECHTS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
-            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+        coEvery { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns
+                HandleSwipeActionUseCase.Result.NoAction
 
         setupViewModel()
         advanceUntilIdle()
@@ -770,14 +748,14 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
+        coVerify { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) }
     }
 
     @Test
     fun `onFlingRight - when app assigned but not installed - UseCase returns NoAction`() = runTest {
         // Swipe nach RECHTS → zieht von LINKS
-        whenever(handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
-            .thenReturn(HandleSwipeActionUseCase.Result.NoAction)
+        coEvery { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns
+                HandleSwipeActionUseCase.Result.NoAction
 
         setupViewModel()
         advanceUntilIdle()
@@ -787,7 +765,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(handleSwipeActionUseCase).invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        coVerify { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) }
     }
 
     @Test
@@ -805,8 +783,8 @@ class MonolithicLauncherViewModelTest {
         )
 
         // Der UseCase gibt chronologisch sortierte Events zurück
-        whenever(observeTimeBasedEventsUseCase.invoke(any()))
-            .thenReturn(flowOf(listOf(alarm, meeting)))
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns
+                flowOf(listOf(alarm, meeting))
 
         setupViewModel()
         advanceUntilIdle()
@@ -826,8 +804,8 @@ class MonolithicLauncherViewModelTest {
         )
 
         // Der UseCase gibt nur Alarm zurück (weil Calendar deaktiviert)
-        whenever(observeTimeBasedEventsUseCase.invoke(any()))
-            .thenReturn(flowOf(listOf(alarm)))
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns
+                flowOf(listOf(alarm))
 
         setupViewModel()
         advanceUntilIdle()
@@ -840,8 +818,8 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `init - when both calendar and alarm disabled - shows no events`() = runTest {
         // Der UseCase gibt leere Liste zurück (weil beide deaktiviert)
-        whenever(observeTimeBasedEventsUseCase.invoke(any()))
-            .thenReturn(flowOf(emptyList()))
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns
+                flowOf(emptyList())
 
         setupViewModel()
         advanceUntilIdle()
@@ -852,9 +830,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onShowApp - when UseCase throws - emits error`() = runTest {
-        whenever(showAppUseCase.invoke(any())).doAnswer {
-            throw IOException("Cannot show")
-        }
+        coEvery { showAppUseCase.invoke(any()) } throws IOException("Cannot show")
 
         setupViewModel()
         advanceUntilIdle()
@@ -870,9 +846,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `toggleSortOrder - when UseCase throws - emits error`() = runTest {
-        whenever(toggleSortOrderUseCase.invoke()).doAnswer {
-            throw IOException("Cannot save")
-        }
+        coEvery { toggleSortOrderUseCase.invoke() } throws IOException("Cannot save")
 
         setupViewModel()
         advanceUntilIdle()
@@ -934,9 +908,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onResetAppUsage - when UseCase throws - emits error`() = runTest {
-        whenever(resetAppUsageUseCase.invoke(any())).doAnswer {
-            throw IOException("Cannot reset")
-        }
+        coEvery { resetAppUsageUseCase.invoke(any()) } throws IOException("Cannot reset")
 
         setupViewModel()
         advanceUntilIdle()
@@ -952,8 +924,8 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onFlingDown - when UseCase returns ErrorDisabled - shows toast once`() = runTest {
-        whenever(requestNotificationsUseCase.invoke())
-            .thenReturn(RequestNotificationsUseCase.Result.ErrorDisabled)
+        coEvery { requestNotificationsUseCase.invoke() } returns
+                RequestNotificationsUseCase.Result.ErrorDisabled
 
         setupViewModel()
         advanceUntilIdle()
@@ -971,13 +943,13 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
             expectNoEvents()
         }
-        verify(requestNotificationsUseCase, times(2)).invoke()
+        coVerify(exactly = 2) { requestNotificationsUseCase.invoke() }
     }
 
     @Test
     fun `onFlingDown - when UseCase returns ErrorAccessibility - shows dialog`() = runTest {
-        whenever(requestNotificationsUseCase.invoke())
-            .thenReturn(RequestNotificationsUseCase.Result.ErrorAccessibility)
+        coEvery { requestNotificationsUseCase.invoke() } returns
+                RequestNotificationsUseCase.Result.ErrorAccessibility
 
         setupViewModel()
         advanceUntilIdle()
@@ -1003,14 +975,14 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Sollte 10x recordAppLaunch aufrufen
-        verify(recordAppLaunchUseCase, times(10)).invoke(app1)
-        verify(refreshAppsUseCase, times(10)).invoke()
+        coVerify(exactly = 10) { recordAppLaunchUseCase.invoke(app1) }
+        coVerify(exactly = 10) { refreshAppsUseCase.invoke() }
     }
 
     @Test
     fun `onToggleFavorite - called twice quickly - both complete without crash`() = runTest {
-        whenever(toggleFavoriteUseCase.invoke(any(), any()))
-            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
+        coEvery { toggleFavoriteUseCase.invoke(any(), any()) } returns
+                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
 
         setupViewModel()
         advanceUntilIdle()
@@ -1029,8 +1001,8 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `multiple simultaneous operations - all complete successfully`() = runTest {
-        whenever(toggleFavoriteUseCase.invoke(any(), any()))
-            .thenReturn(ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites))
+        coEvery { toggleFavoriteUseCase.invoke(any(), any()) } returns
+                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
 
         setupViewModel()
         advanceUntilIdle()
@@ -1044,9 +1016,9 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Keine Crashes, alle Operationen abgeschlossen
-        verify(recordAppLaunchUseCase).invoke(app1)
-        verify(toggleFavoriteUseCase).invoke(eq(app2), any())  // ← eq() hinzugefügt!
-        verify(toggleSortOrderUseCase).invoke()
+        coVerify { recordAppLaunchUseCase.invoke(app1) }
+        coVerify { toggleFavoriteUseCase.invoke(eq(app2), any()) }
+        coVerify { toggleSortOrderUseCase.invoke() }
     }
 
     @Test
@@ -1054,7 +1026,7 @@ class MonolithicLauncherViewModelTest {
         val favoriteApps = FavoriteAppsResult(testApps, isFallback = false)
         val stateFlow = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
 
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(stateFlow)
+        every { getFavoriteAppsUseCase.favoriteApps } returns stateFlow
 
         setupViewModel()
 
@@ -1178,15 +1150,15 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `init - when all UseCases throw - ViewModel still initializes`() = runTest {
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(flow {
+        every { getFavoriteAppsUseCase.favoriteApps } returns flow {
             throw RuntimeException("Critical error")
-        })
-        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(flow {
+        }
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns flow {
             throw RuntimeException("Critical error")
-        })
-        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(flow {
+        }
+        every { observeUiColorsUseCase.invoke(any()) } returns flow {
             throw RuntimeException("Critical error")
-        })
+        }
 
         setupViewModel(enableTestMode = false)
         advanceUntilIdle()
@@ -1211,14 +1183,14 @@ class MonolithicLauncherViewModelTest {
         }
 
         // Beide Aufrufe sollten passiert sein
-        verify(recordAppLaunchUseCase).invoke(app1)
-        verify(refreshAppsUseCase).invoke()
+        coVerify { recordAppLaunchUseCase.invoke(app1) }
+        coVerify { refreshAppsUseCase.invoke() }
     }
 
     @Test
     fun `onDoubleTapToLock - shows toast only once despite multiple calls`() = runTest {
-        whenever(requestLockUseCase.invoke())
-            .thenReturn(RequestLockUseCase.Result.ErrorDisabled)
+        coEvery { requestLockUseCase.invoke() } returns
+                RequestLockUseCase.Result.ErrorDisabled
 
         setupViewModel()
         advanceUntilIdle()
@@ -1239,8 +1211,8 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `onFlingDown - shows toast only once despite multiple calls`() = runTest {
-        whenever(requestNotificationsUseCase.invoke())
-            .thenReturn(RequestNotificationsUseCase.Result.ErrorDisabled)
+        coEvery { requestNotificationsUseCase.invoke() } returns
+                RequestNotificationsUseCase.Result.ErrorDisabled
 
         setupViewModel()
         advanceUntilIdle()
@@ -1263,7 +1235,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Im Test-Mode sollte observeInstalledAppsUseCase NICHT aufgerufen werden
-        verify(observeInstalledAppsUseCase, never()).invoke()
+        verify(exactly = 0) { observeInstalledAppsUseCase.invoke() }
     }
 
     @Test
@@ -1272,15 +1244,14 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Im Production-Mode sollte observeInstalledAppsUseCase aufgerufen werden
-        verify(observeInstalledAppsUseCase, atLeastOnce()).invoke()
+        verify(atLeast = 1) { observeInstalledAppsUseCase.invoke() }
     }
 
     @Test
     fun `init - in test mode - still observes favorites`() = runTest {
         val favoriteApps = FavoriteAppsResult(testApps, isFallback = false)
-        whenever(getFavoriteAppsUseCase.favoriteApps).thenReturn(
-            flowOf(UiState.Success(favoriteApps))
-        )
+        every { getFavoriteAppsUseCase.favoriteApps } returns
+                flowOf(UiState.Success(favoriteApps))
 
         setupViewModel(enableTestMode = true)
         advanceUntilIdle()
@@ -1293,20 +1264,20 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `isAutoLaunchEnabled - returns UseCase result`() = runTest {
-        whenever(getAutoLaunchSettingUseCase.invoke()).thenReturn(true)
+        coEvery { getAutoLaunchSettingUseCase.invoke() } returns true
         setupViewModel()
 
         val result = viewModel.isAutoLaunchEnabled()
         assertTrue(result)
 
-        whenever(getAutoLaunchSettingUseCase.invoke()).thenReturn(false)
+        coEvery { getAutoLaunchSettingUseCase.invoke() } returns false
         val result2 = viewModel.isAutoLaunchEnabled()
         assertFalse(result2)
     }
 
     @Test
     fun `hasUsageData - returns UseCase result`() = runTest {
-        whenever(checkAppUsageUseCase.invoke("com.test")).thenReturn(true)
+        coEvery { checkAppUsageUseCase.invoke("com.test") } returns true
         setupViewModel()
 
         val result = viewModel.hasUsageData("com.test")
@@ -1315,7 +1286,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `hasUsageData - with null package - returns false`() = runTest {
-        whenever(checkAppUsageUseCase.invoke(null)).thenReturn(false)
+        coEvery { checkAppUsageUseCase.invoke(null) } returns false
         setupViewModel()
 
         val result = viewModel.hasUsageData(null)
@@ -1324,7 +1295,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `isAutoShowKeyboardEnabled - returns UseCase result`() = runTest {
-        whenever(getAutoShowKeyboardSettingUseCase.invoke()).thenReturn(true)
+        coEvery { getAutoShowKeyboardSettingUseCase.invoke() } returns true
         setupViewModel()
 
         val result = viewModel.isAutoShowKeyboardEnabled()
@@ -1333,7 +1304,7 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `isTextShadowEnabled - returns UseCase result`() = runTest {
-        whenever(getTextShadowEnabledUseCase.invoke()).thenReturn(true)
+        coEvery { getTextShadowEnabledUseCase.invoke() } returns true
         setupViewModel()
 
         val result = viewModel.isTextShadowEnabled()
@@ -1348,7 +1319,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetTextColor(Color.RED)
         advanceUntilIdle()
 
-        verify(setTextColorUseCase).invoke(Color.RED)
+        coVerify { setTextColorUseCase.invoke(Color.RED) }
     }
 
     @Test
@@ -1359,12 +1330,12 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetTextShadowEnabled(true)
         advanceUntilIdle()
 
-        verify(setTextShadowEnabledUseCase).invoke(true)
+        coVerify { setTextShadowEnabledUseCase.invoke(true) }
 
         viewModel.onSetTextShadowEnabled(false)
         advanceUntilIdle()
 
-        verify(setTextShadowEnabledUseCase).invoke(false)
+        coVerify { setTextShadowEnabledUseCase.invoke(false) }
     }
 
     @Test
@@ -1375,7 +1346,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetChipBackgroundColor(Color.BLUE)
         advanceUntilIdle()
 
-        verify(setChipBackgroundColorUseCase).invoke(Color.BLUE)
+        coVerify { setChipBackgroundColorUseCase.invoke(Color.BLUE) }
     }
 
     @Test
@@ -1388,7 +1359,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Verify that observeUiColorsUseCase was called with the flow
-        verify(observeUiColorsUseCase).invoke(any())
+        verify { observeUiColorsUseCase.invoke(any()) }
     }
 
     @Test
@@ -1433,7 +1404,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Verify refresh was triggered
-        verify(observeTimeBasedEventsUseCase, atLeastOnce()).refresh()
+        verify(atLeast = 1) { observeTimeBasedEventsUseCase.refresh() }
         assertNotNull(viewModel.uiState.value.timeString)
     }
 
@@ -1443,13 +1414,13 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Reset mocks
-        clearInvocations(refreshAppsUseCase, observeTimeBasedEventsUseCase)
+        clearMocks(refreshAppsUseCase, observeTimeBasedEventsUseCase, answers = false)
 
         viewModel.refreshAllData()
         advanceUntilIdle()
 
-        verify(observeTimeBasedEventsUseCase).refresh()
-        verify(refreshAppsUseCase).invoke()
+        verify { observeTimeBasedEventsUseCase.refresh() }
+        coVerify { refreshAppsUseCase.invoke() }
     }
 
     @Test
@@ -1466,7 +1437,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - reflects value from UseCase`() = runTest {
         // Arrange
         val expectedThreshold = 250
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(expectedThreshold))
+        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(expectedThreshold)
 
         // Act
         setupViewModel()
@@ -1491,7 +1462,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - updates dynamically when UseCase emits new value`() = runTest {
         // Arrange: Wir nutzen einen MutableStateFlow, um Werte zur Laufzeit zu ändern
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1510,17 +1481,16 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `refreshDynamicUiData - updates time but preserves battery state`() = runTest {
         // 1. Arrange: Wir simulieren einen System-Intent mit 88% Akku
-        val batteryIntent = mock(Intent::class.java)
-        `when`(batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)).thenReturn(88)
-        `when`(batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)).thenReturn(100)
+        val batteryIntent = mockk<Intent>()
+        every { batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 88
+        every { batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
 
         // WICHTIG: Wenn das ViewModel den Context fragt, muss dieser Intent zurückkommen!
-        // Wir nutzen anyOrNull() für den Receiver und any() für Filter/Flags
-        `when`(context.registerReceiver(
-            org.mockito.kotlin.anyOrNull(),
+        every { context.registerReceiver(
+            anyOrNull<BroadcastReceiver>(),
             any(),
-            any()
-        )).thenReturn(batteryIntent)
+            any<Int>()
+        ) } returns batteryIntent
 
         // ViewModel setup
         setupViewModel()
@@ -1549,13 +1519,13 @@ class MonolithicLauncherViewModelTest {
 
         // === ARRANGE ===
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
-        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(colorsFlow)
+        every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
 
         val eventsFlow = MutableStateFlow(emptyList<TimeBasedEvent>())
-        whenever(observeTimeBasedEventsUseCase.invoke(any())).thenReturn(eventsFlow)
+        every { observeTimeBasedEventsUseCase.invoke(any()) } returns eventsFlow
 
         setupViewModel()
 
@@ -1593,7 +1563,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `splitModeThreshold - default value is 0 (Auto mode)`() = runTest {
         // Arrange
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(0))
+        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
 
         // Act
         setupViewModel()
@@ -1608,7 +1578,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - maximum value 512 works correctly`() = runTest {
         // Arrange
         val maxThreshold = 512
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(maxThreshold))
+        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(maxThreshold)
 
         // Act
         setupViewModel()
@@ -1627,7 +1597,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - typical power-user value 42px works`() = runTest {
         // Arrange
         val recommendedThreshold = 42
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flowOf(recommendedThreshold))
+        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(recommendedThreshold)
 
         // Act
         setupViewModel()
@@ -1646,7 +1616,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - rapid changes are all propagated`() = runTest {
         // Arrange: Simuliere schnelle Slider-Bewegung
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1672,7 +1642,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - change during app launch does not interfere`() = runTest {
         // Arrange
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1694,7 +1664,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Assert: Beide Operationen sollten erfolgreich sein
-        verify(recordAppLaunchUseCase).invoke(app1)
+        coVerify { recordAppLaunchUseCase.invoke(app1) }
         assertEquals(100, viewModel.splitModeThreshold.value)
     }
 
@@ -1702,13 +1672,13 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - survives UseCase throwing exception`() = runTest {
         // Arrange: UseCase wirft beim ersten Mal Exception, dann funktioniert es
         var callCount = 0
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(flow {
+        every { getSplitModeThresholdUseCase.invoke() } returns flow {
             callCount++
             if (callCount == 1) {
                 throw RuntimeException("Settings corrupted")
             }
             emit(42)
-        })
+        }
 
         // Act
         setupViewModel()
@@ -1728,7 +1698,7 @@ class MonolithicLauncherViewModelTest {
         for (preset in presetValues) {
             // Arrange
             val thresholdFlow = MutableStateFlow(preset)
-            whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+            every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
             // Act
             setupViewModel()
@@ -1749,7 +1719,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - zero to non-zero transition works`() = runTest {
         // Arrange: User aktiviert Split-Mode-Threshold zum ersten Mal
         val thresholdFlow = MutableStateFlow(0)  // Start: Auto-Mode
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1768,7 +1738,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - non-zero to zero transition works`() = runTest {
         // Arrange: User deaktiviert Split-Mode-Threshold
         val thresholdFlow = MutableStateFlow(100)  // Start: Manuell
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1787,7 +1757,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - changes while battery and time update simultaneously`() = runTest {
         // Arrange: Realistische Multi-Update-Situation
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1815,7 +1785,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - multiple subscribers receive same values`() = runTest {
         // Arrange
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1856,7 +1826,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - Flow is hot (StateFlow behavior)`() = runTest {
         // Arrange
         val thresholdFlow = MutableStateFlow(42)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
         advanceUntilIdle()
@@ -1879,7 +1849,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - ViewModel recreation preserves UseCase subscription`() = runTest {
         // Arrange
         val thresholdFlow = MutableStateFlow(42)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         // --- VM 1 ---
         setupViewModel()
@@ -1915,7 +1885,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - extreme rapid changes are handled gracefully`() = runTest {
         // Arrange: Stress-Test
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1945,8 +1915,8 @@ class MonolithicLauncherViewModelTest {
         val thresholdFlow = MutableStateFlow(0)
         val homeSettingsFlow = MutableStateFlow(HomeSettings())
 
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
-        whenever(observeHomeSettingsUseCase.invoke()).thenReturn(homeSettingsFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
+        every { observeHomeSettingsUseCase.invoke() } returns homeSettingsFlow
 
         setupViewModel(enableTestMode = false)
 
@@ -1976,7 +1946,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `splitModeThreshold - boundary value 1 works (smallest non-zero)`() = runTest {
         val thresholdFlow = MutableStateFlow(1)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -1989,7 +1959,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `splitModeThreshold - boundary value 511 works (max minus 1)`() = runTest {
         val thresholdFlow = MutableStateFlow(511)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -2003,7 +1973,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - toggle between two values repeatedly`() = runTest {
         // Realistisches Szenario: User experimentiert mit zwei Werten
         val thresholdFlow = MutableStateFlow(0)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -2023,7 +1993,7 @@ class MonolithicLauncherViewModelTest {
     fun `splitModeThreshold - survives ViewModel being in background`() = runTest {
         // Arrange
         val thresholdFlow = MutableStateFlow(42)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
 
         setupViewModel()
 
@@ -2095,7 +2065,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `layoutScaleState - updates dynamically when UseCase emits new value`() = runTest {
         val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+        every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
 
         setupViewModel()
 
@@ -2113,7 +2083,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `verticalPaddingState - updates dynamically when UseCase emits new value`() = runTest {
         val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
+        every { getLayoutSettingsUseCase.verticalPadding } returns paddingFlow
 
         setupViewModel()
 
@@ -2128,7 +2098,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `isFontBoldState - updates dynamically when UseCase emits new value`() = runTest {
         val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
+        every { getLayoutSettingsUseCase.isFontBold } returns boldFlow
 
         setupViewModel()
 
@@ -2149,9 +2119,9 @@ class MonolithicLauncherViewModelTest {
         val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
 
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
-        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
+        every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
+        every { getLayoutSettingsUseCase.verticalPadding } returns paddingFlow
+        every { getLayoutSettingsUseCase.isFontBold } returns boldFlow
 
         setupViewModel()
         advanceUntilIdle()
@@ -2170,11 +2140,11 @@ class MonolithicLauncherViewModelTest {
 
     @Test
     fun `layout settings - survive UseCase throwing exception`() = runTest {
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flow {
+        every { getLayoutSettingsUseCase.layoutScale } returns flow {
             throw RuntimeException("Settings corrupted")
-        })
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR))
-        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(flowOf(AppConstants.DEFAULT_FONT_BOLD))
+        }
+        every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        every { getLayoutSettingsUseCase.isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
 
         setupViewModel()
         advanceUntilIdle()
@@ -2187,7 +2157,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `layout settings - rapid slider changes are handled gracefully`() = runTest {
         val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
+        every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
 
         setupViewModel()
 
@@ -2218,11 +2188,11 @@ class MonolithicLauncherViewModelTest {
         val thresholdFlow = MutableStateFlow(0)
         val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
 
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(paddingFlow)
-        whenever(getLayoutSettingsUseCase.isFontBold).thenReturn(boldFlow)
-        whenever(getSplitModeThresholdUseCase.invoke()).thenReturn(thresholdFlow)
-        whenever(observeUiColorsUseCase.invoke(any())).thenReturn(colorsFlow)
+        every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
+        every { getLayoutSettingsUseCase.verticalPadding } returns paddingFlow
+        every { getLayoutSettingsUseCase.isFontBold } returns boldFlow
+        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
+        every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
 
         setupViewModel()
 
@@ -2259,7 +2229,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetLayoutScale(0.75f)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(0.75f)
+        coVerify { setLayoutScaleUseCase.invoke(0.75f) }
     }
 
     @Test
@@ -2272,7 +2242,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetLayoutScale(exceededCount)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(limit)
+        coVerify { setLayoutScaleUseCase.invoke(limit) }
     }
 
     @Test
@@ -2283,7 +2253,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetLayoutScale(-0.5f)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(0f)
+        coVerify { setLayoutScaleUseCase.invoke(0f) }
     }
 
     @Test
@@ -2294,7 +2264,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetLayoutScale(0f)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(0f)
+        coVerify { setLayoutScaleUseCase.invoke(0f) }
     }
 
     @Test
@@ -2305,7 +2275,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetLayoutScale(1.0f)
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(1.0f)
+        coVerify { setLayoutScaleUseCase.invoke(1.0f) }
     }
 
     @Test
@@ -2316,7 +2286,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetVerticalPadding(0.6f)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(0.6f)
+        coVerify { setVerticalPaddingUseCase.invoke(0.6f) }
     }
 
     @Test
@@ -2329,7 +2299,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetVerticalPadding(exceededCount)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(limit)
+        coVerify { setVerticalPaddingUseCase.invoke(limit) }
     }
 
     @Test
@@ -2340,7 +2310,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetVerticalPadding(-1.0f)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(0f)
+        coVerify { setVerticalPaddingUseCase.invoke(0f) }
     }
 
     @Test
@@ -2351,7 +2321,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetVerticalPadding(0f)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(0f)
+        coVerify { setVerticalPaddingUseCase.invoke(0f) }
     }
 
     @Test
@@ -2362,7 +2332,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetVerticalPadding(1.0f)
         advanceUntilIdle()
 
-        verify(setVerticalPaddingUseCase).invoke(1.0f)
+        coVerify { setVerticalPaddingUseCase.invoke(1.0f) }
     }
 
     @Test
@@ -2373,7 +2343,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetFontBold(true)
         advanceUntilIdle()
 
-        verify(setFontBoldUseCase).invoke(true)
+        coVerify { setFontBoldUseCase.invoke(true) }
     }
 
     @Test
@@ -2384,7 +2354,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetFontBold(false)
         advanceUntilIdle()
 
-        verify(setFontBoldUseCase).invoke(false)
+        coVerify { setFontBoldUseCase.invoke(false) }
     }
 
     @Test
@@ -2395,15 +2365,15 @@ class MonolithicLauncherViewModelTest {
         viewModel.onResetLayoutSettings()
         advanceUntilIdle()
 
-        verify(setLayoutScaleUseCase).invoke(AppConstants.DEFAULT_LAYOUT_SCALE)
-        verify(setVerticalPaddingUseCase).invoke(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
-        verify(setFontBoldUseCase).invoke(AppConstants.DEFAULT_FONT_BOLD)
+        coVerify { setLayoutScaleUseCase.invoke(AppConstants.DEFAULT_LAYOUT_SCALE) }
+        coVerify { setVerticalPaddingUseCase.invoke(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR) }
+        coVerify { setFontBoldUseCase.invoke(AppConstants.DEFAULT_FONT_BOLD) }
     }
 
     @Test
     fun `layoutScaleState - reflects custom value from UseCase`() = runTest {
         val customScale = 0.65f
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(flowOf(customScale))
+        every { getLayoutSettingsUseCase.layoutScale } returns flowOf(customScale)
 
         setupViewModel()
         advanceUntilIdle()
@@ -2416,7 +2386,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `verticalPaddingState - reflects custom value from UseCase`() = runTest {
         val customPadding = 0.4f
-        whenever(getLayoutSettingsUseCase.verticalPadding).thenReturn(flowOf(customPadding))
+        every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(customPadding)
 
         setupViewModel()
         advanceUntilIdle()
@@ -2441,7 +2411,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `contentTopMarginState - reflects value from UseCase`() = runTest {
         val marginFlow = MutableStateFlow(0f)
-        whenever(getLayoutSettingsUseCase.contentTopMargin).thenReturn(marginFlow)
+        every { getLayoutSettingsUseCase.contentTopMargin } returns marginFlow
 
         setupViewModel()
         advanceUntilIdle()
@@ -2462,7 +2432,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetContentTopMargin(0.3f)
         advanceUntilIdle()
 
-        verify(setContentTopMarginUseCase).invoke(0.3f)
+        coVerify { setContentTopMarginUseCase.invoke(0.3f) }
     }
 
     @Test
@@ -2473,7 +2443,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetContentTopMargin(-0.1f)
         advanceUntilIdle()
 
-        verify(setContentTopMarginUseCase).invoke(0f)
+        coVerify { setContentTopMarginUseCase.invoke(0f) }
     }
 
     @Test
@@ -2489,7 +2459,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // 3. Erwartung: Es muss auf das MAX gekappt werden.
-        verify(setContentTopMarginUseCase).invoke(maxLimit)
+        coVerify { setContentTopMarginUseCase.invoke(maxLimit) }
     }
 
     @Test
@@ -2500,7 +2470,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.onSetContentTopMargin(1.0f)
         advanceUntilIdle()
 
-        verify(setContentTopMarginUseCase).invoke(1.0f)
+        coVerify { setContentTopMarginUseCase.invoke(1.0f) }
     }
 
     // ========== TIME & DATE UPDATE TESTS ==========
@@ -2512,13 +2482,13 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Act & Assert
-        val intentFilterCaptor = ArgumentCaptor.forClass(IntentFilter::class.java)
+        val intentFilterSlot = slot<IntentFilter>()
 
         // Wir verifizieren, DASS registerReceiver aufgerufen wurde.
         // Das allein beweist, dass dein Flow gestartet ist.
-        verify(context).registerReceiver(any(), intentFilterCaptor.capture())
+        verify { context.registerReceiver(any(), capture(intentFilterSlot)) }
 
-        val filter = intentFilterCaptor.value
+        val filter = intentFilterSlot.captured
 
         // FIX: Wir prüfen nur auf Existenz.
         // filter.hasAction() funktioniert in Unit-Tests nicht (gibt immer false),
@@ -2546,18 +2516,18 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // 1. Capture den Receiver, den das ViewModel erstellt hat
-        val receiverCaptor = ArgumentCaptor.forClass(BroadcastReceiver::class.java)
-        verify(context).registerReceiver(receiverCaptor.capture(), any())
-        val capturedReceiver = receiverCaptor.value
+        val receiverSlot = slot<BroadcastReceiver>()
+        verify { context.registerReceiver(capture(receiverSlot), any()) }
+        val capturedReceiver = receiverSlot.captured
 
         // Merke dir den aktuellen Wert (oder setze Default)
         val initialTime = viewModel.uiState.value.timeString
 
         // 2. Act: Simuliere den System-Broadcast "ACTION_TIME_TICK"
-        val intent = mock(Intent::class.java)
+        val intent = mockk<Intent>()
         // Hinweis: Dein Code nutzt intent.action nicht zwingend für den Trigger (trySend(Unit)),
         // aber es ist sauberer, es zu mocken, falls du später Logik hinzufügst.
-        whenever(intent.action).thenReturn(Intent.ACTION_TIME_TICK)
+        every { intent.action } returns Intent.ACTION_TIME_TICK
 
         // Rufe manuell onReceive auf (als wäre Android das System)
         capturedReceiver.onReceive(context, intent)
@@ -2591,9 +2561,9 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
-        val receiverCaptor = ArgumentCaptor.forClass(BroadcastReceiver::class.java)
-        verify(context).registerReceiver(receiverCaptor.capture(), any())
-        val capturedReceiver = receiverCaptor.value
+        val receiverSlot = slot<BroadcastReceiver>()
+        verify { context.registerReceiver(capture(receiverSlot), any()) }
+        val capturedReceiver = receiverSlot.captured
 
         // Act: Simuliere ViewModel Zerstörung
         // In Unit Tests können wir onCleared nicht direkt aufrufen (protected),
@@ -2612,287 +2582,5 @@ class MonolithicLauncherViewModelTest {
 
         // Workaround für Test: Wir vertrauen darauf, dass callbackFlow korrekt implementiert ist.
         // (Mocking von unregisterReceiver ist schwer zu verifizieren, da onCleared protected ist).
-    }
-
-    // ========== WALLPAPER TESTS ==========
-
-    @Test
-    fun `wallpaperState - default is NONE`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.wallpaperState.test {
-            val state = awaitItem()
-            assertFalse(state.hasWallpaper)
-        }
-    }
-
-    @Test
-    fun `wallpaperState - reflects value from UseCase`() = runTest {
-        val testUri = mock<Uri>()
-        val wallpaperState = WallpaperState(
-            imageUri = testUri,
-            scale = 1.5f,
-            translateX = 100f,
-            translateY = 50f
-        )
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.wallpaperState.test {
-            val state = awaitItem()
-            assertTrue(state.hasWallpaper)
-            assertEquals(testUri, state.imageUri)
-            assertEquals(1.5f, state.scale)
-        }
-    }
-
-    @Test
-    fun `wallpaperState - updates dynamically`() = runTest {
-        val stateFlow = MutableStateFlow(WallpaperState.NONE)
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(stateFlow)
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.wallpaperState.test {
-            // 1. Initialzustand prüfen (NONE)
-            assertFalse(awaitItem().hasWallpaper)
-
-            // 2. Update auslösen
-            val testUri = Uri.parse("content://media/external/images/456")
-            stateFlow.value = WallpaperState(imageUri = testUri)
-
-            // 3. WICHTIG: Gib dem ViewModel Zeit, das Event zu verarbeiten!
-            // Da wir uns im 'test'-Block befinden, können wir nicht advanceUntilIdle() nutzen,
-            // aber yield() gibt die Kontrolle kurz an andere Coroutinen (das VM) ab.
-            yield()
-
-            // 4. Jetzt sollte das Update da sein
-            assertTrue(awaitItem().hasWallpaper)
-        }
-    }
-
-    @Test
-    fun `onSetWallpaperImage - calls UseCase with URI`() = runTest {
-        val testUri = Uri.parse("content://media/external/images/789")
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.onSetWallpaperImage(testUri)
-        advanceUntilIdle()
-
-        verify(setWallpaperImageUseCase).invoke(testUri)
-    }
-
-    @Test
-    fun `onClearWallpaper - calls UseCase`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.onClearWallpaper()
-        advanceUntilIdle()
-
-        verify(clearWallpaperUseCase).invoke()
-    }
-
-    @Test
-    fun `onSaveWallpaperTransform - calls UseCase with correct values`() = runTest {
-        // Arrange: Wallpaper muss vorhanden sein, sonst macht updateTransform nichts
-        val testUri = mock<Uri>()
-        val wallpaperState = WallpaperState(imageUri = testUri, scale = 1f)
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Act
-        viewModel.onSaveWallpaperTransform(2.0f, 150f, 75f)
-        advanceUntilIdle()
-
-        // Assert
-        verify(saveWallpaperStateUseCase).updateTransform(any(), eq(2.0f), eq(150f), eq(75f))
-    }
-
-    @Test
-    fun `isWallpaperEditMode - default is false`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.isWallpaperEditMode.test {
-            assertFalse(awaitItem())
-        }
-    }
-
-    @Test
-    fun `onSetWallpaperEditMode - updates state`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.isWallpaperEditMode.test {
-            assertFalse(awaitItem())
-
-            viewModel.onSetWallpaperEditMode(true)
-            assertTrue(awaitItem())
-
-            viewModel.onSetWallpaperEditMode(false)
-            assertFalse(awaitItem())
-        }
-    }
-
-    @Test
-    fun `onToggleWallpaperEditMode - toggles state`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.isWallpaperEditMode.test {
-            assertFalse(awaitItem())
-
-            viewModel.onToggleWallpaperEditMode()
-            assertTrue(awaitItem())
-
-            viewModel.onToggleWallpaperEditMode()
-            assertFalse(awaitItem())
-        }
-    }
-
-    @Test
-    fun `onSetWallpaperImage - when UseCase throws - shows error toast`() = runTest {
-        whenever(setWallpaperImageUseCase.invoke(any())).doAnswer {
-            throw IOException("Cannot save wallpaper")
-        }
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        val testUri = Uri.parse("content://media/external/images/999")
-
-        viewModel.event.test {
-            viewModel.onSetWallpaperImage(testUri)
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-        }
-    }
-
-    @Test
-    fun `onClearWallpaper - when UseCase throws - shows error toast`() = runTest {
-        whenever(clearWallpaperUseCase.invoke()).doAnswer {
-            throw IOException("Cannot clear wallpaper")
-        }
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onClearWallpaper()
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-        }
-    }
-
-    @Test
-    fun `onSaveWallpaperTransform - when UseCase throws - shows error toast`() = runTest {
-        // Arrange: Wallpaper muss vorhanden sein
-        val testUri = mock<Uri>()
-        val wallpaperState = WallpaperState(imageUri = testUri)
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
-
-        whenever(saveWallpaperStateUseCase.updateTransform(any(), any(), any(), any())).doAnswer {
-            throw IOException("Cannot save transform")
-        }
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onSaveWallpaperTransform(1.0f, 0f, 0f)
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-        }
-    }
-
-    @Test
-    fun `wallpaper operations - rapid successive calls - handles gracefully`() = runTest {
-        // Arrange: Wallpaper muss vorhanden sein für updateTransform
-        val testUri = Uri.parse("content://media/external/images/123")
-        val wallpaperState = WallpaperState(imageUri = testUri)
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        repeat(10) {
-            viewModel.onSetWallpaperImage(testUri)
-            viewModel.onSaveWallpaperTransform(it.toFloat(), it * 10f, it * 5f)
-            viewModel.onToggleWallpaperEditMode()
-        }
-        advanceUntilIdle()
-
-        // setWallpaperImageUseCase verwendet invoke()
-        verify(setWallpaperImageUseCase, times(10)).invoke(testUri)
-        // saveWallpaperStateUseCase verwendet updateTransform()
-        verify(saveWallpaperStateUseCase, times(10)).updateTransform(any(), any(), any(), any())
-    }
-
-    @Test
-    fun `wallpaper - survives UseCase throwing exception on observe`() = runTest {
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flow {
-            throw RuntimeException("Settings corrupted")
-        })
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // ViewModel sollte überleben
-        assertNotNull(viewModel)
-        assertEquals(WallpaperState.NONE, viewModel.wallpaperState.value)
-    }
-
-    @Test
-    fun `wallpaper - edit mode does not persist across ViewModel recreation`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Edit-Mode aktivieren
-        viewModel.onSetWallpaperEditMode(true)
-        advanceUntilIdle()
-        assertTrue(viewModel.isWallpaperEditMode.value)
-
-        // ViewModel neu erstellen (simuliert Process Death / Recreation)
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Edit-Mode sollte zurückgesetzt sein (ist transient)
-        assertFalse(viewModel.isWallpaperEditMode.value)
-    }
-
-    @Test
-    fun `wallpaper - integration with other layout settings`() = runTest {
-        val testUri = Uri.parse("content://media/external/images/123")
-        val wallpaperState = WallpaperState(imageUri = testUri, scale = 1.2f)
-        whenever(observeWallpaperStateUseCase.invoke()).thenReturn(flowOf(wallpaperState))
-
-        val scaleFlow = MutableStateFlow(0.8f)
-        whenever(getLayoutSettingsUseCase.layoutScale).thenReturn(scaleFlow)
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Beide sollten unabhängig funktionieren
-        assertEquals(0.8f, viewModel.layoutScaleState.value)
-
-        viewModel.wallpaperState.test {
-            val state = awaitItem()
-            assertTrue(state.hasWallpaper)
-            assertEquals(1.2f, state.scale)
-        }
     }
 }
