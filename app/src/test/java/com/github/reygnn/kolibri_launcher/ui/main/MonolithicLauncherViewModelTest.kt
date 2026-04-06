@@ -114,7 +114,9 @@ import org.mockito.kotlin.anyOrNull
  *     • LauncherViewModelSecurityTest (input validation)
  *     • LauncherViewModelDoomsdayTest (stress/edge cases)
  *     • Individual delegate test classes (*DelegateTest)
- * - Do NOT delete tests from here.
+ * - Do NOT delete tests from here unless the underlying API was intentionally
+ *   redesigned. In that case, remove the outdated tests and document the
+ *   change in the changelog below.
  * - DO fix broken mocks if the constructor signature changes (e.g. new parameters).
  * - If a test fails, investigate whether the ViewModel's public behavior changed —
  *   that's a regression, not a test problem.
