@@ -1,4 +1,4 @@
-@file:Suppress("UnusedFlowOnResult", "FlowConstructedButNotUsed")
+@file:Suppress("UnusedFlow")
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
