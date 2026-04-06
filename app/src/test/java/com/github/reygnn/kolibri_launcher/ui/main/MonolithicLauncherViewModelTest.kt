@@ -102,7 +102,10 @@ import org.mockito.kotlin.anyOrNull
  * for the old monolithic implementation.
  *
  * ALL TESTS HERE PASSED AGAINST THE OLD MONOLITHIC VM.
- * IF ANY TEST FAILS AFTER A REFACTOR, THE PUBLIC API CONTRACT IS BROKEN.
+ * IF ANY TEST FAILS AFTER A REFACTOR, EITHER:
+ *   1. The public API contract is broken (regression — fix the code), or
+ *   2. The API was intentionally redesigned (remove the outdated test and
+ *      document the change in the changelog below).
  *
  * Rules:
  * - Do NOT add new tests here. New tests go into:
