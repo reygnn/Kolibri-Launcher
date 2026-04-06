@@ -1,4 +1,6 @@
-package com.github.reygnn.kolibri_launcher.ui
+@file:Suppress("UnusedFlowOnResult")
+
+package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.content.Context
 import android.content.Intent
@@ -51,7 +53,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
-import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
