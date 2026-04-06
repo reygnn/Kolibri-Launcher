@@ -1,3 +1,9 @@
+/*
+ * Warnings in this legacy test suite are deliberately suppressed.
+ * This file is frozen (see class KDoc) — unused variables, redundant conditions,
+ * and unconsumed Flows are artifacts of the original monolithic ViewModel tests.
+ * Cleaning them up would violate the "do not modify unless mocks break" policy.
+ */
 @file:Suppress("UnusedFlow")
 
 package com.github.reygnn.kolibri_launcher.ui.main
@@ -128,6 +134,13 @@ import io.mockk.verify
  *   WallpaperDelegateTest and LauncherViewModelContractTest.
  */
 
+/**
+ * Class-level suppressions for legacy test artifacts:
+ * - unused/UNUSED_*: Dead variables from removed or refactored test sections
+ * - KotlinConstantConditions: DEFAULT_FONT_BOLD comparisons that are always true/false
+ * - Redundant*Backticks: Kotlin test naming convention uses backticks
+ * - UnspecifiedRegisterReceiverFlag: MockK context stubs don't need real receiver flags
+ */
 @Suppress(
     "unused",
     "UNUSED_VARIABLE",
