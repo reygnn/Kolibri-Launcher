@@ -33,11 +33,10 @@ plugins {
 
 // Version-Konstanten
 val materialVersion = "1.13.0"  // DO NOT DOWNGRADE !!!
-val espressoVersion = "3.5.1"  // DO NOT EVEN THINK ABOUT TO CHANGE !!!
-val hiltVersion = "2.57.1"  // DO NOT UPGRADE !!!
+val hiltVersion = "2.57.2"  // DO NOT UPGRADE !!!
 val truthVersion = "1.4.5"  // OK to upgrade
-val lifecycleVersion = "2.9.4"  // OK to upgrade
-val navigationVersion = "2.9.6"  // OK to upgrade
+val lifecycleVersion = "2.10.0"  // OK to upgrade
+val navigationVersion = "2.9.7"  // OK to upgrade
 val coroutinesVersion = "1.10.2"  // OK to upgrade
 val kotlinTestVersion = "2.2.10"  // DO NOT CHANGE !!! (1.9.23 causes compiler errors)
 val timberVersion = "5.0.1"  // DO NOT UPGRADE !!! (6.x breaking changes)
@@ -45,11 +44,15 @@ val fragmentVersion = "1.8.9"  // DO NOT UPGRADE !!! (keep fragment-ktx and frag
 val junitVersion = "4.13.2"  // DO NOT UPGRADE !!! (JUnit 5 needs migration)
 val coreTestingVersion = "2.2.0"  // DO NOT CHANGE !!!
 val turbineVersion = "1.2.1"  // OK to upgrade
-val androidxTestJunitVersion = "1.2.1"  // DO NOT CHANGE !!!
 val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beachten!
 val jsonVersion = "20251224"
-val androidxTestVersion = "1.6.1"
-val androidxTestCoreVersion = "1.6.1"
+
+// === AndroidX Test — keep ALL in sync ===
+val espressoVersion = "3.7.0"  // Updated for androidTest rewrite — keep in sync with test runner/rules
+val androidxTestJunitVersion = "1.3.0"
+val androidxTestVersion = "1.7.0"
+val androidxTestCoreVersion = "1.7.0"
+val orchestratorVersion = "1.6.1"
 val robolectricVersion = "4.16.1"  // OK to upgrade
 
 
@@ -188,26 +191,18 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'MaterialYou' mit
-    implementation("androidx.activity:activity:1.12.2")
+    implementation("androidx.activity:activity:1.12.4")
     //noinspection NewerVersionAvailable
     implementation("androidx.fragment:fragment-ktx:$fragmentVersion")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
 
 // Lifecycle & Navigation
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
     implementation("androidx.navigation:navigation-fragment-ktx:$navigationVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
 // Data & Async
@@ -220,9 +215,7 @@ dependencies {
     //noinspection NewerVersionAvailable
     implementation("com.jakewharton.timber:timber:$timberVersion")
     //noinspection NewerVersionAvailable
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")  // 1.10.0 benötigt Kotlin 2.3.0
     testImplementation("org.robolectric:robolectric:${robolectricVersion}")
 
 // Hilt
@@ -264,7 +257,7 @@ dependencies {
 
 
 // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
-    androidTestUtil("androidx.test:orchestrator:1.6.1")
+    androidTestUtil("androidx.test:orchestrator:$orchestratorVersion")
 
     //noinspection NewerVersionAvailable
     //noinspection GradleDependency

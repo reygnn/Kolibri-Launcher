@@ -75,7 +75,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
-import android.net.Uri
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
@@ -90,8 +89,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import kotlinx.coroutines.yield
-import org.mockito.kotlin.anyOrNull
 
 /**
  * ⚠️ LEGACY TEST SUITE — DO NOT EXTEND ⚠️
@@ -1492,7 +1489,7 @@ class MonolithicLauncherViewModelTest {
 
         // WICHTIG: Wenn das ViewModel den Context fragt, muss dieser Intent zurückkommen!
         every { context.registerReceiver(
-            anyOrNull<BroadcastReceiver>(),
+            any(),
             any(),
             any<Int>()
         ) } returns batteryIntent
