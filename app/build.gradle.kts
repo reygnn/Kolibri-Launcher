@@ -39,8 +39,6 @@ val truthVersion = "1.4.5"  // OK to upgrade
 val lifecycleVersion = "2.9.4"  // OK to upgrade
 val navigationVersion = "2.9.6"  // OK to upgrade
 val coroutinesVersion = "1.10.2"  // OK to upgrade
-val mockitoKotlinVersion = "5.3.1"  // DO NOT CHANGE !!!
-val mockitoCoreVersion = "5.2.0"   // DO NOT CHANGE !!!
 val kotlinTestVersion = "2.2.10"  // DO NOT CHANGE !!! (1.9.23 causes compiler errors)
 val timberVersion = "5.0.1"  // DO NOT UPGRADE !!! (6.x breaking changes)
 val fragmentVersion = "1.8.9"  // DO NOT UPGRADE !!! (keep fragment-ktx and fragment-testing in sync)
@@ -242,7 +240,7 @@ dependencies {
     debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 
 // --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
-    testImplementation("io.mockk:mockk:1.14.9")
+
 
     //noinspection NewerVersionAvailable
     testImplementation("junit:junit:$junitVersion")
@@ -261,11 +259,8 @@ dependencies {
     //noinspection NewerVersionAvailable
     kaptTest("com.google.dagger:hilt-compiler:$hiltVersion")
 
-// Mockito für Unit-Tests
-    //noinspection NewerVersionAvailable
-    testImplementation("org.mockito.kotlin:mockito-kotlin:$mockitoKotlinVersion")
-    //noinspection NewerVersionAvailable
-    testImplementation("org.mockito:mockito-inline:$mockitoCoreVersion")
+// MockK für Unit-Tests
+    testImplementation("io.mockk:mockk:1.14.9")
 
 
 // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
