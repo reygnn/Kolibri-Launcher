@@ -119,7 +119,7 @@ import org.mockito.kotlin.anyOrNull
  * - If a test fails, investigate whether the ViewModel's public behavior changed —
  *   that's a regression, not a test problem.
  *
- * @since v1.0 (pre-delegate architecture)
+ * @since v0.99.50 (pre-delegate architecture)
  *
  * Changelog:
  * - 2026-04: Wallpaper tests removed. The wallpaper API was fundamentally redesigned
