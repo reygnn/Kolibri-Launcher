@@ -28,6 +28,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
     id("jacoco")
+    //noinspection NewerVersionAvailable
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21" // DO NOT EVEN THINK ABOUT TO CHANGE !!!
 }
 
@@ -188,9 +189,13 @@ dependencies {
     implementation("com.google.android.material:material:${materialVersion}")  // MUSS VOR androidx.appcompat:appcompat !!!
 
 // Core Android
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'MaterialYou' mit
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.activity:activity:1.12.4")
     //noinspection NewerVersionAvailable
     implementation("androidx.fragment:fragment-ktx:$fragmentVersion")
@@ -221,6 +226,8 @@ dependencies {
 // Hilt
     //noinspection NewerVersionAvailable
     implementation("com.google.dagger:hilt-android:$hiltVersion")
+    //noinspection NewerVersionAvailable
+    //noinspection GradleDependency
     implementation("androidx.browser:browser:1.9.0")
     //noinspection NewerVersionAvailable
     kapt("com.google.dagger:hilt-compiler:$hiltVersion")

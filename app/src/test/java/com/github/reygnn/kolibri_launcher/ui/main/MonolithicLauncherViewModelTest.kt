@@ -127,6 +127,12 @@ import io.mockk.verify
  *   WallpaperDelegateTest and LauncherViewModelContractTest.
  */
 
+@Suppress(
+    "unused",
+    "UNUSED_VARIABLE",
+    "KotlinConstantConditions",
+    "RedundantBackticks"
+)
 @ExperimentalCoroutinesApi
 class MonolithicLauncherViewModelTest {
 
