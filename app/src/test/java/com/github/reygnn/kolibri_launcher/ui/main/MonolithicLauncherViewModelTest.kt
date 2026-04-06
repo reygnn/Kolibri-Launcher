@@ -131,7 +131,9 @@ import io.mockk.verify
     "unused",
     "UNUSED_VARIABLE",
     "KotlinConstantConditions",
-    "RedundantBackticks"
+    "RedundantBackticks",
+    "RemoveRedundantBackticks",
+    "UNUSED_VALUE"
 )
 @ExperimentalCoroutinesApi
 class MonolithicLauncherViewModelTest {
