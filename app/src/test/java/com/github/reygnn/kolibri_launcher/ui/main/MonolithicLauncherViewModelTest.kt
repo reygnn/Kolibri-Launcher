@@ -1,4 +1,4 @@
-@file:Suppress("UnusedFlowOnResult")
+@file:Suppress("UnusedFlowOnResult", "FlowConstructedButNotUsed")
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
@@ -134,7 +134,8 @@ import io.mockk.verify
     "KotlinConstantConditions",
     "RedundantBackticks",
     "RemoveRedundantBackticks",
-    "UNUSED_VALUE"
+    "UNUSED_VALUE",
+    "UnspecifiedRegisterReceiverFlag"
 )
 @ExperimentalCoroutinesApi
 class MonolithicLauncherViewModelTest {
