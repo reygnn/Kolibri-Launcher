@@ -993,6 +993,11 @@ class BackupManager @Inject constructor(
     // ===========================================
 
     private suspend fun importWallpaper(settings: LauncherSettings) {
+        // Bestehende Wallpaper-Dateien und State entfernen
+        // bevor neue importiert werden (verhindert Layer-Mismatch)
+        wallpaperFileManager.clearAll()
+        wallpaperManager.clearWallpaper()
+
         if (settings.wallpaperLayers.isNotEmpty()) {
             importMultiLayerWallpaper(settings.wallpaperLayers)
         } else {
