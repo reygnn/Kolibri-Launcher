@@ -182,4 +182,18 @@ data class WallpaperLayer(
         translateX = (viewWidth - imgW * scale) / 2f
         translateY = (viewHeight - imgH * scale) / 2f
     }
+
+    /**
+     * Skaliert das Bild proportional auf die Breite des Views
+     * und zentriert es vertikal. Das Seitenverhältnis bleibt erhalten.
+     */
+    fun applyFitWidth(viewWidth: Int, viewHeight: Int) {
+        val bmp = bitmap ?: return
+        val imgW = bmp.width.toFloat()
+        val imgH = bmp.height.toFloat()
+
+        scale = viewWidth / imgW
+        translateX = 0f
+        translateY = (viewHeight - imgH * scale) / 2f
+    }
 }

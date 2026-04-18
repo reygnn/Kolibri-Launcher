@@ -337,6 +337,7 @@
 <string name="toolbar_dock_toggle">Verschiebe Toolbar</string>
 <string name="wallpaper_remove_confirm">Hintergrund und alle Ebenen entfernen? Dies kann nicht rückgängig gemacht werden.</string>
 <string name="wallpaper_remove_yes">Entfernen</string>
+<string name="wallpaper_fit_width">An Breite anpassen</string>
 
 <string name="rotation_lock_title">Bildschirmrotation sperren</string>
 <string name="rotation_lock_summary">Display im Hochformat fixieren</string>

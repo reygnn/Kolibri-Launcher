@@ -412,6 +412,43 @@ class ZoomableImageView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Skaliert das Bild proportional auf die Display-Breite und zentriert vertikal.
+     * Im Multi-Layer-Modus wirkt es auf das aktive Layer.
+     */
+    fun fitToWidth() {
+        if (isMultiLayerMode) {
+            val idx = activeLayerIndex
+            if (idx >= 0) fitToWidthLayer(idx)
+            return
+        }
+
+        val drawable = drawable ?: return
+        if (width == 0 || height == 0) return
+
+        try {
+            cancelSnapBackAnimation()
+            val dWidth = drawable.intrinsicWidth.toFloat()
+            val dHeight = drawable.intrinsicHeight.toFloat()
+
+            _singleScale = width / dWidth
+            _singleBaseScale = _singleScale
+            _singleTranslateX = 0f
+            _singleTranslateY = (height - dHeight * _singleScale) / 2f
+            rebuildSingleMatrix()
+        } catch (e: Exception) {
+            resetTransform()
+        }
+    }
+
+    fun fitToWidthLayer(layerIndex: Int) {
+        val layer = layers.getOrNull(layerIndex) ?: return
+        if (width == 0 || height == 0) return
+        cancelSnapBackAnimation()
+        layer.applyFitWidth(width, height)
+        invalidate()
+    }
+
     // ===========================================
     // PUBLIC API: MULTI-LAYER
     // ===========================================
@@ -451,8 +488,12 @@ class ZoomableImageView @JvmOverloads constructor(
             label = label
         )
 
-        if (centerCrop && width > 0 && height > 0) {
+/*        if (centerCrop && width > 0 && height > 0) {
             layer.applyCenterCrop(width, height)
+        }*/
+
+        if (centerCrop && width > 0 && height > 0) {
+            layer.applyFitWidth(width, height)
         }
 
         layers.add(layer)

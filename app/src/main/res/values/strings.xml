@@ -351,6 +351,7 @@
 <string name="wallpaper_remove_confirm">Remove wallpaper and all layers? This cannot be undone.</string>
 <string name="wallpaper_remove_yes">Remove</string>
 <string name="toolbar_dock_toggle">Move toolbar</string>
+<string name="wallpaper_fit_width">Fit to width</string>
 
 <string name="rotation_lock_title">Lock screen rotation</string>
 <string name="rotation_lock_summary">Keep the display in portrait orientation</string>

@@ -233,6 +233,17 @@
                     app:icon="@drawable/ic_one_to_one"
                     app:iconTint="@android:color/white"
                     app:iconSize="20dp" />
+                    
+                    <!-- Fit to Width -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWallpaperFitWidth"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:contentDescription="@string/wallpaper_fit_width"
+                    app:icon="@drawable/ic_fit_width"
+                    app:iconTint="@android:color/white"
+                    app:iconSize="20dp" />
 
                 <!-- Layer Indicator: "Layer 1/3" -->
                 <TextView

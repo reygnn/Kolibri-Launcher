@@ -2258,6 +2258,15 @@ class HomeFragment : Fragment() {
                     }
                 }
 
+                // 6. Fit to Width
+                binding.btnWallpaperFitWidth.setOnClickListener {
+                    try {
+                        wallpaperView.fitToWidth()
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error fitting to width")
+                    }
+                }
+
                 // ── Dock Toggle (oben ↔ unten) ──
                 binding.btnToolbarDock.setOnClickListener {
                     try {
@@ -2362,6 +2371,7 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperHSnap.setOnClickListener(null)
                 binding.btnWallpaperVSnap.setOnClickListener(null)
                 binding.btnWallpaperOneToOne.setOnClickListener(null)
+                binding.btnWallpaperFitWidth.setOnClickListener(null)
                 binding.btnToolbarDock.setOnClickListener(null)
 
                 // Layer-Buttons aufräumen
@@ -2708,6 +2718,7 @@ class HomeFragment : Fragment() {
                 binding.btnWallpaperHSnap.setOnClickListener(null)
                 binding.btnWallpaperVSnap.setOnClickListener(null)
                 binding.btnWallpaperOneToOne.setOnClickListener(null)
+                binding.btnWallpaperFitWidth.setOnClickListener(null)
                 binding.btnLayerAdd.setOnClickListener(null)
                 binding.btnLayerDelete.setOnClickListener(null)
                 binding.btnLayerUp.setOnClickListener(null)
