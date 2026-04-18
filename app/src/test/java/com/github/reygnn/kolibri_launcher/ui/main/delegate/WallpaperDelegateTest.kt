@@ -601,4 +601,362 @@ class WallpaperDelegateTest {
 
         coVerify(exactly = 1) { saveWallpaperStateUseCase.invoke(any()) }
     }
+
+    // ===========================================
+    // EDIT SESSION — ENTER / COMMIT / CANCEL
+    //
+    // Covers the transactional edit session introduced to fix:
+    //   (1) transform mis-assignment on Cancel after a layer delete, and
+    //   (2) Cancel not actually undoing a layer deletion.
+    //
+    // The session contract is: onEnterWallpaperEditMode() snapshots the
+    // state. Layer removals during the session defer their physical file
+    // deletion; added layers track their internal-file URI for orphan
+    // cleanup. onCommitWallpaperEditMode() commits (delete deferred
+    // removes). onCancelWallpaperEditMode() rolls back (restore snapshot
+    // synchronously, delete added orphans).
+    // ===========================================
+
+    @Test
+    fun `onEnterWallpaperEditMode sets edit mode to true`() {
+        val delegate = createDelegate()
+
+        delegate.onEnterWallpaperEditMode()
+
+        assertTrue(delegate.isWallpaperEditMode.value)
+    }
+
+    @Test
+    fun `onCommitWallpaperEditMode sets edit mode to false`() {
+        val delegate = createDelegate()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()
+
+        assertFalse(delegate.isWallpaperEditMode.value)
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode sets edit mode to false`() {
+        val delegate = createDelegate()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCancelWallpaperEditMode()
+
+        assertFalse(delegate.isWallpaperEditMode.value)
+    }
+
+    @Test
+    fun `onRemoveWallpaperLayer in edit mode defers file deletion`() = runTest {
+        val layerUri: Uri = mockk()
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val currentState: WallpaperState = mockk {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+        }
+
+        val stateFlow = MutableStateFlow(currentState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        // State was updated & persisted, but the physical file must NOT
+        // be deleted yet — Cancel must still be able to restore it.
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+        coVerify { saveWallpaperStateUseCase.invoke(any()) }
+    }
+
+    @Test
+    fun `onRemoveWallpaperLayer outside edit mode deletes file immediately`() = runTest {
+        // Regression guard: non-edit-mode behavior must be unchanged.
+        val layerUri: Uri = mockk()
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val currentState: WallpaperState = mockk {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+        }
+
+        val stateFlow = MutableStateFlow(currentState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        // NOT entering edit mode
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        verify { wallpaperFileManager.deleteFile(layerUri) }
+    }
+
+    @Test
+    fun `onCommitWallpaperEditMode deletes deferred-remove files`() = runTest {
+        val layerUri: Uri = mockk()
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val currentState: WallpaperState = mockk {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+        }
+
+        val stateFlow = MutableStateFlow(currentState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        // Pre-commit: still not deleted
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        // Post-commit: deferred file deletion executed
+        verify { wallpaperFileManager.deleteFile(layerUri) }
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode does not delete deferred-remove files`() = runTest {
+        val layerUri: Uri = mockk()
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val currentState: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+            every { forPersistence() } returns mockk()
+        }
+
+        val stateFlow = MutableStateFlow(currentState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+        delegate.onCancelWallpaperEditMode()
+        advanceUntilIdle()
+
+        // File must survive — the restored snapshot still references it
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(layerUri) }
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode restores snapshot state synchronously`() = runTest {
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns mockk()
+        }
+        val snapshotState: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+            every { forPersistence() } returns mockk()
+        }
+
+        val stateFlow = MutableStateFlow(snapshotState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        // Sanity: state has diverged from the snapshot
+        assertEquals(newState, delegate.wallpaperState.value)
+
+        // Key guarantee: in-memory state is reverted BEFORE any further
+        // coroutine work — the caller (HomeFragment) relies on this so
+        // it can immediately feed the restored value into updateWallpaper().
+        delegate.onCancelWallpaperEditMode()
+        assertEquals(snapshotState, delegate.wallpaperState.value)
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode persists restored snapshot`() = runTest {
+        val persistenceForm: WallpaperState = mockk()
+        val newStateAfterRemove: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns mockk()
+        }
+        val snapshotState: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newStateAfterRemove
+            every { forPersistence() } returns persistenceForm
+        }
+
+        val stateFlow = MutableStateFlow(snapshotState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+        delegate.onCancelWallpaperEditMode()
+        advanceUntilIdle()
+
+        // Snapshot (in persistence form) must be written back so that
+        // any prior in-session saves are overwritten on disk.
+        coVerify { saveWallpaperStateUseCase.invoke(persistenceForm) }
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode deletes files added during edit mode`() = runTest {
+        val addedLayerUri: Uri = mockk()
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns addedLayerUri
+
+        val baseState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { layerCount } returns 0
+            every { withAddedLayer(any()) } returns this
+            every { forPersistence() } returns mockk()
+        }
+
+        val stateFlow = MutableStateFlow(baseState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+
+        // Still in session → no cleanup yet
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+
+        delegate.onCancelWallpaperEditMode()
+        advanceUntilIdle()
+
+        // On cancel the orphan file gets cleaned up
+        verify { wallpaperFileManager.deleteFile(addedLayerUri) }
+    }
+
+    @Test
+    fun `onCommitWallpaperEditMode does not delete files added during edit mode`() = runTest {
+        val addedLayerUri: Uri = mockk()
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns addedLayerUri
+
+        val baseState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { layerCount } returns 0
+            every { withAddedLayer(any()) } returns this
+            every { forPersistence() } returns mockk()
+        }
+
+        val stateFlow = MutableStateFlow(baseState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        // The added layer is kept → its backing file must stay on disk
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+    }
+
+    @Test
+    fun `onSetWallpaperEditMode(true) behaves like onEnterWallpaperEditMode`() = runTest {
+        // Regression guard: legacy API must still snapshot the state
+        // so that Cancel can roll back removes done afterwards.
+        val layerUri: Uri = mockk()
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+            every { forPersistence() } returns mockk()
+        }
+        val snapshotState: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+            every { forPersistence() } returns mockk()
+        }
+
+        val stateFlow = MutableStateFlow(snapshotState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onSetWallpaperEditMode(true) // routes to onEnterWallpaperEditMode
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+        delegate.onCancelWallpaperEditMode()
+
+        assertEquals(snapshotState, delegate.wallpaperState.value)
+    }
 }

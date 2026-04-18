@@ -49,6 +49,30 @@ class WallpaperDelegate(
     private val _isWallpaperEditMode = MutableStateFlow(false)
     val isWallpaperEditMode: StateFlow<Boolean> = _isWallpaperEditMode.asStateFlow()
 
+    // --- Edit Session State ---
+
+    /**
+     * Snapshot of the wallpaper state at the moment edit mode was entered.
+     * Used by [onCancelWallpaperEditMode] to roll back all changes made
+     * during the edit session (transforms, adds, removes, swaps).
+     * null when not in an edit session.
+     */
+    private var editSnapshot: WallpaperState? = null
+
+    /**
+     * URIs of layers removed during the current edit session.
+     * The physical file deletion is deferred until commit so that a
+     * cancel can fully restore the state – including the file on disk.
+     */
+    private val pendingRemovalsOnCommit = mutableSetOf<Uri>()
+
+    /**
+     * URIs of internal files created by layers added during the current
+     * edit session. If the session is canceled, these orphan files are
+     * cleaned up; if committed, they are kept.
+     */
+    private val pendingRemovalsOnCancel = mutableSetOf<Uri>()
+
     // --- Init ---
 
     fun start() {
@@ -124,12 +148,112 @@ class WallpaperDelegate(
     // EDIT MODE
     // ===========================================
 
+    /**
+     * Enters edit mode and snapshots the current wallpaper state.
+     *
+     * While in edit mode:
+     * - Layer removals are persisted in state, but the underlying file
+     *   on disk is kept alive (tracked in [pendingRemovalsOnCommit]).
+     * - Added layers are tracked in [pendingRemovalsOnCancel] so their
+     *   files can be cleaned up if the session is canceled.
+     *
+     * The session ends with either [onCommitWallpaperEditMode] (confirm)
+     * or [onCancelWallpaperEditMode] (roll back all changes).
+     */
+    fun onEnterWallpaperEditMode() {
+        editSnapshot = _wallpaperState.value
+        pendingRemovalsOnCommit.clear()
+        pendingRemovalsOnCancel.clear()
+        _isWallpaperEditMode.value = true
+    }
+
+    /**
+     * Exits edit mode and commits the session: deferred file deletions
+     * from [onRemoveWallpaperLayer] are carried out, orphan tracking
+     * is discarded, and in-memory state stays as-is (already persisted).
+     */
+    fun onCommitWallpaperEditMode() {
+        val filesToDelete = pendingRemovalsOnCommit.toSet()
+        pendingRemovalsOnCommit.clear()
+        pendingRemovalsOnCancel.clear()
+        editSnapshot = null
+        _isWallpaperEditMode.value = false
+
+        if (filesToDelete.isEmpty()) return
+
+        scope.launchSafe("Error committing wallpaper edit") {
+            try {
+                filesToDelete.forEach { uri ->
+                    try {
+                        wallpaperFileManager.deleteFile(uri)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error deleting pending layer file")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error committing wallpaper edit")
+            }
+        }
+    }
+
+    /**
+     * Exits edit mode and rolls the session back to the snapshot taken
+     * on enter:
+     * - In-memory [wallpaperState] is restored SYNCHRONOUSLY so callers
+     *   can read the reverted value immediately after this method returns.
+     * - Persistence and orphan-file cleanup happen asynchronously.
+     * - Files of layers removed during the session are kept (they are
+     *   referenced again by the restored snapshot).
+     * - Files of layers added during the session are deleted.
+     */
+    fun onCancelWallpaperEditMode() {
+        val snapshot = editSnapshot
+        val filesToDelete = pendingRemovalsOnCancel.toSet()
+
+        if (snapshot != null) {
+            _wallpaperState.value = snapshot
+        }
+        pendingRemovalsOnCancel.clear()
+        pendingRemovalsOnCommit.clear()
+        editSnapshot = null
+        _isWallpaperEditMode.value = false
+
+        if (snapshot == null && filesToDelete.isEmpty()) return
+
+        scope.launchSafe("Error canceling wallpaper edit") {
+            try {
+                if (snapshot != null) {
+                    saveWallpaperStateUseCase(snapshot.forPersistence())
+                }
+                filesToDelete.forEach { uri ->
+                    try {
+                        wallpaperFileManager.deleteFile(uri)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error deleting canceled layer file")
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error canceling wallpaper edit")
+            }
+        }
+    }
+
+    /**
+     * Legacy API. Routes to [onEnterWallpaperEditMode] or
+     * [onCommitWallpaperEditMode]. Kept to preserve behavior of call
+     * sites that don't distinguish between commit and cancel
+     * (e.g. long-press exit).
+     */
     fun onSetWallpaperEditMode(enabled: Boolean) {
-        _isWallpaperEditMode.value = enabled
+        if (enabled) onEnterWallpaperEditMode() else onCommitWallpaperEditMode()
     }
 
     fun onToggleWallpaperEditMode() {
-        _isWallpaperEditMode.value = !_isWallpaperEditMode.value
+        if (_isWallpaperEditMode.value) onCommitWallpaperEditMode() else onEnterWallpaperEditMode()
     }
 
     // ===========================================
@@ -143,6 +267,12 @@ class WallpaperDelegate(
                 if (internalUri == null) {
                     TimberWrapper.silentError("Failed to copy layer image to internal storage")
                     return@launchSafe
+                }
+
+                // While in edit mode, track this file so its orphan copy on
+                // disk gets cleaned up if the user cancels the session.
+                if (_isWallpaperEditMode.value) {
+                    pendingRemovalsOnCancel.add(internalUri)
                 }
 
                 val current = _wallpaperState.value
@@ -173,9 +303,17 @@ class WallpaperDelegate(
         scope.launchSafe("Error removing wallpaper layer") {
             try {
                 val current = _wallpaperState.value
+                val layerUri = current.getLayer(layerIndex)?.imageUri
 
-                current.getLayer(layerIndex)?.imageUri?.let { uri ->
-                    wallpaperFileManager.deleteFile(uri)
+                // In edit mode: defer the physical delete until commit so that
+                // a cancel can restore the snapshot including the file on disk.
+                // Outside edit mode: delete immediately as before.
+                if (layerUri != null) {
+                    if (_isWallpaperEditMode.value) {
+                        pendingRemovalsOnCommit.add(layerUri)
+                    } else {
+                        wallpaperFileManager.deleteFile(layerUri)
+                    }
                 }
 
                 val newState = current.withRemovedLayer(layerIndex)

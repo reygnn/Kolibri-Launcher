@@ -169,7 +169,6 @@ class HomeFragment : Fragment() {
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }
     }
-    private var wallpaperStateBeforeEdit: WallpaperState? = null
     private var isToolbarDockedTop = false
 
     private var layerPickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
@@ -2112,8 +2111,8 @@ class HomeFragment : Fragment() {
             wallpaperView.isEditMode = isEditMode
 
             if (isEditMode) {
-                // Zustand VOR Edit speichern (für Cancel)
-                wallpaperStateBeforeEdit = viewModel.wallpaperState.value
+                // Snapshot (für Cancel) wird jetzt im WallpaperDelegate gehalten —
+                // er wurde bereits bei onEnterWallpaperEditMode() aufgenommen.
 
                 // Snap per Default aus im Edit-Mode
                 wallpaperView.isSnapEnabled = false
@@ -2166,37 +2165,25 @@ class HomeFragment : Fragment() {
                             )
                         }
 
-                        viewModel.onSetWallpaperEditMode(false)
+                        viewModel.onCommitWallpaperEditMode()
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error saving wallpaper")
                     }
                 }
 
                 // ── CANCEL BUTTON ──
+                // Rolls back the entire edit session via the delegate:
+                // - state is restored to the snapshot taken on enter
+                //   (in-memory synchronously, persistence async)
+                // - files of removed layers are kept; files of added
+                //   layers are cleaned up
+                // After rolling back the state we re-run updateWallpaper()
+                // so pure transform drags (which never touched the state)
+                // also get reset on the view.
                 binding.btnWallpaperCancel.setOnClickListener {
                     try {
-                        wallpaperStateBeforeEdit?.let { savedState ->
-                            if (savedState.isMultiLayer) {
-                                for ((index, layerState) in savedState.layers.withIndex()) {
-                                    if (index < wallpaperView.layerCount) {
-                                        wallpaperView.applyTransform(
-                                            index,
-                                            layerState.scale,
-                                            layerState.translateX,
-                                            layerState.translateY
-                                        )
-                                    }
-                                }
-                                wallpaperView.invalidate()
-                            } else {
-                                wallpaperView.applyTransform(
-                                    savedState.scale,
-                                    savedState.translateX,
-                                    savedState.translateY
-                                )
-                            }
-                        }
-                        viewModel.onSetWallpaperEditMode(false)
+                        viewModel.onCancelWallpaperEditMode()
+                        updateWallpaper(viewModel.wallpaperState.value)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error canceling wallpaper edit")
                     }
@@ -2389,7 +2376,6 @@ class HomeFragment : Fragment() {
                 wallpaperView.isHorizontalSnapEnabled = true
                 wallpaperView.isVerticalSnapEnabled = true
 
-                wallpaperStateBeforeEdit = null
                 isToolbarDockedTop = false
 
                 Timber.d("Wallpaper edit mode: OFF")
@@ -2706,8 +2692,6 @@ class HomeFragment : Fragment() {
             longClickedApp = null
             lastSpacingInput = null
             cachedBorderDrawable = null
-
-            wallpaperStateBeforeEdit = null
 
             try {
                 binding.wallpaperTouchInterceptor.setOnTouchListener(null)
