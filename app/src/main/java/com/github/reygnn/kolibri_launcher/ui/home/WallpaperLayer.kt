@@ -5,6 +5,7 @@ import android.graphics.BlendMode
 import android.graphics.Matrix
 import android.graphics.RectF
 import android.net.Uri
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Repräsentiert ein einzelnes Layer im Multi-Layer Wallpaper.
@@ -20,8 +21,15 @@ import android.net.Uri
  * Matrix = Scale → Translate
  */
 data class WallpaperLayer(
-    /** Unique ID für Persistierung und Identifikation */
-    val id: String = generateId(),
+    /**
+     * Unique ID für Persistierung und Identifikation.
+     * Wird beim Rebuild aus dem Domain-State übernommen
+     * (siehe [WallpaperLayerState.id]), damit View- und Domain-Layer
+     * über die gleiche ID matched werden können — und Features wie
+     * "aktive Selektion über Rebuild hinweg erhalten" ohne Index-Hack
+     * funktionieren.
+     */
+    val id: String = newId(),
 
     /** Source URI des Bildes (für Restore nach Process Death) */
     var sourceUri: Uri? = null,
@@ -57,16 +65,6 @@ data class WallpaperLayer(
      * mit den darunterliegenden Layern gemischt werden.
      *
      * null = Standard (SRC_OVER, normales Übereinanderlegen)
-     *
-     * Nützliche Modi:
-     * - MULTIPLY: Verdunkelt (gut für Texturen auf dunklem Hintergrund)
-     * - SCREEN: Aufhellt (gut für Lichteffekte)
-     * - OVERLAY: Kontrast-Verstärkung (Mischmodus aus Multiply + Screen)
-     * - SOFT_LIGHT: Subtile Aufhellung/Verdunkelung
-     * - DARKEN: Nur dunklere Pixel übernehmen
-     * - LIGHTEN: Nur hellere Pixel übernehmen
-     *
-     * Benötigt API 29+ (Android Q). Auf älteren Geräten wird ignoriert.
      */
     var blendMode: BlendMode? = null,
 
@@ -74,11 +72,17 @@ data class WallpaperLayer(
     var label: String? = null
 ) {
     companion object {
-        private var counter = 0L
+        // Thread-safe counter. View-seitige Layer werden normalerweise
+        // vom Main-Thread erzeugt, aber sicher ist sicher.
+        private val counter = AtomicLong(0)
 
-        private fun generateId(): String {
-            return "layer_${System.currentTimeMillis()}_${counter++}"
-        }
+        /**
+         * Erzeugt eine neue, prozessweit eindeutige View-Layer-ID.
+         * Thread-safe. Wird nur als Fallback verwendet, wenn kein Domain-State
+         * eine ID mitliefert.
+         */
+        fun newId(): String =
+            "layer_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
 
         /**
          * Alle unterstützten Blend-Modi mit lesbaren Labels.
@@ -126,15 +130,11 @@ data class WallpaperLayer(
         return rect
     }
 
-    /**
-     * Skalierte Breite des Bitmaps.
-     */
+    /** Skalierte Breite des Bitmaps. */
     val scaledWidth: Float
         get() = (bitmap?.width ?: intrinsicWidth) * scale
 
-    /**
-     * Skalierte Höhe des Bitmaps.
-     */
+    /** Skalierte Höhe des Bitmaps. */
     val scaledHeight: Float
         get() = (bitmap?.height ?: intrinsicHeight) * scale
 

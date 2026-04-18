@@ -106,7 +106,10 @@ class WallpaperManager @Inject constructor(
                         WallpaperState.NONE
                     } else {
                         if (validLayers.size < layers.size) {
-                            Timber.w("${layers.size - validLayers.size} layer file(s) missing — removed")
+                            Timber.w(
+                                "${layers.size - validLayers.size} layer file(s) missing — " +
+                                        "removed from state (files not found on disk)"
+                            )
                         }
                         WallpaperState(layers = validLayers)
                     }
@@ -114,6 +117,14 @@ class WallpaperManager @Inject constructor(
                     parseSingleLayerState(preferences)
                 }
             } catch (e: Throwable) {
+                // Highlight this case more visibly: the user may have configured
+                // several layers and will now suddenly see only one (or none).
+                // Logging here is non-fatal but helps post-mortem diagnosis.
+                Timber.w(
+                    e,
+                    "Multi-layer wallpaper state corrupted — falling back to single-layer. " +
+                            "User may see only Layer 0 of their previous composition."
+                )
                 TimberWrapper.silentError(e, "Error parsing layers JSON, falling back to single-layer")
                 parseSingleLayerState(preferences)
             }

@@ -30,6 +30,14 @@ import kotlinx.coroutines.flow.asStateFlow
  * Delegate responsible for wallpaper management:
  * single-image wallpaper, multi-layer wallpaper,
  * edit mode, transforms, layer properties (alpha, blend, visibility).
+ *
+ * == EDIT SESSION ==
+ * The delegate exposes a transactional edit-session API:
+ *   [onEnterWallpaperEditMode] snapshots the current state. All mutations
+ *   during the session can be rolled back via [onCancelWallpaperEditMode]
+ *   or confirmed via [onCommitWallpaperEditMode]. Deletions made during
+ *   the session defer their physical file deletion until commit, so that
+ *   cancel can truly restore the state — including the file on disk.
  */
 class WallpaperDelegate(
     private val context: Context,
@@ -79,6 +87,21 @@ class WallpaperDelegate(
         scope.launchSafe("Error observing wallpaper state") {
             observeWallpaperStateUseCase().collect { state ->
                 _wallpaperState.value = state
+
+                // Periodic-ish orphan GC: each time we observe a new state
+                // (which happens at start and after every save), drop any
+                // file on disk that no longer belongs to the authoritative
+                // state. Cheap (single-directory listFiles) and safe — files
+                // referenced by the state itself are always preserved.
+                // NOTE: intentionally skipped while an edit session is live —
+                // pending-cancel files must survive until the session ends.
+                if (!_isWallpaperEditMode.value) {
+                    try {
+                        wallpaperFileManager.gcOrphans(state.referencedUris)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Wallpaper orphan GC failed")
+                    }
+                }
             }
         }
     }
@@ -225,7 +248,7 @@ class WallpaperDelegate(
         scope.launchSafe("Error canceling wallpaper edit") {
             try {
                 if (snapshot != null) {
-                    saveWallpaperStateUseCase(snapshot.forPersistence())
+                    saveWallpaperStateUseCase(snapshot)
                 }
                 filesToDelete.forEach { uri ->
                     try {
@@ -284,20 +307,44 @@ class WallpaperDelegate(
                     current
                 }
 
+                // Auto-label: pick the lowest unused "Layer N" number so that
+                // after a delete+add cycle we don't get "Layer 3" twice.
+                val resolvedLabel = label ?: nextFreeAutoLabel(base)
+
                 val newLayer = WallpaperLayerState(
                     imageUri = internalUri,
-                    label = label ?: "Layer ${base.layerCount + 1}"
+                    label = resolvedLabel
                 )
 
                 val newState = base.withAddedLayer(newLayer)
                 _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState.forPersistence())
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error adding wallpaper layer")
             }
         }
+
+    /**
+     * Findet die kleinste freie Nummer N, so dass "Layer N" noch nicht im
+     * [state] vorkommt. Verhindert Kollisionen nach Delete-then-Add-Zyklen.
+     *
+     * Defensiv gegen Mock-/Test-States: greift nicht blind auf [layers] zu,
+     * fällt bei Problemen auf "Layer 1" zurück.
+     */
+    private fun nextFreeAutoLabel(state: WallpaperState): String {
+        val used = try {
+            state.layers.mapNotNull { layer ->
+                layer.label?.removePrefix("Layer ")?.toIntOrNull()
+            }.toSet()
+        } catch (e: Throwable) {
+            emptySet()
+        }
+        var n = 1
+        while (n in used) n++
+        return "Layer $n"
+    }
 
     fun onRemoveWallpaperLayer(layerIndex: Int) =
         scope.launchSafe("Error removing wallpaper layer") {
@@ -318,12 +365,12 @@ class WallpaperDelegate(
 
                 val newState = current.withRemovedLayer(layerIndex)
 
-                if (newState.layers.isEmpty() && !newState.hasWallpaper) {
-                    clearWallpaperUseCase()
-                } else {
-                    _wallpaperState.value = newState
-                    saveWallpaperStateUseCase(newState.forPersistence())
-                }
+                // Unified persist path: set in-memory + persist. WallpaperManager's
+                // saveWallpaperState handles the "no wallpaper" case by wiping all
+                // keys, so we don't need a separate clearWallpaperUseCase call here.
+                // (That avoids a brief UI flicker when the last layer is removed.)
+                _wallpaperState.value = newState
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -336,7 +383,7 @@ class WallpaperDelegate(
             try {
                 val newState = _wallpaperState.value.withSwappedLayers(indexA, indexB)
                 _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState.forPersistence())
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -359,7 +406,7 @@ class WallpaperDelegate(
                 it.copy(scale = scale, translateX = translateX, translateY = translateY)
             }
             _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState.forPersistence())
+            saveWallpaperStateUseCase(newState)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -378,7 +425,7 @@ class WallpaperDelegate(
                 }
             }
             _wallpaperState.value = state
-            saveWallpaperStateUseCase(state.forPersistence())
+            saveWallpaperStateUseCase(state)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -397,7 +444,7 @@ class WallpaperDelegate(
                     it.copy(alpha = alpha.coerceIn(0f, 1f))
                 }
                 _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState.forPersistence())
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -412,7 +459,7 @@ class WallpaperDelegate(
                     it.copy(blendModeName = blendModeName)
                 }
                 _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState.forPersistence())
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -427,7 +474,7 @@ class WallpaperDelegate(
                     it.copy(isVisible = isVisible)
                 }
                 _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState.forPersistence())
+                saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

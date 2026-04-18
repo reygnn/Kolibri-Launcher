@@ -471,7 +471,8 @@ class ZoomableImageView @JvmOverloads constructor(
         centerCrop: Boolean = true,
         alpha: Float = 1.0f,
         blendMode: BlendMode? = null,
-        sourceUri: Uri? = null
+        sourceUri: Uri? = null,
+        id: String? = null
     ): Int {
         // Beim ersten Layer: Native Drawable entfernen
         if (layers.isEmpty()) {
@@ -479,6 +480,7 @@ class ZoomableImageView @JvmOverloads constructor(
         }
 
         val layer = WallpaperLayer(
+            id = id ?: WallpaperLayer.newId(),
             sourceUri = sourceUri,
             bitmap = bitmap,
             intrinsicWidth = bitmap.width,
@@ -488,9 +490,9 @@ class ZoomableImageView @JvmOverloads constructor(
             label = label
         )
 
-/*        if (centerCrop && width > 0 && height > 0) {
-            layer.applyCenterCrop(width, height)
-        }*/
+        /*        if (centerCrop && width > 0 && height > 0) {
+                    layer.applyCenterCrop(width, height)
+                }*/
 
         if (centerCrop && width > 0 && height > 0) {
             layer.applyFitWidth(width, height)
@@ -513,10 +515,15 @@ class ZoomableImageView @JvmOverloads constructor(
         if (index !in layers.indices) return false
         layers.removeAt(index)
 
-        when {
-            layers.isEmpty() -> activeLayerIndex = -1
-            activeLayerIndex >= layers.size -> activeLayerIndex = layers.size - 1
-            activeLayerIndex > index -> activeLayerIndex--
+        // Recompute activeLayerIndex consistently. The previous version fell
+        // through silently when the active layer was exactly the one being
+        // removed — leaving activeLayerIndex dangling on the post-shift slot
+        // and skipping the setter (no onActiveLayerChanged, no invalidate via setter).
+        activeLayerIndex = when {
+            layers.isEmpty() -> -1
+            activeLayerIndex == index -> minOf(index, layers.size - 1) // removed active → take slot that shifted in
+            activeLayerIndex > index -> activeLayerIndex - 1           // everything above the removed index shifts down
+            else -> activeLayerIndex                                    // unaffected
         }
 
         invalidate()
@@ -662,11 +669,15 @@ class ZoomableImageView @JvmOverloads constructor(
             val scaleX = targetWidth.toFloat() / width
             val scaleY = targetHeight.toFloat() / height
 
-            // Export-Paint (eigene Instanz, Thread-safe)
+            // Export-Paint und -Matrix (eigene Instanzen, Thread-safe).
+            // Wichtig: NICHT das Klassen-Member `drawMatrix` benutzen —
+            // das wird gleichzeitig von onDraw() verwendet, und composeToBitmap
+            // kann von einem Hintergrund-Thread aufgerufen werden.
             val exportPaint = Paint().apply {
                 isAntiAlias = true
                 isFilterBitmap = true
             }
+            val exportMatrix = Matrix()
 
             if (isMultiLayerMode) {
                 for (layer in layers) {
@@ -677,14 +688,14 @@ class ZoomableImageView @JvmOverloads constructor(
                     exportPaint.alpha = layer.alphaInt
                     exportPaint.blendMode = layer.blendMode
 
-                    drawMatrix.reset()
-                    drawMatrix.set(layer.buildMatrix())
+                    exportMatrix.reset()
+                    exportMatrix.set(layer.buildMatrix())
                     if (scaleX != 1f || scaleY != 1f) {
                         val outputScale = Matrix()
                         outputScale.setScale(scaleX, scaleY)
-                        drawMatrix.postConcat(outputScale)
+                        exportMatrix.postConcat(outputScale)
                     }
-                    canvas.drawBitmap(bmp, drawMatrix, exportPaint)
+                    canvas.drawBitmap(bmp, exportMatrix, exportPaint)
 
                     // Reset für nächstes Layer
                     exportPaint.alpha = 255
@@ -694,14 +705,14 @@ class ZoomableImageView @JvmOverloads constructor(
                 // Single-Layer: Drawable rendern
                 val d = drawable
                 if (d != null) {
-                    drawMatrix.reset()
-                    drawMatrix.postScale(_singleScale * scaleX, _singleScale * scaleY)
-                    drawMatrix.postTranslate(_singleTranslateX * scaleX, _singleTranslateY * scaleY)
+                    exportMatrix.reset()
+                    exportMatrix.postScale(_singleScale * scaleX, _singleScale * scaleY)
+                    exportMatrix.postTranslate(_singleTranslateX * scaleX, _singleTranslateY * scaleY)
 
                     if (d is BitmapDrawable && d.bitmap != null) {
-                        canvas.drawBitmap(d.bitmap, drawMatrix, exportPaint)
+                        canvas.drawBitmap(d.bitmap, exportMatrix, exportPaint)
                     } else {
-                        canvas.withMatrix(drawMatrix) {
+                        canvas.withMatrix(exportMatrix) {
                             d.setBounds(0, 0, d.intrinsicWidth, d.intrinsicHeight)
                             d.draw(this)
                         }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.InputStream
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +28,8 @@ import javax.inject.Singleton
  * - copyFromInputStream(inputStream): Schreibt Bytes aus Stream → interne URI (für ZIP-Import)
  * - deleteFile(uri): Löscht eine interne Datei (z.B. beim Layer-Entfernen)
  * - clearAll(): Löscht alle Wallpaper-Dateien (z.B. beim Wallpaper-Reset)
+ * - gcOrphans(referencedUris): Entfernt verwaiste Dateien, die nicht mehr
+ *   von einem aktuellen State referenziert werden
  * - isInternalUri(uri): Prüft ob eine URI auf unseren internen Speicher zeigt
  */
 @Singleton
@@ -35,7 +38,14 @@ class WallpaperFileManager @Inject constructor(
 ) {
     companion object {
         private const val WALLPAPER_DIR = "wallpapers"
-        private var counter = 0L
+
+        // Thread-safe counter. copyToInternal läuft auf Dispatchers.IO — mehrere
+        // Imports parallel (z.B. via ZIP-Restore) würden sonst Dateinamen-Kollisionen
+        // produzieren, wenn timestamp-Auflösung + nicht-atomarer counter++ kombiniert werden.
+        private val counter = AtomicLong(0)
+
+        private fun nextFileName(prefix: String): String =
+            "${prefix}_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
     }
 
     private fun getWallpaperDir(): File {
@@ -58,7 +68,7 @@ class WallpaperFileManager @Inject constructor(
                 return@withContext sourceUri
             }
 
-            val fileName = "wp_${System.currentTimeMillis()}_${counter++}"
+            val fileName = nextFileName("wp")
             val destFile = File(getWallpaperDir(), fileName)
 
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
@@ -91,7 +101,7 @@ class WallpaperFileManager @Inject constructor(
      */
     fun copyFromInputStream(inputStream: InputStream): Uri? {
         return try {
-            val fileName = "wp_${System.currentTimeMillis()}_${counter++}"
+            val fileName = nextFileName("wp")
             val destFile = File(getWallpaperDir(), fileName)
 
             destFile.outputStream().use { output ->
@@ -161,6 +171,49 @@ class WallpaperFileManager @Inject constructor(
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error clearing wallpaper files")
+        }
+    }
+
+    /**
+     * Räumt verwaiste Wallpaper-Dateien weg: alle Dateien im internen
+     * Wallpaper-Verzeichnis, die nicht in [referencedUris] vorkommen,
+     * werden gelöscht.
+     *
+     * == WARUM? ==
+     * Wenn die App während eines Commits der Edit-Session abstürzt oder
+     * ein `saveWallpaperStateUseCase` nach einem erfolgreichen
+     * `copyToInternal` fehlschlägt, kann eine Datei auf der Platte
+     * zurückbleiben, die keinen State mehr referenziert. Dieser Garbage
+     * Collector räumt sie auf — idealerweise beim App-Start aufrufen,
+     * nachdem der Initial-State aus der Persistenz angekommen ist.
+     *
+     * @param referencedUris Die Menge aller URIs, die aktuell von einem
+     *     gültigen State referenziert werden (z.B.
+     *     [com.github.reygnn.kolibri_launcher.domain.model.WallpaperState.referencedUris]).
+     */
+    fun gcOrphans(referencedUris: Set<Uri>) {
+        try {
+            val dir = getWallpaperDir()
+            val files = dir.listFiles() ?: return
+
+            // Referenzierte absolute Dateipfade für schnellen Lookup
+            val referencedPaths = referencedUris
+                .asSequence()
+                .filter { it.scheme == "file" }
+                .mapNotNull { it.path }
+                .toSet()
+
+            var deleted = 0
+            for (file in files) {
+                if (file.absolutePath !in referencedPaths) {
+                    if (file.delete()) deleted++
+                }
+            }
+            if (deleted > 0) {
+                Timber.d("GC: deleted $deleted orphan wallpaper file(s)")
+            }
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error running wallpaper orphan GC")
         }
     }
 

@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 
 import android.graphics.BlendMode
 import android.net.Uri
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Zustand eines einzelnen Wallpaper-Layers (Folie).
@@ -11,7 +12,7 @@ import android.net.Uri
  */
 data class WallpaperLayerState(
     /** Unique ID für Identifikation */
-    val id: String = "layer_${System.currentTimeMillis()}_${counter++}",
+    val id: String = newId(),
 
     /** URI zum Bild (content:// oder file://) */
     val imageUri: Uri? = null,
@@ -39,14 +40,25 @@ data class WallpaperLayerState(
 ) {
     companion object {
         const val DEFAULT_SCALE = 1.0f
-        private var counter = 0L
+
+        // Thread-safe counter — layer states can be created concurrently
+        // (e.g. parsed from JSON on an IO thread while the UI thread
+        // also calls withAddedLayer).
+        private val counter = AtomicLong(0)
+
+        /**
+         * Erzeugt eine neue, prozessweit eindeutige Layer-ID.
+         * Thread-safe.
+         */
+        fun newId(): String =
+            "layer_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
 
         /**
          * Erstellt einen LayerState aus einer Map (Restore aus SharedPreferences).
          */
         fun fromMap(map: Map<String, Any?>): WallpaperLayerState {
             return WallpaperLayerState(
-                id = map["id"] as? String ?: "layer_${System.currentTimeMillis()}_${counter++}",
+                id = map["id"] as? String ?: newId(),
                 imageUri = (map["imageUri"] as? String)?.takeIf { it.isNotEmpty() }?.let { Uri.parse(it) },
                 scale = (map["scale"] as? Number)?.toFloat() ?: DEFAULT_SCALE,
                 translateX = (map["translateX"] as? Number)?.toFloat() ?: 0f,
@@ -128,12 +140,7 @@ data class WallpaperState(
     // --- Multi-Layer Felder ---
 
     /** Liste der Layer-States. Leer = Single-Layer-Modus. */
-    val layers: List<WallpaperLayerState> = emptyList(),
-
-    // --- Transient UI State ---
-
-    /** Edit-Modus aktiv? (transient – nicht persistiert) */
-    val isEditMode: Boolean = false
+    val layers: List<WallpaperLayerState> = emptyList()
 ) {
     companion object {
         const val DEFAULT_SCALE = WallpaperLayerState.DEFAULT_SCALE
@@ -183,6 +190,21 @@ data class WallpaperState(
             layers.any { it.isTransformed }
         } else {
             scale != DEFAULT_SCALE || translateX != 0f || translateY != 0f
+        }
+
+    /**
+     * Alle Bild-URIs, die dieser State referenziert — Single-Layer- und Multi-Layer-Fall kombiniert.
+     * Nützlich für Orphan-File-GC: Dateien in `wallpapers/`, die nicht in diesem Set
+     * vorkommen, sind Waisen und können weggeräumt werden.
+     */
+    val referencedUris: Set<Uri>
+        get() {
+            val set = mutableSetOf<Uri>()
+            imageUri?.let { set.add(it) }
+            for (layer in layers) {
+                layer.imageUri?.let { set.add(it) }
+            }
+            return set
         }
 
     // ===========================================
@@ -263,7 +285,11 @@ data class WallpaperState(
     // ===========================================
 
     /**
-     * Kopie ohne transiente UI-State (für Persistierung).
+     * Legacy no-op. Ursprünglich hat diese Methode das transiente Feld
+     * `isEditMode` auf false gesetzt, bevor der State persistiert wurde.
+     * Das Feld existiert nicht mehr; die Methode wird beibehalten, weil
+     * bestehende Tests sie mocken. Neuer Code muss sie nicht mehr aufrufen.
      */
-    fun forPersistence(): WallpaperState = copy(isEditMode = false)
+    @Suppress("unused")
+    fun forPersistence(): WallpaperState = this
 }

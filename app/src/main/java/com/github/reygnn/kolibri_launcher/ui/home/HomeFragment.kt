@@ -237,15 +237,9 @@ class HomeFragment : Fragment() {
         ) { uri ->
             if (uri != null) {
                 try {
-                    // Best-effort: Persistable Permission holen (funktioniert nicht immer bei GetContent)
-                    try {
-                        requireContext().contentResolver.takePersistableUriPermission(
-                            uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (e: SecurityException) {
-                        // Nicht kritisch – Bild wird im ViewModel in internen Speicher kopiert
-                        TimberWrapper.silentError(e, "Could not persist URI permission for layer")
-                    }
+                    // The delegate copies the image to internal storage right
+                    // away, so takePersistableUriPermission would be wasted
+                    // effort here (the original content URI is never used again).
                     viewModel.onAddWallpaperLayer(uri)
                     Timber.d("Layer added from picker: $uri")
                 } catch (e: Throwable) {
@@ -1962,6 +1956,11 @@ class HomeFragment : Fragment() {
                 // ═══════════════════════════════════
 
                 if (wallpaperView.layerCount != state.layers.size || !wallpaperView.isMultiLayerMode) {
+                    // Preserve the currently-active selection ACROSS the rebuild
+                    // by using the stable domain-layer ID instead of the position.
+                    val previouslyActiveId =
+                        wallpaperView.getLayer(wallpaperView.activeLayerIndex)?.id
+
                     wallpaperView.clearLayers()
 
                     for ((index, layerState) in state.layers.withIndex()) {
@@ -1976,7 +1975,8 @@ class HomeFragment : Fragment() {
                                 centerCrop = !layerState.isTransformed,
                                 alpha = layerState.alpha,
                                 blendMode = layerState.blendMode,
-                                sourceUri = layerState.imageUri
+                                sourceUri = layerState.imageUri,
+                                id = layerState.id
                             )
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error loading layer $index")
@@ -1985,9 +1985,16 @@ class HomeFragment : Fragment() {
 
                     wallpaperView.visibility = if (wallpaperView.layerCount > 0) View.VISIBLE else View.GONE
 
-                    // Neues Layer automatisch aktiv setzen (letztes = soeben hinzugefügtes)
+                    // Try to restore previously active layer by ID, else fall
+                    // back to the top layer (this is what a fresh "add layer"
+                    // typically wants).
                     if (wallpaperView.layerCount > 0) {
-                        wallpaperView.activeLayerIndex = wallpaperView.layerCount - 1
+                        val restored = previouslyActiveId?.let { id ->
+                            (0 until wallpaperView.layerCount).firstOrNull {
+                                wallpaperView.getLayer(it)?.id == id
+                            }
+                        }
+                        wallpaperView.activeLayerIndex = restored ?: (wallpaperView.layerCount - 1)
                     }
                 }
 
@@ -2111,8 +2118,8 @@ class HomeFragment : Fragment() {
             wallpaperView.isEditMode = isEditMode
 
             if (isEditMode) {
-                // Snapshot (für Cancel) wird jetzt im WallpaperDelegate gehalten —
-                // er wurde bereits bei onEnterWallpaperEditMode() aufgenommen.
+                // Snapshot für Cancel wird jetzt im WallpaperDelegate gehalten —
+                // bereits bei onEnterWallpaperEditMode() aufgenommen.
 
                 // Snap per Default aus im Edit-Mode
                 wallpaperView.isSnapEnabled = false
@@ -2174,7 +2181,7 @@ class HomeFragment : Fragment() {
                 // ── CANCEL BUTTON ──
                 // Rolls back the entire edit session via the delegate:
                 // - state is restored to the snapshot taken on enter
-                //   (in-memory synchronously, persistence async)
+                //   (in-memory synchronously, persistence + file cleanup async)
                 // - files of removed layers are kept; files of added
                 //   layers are cleaned up
                 // After rolling back the state we re-run updateWallpaper()
@@ -2331,7 +2338,7 @@ class HomeFragment : Fragment() {
                 }
 
                 // ── Layer-Tap Callback: Aktualisiert Indikator ──
-                wallpaperView.onLayerTapped = { index, layer ->
+                wallpaperView.onLayerTapped = { _, _ ->
                     updateLayerIndicator()
                     updateLayerButtonStates()
                 }

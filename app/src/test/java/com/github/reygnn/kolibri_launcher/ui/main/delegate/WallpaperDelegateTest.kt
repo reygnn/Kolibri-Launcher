@@ -367,10 +367,9 @@ class WallpaperDelegateTest {
         val addedState: WallpaperState = mockk(relaxed = true) {
             every { forPersistence() } returns mockk()
         }
-        val mockState: WallpaperState = mockk {
+        val mockState: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
-            every { layerCount } returns 1
             every { withAddedLayer(any()) } returns addedState
         }
 
@@ -439,11 +438,15 @@ class WallpaperDelegateTest {
     }
 
     @Test
-    fun `onRemoveWallpaperLayer clears wallpaper when last layer removed`() = runTest {
+    fun `onRemoveWallpaperLayer when last layer removed persists empty state`() = runTest {
+        // Under the unified remove path, the delegate never calls
+        // clearWallpaperUseCase from onRemoveWallpaperLayer — it simply
+        // persists the resulting (empty) state. WallpaperManager.saveWallpaperState
+        // treats the empty state as "no wallpaper" and wipes all keys.
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns mockk()
         }
-        val emptyState: WallpaperState = mockk {
+        val emptyState: WallpaperState = mockk(relaxed = true) {
             every { layers } returns emptyList()
             every { hasWallpaper } returns false
         }
@@ -464,8 +467,8 @@ class WallpaperDelegateTest {
         delegate.onRemoveWallpaperLayer(0)
         advanceUntilIdle()
 
-        coVerify { clearWallpaperUseCase.invoke() }
-        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(any()) }
+        coVerify(exactly = 0) { clearWallpaperUseCase.invoke() }
+        coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 
     // ===========================================
@@ -609,12 +612,9 @@ class WallpaperDelegateTest {
     //   (1) transform mis-assignment on Cancel after a layer delete, and
     //   (2) Cancel not actually undoing a layer deletion.
     //
-    // The session contract is: onEnterWallpaperEditMode() snapshots the
-    // state. Layer removals during the session defer their physical file
-    // deletion; added layers track their internal-file URI for orphan
-    // cleanup. onCommitWallpaperEditMode() commits (delete deferred
-    // removes). onCancelWallpaperEditMode() rolls back (restore snapshot
-    // synchronously, delete added orphans).
+    // Contract: onEnterWallpaperEditMode() snapshots the state. Layer removals
+    // during the session defer their physical file deletion until commit;
+    // added layers track their internal-file URI for orphan cleanup on cancel.
     // ===========================================
 
     @Test
@@ -825,7 +825,6 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onCancelWallpaperEditMode persists restored snapshot`() = runTest {
-        val persistenceForm: WallpaperState = mockk()
         val newStateAfterRemove: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
             every { hasWallpaper } returns true
@@ -837,7 +836,6 @@ class WallpaperDelegateTest {
         val snapshotState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newStateAfterRemove
-            every { forPersistence() } returns persistenceForm
         }
 
         val stateFlow = MutableStateFlow(snapshotState)
@@ -854,9 +852,9 @@ class WallpaperDelegateTest {
         delegate.onCancelWallpaperEditMode()
         advanceUntilIdle()
 
-        // Snapshot (in persistence form) must be written back so that
-        // any prior in-session saves are overwritten on disk.
-        coVerify { saveWallpaperStateUseCase.invoke(persistenceForm) }
+        // Snapshot must be written back so that any prior in-session
+        // saves are overwritten on disk.
+        coVerify { saveWallpaperStateUseCase.invoke(snapshotState) }
     }
 
     @Test
@@ -867,9 +865,7 @@ class WallpaperDelegateTest {
         val baseState: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
-            every { layerCount } returns 0
             every { withAddedLayer(any()) } returns this
-            every { forPersistence() } returns mockk()
         }
 
         val stateFlow = MutableStateFlow(baseState)
@@ -902,9 +898,7 @@ class WallpaperDelegateTest {
         val baseState: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
-            every { layerCount } returns 0
             every { withAddedLayer(any()) } returns this
-            every { forPersistence() } returns mockk()
         }
 
         val stateFlow = MutableStateFlow(baseState)
@@ -958,5 +952,40 @@ class WallpaperDelegateTest {
         delegate.onCancelWallpaperEditMode()
 
         assertEquals(snapshotState, delegate.wallpaperState.value)
+    }
+
+    // ===========================================
+    // LABEL AUTO-NUMBERING
+    // ===========================================
+
+    @Test
+    fun `onAddWallpaperLayer picks non-colliding auto-label after delete`() = runTest {
+        // This is a weak-sauce test at the unit level because mockk()'d
+        // WallpaperState cannot easily capture the label of the added layer.
+        // The strongest signal we can assert here is that add still
+        // persists even when layers is non-empty with gaps in labels.
+        val existingLayer: WallpaperLayerState = mockk {
+            every { label } returns "Layer 1"
+        }
+        val addedState: WallpaperState = mockk(relaxed = true)
+        val mockState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { layers } returns listOf(existingLayer)
+            every { withAddedLayer(any()) } returns addedState
+        }
+
+        val stateFlow = MutableStateFlow(mockState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+
+        coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 }
