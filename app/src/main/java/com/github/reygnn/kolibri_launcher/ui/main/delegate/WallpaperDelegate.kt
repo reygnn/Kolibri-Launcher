@@ -7,6 +7,101 @@
  * (at your option) any later version.
  */
 
+/**
+ * =====================================================================================
+ * ARCHITECTURAL NOTE: The Transactional Edit-Session Protocol
+ * =====================================================================================
+ *
+ * The edit session (Enter → mutations... → Commit | Cancel) is the most intricate
+ * piece of this delegate, and it got that way because naive implementations kept
+ * producing subtle bugs that only showed up in specific user workflows. This note
+ * explains the contract so that future maintainers understand the invariants they
+ * must preserve.
+ *
+ * **The Naive Approach (That Failed):**
+ * Originally there was only one method: `onSetWallpaperEditMode(enabled: Boolean)`.
+ * The fragment held a private field `wallpaperStateBeforeEdit: WallpaperState?`,
+ * snapshotted it when entering edit mode, and on Cancel tried to apply each snapshot-
+ * layer's transforms back to the view at matching positions.
+ *
+ * This broke the moment the user did the natural thing: enter edit mode, DELETE a
+ * layer, then click Cancel. The delete had already persisted the shrunk state AND
+ * deleted the file from disk (irreversibly). Cancel could only apply transforms to
+ * whatever layers remained, producing wrong visual assignments. Even worse, the
+ * deleted layer's file was gone — Cancel could never truly restore it.
+ *
+ * **The Contract Now:**
+ *
+ * 1. **Enter** — onEnterWallpaperEditMode:
+ *    - Takes a snapshot of the current [WallpaperState] in [editSnapshot].
+ *    - Clears both pending-removal sets.
+ *    - Sets [isWallpaperEditMode] to true.
+ *    - Fragment uses this signal to switch into edit UX (snap handles, toolbar, etc.).
+ *
+ * 2. **Mutations during session** — onAddWallpaperLayer, onRemoveWallpaperLayer,
+ *    [onSaveLayerTransform], [onSwapWallpaperLayers], etc:
+ *    - All update [_wallpaperState] AND persist via [saveWallpaperStateUseCase] normally.
+ *    - **BUT file deletions are deferred**: [onRemoveWallpaperLayer] in edit mode adds
+ *      the URI to [pendingRemovalsOnCommit] instead of deleting the file. This
+ *      preserves the disk copy so Cancel can restore it.
+ *    - **AND file additions are tracked**: [onAddWallpaperLayer] in edit mode adds
+ *      the new internal URI to [pendingRemovalsOnCancel], so these orphan files get
+ *      cleaned up if the user backs out.
+ *
+ * 3. **Commit** — onCommitWallpaperEditMode:
+ *    - Processes [pendingRemovalsOnCommit]: actually deletes those files now.
+ *    - Discards [pendingRemovalsOnCancel]: added layers survive.
+ *    - Clears [editSnapshot] and sets [isWallpaperEditMode] to false.
+ *
+ * 4. **Cancel** — onCancelWallpaperEditMode:
+ *    - **Synchronously** restores [_wallpaperState] to the snapshot. This is critical
+ *      — see below.
+ *    - Asynchronously persists the restored snapshot and processes
+ *      [pendingRemovalsOnCancel] (cleaning up files from added-then-cancelled layers).
+ *    - Discards [pendingRemovalsOnCommit]: deleted layers' files survive because they're
+ *      referenced again by the restored snapshot.
+ *    - Clears [pendingFocusLayerId] so that a stale add-layer focus hint doesn't
+ *      point at a layer that no longer exists in the restored snapshot.
+ *
+ * **Why Synchronous State Restoration on Cancel:**
+ * After `viewModel.onCancelWallpaperEditMode()` returns, the fragment immediately
+ * reads `viewModel.wallpaperState.value` and passes it to `updateWallpaper()`. If the
+ * restore happened asynchronously, this read would see the pre-cancel state and the
+ * view rebuild would display the wrong thing — exactly the bug the edit session was
+ * designed to fix. The disk persistence is still async (fire-and-forget via
+ * `launchSafe`) because that's cosmetic, but the in-memory value MUST land before
+ * the caller returns.
+ *
+ * **Why The Legacy `onSetWallpaperEditMode(enabled: Boolean)` Still Exists:**
+ * Some call sites (long-press to exit, MainActivity lifecycle events) can't or
+ * shouldn't distinguish between "I'm done, keep changes" and "cancel". They call
+ * the legacy API with `true/false`, which routes to Enter/Commit respectively —
+ * the same behavior as before the transactional API was added. This preserves
+ * backward compatibility without forcing every caller to learn the new protocol.
+ *
+ * **Invariants A Maintainer Must Preserve:**
+ * - An edit session always ends via EXACTLY ONE of: Commit, Cancel, or the legacy
+ *   `onSetWallpaperEditMode(false)` (which routes to Commit).
+ * - Never delete a file inline when _isWallpaperEditMode is true — always route
+ *   through pendingRemovalsOnCommit so Cancel can restore.
+ * - Never skip the pending-removal bookkeeping on add — dangling files will
+ *   eventually be caught by `gcOrphans`, but relying on that instead of explicit
+ *   tracking is fragile and makes the cancel path slower.
+ * - Never make Cancel's state-restore asynchronous. The fragment's immediate read
+ *   depends on synchronicity.
+ *
+ * **Regression Guards:**
+ * - `onCancelWallpaperEditMode restores snapshot state synchronously`
+ * - `onCancelWallpaperEditMode does not delete deferred-remove files`
+ * - `onCancelWallpaperEditMode deletes files added during edit mode`
+ * - `onCommitWallpaperEditMode deletes deferred-remove files`
+ * - `onCommitWallpaperEditMode does not delete files added during edit mode`
+ * - `onRemoveWallpaperLayer in edit mode defers file deletion`
+ * - `onRemoveWallpaperLayer outside edit mode deletes file immediately`
+ * All in com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegateTest.
+ * =====================================================================================
+ */
+
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import android.content.Context
@@ -57,6 +152,30 @@ class WallpaperDelegate(
     private val _isWallpaperEditMode = MutableStateFlow(false)
     val isWallpaperEditMode: StateFlow<Boolean> = _isWallpaperEditMode.asStateFlow()
 
+    /**
+     * One-shot signal that the next state emission carries a layer that
+     * should be focused (selected as active) after the view rebuild.
+     *
+     * Emitted by [onAddWallpaperLayer] so that a freshly-added wallpaper
+     * becomes active automatically — matches the UX expectation that
+     * "I just picked this, I want to adjust it now". The consumer
+     * (Fragment/Binder) reads the id alongside the state and then calls
+     * [consumePendingFocusLayerId] to clear the signal.
+     *
+     * Null when nothing new is pending focus.
+     */
+    private val _pendingFocusLayerId = MutableStateFlow<String?>(null)
+    val pendingFocusLayerId: StateFlow<String?> = _pendingFocusLayerId.asStateFlow()
+
+    /**
+     * Clears the pending-focus signal. The consumer must call this after
+     * applying the focus, otherwise the next unrelated state emission
+     * would spuriously re-focus the same layer.
+     */
+    fun consumePendingFocusLayerId() {
+        _pendingFocusLayerId.value = null
+    }
+
     // --- Edit Session State ---
 
     /**
@@ -83,19 +202,69 @@ class WallpaperDelegate(
 
     // --- Init ---
 
+
     fun start() {
         scope.launchSafe("Error observing wallpaper state") {
+            // =================================================================================
+            // ARCHITECTURAL NOTE: Why the orphan GC runs EXACTLY ONCE per process, not per emission
+            // =================================================================================
+            //
+            // Two questions a future maintainer will have:
+            //
+            //   Q1: "Shouldn't we GC more often? Files leak on every crash."
+            //   Q2: "Shouldn't we GC inline right after every state save? Cheaper than a Flow."
+            //
+            // The answer to both is NO, for a subtle reason that is not obvious from reading
+            // the code path in isolation.
+            //
+            // **Why Not Per-Emission:**
+            // A per-emission GC would run every time the state changes — every time a layer
+            // is added, removed, transformed, re-ordered, or when the edit session is committed
+            // or cancelled. During a backup restore (BackupManager -> WallpaperFileManager.
+            // copyFromInputStream for each extracted image) this emits *multiple* intermediate
+            // states as each layer is added. If the GC ran between those, it would see
+            // "state has 3 layers, disk has 4 files" and delete the fourth file — the one
+            // that's about to be added to the state in the next tick. Restore would lose data.
+            //
+            // The 60-second age cutoff in gcOrphans would protect us in MOST of those cases,
+            // but not all — a slow device extracting a large ZIP with many files could take
+            // longer than 60s between file-write and state-save. We don't want to rely on
+            // the age cutoff as the only safety net when we can avoid the race entirely.
+            //
+            // **Why Not Inline After Every Save:**
+            // Same reason — the timing window is the problem, not the call frequency. Inline
+            // GC would have the exact same race with backup restore, just triggered from a
+            // different call site.
+            //
+            // **Why Once Per Process:**
+            // - On app start, we get the FIRST authoritative state emission from DataStore.
+            //   At that point, any file on disk that isn't in the state is either (a) an
+            //   orphan from a previous crashed operation, or (b) a currently-in-progress
+            //   write. Case (b) is handled by the age cutoff in gcOrphans.
+            // - Running exactly once catches 100% of leftover orphans with zero risk of
+            //   deleting a file mid-write later in the session (there's no later GC to race
+            //   with).
+            // - The gcHasRun closure variable makes this self-evident without pulling in
+            //   a separate state flow.
+            //
+            // **Why The Edit-Mode Check:**
+            // If the user enters edit mode BEFORE the first state emission (unusual but
+            // possible during configuration changes), we defer the GC. Pending-removal files
+            // tracked in pendingRemovalsOnCommit/pendingRemovalsOnCancel are only referenced
+            // by the in-memory editSnapshot, NOT by state.referencedUris — a GC here would
+            // destroy them. The GC will run on the first post-edit-mode emission instead.
+            //
+            // **Regression Guards:**
+            // - `start runs gcOrphans exactly once across multiple state emissions`
+            // - `start does not run gcOrphans while an edit session is active`
+            // Both in [WallpaperDelegateTest].
+            // =================================================================================
+            var gcHasRun = false
             observeWallpaperStateUseCase().collect { state ->
                 _wallpaperState.value = state
 
-                // Periodic-ish orphan GC: each time we observe a new state
-                // (which happens at start and after every save), drop any
-                // file on disk that no longer belongs to the authoritative
-                // state. Cheap (single-directory listFiles) and safe — files
-                // referenced by the state itself are always preserved.
-                // NOTE: intentionally skipped while an edit session is live —
-                // pending-cancel files must survive until the session ends.
-                if (!_isWallpaperEditMode.value) {
+                if (!gcHasRun && !_isWallpaperEditMode.value) {
+                    gcHasRun = true
                     try {
                         wallpaperFileManager.gcOrphans(state.referencedUris)
                     } catch (e: Throwable) {
@@ -238,6 +407,9 @@ class WallpaperDelegate(
         if (snapshot != null) {
             _wallpaperState.value = snapshot
         }
+        // Any pending-focus hint from a mid-session add now points to a
+        // layer that no longer exists in the restored snapshot.
+        _pendingFocusLayerId.value = null
         pendingRemovalsOnCancel.clear()
         pendingRemovalsOnCommit.clear()
         editSnapshot = null
@@ -317,6 +489,12 @@ class WallpaperDelegate(
                 )
 
                 val newState = base.withAddedLayer(newLayer)
+
+                // Signal to the view that this new layer should be focused
+                // (selected as active) after the imminent rebuild. Consumer
+                // calls consumePendingFocusLayerId() after applying.
+                _pendingFocusLayerId.value = newLayer.id
+
                 _wallpaperState.value = newState
                 saveWallpaperStateUseCase(newState)
             } catch (e: CancellationException) {
@@ -330,7 +508,7 @@ class WallpaperDelegate(
      * Findet die kleinste freie Nummer N, so dass "Layer N" noch nicht im
      * [state] vorkommt. Verhindert Kollisionen nach Delete-then-Add-Zyklen.
      *
-     * Defensiv gegen Mock-/Test-States: greift nicht blind auf [layers] zu,
+     * Defensiv gegen Mock-/Test-States: greift nicht blind auf layers zu,
      * fällt bei Problemen auf "Layer 1" zurück.
      */
     private fun nextFreeAutoLabel(state: WallpaperState): String {

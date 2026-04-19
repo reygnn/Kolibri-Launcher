@@ -45,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
@@ -169,6 +170,9 @@ class HomeFragment : Fragment() {
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }
     }
+    private val wallpaperViewBinder = WallpaperViewBinder(
+        bitmapLoader = { uri -> loadBitmapFromUri(uri) }
+    )
     private var isToolbarDockedTop = false
 
     private var layerPickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
@@ -1939,9 +1943,13 @@ class HomeFragment : Fragment() {
      * Aktualisiert das Wallpaper basierend auf dem State.
      */
 // ═════════════════════════════════════════════════════════════════════════════
-// METHODE: updateWallpaper() – ERSETZT die bestehende
-// Identisch zur vorherigen Multi-Layer Version, aber ruft am Ende
-// die Layer-Toolbar-Updates auf wenn wir im Edit-Mode sind.
+// METHODE: updateWallpaper()
+//
+// Now a thin wrapper around WallpaperViewBinder. The reconciliation
+// logic (diff, rebuild decisions, active-layer preservation) lives in
+// WallpaperViewDiff, which is unit-tested in isolation — see
+// WallpaperViewDiffTest for the full coverage, including the regression
+// guard for the delete+add+cancel identity-mismatch bug.
 // ═════════════════════════════════════════════════════════════════════════════
 
     private fun updateWallpaper(state: WallpaperState) {
@@ -1950,141 +1958,32 @@ class HomeFragment : Fragment() {
         try {
             val wallpaperView = binding.wallpaperView
 
-            if (state.isMultiLayer) {
-                // ═══════════════════════════════════
-                // MULTI-LAYER MODUS (Folien)
-                // ═══════════════════════════════════
+            // Read-and-consume the one-shot focus hint: when a new layer
+            // was just added, the delegate sets this so the view selects
+            // the new layer automatically. Consuming here prevents the
+            // hint from leaking into an unrelated next rebuild.
+            val focusHint = viewModel.pendingFocusLayerId.value
+            if (focusHint != null) {
+                viewModel.consumePendingFocusLayerId()
+            }
 
-                if (wallpaperView.layerCount != state.layers.size || !wallpaperView.isMultiLayerMode) {
-                    // Preserve the currently-active selection ACROSS the rebuild
-                    // by using the stable domain-layer ID instead of the position.
-                    val previouslyActiveId =
-                        wallpaperView.getLayer(wallpaperView.activeLayerIndex)?.id
-
-                    wallpaperView.clearLayers()
-
-                    for ((index, layerState) in state.layers.withIndex()) {
-                        if (layerState.imageUri == null) continue
-
+            wallpaperViewBinder.bind(
+                view = wallpaperView,
+                target = state,
+                preferredActiveLayerId = focusHint,
+                onRebuildComplete = {
+                    // Layer-Toolbar aktualisieren wenn im Edit-Mode
+                    if (wallpaperView.isEditMode) {
                         try {
-                            val bitmap = loadBitmapFromUri(layerState.imageUri) ?: continue
-
-                            wallpaperView.addLayer(
-                                bitmap = bitmap,
-                                label = layerState.label,
-                                centerCrop = !layerState.isTransformed,
-                                alpha = layerState.alpha,
-                                blendMode = layerState.blendMode,
-                                sourceUri = layerState.imageUri,
-                                id = layerState.id
-                            )
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error loading layer $index")
-                        }
-                    }
-
-                    wallpaperView.visibility = if (wallpaperView.layerCount > 0) View.VISIBLE else View.GONE
-
-                    // Try to restore previously active layer by ID, else fall
-                    // back to the top layer (this is what a fresh "add layer"
-                    // typically wants).
-                    if (wallpaperView.layerCount > 0) {
-                        val restored = previouslyActiveId?.let { id ->
-                            (0 until wallpaperView.layerCount).firstOrNull {
-                                wallpaperView.getLayer(it)?.id == id
-                            }
-                        }
-                        wallpaperView.activeLayerIndex = restored ?: (wallpaperView.layerCount - 1)
-                    }
-                }
-
-                // Transforms anwenden (nach Layout)
-                wallpaperView.post {
-                    try {
-                        for ((index, layerState) in state.layers.withIndex()) {
-                            if (index >= wallpaperView.layerCount) break
-
-                            if (layerState.isTransformed) {
-                                wallpaperView.applyTransform(
-                                    index,
-                                    layerState.scale,
-                                    layerState.translateX,
-                                    layerState.translateY
-                                )
-                            } else {
-                                wallpaperView.centerCropLayer(index)
-                            }
-
-                            wallpaperView.getLayer(index)?.let { layer ->
-                                layer.alpha = layerState.alpha
-                                layer.blendMode = layerState.blendMode
-                                layer.isVisible = layerState.isVisible
-                            }
-                        }
-                        wallpaperView.invalidate()
-
-                        // Layer-Toolbar aktualisieren wenn im Edit-Mode
-                        if (wallpaperView.isEditMode) {
                             updateLayerButtonsVisibility()
                             updateLayerButtonStates()
                             updateLayerIndicator()
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error applying multi-layer transforms")
-                    }
-                }
-
-            } else if (state.hasWallpaper && state.imageUri != null) {
-                // ═══════════════════════════════════
-                // SINGLE-LAYER MODUS (Original)
-                // ═══════════════════════════════════
-
-                if (wallpaperView.isMultiLayerMode) {
-                    wallpaperView.clearLayers()
-                }
-
-                try {
-                    wallpaperView.setImageURI(state.imageUri)
-                    wallpaperView.visibility = View.VISIBLE
-
-                    wallpaperView.post {
-                        try {
-                            if (state.isTransformed) {
-                                wallpaperView.applyTransform(
-                                    state.scale,
-                                    state.translateX,
-                                    state.translateY
-                                )
-                            } else {
-                                wallpaperView.centerCrop()
-                            }
-
-                            // Layer-Toolbar aktualisieren (Buttons ausblenden)
-                            if (wallpaperView.isEditMode) {
-                                updateLayerButtonsVisibility()
-                                updateLayerIndicator()
-                            }
                         } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error applying wallpaper transform")
+                            TimberWrapper.silentError(e, "Error refreshing layer toolbar")
                         }
                     }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error loading wallpaper image")
-                    wallpaperView.visibility = View.GONE
                 }
-
-            } else {
-                // ═══════════════════════════════════
-                // KEIN WALLPAPER
-                // ═══════════════════════════════════
-
-                if (wallpaperView.isMultiLayerMode) {
-                    wallpaperView.clearLayers()
-                }
-                wallpaperView.setImageDrawable(null)
-                wallpaperView.visibility = View.GONE
-            }
-
+            )
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in updateWallpaper")
         }

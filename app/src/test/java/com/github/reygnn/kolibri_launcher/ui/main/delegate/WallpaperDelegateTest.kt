@@ -29,6 +29,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -987,5 +989,158 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify { saveWallpaperStateUseCase.invoke(any()) }
+    }
+
+    // ===========================================
+    // ORPHAN GC — FREQUENCY CONTRACT
+    // ===========================================
+
+    @Test
+    fun `start runs gcOrphans exactly once across multiple state emissions`() = runTest {
+        // Running the GC per-emission would be dangerous: a mid-flight
+        // copyFromInputStream (e.g. backup restore) could see its
+        // freshly-written file classified as orphan before the matching
+        // saveWallpaperState lands. The contract is once per process.
+        val stateFlow = MutableStateFlow(WallpaperState.NONE)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        // Emit two more states — these represent routine saves during
+        // normal operation (add layer, transform change, etc.).
+        stateFlow.value = WallpaperState(imageUri = mockk(relaxed = true))
+        advanceUntilIdle()
+        stateFlow.value = WallpaperState.NONE
+        advanceUntilIdle()
+
+        verify(exactly = 1) { wallpaperFileManager.gcOrphans(any()) }
+    }
+
+    @Test
+    fun `start does not run gcOrphans while an edit session is active`() = runTest {
+        // Context: if the user enters edit mode BEFORE the first state
+        // emission has been observed (unusual but possible during
+        // reconfiguration), we must not GC — pending-cancel files would
+        // be destroyed before they can be restored.
+        val stateFlow = MutableStateFlow<WallpaperState>(WallpaperState.NONE)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+
+        // Enter edit mode BEFORE starting the observer.
+        delegate.onEnterWallpaperEditMode()
+        delegate.start()
+        advanceUntilIdle()
+
+        // Emit additional states too — still no GC while in session.
+        stateFlow.value = WallpaperState(imageUri = mockk(relaxed = true))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { wallpaperFileManager.gcOrphans(any()) }
+    }
+
+    // ===========================================
+    // PENDING FOCUS (auto-activate newly added layer)
+    // ===========================================
+
+    @Test
+    fun `onAddWallpaperLayer sets pendingFocusLayerId for the new layer`() = runTest {
+        val internalUri: Uri = mockk()
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
+
+        val mockState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { withAddedLayer(any()) } returns this
+        }
+
+        val stateFlow = MutableStateFlow(mockState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        assertNull("initial pending-focus must be null", delegate.pendingFocusLayerId.value)
+
+        delegate.onAddWallpaperLayer(testUri, "My Layer")
+        advanceUntilIdle()
+
+        assertNotNull(
+            "after add, pending-focus must carry the new layer's id",
+            delegate.pendingFocusLayerId.value
+        )
+    }
+
+    @Test
+    fun `consumePendingFocusLayerId clears the signal`() = runTest {
+        val internalUri: Uri = mockk()
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
+
+        val mockState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { withAddedLayer(any()) } returns this
+        }
+
+        val stateFlow = MutableStateFlow(mockState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+
+        assertNotNull(delegate.pendingFocusLayerId.value)
+
+        delegate.consumePendingFocusLayerId()
+
+        assertNull("consume must clear the signal", delegate.pendingFocusLayerId.value)
+    }
+
+    @Test
+    fun `onCancelWallpaperEditMode clears pendingFocusLayerId`() = runTest {
+        // If the user adds a layer mid-session and then cancels, the
+        // pending-focus hint points to a layer that no longer exists
+        // in the restored snapshot. It must be cleared to avoid a
+        // stale focus attempt on the next unrelated rebuild.
+        val internalUri: Uri = mockk()
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
+
+        val baseState: WallpaperState = mockk(relaxed = true) {
+            every { isMultiLayer } returns true
+            every { hasWallpaper } returns true
+            every { withAddedLayer(any()) } returns this
+        }
+
+        val stateFlow = MutableStateFlow(baseState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+
+        assertNotNull(delegate.pendingFocusLayerId.value)
+
+        delegate.onCancelWallpaperEditMode()
+        advanceUntilIdle()
+
+        assertNull(
+            "cancel must drop the pending-focus hint — the added layer no longer exists",
+            delegate.pendingFocusLayerId.value
+        )
     }
 }

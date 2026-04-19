@@ -99,7 +99,20 @@ class WallpaperManager @Inject constructor(
                 val layers = parseLayersFromJson(layersJson)
                 if (layers.isNotEmpty()) {
                     val validLayers = layers.filter { layer ->
-                        layer.imageUri == null || wallpaperFileManager.fileExists(layer.imageUri)
+                        val uri = layer.imageUri ?: return@filter true
+                        // Defensive: non-file URIs should not exist in the
+                        // state (copyToInternal converts everything to file://
+                        // before persistence). If one slips through — old
+                        // version, bad restore, remapped volume — drop the
+                        // layer rather than crashing at setImageURI.
+                        if (uri.scheme != "file") {
+                            Timber.w(
+                                "Dropping layer with non-file URI (scheme='${uri.scheme}', " +
+                                        "id='${layer.id}') — likely old-version or restore artifact"
+                            )
+                            return@filter false
+                        }
+                        wallpaperFileManager.fileExists(uri)
                     }
                     if (validLayers.isEmpty()) {
                         Timber.w("All layer files missing — resetting wallpaper")
@@ -143,6 +156,19 @@ class WallpaperManager @Inject constructor(
             WallpaperState.NONE
         } else {
             val uri = uriString.toUri()
+            // Defensive: we always convert to file:// via copyToInternal. A
+            // content:// URI reaching persistence points to either a very
+            // old app version, an out-of-band restore, or a volume rename
+            // (e.g. `content://media/external_primary/...` after SD-card
+            // remap). Rendering these often throws at setImageURI time,
+            // so treat them as "no wallpaper" and let the user re-pick.
+            if (uri.scheme != "file") {
+                Timber.w(
+                    "Non-file wallpaper URI in state (scheme='${uri.scheme}') — " +
+                            "resetting. Likely an old-version leftover or restored backup."
+                )
+                return WallpaperState.NONE
+            }
             if (!wallpaperFileManager.fileExists(uri)) {
                 Timber.w("Wallpaper file missing: $uri — resetting")
                 return WallpaperState.NONE

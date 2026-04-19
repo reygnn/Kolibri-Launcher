@@ -115,6 +115,44 @@ class WallpaperManagerTest {
     }
 
     @Test
+    fun `parseWallpaperState with non-file single-layer URI yields NONE`() = runTest {
+        // Regression guard against ACRA-reported
+        // "Volume external_primary not found" crash: if a content:// URI
+        // ever reaches persistence (old app version, bad restore, or
+        // remapped external volume), we must not pass it to setImageURI —
+        // it can throw IllegalArgumentException on resolve. Treat as
+        // NONE so the user sees an empty wallpaper and can re-pick.
+        dataStore.seed {
+            it[KEY_WALLPAPER_URI] = "content://media/external_primary/images/media/42"
+            it[KEY_WALLPAPER_SCALE] = 1.0f
+        }
+
+        val state = manager.wallpaperState.first()
+
+        assertEquals(WallpaperState.NONE, state)
+    }
+
+    @Test
+    fun `parseWallpaperState with mixed file and non-file multi-layer URIs drops only the bad ones`() = runTest {
+        val json = """
+            [
+              {"id":"l_ok","imageUri":"file:///data/a.jpg"},
+              {"id":"l_bad","imageUri":"content://media/external_primary/images/media/42"},
+              {"id":"l_ok2","imageUri":"file:///data/b.jpg"}
+            ]
+        """.trimIndent()
+        dataStore.seed { it[KEY_LAYERS_JSON] = json }
+
+        val state = manager.wallpaperState.first()
+
+        // Bad URI layer dropped; good ones kept.
+        assertTrue(state.isMultiLayer)
+        assertEquals(2, state.layerCount)
+        assertEquals("l_ok", state.getLayer(0)!!.id)
+        assertEquals("l_ok2", state.getLayer(1)!!.id)
+    }
+
+    @Test
     fun `parseWallpaperState with valid LAYERS_JSON yields multi-layer state`() = runTest {
         val json = """
             [

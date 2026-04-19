@@ -249,6 +249,9 @@ class LauncherViewModel @Inject constructor(
 
     val wallpaperState: StateFlow<WallpaperState> get() = wallpaperDelegate.wallpaperState
     val isWallpaperEditMode: StateFlow<Boolean> get() = wallpaperDelegate.isWallpaperEditMode
+    val pendingFocusLayerId: StateFlow<String?> get() = wallpaperDelegate.pendingFocusLayerId
+
+    fun consumePendingFocusLayerId() = wallpaperDelegate.consumePendingFocusLayerId()
 
     val isLockingInProgress: StateFlow<Boolean> get() = gestureDelegate.isLockingInProgress
 
