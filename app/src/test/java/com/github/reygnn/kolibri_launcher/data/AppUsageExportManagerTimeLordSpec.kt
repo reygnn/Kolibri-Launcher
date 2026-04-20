@@ -18,7 +18,7 @@ import kotlin.test.assertIs
  * TIME LORD EDITION
  * * Testet temporale Anomalien, Y2K38 Probleme und Zeitzonen-Chaos.
  */
-class AppUsageExportManager_TimeLordSpec {
+class AppUsageExportManagerTimeLordSpec {
 
     @get:Rule
     val timberRule = TimberRule()

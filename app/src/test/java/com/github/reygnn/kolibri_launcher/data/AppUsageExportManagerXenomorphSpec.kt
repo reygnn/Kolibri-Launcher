@@ -18,7 +18,7 @@ import kotlin.test.assertIs
  * * Security Stress Tests für UsageExportManager.
  * Simuliert bösartige Angriffe auf die JSON-Struktur und den Parser.
  */
-class AppUsageExportManager_XenomorphSpec {
+class AppUsageExportManagerXenomorphSpec {
 
     @get:Rule
     val timberRule = TimberRule()

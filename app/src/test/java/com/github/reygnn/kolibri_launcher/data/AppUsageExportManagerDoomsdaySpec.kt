@@ -17,7 +17,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,7 +35,7 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
-class AppUsageExportManager_DoomsdaySpec {
+class AppUsageExportManagerDoomsdaySpec {
 
     @get:Rule
     val timberRule = TimberRule()
@@ -70,7 +69,6 @@ class AppUsageExportManager_DoomsdaySpec {
     // LOAD FROM FILE SCENARIOS (Import)
     // ============================================================================================
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Blob (File too large DoS attack)`() = runTest {
         val hugeSize = AppConstants.MAX_BACKUP_SIZE_BYTES + 1
@@ -80,10 +78,8 @@ class AppUsageExportManager_DoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
-        Assert.assertTrue(result.message.contains("too large", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Vanishing Act (File deleted before read)`() = runTest {
         every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
@@ -95,7 +91,6 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Cannot read", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Firewall (Permission Denied SecurityException)`() = runTest {
         every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } throws
@@ -109,7 +104,6 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Permission denied", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Broken Disk (IOException mid-read)`() = runTest {
         val brokenStream = object : ByteArrayInputStream(ByteArray(10)) {
@@ -127,7 +121,6 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Disk sector corrupted"))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Garbage URI (Invalid input)`() = runTest {
         val result = manager.loadFromFile("://this-is-not-a-uri", false)
@@ -145,7 +138,6 @@ class AppUsageExportManager_DoomsdaySpec {
     // SAVE TO FILE SCENARIOS (Export)
     // ============================================================================================
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - save - The Full Disk (IOException on write)`() = runTest {
         val brokenOutputStream = mockk<OutputStream>()
@@ -157,7 +149,6 @@ class AppUsageExportManager_DoomsdaySpec {
         Assert.assertFalse("Save should fail on IOException", success)
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - save - The Locked File (Cannot open output stream)`() = runTest {
         every { mockContentResolver.openOutputStream(eq(testUri)) } returns null

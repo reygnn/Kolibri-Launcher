@@ -12,7 +12,7 @@ import org.junit.Before
 import org.junit.Rule
 import kotlin.test.Test
 
-class AppUsageExportManager_FormatSpec {
+class AppUsageExportManagerFormatSpec {
 
     @get:Rule
     val timberRule = TimberRule()

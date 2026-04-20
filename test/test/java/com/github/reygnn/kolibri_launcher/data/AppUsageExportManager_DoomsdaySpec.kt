@@ -78,7 +78,7 @@ class AppUsageExportManager_DoomsdaySpec {
     // LOAD FROM FILE SCENARIOS (Import)
     // ============================================================================================
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Blob (File too large DoS attack)`() = runTest {
         // SZENARIO: User wählt eine 1GB Datei aus.
@@ -103,7 +103,7 @@ class AppUsageExportManager_DoomsdaySpec {
         Assert.assertTrue(result.message.contains("too large", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Vanishing Act (File deleted before read)`() = runTest {
         // SZENARIO: Datei existiert beim Auswählen, aber wird gelöscht bevor der Stream öffnet.
@@ -127,7 +127,7 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Cannot read", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Firewall (Permission Denied SecurityException)`() = runTest {
         // SZENARIO: App verliert Berechtigung.
@@ -148,7 +148,7 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Permission denied", ignoreCase = true))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Broken Disk (IOException mid-read)`() = runTest {
         // SZENARIO: Der Stream öffnet sich, aber mittendrin gibt es einen I/O Fehler.
@@ -178,7 +178,7 @@ class AppUsageExportManager_DoomsdaySpec {
         assertTrue(result.message.contains("Disk sector corrupted"))
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - load - The Garbage URI (Invalid input)`() = runTest {
         val garbageUri = "://this-is-not-a-uri"
@@ -201,7 +201,7 @@ class AppUsageExportManager_DoomsdaySpec {
     // SAVE TO FILE SCENARIOS (Export)
     // ============================================================================================
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - save - The Full Disk (IOException on write)`() = runTest {
         // SZENARIO: Speicher ist voll während des Schreibens.
@@ -221,7 +221,7 @@ class AppUsageExportManager_DoomsdaySpec {
         Assert.assertFalse("Save should fail on IOException", success)
     }
 
-    @Ignore("Fails on GitHub due to missing SDK version 36")
+    //@Ignore("Fails on GitHub due to missing SDK version 36")
     @Test
     fun `doomsday - save - The Locked File (Cannot open output stream)`() = runTest {
         // SZENARIO: Datei ist schreibgeschützt oder gesperrt. openOutputStream gibt null zurück.
