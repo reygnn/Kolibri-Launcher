@@ -1,0 +1,54 @@
+package com.github.reygnn.kolibri_launcher.domain
+
+import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import io.mockk.MockKAnnotations
+import io.mockk.every
+import io.mockk.impl.annotations.MockK
+import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import kotlin.test.assertEquals
+
+@ExperimentalCoroutinesApi
+class GetInstalledAppsUseCaseTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
+
+    @MockK
+    private lateinit var installedAppsRepository: InstalledAppsRepository
+
+    private lateinit var useCase: GetInstalledAppsUseCase
+
+    @Before
+    fun setup() {
+        MockKAnnotations.init(this)
+        useCase = GetInstalledAppsUseCase(installedAppsRepository)
+    }
+
+    @Test
+    fun `invoke - delegates to repository and emits apps`() = runTest {
+        val testApps = listOf(
+            AppInfo("App A", "App A", "pkg.a", "cls.a"),
+            AppInfo("App B", "App B", "pkg.b", "cls.b")
+        )
+        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
+
+        useCase().test {
+            val result = awaitItem()
+            assertEquals(2, result.size)
+            assertEquals("App A", result[0].displayName)
+            awaitComplete()
+        }
+
+        verify { installedAppsRepository.getInstalledApps() }
+    }
+}

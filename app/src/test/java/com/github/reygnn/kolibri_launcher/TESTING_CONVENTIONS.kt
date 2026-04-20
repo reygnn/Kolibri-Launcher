@@ -71,3 +71,71 @@ package com.github.reygnn.kolibri_launcher
  * See: MainDispatcherRule.kt, AppManagementDelegateTest.kt (reference impl)
  * ============================================================================
  */
+
+/**
+ * ============================================================================
+ * MOCKK CONVENTIONS
+ * ============================================================================
+ *
+ * IMPORTS
+ * -------
+ * Rule:    import com.github.reygnn.kolibri_launcher.rule.TimberRule       ✅
+ *          import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule ✅
+ * Not:     import com.github.reygnn.kolibri_launcher.rules.TimberRule       ❌ (falsches Package)
+ *
+ *
+ * SUSPEND FUNCTIONS — coEvery + answers { }
+ * -----------------------------------------
+ * coAnswers does NOT exist in MockK. For suspend functions that need to
+ * return a value based on their arguments, use coEvery with regular answers:
+ *
+ *   // ✅ correct
+ *   coEvery { mock.suspendFun(any()) } returns fixedValue
+ *   coEvery { mock.suspendFun(any()) } answers { secondArg() }    // arg-based return
+ *   coEvery { mock.suspendFun(any()) } throws IOException("fail")
+ *
+ *   // ❌ coAnswers does not exist — compile error
+ *   coEvery { mock.suspendFun(any()) } coAnswers { secondArg() }
+ *
+ * The answers { } lambda is always synchronous. It just extracts/transforms
+ * the arguments and returns a value — it does not need to be a coroutine
+ * even if the stubbed function is suspend.
+ *
+ *
+ * DATASTORE — NEVER mock DataStore<Preferences> directly
+ * -------------------------------------------------------
+ * DataStore.edit() and DataStore.updateData() are extension/interface functions
+ * that MockK cannot stub reliably. Use FakeDataStore instead.
+ *
+ *   // ❌ will NOT compile — edit() is an extension function
+ *   val mockDataStore = mockk<DataStore<Preferences>>()
+ *   coEvery { mockDataStore.edit(any()) } returns preferencesOf()
+ *
+ *   // ✅ use FakeDataStore — has makeEditFail(), makeCancellable(), makeReadFail()
+ *   private lateinit var fakeDataStore: FakeDataStore
+ *
+ *   @Before fun setup() {
+ *       fakeDataStore = FakeDataStore()
+ *       manager = MyManager(fakeDataStore, ...)
+ *   }
+ *
+ * Mapping from Mockito patterns to FakeDataStore:
+ *
+ *   whenever(store.data).thenReturn(flowOf(prefs))          → fakeDataStore.setInitialData(prefs)
+ *   whenever(store.edit(any())).doReturn(preferencesOf())   → (no setup needed, works by default)
+ *   whenever(store.edit(any())).doAnswer { throw IOException() } → fakeDataStore.makeEditFail()
+ *   whenever(store.edit(any())).doAnswer { throw CancellationException() } → fakeDataStore.makeCancellable()
+ *   whenever(store.data).thenReturn(flow { throw IOException() })  → fakeDataStore.makeReadFail()
+ *   verify(store).edit(any())                               → Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+ *   verify(store, never()).edit(any())                      → Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+ *
+ * EXCEPTION: If you need data to throw RuntimeException or CancellationException
+ * (not supported by FakeDataStore), mock only the data property — which IS a
+ * regular interface member and CAN be stubbed:
+ *
+ *   val brokenStore = mockk<DataStore<Preferences>>()
+ *   every { brokenStore.data } returns flow { throw CancellationException() }
+ *   val manager = MyManager(brokenStore, ...)   // only for this one test
+ *
+ * ============================================================================
+ */
