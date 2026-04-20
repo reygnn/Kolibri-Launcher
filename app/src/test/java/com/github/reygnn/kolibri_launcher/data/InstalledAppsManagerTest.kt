@@ -219,7 +219,7 @@ class InstalledAppsManagerTest {
 
     @Test
     fun `triggerAppsUpdate - when flow emit fails - does not crash`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(any()) } throws RuntimeException("Flow error")
+        coEvery { mockAppsUpdateTrigger.emit(Unit) } throws RuntimeException("Flow error")
 
         installedAppsManager.triggerAppsUpdate()
 
@@ -246,6 +246,6 @@ class InstalledAppsManagerTest {
     fun `purgeRepository - does nothing and does not crash`() = runTest {
         installedAppsManager.purgeRepository()
 
-        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(any()) }
+        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(Unit) }
     }
 }

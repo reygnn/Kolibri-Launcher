@@ -46,7 +46,7 @@ class DataMigrationManagerTest {
         every { context.getSharedPreferences(eq(VERSION_PREFS_NAME), any()) } returns sharedPreferences
         every { sharedPreferences.edit() } returns sharedPreferencesEditor
         every { sharedPreferencesEditor.putInt(any(), any()) } returns sharedPreferencesEditor
-        every { sharedPreferencesEditor.apply() } returns Unit
+        every { sharedPreferencesEditor.commit() } returns true
 
         dataMigrationManager = DataMigrationManager(context, fakeDataStore)
     }
@@ -64,7 +64,7 @@ class DataMigrationManagerTest {
         Assert.assertFalse("DataStore should not be cleared on first installation", data.asMap().isEmpty())
 
         verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
-        verify { sharedPreferencesEditor.apply() }
+        verify { sharedPreferencesEditor.commit() }
     }
 
     @Test
@@ -107,7 +107,7 @@ class DataMigrationManagerTest {
     @Test
     fun `runMigrationIfNeeded - when SharedPreferences edit fails - does not crash`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 0
-        every { sharedPreferencesEditor.apply() } throws RuntimeException("Cannot write preferences")
+        every { sharedPreferencesEditor.commit() } throws RuntimeException("Cannot write preferences")
 
         dataMigrationManager.runMigrationIfNeeded()
     }
@@ -196,7 +196,7 @@ class DataMigrationManagerTest {
         dataMigrationManager.runMigrationIfNeeded()
 
         verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
-        verify { sharedPreferencesEditor.apply() }
+        verify { sharedPreferencesEditor.commit() }
     }
 
     @Test

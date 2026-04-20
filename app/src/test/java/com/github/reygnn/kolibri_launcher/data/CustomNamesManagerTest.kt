@@ -231,7 +231,7 @@ class CustomNamesManagerTest {
 
         Assert.assertTrue(result)
         Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
-        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(any()) }
+        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(Unit) }
     }
 
     @Test

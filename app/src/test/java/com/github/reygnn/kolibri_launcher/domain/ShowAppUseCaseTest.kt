@@ -18,7 +18,7 @@ class ShowAppUseCaseTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    @MockK(relaxUnitFun = true)
+    @MockK(relaxed = true)
     private lateinit var repository: HiddenAppsRepository
 
     private lateinit var useCase: ShowAppUseCase

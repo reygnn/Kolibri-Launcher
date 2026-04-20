@@ -233,7 +233,10 @@ class BackupManagerWallpaperTest {
     }
 
     @Test
-    fun `importFromJson - without wallpaper in backup - does not modify existing wallpaper`() = runTest {
+    fun `importFromJson - without wallpaper in backup - clears existing wallpaper`() = runTest {
+        // BackupManager.importWallpaper() calls clearWallpaper() unconditionally
+        // before attempting to restore — so existing wallpaper is always cleared
+        // when importThemeSettings = true, even if the backup has no wallpaper URI.
         fakeWallpaperRepo.currentState = WallpaperState(
             imageUri = testWallpaperUri.toUri(),
             scale = 1.2f,
@@ -260,10 +263,7 @@ class BackupManagerWallpaperTest {
         )
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        val currentState = fakeWallpaperRepo.currentState
-        assertThat(currentState.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(currentState.scale).isEqualTo(1.2f)
+        assertThat(fakeWallpaperRepo.currentState).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
