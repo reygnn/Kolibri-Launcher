@@ -78,17 +78,39 @@ class InstalledAppsStateManagerTest {
         Assert.assertEquals("App A", result[0].displayName)
     }
 
-    @Test
-    fun `purgeRepository - does nothing and keeps state`() = runTest {
-        // Arrange
-        stateManager.updateApps(listOf(app1))
+//    @Test
+//    fun `purgeRepository - does nothing and keeps state`() = runTest {
+//        // Arrange
+//        stateManager.updateApps(listOf(app1))
+//
+//        // Act
+//        stateManager.purgeRepository()
+//
+//        // Assert
+//        // StateManager darf System-Daten nicht löschen!
+//        Assert.assertEquals(1, stateManager.rawAppsFlow.value.size)
+//    }
 
-        // Act
+    @Test
+    fun `purgeRepository - keeps both flow value and fallback cache intact`() = runTest {
+        // Arrange: Flow + Cache beide befüllen
+        stateManager.updateApps(listOf(app1, app2))
+
+        // Act: purge darf nichts ändern
         stateManager.purgeRepository()
 
-        // Assert
-        // StateManager darf System-Daten nicht löschen!
-        Assert.assertEquals(1, stateManager.rawAppsFlow.value.size)
+        // Assert 1: Flow-Wert unverändert
+        Assert.assertEquals(2, stateManager.rawAppsFlow.value.size)
+
+        // Assert 2: Cache unabhängig intakt — Flow leeren, dann muss
+        // getCurrentApps() trotzdem den gecachten Wert liefern.
+        // Ohne diesen Schritt würde der Test auch passen, wenn purge
+        // heimlich den Cache löscht (weil getCurrentApps dann den
+        // noch befüllten Flow zurückgibt und den Cache nie konsultiert).
+        stateManager.updateApps(emptyList())
+        val cached = stateManager.getCurrentApps()
+        Assert.assertEquals(2, cached.size)
+        Assert.assertEquals("App A", cached[0].displayName)
     }
 
     @Test
