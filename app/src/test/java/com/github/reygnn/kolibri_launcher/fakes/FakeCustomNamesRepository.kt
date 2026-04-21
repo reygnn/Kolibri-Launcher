@@ -37,11 +37,17 @@ class FakeCustomNamesRepository : CustomNamesRepository {
     }
 
     override suspend fun removeCustomNameForPackage(packageName: String): Boolean {
-        val success = customNames.remove(packageName) != null
-        if (success) {
-            triggerCustomNameUpdate()
-        }
-        return success
+        // Idempotent — analog zu CustomNamesManager.removeCustomNameForPackage:
+        // der Zielzustand "kein Custom-Name für packageName" ist nach dem Aufruf
+        // erreicht, also Erfolg, unabhängig davon ob vorher ein Eintrag da war.
+        // Trigger erfolgt immer, weil der Manager das auch tut (DataStore.edit
+        // ist immer "successful", auch ohne effektive Änderung).
+        // Konsistent zur gleichen Idempotenz-Regel bei
+        // FakeFavoritesRepository.removeFavoriteComponent und
+        // FakeHiddenAppsRepository.showComponent.
+        customNames.remove(packageName)
+        triggerCustomNameUpdate()
+        return true
     }
 
     override suspend fun hasCustomNameForPackage(packageName: String): Boolean {
