@@ -20,6 +20,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -213,13 +214,32 @@ class OnboardingViewModelTest {
             throw IOException("Cannot load apps")
         }
 
-        // 3. ViewModel initialisieren — Konvention: nutze mainDispatcherRule.testDispatcher,
-        // KEIN eigener StandardTestDispatcher.
+        // 3. ViewModel initialisieren
+        //
+        // ⚠️ AUSNAHME zur Dispatcher-Konvention:
+        // Hier braucht der mainDispatcher StandardTestDispatcher-Semantik (queued),
+        // NICHT UnconfinedTestDispatcher (eager) wie sonst aus mainDispatcherRule.
+        //
+        // Grund: Der init-Block des ViewModels macht launch(mainDispatcher) { collectFlow() }.
+        // Mit UnconfinedTestDispatcher läuft das launch SOFORT im Konstruktor durch,
+        // wirft die IOException, das ViewModel emittet ShowError auf _event —
+        // aber unser Turbine-Subscriber existiert zu diesem Zeitpunkt noch nicht
+        // (event.test {} kommt erst nach dem Konstruktor). _event ist eine
+        // MutableSharedFlow ohne Replay → Event ist weg, Test timed out.
+        //
+        // Mit StandardTestDispatcher(testScheduler) wird das launch nur queued.
+        // Wir subscriben erst per event.test {} und dispatchen dann mit
+        // advanceUntilIdle(). Der Subscriber ist da, das Event kommt an.
+        //
+        // testScheduler kommt aus runTest und ist derselbe wie mainDispatcherRule —
+        // also EIN Scheduler, zwei Dispatcher-Strategien. Das ist die Variante
+        // aus dem "EXCEPTION"-Block in TESTING_CONVENTIONS.kt.
+        val testDispatcher = StandardTestDispatcher(testScheduler)
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
             completeOnboardingUseCase,
-            mainDispatcher = mainDispatcherRule.testDispatcher
+            mainDispatcher = testDispatcher
         )
 
         // 4. Jetzt hängen wir uns an den Event-Stream
