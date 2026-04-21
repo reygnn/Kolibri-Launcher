@@ -262,8 +262,9 @@ class FavoritesManager : FavoritesRepository {
 
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {
         try {
+            val filtered = componentNames.filter { it.isNotBlank() }.toSet()
             dataStore.edit { preferences ->
-                preferences[PreferencesKeys.FAVORITES] = componentNames.toSet()
+                preferences[PreferencesKeys.FAVORITES] = filtered
             }
         } catch (e: CancellationException) {
             throw e

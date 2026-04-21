@@ -279,6 +279,14 @@ class FavoritesManagerShareInTest {
      * Damit wird der Sinn der ganzen Konstruktion validiert: schnelle
      * Navigation zwischen Screens soll kein teures DataStore-Reconnect
      * auslösen.
+     *
+     * ACHTUNG — `testScheduler.runCurrent()` statt `advanceUntilIdle()`:
+     * `advanceUntilIdle()` läuft durch ALLE geplanten Tasks durch, auch durch
+     * den von `WhileSubscribed` nach dem Unsubscribe gesetzten `delay(timeout)`.
+     * Das würde den Timeout künstlich sofort ablaufen lassen und den Upstream
+     * droppen, lange bevor wir mit `advanceTimeBy` die Test-Semantik setzen.
+     * `runCurrent()` prozessiert nur Tasks der aktuellen virtuellen Zeit
+     * (0ms) und lässt den Delay stehen.
      */
     @Test
     fun `WhileSubscribed - upstream is reused on resubscribe within timeout`() = runTest {
@@ -294,7 +302,7 @@ class FavoritesManagerShareInTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(
             "Erster Subscriber muss genau ein Upstream-Abo ausgelöst haben",
             1,
@@ -308,7 +316,7 @@ class FavoritesManagerShareInTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(
             "Resubscribe innerhalb des Timeouts darf KEIN neues Upstream-Abo erzeugen",
             1,
@@ -322,6 +330,11 @@ class FavoritesManagerShareInTest {
      * `WhileSubscribed(5000)`: 5s+ nach dem letzten Unsubscribe droppt der
      * Upstream. Der nächste Subscriber triggert ein komplett neues Abo —
      * Counter geht auf 2.
+     *
+     * Gleiches `runCurrent`-Muster wie im Reuse-Test: wir wollen die
+     * Kausalkette sauber haben — der Upstream wird durch
+     * `advanceTimeBy(timeout + 1000)` gedroppt, nicht schon vorher durch ein
+     * versehentliches `advanceUntilIdle`.
      */
     @Test
     fun `WhileSubscribed - upstream restarts on resubscribe after timeout`() = runTest {
@@ -337,18 +350,17 @@ class FavoritesManagerShareInTest {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(1, counting.subscriptionCount.get())
 
         // Deutlich über das Timeout hinaus — 1 Sekunde Puffer reicht.
         advanceTimeBy(AppConstants.FLOW_SHARING_TIMEOUT_MS + 1000)
-        advanceUntilIdle()
 
         manager.favoriteComponentsFlow.test {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(
             "Nach Timeout muss der Upstream neu abonniert werden",
             2,

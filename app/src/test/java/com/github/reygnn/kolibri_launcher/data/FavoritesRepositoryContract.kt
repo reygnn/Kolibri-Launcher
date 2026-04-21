@@ -40,20 +40,11 @@ import org.junit.Test
  *   - Kein eigener `TestScope` / `StandardTestDispatcher`
  *     (siehe TESTING_CONVENTIONS.kt).
  *
- * BEKANNTE DIVERGENZ (nicht im Contract):
+ * NICHT IM CONTRACT:
  *   `FavoritesManager` erzwingt `AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME`
- *   als Package-Limit. Der Fake tut das nicht. Weil das (a) Business-Regel des
- *   konkreten Managers ist und (b) 500 Adds pro Test spart, wird dieses
- *   Verhalten hier nicht getestet, sondern im `FavoritesManagerTest` direkt.
- *
- * DIVERGENZ DIE HIER TESTET:
- *   `isFavoriteComponent("")` verhält sich aktuell unterschiedlich, wenn ""
- *   vorher per `saveFavoriteComponents(listOf(""))` gespeichert wurde:
- *   - Manager: false (isNullOrBlank-Early-Return)
- *   - Fake:    true  (reine Set-Membership)
- *   Der entsprechende Contract-Test wird auf dem Fake rot. Absicht: Fake fixen
- *   oder — falls bewusst — saveFavoriteComponents so härten, dass blank-Einträge
- *   nicht persistiert werden.
+ *   als Package-Limit. Der Fake tut das nicht. Das ist (a) Business-Regel des
+ *   konkreten Managers und (b) 500 Adds pro Test wären unverhältnismäßig —
+ *   daher getestet in `FavoritesManagerTest` direkt, nicht hier.
  *
  * @see FakeFavoritesRepositoryContractTest
  * @see FavoritesManagerContractTest
@@ -213,23 +204,18 @@ abstract class FavoritesRepositoryContract {
     }
 
     /**
-     * KNOWN CONTRACT DIVERGENCE — wird auf dem Fake rot.
-     *
-     * - [FavoritesManager.isFavoriteComponent] prüft `isNullOrBlank` VOR dem
-     *   Set-Lookup → gibt false zurück, selbst wenn "" im Set steht.
-     * - `FakeFavoritesRepository.isFavoriteComponent` macht nur Set-Membership →
-     *   gibt true zurück, sobald "" im Set steht (was via `saveFavoriteComponents`
-     *   durchrutscht, weil save keine Blank-Filterung macht).
-     *
-     * Fix-Option 1: Im Fake analog zum Manager `isNullOrBlank` prüfen.
-     * Fix-Option 2: In beiden Implementierungen `saveFavoriteComponents` so
-     *               härten, dass blank-Einträge herausgefiltert werden.
+     * `saveFavoriteComponents` ist die einzige Tür, durch die beliebige Strings
+     * (Backup-Import, UI-Eingabe, Onboarding) in den persistierten Set kommen.
+     * Blanks haben dort nie etwas zu suchen — `addFavoriteComponent` filtert
+     * sie bereits, und `isFavoriteComponent(blank)` gibt false zurück. Damit
+     * die drei Schreib-/Lese-Operationen konsistent bleiben, muss auch `save`
+     * Blanks aus der Eingabe herausfiltern.
      */
     @Test
-    fun `isFavoriteComponent returns false for blank even after save with blank`() = runTest {
+    fun `saveFavoriteComponents filters out blank entries`() = runTest {
         val repo = createRepository()
-        repo.saveFavoriteComponents(listOf(""))
-        assertFalse(repo.isFavoriteComponent(""))
+        repo.saveFavoriteComponents(listOf(compA, "", "   ", compB))
+        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
     }
 
     // ---------- toggleFavoriteComponent ----------
