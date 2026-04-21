@@ -405,6 +405,91 @@ class WallpaperManagerTest {
         assertEquals("file:///data/a.jpg", state.imageUri.toString())
         assertEquals(2.0f, state.scale)
     }
+
+    // ===========================================
+// EDGE CASES — VALUE PASSTHROUGH
+// ===========================================
+
+    @Test
+    fun `clearWallpaper on already empty state is idempotent`() = runTest {
+        // No seed — DataStore starts empty.
+
+        manager.clearWallpaper()
+        advanceUntilIdle()
+
+        // Calling it again must also be safe (regression guard against
+        // accidental "first call required" assumptions in removeAllKeys).
+        manager.clearWallpaper()
+        advanceUntilIdle()
+
+        val state = manager.wallpaperState.first()
+        assertEquals(WallpaperState.NONE, state)
+
+        val prefs = dataStore.data.first()
+        assertNull(prefs[KEY_WALLPAPER_URI])
+        assertNull(prefs[KEY_LAYERS_JSON])
+    }
+
+    @Test
+    fun `purgeRepository has same effect as clearWallpaper`() = runTest {
+        // Both methods must wipe identical key sets. They currently share
+        // removeAllKeys() — this test guards against future divergence
+        // (e.g. someone adds purge-only behavior without updating clear).
+        val seed: (androidx.datastore.preferences.core.MutablePreferences) -> Unit = {
+            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
+            it[KEY_WALLPAPER_SCALE] = 1.5f
+            it[KEY_WALLPAPER_TRANSLATE_X] = 10f
+            it[KEY_WALLPAPER_TRANSLATE_Y] = 20f
+            it[KEY_LAYERS_JSON] = """[{"id":"l1","imageUri":"file:///data/a.jpg"}]"""
+        }
+
+        dataStore.seed(seed)
+        manager.purgeRepository()
+        advanceUntilIdle()
+        val afterPurge = dataStore.data.first().asMap()
+
+        dataStore.seed(seed)
+        manager.clearWallpaper()
+        advanceUntilIdle()
+        val afterClear = dataStore.data.first().asMap()
+
+        assertEquals(afterClear, afterPurge)
+    }
+
+    @Test
+    fun `saveWallpaperState handles extreme scale values`() = runTest {
+        // Guards against silent clamping (e.g. a future min/max validator).
+        // 0.25f and 8.0f are both exactly representable as Float to avoid
+        // precision noise in the round-trip via Double in the JSON path.
+        val tinyState = WallpaperState(imageUri = "file:///data/x.jpg".toUri(), scale = 0.25f)
+        manager.saveWallpaperState(tinyState)
+        advanceUntilIdle()
+        assertEquals(0.25f, manager.wallpaperState.first().scale)
+
+        val hugeState = WallpaperState(imageUri = "file:///data/x.jpg".toUri(), scale = 8.0f)
+        manager.saveWallpaperState(hugeState)
+        advanceUntilIdle()
+        assertEquals(8.0f, manager.wallpaperState.first().scale)
+    }
+
+    @Test
+    fun `saveWallpaperState handles negative translate values`() = runTest {
+        // Negative translate is normal during pan operations. READ-side is
+        // covered by `with only legacy keys` (-100/-50); this guards the
+        // SAVE-side specifically against future clamping at write time.
+        val state = WallpaperState(
+            imageUri = "file:///data/x.jpg".toUri(),
+            translateX = -999f,
+            translateY = -1500f
+        )
+
+        manager.saveWallpaperState(state)
+        advanceUntilIdle()
+
+        val prefs = dataStore.data.first()
+        assertEquals(-999f, prefs[KEY_WALLPAPER_TRANSLATE_X])
+        assertEquals(-1500f, prefs[KEY_WALLPAPER_TRANSLATE_Y])
+    }
 }
 
 // ===========================================
@@ -435,4 +520,6 @@ private class FakeDataStore(initial: Preferences = emptyPreferences()) : DataSto
         build(prefs)
         state.value = prefs
     }
+
+
 }
