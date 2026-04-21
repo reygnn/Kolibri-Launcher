@@ -38,7 +38,7 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository {
         if (order.isEmpty()) return favoriteApps.sortedBy { it.displayName.lowercase() }
 
         val appMap = favoriteApps.associateBy { it.componentName }
-        val orderedApps = order.mapNotNull { appMap[it] }
+        val orderedApps = order.distinct().mapNotNull { appMap[it] }
         val remainingApps = favoriteApps.filter { it.componentName !in order }
             .sortedBy { it.displayName.lowercase() }
 
