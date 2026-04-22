@@ -183,6 +183,62 @@ package com.github.reygnn.kolibri_launcher
  * even if the stubbed function is suspend.
  *
  *
+ * RELAXED vs RELAXUNITFUN — SUSPEND FUNCTIONS BRAUCHEN relaxed = true
+ * -------------------------------------------------------------------
+ * MockK hat zwei verschiedene "relax"-Flags:
+ *   - `relaxUnitFun = true` relaxiert NUR non-suspend Funktionen die
+ *     `Unit` zurückgeben.
+ *   - `relaxed = true` relaxiert ALLES, inklusive suspend-Funktionen.
+ *
+ * Für Fake-artige Mocks von Repositories mit suspend-Unit-Methoden
+ * (`hideComponent`, `showComponent`, `triggerUpdate`, …) MUSS man
+ * `relaxed = true` benutzen. `relaxUnitFun = true` sieht korrekt aus,
+ * produziert aber zur LAUFZEIT einen `MockKException: no answer found`
+ * beim ersten Aufruf der suspend-Methode.
+ *
+ *   // ❌ kompiliert, crashed zur Laufzeit
+ *   val repo = mockk<HiddenAppsRepository>(relaxUnitFun = true)
+ *   repo.hideComponent("...")   // MockKException: no answer found
+ *
+ *   // ✅ kompiliert, läuft
+ *   val repo = mockk<HiddenAppsRepository>(relaxed = true)
+ *   repo.hideComponent("...")
+ *
+ * Faustregel: im Zweifel `relaxed = true`. `relaxUnitFun = true` ist
+ * eine Feinheit für Fälle wo man explizit will dass nicht-Unit-Fns
+ * "loud" scheitern, aber suspend-Fns kriegt man damit nicht in den
+ * Griff.
+ *
+ *
+ * SHARED FLOW emit — emit(Unit) STATT emit(any()) STUBBEN
+ * -------------------------------------------------------
+ * MockK matcht `Unit` über `any()` nicht zuverlässig. Bei einem
+ * Mock-Setup wie:
+ *
+ *   coEvery { mockTrigger.emit(any()) } just Runs
+ *
+ * auf einem `MutableSharedFlow<Unit>` inferiert MockK `any<Unit>()` und
+ * schlägt beim tatsächlichen Aufruf mit
+ *
+ *     left matchers: [any<Unit>()]
+ *
+ * fehl — die Methode wird nicht gematcht, der Call schlägt durch als
+ * "no answer found". Empirisch beobachtet in CustomNamesManagerTest und
+ * InstalledAppsManagerTest.
+ *
+ *   // ❌ matcht nicht
+ *   coEvery { mockTrigger.emit(any()) } just Runs
+ *   coVerify { mockTrigger.emit(any()) }
+ *
+ *   // ✅ matcht
+ *   coEvery { mockTrigger.emit(Unit) } just Runs
+ *   coVerify { mockTrigger.emit(Unit) }
+ *
+ * Bei `MutableSharedFlow<Unit>` also IMMER `Unit` direkt angeben, nie
+ * `any()`. Bei `MutableSharedFlow<T>` mit anderem T (z.B. Events,
+ * Strings) ist `any()` wie gewohnt sicher.
+ *
+ *
  * DATASTORE — NEVER mock DataStore<Preferences> directly
  * -------------------------------------------------------
  * DataStore.edit() and DataStore.updateData() are extension/interface functions
