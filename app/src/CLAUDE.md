@@ -1,0 +1,247 @@
+# CLAUDE.md
+
+Orientierungshilfe für zukünftige Sessions, die sich mit den Unit-Tests
+dieses Projekts beschäftigen. Nicht als technisches Handbuch gedacht —
+dafür gibt es `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`,
+und dort steht alles Konkrete. Diese Datei beantwortet die _Meta_-Fragen:
+Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
+
+---
+
+## Stack im Kurzformat
+
+- Kotlin Android Launcher, Hilt-basierte DI
+- Unit-Tests: JUnit4, MockK, kotlinx-coroutines-test, Turbine
+- Einige Tests brauchen Robolectric (alles was `android.net.Uri` berührt)
+- Test-Konventionen zementiert in
+  `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`
+- Rules für Tests: `MainDispatcherRule`, `TimberRule` (beide in `rule/`)
+
+Das Projekt hat eine bewusste Trennung zwischen:
+
+- **`data/`** — Produktions-Manager-Implementierungen (z.B. `FavoritesManager`)
+- **`domain/repository/`** — Interfaces (z.B. `FavoritesRepository`)
+- **`fakes/`** (im Test-Sourceset) — Test-Doubles
+
+Fast jedes Interface hat sowohl eine Produktionsklasse als auch einen Fake.
+Das ist der Angriffspunkt für Contract-Tests.
+
+---
+
+## Was bereits existiert — Contract-Tests
+
+Das Projekt hat eine vollständige Contract-Test-Suite, die Fake-vs-Manager-Drift
+für alle Repository-Interfaces abfängt. Namens-Schema:
+
+- `XyzRepositoryContract.kt` — abstract class mit @Test-Methoden
+- `FakeXyzRepositoryContractTest.kt` — läuft die Tests gegen den Fake
+- `XyzManagerContractTest.kt` — läuft dieselben Tests gegen den Manager
+
+### Status je Repository (Stand: Ende der Contract-Test-Initiative)
+
+Alle 13 Repository-Interfaces sind behandelt:
+
+| Interface              | Contract | Manager-Test | Kommentar |
+|------------------------|:--------:|:------------:|-----------|
+| FavoritesRepository    |    ✓     |      ✓       | + ShareIn-Infrastruktur-Test |
+| SettingsRepository     |    ✓     |      ✓       | — |
+| SwipeActionsRepository |    ✓     |      ✓       | — |
+| FavoritesOrderRepository |  ✓     |      ✓       | — |
+| HiddenAppsRepository   |    ✓     |      ✓       | — |
+| InstalledAppsRepository|    ✓     |      —       | Zwei Fake-Subklassen, kein Manager (PackageManager) |
+| AppUsageRepository     |    ✓     |      ✓       | Sort-Algorithmus NICHT im Vertrag (Clock-Problem) |
+| WallpaperRepository    |    ✓     |      ✓       | Robolectric (Uri) |
+| CustomNamesRepository  |    ✓     |      ✓       | — |
+| InstalledAppsStateRepository |  ✓ |      ✓       | — |
+| ScreenLockRepository   |    ✓     |      ✓       | — |
+| BackupRepository       |    ✓     |      —       | Fake-only (Uri + ContentResolver) |
+| TimeBasedEventsRepository | ADR only |    —      | Keine Tests — Begründung im File |
+
+"ADR only" = `TimeBasedEventsRepositoryContract.kt` enthält ausschließlich
+KDoc, der begründet warum es keinen Test gibt. Kein ungeschriebener Test,
+sondern eine dokumentierte Entscheidung.
+
+### Bugs, die die Contracts aufgedeckt haben
+
+Drei echte Divergenzen zwischen Fake und Manager wurden über den Prozess
+gefunden und gefixt. Jeweils Fake an Manager angeglichen (Manager ist
+Produktions-Wahrheit):
+
+1. **`FakeFavoritesRepository.saveFavoriteComponents`** filterte keine
+   Blanks, der Manager tut es. Fix: `componentNames.filter { it.isNotBlank() }.toSet()`.
+2. **`FakeFavoritesOrderRepository.sortFavoriteComponents`** produzierte bei
+   duplikaten Einträgen in `order` Apps mehrfach im Output. Fix:
+   `order.distinct().mapNotNull { appMap[it] }`.
+3. **`FakeCustomNamesRepository.removeCustomNameForPackage`** war nicht
+   idempotent (false für nicht-existente Keys), der Manager ist es (true,
+   immer). Fix: Fake entsprechend angleichen.
+
+Alle drei Fixes stehen in den jeweiligen Fake-Dateien mit Kommentar, der
+auf die Parallele zum Manager verweist. Wenn jemand das beim Refactoring
+wieder rückgängig macht, schlägt der Contract erneut an.
+
+### Ein Manager-Fix, ebenfalls durch Contract aufgedeckt
+
+`FavoritesManager.saveFavoriteComponents` bekam denselben Blank-Filter —
+nicht weil der Manager kaputt war, sondern um die Asymmetrie zum Fake zu
+schließen und die Semantik projektweit konsistent zu machen.
+
+---
+
+## Was in den Contracts **nicht** geprüft wird — und warum
+
+Bewusst weggelassene Verhaltensweisen sind in den jeweiligen KDocs der
+Contracts unter "NICHT IM CONTRACT — bewusste Drifts" dokumentiert. Ein
+paar prominente Beispiele:
+
+- **`ScreenLockRepository`**: Fake-Default `isLockingAvailable = true`
+  vs. Manager-Default `false`. Bewusst, weil Tests sonst in jedem
+  `@Before` `setServiceState(true)` rufen müssten.
+- **`InstalledAppsStateRepository`**: `purgeRepository` ist beim Manager
+  explizit No-Op (System-Daten), beim Fake ein echter Reset
+  (Test-Isolation).
+- **`AppUsageRepository`**: Konkrete Sortierreihenfolge von
+  `sortAppsByTimeWeightedUsage` — der Manager benutzt
+  `System.currentTimeMillis()` direkt ohne Clock-Abstraktion. Contract
+  prüft nur Multiset-Properties (gleiche Apps rein wie raus).
+- **`WallpaperRepository`**: drei Drifts bei exotischen States
+  (scale ohne imageUri, non-file URIs, fehlende Dateien) — alle im
+  KDoc dokumentiert, keine Tests dafür weil die Fakes "kaputt" zu
+  deklarieren übertrieben wäre für Pfade die in der Praxis keiner geht.
+
+Wenn eine dieser Drifts doch mal relevant wird (weil neuer Produktions-
+Code einen der exotischen Pfade betritt), gehört der entsprechende Test
+in den Contract. Fake anpassen, dann rot→grün.
+
+---
+
+## Wenn du als Claude-Session in dieses Projekt kommst
+
+### Reihenfolge beim Einlesen
+
+1. **Zuerst** `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
+   Das ist die technische Referenz. Coroutine-Konventionen, MockK→Mockito-
+   Mapping, Contract-Test-Muster, MutableSharedFlow-Traps. Ist verpflichtend
+   bevor du irgendeinen Test anfasst.
+2. **Dann** eine existierende Contract-Pair-Gruppe als Beispiel —
+   `FavoritesRepositoryContract.kt` + `FakeFavoritesRepositoryContractTest.kt`
+   + `FavoritesManagerContractTest.kt`. Das zeigt das Muster in seiner vollen
+   Form, mit ausführlichem KDoc.
+3. **Bei Bedarf** `FavoritesManagerShareInTest.kt` für die `shareIn`-
+   Infrastruktur-Test-Mechanik.
+
+### Häufige Aufgaben und wo sie reingehören
+
+**Neues Interface + neuer Manager + neuer Fake:**
+Baue Contract-Pair. Reihenfolge: abstract Class zuerst, dann die zwei
+Subklassen. Siehe TESTING_CONVENTIONS.kt → "CONTRACT TESTS" für das Muster.
+Wenn der Manager `shareIn` benutzt, `externalScope = null` im Test.
+
+**Neue Methode in existierendem Interface:**
+Methode auch in beide Implementierungen einfügen, dann `@Test`-Methode(n)
+zum bestehenden `XyzRepositoryContract` hinzufügen. Beide Subklassen laufen
+automatisch mit — keine Änderung nötig.
+
+**Rot gewordener Contract-Test nach einem Refactor:**
+Die Standard-Antwort ist Option B: Fake an Manager angleichen, nicht
+umgekehrt. Manager-Verhalten ist Produktions-Wahrheit. Details in
+TESTING_CONVENTIONS.kt → "DRIFT-FIX POLICY".
+
+**Test hängt im CI:**
+Wenn das Repository `MutableSharedFlow` benutzt, wahrscheinlich Buffer-
+Overflow-Trap. Siehe TESTING_CONVENTIONS.kt → "MUTABLESHAREDFLOW IN
+CONSTRUCTOR" für die zwei Fixes (DROP_OLDEST oder Turbine).
+
+**Test soll `advanceUntilIdle()` benutzen aber es passiert nichts / zu viel:**
+Siehe TESTING_CONVENTIONS.kt, erster großer Block. Die Dispatcher-Regeln
+sind streng und die Fehler sind _stumm_ (Test scheitert ohne verwertbare
+Fehlermeldung). `testScheduler.runCurrent()` als Alternative wenn
+`advanceUntilIdle` zu weit läuft (passiert bei `WhileSubscribed`-Tests).
+
+**Manager braucht Android-System-APIs:**
+Dann in den meisten Fällen KEIN Manager-Contract-Test — nur Fake-Subklasse,
+plus ehrliches KDoc das erklärt warum. Beispiele im Projekt:
+`BackupRepositoryContract`, `InstalledAppsRepositoryContract`,
+`TimeBasedEventsRepositoryContract` (letzterer rein ADR-Doku ohne Tests).
+
+### Anti-Patterns, die ich in diesem Projekt schon mal gemacht habe
+
+(Damit du sie nicht wiederholst.)
+
+1. **`advanceUntilIdle()` in einem `WhileSubscribed`-Test.** Läuft durch
+   den Timeout-Delay und droppt den Upstream, bevor der Test ihn prüft.
+   Fix: `testScheduler.runCurrent()`.
+
+2. **`MutableSharedFlow()` in einem Test-Setup ohne Subscriber.**
+   Erste Emission geht ins default-0-Buffer und suspendiert. Fix:
+   `BufferOverflow.DROP_OLDEST` oder Turbine.
+
+3. **Existenz-Checks auf `find` statt tatsächliches Ausführen eines
+   `grep`/`ls`.** Ich habe einmal gesagt "`ReactiveFakeInstalledAppsRepository`
+   ist toter Code" ohne vorher ein zweites Suchwerkzeug zu benutzen.
+   War falsch — der Test, der ihn benutzt, war nicht im Zip das ich
+   hatte. Lerning: bei "existiert X?"-Fragen immer **explizit nachschauen**
+   und bei "ich finde X nicht" den Unsicherheits-Marker setzen, nicht
+   direkt zu "es existiert nicht" springen.
+
+4. **Contract-Test mit echten `content://`-URIs schreiben**, ohne zu
+   merken dass der Manager non-file-URIs als `WallpaperState.NONE`
+   interpretiert. Immer die Read-Pfade im Manager lesen, bevor man
+   Test-Daten konstruiert.
+
+### Was die Contracts NICHT sind
+
+- Sie sind keine Manager-Logik-Tests. Die `BackupManager*Test`-Suite
+  (~200KB) existiert separat und prüft die Business-Logik des Managers.
+  Contracts prüfen nur Interface-Garantien.
+- Sie sind keine Integration-Tests. Sie laufen gegen `FakeDataStore`,
+  nicht gegen echtes DataStore-auf-Disk.
+- Sie sind keine UI-Tests. Die liegen in `androidTest/`.
+- Sie sind kein Ersatz für Manager-spezifische Tests bei nicht-trivialer
+  Logik (z.B. das Sort-Verhalten in `AppUsageManager`). Der Contract
+  dokumentiert _warum_ er solche Logik nicht prüft, und zeigt so, wo
+  zusätzliche Tests nötig sind.
+
+---
+
+## Verhaltens-Disziplin für die Test-Arbeit
+
+Dinge, die in dieser Codebase mehrfach nachweislich funktionieren und
+deshalb Standard sein sollten:
+
+1. **Contract-Tests sind das Default-Werkzeug für Drift-Schutz.** Wenn
+   ein Interface zwei Implementierungen hat, gehört ein Contract dazu.
+   Ausnahmen sind begründet in TESTING_CONVENTIONS.kt.
+
+2. **Bewusste Drifts werden dokumentiert, nicht versteckt.** Wenn Fake
+   und Manager absichtlich unterschiedlich sind, gehört das in den
+   Klassen-KDoc des Contracts, in den Abschnitt "NICHT IM CONTRACT —
+   bewusste Drifts".
+
+3. **Bei Contract-Rot gewinnt der Manager.** Fake angleichen, nicht
+   Manager lockern. (Ausnahme: bewusste Drift, dann in KDoc dokumentieren
+   und Test _nicht_ schreiben.)
+
+4. **Vor dem Testschreiben: beide Implementierungen lesen.** Am
+   liebsten nebeneinander. Subtile Asymmetrien (blank==remove im
+   Single-Pfad aber blank==ignore im Batch-Pfad bei CustomNames, z.B.)
+   sind sonst nicht sichtbar und führen zu falschen Tests.
+
+5. **Ehrliches KDoc > zu viele Tests.** Wenn ein Test nicht ehrlich
+   möglich ist (Mock-Theater, System-APIs), gehört das begründet
+   dokumentiert statt mit pseudo-Tests erschlagen. `TimeBasedEvents`
+   ist das Extrem davon: ein ganzer File nur für ein ADR, kein einziger
+   Test. Das ist legitim.
+
+---
+
+## Historische Notiz
+
+Die Contract-Test-Suite wurde in sieben aufeinanderfolgenden Runden
+aufgebaut, jede Runde mit Verifikation ("alle Tests grün") vor der
+nächsten. Das Muster ist: **ein Contract + zwei Subklassen + Verify +
+falls rot: Fake fixen + Verify**. Nicht versuchen, alle auf einmal zu
+machen — jede Runde hat mindestens eine neue Subtilität offenbart.
+
+Wenn neue Repositories dazukommen, ist diese Reihenfolge weiterhin
+empfohlen, statt Shortcut zu suchen.

@@ -220,3 +220,176 @@ package com.github.reygnn.kolibri_launcher
  *
  * ============================================================================
  */
+
+/**
+ * ============================================================================
+ * CONTRACT TESTS — FAKE vs REAL REPOSITORY
+ * ============================================================================
+ *
+ * Wozu Contract Tests?
+ *   Fakes driften über die Zeit von ihrer echten Implementierung ab — man ändert
+ *   den Manager, vergisst den Fake, und plötzlich sehen Unit-Tests gegen den
+ *   Fake glücklich aus, während Produktion still kaputt ist. Contract Tests
+ *   fahren denselben Satz an Assertions gegen BEIDE Implementierungen. Wenn
+ *   etwas driftet, wird ein Test rot.
+ *
+ * Naming-Konvention (siehe test/.../data/):
+ *   XyzRepositoryContract.kt                — abstract, enthält alle @Test-Methoden
+ *   FakeXyzRepositoryContractTest.kt        — konkrete Subklasse gegen den Fake
+ *   XyzManagerContractTest.kt               — konkrete Subklasse gegen den Manager
+ *
+ * Das Muster:
+ *
+ *   abstract class XyzRepositoryContract {
+ *       @get:Rule val mainDispatcherRule = MainDispatcherRule()
+ *       @get:Rule val timberRule = TimberRule()
+ *
+ *       protected abstract fun createRepository(): XyzRepository
+ *
+ *       @Test fun `some invariant`() = runTest {
+ *           val repo = createRepository()
+ *           // assert against the interface contract…
+ *       }
+ *   }
+ *
+ *   class FakeXyzRepositoryContractTest : XyzRepositoryContract() {
+ *       override fun createRepository() = FakeXyzRepository()
+ *   }
+ *
+ *   class XyzManagerContractTest : XyzRepositoryContract() {
+ *       override fun createRepository() = XyzManager(FakeDataStore(), mockk(relaxed = true))
+ *   }
+ *
+ * JUNIT4 REGELN-VERERBUNG:
+ *   JUnit4 findet geerbte @get:Rule Felder via Reflection. Die Rules gehören
+ *   in die abstrakte Basisklasse, NICHT in jede Subklasse einzeln. Verifiziert
+ *   mit allen bestehenden Contract-Tests — funktioniert zuverlässig.
+ *
+ * MANAGER-TEST: `externalScope = null` BEI shareIn-BASIERTEN MANAGERN
+ *   Managers, die `shareIn(externalScope, WhileSubscribed(…), replay = 1)`
+ *   über ihre Flows legen (FavoritesManager, FavoritesOrderManager,
+ *   SwipeActionsManager), haben einen Write-then-Read-Bug unter
+ *   UnconfinedTestDispatcher: der Write geht durch zu dataStore, der
+ *   Upstream-Collector hat den Update aber noch nicht in den Replay-Buffer
+ *   geschrieben, der Read liefert den alten gecachten Wert.
+ *
+ *   Lösung: im Manager-Contract-Test `externalScope = null` übergeben —
+ *   das überspringt die shareIn-Schicht, der Flow bleibt cold, und jeder
+ *   `.first()` sieht den aktuellen dataStore-Wert direkt. Konkretes
+ *   Beispiel in `FavoritesManagerContractTest.kt`.
+ *
+ *   Das shareIn-Verhalten SELBST gehört NICHT in den Contract (es ist
+ *   Produktions-Infrastruktur, kein Interface-Vertrag). Separater Test:
+ *   `FavoritesManagerShareInTest.kt` prüft Replay, Hot-Sharing und
+ *   WhileSubscribed-Timeout mit virtueller Zeit.
+ *
+ *   Wichtig dort: `testScheduler.runCurrent()` statt `advanceUntilIdle()`,
+ *   sonst läuft man versehentlich durch den WhileSubscribed-Timeout.
+ *
+ * MOCK-THEATER VERMEIDEN — WENN MANAGER NICHT EHRLICH INSTANZIIERBAR IST:
+ *   Wenn der Manager System-APIs braucht (PackageManager, ContentResolver,
+ *   AlarmManager, Calendar), ist er im Unit-Test nur mit heavy mocking
+ *   instanziierbar. Ein Contract-Test gegen dieses Mock-Konstrukt beweist
+ *   nichts: er prüft Vertragstreue zwischen Fake und Mock, nicht zwischen
+ *   Fake und echtem Manager.
+ *
+ *   Konvention: In solchen Fällen KEINEN Manager-Contract-Test schreiben.
+ *   Der Contract wird Fake-only (eine Subklasse), mit ehrlichem KDoc das
+ *   die Limitation benennt. Beispiele:
+ *     - BackupRepositoryContract (60KB Manager mit Uri/ContentResolver)
+ *     - InstalledAppsRepositoryContract (PackageManager)
+ *     - TimeBasedEventsRepositoryContract (kein Contract, nur ADR-Doku —
+ *       siehe dortigen KDoc)
+ *
+ * BEKANNTE DIVERGENZEN DOKUMENTIEREN STATT VERSTECKEN:
+ *   Wenn Fake und Manager bewusst unterschiedlich sind (z.B. Fake-Default
+ *   ist `true` für Test-Convenience, Manager-Default ist `false`), gehört
+ *   das in den Klassen-KDoc des Contracts. Unter "NICHT IM CONTRACT — bewusste
+ *   Drifts". Das verhindert dass ein Nachfolger diese Drift aus Versehen
+ *   als Contract-Bug interpretiert.
+ *
+ *   Beispiele (siehe jeweiliges KDoc):
+ *     - ScreenLockRepositoryContract: initial isLockingAvailable true vs false
+ *     - InstalledAppsStateRepositoryContract: purgeRepository No-Op vs Reset
+ *     - WallpaperRepositoryContract: scale ohne imageUri, non-file URI scheme
+ *
+ * DRIFT-FIX POLICY:
+ *   Wenn ein Contract-Test einen echten Bug aufdeckt (Fake != Manager, keine
+ *   bewusste Drift), ist die Faustregel: Fake an Manager-Semantik angleichen,
+ *   NICHT Manager lockern. Grund: Produktions-Verhalten ist Wahrheit, Test-
+ *   Verhalten muss dem folgen. Bereits so gefixt:
+ *     - FakeFavoritesRepository.saveFavoriteComponents: Blank-Filter analog
+ *       zum Manager
+ *     - FakeFavoritesOrderRepository.sortFavoriteComponents: `order.distinct()`
+ *       analog zur Find-and-Remove-Logik im Manager
+ *     - FakeCustomNamesRepository.removeCustomNameForPackage: idempotent,
+ *       immer true, immer trigger — analog zum Manager
+ *
+ * ANDROIDTEST-DOPPLUNG VERGESSEN NICHT:
+ *   Einige Fakes haben Dublikate im androidTest-Sourceset (z.B.
+ *   FakeSettingsRepository). Beim Fake-Fix IMMER BEIDE Orte syncen, sonst
+ *   driftet man in die andere Richtung. Siehe Warnung in
+ *   FakeSettingsRepository.kt.
+ * ============================================================================
+ */
+
+/**
+ * ============================================================================
+ * MUTABLESHAREDFLOW IN CONSTRUCTOR — BUFFER OVERFLOW TRAP
+ * ============================================================================
+ *
+ * Das Problem:
+ *   Einige Manager (z.B. CustomNamesManager, ScreenLockManager) benutzen
+ *   `MutableSharedFlow<Unit>` für Event-Streams. In Produktion wird dieser
+ *   SharedFlow von einem Konsumenten (InstalledAppsManager, etc.)
+ *   permanent collected — `emit` geht immer durch, weil der Buffer sofort
+ *   geleert wird.
+ *
+ *   In Tests gibt es oft keinen Subscriber. Das default-Verhalten von
+ *   MutableSharedFlow mit `extraBufferCapacity = 0` und keinen Subscribern
+ *   ist: `emit` SUSPENDIERT, bis ein Subscriber kommt. Im Unit-Test kommt
+ *   nie einer. Resultat: Der Test hängt, JUnit-Timeout nach 60s.
+ *
+ *   Auch mit `extraBufferCapacity = 1` (wie in Produktion via
+ *   AppUpdateModule) ist das nur bis zur ERSTEN Emission sicher. Der
+ *   zweite `emit` füllt den Buffer wieder und suspendiert.
+ *
+ * Zwei Fixes, je nach Kontext:
+ *
+ * 1) Manager-Tests mit Contract-artigen Aufrufen (repo.triggerX() mehrmals):
+ *    SharedFlow im Test-Setup mit `BufferOverflow.DROP_OLDEST` konfigurieren.
+ *    Trigger-Verhalten ist dann nicht beobachtbar, aber der Test hängt nicht.
+ *
+ *      val trigger = MutableSharedFlow<Unit>(
+ *          replay = 0,
+ *          extraBufferCapacity = 1,
+ *          onBufferOverflow = BufferOverflow.DROP_OLDEST
+ *      )
+ *      val manager = CustomNamesManager(fakeDataStore, trigger, context)
+ *
+ *    Referenz: CustomNamesManagerContractTest.kt
+ *
+ * 2) Tests die das Event-Verhalten PRÜFEN wollen (nicht nur nicht-hängen):
+ *    Turbine-Pattern — Collector vor Trigger aufsetzen.
+ *
+ *      repo.eventFlow.test {
+ *          repo.doAction()
+ *          assertEquals(Unit, awaitItem())
+ *          cancelAndIgnoreRemainingEvents()
+ *      }
+ *
+ *    Das funktioniert weil `test { }` synchron einen Collector attached,
+ *    bevor `doAction` aufgerufen wird. Der Buffer-Overflow tritt nicht ein.
+ *
+ *    Referenz: ScreenLockRepositoryContract.kt, ScreenLockManagerTest.kt
+ *
+ * ANTI-PATTERN:
+ * ✗ val trigger = MutableSharedFlow<Unit>()   // hängt beim ersten emit!
+ * ✗ val trigger = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+ *                                              // hängt beim zweiten emit!
+ *
+ * Wann WELCHER FIX:
+ *   - Event-Emission ist nicht-observed, nur "darf nicht crashen"  → DROP_OLDEST
+ *   - Event-Emission soll beobachtet werden (awaitItem/expectNoEvents) → Turbine
+ * ============================================================================
+ */
