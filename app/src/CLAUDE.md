@@ -237,11 +237,34 @@ deshalb Standard sein sollten:
 
 ## Historische Notiz
 
-Die Contract-Test-Suite wurde in sieben aufeinanderfolgenden Runden
-aufgebaut, jede Runde mit Verifikation ("alle Tests grün") vor der
-nächsten. Das Muster ist: **ein Contract + zwei Subklassen + Verify +
-falls rot: Fake fixen + Verify**. Nicht versuchen, alle auf einmal zu
-machen — jede Runde hat mindestens eine neue Subtilität offenbart.
+Die Test-Infrastruktur dieses Projekts wurde in zwei großen,
+aufeinanderfolgenden Aufräum-Runden auf den heutigen Stand gebracht.
+Beide wurden schrittweise durchgeführt, nicht in einem Rutsch, und
+beide hatten denselben Rhythmus: **eine Einheit + Verifikation ("alle
+Tests grün") + nächste Einheit**. Die Verifikation zwischendrin hat
+in beiden Runden nicht-triviale Probleme aufgedeckt, die ohne sie erst
+viel später sichtbar geworden wären.
+
+### MockK-Migration
+
+Die Unit-Test-Suite wurde in einer separaten Session vollständig von
+Mockito auf MockK migriert (72 Testdateien, ~1134 Tests). Die dabei
+gesammelten Fallstricke stehen in `TESTING_CONVENTIONS.kt` →
+"MOCKK CONVENTIONS". Darunter: `relaxUnitFun` vs. `relaxed` für suspend-
+Funktionen, `emit(Unit)` statt `emit(any())` für `MutableSharedFlow<Unit>`,
+`coEvery + answers` statt des nicht-existenten `coAnswers`, und die
+`DataStore`-Extension-Function-Falle mit `FakeDataStore` als Lösung.
+**Neue Tests schreiben ausschließlich MockK, nie Mockito.**
+
+### Contract-Test-Initiative
+
+Die Contract-Test-Suite (12 echte Contracts + 1 ADR-Doku) wurde in
+sieben aufeinanderfolgenden Runden aufgebaut. Das Muster pro Repository
+war: **ein Contract + zwei Subklassen + Verify + falls rot: Fake fixen
++ Verify**. Nicht versuchen, alles auf einmal zu machen — jede Runde
+hat mindestens eine neue Subtilität offenbart (shareIn-Write-then-Read,
+WhileSubscribed-Timeout in Infrastruktur-Tests, SharedFlow-Buffer-
+Overflow-Trap, Wallpaper-URI-Validierung, idempotenter Remove).
 
 Wenn neue Repositories dazukommen, ist diese Reihenfolge weiterhin
 empfohlen, statt Shortcut zu suchen.
