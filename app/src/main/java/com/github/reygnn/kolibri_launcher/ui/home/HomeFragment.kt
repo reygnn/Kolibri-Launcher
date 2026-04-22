@@ -46,6 +46,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
+import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
@@ -237,7 +238,7 @@ class HomeFragment : Fragment() {
      */
     private fun registerLayerImagePicker() {
         layerPickerLauncher = registerForActivityResult(
-            androidx.activity.result.contract.ActivityResultContracts.GetContent()
+            WallpaperImagePicker.contract()
         ) { uri ->
             if (uri != null) {
                 try {
@@ -2182,7 +2183,7 @@ class HomeFragment : Fragment() {
                     try {
                         // Transforms sichern BEVOR neuer Layer hinzugefügt wird
                         saveCurrentViewTransforms()
-                        layerPickerLauncher?.launch("image/*")
+                        layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error launching layer picker")
                     }

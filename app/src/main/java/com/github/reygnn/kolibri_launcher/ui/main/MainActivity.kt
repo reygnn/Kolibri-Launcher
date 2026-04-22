@@ -20,7 +20,6 @@ import android.provider.CalendarContract
 import android.provider.Settings
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
@@ -43,6 +42,7 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -142,7 +142,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private val wallpaperPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        WallpaperImagePicker.contract()
     ) { uri: android.net.Uri? ->
         try {
             if (uri != null) {
@@ -557,9 +557,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
                 is UiEvent.OpenWallpaperPicker -> {
                     try {
-                        wallpaperPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        WallpaperImagePicker.launch(wallpaperPickerLauncher)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error launching wallpaper picker")
                         Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
@@ -674,9 +672,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 // Normal: Wallpaper wählen
                 options.add(getString(R.string.wallpaper_choose))
                 actions.add {
-                    wallpaperPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
+                    WallpaperImagePicker.launch(wallpaperPickerLauncher)
                 }
 
                 // Falls Wallpaper vorhanden: Edit & Remove Optionen
