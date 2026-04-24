@@ -99,12 +99,11 @@ class BackupFragment : Fragment() {
         observeBackupState()
     }
 
+    private val backupFilenameBuilder = BackupFilenameBuilder()
+
     private fun setupClickListeners() {
         binding.buttonExportBackup.setOnClickListener {
-            val timestamp = SimpleDateFormat(AppConstants.DATE_FORMAT_BACKUP_FILENAME, Locale.getDefault())
-                .format(Date())
-            val filename = "${AppConstants.BACKUP_FILE_PREFIX}$timestamp${AppConstants.BACKUP_FILE_EXTENSION}"
-            exportLauncher.launch(filename)
+            exportLauncher.launch(backupFilenameBuilder.build())
         }
 
         binding.buttonImportBackup.setOnClickListener {
@@ -143,8 +142,11 @@ class BackupFragment : Fragment() {
                 // 3. DANN Dialog erstellen mit bereits geladenen Daten
                 val dialogBinding = DialogImportOptionsBinding.inflate(layoutInflater)
 
-                // Preview-Daten sofort setzen (nicht asynchron!)
-                val dateText = if (preview.timestamp > 0L) {
+                // Pure UI-State aus der Preview ableiten (getestet in ImportOptionsUiStateTest)
+                val uiState = ImportOptionsUiState.from(preview)
+
+                // Display-Datum bleibt hier - Locale + StringResource nur im Fragment
+                val dateText = if (uiState.dateHasTimestamp) {
                     SimpleDateFormat(AppConstants.DATE_FORMAT_DISPLAY, Locale.getDefault())
                         .format(Date(preview.timestamp))
                 } else {
@@ -152,77 +154,47 @@ class BackupFragment : Fragment() {
                 }
 
                 dialogBinding.apply {
-                    textBackupInfo.text = getString(
-                        R.string.backup_preview_date,
-                        dateText
-                    )
+                    textBackupInfo.text = getString(R.string.backup_preview_date, dateText)
 
-                    val favoritesVisible = preview.favoriteCount > 0
-                    checkboxImportFavorites.text = getString(
-                        R.string.import_option_favorites,
-                        preview.favoriteCount
-                    )
-                    checkboxImportFavorites.isVisible = favoritesVisible
-                    checkboxImportFavorites.isChecked = favoritesVisible
+                    checkboxImportFavorites.text = getString(R.string.import_option_favorites, preview.favoriteCount)
+                    checkboxImportFavorites.isVisible = uiState.favorites.visible
+                    checkboxImportFavorites.isChecked = uiState.favorites.checked
 
+                    checkboxImportOrder.text = getString(R.string.import_option_order)
+                    checkboxImportOrder.isVisible = uiState.order.visible
+                    checkboxImportOrder.isChecked = uiState.order.checked
 
-                    val orderVisible = preview.orderCount > 0
-                    checkboxImportOrder.text = getString(
-                        R.string.import_option_order
-                    )
-                    checkboxImportOrder.isVisible = orderVisible
-                    checkboxImportOrder.isChecked = orderVisible
+                    checkboxImportHiddenApps.text = getString(R.string.import_option_hidden_apps, preview.hiddenCount)
+                    checkboxImportHiddenApps.isVisible = uiState.hiddenApps.visible
+                    checkboxImportHiddenApps.isChecked = uiState.hiddenApps.checked
 
+                    checkboxImportCustomNames.text = getString(R.string.import_option_custom_names, preview.customNamesCount)
+                    checkboxImportCustomNames.isVisible = uiState.customNames.visible
+                    checkboxImportCustomNames.isChecked = uiState.customNames.checked
 
-                    val hiddenVisible = preview.hiddenCount > 0
-                    checkboxImportHiddenApps.text = getString(
-                        R.string.import_option_hidden_apps,
-                        preview.hiddenCount
-                    )
-                    checkboxImportHiddenApps.isVisible = hiddenVisible
-                    checkboxImportHiddenApps.isChecked = hiddenVisible
+                    checkboxImportSwipeActions.text = getString(R.string.import_option_swipe_actions, uiState.swipeActionCount)
+                    checkboxImportSwipeActions.isVisible = uiState.swipeActions.visible
+                    checkboxImportSwipeActions.isChecked = uiState.swipeActions.checked
 
-
-                    val namesVisible = preview.customNamesCount > 0
-                    checkboxImportCustomNames.text = getString(
-                        R.string.import_option_custom_names,
-                        preview.customNamesCount
-                    )
-                    checkboxImportCustomNames.isVisible = namesVisible
-                    checkboxImportCustomNames.isChecked = namesVisible
-
-
-                    val swipeCount = listOf(preview.hasSwipeLeft, preview.hasSwipeRight).count { it }
-                    val swipeActionsVisible = swipeCount > 0
-                    checkboxImportSwipeActions.text = buildSwipeActionsText(preview)
-                    checkboxImportSwipeActions.isVisible = swipeActionsVisible
-                    checkboxImportSwipeActions.isChecked = swipeActionsVisible
-
-
-                    val themeVisible = preview.hasThemeSettings
                     checkboxImportThemeSettings.text = getString(R.string.import_option_theme)
-                    checkboxImportThemeSettings.isVisible = themeVisible
-                    checkboxImportThemeSettings.isChecked = themeVisible
+                    checkboxImportThemeSettings.isVisible = uiState.themeSettings.visible
+                    checkboxImportThemeSettings.isChecked = uiState.themeSettings.checked
 
-                    val gestureVisible = preview.hasGestureSettings
                     checkboxImportGestureSettings.text = getString(R.string.import_option_gestures)
-                    checkboxImportGestureSettings.isVisible = gestureVisible
-                    checkboxImportGestureSettings.isChecked = gestureVisible
+                    checkboxImportGestureSettings.isVisible = uiState.gestureSettings.visible
+                    checkboxImportGestureSettings.isChecked = uiState.gestureSettings.checked
 
-                    val timeEventsVisible = preview.hasTimeBasedEvents
                     checkboxImportTimeBasedEvents.text = getString(R.string.import_option_time_events)
-                    checkboxImportTimeBasedEvents.isVisible = timeEventsVisible
-                    checkboxImportTimeBasedEvents.isChecked = timeEventsVisible
+                    checkboxImportTimeBasedEvents.isVisible = uiState.timeBasedEvents.visible
+                    checkboxImportTimeBasedEvents.isChecked = uiState.timeBasedEvents.checked
 
-                    val qolVisible = preview.hasQualityOfLife
                     checkboxImportQualityOfLife.text = getString(R.string.import_option_qol)
-                    checkboxImportQualityOfLife.isVisible = qolVisible
-                    checkboxImportQualityOfLife.isChecked = qolVisible
+                    checkboxImportQualityOfLife.isVisible = uiState.qualityOfLife.visible
+                    checkboxImportQualityOfLife.isChecked = uiState.qualityOfLife.checked
 
-                    val powerUserVisible = preview.hasPowerUserSettings
                     checkboxImportPowerUserSettings.text = getString(R.string.import_option_power_user)
-                    checkboxImportPowerUserSettings.isVisible = powerUserVisible
-                    checkboxImportPowerUserSettings.isChecked = powerUserVisible
+                    checkboxImportPowerUserSettings.isVisible = uiState.powerUserSettings.visible
+                    checkboxImportPowerUserSettings.isChecked = uiState.powerUserSettings.checked
                 }
 
                 // 4. Dialog anzeigen
@@ -260,14 +232,6 @@ class BackupFragment : Fragment() {
         }
     }
 
-    /**
-     * NEU: Baut den Text für die Swipe Actions Checkbox basierend auf Preview-Daten.
-     */
-    private fun buildSwipeActionsText(preview: BackupPreview): String {
-        val swipeCount = listOf(preview.hasSwipeLeft, preview.hasSwipeRight).count { it }
-        return getString(R.string.import_option_swipe_actions, swipeCount)
-    }
-
     private fun observeBackupState() {
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -294,21 +258,22 @@ class BackupFragment : Fragment() {
             is BackupState.ImportSuccess -> {
                 hideLoading()
 
-                // Unterscheide zwischen App-Import und Settings-Import
-                val message = if (state.importedCount > 0) {
-                    // Apps wurden importiert
-                    if (state.skippedCount > 0) {
-                        getString(
-                            R.string.backup_import_success_with_skipped,
-                            state.importedCount,
-                            state.skippedCount
-                        )
-                    } else {
-                        getString(R.string.backup_import_success_simple, state.importedCount)
-                    }
-                } else {
-                    // Nur Settings importiert (Gestures/TimeEvents/Theme/SwipeActions)
-                    getString(R.string.backup_import_success_settings_only)
+                // Pure Logic entscheidet die Variante (getestet in ImportSuccessMessageTest)
+                val message = when (
+                    val msg = ImportSuccessMessage.select(state.importedCount, state.skippedCount)
+                ) {
+                    is ImportSuccessMessage.AppsImportedWithSkipped -> getString(
+                        R.string.backup_import_success_with_skipped,
+                        msg.importedCount,
+                        msg.skippedCount,
+                    )
+                    is ImportSuccessMessage.AppsImported -> getString(
+                        R.string.backup_import_success_simple,
+                        msg.importedCount,
+                    )
+                    ImportSuccessMessage.SettingsOnly -> getString(
+                        R.string.backup_import_success_settings_only,
+                    )
                 }
 
                 showImportSuccess(message, state.missingApps)
@@ -366,21 +331,25 @@ class BackupFragment : Fragment() {
         }
     }
 
+    private val missingAppsFormatter = MissingAppsFormatter()
+
     private fun showImportSuccess(message: String, missingApps: Set<String>) {
         _binding?.let {
-            val displayMessage = if (missingApps.isNotEmpty()) {
-                val appList = missingApps.take(AppConstants.MAX_MISSING_APPS_IN_SNACKBAR).joinToString("\n") { app ->
-                    app.split("/")[0]
-                }
-
-                val moreText = if (missingApps.size > AppConstants.MAX_MISSING_APPS_IN_SNACKBAR) {
-                    "\n... ${getString(R.string.backup_and_more, missingApps.size - AppConstants.MAX_MISSING_APPS_IN_SNACKBAR)}"
-                } else {
-                    ""
-                }
-                "$message\n\n${getString(R.string.backup_missing_apps)}:\n$appList$moreText"
-            } else {
+            val formatted = missingAppsFormatter.format(missingApps)
+            val displayMessage = if (formatted.listText.isEmpty()) {
                 message
+            } else {
+                buildString {
+                    append(message)
+                    append("\n\n")
+                    append(getString(R.string.backup_missing_apps))
+                    append(":\n")
+                    append(formatted.listText)
+                    if (formatted.hasOverflow) {
+                        append("\n... ")
+                        append(getString(R.string.backup_and_more, formatted.overflowCount))
+                    }
+                }
             }
 
             Snackbar.make(it.root, displayMessage, Snackbar.LENGTH_LONG).show()

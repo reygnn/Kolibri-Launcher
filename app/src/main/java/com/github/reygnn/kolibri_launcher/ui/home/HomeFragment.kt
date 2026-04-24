@@ -71,6 +71,149 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+# HomeFragment size — rationale
+
+This note documents why `HomeFragment.kt` is currently ~2,640 lines and why
+a Fragment-delegate split was deprioritized in favor of pulling pure logic
+into separately testable classes.
+
+## Why the file is large
+
+HomeFragment carries the full UI responsibility of the launcher's home screen:
+
+- Wallpaper rendering and live edit mode (enter / commit / cancel,
+save button, layer add / delete / up / down, snap controls, toolbar
+dimming, touch interception)
+- Multi-mode favorites rendering (single / split), including per-button
+colors, long-press menus, and scroll-width adjustment
+- Time-based chips (alarm, calendar) with formatting and contrast-aware
+styling
+- Clock display and AM/PM handling
+- Status-bar and navigation-bar insets
+- Back-press handling across edit states
+- Orientation lock coordination
+- Lifecycle-scoped observation of every relevant ViewModel flow
+
+All of these touch `View`, `binding`, or `LifecycleOwner`. None of it can
+live outside a Fragment on Android. The absolute floor for this file —
+given what the screen actually does — is not small.
+
+## Why not split it into Fragment delegates?
+
+The ViewModel layer already uses a delegate pattern (`ClockDelegate`,
+`WallpaperDelegate`, `AppManagementDelegate`, etc.). Copying that pattern
+into the Fragment would produce a `WallpaperEditController`,
+`FavoritesRenderer`, and `TimeChipsRenderer`, and would shrink
+HomeFragment to roughly 600–700 lines.
+
+That split would deliver:
+
+- Smaller files per review
+- Fewer merge conflicts when multiple features land simultaneously
+- Easier navigation for someone new to the codebase
+
+It would **not** deliver:
+
+- Better test coverage
+- Fewer bugs in the extracted regions
+
+The reason is that Fragment-side delegates still depend on `View`,
+`binding`, and `LifecycleOwner`. They cannot be unit-tested with JUnit +
+MockK the way ViewModel delegates can. Testing them requires Robolectric
+or instrumented tests, both of which this project deliberately avoids —
+instrumented tests are flaky and slow locally, which is why the convention
+is to write JVM unit tests against pure-logic classes.
+
+In other words: a Fragment split reduces the number reviewers see,
+without reducing the complexity they need to understand. File size alone
+isn't a quality metric.
+
+## What was done instead
+
+Rather than reorganizing UI wiring, the decision logic most prone to
+silent regressions was extracted into pure Kotlin classes and covered by
+fast unit tests:
+
+- `LayerButtonsState` — visibility, enabled state, and alpha for layer
+edit buttons
+- `SnapIconResolver` + top-level `SnapMode` enum — drawable resource
+selection for the four snap buttons
+- `DoubleClickDetector` — threshold-based double-click detection with an
+injected clock (replaces a `System.currentTimeMillis`-based test that
+needed `Thread.sleep`)
+- `BackupFilenameBuilder` — export filename generation with injected
+clock and locale
+- `ImportOptionsUiState` + `CheckboxSpec` — derives dialog checkbox
+visibility from a `BackupPreview`
+- `MissingAppsFormatter` — truncation and overflow formatting for the
+missing-apps list
+- `ImportSuccessMessage` — sealed class selecting the correct success
+message variant based on imported / skipped counts
+
+These cover the classes of bugs that actually appear in practice:
+
+- "New `BackupPreview` field added but the dialog forgot to render it"
+- "New `SnapMode` value but no icon mapping for it"
+- "Off-by-one in layer button enable / disable logic"
+- "Locale-dependent date format slipped into a filename"
+
+The Fragment itself is still large, but the parts most likely to regress
+silently are now fenced off and covered by hermetic JVM tests that run
+in under a second.
+
+## When a split would become worthwhile
+
+Reasons to actually perform the Fragment-delegate split later:
+
+- Multiple developers hit merge conflicts in HomeFragment regularly
+- Code review on HomeFragment changes is consistently slow because
+reviewers can't hold the whole file in their head
+- One UI region starts receiving frequent new features, and isolating it
+would meaningfully speed up feature work
+
+If none of those pressures exist, the split is cosmetic — and carries
+real risk, because several UI regions share ordering assumptions around
+Flow collection (e.g., colors are applied before chips re-render). A
+split would need to make those assumptions explicit, which is a nontrivial
+piece of work on its own.
+
+## Candidate split points (for reference)
+
+If and when the split is warranted, these are the regions that make
+sense to extract, in order of decreasing self-containment and decreasing
+refactor safety:
+
+1. **Wallpaper edit controller** — lines ~1956–2526, roughly 570 lines.
+Covers enter / commit / cancel, snap buttons, layer operations, save
+and cancel buttons. Largest single region and the most self-contained.
+
+2. **Time chips renderer** — roughly 160 lines around
+`updateTimeBasedChips`, `configureChip`, `createAlarmChip`,
+`createCalendarChip`. Smallest region; good as an initial extraction
+to validate the controller pattern.
+
+3. **Favorites renderer** — roughly 490 lines scattered across
+`renderFavorites`, `adjustScrollViewWidth`, `createAppButton`,
+`updateAllColors`, `clearAllViews`. Most entangled with layout-related
+flows; highest refactor risk. Should be done last, one staged PR at
+a time.
+
+Expected combined reduction: ~1,200 lines. HomeFragment would end up
+around 600–700 lines. Each extraction should ship as its own PR, not
+bundled.
+
+## Summary
+
+HomeFragment is large because the home screen genuinely does a lot of
+platform-coupled work. The lever that improves correctness — pulling out
+pure decision logic and testing it directly — has been applied.
+The lever that only improves organization — moving Android-coupled code
+across file boundaries — is available but has been deferred until there
+is concrete evidence it would pay off.
+**/
+
+
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
@@ -1602,20 +1745,27 @@ class HomeFragment : Fragment() {
         }
     }
 
-    abstract class DoubleClickListener : View.OnClickListener {
-        private var lastClickTime: Long = 0
+    /**
+     * View.OnClickListener-Wrapper für Double-Click-Erkennung.
+     *
+     * Die eigentliche Threshold-/Timing-Logik liegt in [DoubleClickDetector],
+     * damit sie deterministisch unit-testbar ist (siehe DoubleClickDetectorTest).
+     * Dieser Wrapper bleibt hier bestehen, da Call-Sites (setOnClickListener)
+     * eine View.OnClickListener-Instanz erwarten.
+     */
+    abstract class DoubleClickListener(
+        private val detector: DoubleClickDetector = DoubleClickDetector(),
+    ) : View.OnClickListener {
 
         override fun onClick(v: View?) {
             try {
-                val clickTime = System.currentTimeMillis()
-                if (clickTime - lastClickTime < AppConstants.DOUBLE_CLICK_THRESHOLD) {
+                if (detector.registerClick()) {
                     try {
                         onDoubleClick()
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in onDoubleClick")
                     }
                 }
-                lastClickTime = clickTime
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in onClick")
             }
@@ -2434,95 +2584,91 @@ class HomeFragment : Fragment() {
     }
 
     /**
+     * Wendet den aus [LayerButtonsState] berechneten UI-Zustand auf die
+     * Layer-Buttons an (Visibility, Enabled, Alpha). Gemeinsame Quelle der
+     * Wahrheit für [updateLayerButtonsVisibility] und [updateLayerButtonStates].
+     *
+     * Idempotent: mehrfacher Aufruf hintereinander ist unproblematisch.
+     */
+    private fun applyLayerButtonsState() {
+        if (_binding == null) return
+        try {
+            val wallpaperView = binding.wallpaperView
+            val state = LayerButtonsState.from(
+                isMultiLayerMode = wallpaperView.isMultiLayerMode,
+                layerCount = wallpaperView.layerCount,
+                activeLayerIndex = wallpaperView.activeLayerIndex,
+            )
+
+            binding.btnLayerAdd.visibility = if (state.addVisible) View.VISIBLE else View.GONE
+            binding.btnLayerDelete.visibility = if (state.deleteVisible) View.VISIBLE else View.GONE
+            binding.btnLayerUp.visibility = if (state.upVisible) View.VISIBLE else View.GONE
+            binding.btnLayerDown.visibility = if (state.downVisible) View.VISIBLE else View.GONE
+            binding.txtLayerIndicator.visibility = if (state.indicatorVisible) View.VISIBLE else View.GONE
+
+            binding.btnLayerUp.isEnabled = state.upEnabled
+            binding.btnLayerDown.isEnabled = state.downEnabled
+            binding.btnLayerDelete.isEnabled = state.deleteEnabled
+
+            // Visuelle Rückmeldung: Deaktivierte Buttons halbtransparent
+            binding.btnLayerUp.alpha = state.upAlpha
+            binding.btnLayerDown.alpha = state.downAlpha
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error applying layer buttons state")
+        }
+    }
+
+    /**
      * Steuert die Sichtbarkeit der Layer-Buttons.
      * Add-Button: Immer sichtbar (auch ohne Layer, um den ersten hinzuzufügen)
      * Delete/Up/Down: Nur sichtbar wenn Layer vorhanden
+     *
+     * Delegiert an [applyLayerButtonsState] - Name erhalten für Call-Site-Klarheit.
      */
-    private fun updateLayerButtonsVisibility() {
-        if (_binding == null) return
-
-        try {
-            val wallpaperView = binding.wallpaperView
-            val hasLayers = wallpaperView.isMultiLayerMode && wallpaperView.layerCount > 0
-
-            // Add: Immer sichtbar im Edit-Mode
-            binding.btnLayerAdd.visibility = View.VISIBLE
-
-            // Delete, Up, Down: Nur wenn Layer existieren
-            binding.btnLayerDelete.visibility = if (hasLayers) View.VISIBLE else View.GONE
-            binding.btnLayerUp.visibility = if (hasLayers) View.VISIBLE else View.GONE
-            binding.btnLayerDown.visibility = if (hasLayers) View.VISIBLE else View.GONE
-            binding.txtLayerIndicator.visibility = if (hasLayers) View.VISIBLE else View.GONE
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating layer buttons visibility")
-        }
-    }
+    private fun updateLayerButtonsVisibility() = applyLayerButtonsState()
 
     /**
      * Aktiviert/Deaktiviert Layer-Buttons basierend auf Position.
      * - Up deaktiviert wenn Layer ganz oben
      * - Down deaktiviert wenn Layer ganz unten
      * - Delete deaktiviert wenn kein Layer selektiert
+     *
+     * Delegiert an [applyLayerButtonsState] - Name erhalten für Call-Site-Klarheit.
      */
-    private fun updateLayerButtonStates() {
-        if (_binding == null) return
-
-        try {
-            val wallpaperView = binding.wallpaperView
-            val active = wallpaperView.activeLayerIndex
-            val count = wallpaperView.layerCount
-
-            binding.btnLayerUp.isEnabled = active < count - 1
-            binding.btnLayerDown.isEnabled = active > 0
-            binding.btnLayerDelete.isEnabled = active >= 0 && count > 0
-
-            // Visuelle Rückmeldung: Deaktivierte Buttons halbtransparent
-            binding.btnLayerUp.alpha = if (binding.btnLayerUp.isEnabled) 1.0f else 0.3f
-            binding.btnLayerDown.alpha = if (binding.btnLayerDown.isEnabled) 1.0f else 0.3f
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating layer button states")
-        }
-    }
+    private fun updateLayerButtonStates() = applyLayerButtonsState()
 
     private fun updateSnapButtonIcon(isEnabled: Boolean) {
         if (_binding == null) return
-        binding.btnWallpaperSnap.setIconResource(
-            if (isEnabled) R.drawable.ic_magnet_on else R.drawable.ic_magnet_off
-        )
+        binding.btnWallpaperSnap.setIconResource(SnapIconResolver.resolveMagnet(isEnabled))
     }
 
     private fun updateSnapModeButtonIcon(mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
-        binding.btnWallpaperSnapMode.setIconResource(
-            when (mode) {
-                ZoomableImageView.SnapMode.EDGE -> R.drawable.ic_rectangle_on
-                ZoomableImageView.SnapMode.CENTER -> R.drawable.ic_center_on
-            }
-        )
+        binding.btnWallpaperSnapMode.setIconResource(SnapIconResolver.resolveSnapMode(mode.toIconMode()))
     }
 
     private fun updateHorizontalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
         binding.btnWallpaperHSnap.setIconResource(
-            when (mode) {
-                ZoomableImageView.SnapMode.EDGE ->
-                    if (isEnabled) R.drawable.ic_horizontal_edge_on else R.drawable.ic_horizontal_edge_off
-                ZoomableImageView.SnapMode.CENTER ->
-                    if (isEnabled) R.drawable.ic_horizontal_center_on else R.drawable.ic_horizontal_center_off
-            }
+            SnapIconResolver.resolveHorizontal(isEnabled, mode.toIconMode())
         )
     }
 
     private fun updateVerticalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
         if (_binding == null) return
         binding.btnWallpaperVSnap.setIconResource(
-            when (mode) {
-                ZoomableImageView.SnapMode.EDGE ->
-                    if (isEnabled) R.drawable.ic_vertical_edge_on else R.drawable.ic_vertical_edge_off
-                ZoomableImageView.SnapMode.CENTER ->
-                    if (isEnabled) R.drawable.ic_vertical_center_on else R.drawable.ic_vertical_center_off
-            }
+            SnapIconResolver.resolveVertical(isEnabled, mode.toIconMode())
         )
+    }
+
+    /**
+     * Überbrückt das im View genestete [ZoomableImageView.SnapMode] zum
+     * android-freien [SnapMode]-Enum von [SnapIconResolver]. Langfristig
+     * sollte ZoomableImageView direkt auf das Top-Level-Enum migrieren.
+     */
+    private fun ZoomableImageView.SnapMode.toIconMode(): SnapMode = when (this) {
+        ZoomableImageView.SnapMode.EDGE -> SnapMode.EDGE
+        ZoomableImageView.SnapMode.CENTER -> SnapMode.CENTER
     }
 
     // ============================================================================

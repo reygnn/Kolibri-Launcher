@@ -8,39 +8,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * ============================================================================
+ * LEGACY TEST - behalten als Integration-Coverage für
+ * HomeFragment.DoubleClickListener (View.OnClickListener-Wrapper).
+ *
+ * Die eigentliche Threshold-/Timing-Logik wird nun deterministisch durch
+ * [DoubleClickDetectorTest] abgedeckt (ohne Thread.sleep, ohne System-Clock).
+ *
+ * Dieser Test dokumentiert weiterhin, dass die DoubleClickListener-Klasse
+ * existiert, instanziert werden kann und grob erwartungsgemäß funktioniert,
+ * wenn man System.currentTimeMillis() aus Echtzeit nutzt.
+ *
+ * NICHT erweitern. Neue Timing-/Grenzwert-Fälle gehören in
+ * DoubleClickDetectorTest.
+ * ============================================================================
+ */
 class DoubleClickListenerTest {
 
     @get:Rule
     val timberRule = TimberRule()
-
-    // Helper Klasse um Zeit zu simulieren
-    private class TestableDoubleClickListener(
-        private val timeProvider: () -> Long
-    ) : HomeFragment.DoubleClickListener() {
-
-        var triggerCount = 0
-
-        // Wir überschreiben onClick leicht, um unsere simulierte Zeit einzuschleusen
-        // Da 'lastClickTime' private ist, können wir es nicht direkt setzen.
-        // TRICK: Wir müssen uns darauf verlassen, dass System.currentTimeMillis()
-        // im echten Code verwendet wird.
-        //
-        // ALTERNATIVE FÜR UNIT TEST OHNE MOCKK/REFLECTION:
-        // Wir extrahieren die Zeit-Logik oder testen die Logik basierend auf realem Thread.sleep (dirty).
-        //
-        // SAUBERSTE LÖSUNG: Wir kopieren die Logik hier rein um sie zu testen,
-        // da wir die System-Zeit in der inner class nicht mocken können ohne Refactoring.
-        //
-        // Aber für diesen Test nehmen wir an, wir refactorn den Listener minimal
-        // oder nutzen Thread.sleep (für 300ms ist das im Unit Test akzeptabel).
-
-        override fun onDoubleClick() {
-            triggerCount++
-        }
-    }
-
-    // Da wir System.currentTimeMillis() nicht mocken wollen ohne PowerMock,
-    // nutzen wir hier echte Zeitabstände. 300ms sind kurz genug für einen Test.
 
     @Test
     fun `click - fast sequence triggers double click`() {
