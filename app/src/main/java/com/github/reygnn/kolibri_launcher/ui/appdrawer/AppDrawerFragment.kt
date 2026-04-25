@@ -31,6 +31,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -218,30 +219,18 @@ class AppDrawerFragment : Fragment() {
         }
 
         // Observer 3: UI colors
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.uiColorsState.collect { colors ->
-                            if (_binding == null || !isAdded) return@collect
+        collectOnStarted(
+            flow = viewModel.uiColorsState,
+            errorTag = "uiColorsState",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { colors ->
+            if (_binding == null || !isAdded) return@collectOnStarted
 
-                            try {
-                                appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating adapter colors")
-                                // Keep old colors - not critical
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in uiColorsState collection")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+            try {
+                appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle")
+                TimberWrapper.silentError(e, "Error updating adapter colors")
+                // Keep old colors - not critical
             }
         }
 

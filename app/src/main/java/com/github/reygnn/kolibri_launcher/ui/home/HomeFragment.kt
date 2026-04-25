@@ -32,9 +32,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -47,9 +45,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
-import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
+import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
@@ -71,148 +70,197 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-/**
-# HomeFragment size — rationale
-
-This note documents why `HomeFragment.kt` is currently ~2,640 lines and why
-a Fragment-delegate split was deprioritized in favor of pulling pure logic
-into separately testable classes.
-
-## Why the file is large
-
-HomeFragment carries the full UI responsibility of the launcher's home screen:
-
-- Wallpaper rendering and live edit mode (enter / commit / cancel,
-save button, layer add / delete / up / down, snap controls, toolbar
-dimming, touch interception)
-- Multi-mode favorites rendering (single / split), including per-button
-colors, long-press menus, and scroll-width adjustment
-- Time-based chips (alarm, calendar) with formatting and contrast-aware
-styling
-- Clock display and AM/PM handling
-- Status-bar and navigation-bar insets
-- Back-press handling across edit states
-- Orientation lock coordination
-- Lifecycle-scoped observation of every relevant ViewModel flow
-
-All of these touch `View`, `binding`, or `LifecycleOwner`. None of it can
-live outside a Fragment on Android. The absolute floor for this file —
-given what the screen actually does — is not small.
-
-## Why not split it into Fragment delegates?
-
-The ViewModel layer already uses a delegate pattern (`ClockDelegate`,
-`WallpaperDelegate`, `AppManagementDelegate`, etc.). Copying that pattern
-into the Fragment would produce a `WallpaperEditController`,
-`FavoritesRenderer`, and `TimeChipsRenderer`, and would shrink
-HomeFragment to roughly 600–700 lines.
-
-That split would deliver:
-
-- Smaller files per review
-- Fewer merge conflicts when multiple features land simultaneously
-- Easier navigation for someone new to the codebase
-
-It would **not** deliver:
-
-- Better test coverage
-- Fewer bugs in the extracted regions
-
-The reason is that Fragment-side delegates still depend on `View`,
-`binding`, and `LifecycleOwner`. They cannot be unit-tested with JUnit +
-MockK the way ViewModel delegates can. Testing them requires Robolectric
-or instrumented tests, both of which this project deliberately avoids —
-instrumented tests are flaky and slow locally, which is why the convention
-is to write JVM unit tests against pure-logic classes.
-
-In other words: a Fragment split reduces the number reviewers see,
-without reducing the complexity they need to understand. File size alone
-isn't a quality metric.
-
-## What was done instead
-
-Rather than reorganizing UI wiring, the decision logic most prone to
-silent regressions was extracted into pure Kotlin classes and covered by
-fast unit tests:
-
-- `LayerButtonsState` — visibility, enabled state, and alpha for layer
-edit buttons
-- `SnapIconResolver` + top-level `SnapMode` enum — drawable resource
-selection for the four snap buttons
-- `DoubleClickDetector` — threshold-based double-click detection with an
-injected clock (replaces a `System.currentTimeMillis`-based test that
-needed `Thread.sleep`)
-- `BackupFilenameBuilder` — export filename generation with injected
-clock and locale
-- `ImportOptionsUiState` + `CheckboxSpec` — derives dialog checkbox
-visibility from a `BackupPreview`
-- `MissingAppsFormatter` — truncation and overflow formatting for the
-missing-apps list
-- `ImportSuccessMessage` — sealed class selecting the correct success
-message variant based on imported / skipped counts
-
-These cover the classes of bugs that actually appear in practice:
-
-- "New `BackupPreview` field added but the dialog forgot to render it"
-- "New `SnapMode` value but no icon mapping for it"
-- "Off-by-one in layer button enable / disable logic"
-- "Locale-dependent date format slipped into a filename"
-
-The Fragment itself is still large, but the parts most likely to regress
-silently are now fenced off and covered by hermetic JVM tests that run
-in under a second.
-
-## When a split would become worthwhile
-
-Reasons to actually perform the Fragment-delegate split later:
-
-- Multiple developers hit merge conflicts in HomeFragment regularly
-- Code review on HomeFragment changes is consistently slow because
-reviewers can't hold the whole file in their head
-- One UI region starts receiving frequent new features, and isolating it
-would meaningfully speed up feature work
-
-If none of those pressures exist, the split is cosmetic — and carries
-real risk, because several UI regions share ordering assumptions around
-Flow collection (e.g., colors are applied before chips re-render). A
-split would need to make those assumptions explicit, which is a nontrivial
-piece of work on its own.
-
-## Candidate split points (for reference)
-
-If and when the split is warranted, these are the regions that make
-sense to extract, in order of decreasing self-containment and decreasing
-refactor safety:
-
-1. **Wallpaper edit controller** — lines ~1956–2526, roughly 570 lines.
-Covers enter / commit / cancel, snap buttons, layer operations, save
-and cancel buttons. Largest single region and the most self-contained.
-
-2. **Time chips renderer** — roughly 160 lines around
-`updateTimeBasedChips`, `configureChip`, `createAlarmChip`,
-`createCalendarChip`. Smallest region; good as an initial extraction
-to validate the controller pattern.
-
-3. **Favorites renderer** — roughly 490 lines scattered across
-`renderFavorites`, `adjustScrollViewWidth`, `createAppButton`,
-`updateAllColors`, `clearAllViews`. Most entangled with layout-related
-flows; highest refactor risk. Should be done last, one staged PR at
-a time.
-
-Expected combined reduction: ~1,200 lines. HomeFragment would end up
-around 600–700 lines. Each extraction should ship as its own PR, not
-bundled.
-
-## Summary
-
-HomeFragment is large because the home screen genuinely does a lot of
-platform-coupled work. The lever that improves correctness — pulling out
-pure decision logic and testing it directly — has been applied.
-The lever that only improves organization — moving Android-coupled code
-across file boundaries — is available but has been deferred until there
-is concrete evidence it would pay off.
-**/
-
+/*
+ * =============================================================================
+ *                    HomeFragment — Size & Refactoring Notes
+ * =============================================================================
+ *
+ * This file is large — well over 2,000 lines. That size is a deliberate
+ * trade-off, not an accident, and it is being reduced in planned stages.
+ * If you are here to split it up, please read this first — the split is
+ * NOT the next step.
+ *
+ *
+ * Why the file is large
+ * ---------------------
+ * The home screen carries the full UI responsibility of the launcher:
+ * wallpaper rendering and live edit mode (enter / commit / cancel, save
+ * button, layer add / delete / up / down, snap controls, toolbar dimming,
+ * touch interception), multi-mode favorites rendering with per-button
+ * colors, long-press menus and scroll-width adjustment, time-based chips
+ * (alarm, calendar) with contrast-aware styling, clock display, status-bar
+ * and navigation-bar insets, back-press handling across edit states,
+ * orientation lock coordination, and lifecycle-scoped observation of
+ * every relevant ViewModel flow.
+ *
+ * All of it touches View, binding, or LifecycleOwner. None of it can live
+ * outside a Fragment on Android. The floor for this file, given the scope
+ * of what the screen actually does, is not small — but it is well above
+ * the current size.
+ *
+ *
+ * Pure-logic extractions: what's done
+ * -----------------------------------
+ * Decision logic most prone to silent regression has been pulled into
+ * pure Kotlin classes covered by fast JVM unit tests, independent of the
+ * Android framework:
+ *
+ *   LayerButtonsState       — layer-edit button visibility / enabled / alpha
+ *   SnapIconResolver        — drawable selection for the four snap buttons
+ *   DoubleClickDetector     — threshold detection with an injected clock
+ *   BackupFilenameBuilder   — export filename with injected clock / locale
+ *   ImportOptionsUiState    — dialog checkbox state from BackupPreview
+ *   MissingAppsFormatter    — truncation / overflow of the missing-apps list
+ *   ImportSuccessMessage    — sealed success-message selection
+ *   ContextMenuResult       — context-menu action routing (parse + sealed
+ *                             interface; bundle read stays in the Fragment)
+ *
+ * Together they catch the classes of bugs that actually appear in
+ * practice: new BackupPreview field added but the dialog forgets it; new
+ * SnapMode value added but no icon mapping; off-by-one in layer button
+ * enable / disable; locale-dependent date format slipping into a filename.
+ *
+ * Boilerplate reduction in the same direction:
+ *
+ *   Fragment.collectOnStarted (ui.flow) — replaced nine structurally
+ *     identical repeatOnLifecycle(STARTED) blocks (eight in HomeFragment,
+ *     one in AppDrawerFragment) with a single extension. Same behavior,
+ *     ~100 lines smaller in HomeFragment, single point for the audit
+ *     below to redesign the catch hierarchy. One Observer (split-mode
+ *     threshold) was lifted from a single-catch to the resilient
+ *     two-catch shape during migration; treated as fixing a copy-paste
+ *     oversight, not a behavior change in spirit.
+ *
+ *
+ * Pure-logic extractions: what's next (same pattern)
+ * --------------------------------------------------
+ * One more site in this file is pure enough to extract with exactly the
+ * same approach. It does not require any Fragment-level refactor:
+ *
+ *   updateWallpaperEditMode — the enter / exit state transition (which
+ *   fields are set, nulled, or reset) is a pure state machine and
+ *   maps cleanly to a WallpaperEditTransition sealed class.
+ *
+ * (Two earlier planned items — the Fragment.collectOnStarted extension
+ * that collapsed the eight repeatOnLifecycle(STARTED) blocks, and the
+ * ContextMenuResult sealed interface for setupFragmentResultListener —
+ * have been done and are listed under "what's done" above.)
+ *
+ *
+ * Next priority after that: try/catch(Throwable) audit
+ * ----------------------------------------------------
+ * Once the remaining pure-logic extractions are done, the next item on
+ * the list is an audit of the defensive try/catch(Throwable) pattern
+ * that wraps most non-trivial calls in this file. This is roughly 30–40%
+ * of the current line count — the single biggest lever, larger than
+ * the Fragment split would be.
+ *
+ * The goal behind this pattern is correct: the launcher must not crash
+ * in the user's face. A black screen on a home-screen launcher is worse
+ * than on almost any other kind of app, because the user has no way to
+ * navigate away. Stability matters.
+ *
+ * But try/catch(Throwable) + silentError is the wrong tool for that
+ * goal. It doesn't achieve stability — it achieves *continuation*, which
+ * is a different thing. When a render call throws and the wrapper
+ * swallows it, the app keeps running, but in a half-broken state: a
+ * layer didn't render, a color didn't apply, a binding is null further
+ * down. The user sees a quietly broken screen and doesn't know anything
+ * is wrong. Failures become invisible, and invisible failures don't
+ * get fixed.
+ *
+ * The replacement is an escalation hierarchy matched to the failure
+ * class, not a single catch(Throwable) for everything:
+ *
+ *   Expected errors (I/O, parse, missing package) — caught with specific
+ *     exception types, surfaced to the user where they matter, otherwise
+ *     logged at the appropriate level. Never silently swallowed.
+ *
+ *   Teardown races (fragment gone, coroutine still delivering) —
+ *     prevented structurally via viewLifecycleOwner.lifecycleScope and
+ *     `_binding?.let { }` checks, not masked with try/catch after the
+ *     fact.
+ *
+ *   Programmer errors (NPE, IllegalState, IndexOutOfBounds) — these are
+ *     bugs, not conditions. Crash loudly in debug, report via whatever
+ *     crash-reporting channel exists in release, fix in source. Never
+ *     swallow.
+ *
+ *   Unrecoverable failures (inflate failure → black screen, OOM on
+ *     bitmap load) — controlled process termination with a brief
+ *     user-facing notice, so the system restarts cleanly. This matches
+ *     the direction the author already identified — for failures this
+ *     severe, a controlled exit is better than continued execution in
+ *     a broken state.
+ *
+ * Expected outcome of the audit: ~30–40% line reduction in HomeFragment,
+ * a sharply smaller surface of latent bugs, and failures that are
+ * actually observable when they happen. The work is design-level, not
+ * mechanical — each existing wrapper needs to be classified and the
+ * legitimate subset (teardown races, OOM) separated from the rest.
+ *
+ *
+ * Later, possibly: Fragment-delegate split
+ * ----------------------------------------
+ * After pure-logic extraction and the try/catch audit are done, this
+ * file will land somewhere around 1,400–1,600 lines — still not small,
+ * but substantially smaller and with most of the bug-prone logic behind
+ * tests. At that point, the question of a Fragment-delegate split
+ * (copying the ViewModel's delegate pattern into a
+ * WallpaperEditController, FavoritesRenderer, TimeChipsRenderer, etc.)
+ * becomes a real question rather than a premature one.
+ *
+ * The case for deferring it until then: Fragment-side delegates still
+ * depend on View, binding, and LifecycleOwner. They cannot be
+ * unit-tested with JUnit + MockK the way ViewModel delegates can —
+ * testing them needs Robolectric or instrumented tests, both of which
+ * this project deliberately avoids. A split improves readability,
+ * merge-conflict surface, and review speed (all of which indirectly
+ * reduce bugs), but it does not directly improve unit-test coverage.
+ * After the earlier steps, the marginal gain from a split is expected
+ * to be much smaller than it looks today.
+ *
+ * Triggers that would move a split from "maybe later" to "now":
+ *   - Multiple developers hitting merge conflicts in HomeFragment
+ *     regularly.
+ *   - Reviews on HomeFragment PRs consistently slow or shallow.
+ *   - One UI region accumulating new features fast enough that
+ *     isolating it would materially speed up feature work.
+ *
+ * If and when the split is done, the order is most self-contained
+ * first, highest risk last:
+ *   1. WallpaperEditController — ~570 lines (roughly 1956–2526). Enter
+ *      / commit / cancel, snap buttons, layer ops, save / cancel.
+ *   2. TimeChipsRenderer       — ~160 lines. Small; good pattern
+ *      validation before the bigger ones.
+ *   3. FavoritesRenderer       — ~490 lines (renderFavorites,
+ *      adjustScrollViewWidth, createAppButton, updateAllColors,
+ *      clearAllViews). Most entangled with layout-related flows;
+ *      highest refactor risk.
+ *
+ * Each as its own PR, not bundled. A note on flow-collection ordering:
+ * some observers here assume implicit ordering (e.g., colors applied
+ * before chips re-render). The split would need to make those
+ * assumptions explicit — which is a correctness win the split would
+ * deliver, not a reason to avoid it.
+ *
+ *
+ * Priority order (operational summary)
+ * ------------------------------------
+ *   1. Remaining pure-logic extraction (WallpaperEditTransition). Low
+ *      risk, direct test-coverage gain. Short work.
+ *
+ *   2. try/catch(Throwable) audit and replacement with the escalation
+ *      hierarchy above. Largest single lever in the file — ~30–40%
+ *      line reduction and a sharp drop in latent-bug surface.
+ *      Design-level work, not mechanical.
+ *
+ *   3. Fragment-delegate split. Deferred. Re-evaluate against the
+ *      triggers above once (1) and (2) are done. May look much less
+ *      necessary at that point.
+ *
+ * =============================================================================
+ */
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -476,309 +524,212 @@ class HomeFragment : Fragment() {
 
     private fun observeViewModel() {
         // Observer 1: Favorites
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+        collectOnStarted(
+            flow = viewModel.favoriteAppsState,
+            errorTag = "favorites",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { favState ->
+            if (_binding == null) return@collectOnStarted
+
+            Timber.d("Favorites state: ${favState::class.simpleName}")
+
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.favoriteAppsState.collect { favState ->
-                            if (_binding == null) return@collect
+                when (favState) {
+                    is UiState.Loading -> clearAllViews()
+                    is UiState.Success -> {
+                        val colors = viewModel.uiColorsState.value
+                        renderFavorites(favState.data.apps, colors)
+                    }
 
-                            Timber.d("Favorites state: ${favState::class.simpleName}")
-
-                            try {
-                                when (favState) {
-                                    is UiState.Loading -> clearAllViews()
-                                    is UiState.Success -> {
-                                        val colors = viewModel.uiColorsState.value
-                                        renderFavorites(favState.data.apps, colors)
-                                    }
-
-                                    is UiState.Error -> {
-                                        viewModel.onFavoriteAppsError(favState.message)
-                                        clearAllViews()
-                                    }
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error handling favorites state")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting favorites")
+                    is UiState.Error -> {
+                        viewModel.onFavoriteAppsError(favState.message)
+                        clearAllViews()
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for favorites")
+                TimberWrapper.silentError(e, "Error handling favorites state")
             }
         }
 
         // Observer 2: Scroll state → Layout adjustment
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+        collectOnStarted(
+            flow = needsSplit.combine(orientationState) { split, orientation ->
+                // Ein Tupel (Pair) zurückgeben,
+                // das sowohl den Split-Status als auch die Ausrichtung enthält.
+                Pair(split, orientation)
+            }
+                // distinctUntilChanged() vergleicht nun BEIDE Werte im Pair
+                .distinctUntilChanged(),
+            errorTag = "scroll state",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { (split, orientation) -> // Destrukturierung des Pairs
+            if (_binding == null) return@collectOnStarted
+
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        needsSplit.combine(orientationState) { split, orientation ->
-                            // Ein Tupel (Pair) zurückgeben,
-                            // das sowohl den Split-Status als auch die Ausrichtung enthält.
-                            Pair(split, orientation)
-                        }
-                            // distinctUntilChanged() vergleicht nun BEIDE Werte im Pair
-                            .distinctUntilChanged()
-                            .collect { (split, orientation) -> // Destrukturierung des Pairs
-                                if (_binding == null) return@collect
+                Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
+                val colors = viewModel.uiColorsState.value
 
-                                try {
-                                    Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
-                                    val colors = viewModel.uiColorsState.value
-
-                                    // adjustScrollViewWidth(split, colors) wird aufgerufen,
-                                    // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
-                                    adjustScrollViewWidth(split, colors)
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error adjusting layout")
-                                }
-                            }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting scroll state")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+                // adjustScrollViewWidth(split, colors) wird aufgerufen,
+                // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
+                adjustScrollViewWidth(split, colors)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for scroll state")
+                TimberWrapper.silentError(e, "Error adjusting layout")
             }
         }
 
         // Observer 3: Time, date, battery
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+        collectOnStarted(
+            flow = viewModel.uiState,
+            errorTag = "uiState",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { state ->
+            if (_binding == null) return@collectOnStarted
+
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.uiState.collect { state ->
-                            if (_binding == null) return@collect
-
-                            try {
-                                binding.timeText.text = state.timeString
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating time")
-                            }
-
-                            try {
-                                binding.dateText.text = state.dateString
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating date")
-                            }
-
-                            try {
-                                binding.batteryText.text = state.batteryString
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating battery")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting uiState")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+                binding.timeText.text = state.timeString
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for UI state")
+                TimberWrapper.silentError(e, "Error updating time")
+            }
+
+            try {
+                binding.dateText.text = state.dateString
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error updating date")
+            }
+
+            try {
+                binding.batteryText.text = state.batteryString
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error updating battery")
             }
         }
 
         // Observer 4: TimeBasedEvents
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.uiState
-                            .map { it.timeBasedEvents }
-                            .distinctUntilChanged()
-                            .collect { events ->
-                                if (_binding == null) return@collect
+        collectOnStarted(
+            flow = viewModel.uiState
+                .map { it.timeBasedEvents }
+                .distinctUntilChanged(),
+            errorTag = "events",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { events ->
+            if (_binding == null) return@collectOnStarted
 
-                                try {
-                                    updateTimeBasedChips(events)
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error updating chips")
-                                }
-                            }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting events")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+            try {
+                updateTimeBasedChips(events)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for events")
+                TimberWrapper.silentError(e, "Error updating chips")
             }
         }
 
         // Observer 5: Colors
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.uiColorsState.collect { colors ->
-                            if (_binding == null) return@collect
+        collectOnStarted(
+            flow = viewModel.uiColorsState,
+            errorTag = "colors",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { colors ->
+            if (_binding == null) return@collectOnStarted
 
-                            try {
-                                updateAllColors(colors)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating colors")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting colors")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+            try {
+                updateAllColors(colors)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for colors")
+                TimberWrapper.silentError(e, "Error updating colors")
             }
         }
 
         // Observer 6: Split Mode Threshold Changes
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+        // Note: lifted to the resilient inner-catch pattern to match the
+        // other 7 observers. Original had only the outer catch, treated as
+        // an oversight rather than intentional one-shot semantics.
+        collectOnStarted(
+            flow = viewModel.splitModeThreshold,
+            errorTag = "threshold",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { threshold ->
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    viewModel.splitModeThreshold.collect { threshold ->
-                        Timber.d("Split threshold changed to: $threshold")
+                Timber.d("Split threshold changed to: $threshold")
 
-                        checkScrollStateAfterNextLayout("Threshold changed check")
-                        safePost { scheduleScrollVerification() }
-                    }
-                }
+                checkScrollStateAfterNextLayout("Threshold changed check")
+                safePost { scheduleScrollVerification() }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error observing threshold")
+                TimberWrapper.silentError(e, "Error handling threshold change")
             }
         }
 
         // Observer 7: Wallpaper State
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.wallpaperState.collect { wallpaperState ->
-                            if (_binding == null) return@collect
+        collectOnStarted(
+            flow = viewModel.wallpaperState,
+            errorTag = "wallpaper state",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { wallpaperState ->
+            if (_binding == null) return@collectOnStarted
 
-                            try {
-                                updateWallpaper(wallpaperState)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating wallpaper")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting wallpaper state")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+            try {
+                updateWallpaper(wallpaperState)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for wallpaper")
+                TimberWrapper.silentError(e, "Error updating wallpaper")
             }
         }
 
         // Observer 8: Wallpaper Edit Mode
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        viewModel.isWallpaperEditMode.collect { isEditMode ->
-                            if (_binding == null) return@collect
+        collectOnStarted(
+            flow = viewModel.isWallpaperEditMode,
+            errorTag = "wallpaper edit mode",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { isEditMode ->
+            if (_binding == null) return@collectOnStarted
 
-                            try {
-                                updateWallpaperEditMode(isEditMode)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting wallpaper edit mode")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+            try {
+                updateWallpaperEditMode(isEditMode)
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for wallpaper edit mode")
+                TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
             }
         }
 
     }
 
     private fun observeLayoutChanges() {
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
+        collectOnStarted(
+            flow = combine(
+                viewModel.layoutScaleState,
+                viewModel.verticalPaddingState,
+                viewModel.isFontBoldState,
+                viewModel.contentTopMarginState
+            ) { scale, paddingFactor, isBold, marginScale ->
+
+                LayoutConfig(
+                    scale = scale,
+                    paddingFactor = paddingFactor,
+                    isBold = isBold,
+                    marginScale = marginScale
+                )
+            },
+            errorTag = "layout",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { config ->
+            if (_binding == null) return@collectOnStarted
+
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    try {
-                        // Wir kombinieren 4 Flows zu einem LayoutConfig Objekt
-                        combine(
-                            viewModel.layoutScaleState,
-                            viewModel.verticalPaddingState,
-                            viewModel.isFontBoldState,
-                            viewModel.contentTopMarginState
-                        ) { scale, paddingFactor, isBold, marginScale ->
+                // 1. Cache für Textgrösse/Padding neu berechnen
+                recalculateLayoutCache(
+                    config.scale,
+                    config.paddingFactor,
+                    config.isBold
+                )
 
-                            LayoutConfig(
-                                scale = scale,
-                                paddingFactor = paddingFactor,
-                                isBold = isBold,
-                                marginScale = marginScale
-                            )
+                // 2. Den neuen Abstand (Margin) anwenden
+                applyTopMargin(config.marginScale)
 
-                        }.collect { config ->
-                            if (_binding == null) return@collect
+                // 3. Alle existierenden Buttons aktualisieren (Textgrösse etc.)
+                applyLayoutToExistingViews()
 
-                            try {
-                                // 1. Cache für Textgrösse/Padding neu berechnen
-                                recalculateLayoutCache(
-                                    config.scale,
-                                    config.paddingFactor,
-                                    config.isBold
-                                )
-
-                                // 2. Den neuen Abstand (Margin) anwenden
-                                applyTopMargin(config.marginScale)
-
-                                // 3. Alle existierenden Buttons aktualisieren (Textgrösse etc.)
-                                applyLayoutToExistingViews()
-
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error applying layout config")
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error collecting layout changes")
-                    }
-                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for layout")
+                TimberWrapper.silentError(e, "Error applying layout config")
             }
         }
     }
@@ -1817,16 +1768,18 @@ class HomeFragment : Fragment() {
                         null
                     }
 
-                    when (action) {
-                        "launch_shortcut" -> handleShortcutLaunch(
+                    when (val result = ContextMenuResult.parse(action)) {
+                        ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
                             bundle,
                             viewModel,
                             launchShortcutUseCase
                         )
-                        AppContextMenuAction.ACTION_ID_APP_INFO -> showAppInfo(app)
-                        AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(app)
-                        AppContextMenuAction.ACTION_ID_HIDE_APP -> viewModel.onHideApp(app)
-                        AppContextMenuAction.ACTION_ID_UNHIDE_APP -> viewModel.onShowApp(app)
+                        ContextMenuResult.AppInfo -> showAppInfo(app)
+                        ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
+                        ContextMenuResult.HideApp -> viewModel.onHideApp(app)
+                        ContextMenuResult.UnhideApp -> viewModel.onShowApp(app)
+                        is ContextMenuResult.Unknown ->
+                            Timber.w("Unknown context menu action: ${result.action}")
                     }
                 } catch (e: CancellationException) {
                     throw e
