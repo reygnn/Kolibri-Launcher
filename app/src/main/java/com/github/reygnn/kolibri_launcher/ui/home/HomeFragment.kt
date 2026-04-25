@@ -43,6 +43,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
@@ -114,6 +116,10 @@ import javax.inject.Inject
  *   ImportSuccessMessage    — sealed success-message selection
  *   ContextMenuResult       — context-menu action routing (parse + sealed
  *                             interface; bundle read stays in the Fragment)
+ *   WallpaperEditTransition — enter / exit state transition for wallpaper
+ *                             edit mode (sealed interface + WallpaperEditState
+ *                             data class; listener setup stays in the
+ *                             Fragment)
  *
  * Together they catch the classes of bugs that actually appear in
  * practice: new BackupPreview field added but the dialog forgets it; new
@@ -132,28 +138,23 @@ import javax.inject.Inject
  *     oversight, not a behavior change in spirit.
  *
  *
- * Pure-logic extractions: what's next (same pattern)
- * --------------------------------------------------
- * One more site in this file is pure enough to extract with exactly the
- * same approach. It does not require any Fragment-level refactor:
- *
- *   updateWallpaperEditMode — the enter / exit state transition (which
- *   fields are set, nulled, or reset) is a pure state machine and
- *   maps cleanly to a WallpaperEditTransition sealed class.
- *
- * (Two earlier planned items — the Fragment.collectOnStarted extension
- * that collapsed the eight repeatOnLifecycle(STARTED) blocks, and the
- * ContextMenuResult sealed interface for setupFragmentResultListener —
- * have been done and are listed under "what's done" above.)
+ * Pure-logic extractions: phase complete
+ * --------------------------------------
+ * The three planned pure-logic extractions — Fragment.collectOnStarted
+ * (collapsed eight repeatOnLifecycle blocks), ContextMenuResult (sealed
+ * interface for setupFragmentResultListener), and WallpaperEditTransition
+ * (state machine for updateWallpaperEditMode) — are all done and listed
+ * under "what's done" above. The next priority is the try/catch audit
+ * below, then the Fragment-delegate split.
  *
  *
- * Next priority after that: try/catch(Throwable) audit
- * ----------------------------------------------------
- * Once the remaining pure-logic extractions are done, the next item on
- * the list is an audit of the defensive try/catch(Throwable) pattern
- * that wraps most non-trivial calls in this file. This is roughly 30–40%
- * of the current line count — the single biggest lever, larger than
- * the Fragment split would be.
+ * Next priority: try/catch(Throwable) audit
+ * -----------------------------------------
+ * With the pure-logic extractions done, the next item on the list is an
+ * audit of the defensive try/catch(Throwable) pattern that wraps most
+ * non-trivial calls in this file. This is roughly 30–40% of the current
+ * line count — the single biggest lever, larger than the Fragment split
+ * would be.
  *
  * The goal behind this pattern is correct: the launcher must not crash
  * in the user's face. A black screen on a home-screen launcher is worse
@@ -202,13 +203,13 @@ import javax.inject.Inject
  *
  * Later, possibly: Fragment-delegate split
  * ----------------------------------------
- * After pure-logic extraction and the try/catch audit are done, this
- * file will land somewhere around 1,400–1,600 lines — still not small,
- * but substantially smaller and with most of the bug-prone logic behind
- * tests. At that point, the question of a Fragment-delegate split
- * (copying the ViewModel's delegate pattern into a
- * WallpaperEditController, FavoritesRenderer, TimeChipsRenderer, etc.)
- * becomes a real question rather than a premature one.
+ * After the try/catch audit is done, this file will land somewhere
+ * around 1,400–1,600 lines — still not small, but substantially smaller
+ * and with most of the bug-prone logic behind tests. At that point, the
+ * question of a Fragment-delegate split (copying the ViewModel's
+ * delegate pattern into a WallpaperEditController, FavoritesRenderer,
+ * TimeChipsRenderer, etc.) becomes a real question rather than a
+ * premature one.
  *
  * The case for deferring it until then: Fragment-side delegates still
  * depend on View, binding, and LifecycleOwner. They cannot be
@@ -247,16 +248,13 @@ import javax.inject.Inject
  *
  * Priority order (operational summary)
  * ------------------------------------
- *   1. Remaining pure-logic extraction (WallpaperEditTransition). Low
- *      risk, direct test-coverage gain. Short work.
- *
- *   2. try/catch(Throwable) audit and replacement with the escalation
+ *   1. try/catch(Throwable) audit and replacement with the escalation
  *      hierarchy above. Largest single lever in the file — ~30–40%
  *      line reduction and a sharp drop in latent-bug surface.
  *      Design-level work, not mechanical.
  *
- *   3. Fragment-delegate split. Deferred. Re-evaluate against the
- *      triggers above once (1) and (2) are done. May look much less
+ *   2. Fragment-delegate split. Deferred. Re-evaluate against the
+ *      triggers above once (1) is done. May look much less
  *      necessary at that point.
  *
  * =============================================================================
@@ -2118,19 +2116,13 @@ class HomeFragment : Fragment() {
             val editOverlay = binding.wallpaperEditOverlay
             val touchInterceptor = binding.wallpaperTouchInterceptor
 
-            wallpaperView.isEditMode = isEditMode
+            applyWallpaperEditState(
+                WallpaperEditTransition.targetState(WallpaperEditTransition.forMode(isEditMode))
+            )
 
             if (isEditMode) {
                 // Snapshot für Cancel wird jetzt im WallpaperDelegate gehalten —
                 // bereits bei onEnterWallpaperEditMode() aufgenommen.
-
-                // Snap per Default aus im Edit-Mode
-                wallpaperView.isSnapEnabled = false
-                wallpaperView.isHorizontalSnapEnabled = false
-                wallpaperView.isVerticalSnapEnabled = false
-
-                editOverlay.visibility = View.VISIBLE
-                binding.rootLayout.alpha = 0.7f
 
                 // ── TOOLBAR DIMMING bei Gesten ──
                 // Toolbar wird gedimmt sobald der User draggt oder zoomt,
@@ -2353,12 +2345,7 @@ class HomeFragment : Fragment() {
                 // EDIT MODE BEENDET
                 // ══════════════════════════════════════
 
-                editOverlay.visibility = View.GONE
                 touchInterceptor.setOnTouchListener(null)
-                binding.rootLayout.alpha = 1.0f
-
-                // Toolbar Alpha zurücksetzen
-                binding.wallpaperEditButtons.alpha = 1.0f
 
                 // Alle Listener aufräumen
                 binding.btnWallpaperSave.setOnClickListener(null)
@@ -2380,20 +2367,36 @@ class HomeFragment : Fragment() {
                 // Layer-Callbacks aufräumen
                 wallpaperView.onLayerTapped = null
 
-                // Snap-State auf Default zurücksetzen
-                wallpaperView.isSnapEnabled = true
-                wallpaperView.snapMode = ZoomableImageView.SnapMode.EDGE
-                wallpaperView.isHorizontalSnapEnabled = true
-                wallpaperView.isVerticalSnapEnabled = true
-
-                isToolbarDockedTop = false
-
                 Timber.d("Wallpaper edit mode: OFF")
             }
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
         }
+    }
+
+    /**
+     * Applies a [WallpaperEditState] target onto the views and the
+     * Fragment's own properties. Pure side-effect; the decision of *which*
+     * state to apply is made by [WallpaperEditTransition.targetState].
+     *
+     * Both Enter and Exit funnel through this method, so adding a new
+     * field to [WallpaperEditState] only requires one place here to apply
+     * it (plus the per-transition target values in
+     * [WallpaperEditTransition], which the compiler enforces).
+     */
+    private fun applyWallpaperEditState(state: WallpaperEditState) {
+        val wallpaperView = binding.wallpaperView
+        wallpaperView.isEditMode = state.isEditMode
+        wallpaperView.isSnapEnabled = state.snapEnabled
+        wallpaperView.isHorizontalSnapEnabled = state.horizontalSnapEnabled
+        wallpaperView.isVerticalSnapEnabled = state.verticalSnapEnabled
+        wallpaperView.snapMode = state.snapMode
+        binding.wallpaperEditOverlay.visibility =
+            if (state.overlayVisible) View.VISIBLE else View.GONE
+        binding.rootLayout.alpha = state.rootLayoutAlpha
+        binding.wallpaperEditButtons.alpha = state.toolbarAlpha
+        isToolbarDockedTop = state.toolbarDockedTop
     }
 
 
