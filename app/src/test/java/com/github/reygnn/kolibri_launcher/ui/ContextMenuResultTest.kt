@@ -36,6 +36,7 @@ class ContextMenuResultTest {
             AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE to ContextMenuResult.ToggleFavorite,
             AppContextMenuAction.ACTION_ID_HIDE_APP to ContextMenuResult.HideApp,
             AppContextMenuAction.ACTION_ID_UNHIDE_APP to ContextMenuResult.UnhideApp,
+            AppContextMenuAction.ACTION_ID_RESET_USAGE to ContextMenuResult.ResetUsage,
         )
 
         cases.forEach { (input, expected) ->
@@ -70,19 +71,18 @@ class ContextMenuResultTest {
     }
 
     @Test
-    fun `parse returns Unknown for actions defined but not routed to home`() {
-        // AppContextMenuAction defines several action ids that are handled
-        // inside the dialog (rename / restore name) or only shown in
-        // contexts other than home (reset usage in the app drawer). They
-        // legitimately reach Unknown when seen on the home side, and the
+    fun `parse returns Unknown for actions handled inside the dialog`() {
+        // AppContextMenuAction defines RENAME_APP and RESTORE_NAME for
+        // actions that the dialog itself handles (the rename input flow)
+        // — they never reach a result listener via setFragmentResult.
+        // They legitimately reach Unknown if ever observed, and the
         // log line carries the real action string for diagnosis.
-        val notRoutedToHome = listOf(
-            AppContextMenuAction.ACTION_ID_RESET_USAGE,
+        val handledInsideDialog = listOf(
             AppContextMenuAction.ACTION_ID_RENAME_APP,
             AppContextMenuAction.ACTION_ID_RESTORE_NAME,
         )
 
-        notRoutedToHome.forEach { action ->
+        handledInsideDialog.forEach { action ->
             val result = ContextMenuResult.parse(action)
             assertTrue(
                 "expected Unknown for action $action, got $result",

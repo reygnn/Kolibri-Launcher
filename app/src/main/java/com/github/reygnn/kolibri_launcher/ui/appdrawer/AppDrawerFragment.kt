@@ -28,9 +28,9 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentAppDrawerBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
+import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
@@ -287,19 +287,33 @@ class AppDrawerFragment : Fragment() {
                         null
                     }
 
-                    when (action) {
-                        AppConstants.ACTION_LAUNCH_SHORTCUT -> handleShortcutLaunch(
+                    when (val result = ContextMenuResult.parse(action)) {
+                        is ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
                             bundle,
                             viewModel,
                             launchShortcutUseCase
                         )
-                        AppContextMenuAction.Companion.ACTION_ID_APP_INFO -> showAppInfo(app)
-                        AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE -> toggleFavorite(
-                            app
+                        is ContextMenuResult.AppInfo -> showAppInfo(app)
+                        is ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
+                        is ContextMenuResult.HideApp -> hideApp(app)
+                        is ContextMenuResult.ResetUsage -> resetAppUsage(app)
+                        // Structurally unreachable: per the architecture
+                        // rule (see GetFavoriteAppsUseCase KDoc), hidden
+                        // apps applies only to the AppDrawer, so
+                        // GetDrawerAppsUseCase (Z. 56) filters hidden
+                        // apps out of this listing. A hidden app cannot
+                        // be long-pressed here, so the dialog cannot
+                        // emit UNHIDE_APP from this fragment. The
+                        // branch exists for sealed-when exhaustiveness
+                        // only. Compare HomeFragment, where the same
+                        // action is live: a favorite that is also
+                        // hidden appears in the home screen's favorite
+                        // area, can be long-pressed there, and produces
+                        // UNHIDE_APP — handled via viewModel.onShowApp.
+                        is ContextMenuResult.UnhideApp -> Unit
+                        is ContextMenuResult.Unknown -> Timber.Forest.w(
+                            "Unknown context menu action: ${result.action}"
                         )
-
-                        AppContextMenuAction.Companion.ACTION_ID_HIDE_APP -> hideApp(app)
-                        AppContextMenuAction.Companion.ACTION_ID_RESET_USAGE -> resetAppUsage(app)
                     }
                 } catch (e: CancellationException) {
                     throw e

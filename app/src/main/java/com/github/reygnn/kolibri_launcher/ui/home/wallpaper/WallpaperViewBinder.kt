@@ -107,6 +107,54 @@ class WallpaperViewBinder(
         view.visibility = View.GONE
     }
 
+    /**
+     * Applies [transform] to the single-layer view, or falls back to the
+     * default initial transform when [transform] is `null`.
+     *
+     * The default policy when no saved transform exists is **center-crop**:
+     * the image is scaled to cover the view (`scale = max(viewW/dW, viewH/dH)`)
+     * and centered on both axes. This default is intentionally chosen here
+     * — historically, the inline form was duplicated across single-layer
+     * and per-layer bind paths; this function and its sibling
+     * [applyLayerTransformOrDefault] are the single source of truth.
+     *
+     * If the default ever needs to change (e.g. fit-to-width as a new
+     * app-wide default), this is the only place to edit. Note that
+     * [ZoomableImageView.centerCrop] itself stays mechanical and unchanged
+     * — it is the operation, not the policy.
+     */
+    private fun applySingleTransformOrDefault(
+        view: ZoomableImageView,
+        transform: LayerPropertyUpdate.Transform?,
+    ) {
+        if (transform != null) {
+            view.applyTransform(transform.scale, transform.translateX, transform.translateY)
+        } else {
+            view.centerCrop()
+        }
+    }
+
+    /**
+     * Per-layer variant of [applySingleTransformOrDefault]. See that
+     * function for the rationale and the default-policy contract.
+     */
+    private fun applyLayerTransformOrDefault(
+        view: ZoomableImageView,
+        layerIndex: Int,
+        transform: LayerPropertyUpdate.Transform?,
+    ) {
+        if (transform != null) {
+            view.applyTransform(
+                layerIndex,
+                transform.scale,
+                transform.translateX,
+                transform.translateY,
+            )
+        } else {
+            view.centerCropLayer(layerIndex)
+        }
+    }
+
     private fun applySingleLayer(
         view: ZoomableImageView,
         plan: RebuildPlan.SwitchToSingleLayer,
@@ -121,12 +169,11 @@ class WallpaperViewBinder(
 
             view.post {
                 try {
-                    val t = plan.transform
-                    if (t != null) {
-                        view.applyTransform(t.scale, t.translateX, t.translateY)
-                    } else {
-                        view.centerCrop()
-                    }
+                    // Decision: saved transform or default. See
+                    // applySingleTransformOrDefault for the policy
+                    // (single source of truth, shared with the per-layer
+                    // path in applyUpdates below).
+                    applySingleTransformOrDefault(view, plan.transform)
                     onRebuildComplete?.invoke()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error applying single-layer transform")
@@ -189,16 +236,12 @@ class WallpaperViewBinder(
                 for (update in updates) {
                     if (update.layerIndex >= view.layerCount) break
 
-                    if (update.transform != null) {
-                        view.applyTransform(
-                            update.layerIndex,
-                            update.transform.scale,
-                            update.transform.translateX,
-                            update.transform.translateY
-                        )
-                    } else {
-                        view.centerCropLayer(update.layerIndex)
-                    }
+                    // Decision: saved transform or default. Shared policy
+                    // with the single-layer path; the bounds-check above,
+                    // the property setters below, and the single
+                    // invalidate() outside this loop stay caller-side
+                    // because they are not part of the decision.
+                    applyLayerTransformOrDefault(view, update.layerIndex, update.transform)
 
                     view.getLayer(update.layerIndex)?.let { layer ->
                         layer.alpha = update.alpha

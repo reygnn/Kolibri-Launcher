@@ -45,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
@@ -120,6 +121,12 @@ import javax.inject.Inject
  *                             edit mode (sealed interface + WallpaperEditState
  *                             data class; listener setup stays in the
  *                             Fragment)
+ *   WallpaperSaveAction     — three-way decision (all layers / single /
+ *                             none) shared by save-button and pre-layer-op
+ *                             transform saver. Surfaced during walkthrough
+ *                             after the original three; intentional
+ *                             asymmetry between the two callers preserved
+ *                             and now documented inline at the call site.
  *
  * Together they catch the classes of bugs that actually appear in
  * practice: new BackupPreview field added but the dialog forgets it; new
@@ -1775,7 +1782,20 @@ class HomeFragment : Fragment() {
                         ContextMenuResult.AppInfo -> showAppInfo(app)
                         ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
                         ContextMenuResult.HideApp -> viewModel.onHideApp(app)
+                        // Live branch: per the architecture rule (see
+                        // GetFavoriteAppsUseCase KDoc), a favorite that
+                        // is also hidden remains pinned to the home
+                        // screen and can be long-pressed there. This is
+                        // the path that lets the user un-hide such an
+                        // app — without it, the unhide action would
+                        // have no home-screen-side handler.
                         ContextMenuResult.UnhideApp -> viewModel.onShowApp(app)
+                        // Only reachable from MenuContext.APP_DRAWER, the
+                        // dialog filters this action by context. Ignored
+                        // here because HOME_SCREEN never receives it in
+                        // practice — but the branch is required for
+                        // sealed-when exhaustiveness.
+                        ContextMenuResult.ResetUsage -> Unit
                         is ContextMenuResult.Unknown ->
                             Timber.w("Unknown context menu action: ${result.action}")
                     }
@@ -2149,23 +2169,17 @@ class HomeFragment : Fragment() {
                     try {
                         val currentWallpaperState = viewModel.wallpaperState.value
 
-                        if (currentWallpaperState.isMultiLayer) {
-                            val transforms = (0 until wallpaperView.layerCount).map { i ->
-                                val layer = wallpaperView.getLayer(i)
-                                Triple(
-                                    layer?.scale ?: 1f,
-                                    layer?.translateX ?: 0f,
-                                    layer?.translateY ?: 0f
-                                )
-                            }
-                            viewModel.onSaveAllLayerTransforms(transforms)
-                        } else if (currentWallpaperState.hasWallpaper) {
-                            viewModel.onSaveWallpaperTransform(
-                                wallpaperView.currentScale,
-                                wallpaperView.currentTranslateX,
-                                wallpaperView.currentTranslateY
-                            )
-                        }
+                        // Save-button runs after a finished edit session, so we
+                        // trust the state's isMultiLayer value directly. No
+                        // race-guard against the view here — see the contrast
+                        // at saveCurrentViewTransforms below.
+                        val action = WallpaperSaveAction.decide(
+                            isMultiLayer = currentWallpaperState.isMultiLayer,
+                            hasWallpaper = currentWallpaperState.hasWallpaper,
+                            allLayerTransforms = readAllLayerTransforms(wallpaperView),
+                            singleTransform = readSingleTransform(wallpaperView),
+                        )
+                        dispatchSaveAction(action)
 
                         viewModel.onCommitWallpaperEditMode()
                     } catch (e: Throwable) {
@@ -2488,27 +2502,82 @@ class HomeFragment : Fragment() {
             val wallpaperView = binding.wallpaperView
             val currentState = viewModel.wallpaperState.value
 
-            if (currentState.isMultiLayer && wallpaperView.isMultiLayerMode) {
-                // Multi-Layer: Alle Layer-Transforms speichern
-                val transforms = (0 until wallpaperView.layerCount).map { i ->
-                    val layer = wallpaperView.getLayer(i)
-                    Triple(
-                        layer?.scale ?: 1f,
-                        layer?.translateX ?: 0f,
-                        layer?.translateY ?: 0f
-                    )
-                }
-                viewModel.onSaveAllLayerTransforms(transforms)
-            } else if (currentState.hasWallpaper) {
-                // Single-Layer: Transform speichern
-                viewModel.onSaveWallpaperTransform(
-                    wallpaperView.currentScale,
-                    wallpaperView.currentTranslateX,
-                    wallpaperView.currentTranslateY
-                )
-            }
+            // Race-Guard: läuft vor Layer-Operationen, in denen WallpaperState
+            // und ZoomableImageView temporär divergieren können (State updated,
+            // View noch nicht rebuilt — oder umgekehrt). Wir gehen nur dann auf
+            // den Multi-Layer-Save-Pfad, wenn beide Seiten einig sind, sonst
+            // liest getLayer(i) aus einem nicht-rebuilt View und produziert
+            // Garbage oder crasht. Der Save-Button-Pfad oben hat diesen Guard
+            // bewusst nicht, weil er nach abgeschlossener Edit-Session läuft.
+            val isMultiLayerEffective =
+                currentState.isMultiLayer && wallpaperView.isMultiLayerMode
+
+            val action = WallpaperSaveAction.decide(
+                isMultiLayer = isMultiLayerEffective,
+                hasWallpaper = currentState.hasWallpaper,
+                allLayerTransforms = readAllLayerTransforms(wallpaperView),
+                singleTransform = readSingleTransform(wallpaperView),
+            )
+            dispatchSaveAction(action)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving current view transforms")
+        }
+    }
+
+    /**
+     * Reads all layer transforms from the view in index order. Cheap:
+     * `getLayer` is `List.getOrNull`, layer count is small. The caller
+     * passes the list to [WallpaperSaveAction.decide] which may discard
+     * it (when the chosen branch is single-layer or no-op).
+     */
+    private fun readAllLayerTransforms(
+        wallpaperView: ZoomableImageView,
+    ): List<Triple<Float, Float, Float>> =
+        (0 until wallpaperView.layerCount).map { i ->
+            val layer = wallpaperView.getLayer(i)
+            Triple(
+                layer?.scale ?: 1f,
+                layer?.translateX ?: 0f,
+                layer?.translateY ?: 0f,
+            )
+        }
+
+    /**
+     * Reads the single-layer transform from the view. The view's
+     * currentScale/Tx/Ty getters fall back to layer-active values in
+     * multi-layer mode; that's fine because the caller passes this
+     * triple to [WallpaperSaveAction.decide] which only uses it on the
+     * single-layer branch.
+     */
+    private fun readSingleTransform(
+        wallpaperView: ZoomableImageView,
+    ): Triple<Float, Float, Float> = Triple(
+        wallpaperView.currentScale,
+        wallpaperView.currentTranslateX,
+        wallpaperView.currentTranslateY,
+    )
+
+    /**
+     * Forwards a [WallpaperSaveAction] decision to the corresponding
+     * ViewModel call. The dispatch table is the only place where the
+     * decision branches translate into side effects; the decision
+     * itself is pure.
+     */
+    private fun dispatchSaveAction(action: WallpaperSaveAction) {
+        when (action) {
+            is WallpaperSaveAction.SaveAllLayers ->
+                viewModel.onSaveAllLayerTransforms(action.transforms)
+            is WallpaperSaveAction.SaveSingle ->
+                viewModel.onSaveWallpaperTransform(
+                    action.scale,
+                    action.translateX,
+                    action.translateY,
+                )
+            is WallpaperSaveAction.NoOp -> {
+                // Nothing to save. The caller decides whether a follow-up
+                // commit is still needed (save-button does, layer-op
+                // pre-flush does not).
+            }
         }
     }
 

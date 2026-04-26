@@ -17,6 +17,44 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+/**
+ * Produces the list of favorite apps shown on the home screen, with a
+ * fallback to top-N alphabetically-sorted apps when the user has set
+ * no favorites.
+ *
+ * == ARCHITECTURE RULE: hidden apps and the home screen ==
+ * (First written-down location of this rule. Kept in this KDoc as the
+ * canonical reference; if the rule ever moves to a higher-level doc,
+ * this block can be replaced with a link.)
+ *
+ * Hidden apps applies only to the AppDrawer. On the home screen, the
+ * hidden filter is broken only by favorite status — a favorite that is
+ * also hidden remains pinned to the home screen, because favorites
+ * must always be visible.
+ *
+ * The two code paths in this use case follow from that one rule:
+ *
+ *   - Favorites path ([processApps] when favorites exist, Z. 68–84):
+ *     filter by `isFavorite` only. Hidden flag does not apply, because
+ *     the favorite-status break is in effect.
+ *
+ *   - Fallback path ([createFallbackApps], Z. 155–168, used when the
+ *     user has set no favorites): filter by `!hidden`. There is no
+ *     favorite status to break the hidden filter, so the filter
+ *     applies as it does in the drawer.
+ *
+ * The unhide path remains reachable for a hidden favorite via long-press
+ * on the home screen entry; HomeFragment routes the resulting UnhideApp
+ * action to onShowApp. The same action is unreachable from the
+ * AppDrawer for the symmetric reason — hidden apps do not appear in
+ * the drawer listing (see [GetDrawerAppsUseCase] Z. 56), so they
+ * cannot be long-pressed there.
+ *
+ * == Why HiddenAppsRepository is injected ==
+ * The flow is part of the combined state graph because both paths need
+ * it: the favorites path needs to know the hidden set is in scope (for
+ * the rule above), and the fallback path uses it as a filter directly.
+ */
 class GetFavoriteAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val favoritesManager: FavoritesRepository,
@@ -55,6 +93,13 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private suspend fun processApps(
         rawApps: List<AppInfo>,
         favorites: Set<String>,
+        // Two uses, both consistent with the architecture rule (see
+        // class KDoc): not used as a filter on favorites in this body
+        // (the favorite-status break is in effect), but forwarded to
+        // createFallbackApps where it does filter (no favorites set
+        // means no break, so the hidden filter applies normally).
+        // Do NOT add a hidden filter to the favorites filter on
+        // line 91 below without revisiting the architecture rule.
         hiddenApps: Set<String>,
         savedOrder: List<String>
     ): UiState<FavoriteAppsResult> {
