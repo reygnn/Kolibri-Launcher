@@ -15,7 +15,7 @@ testing reference.
 
 - Kotlin 2.2.21, Android Views + ViewBinding (**no Compose**), Material 3
 - Min SDK 36 / Target 36 / Compile 36 — **Android 16 only**, no compatibility shims
-- JDK 17
+- JDK 21 (Robolectric requires it for SDK 36)
 - MVVM + Clean Architecture, **DI via Hilt 2.57.2**
 - Persistence: Jetpack DataStore Preferences (no SharedPreferences)
 - Crash reporting: ACRA 5.11.4, self-hosted, opt-in

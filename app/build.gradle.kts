@@ -154,13 +154,23 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlin {
+        jvmToolchain(21)
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
+    }
+
+    // Configures the JDK used by the Java toolchain. AGP picks this up for
+    // most tasks; the `tasks.withType<JavaCompile>` block below covers the
+    // hiltJavaCompileDebug task that doesn't honor it on its own.
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 
@@ -182,6 +192,18 @@ android {
             }
         }
     }
+}
+
+// Force the JDK 21 toolchain on every JavaCompile task. AGP/kapt-generated
+// tasks like `hiltJavaCompileDebug` don't pick up the project-level toolchain
+// on their own and would otherwise fall back to the system JDK with
+// "invalid source release: 21".
+tasks.withType<JavaCompile>().configureEach {
+    javaCompiler.set(
+        javaToolchains.compilerFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    )
 }
 
 dependencies {
