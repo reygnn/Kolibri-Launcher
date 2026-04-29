@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
-import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -39,7 +39,7 @@ class GetFavoriteAppsUseCaseTest {
     @MockK
     private lateinit var favoritesManager: FavoritesRepository
     @MockK
-    private lateinit var favoritesOrderManager: FavoritesOrderManager
+    private lateinit var favoritesOrderManager: FavoritesOrderRepositoryImpl
     @MockK
     private lateinit var appVisibilityManager: HiddenAppsRepository
 

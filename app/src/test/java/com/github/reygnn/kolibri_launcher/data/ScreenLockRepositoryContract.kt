@@ -48,7 +48,7 @@ import org.junit.Test
  *      Bewusste Drift. Kein Contract-Test.
  *
  * @see FakeScreenLockRepositoryContractTest
- * @see ScreenLockManagerContractTest
+ * @see ScreenLockRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

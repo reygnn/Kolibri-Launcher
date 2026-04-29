@@ -42,11 +42,11 @@ import org.junit.Test
  *   - Der Manager wirft Exceptions in `setSwipeAction` weiter (für `launchSafe`
  *     im ViewModel). Der Fake nicht. Fehlerverhalten ist Implementierungs-
  *     Detail, nicht Interface-Garantie.
- *   - `shareIn`-Lifecycle gehört in einen `SwipeActionsManagerShareInTest`
- *     (analog zu `FavoritesManagerShareInTest`), falls jemals nötig.
+ *   - `shareIn`-Lifecycle gehört in einen `SwipeActionsRepositoryImplShareInTest`
+ *     (analog zu `FavoritesRepositoryImplShareInTest`), falls jemals nötig.
  *
  * @see FakeSwipeActionsRepositoryContractTest
- * @see SwipeActionsManagerContractTest
+ * @see SwipeActionsRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

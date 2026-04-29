@@ -19,7 +19,7 @@ import org.junit.Test
  *
  * Dieses ist ein *Contract-Test*: Er definiert das Verhalten, das JEDE Implementierung
  * von [FavoritesRepository] einhalten muss — egal ob es sich um die Produktions-
- * implementierung [FavoritesManager] oder um den Unit-Test-Fake
+ * implementierung [FavoritesRepositoryImpl] oder um den Unit-Test-Fake
  * `FakeFavoritesRepository` handelt.
  *
  * ZWECK:
@@ -41,13 +41,13 @@ import org.junit.Test
  *     (siehe TESTING_CONVENTIONS.kt).
  *
  * NICHT IM CONTRACT:
- *   `FavoritesManager` erzwingt `AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME`
+ *   `FavoritesRepositoryImpl` erzwingt `AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME`
  *   als Package-Limit. Der Fake tut das nicht. Das ist (a) Business-Regel des
  *   konkreten Managers und (b) 500 Adds pro Test wären unverhältnismäßig —
- *   daher getestet in `FavoritesManagerTest` direkt, nicht hier.
+ *   daher getestet in `FavoritesRepositoryImplTest` direkt, nicht hier.
  *
  * @see FakeFavoritesRepositoryContractTest
- * @see FavoritesManagerContractTest
+ * @see FavoritesRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,7 +65,7 @@ abstract class FavoritesRepositoryContract {
      * Wird aus dem `runTest { … }`-Block heraus aufgerufen. Aktuell braucht
      * keine der Implementierungen einen externen Coroutine-Scope:
      *  - `FakeFavoritesRepository` arbeitet rein auf `MutableStateFlow`.
-     *  - `FavoritesManager` bekommt `externalScope = null` und überspringt
+     *  - `FavoritesRepositoryImpl` bekommt `externalScope = null` und überspringt
      *    damit den `shareIn`-Layer. Grund: `shareIn` + Replay-Buffer liefert
      *    unter `UnconfinedTestDispatcher` für Write-then-Read-Sequenzen im
      *    selben `runTest`-Block den alten Replay-Wert zurück, bevor der

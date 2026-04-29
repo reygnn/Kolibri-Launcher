@@ -24,7 +24,7 @@ package com.github.reygnn.kolibri_launcher.data
  * WARUM TROTZDEM KEIN CONTRACT?
  *
  * 1. **Kein ehrlicher Manager-Test möglich.**
- *    `TimeBasedEventsManager` braucht im Konstruktor:
+ *    `TimeBasedEventsRepositoryImpl` braucht im Konstruktor:
  *      - `Context`
  *      - `SettingsRepository`
  *      - `AlarmManager` (System-Service)
@@ -47,10 +47,10 @@ package com.github.reygnn.kolibri_launcher.data
  *    Hier gibt es keine zweite Implementierung in Sicht.
  *
  * 3. **Die echte Logik liegt im Manager — und die ist abgedeckt.**
- *    `TimeBasedEventsManager` macht die nicht-trivialen Sachen: Calendar-
+ *    `TimeBasedEventsRepositoryImpl` macht die nicht-trivialen Sachen: Calendar-
  *    Permission-Check, Alarm-Snapshot vs. Calendar-Merge, chronologisches
  *    Sortieren, Cap auf maxCount. Diese Logik wird im
- *    `TimeBasedEventsManagerTest` gegen Mocks getestet — das ist die
+ *    `TimeBasedEventsRepositoryImplTest` gegen Mocks getestet — das ist die
  *    angemessene Test-Form für system-API-getriebenen Code.
  *
  * 4. **Der Fake hat keinen Konsumenten, der vom Vertrag profitieren würde.**
@@ -75,7 +75,7 @@ package com.github.reygnn.kolibri_launcher.data
  *   - `BackupRepositoryContract` für ein vergleichbares Beispiel (dünner
  *     Fake-only-Contract, kein Manager-Test).
  *   - `InstalledAppsRepositoryContract` für das Doppel-Fake-Muster.
- *   - `TimeBasedEventsManagerTest` für die echten Logik-Tests via MockK.
+ *   - `TimeBasedEventsRepositoryImplTest` für die echten Logik-Tests via MockK.
  * ============================================================================
  */
 @Suppress("unused")

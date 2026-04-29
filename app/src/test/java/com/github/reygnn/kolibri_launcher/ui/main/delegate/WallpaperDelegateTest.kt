@@ -443,7 +443,7 @@ class WallpaperDelegateTest {
     fun `onRemoveWallpaperLayer when last layer removed persists empty state`() = runTest {
         // Under the unified remove path, the delegate never calls
         // clearWallpaperUseCase from onRemoveWallpaperLayer — it simply
-        // persists the resulting (empty) state. WallpaperManager.saveWallpaperState
+        // persists the resulting (empty) state. WallpaperRepositoryImpl.saveWallpaperState
         // treats the empty state as "no wallpaper" and wipes all keys.
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns mockk()

@@ -13,7 +13,7 @@ class FakeCustomNamesRepository : CustomNamesRepository {
     var onUpdateTrigger: (suspend () -> Unit)? = null
     var shouldFailOnSet = false
 
-    // Für BackupManagerTest
+    // Für BackupRepositoryImplTest
     var batchSetCalled = false
     var shouldFailOnBatch = false
 
@@ -37,7 +37,7 @@ class FakeCustomNamesRepository : CustomNamesRepository {
     }
 
     override suspend fun removeCustomNameForPackage(packageName: String): Boolean {
-        // Idempotent — analog zu CustomNamesManager.removeCustomNameForPackage:
+        // Idempotent — analog zu CustomNamesRepositoryImpl.removeCustomNameForPackage:
         // der Zielzustand "kein Custom-Name für packageName" ist nach dem Aufruf
         // erreicht, also Erfolg, unabhängig davon ob vorher ein Eintrag da war.
         // Trigger erfolgt immer, weil der Manager das auch tut (DataStore.edit

@@ -19,43 +19,53 @@ Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 
 Das Projekt hat eine bewusste Trennung zwischen:
 
-- **`data/`** — Produktions-Manager-Implementierungen (z.B. `FavoritesManager`)
+- **`data/`** — Produktions-Implementierungen (z.B. `FavoritesRepositoryImpl`)
 - **`domain/repository/`** — Interfaces (z.B. `FavoritesRepository`)
 - **`fakes/`** (im Test-Sourceset) — Test-Doubles
 
-Fast jedes Interface hat sowohl eine Produktionsklasse als auch einen Fake.
-Das ist der Angriffspunkt für Contract-Tests.
+Fast jedes Interface hat sowohl eine Produktionsklasse (`XyzRepositoryImpl`)
+als auch einen Fake (`FakeXyzRepository`). Das ist der Angriffspunkt für
+Contract-Tests.
+
+> **Namens-Historie:** Vor der Hilt-Migration hießen die Produktions-
+> Implementierungen `XyzManager`. Nach dem Rename auf `XyzRepositoryImpl`
+> kann ältere Doku oder ältere Commits noch die `Manager`-Schreibweise
+> verwenden — gemeint ist immer dasselbe: die konkrete Klasse, die das
+> jeweilige `XyzRepository`-Interface implementiert. Zwei Reste tragen den
+> alten Namen weiterhin bewusst: `WallpaperFileManager` (kein Repo, reines
+> File-Helper-Konstrukt) und `DataMigrationManager` (Migrations-Bootstrap,
+> kein Repo).
 
 ---
 
 ## Was bereits existiert — Contract-Tests
 
-Das Projekt hat eine vollständige Contract-Test-Suite, die Fake-vs-Manager-Drift
+Das Projekt hat eine vollständige Contract-Test-Suite, die Fake-vs-Impl-Drift
 für alle Repository-Interfaces abfängt. Namens-Schema:
 
 - `XyzRepositoryContract.kt` — abstract class mit @Test-Methoden
 - `FakeXyzRepositoryContractTest.kt` — läuft die Tests gegen den Fake
-- `XyzManagerContractTest.kt` — läuft dieselben Tests gegen den Manager
+- `XyzRepositoryImplContractTest.kt` — läuft dieselben Tests gegen die Impl
 
 ### Status je Repository (Stand: Ende der Contract-Test-Initiative)
 
 Alle 13 Repository-Interfaces sind behandelt:
 
-| Interface              | Contract | Manager-Test | Kommentar |
-|------------------------|:--------:|:------------:|-----------|
-| FavoritesRepository    |    ✓     |      ✓       | + ShareIn-Infrastruktur-Test |
-| SettingsRepository     |    ✓     |      ✓       | — |
-| SwipeActionsRepository |    ✓     |      ✓       | — |
-| FavoritesOrderRepository |  ✓     |      ✓       | — |
-| HiddenAppsRepository   |    ✓     |      ✓       | — |
-| InstalledAppsRepository|    ✓     |      —       | Zwei Fake-Subklassen, kein Manager (PackageManager) |
-| AppUsageRepository     |    ✓     |      ✓       | Sort-Algorithmus NICHT im Vertrag (Clock-Problem) |
-| WallpaperRepository    |    ✓     |      ✓       | Robolectric (Uri) |
-| CustomNamesRepository  |    ✓     |      ✓       | — |
-| InstalledAppsStateRepository |  ✓ |      ✓       | — |
-| ScreenLockRepository   |    ✓     |      ✓       | — |
-| BackupRepository       |    ✓     |      —       | Fake-only (Uri + ContentResolver) |
-| TimeBasedEventsRepository | ADR only |    —      | Keine Tests — Begründung im File |
+| Interface              | Contract | Impl-Test | Kommentar |
+|------------------------|:--------:|:---------:|-----------|
+| FavoritesRepository    |    ✓     |     ✓     | + ShareIn-Infrastruktur-Test |
+| SettingsRepository     |    ✓     |     ✓     | — |
+| SwipeActionsRepository |    ✓     |     ✓     | — |
+| FavoritesOrderRepository |  ✓     |     ✓     | — |
+| HiddenAppsRepository   |    ✓     |     ✓     | — |
+| InstalledAppsRepository|    ✓     |     —     | Zwei Fake-Subklassen, keine Impl (PackageManager) |
+| AppUsageRepository     |    ✓     |     ✓     | Sort-Algorithmus NICHT im Vertrag (Clock-Problem) |
+| WallpaperRepository    |    ✓     |     ✓     | Robolectric (Uri) |
+| CustomNamesRepository  |    ✓     |     ✓     | — |
+| InstalledAppsStateRepository |  ✓ |     ✓     | — |
+| ScreenLockRepository   |    ✓     |     ✓     | — |
+| BackupRepository       |    ✓     |     —     | Fake-only (Uri + ContentResolver) |
+| TimeBasedEventsRepository | ADR only |   —    | Keine Tests — Begründung im File |
 
 "ADR only" = `TimeBasedEventsRepositoryContract.kt` enthält ausschließlich
 KDoc, der begründet warum es keinen Test gibt. Kein ungeschriebener Test,
@@ -63,28 +73,28 @@ sondern eine dokumentierte Entscheidung.
 
 ### Bugs, die die Contracts aufgedeckt haben
 
-Drei echte Divergenzen zwischen Fake und Manager wurden über den Prozess
-gefunden und gefixt. Jeweils Fake an Manager angeglichen (Manager ist
+Drei echte Divergenzen zwischen Fake und Impl wurden über den Prozess
+gefunden und gefixt. Jeweils Fake an die Impl angeglichen (die Impl ist
 Produktions-Wahrheit):
 
 1. **`FakeFavoritesRepository.saveFavoriteComponents`** filterte keine
-   Blanks, der Manager tut es. Fix: `componentNames.filter { it.isNotBlank() }.toSet()`.
+   Blanks, die Impl tut es. Fix: `componentNames.filter { it.isNotBlank() }.toSet()`.
 2. **`FakeFavoritesOrderRepository.sortFavoriteComponents`** produzierte bei
    duplikaten Einträgen in `order` Apps mehrfach im Output. Fix:
    `order.distinct().mapNotNull { appMap[it] }`.
 3. **`FakeCustomNamesRepository.removeCustomNameForPackage`** war nicht
-   idempotent (false für nicht-existente Keys), der Manager ist es (true,
+   idempotent (false für nicht-existente Keys), die Impl ist es (true,
    immer). Fix: Fake entsprechend angleichen.
 
 Alle drei Fixes stehen in den jeweiligen Fake-Dateien mit Kommentar, der
-auf die Parallele zum Manager verweist. Wenn jemand das beim Refactoring
+auf die Parallele zur Impl verweist. Wenn jemand das beim Refactoring
 wieder rückgängig macht, schlägt der Contract erneut an.
 
-### Ein Manager-Fix, ebenfalls durch Contract aufgedeckt
+### Ein Impl-Fix, ebenfalls durch Contract aufgedeckt
 
-`FavoritesManager.saveFavoriteComponents` bekam denselben Blank-Filter —
-nicht weil der Manager kaputt war, sondern um die Asymmetrie zum Fake zu
-schließen und die Semantik projektweit konsistent zu machen.
+`FavoritesRepositoryImpl.saveFavoriteComponents` bekam denselben Blank-
+Filter — nicht weil die Impl kaputt war, sondern um die Asymmetrie zum
+Fake zu schließen und die Semantik projektweit konsistent zu machen.
 
 ---
 
@@ -95,13 +105,13 @@ Contracts unter "NICHT IM CONTRACT — bewusste Drifts" dokumentiert. Ein
 paar prominente Beispiele:
 
 - **`ScreenLockRepository`**: Fake-Default `isLockingAvailable = true`
-  vs. Manager-Default `false`. Bewusst, weil Tests sonst in jedem
+  vs. Impl-Default `false`. Bewusst, weil Tests sonst in jedem
   `@Before` `setServiceState(true)` rufen müssten.
-- **`InstalledAppsStateRepository`**: `purgeRepository` ist beim Manager
+- **`InstalledAppsStateRepository`**: `purgeRepository` ist bei der Impl
   explizit No-Op (System-Daten), beim Fake ein echter Reset
   (Test-Isolation).
 - **`AppUsageRepository`**: Konkrete Sortierreihenfolge von
-  `sortAppsByTimeWeightedUsage` — der Manager benutzt
+  `sortAppsByTimeWeightedUsage` — die Impl benutzt
   `System.currentTimeMillis()` direkt ohne Clock-Abstraktion. Contract
   prüft nur Multiset-Properties (gleiche Apps rein wie raus).
 - **`WallpaperRepository`**: drei Drifts bei exotischen States
@@ -125,17 +135,17 @@ in den Contract. Fake anpassen, dann rot→grün.
    bevor du irgendeinen Test anfasst.
 2. **Dann** eine existierende Contract-Pair-Gruppe als Beispiel —
    `FavoritesRepositoryContract.kt` + `FakeFavoritesRepositoryContractTest.kt`
-   + `FavoritesManagerContractTest.kt`. Das zeigt das Muster in seiner vollen
-   Form, mit ausführlichem KDoc.
-3. **Bei Bedarf** `FavoritesManagerShareInTest.kt` für die `shareIn`-
+   + `FavoritesRepositoryImplContractTest.kt`. Das zeigt das Muster in seiner
+   vollen Form, mit ausführlichem KDoc.
+3. **Bei Bedarf** `FavoritesRepositoryImplShareInTest.kt` für die `shareIn`-
    Infrastruktur-Test-Mechanik.
 
 ### Häufige Aufgaben und wo sie reingehören
 
-**Neues Interface + neuer Manager + neuer Fake:**
+**Neues Interface + neue Impl + neuer Fake:**
 Baue Contract-Pair. Reihenfolge: abstract Class zuerst, dann die zwei
 Subklassen. Siehe TESTING_CONVENTIONS.kt → "CONTRACT TESTS" für das Muster.
-Wenn der Manager `shareIn` benutzt, `externalScope = null` im Test.
+Wenn die Impl `shareIn` benutzt, `externalScope = null` im Test.
 
 **Neue Methode in existierendem Interface:**
 Methode auch in beide Implementierungen einfügen, dann `@Test`-Methode(n)
@@ -143,8 +153,8 @@ zum bestehenden `XyzRepositoryContract` hinzufügen. Beide Subklassen laufen
 automatisch mit — keine Änderung nötig.
 
 **Rot gewordener Contract-Test nach einem Refactor:**
-Die Standard-Antwort ist Option B: Fake an Manager angleichen, nicht
-umgekehrt. Manager-Verhalten ist Produktions-Wahrheit. Details in
+Die Standard-Antwort ist Option B: Fake an die Impl angleichen, nicht
+umgekehrt. Impl-Verhalten ist Produktions-Wahrheit. Details in
 TESTING_CONVENTIONS.kt → "DRIFT-FIX POLICY".
 
 **Test hängt im CI:**
@@ -158,8 +168,8 @@ sind streng und die Fehler sind _stumm_ (Test scheitert ohne verwertbare
 Fehlermeldung). `testScheduler.runCurrent()` als Alternative wenn
 `advanceUntilIdle` zu weit läuft (passiert bei `WhileSubscribed`-Tests).
 
-**Manager braucht Android-System-APIs:**
-Dann in den meisten Fällen KEIN Manager-Contract-Test — nur Fake-Subklasse,
+**Impl braucht Android-System-APIs:**
+Dann in den meisten Fällen KEIN Impl-Contract-Test — nur Fake-Subklasse,
 plus ehrliches KDoc das erklärt warum. Beispiele im Projekt:
 `BackupRepositoryContract`, `InstalledAppsRepositoryContract`,
 `TimeBasedEventsRepositoryContract` (letzterer rein ADR-Doku ohne Tests).
@@ -185,20 +195,20 @@ plus ehrliches KDoc das erklärt warum. Beispiele im Projekt:
    direkt zu "es existiert nicht" springen.
 
 4. **Contract-Test mit echten `content://`-URIs schreiben**, ohne zu
-   merken dass der Manager non-file-URIs als `WallpaperState.NONE`
-   interpretiert. Immer die Read-Pfade im Manager lesen, bevor man
+   merken dass die Impl non-file-URIs als `WallpaperState.NONE`
+   interpretiert. Immer die Read-Pfade in der Impl lesen, bevor man
    Test-Daten konstruiert.
 
 ### Was die Contracts NICHT sind
 
-- Sie sind keine Manager-Logik-Tests. Die `BackupManager*Test`-Suite
-  (~200KB) existiert separat und prüft die Business-Logik des Managers.
+- Sie sind keine Impl-Logik-Tests. Die `BackupRepositoryImpl*Test`-Suite
+  (~200KB) existiert separat und prüft die Business-Logik der Impl.
   Contracts prüfen nur Interface-Garantien.
 - Sie sind keine Integration-Tests. Sie laufen gegen `FakeDataStore`,
   nicht gegen echtes DataStore-auf-Disk.
 - Sie sind keine UI-Tests. Die liegen in `androidTest/`.
-- Sie sind kein Ersatz für Manager-spezifische Tests bei nicht-trivialer
-  Logik (z.B. das Sort-Verhalten in `AppUsageManager`). Der Contract
+- Sie sind kein Ersatz für Impl-spezifische Tests bei nicht-trivialer
+  Logik (z.B. das Sort-Verhalten in `AppUsageRepositoryImpl`). Der Contract
   dokumentiert _warum_ er solche Logik nicht prüft, und zeigt so, wo
   zusätzliche Tests nötig sind.
 
@@ -214,12 +224,12 @@ deshalb Standard sein sollten:
    Ausnahmen sind begründet in TESTING_CONVENTIONS.kt.
 
 2. **Bewusste Drifts werden dokumentiert, nicht versteckt.** Wenn Fake
-   und Manager absichtlich unterschiedlich sind, gehört das in den
+   und Impl absichtlich unterschiedlich sind, gehört das in den
    Klassen-KDoc des Contracts, in den Abschnitt "NICHT IM CONTRACT —
    bewusste Drifts".
 
-3. **Bei Contract-Rot gewinnt der Manager.** Fake angleichen, nicht
-   Manager lockern. (Ausnahme: bewusste Drift, dann in KDoc dokumentieren
+3. **Bei Contract-Rot gewinnt die Impl.** Fake angleichen, nicht
+   Impl lockern. (Ausnahme: bewusste Drift, dann in KDoc dokumentieren
    und Test _nicht_ schreiben.)
 
 4. **Vor dem Testschreiben: beide Implementierungen lesen.** Am

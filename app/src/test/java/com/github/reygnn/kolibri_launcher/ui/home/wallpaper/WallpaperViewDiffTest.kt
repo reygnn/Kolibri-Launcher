@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
  * wallpaper rebuild reconciliation.
  *
  * Runs under Robolectric so that `Uri.parse` / `String.toUri()` work on
- * the JVM — same pattern as [com.github.reygnn.kolibri_launcher.data.WallpaperManagerTest].
+ * the JVM — same pattern as [com.github.reygnn.kolibri_launcher.data.WallpaperRepositoryImplTest].
  * The diff logic itself is pure Kotlin with no Android dependencies, but
  * its inputs ([WallpaperLayerState] / [WallpaperState]) carry real `Uri`
  * instances, which can't be `mockk()`'d cleanly because several `Uri`

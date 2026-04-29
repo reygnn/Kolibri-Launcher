@@ -47,7 +47,7 @@ class FakeFavoritesRepository : FavoritesRepository {
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {
         // Blank-Einträge filtern — konsistent mit addFavoriteComponent und
         // isFavoriteComponent, die beide Blanks ablehnen. Muss mit
-        // FavoritesManager.saveFavoriteComponents synchron gehalten werden.
+        // FavoritesRepositoryImpl.saveFavoriteComponents synchron gehalten werden.
         favorites = componentNames.filter { it.isNotBlank() }.toSet()
     }
 

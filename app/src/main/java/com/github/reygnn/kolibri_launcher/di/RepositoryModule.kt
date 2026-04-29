@@ -1,21 +1,21 @@
 package com.github.reygnn.kolibri_launcher.di
 
-import com.github.reygnn.kolibri_launcher.data.AppUsageManager
-import com.github.reygnn.kolibri_launcher.data.BackupManager
-import com.github.reygnn.kolibri_launcher.data.CustomNamesManager
-import com.github.reygnn.kolibri_launcher.data.FavoritesManager
-import com.github.reygnn.kolibri_launcher.data.FavoritesOrderManager
-import com.github.reygnn.kolibri_launcher.data.HiddenAppsManager
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsManager
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateManager
-import com.github.reygnn.kolibri_launcher.data.ResetManager
-import com.github.reygnn.kolibri_launcher.data.ScreenLockManager
-import com.github.reygnn.kolibri_launcher.data.SettingsManager
-import com.github.reygnn.kolibri_launcher.data.ShortcutManager
-import com.github.reygnn.kolibri_launcher.data.SwipeActionsManager
-import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsManager
-import com.github.reygnn.kolibri_launcher.data.AppUsageExportManager
-import com.github.reygnn.kolibri_launcher.data.WallpaperManager
+import com.github.reygnn.kolibri_launcher.data.AppUsageRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.BackupRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.CustomNamesRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.FavoritesRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.ResetRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.ScreenLockRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.SettingsRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.ShortcutRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.UsageExportRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.WallpaperRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
@@ -46,102 +46,68 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindSettingsRepository(
-        settingsManager: SettingsManager
-    ): SettingsRepository
+    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 
     @Binds
     @Singleton
-    abstract fun bindFavoritesRepository(
-        favoritesManager: FavoritesManager
-    ): FavoritesRepository
+    abstract fun bindFavoritesRepository(impl: FavoritesRepositoryImpl): FavoritesRepository
 
     @Binds
     @Singleton
-    abstract fun bindAppUsageRepository(
-        appUsageManager: AppUsageManager
-    ): AppUsageRepository
+    abstract fun bindAppUsageRepository(impl: AppUsageRepositoryImpl): AppUsageRepository
 
     @Binds
     @Singleton
-    abstract fun bindVisibilityRepository(
-        visibilityManager: HiddenAppsManager
-    ): HiddenAppsRepository
+    abstract fun bindHiddenAppsRepository(impl: HiddenAppsRepositoryImpl): HiddenAppsRepository
 
     @Binds
     @Singleton
-    abstract fun bindFavoritesOrderRepository(
-        favoritesOrderManager: FavoritesOrderManager
-    ): FavoritesOrderRepository
+    abstract fun bindFavoritesOrderRepository(impl: FavoritesOrderRepositoryImpl): FavoritesOrderRepository
 
     @Binds
     @Singleton
-    abstract fun bindAppRepository(
-        installedAppsManager: InstalledAppsManager
-    ): InstalledAppsRepository
-
-     @Binds
-    @Singleton
-    abstract fun bindAppNamesRepository(
-        appNamesManager: CustomNamesManager
-    ): CustomNamesRepository
+    abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
 
     @Binds
     @Singleton
-    abstract fun bindInstalledAppsStateRepository(
-        impl: InstalledAppsStateManager
-    ): InstalledAppsStateRepository
+    abstract fun bindCustomNamesRepository(impl: CustomNamesRepositoryImpl): CustomNamesRepository
 
     @Binds
     @Singleton
-    abstract fun bindScreenLockRepository(
-        screenLockManager: ScreenLockManager
-    ): ScreenLockRepository
+    abstract fun bindInstalledAppsStateRepository(impl: InstalledAppsStateRepositoryImpl): InstalledAppsStateRepository
 
     @Binds
     @Singleton
-    abstract fun bindShortcutRepository(
-        shortcutManager: ShortcutManager
-    ): ShortcutRepository
+    abstract fun bindScreenLockRepository(impl: ScreenLockRepositoryImpl): ScreenLockRepository
 
     @Binds
     @Singleton
-    abstract fun bindSwipeActionsRepository(
-        swipeActionsManager: SwipeActionsManager
-    ): SwipeActionsRepository
+    abstract fun bindShortcutRepository(impl: ShortcutRepositoryImpl): ShortcutRepository
 
     @Binds
     @Singleton
-    abstract fun bindBackupRepository(
-        backupManager: BackupManager
-    ): BackupRepository
-
-    @Binds
-    abstract fun bindUsageExportRepository(
-        appUsageExportManager: AppUsageExportManager
-    ): UsageExportRepository
+    abstract fun bindSwipeActionsRepository(impl: SwipeActionsRepositoryImpl): SwipeActionsRepository
 
     @Binds
     @Singleton
-    abstract fun bindCalendarRepository(
-        impl: TimeBasedEventsManager
-    ): TimeBasedEventsRepository
+    abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
+
+    @Binds
+    abstract fun bindUsageExportRepository(impl: UsageExportRepositoryImpl): UsageExportRepository
 
     @Binds
     @Singleton
-    abstract fun bindResetRepository(
-        resetManager: ResetManager
-    ): ResetRepository
+    abstract fun bindTimeBasedEventsRepository(impl: TimeBasedEventsRepositoryImpl): TimeBasedEventsRepository
 
     @Binds
     @Singleton
-    abstract fun bindShortcutLauncherService(
-        impl: ShortcutLauncherServiceImpl
-    ): ShortcutLauncherService
+    abstract fun bindResetRepository(impl: ResetRepositoryImpl): ResetRepository
 
     @Binds
     @Singleton
-    abstract fun bindWallpaperRepository(
-        impl: WallpaperManager
-    ): WallpaperRepository
+    abstract fun bindShortcutLauncherService(impl: ShortcutLauncherServiceImpl): ShortcutLauncherService
+
+    @Binds
+    @Singleton
+    abstract fun bindWallpaperRepository(impl: WallpaperRepositoryImpl): WallpaperRepository
 }

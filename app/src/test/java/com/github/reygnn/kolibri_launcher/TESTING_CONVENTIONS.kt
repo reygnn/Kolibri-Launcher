@@ -223,8 +223,8 @@ package com.github.reygnn.kolibri_launcher
  *     left matchers: [any<Unit>()]
  *
  * fehl — die Methode wird nicht gematcht, der Call schlägt durch als
- * "no answer found". Empirisch beobachtet in CustomNamesManagerTest und
- * InstalledAppsManagerTest.
+ * "no answer found". Empirisch beobachtet in CustomNamesRepositoryImplTest und
+ * InstalledAppsRepositoryImplTest.
  *
  *   // ❌ matcht nicht
  *   coEvery { mockTrigger.emit(any()) } just Runs
@@ -323,8 +323,8 @@ package com.github.reygnn.kolibri_launcher
  *
  * MANAGER-TEST: `externalScope = null` BEI shareIn-BASIERTEN MANAGERN
  *   Managers, die `shareIn(externalScope, WhileSubscribed(…), replay = 1)`
- *   über ihre Flows legen (FavoritesManager, FavoritesOrderManager,
- *   SwipeActionsManager), haben einen Write-then-Read-Bug unter
+ *   über ihre Flows legen (FavoritesRepositoryImpl, FavoritesOrderRepositoryImpl,
+ *   SwipeActionsRepositoryImpl), haben einen Write-then-Read-Bug unter
  *   UnconfinedTestDispatcher: der Write geht durch zu dataStore, der
  *   Upstream-Collector hat den Update aber noch nicht in den Replay-Buffer
  *   geschrieben, der Read liefert den alten gecachten Wert.
@@ -332,11 +332,11 @@ package com.github.reygnn.kolibri_launcher
  *   Lösung: im Manager-Contract-Test `externalScope = null` übergeben —
  *   das überspringt die shareIn-Schicht, der Flow bleibt cold, und jeder
  *   `.first()` sieht den aktuellen dataStore-Wert direkt. Konkretes
- *   Beispiel in `FavoritesManagerContractTest.kt`.
+ *   Beispiel in `FavoritesRepositoryImplContractTest.kt`.
  *
  *   Das shareIn-Verhalten SELBST gehört NICHT in den Contract (es ist
  *   Produktions-Infrastruktur, kein Interface-Vertrag). Separater Test:
- *   `FavoritesManagerShareInTest.kt` prüft Replay, Hot-Sharing und
+ *   `FavoritesRepositoryImplShareInTest.kt` prüft Replay, Hot-Sharing und
  *   WhileSubscribed-Timeout mit virtueller Zeit.
  *
  *   Wichtig dort: `testScheduler.runCurrent()` statt `advanceUntilIdle()`,
@@ -395,9 +395,9 @@ package com.github.reygnn.kolibri_launcher
  * ============================================================================
  *
  * Das Problem:
- *   Einige Manager (z.B. CustomNamesManager, ScreenLockManager) benutzen
+ *   Einige Manager (z.B. CustomNamesRepositoryImpl, ScreenLockRepositoryImpl) benutzen
  *   `MutableSharedFlow<Unit>` für Event-Streams. In Produktion wird dieser
- *   SharedFlow von einem Konsumenten (InstalledAppsManager, etc.)
+ *   SharedFlow von einem Konsumenten (InstalledAppsRepositoryImpl, etc.)
  *   permanent collected — `emit` geht immer durch, weil der Buffer sofort
  *   geleert wird.
  *
@@ -421,9 +421,9 @@ package com.github.reygnn.kolibri_launcher
  *          extraBufferCapacity = 1,
  *          onBufferOverflow = BufferOverflow.DROP_OLDEST
  *      )
- *      val manager = CustomNamesManager(fakeDataStore, trigger, context)
+ *      val manager = CustomNamesRepositoryImpl(fakeDataStore, trigger, context)
  *
- *    Referenz: CustomNamesManagerContractTest.kt
+ *    Referenz: CustomNamesRepositoryImplContractTest.kt
  *
  * 2) Tests die das Event-Verhalten PRÜFEN wollen (nicht nur nicht-hängen):
  *    Turbine-Pattern — Collector vor Trigger aufsetzen.
@@ -437,7 +437,7 @@ package com.github.reygnn.kolibri_launcher
  *    Das funktioniert weil `test { }` synchron einen Collector attached,
  *    bevor `doAction` aufgerufen wird. Der Buffer-Overflow tritt nicht ein.
  *
- *    Referenz: ScreenLockRepositoryContract.kt, ScreenLockManagerTest.kt
+ *    Referenz: ScreenLockRepositoryContract.kt, ScreenLockRepositoryImplTest.kt
  *
  * ANTI-PATTERN:
  * ✗ val trigger = MutableSharedFlow<Unit>()   // hängt beim ersten emit!

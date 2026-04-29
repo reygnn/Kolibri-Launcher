@@ -25,14 +25,14 @@ import org.junit.Test
  * Behavior-Double.
  *
  * KEIN MANAGER-CONTRACT-TEST:
- *   `BackupManager` (60KB Datei) macht echte JSON-Serialisierung,
+ *   `BackupRepositoryImpl` (60KB Datei) macht echte JSON-Serialisierung,
  *   Datei-I/O über Android-`Uri`s, und braucht einen ganzen Stack an
- *   Dependencies (FavoritesManager, SettingsManager, WallpaperManager, …
+ *   Dependencies (FavoritesRepositoryImpl, SettingsRepositoryImpl, WallpaperRepositoryImpl, …
  *   plus ContentResolver). Im Unit-Test-Setup ohne Robolectric +
  *   heavy mocking ist er nicht ehrlich instanziierbar — und mit
  *   Mocks würden wir Vertragstreue zwischen "Fake" und "Mock-Konstrukt"
  *   prüfen, nicht zwischen "Fake" und echtem Manager. Die Manager-
- *   Realität wird im umfangreichen `BackupManager*Test`-Suite separat
+ *   Realität wird im umfangreichen `BackupRepositoryImpl*Test`-Suite separat
  *   abgedeckt (Doomsday, Security, Isolation, etc.).
  *
  * Was der Contract dennoch festschreibt — und damit Drift abfängt, falls

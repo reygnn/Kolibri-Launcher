@@ -114,7 +114,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             val hiltEntryPoint = try {
                 EntryPointAccessors.fromApplication(
                     appContext,
-                    InstalledAppsManagerEntryPoint::class.java
+                    InstalledAppsRepositoryEntryPoint::class.java
                 )
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "[KOLIBRI] Failed to access Hilt entry point")

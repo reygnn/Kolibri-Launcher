@@ -24,7 +24,7 @@ import org.junit.Test
  * **LAST KNOWN GOOD CACHING:**
  *   `getCurrentApps()` muss bei leerem aktuellen State auf die letzte
  *   nicht-leere App-Liste zurückfallen. Begründung im
- *   [InstalledAppsStateManager]-KDoc: "UI never shows empty state due to
+ *   [InstalledAppsStateRepositoryImpl]-KDoc: "UI never shows empty state due to
  *   transient errors". Wenn ein Refactoring diesen Fallback entfernt, würde
  *   ein PackageManager-Hiccup direkt zu einer leeren App-Liste in der UI
  *   führen — die Kernfunktion des Launchers wäre temporär kaputt.
@@ -44,7 +44,7 @@ import org.junit.Test
  *      Implementation-Detail.
  *
  * @see FakeInstalledAppsStateRepositoryContractTest
- * @see InstalledAppsStateManagerContractTest
+ * @see InstalledAppsStateRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

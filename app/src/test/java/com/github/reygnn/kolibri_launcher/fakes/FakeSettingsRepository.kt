@@ -300,7 +300,7 @@ class FakeSettingsRepository : SettingsRepository {
         onboardingCompletedState.value = completed
     }
 
-    // rotationLocked — neu mit WallpaperManager/BackupManager
+    // rotationLocked — neu mit WallpaperRepositoryImpl/BackupRepositoryImpl
     private val rotationLockedState = MutableStateFlow(false)
 
     var rotationLocked: Boolean

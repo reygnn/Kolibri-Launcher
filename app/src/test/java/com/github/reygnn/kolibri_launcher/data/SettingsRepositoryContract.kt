@@ -37,7 +37,7 @@ import org.junit.Test
  * gehört der Test dafür in diesen Contract.
  *
  * @see FakeSettingsRepositoryContractTest
- * @see SettingsManagerContractTest
+ * @see SettingsRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

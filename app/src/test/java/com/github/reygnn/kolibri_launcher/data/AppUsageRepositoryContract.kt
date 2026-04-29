@@ -37,7 +37,7 @@ import org.junit.Test
  *   NICHT geprüft: konkrete Reihenfolge bei mehr als einer App, weil der Fake
  *   das nicht implementiert (und es im Manager zeitabhängig ist).
  *
- *   Wenn `AppUsageManager` jemals eine `Clock`-Abstraktion bekommt, kann
+ *   Wenn `AppUsageRepositoryImpl` jemals eine `Clock`-Abstraktion bekommt, kann
  *   dieser Contract um echte Sortier-Tests erweitert werden — der Fake
  *   müsste dann allerdings auch nachgerüstet werden.
  *
@@ -49,7 +49,7 @@ import org.junit.Test
  *   - `purgeRepository` löscht alle Usage-Daten
  *
  * @see FakeAppUsageRepositoryContractTest
- * @see AppUsageManagerContractTest
+ * @see AppUsageRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

@@ -48,14 +48,14 @@ import org.junit.Test
  * NICHT IM CONTRACT (Manager-spezifisch):
  *   - `MAX_ORDER_LIST_SIZE`-Truncation in `saveOrder` (Manager: Cap; Fake: nimmt
  *     alles). Business-Regel des konkreten Managers — gehört in
- *     `FavoritesOrderManagerTest`.
+ *     `FavoritesOrderRepositoryImplTest`.
  *   - JSON-Parse-Fehler → empty list (kein JSON im Fake).
  *   - `saveOrder` returnt false bei Schreibfehlern (Fake returnt immer true).
  *   - `removeComponentFromOrder` ist **nicht** Teil des Interfaces, sondern eine
  *     `open suspend fun` direkt auf dem Manager → kein Contract-Test hier.
  *
  * @see FakeFavoritesOrderRepositoryContractTest
- * @see FavoritesOrderManagerContractTest
+ * @see FavoritesOrderRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

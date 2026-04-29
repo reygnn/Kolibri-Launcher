@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
 // Das ist der Vertrag. Jede Klasse, die diesen Vertrag erfüllt,
-// kann dem InstalledAppsManager als Helfer dienen.
+// kann dem InstalledAppsRepositoryImpl als Helfer dienen.
 interface CustomNamesRepository : Purgeable {
     suspend fun getDisplayNameForPackage(packageName: String, originalName: String): String
     suspend fun setCustomNameForPackage(packageName: String, customName: String): Boolean

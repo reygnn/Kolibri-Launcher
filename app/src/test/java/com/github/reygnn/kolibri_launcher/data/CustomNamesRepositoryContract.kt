@@ -67,7 +67,7 @@ import org.junit.Test
  *     `batchSetCalled`, `onUpdateTrigger`) — sind kein Interface-Vertrag.
  *
  * @see FakeCustomNamesRepositoryContractTest
- * @see CustomNamesManagerContractTest
+ * @see CustomNamesRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

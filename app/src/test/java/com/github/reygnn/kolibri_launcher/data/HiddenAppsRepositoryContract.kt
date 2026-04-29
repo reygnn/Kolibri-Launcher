@@ -43,7 +43,7 @@ import org.junit.Test
  *   - DataStore-IOException-Recovery.
  *
  * @see FakeHiddenAppsRepositoryContractTest
- * @see HiddenAppsManagerContractTest
+ * @see HiddenAppsRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

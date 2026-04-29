@@ -220,7 +220,7 @@ class WallpaperDelegate(
             // **Why Not Per-Emission:**
             // A per-emission GC would run every time the state changes — every time a layer
             // is added, removed, transformed, re-ordered, or when the edit session is committed
-            // or cancelled. During a backup restore (BackupManager -> WallpaperFileManager.
+            // or cancelled. During a backup restore (BackupRepositoryImpl -> WallpaperFileManager.
             // copyFromInputStream for each extracted image) this emits *multiple* intermediate
             // states as each layer is added. If the GC ran between those, it would see
             // "state has 3 layers, disk has 4 files" and delete the fourth file — the one
@@ -543,7 +543,7 @@ class WallpaperDelegate(
 
                 val newState = current.withRemovedLayer(layerIndex)
 
-                // Unified persist path: set in-memory + persist. WallpaperManager's
+                // Unified persist path: set in-memory + persist. WallpaperRepositoryImpl's
                 // saveWallpaperState handles the "no wallpaper" case by wiping all
                 // keys, so we don't need a separate clearWallpaperUseCase call here.
                 // (That avoids a brief UI flicker when the last layer is removed.)

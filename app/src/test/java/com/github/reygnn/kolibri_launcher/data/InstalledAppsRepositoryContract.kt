@@ -30,7 +30,7 @@ import org.junit.Test
  *      einen injizierten `CustomNamesRepository`.
  *
  * Die `triggerAppsUpdate()`-Semantik unterscheidet sich also fundamental
- * zwischen den Fakes — und auch der echte [InstalledAppsManager] macht etwas
+ * zwischen den Fakes — und auch der echte [InstalledAppsRepositoryImpl] macht etwas
  * Drittes (löst eine `SharedFlow`-Emission aus, die einen `flatMapLatest`-
  * PackageManager-Reload triggert). Das heißt: das beobachtbare Verhalten von
  * `triggerAppsUpdate` ist **nicht Teil des Interface-Vertrags** — es ist
@@ -52,7 +52,7 @@ import org.junit.Test
  * würde alle bestehenden Konsumenten brechen.
  *
  * KEIN MANAGER-CONTRACT-TEST:
- *   `InstalledAppsManager` liest aus dem Android-`PackageManager`. Um ihn
+ *   `InstalledAppsRepositoryImpl` liest aus dem Android-`PackageManager`. Um ihn
  *   im Unit-Test zu instanziieren, müsste der `PackageManager` voll gemockt
  *   werden — wir würden dann Vertragstreue zwischen "Fake" und
  *   "Mock-Konstrukt" prüfen, nicht zwischen "Fake" und echtem Manager. Die

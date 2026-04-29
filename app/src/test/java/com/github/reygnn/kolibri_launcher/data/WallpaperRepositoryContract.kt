@@ -76,7 +76,7 @@ import org.junit.Test
  *   mit diesem Setup; Begründung im jeweiligen Subklassen-KDoc.
  *
  * @see FakeWallpaperRepositoryContractTest
- * @see WallpaperManagerContractTest
+ * @see WallpaperRepositoryImplContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)
