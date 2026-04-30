@@ -121,13 +121,9 @@ Verteilung laut Sub-Agent-Survey, abzüglich des Sweeps:
 
 ### Default-Disposition
 
-Wenn ein neuer Catch bei der Code-Review auftaucht, ist die Frage
-**„welche Kategorie?"** vor dem Approve. Die fünf Buckets aus dem
-Sub-Agent-Survey (CANT_THROW / DEAD_REDUNDANT / LIFECYCLE / EXTERNAL /
-UNCLEAR) sind das Mental-Frame. Default für Programmierfehler:
-**propagieren lassen**, in DEBUG via `silentError` (Rule 9), in
-RELEASE via Flow-`.catch` oder ViewModel-`launchSafe` als Sicherheits-
-netz. NICHT mehr per nested try/catch maskieren.
+Siehe **CLAUDE.md Rule 11** — die Default-Regel für neue Catches lebt
+dort als projektweite Konvention. Im Review die Vier-Kategorien-Frage
+stellen (siehe Rule 11 + `HomeFragment.kt:157-208`).
 
 ---
 
