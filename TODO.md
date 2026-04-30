@@ -73,12 +73,6 @@ anderen Gründen ohnehin offen ist.
   Navigation-State-Logik. Vorschlag: ins ViewModel oder einen
   `delegate/`-Sibling, Activity bekommt fertiges `PopThenLaunch`-Event.
 
-- [ ] **`CustomNamesActivity.handleRename()` (`:352-372`)** — vierfache
-  Validierung (empty → remove, too long → error, equals original →
-  remove, sonst → set) mit Inline-Konstante `MAX_APP_NAME_LENGTH`.
-  Vorschlag: `CustomNamesViewModel.onRenameSubmitted(app, newName)` oder
-  ein `RenameDecision`-Helper mit Tests pro Branch.
-
 - [ ] **`AppContextMenuDialogFragment.loadActions()` (`:192-346`)** —
   koordiniert vier Repositories (`shortcutManager`, `favoritesManager`,
   `appNamesManager`, `visibilityManager`) und branched auf

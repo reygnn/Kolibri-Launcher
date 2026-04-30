@@ -60,7 +60,6 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     private companion object {
         private const val SEARCH_DEBOUNCE_MS = 300L
         private const val STATE_SEARCH_QUERY = "search_query"
-        private const val MAX_APP_NAME_LENGTH = 50
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -351,19 +350,11 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
     private fun handleRename(app: AppInfo, newName: String) {
         try {
-            when {
-                newName.isEmpty() -> {
-                    viewModel.removeCustomName(app.packageName)
-                }
-                newName.length > MAX_APP_NAME_LENGTH -> {
-                    showError(getString(R.string.error_name_too_long, MAX_APP_NAME_LENGTH))
-                }
-                newName == app.originalName -> {
-                    viewModel.removeCustomName(app.packageName)
-                }
-                else -> {
-                    viewModel.setCustomName(app.packageName, newName)
-                }
+            when (val decision = RenameDecision.decide(newName, app.originalName)) {
+                RenameDecision.Remove -> viewModel.removeCustomName(app.packageName)
+                is RenameDecision.TooLong ->
+                    showError(getString(R.string.error_name_too_long, decision.maxLength))
+                is RenameDecision.Set -> viewModel.setCustomName(app.packageName, decision.name)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in handleRename")
