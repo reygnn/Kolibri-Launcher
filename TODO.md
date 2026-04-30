@@ -44,36 +44,75 @@ schluckende Logik kippen.
 
 ---
 
-## 2. Throwable-Catch-Religion: Failure-Maskerade auditieren
+## 2. Throwable-Catch-Religion — Trivial-Sweep abgeschlossen, Reststand
 
-Code-Audit hat **71 `catch (e: Throwable)`-Blöcke im Main-Sourceset**
-gezählt. Die Crash-Safety-Kultur ist Designziel (CLAUDE.md Rule 7
-für `KolibriLauncherApp`), aber sie ist über die Whitelist
-hinausgewuchert. Das eigentliche Problem hat der Autor selbst in
-`HomeFragment.kt:157-208` formuliert:
+Survey hat insgesamt **735 `catch (Throwable)` / `catch (Exception)`-
+Blöcke im Main-Sourceset** gezählt (das initiale Audit-Sample von 71
+war zu eng gefiltert). Die Crash-Safety-Kultur ist Designziel
+(CLAUDE.md Rule 7 für `KolibriLauncherApp`), aber sie war über die
+Whitelist hinausgewuchert. Das eigentliche Problem hat der Autor
+selbst in `HomeFragment.kt:157-208` formuliert:
 
 > achieves *continuation*, which is a different thing from
 > recovery — invisible failures don't get fixed.
 
-Konkrete Belegstelle: `domain/usecase/GetDrawerAppsUseCase.kt:49-115`
-hat **drei verschachtelte try/catch um eine `sortedBy { lowercase() }`-
-Operation**, mit drei Fallback-Pfaden. Das maskiert Programmierfehler
-statt sie sichtbar zu machen.
+### Erledigt
 
-- [ ] **Catch-Audit ausführen.** Pro Catch entscheiden:
-  - **Behalten:** echter externer Fehlerfall (System-API, IO,
-    Reflection auf fragile Plattform-Klassen, OOM-Recovery in
-    `KolibriLauncherApp` per Rule 7-Whitelist).
-  - **Auf `silentError` migrieren:** Application-Logik, wo ein
-    Programmierfehler in DEBUG laut werden soll (siehe Rule 9).
-  - **Catch entfernen:** triviale Pfade (`sortedBy`, Listen-Map,
-    String-Vergleich) — der Compiler garantiert hier schon, dass
-    der Pfad nicht Throwable wirft.
-- [ ] **`GetDrawerAppsUseCase.kt:49-115` als Pilot.** Drei
-  verschachtelte Catches abbauen: die innere `sortedBy` braucht
-  keinen Catch, die mittlere kann auf `silentError` heruntergehen,
-  die äußere bleibt nur falls echte Cancellation-/IO-Pfade berührt
-  werden.
+5 Sweep-PRs haben **79 nachweislich tote oder CANT_THROW-Catches**
+entfernt:
+
+| PR | Catches | Files |
+|---|---:|---|
+| Pilot `GetDrawerAppsUseCase` | 6 | 1 |
+| Layer-A (`core`/`data`/`domain`) | 9 | 4 |
+| Adapter-Sweep (App- + FavoritesAdapter) | 29 | 2 |
+| SettingsFragment-Sweep | 32 | 1 |
+| MainActivity-Mini | 3 | 1 |
+| **Total** | **79** | **9** |
+
+In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
+Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
+Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
+
+### Reststand: ~656 Catches
+
+Verteilung laut Sub-Agent-Survey, abzüglich des Sweeps:
+- **~250 EXTERNAL** — echte System-/IO-/ContentResolver-/PackageManager-
+  Calls. Bleibt.
+- **~100 LIFECYCLE** in `HomeFragment` & co — formal CANT_THROW (View-
+  Setter), aber als Schutz gegen Teardown-Races platziert. **Gehört
+  in ein strukturelles Refactoring** (`_binding?.let { }` +
+  `viewLifecycleOwner.lifecycleScope`), nicht in einen Sweep. Das
+  HomeFragment-eigene KDoc Z. 157-208 beschreibt diesen Pfad.
+- **~120-150 weitere CANT_THROW/DEAD** in den UI-Files, die wir noch
+  nicht angefasst haben (`AppDrawerFragment` ~36, `OnboardingActivity`
+  ~19, `HiddenAppsActivity` ~15, etc.). Lohn-Surface aber kleinteilig
+  pro File.
+- **~30 in `KolibriLauncherApp`** — Rule-7-Whitelist, **bleibt
+  unangetastet**.
+
+### Optionale nächste Sweeps
+
+- [ ] **`AppDrawerFragment` (~36 Catches)** — laut Survey ähnliches
+  Profil wie die Adapter, etwa hälftiger Trivial-Anteil. Kandidat für
+  einen weiteren kleinen PR.
+- [ ] **`OnboardingActivity` / `HiddenAppsActivity` / `CustomNamesActivity`
+  / weitere Activities** — Repetitive Doppelschalung um setOn*Listener.
+  Pattern ist exakt der SettingsFragment-Sweep, vermutlich 30-50%
+  Reduktion pro File.
+- [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
+  nicht als Sweep. Sollte erst angegangen werden, wenn die vier
+  Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
+
+### Default-Disposition
+
+Wenn ein neuer Catch bei der Code-Review auftaucht, ist die Frage
+**„welche Kategorie?"** vor dem Approve. Die fünf Buckets aus dem
+Sub-Agent-Survey (CANT_THROW / DEAD_REDUNDANT / LIFECYCLE / EXTERNAL /
+UNCLEAR) sind das Mental-Frame. Default für Programmierfehler:
+**propagieren lassen**, in DEBUG via `silentError` (Rule 9), in
+RELEASE via Flow-`.catch` oder ViewModel-`launchSafe` als Sicherheits-
+netz. NICHT mehr per nested try/catch maskieren.
 
 ---
 
