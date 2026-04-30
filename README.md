@@ -3,7 +3,7 @@
 [![Android CI](https://github.com/reygnn/kolibri-launcher/actions/workflows/android.yml/badge.svg)](https://github.com/reygnn/kolibri-launcher/actions/workflows/android.yml)
 [![Coverage](https://codecov.io/gh/reygnn/kolibri-launcher/branch/main/graph/badge.svg)](https://codecov.io/gh/reygnn/kolibri-launcher)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![API](https://img.shields.io/badge/API-16%2B-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers#platform-code-names-versions-api-levels-and-ndk-releases)
+[![API](https://img.shields.io/badge/API-36%2B-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers#platform-code-names-versions-api-levels-and-ndk-releases)
 
 A minimalist, open-source Android launcher designed for focus and speed, built with a state-of-the-art, reactive, and highly decoupled architecture.
 
@@ -53,7 +53,7 @@ This launcher is built with a strong emphasis on clean architecture, SOLID princ
 *   **MVVM Architecture:** A strict separation of concerns between the UI (`Fragments`), state-holding (`ViewModel`), and business logic.
 *   **Clean Architecture & SOLID Principles:**
     *   **Dependency Inversion Principle (SOLID):** The entire application is decoupled through the use of interfaces (`...Repository`). High-level components like `ViewModel` and `UseCase` depend on abstract contracts, not concrete implementations.
-    *   **UseCase Layer:** Centralizes complex business logic (`AppListUseCaseRepository`) by orchestrating multiple repositories.
+    *   **UseCase Layer:** Business logic lives in fine-grained use cases under `domain/usecase/` (e.g. `GetDrawerAppsUseCase`, `ToggleFavoriteUseCase`), each orchestrating exactly the repositories it needs.
     *   **Repository Pattern:** Each data source is managed by a dedicated repository (e.g., `FavoritesRepository`, `SettingsRepository`).
 *   **Reactive UI & State Management:**
     *   **Kotlin Coroutines & Flows:** Used for the entire asynchronous pipeline, from the data layer (`DataStore`) to the UI.
@@ -73,7 +73,7 @@ The project is built with testability as a first-class citizen, ensuring reliabi
 *   **Unit Tests (JVM):**
     *   **Purpose:** Fast, local tests for the data, business, and presentation logic layers, running on the JVM without an emulator.
     *   **Coverage:** Covers `ViewModel` logic, the `AppListUseCaseRepository`, and all `Repository` interactions.
-    *   **Tech Stack:** **JUnit**, **Mockito** (via mockito-kotlin for idiomatic syntax), and **Turbine** for robust testing of Kotlin Flows.
+    *   **Tech Stack:** **JUnit**, **MockK** for idiomatic Kotlin mocking (the test suite was previously on Mockito and has been fully migrated), **Turbine** for robust testing of Kotlin Flows, and **kotlinx-coroutines-test** for deterministic coroutine scheduling.
 
 *   **UI / Instrumented Tests (On-Device):**
     *   **Purpose:** To verify the correctness of the UI layer, user interactions, and the integration between Fragments and the `ViewModel`. These tests run on an Android emulator or a physical device.

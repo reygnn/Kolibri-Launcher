@@ -216,7 +216,6 @@ or historical reference may still hang on the branch. Always confirm first.
 ## What this file is NOT
 
 - Not a description of the project (see `README.md`).
-- Not a changelog (see `CHANGELOG.md`).
 - Not a TODO list (see `TODO.md`).
 - Not the full testing reference (see `app/src/CLAUDE.md` and
   `TESTING_CONVENTIONS.kt`).
