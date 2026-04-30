@@ -16,6 +16,7 @@ import android.content.IntentFilter
 import android.os.Process
 import android.util.Log
 import com.github.anrwatchdog.ANRWatchDog
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
@@ -191,13 +192,11 @@ class KolibriLauncherApp : Application() {
 
         setupANRWatchDog()
 
-        // Receiver registration
-        try {
-            Timber.d("[LIFECYCLE] Application.onCreate - Registering receiver...")
-            registerPackageUpdateReceiver()
-        } catch (e: Throwable) {
-            Timber.e(e, "[LIFECYCLE] FATAL: Could not register PackageUpdateReceiver!")
-        }
+        // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
+        // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
+        // outer try/catch wäre toter Code.
+        Timber.d("[LIFECYCLE] Application.onCreate - Registering receiver...")
+        registerPackageUpdateReceiver()
 
         // Data migration - Ultra Paranoid version
         applicationScope.launch(applicationExceptionHandler) {
@@ -242,7 +241,7 @@ class KolibriLauncherApp : Application() {
             )
             Timber.d("[LIFECYCLE] PackageUpdateReceiver registered successfully.")
         } catch (e: Throwable) {
-            Timber.e(e, "[LIFECYCLE] FATAL: Could not register PackageUpdateReceiver!")
+            TimberWrapper.silentError(e, "[LIFECYCLE] Could not register PackageUpdateReceiver")
         }
     }
 

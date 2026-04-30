@@ -21,8 +21,8 @@ Direktes `Timber.e(...)` hat dieses Verhalten **nicht** — es loggt in beiden
 Build-Typen still. Bug-Symptome im Debug-Build landen damit in der
 Logcat-Mülltonne, statt dem Senior aufzufallen.
 
-Nach den ersten Fixes verbleiben 11 von ursprünglich 21 `Timber.e`-Aufrufen
-im Main-Source: 7 in Gruppe A (bleiben aus Design), 4 in Gruppe B (warten
+Nach den weiteren Fixes verbleiben 9 von ursprünglich 21 `Timber.e`-Aufrufen
+im Main-Source: 7 in Gruppe A (bleiben aus Design), 2 in Gruppe B (warten
 auf Senior-Sign-off).
 
 ### Gruppe A — bleibt `Timber.e` (7 Aufrufe, kein Handlungsbedarf)
@@ -32,26 +32,25 @@ eigene Crash-Behandlung auslösen.
 
 | Stelle | Kontext |
 |---|---|
-| `KolibriLauncherApp.kt:75` | `applicationExceptionHandler` selbst |
-| `:179`, `:257` | Catch um `setupGlobalExceptionHandler` (zwei Pfade) |
-| `:188` | StrictMode-Setup-Fallback |
-| `:270` | `handleUncaughtException` selbst |
-| `:295` | Catch innerhalb des Crash-Handlers |
-| `:369` | `onTerminate` (Process wird gekillt) |
+| `KolibriLauncherApp.kt:76` | `applicationExceptionHandler` selbst |
+| `:180`, `:256` | Catch um `setupGlobalExceptionHandler` (zwei Pfade) |
+| `:189` | StrictMode-Setup-Fallback |
+| `:269` | `handleUncaughtException` selbst |
+| `:294` | Catch innerhalb des Crash-Handlers |
+| `:368` | `onTerminate` (Process wird gekillt) |
 
 ### Gruppe B — verbleibende `silentError`-Kandidaten
 
-- [ ] **`KolibriLauncherApp.kt`: 4 Aufrufe — BENÖTIGT SENIOR-SIGN-OFF**
-  - `:199`, `:245` — PackageUpdateReceiver-Registrierung
-  - `:211` — Backup-Restore-Fehler (Quellcode-Kommentar sagt selbst
+- [ ] **`KolibriLauncherApp.kt`: 2 Aufrufe — BENÖTIGT SENIOR-SIGN-OFF**
+  - `:210` — Backup-Restore-Fehler (Quellcode-Kommentar sagt selbst
     `// Continue anyway - not critical`)
-  - `:218` — Migration-Error
+  - `:217` — Migration-Error
   - **Warnung:** `KolibriLauncherApp` ist laut CLAUDE.md Regel 7 explizit
     gegen Vereinfachung geschützt. Es ist möglich, dass die
     `Timber.e`-Wahl hier Absicht ist, weil das Lifecycle-Setup auch im
     Debug-Build nicht crashen darf, wenn etwas Unerwartetes reinkommt.
   - Vor jedem Edit explizit beim Senior abklären. Falls Freigabe:
-    4 Aufrufe zu `silentError(e, ...)` umwandeln.
+    2 Aufrufe zu `silentError(e, ...)` umwandeln.
 
 ---
 
