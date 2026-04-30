@@ -54,6 +54,50 @@ eigene Crash-Behandlung auslösen.
 
 ---
 
+## 2. Rule 10 — Logik aus Android-Runtime-Klassen extrahieren
+
+Audit am 2026-04-30 hat fünf Stellen identifiziert, an denen testbare
+Logik direkt in einer Activity oder einem Fragment lebt. Rule 10 gilt
+explizit nur für neuen Code — diese Punkte sind pre-existing Tech-Debt,
+kein Block-Refactor. Einzeln angehen, wenn die jeweilige Klasse aus
+anderen Gründen ohnehin offen ist.
+
+- [ ] **`MainActivity.showCustomizationOptionsDialog()` (`:662-759`)** —
+  baut eine dynamische Dialog-Liste anhand von `hasWallpaper` ×
+  `isEditMode`. Reine Entscheidung. Vorschlag: `CustomizationDialogModel`-
+  Helper analog zum existierenden `LayerButtonsState`-Muster, Fragment
+  rendert die fertige Liste.
+
+- [ ] **`MainActivity.handleSpecificEvent()` LaunchApp-Branch
+  (`:536-562`)** — „pop back-stack falls in Drawer, dann launch" ist
+  Navigation-State-Logik. Vorschlag: ins ViewModel oder einen
+  `delegate/`-Sibling, Activity bekommt fertiges `PopThenLaunch`-Event.
+
+- [ ] **`CustomNamesActivity.handleRename()` (`:352-372`)** — vierfache
+  Validierung (empty → remove, too long → error, equals original →
+  remove, sonst → set) mit Inline-Konstante `MAX_APP_NAME_LENGTH`.
+  Vorschlag: `CustomNamesViewModel.onRenameSubmitted(app, newName)` oder
+  ein `RenameDecision`-Helper mit Tests pro Branch.
+
+- [ ] **`AppContextMenuDialogFragment.loadActions()` (`:192-346`)** —
+  koordiniert vier Repositories (`shortcutManager`, `favoritesManager`,
+  `appNamesManager`, `visibilityManager`) und branched auf
+  `menuContext`/`hasUsageData`/`isFavorite`/`isHidden`/`hasCustomName`.
+  Vorschlag: `BuildAppContextMenuUseCase` retourniert
+  `List<AppContextMenuAction>`, Fragment observiert und rendert.
+
+- [ ] **`FavoritesSortFragment.saveFavoritesOrder()` +
+  `sortFavoritesAlphabetically()` (`:260-282`, `:318-356`)** —
+  Multi-Step-Orchestrierung (Map → Repo → Fragment-Result → Toast). Das
+  aktuelle KDoc rechtfertigt explizit die ViewModel-Lücke; Rule 10 dreht
+  diesen Kalkül um (JVM-only Test-Target). Vorschlag:
+  `FavoritesSortViewModel`.
+
+Audit-Quelle: Sub-Agent-Review der Codebase. Vor jedem Refactoring
+selbst gegenlesen — Zeilennummern können durch andere Edits abweichen.
+
+---
+
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
 - Keine Test-Referenz — siehe `app/src/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.
