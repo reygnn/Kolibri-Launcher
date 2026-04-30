@@ -192,6 +192,22 @@ android {
             }
         }
     }
+
+    // Fail the build on real XML/resource breakage. The 93 existing warnings
+    // (mostly PluralsCandidate, GradleDependency, LogNotTimber in paranoid
+    // KolibriLauncherApp fallbacks) are intentionally left as warnings — only
+    // genuine localization/resource bugs should block.
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+        warningsAsErrors = false
+
+        error += setOf(
+            "MissingTranslation",
+            "ExtraTranslation",
+            "MissingDefaultResource",
+        )
+    }
 }
 
 // Force the JDK 21 toolchain on every JavaCompile task. AGP/kapt-generated

@@ -38,6 +38,16 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
 
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --stacktrace
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-debug.html
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
