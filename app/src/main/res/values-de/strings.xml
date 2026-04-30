@@ -325,6 +325,9 @@
 <string name="wallpaper_edit_mode">Hintergrund bearbeiten</string>
 <string name="wallpaper_remove">Hintergrund entfernen</string>
 <string name="wallpaper_removed">Hintergrund entfernt</string>
+<string name="wallpaper_edit_hint">Zoomen mit zwei Fingern, ziehen zum Verschieben</string>
+<string name="wallpaper_save">Speichern</string>
+<string name="wallpaper_cancel">Abbrechen</string>
 <string name="wallpaper_snap_toggle">Snap an/aus</string>
 <string name="wallpaper_snap_mode_toggle">Snap-Modus wechseln</string>
 <string name="wallpaper_horizontal_snap_toggle">Horizontaler Snap ein/aus</string>
@@ -333,7 +336,7 @@
 <string name="wallpaper_delete_layer">Layer löschen</string>
 <string name="wallpaper_move_layer_up">Layer nach vorne</string>
 <string name="wallpaper_move_layer_down">Layer nach hinten</string>
-<string name="wallpaper_original_size">Original Grösse (1:1)</string>
+<string name="wallpaper_original_size">Originalgröße (1:1)</string>
 <string name="toolbar_dock_toggle">Verschiebe Toolbar</string>
 <string name="wallpaper_remove_confirm">Hintergrund und alle Ebenen entfernen? Dies kann nicht rückgängig gemacht werden.</string>
 <string name="wallpaper_remove_yes">Entfernen</string>
