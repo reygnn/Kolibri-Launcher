@@ -11,7 +11,7 @@
 
         <!-- für Monkeys Test -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.main.MainActivity"
             android:exported="true"
             tools:node="merge">
             <intent-filter>
