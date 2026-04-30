@@ -202,14 +202,17 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 WindowCompat.setDecorFitsSystemWindows(window, false)
                 true
             } else {
-                TimberWrapper.silentError("NavHostFragment not found")
-                finish()
-                false
+                // finish() würde nichts bringen: Kolibri ist als HOME registriert,
+                // Android startet die Activity sofort wieder → Endlos-Loop mit
+                // ACRA-Spam. silentDeath beendet den Process kontrolliert; das
+                // System fällt dann auf den nächsten Default-Launcher zurück.
+                TimberWrapper.silentDeath("NavHostFragment not found — main UI cannot start")
             }
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Fatal error setting up main content")
-            finish()
-            false
+            // Gleicher Grund wie oben: setContentView/findFragment kann fatal
+            // failen (View-Inflation, OOM, kaputte Resource), und ein finish()
+            // wäre Zombie-Maker.
+            TimberWrapper.silentDeath(e, "Fatal error setting up main content")
         }
     }
 
@@ -249,7 +252,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             try {
                 initializeMainApp()
             } catch (fallbackError: Throwable) {
-                TimberWrapper.silentError(fallbackError, "Fallback initialization failed")
+                // Letzter Recovery-Pfad ist auch geplatzt. Die Activity
+                // weiterlaufen zu lassen würde dem User eine leere Hülle
+                // ohne ViewModel-Daten präsentieren — schlimmer als ein
+                // Restart, der beim zweiten Versuch funktionieren kann.
+                TimberWrapper.silentDeath(
+                    fallbackError,
+                    "Fallback initialization failed — no recovery path left"
+                )
             }
         }
     }

@@ -62,7 +62,17 @@ class DataMigrationManager @Inject constructor(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Failed to clear DataStore during migration")
+                        // Cleanup hat möglicherweise mitten im DataStore aufgehört
+                        // (manche Keys gelöscht, andere nicht). Würden wir weiter
+                        // unten updateVersionInPreferences(TARGET) rufen, sähe der
+                        // nächste App-Start die Migration als erledigt — bei in
+                        // Wirklichkeit halb-leerem DataStore. Lieber kontrolliert
+                        // sterben, beim Neustart wird Migration ehrlich nochmal
+                        // versucht.
+                        TimberWrapper.silentDeath(
+                            e,
+                            "Migration cleanup failed — refusing to mark version as migrated"
+                        )
                     }
                 }
                 else -> {
@@ -88,8 +98,14 @@ class DataMigrationManager @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error reading data version")
-            0
+            // Ein silent return 0 würde "First launch detected" triggern und
+            // den Onboarding-Flow über echte User-Daten kippen. Lieber
+            // kontrolliert sterben — beim Neustart kommt der Read-Versuch
+            // nochmal, und wenn er weiter failt, häuft sich der ACRA-Report.
+            TimberWrapper.silentDeath(
+                e,
+                "Cannot read data version — refusing to assume first launch"
+            )
         }
     }
 
