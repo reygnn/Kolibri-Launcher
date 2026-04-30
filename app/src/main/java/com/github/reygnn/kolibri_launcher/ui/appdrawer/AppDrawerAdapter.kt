@@ -21,7 +21,7 @@ import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
  */
 class AppDrawerAdapter(
     private val onAppClicked: (AppInfo) -> Unit,
-    private val onAppLongClicked: (AppInfo) -> Unit
+    private val onAppLongClicked: (AppInfo) -> Unit,
 ) : ListAdapter<AppInfo, AppDrawerAdapter.AppViewHolder>(AppInfoDiffCallback()) {
 
     private var textColor: Int = Color.WHITE
@@ -37,28 +37,24 @@ class AppDrawerAdapter(
      * Verwendet Payloads für effiziente Updates ohne vollständigen Rebind.
      */
     fun setUiColors(textColor: Int, shadowColor: Int) {
+        val colorsChanged = this.textColor != textColor || this.shadowColor != shadowColor
+        if (!colorsChanged) return
+
+        this.textColor = textColor
+        this.shadowColor = shadowColor
+
+        // notifyItemRangeChanged kann IllegalStateException werfen,
+        // wenn die RecyclerView gerade scrollt/layoutet — echtes Risiko,
+        // Catch + Fallback bleiben.
         try {
-            val colorsChanged = this.textColor != textColor || this.shadowColor != shadowColor
-
-            if (!colorsChanged) {
-                return
-            }
-
-            this.textColor = textColor
-            this.shadowColor = shadowColor
-
-            try {
-                notifyItemRangeChanged(0, itemCount, PAYLOAD_COLOR_CHANGE)
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error notifying color change, attempting full refresh")
-                try {
-                    notifyDataSetChanged()
-                } catch (e2: Exception) {
-                    TimberWrapper.silentError(e2, "Error in fallback notifyDataSetChanged")
-                }
-            }
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_COLOR_CHANGE)
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in setUiColors")
+            TimberWrapper.silentError(e, "Error notifying color change, attempting full refresh")
+            try {
+                notifyDataSetChanged()
+            } catch (e2: Exception) {
+                TimberWrapper.silentError(e2, "Error in fallback notifyDataSetChanged")
+            }
         }
     }
 
@@ -69,17 +65,16 @@ class AppDrawerAdapter(
     }
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
-        try {
-            val item = getItem(position)
-            if (item != null) {
-                holder.bind(item)
-            } else {
-                TimberWrapper.silentError("Null item at position $position")
-            }
+        val item = try {
+            getItem(position)
         } catch (e: IndexOutOfBoundsException) {
             TimberWrapper.silentError(e, "Index out of bounds at position $position")
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error binding ViewHolder at position $position")
+            return
+        }
+        if (item != null) {
+            holder.bind(item)
+        } else {
+            TimberWrapper.silentError("Null item at position $position")
         }
     }
 
@@ -88,169 +83,115 @@ class AppDrawerAdapter(
      * Ermöglicht partielle Updates ohne vollständigen Rebind.
      */
     override fun onBindViewHolder(holder: AppViewHolder, position: Int, payloads: MutableList<Any>) {
-        try {
-            if (payloads.isEmpty()) {
-                super.onBindViewHolder(holder, position, payloads)
-            } else {
-                val item = try {
-                    getItem(position)
-                } catch (e: IndexOutOfBoundsException) {
-                    TimberWrapper.silentError(e, "Index out of bounds at position $position in payload binding")
-                    return
-                }
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
 
-                if (item == null) {
-                    TimberWrapper.silentError("Null item at position $position in payload binding")
-                    return
-                }
+        val item = try {
+            getItem(position)
+        } catch (e: IndexOutOfBoundsException) {
+            TimberWrapper.silentError(e, "Index out of bounds at position $position in payload binding")
+            return
+        }
+        if (item == null) {
+            TimberWrapper.silentError("Null item at position $position in payload binding")
+            return
+        }
 
-                try {
-                    payloads.forEach { payload ->
-                        try {
-                            when (payload) {
-                                PAYLOAD_COLOR_CHANGE -> holder.updateColors(textColor, shadowColor)
-                                PAYLOAD_NAME_CHANGE -> holder.updateName(item.displayName)
-                            }
-                        } catch (e: Exception) {
-                            TimberWrapper.silentError(e, "Error processing payload: $payload for position $position")
-                        }
-                    }
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error iterating payloads at position $position")
-                }
+        // when auf String-Payloads + holder.updateX-Aufrufe sind reine
+        // TextView-Setter — können nicht werfen. Frühere Triple-Schachtel-
+        // Catches waren tot.
+        payloads.forEach { payload ->
+            when (payload) {
+                PAYLOAD_COLOR_CHANGE -> holder.updateColors(textColor, shadowColor)
+                PAYLOAD_NAME_CHANGE -> holder.updateName(item.displayName)
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in onBindViewHolder with payloads at position $position")
         }
     }
 
     override fun onViewRecycled(holder: AppViewHolder) {
-        try {
-            holder.unbind()
-            super.onViewRecycled(holder)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error recycling ViewHolder")
-        }
+        // unbind ist no-op, super.onViewRecycled der Base-Klasse ist leer.
+        holder.unbind()
+        super.onViewRecycled(holder)
     }
 
     inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val appName: TextView? = try {
-            itemView.findViewById(R.id.app_name)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error finding app_name TextView")
-            null
-        }
+        // findViewById gibt null bei nicht gefunden — wirft nicht.
+        private val appName: TextView? = itemView.findViewById(R.id.app_name)
 
         init {
-            try {
-                itemView.setOnClickListener {
-                    try {
-                        val position = bindingAdapterPosition
-                        if (position != RecyclerView.NO_POSITION) {
-                            val item = try {
-                                getItem(position)
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error getting item for click at position $position")
-                                return@setOnClickListener
-                            }
-
-                            if (item != null) {
-                                try {
-                                    onAppClicked(item)
-                                } catch (e: Exception) {
-                                    TimberWrapper.silentError(e, "Error in onAppClicked callback for ${item.packageName}")
-                                }
-                            }
-                        }
+            itemView.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    val item = try {
+                        // getItem kann unter Race-Bedingungen werfen,
+                        // wenn die Liste mitten im Click neu gesetzt wird.
+                        getItem(position)
                     } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in click listener")
+                        TimberWrapper.silentError(e, "Error getting item for click at position $position")
+                        return@setOnClickListener
+                    }
+
+                    if (item != null) {
+                        try {
+                            // User-Code-Callback — kann beliebig werfen.
+                            onAppClicked(item)
+                        } catch (e: Exception) {
+                            TimberWrapper.silentError(e, "Error in onAppClicked callback for ${item.packageName}")
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting click listener")
             }
 
-            try {
-                itemView.setOnLongClickListener {
-                    try {
-                        val position = bindingAdapterPosition
-                        if (position != RecyclerView.NO_POSITION) {
-                            val item = try {
-                                getItem(position)
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error getting item for long click at position $position")
-                                return@setOnLongClickListener false
-                            }
-
-                            if (item != null) {
-                                try {
-                                    onAppLongClicked(item)
-                                } catch (e: Exception) {
-                                    TimberWrapper.silentError(e, "Error in onAppLongClicked callback for ${item.packageName}")
-                                }
-                            }
-                        }
-                        true
+            itemView.setOnLongClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    val item = try {
+                        getItem(position)
                     } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in long click listener")
-                        false
+                        TimberWrapper.silentError(e, "Error getting item for long click at position $position")
+                        return@setOnLongClickListener false
+                    }
+
+                    if (item != null) {
+                        try {
+                            onAppLongClicked(item)
+                        } catch (e: Exception) {
+                            TimberWrapper.silentError(e, "Error in onAppLongClicked callback for ${item.packageName}")
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting long click listener")
+                true
             }
         }
 
         fun bind(appInfo: AppInfo) {
-            try {
-                updateName(appInfo.displayName)
-                updateColors(textColor, shadowColor)
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error binding app: ${appInfo.packageName}")
-                // Fallback: Versuche wenigstens den Namen zu setzen
-                try {
-                    appName?.text = appInfo.packageName
-                } catch (e2: Exception) {
-                    TimberWrapper.silentError(e2, "Critical error in bind fallback")
-                }
-            }
+            // Reine TextView-Setter — können nicht werfen.
+            updateName(appInfo.displayName)
+            updateColors(textColor, shadowColor)
         }
 
         fun updateColors(textColor: Int, shadowColor: Int) {
-            try {
-                appName?.setTextColor(textColor)
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting text color")
-            }
-
-            try {
-                appName?.setShadowLayer(
-                    AppConstants.SHADOW_RADIUS_APPS,
-                    AppConstants.SHADOW_DX,
-                    AppConstants.SHADOW_DY,
-                    shadowColor
-                )
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting shadow layer")
-            }
+            appName?.setTextColor(textColor)
+            appName?.setShadowLayer(
+                AppConstants.SHADOW_RADIUS_APPS,
+                AppConstants.SHADOW_DX,
+                AppConstants.SHADOW_DY,
+                shadowColor,
+            )
         }
 
         fun updateName(name: String) {
-            try {
-                appName?.text = name
-                appName?.maxLines = 1
-                appName?.ellipsize = TextUtils.TruncateAt.END
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error updating name: $name")
-            }
+            appName?.text = name
+            appName?.maxLines = 1
+            appName?.ellipsize = TextUtils.TruncateAt.END
         }
 
         fun unbind() {
-            try {
-                // Cleanup falls nötig in der Zukunft
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error unbinding ViewHolder")
-            }
+            // Cleanup-Hook für die Zukunft. Body ist absichtlich leer;
+            // der frühere try{}/catch-Block um diesen leeren Body war
+            // absurd und ist entfernt.
         }
     }
 }

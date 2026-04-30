@@ -12,44 +12,34 @@ import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
 import timber.log.Timber
 
 /**
- * CRASH-SAFE VERSION
+ * Adapter for the drag-and-drop favorites-reorder list.
  *
- * Crash safety through:
- * - Try-catch around all ViewHolder operations
- * - Safe layout inflation
- * - Safe list manipulation
- * - Defensive validation
- * - Safe callback invocation
+ * Crash-safety: legitimate catches stay around layout inflation
+ * (`InflateException`, `OutOfMemoryError`), getItem race conditions,
+ * `MutableList.add/removeAt` IOBE under concurrent edits, and the
+ * user-supplied `onOrderChanged` callback. Throwable-catches around
+ * pure View-property setters and ListAdapter-property reads were
+ * removed in the throwable-audit sweep — they could not throw.
  */
 class FavoritesAdapter(
-    private val onOrderChanged: (List<AppInfo>) -> Unit
+    private val onOrderChanged: (List<AppInfo>) -> Unit,
 ) : ListAdapter<AppInfo, FavoritesAdapter.ViewHolder>(AppInfoDiffCallback()) {
 
     class ViewHolder(val binding: ItemFavoriteBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(app: AppInfo) {
-            try {
-                binding.appName.text = app.displayName
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting app name: ${app.packageName}")
-                try {
-                    binding.appName.text = app.packageName
-                } catch (e2: Exception) {
-                    TimberWrapper.silentError(e2, "Critical error in bind fallback")
-                }
-            }
-
-            try {
-                binding.appIcon.visibility = View.GONE
-                binding.dragHandle.visibility = View.VISIBLE
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error setting visibility")
-            }
+            // Reine TextView/View-Setter auf Non-Null-Binding — werfen nicht.
+            binding.appName.text = app.displayName
+            binding.appIcon.visibility = View.GONE
+            binding.dragHandle.visibility = View.VISIBLE
         }
 
         companion object {
             fun from(parent: ViewGroup): ViewHolder? {
                 return try {
+                    // Layout-Inflation kann InflateException oder
+                    // ResourcesNotFoundException werfen, OOM bei Bitmap-
+                    // Resources. Echter Wurfpfad — Catch behalten.
                     val layoutInflater = LayoutInflater.from(parent.context)
                     val binding = ItemFavoriteBinding.inflate(layoutInflater, parent, false)
                     ViewHolder(binding)
@@ -62,14 +52,10 @@ class FavoritesAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        return try {
-            ViewHolder.from(parent) ?: run {
-                // Fallback: Create minimal ViewHolder
-                Timber.Forest.w("Failed to create normal ViewHolder, creating fallback")
-                createFallbackViewHolder(parent)
-            }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in onCreateViewHolder, creating fallback")
+        // ViewHolder.from fängt Inflate-Exceptions selbst und gibt null
+        // zurück; ein zusätzlicher äußerer Catch wäre tot.
+        return ViewHolder.from(parent) ?: run {
+            Timber.Forest.w("Failed to create normal ViewHolder, creating fallback")
             createFallbackViewHolder(parent)
         }
     }
@@ -80,118 +66,90 @@ class FavoritesAdapter(
             val binding = ItemFavoriteBinding.inflate(layoutInflater, parent, false)
             ViewHolder(binding)
         } catch (e: Exception) {
+            // Wenn auch der Fallback-Inflate failt, ist die Liste nicht
+            // mehr renderbar. Re-throw, damit der RecyclerView-Stack
+            // explizit failen kann statt zombiehaft weiterzulaufen.
             TimberWrapper.silentError(e, "Critical error in fallback ViewHolder")
             throw RuntimeException("Unable to create ViewHolder", e)
         }
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        try {
-            val item = try {
-                getItem(position)
-            } catch (e: IndexOutOfBoundsException) {
-                TimberWrapper.silentError(e, "Index out of bounds at position $position")
-                return
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error getting item at position $position")
-                return
-            }
+        val item = try {
+            // Race-Schutz: Liste kann zwischen Layout und Bind neu sein.
+            getItem(position)
+        } catch (e: IndexOutOfBoundsException) {
+            TimberWrapper.silentError(e, "Index out of bounds at position $position")
+            return
+        }
 
-            if (item != null) {
-                holder.bind(item)
-            } else {
-                Timber.Forest.w("Null item at position $position")
-            }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error binding ViewHolder at position $position")
+        if (item != null) {
+            holder.bind(item)
+        } else {
+            Timber.Forest.w("Null item at position $position")
         }
     }
 
     override fun onViewRecycled(holder: ViewHolder) {
-        try {
-            super.onViewRecycled(holder)
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error recycling ViewHolder")
-        }
+        // RecyclerView.Adapter.onViewRecycled der Base-Klasse ist leer.
+        super.onViewRecycled(holder)
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {
+        val list = currentList // ListAdapter-Property, wirft nicht.
+
+        if (fromPosition < 0 ||
+            fromPosition >= list.size ||
+            toPosition < 0 ||
+            toPosition >= list.size
+        ) {
+            Timber.Forest.w("Invalid positions: from=$fromPosition, to=$toPosition, size=${list.size}")
+            return
+        }
+
+        val mutableList = list.toMutableList()
+
+        val movedItem = try {
+            // Race-geschützt: trotz size-Check oben kann die Liste
+            // zwischen Check und removeAt neu gesetzt werden.
+            mutableList.removeAt(fromPosition)
+        } catch (e: IndexOutOfBoundsException) {
+            TimberWrapper.silentError(e, "Error removing item at $fromPosition")
+            return
+        }
+
         try {
-            val currentList = try {
-                currentList
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error getting current list")
-                return
-            }
-
-            // Validation
-            if (fromPosition < 0 ||
-                fromPosition >= currentList.size ||
-                toPosition < 0 ||
-                toPosition >= currentList.size) {
-                Timber.Forest.w("Invalid positions: from=$fromPosition, to=$toPosition, size=${currentList.size}")
-                return
-            }
-
-            val mutableList = try {
-                currentList.toMutableList()
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error creating mutable list")
-                return
-            }
-
-            val movedItem = try {
-                mutableList.removeAt(fromPosition)
-            } catch (e: IndexOutOfBoundsException) {
-                TimberWrapper.silentError(e, "Error removing item at $fromPosition")
-                return
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Unexpected error removing item")
-                return
-            }
-
+            mutableList.add(toPosition, movedItem)
+        } catch (e: IndexOutOfBoundsException) {
+            TimberWrapper.silentError(e, "Error adding item at $toPosition")
+            // Revert: Item zurück an die Original-Position. Falls auch
+            // das wirft, ist die Liste in einem unbestimmten Zwischen-
+            // Zustand — submitList unten wird dann ohnehin nicht mehr
+            // gerufen, der nächste echte Update überschreibt.
             try {
-                mutableList.add(toPosition, movedItem)
-            } catch (e: IndexOutOfBoundsException) {
-                TimberWrapper.silentError(e, "Error adding item at $toPosition")
-                // Revert: Add item back at original position
-                try {
-                    mutableList.add(fromPosition, movedItem)
-                } catch (revertError: Exception) {
-                    TimberWrapper.silentError(revertError, "Critical: Failed to revert move")
-                }
-                return
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Unexpected error adding item")
-                return
+                mutableList.add(fromPosition, movedItem)
+            } catch (revertError: IndexOutOfBoundsException) {
+                TimberWrapper.silentError(revertError, "Critical: Failed to revert move")
             }
+            return
+        }
 
-            try {
-                submitList(mutableList)
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error submitting moved list")
-            }
+        try {
+            // submitList kann während laufender DiffUtil-Berechnung
+            // werfen — selten, aber dokumentierter Edge-Case.
+            submitList(mutableList)
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Critical error in moveItem")
+            TimberWrapper.silentError(e, "Error submitting moved list")
         }
     }
 
     fun onMoveFinished() {
+        // currentList ist eine ListAdapter-Property — wirft nicht.
         try {
-            val currentList = try {
-                currentList
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error getting current list for callback")
-                emptyList()
-            }
-
-            try {
-                onOrderChanged(currentList)
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error in onOrderChanged callback")
-            }
+            // Callback ist User-Code (Fragment-Lambda) — kann beliebig werfen.
+            onOrderChanged(currentList)
         } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Critical error in onMoveFinished")
+            TimberWrapper.silentError(e, "Error in onOrderChanged callback")
         }
     }
 }
