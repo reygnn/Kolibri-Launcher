@@ -534,17 +534,21 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
 
                 is UiEvent.LaunchApp -> {
+                    val action = AppLaunchAction.decide(
+                        currentDestinationId = navController?.currentDestination?.id,
+                        drawerDestinationId = R.id.appDrawerFragment,
+                        app = event.app,
+                    )
+
                     if (BuildConfig.DEBUG) {
-                        val isInDrawer =
-                            navController?.currentDestination?.id == R.id.appDrawerFragment
-                        Timber.Forest.d("[MAIN] Processing LaunchApp for: ${event.app.displayName}, inDrawer: $isInDrawer")
+                        Timber.Forest.d(
+                            "[MAIN] Processing LaunchApp for: ${event.app.displayName}, " +
+                                "action: ${action::class.simpleName}",
+                        )
                     }
 
                     try {
-                        val isInDrawer =
-                            navController?.currentDestination?.id == R.id.appDrawerFragment
-
-                        if (isInDrawer) {
+                        if (action is AppLaunchAction.PopThenLaunch) {
                             try {
                                 navController?.popBackStack()
                                 if (BuildConfig.DEBUG) {
@@ -555,7 +559,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                             }
                         }
 
-                        launchApp(event.app)
+                        launchApp(action.app)
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "[MAIN] Error handling launch app event")
                     }

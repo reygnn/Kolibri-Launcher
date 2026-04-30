@@ -68,11 +68,6 @@ anderen Gründen ohnehin offen ist.
   Helper analog zum existierenden `LayerButtonsState`-Muster, Fragment
   rendert die fertige Liste.
 
-- [ ] **`MainActivity.handleSpecificEvent()` LaunchApp-Branch
-  (`:536-562`)** — „pop back-stack falls in Drawer, dann launch" ist
-  Navigation-State-Logik. Vorschlag: ins ViewModel oder einen
-  `delegate/`-Sibling, Activity bekommt fertiges `PopThenLaunch`-Event.
-
 - [ ] **`AppContextMenuDialogFragment.loadActions()` (`:192-346`)** —
   koordiniert vier Repositories (`shortcutManager`, `favoritesManager`,
   `appNamesManager`, `visibilityManager`) und branched auf
