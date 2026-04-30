@@ -43,89 +43,50 @@ class GetDrawerAppsUseCase @Inject constructor(
         appVisibilityManager.hiddenAppsFlow.catch { e ->
             Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
-        }
+        },
     ) { rawApps, sortOrder, hiddenComponents ->
+        Timber.Forest.d(
+            "[DATAFLOW] 6. UseCase combine block triggered. " +
+                "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
+        )
 
-        try {
-            Timber.Forest.d("[DATAFLOW] 6. UseCase combine block triggered. SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}")
+        // Filter + alphabetischer Sort sind reine Operationen auf
+        // String/Set/List — können nicht werfen. Frühere Throwable-Catches
+        // hier entfernt (Throwable-Audit Pilot, §2): Programmierfehler
+        // sollen via Rule 9 in DEBUG laut werden (über den Flow-catch
+        // unten propagiert silentError und wirft).
+        val visibleApps = rawApps.filter { app ->
+            !hiddenComponents.contains(app.componentName)
+        }
 
-            // Filtere versteckte Apps
-            val visibleApps = try {
-                rawApps.filter { app ->
-                    try {
-                        !hiddenComponents.contains(app.componentName)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(
-                            e,
-                            "Error checking visibility for app: ${app.packageName}"
-                        )
-                        true // Im Fehlerfall: App sichtbar lassen
-                    }
-                }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error filtering visible apps, using all apps")
-                rawApps
-            }
+        val sortedApps = when (sortOrder) {
+            SortOrder.ALPHABETICAL -> visibleApps.sortedBy { it.displayName.lowercase() }
 
-            // Sortiere basierend auf Einstellung
-            val sortedApps = try {
-                when (sortOrder) {
-                    SortOrder.ALPHABETICAL -> {
-                        try {
-                            visibleApps.sortedBy { it.displayName.lowercase() }
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(
-                                e,
-                                "Error in alphabetical sort, returning unsorted"
-                            )
-                            visibleApps
-                        }
-                    }
-
-                    SortOrder.TIME_WEIGHTED_USAGE -> {
-                        try {
-                            appUsageManager.sortAppsByTimeWeightedUsage(visibleApps)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(
-                                e,
-                                "Error in time-weighted sort, falling back to alphabetical"
-                            )
-                            try {
-                                visibleApps.sortedBy { it.displayName.lowercase() }
-                            } catch (e2: Throwable) {
-                                TimberWrapper.silentError(
-                                    e2,
-                                    "Error in fallback sort, returning unsorted"
-                                )
-                                visibleApps
-                            }
-                        }
-                    }
-                }
+            SortOrder.TIME_WEIGHTED_USAGE -> try {
+                // Echte externe Abhängigkeit (UsageStats / System-Clock /
+                // DataStore via Manager). Fallback auf Alphabetical ist
+                // bewusster Graceful-Degrade. Dies ist der einzige
+                // legitime Catch in diesem Block.
+                appUsageManager.sortAppsByTimeWeightedUsage(visibleApps)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(
                     e,
-                    "Critical error in sorting, returning visible apps unsorted"
+                    "Error in time-weighted sort, falling back to alphabetical",
                 )
-                visibleApps
+                visibleApps.sortedBy { it.displayName.lowercase() }
             }
-
-            Timber.Forest.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
-            sortedApps
-
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Critical error in combine block, returning empty list")
-            emptyList()
         }
+
+        Timber.Forest.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
+        sortedApps
     }
         .catch { e ->
-            // Nur critical Errors landen hier (rawAppsFlow)
+            // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
+            // was die obigen Catches nicht abdecken (Programmierfehler).
+            // silentError macht das in DEBUG laut, in RELEASE landet
+            // emptyList() im LiveData.
             TimberWrapper.silentError(e, "Critical error in drawerApps flow, emitting empty list")
             emit(emptyList())
         }
