@@ -155,13 +155,55 @@ in Field-Namen aber stehengeblieben:
 Cosmetic, aber „Tagesform der Migration" ist genau die Art Detail,
 die einen frischen Reviewer beim ersten Vorbeigang stolpern lässt.
 
-- [ ] **Field-Renames in `BackupRepositoryImpl`** — `favoritesManager`
-  → `favoritesRepository`, etc. Andere Repos parallel checken
-  (Grep nach `Manager:` in Field-Position).
-- [ ] **Bewusste Ausnahmen erhalten:** `WallpaperFileManager`
-  (kein Repo, reines File-Helper-Konstrukt) und
-  `DataMigrationManager` (Migrations-Bootstrap, kein Repo) —
-  per `app/src/CLAUDE.md` explizit dokumentiert. Nicht anfassen.
+### Werkzeug: Android Studio, nicht Claude
+
+**Diese Aufgabe gehört in die IDE, nicht in eine Edit-Session mit Claude.**
+Android Studio's Refactor → Rename (Shift+F6 auf dem Field-Namen)
+macht den Rename atomar projektweit:
+
+- alle Aufrufstellen in derselben Klasse
+- Imports und Hilt-Bindings
+- KDoc-`[link]`-Referenzen
+- String-Templates (`"Failed to query $favoritesManager"`)
+- Named-Argument-Call-Sites in Tests
+
+Aufwand pro Field: Cursor → Shift+F6 → neuer Name → Enter. Für die
+~22 Fields gesamt **~5 Minuten**. Per Hand (oder via Claude-Edits)
+wären das ~1-2h plus reales Risiko, eine Referenz zu übersehen
+(KDoc, String-Template). Falsches Werkzeug.
+
+Claude kann unterstützen: vor dem Rename den Plan validieren, nach
+dem Rename Tests laufen lassen, Grep nach Reststand `Manager:` mit
+`*Repository`-Typ, Commit-Message + Merge-Ablauf.
+
+### Inventar (~22 Fields, alle mit Typ `*Repository`)
+
+- [ ] **`data/BackupRepositoryImpl.kt`** (Z. 77-84) — 8 Fields:
+  `favoritesManager`, `favoritesOrderManager`, `appVisibilityManager`,
+  `appNamesManager`, `installedAppsManager`, `swipeActionsManager`,
+  `settingsManager`, `wallpaperManager`. Größtes File, dichtest
+  benutzt — eigener PR.
+- [ ] **`ui/settings/SettingsFragment.kt`** (Z. 78-90) — 5 Fields:
+  `appVisibilityManager`, `favoritesManager`, `favoritesOrderManager`,
+  `settingsManager`, `screenLockManager`. Eigener PR.
+- [ ] **Sammel-PR** für die übrigen 9 Fields:
+  - `domain/usecase/GetDrawerAppsUseCase.kt` (3)
+  - `domain/usecase/GetFavoriteAppsUseCase.kt` (3)
+  - `data/InstalledAppsRepositoryImpl.kt` (1)
+  - `data/TimeBasedEventsRepositoryImpl.kt` (1)
+  - `ui/appcontextmenu/AppContextMenuDialogFragment.kt` (1)
+
+### Bewusste Ausnahmen — nicht anfassen
+
+Per `app/src/CLAUDE.md` explizit dokumentiert:
+- **`WallpaperFileManager`** (kein Repo, reines File-Helper-Konstrukt)
+- **`DataMigrationManager`** (Migrations-Bootstrap, kein Repo)
+
+Auch nicht anfassen — Android-System-Klassen die *Manager* heißen,
+weil Android sie so nennt: `PackageManager`, `RoleManager`,
+`AlarmManager`, `WallpaperManager`, `FragmentManager`,
+`LayoutManager`, `LauncherApps`. Das Distinktions-Kriterium ist
+trivial: nur Felder umbenennen, deren **Typ** `*Repository` ist.
 
 ---
 
