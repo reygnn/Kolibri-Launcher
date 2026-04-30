@@ -207,6 +207,14 @@ class KolibriLauncherApp : Application() {
                     try {
                         dataStoreBackup.restoreFromBackup()
                     } catch (e: Throwable) {
+                        // Bleibt bewusst Timber.e (statt silentError):
+                        // dieser Pfad läuft nur in DEBUG, der Catch ist
+                        // Fail-Safe-by-Design ("Continue anyway - not
+                        // critical"). Ein silentError-Throw würde hier
+                        // die anschließende Migration killen UND in den
+                        // outer catch fallen, der dann fälschlich "Error
+                        // during migration" loggt — die Migration hat
+                        // aber gar nicht angefangen.
                         Timber.e(e, "Error restoring backup")
                         // Continue anyway - not critical
                     }
@@ -214,7 +222,7 @@ class KolibriLauncherApp : Application() {
 
                 dataMigrationManager.runMigrationIfNeeded()
             } catch (e: Throwable) {
-                Timber.e(e, "Error during migration")
+                TimberWrapper.silentError(e, "Error during migration")
                 // Try to record the error in ACRA
                 try {
                     ACRA.errorReporter.putCustomData("migration_error", e.message ?: "unknown")

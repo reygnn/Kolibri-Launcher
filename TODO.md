@@ -8,7 +8,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ---
 
-## 1. `Timber.e` vs. `silentError`: Severity-Audit
+## 1. `Timber.e` vs. `silentError`: Severity-Audit — abgeschlossen
 
 `TimberWrapper.silentError(...)` ist als „fail fast in DEBUG, fail safe in
 RELEASE" gebaut:
@@ -21,36 +21,26 @@ Direktes `Timber.e(...)` hat dieses Verhalten **nicht** — es loggt in beiden
 Build-Typen still. Bug-Symptome im Debug-Build landen damit in der
 Logcat-Mülltonne, statt dem Senior aufzufallen.
 
-Nach den weiteren Fixes verbleiben 9 von ursprünglich 21 `Timber.e`-Aufrufen
-im Main-Source: 7 in Gruppe A (bleiben aus Design), 2 in Gruppe B (warten
-auf Senior-Sign-off).
+Nach allen Migrationen verbleiben 8 `Timber.e`-Aufrufe im Main-Source —
+alle in Gruppe A (bleibt bewusst `Timber.e`). Diese Sektion bleibt im
+TODO als Referenz, damit ein neuer Reviewer beim Auftauchen weiterer
+`Timber.e`-Aufrufe sofort den richtigen Mental-Frame hat.
 
-### Gruppe A — bleibt `Timber.e` (7 Aufrufe, kein Handlungsbedarf)
+### Gruppe A — bleibt `Timber.e` (8 Aufrufe, bewusst, kein Handlungsbedarf)
 
-Direkt im Crash-Handler-Code. `silentError` würde hier rekursiv die
-eigene Crash-Behandlung auslösen.
+Direkt im Crash-Handler-Code oder im Fail-Safe-Pfad. `silentError` würde
+hier rekursiv die eigene Crash-Behandlung auslösen oder eine bewusst
+schluckende Logik kippen.
 
 | Stelle | Kontext |
 |---|---|
 | `KolibriLauncherApp.kt:76` | `applicationExceptionHandler` selbst |
-| `:180`, `:256` | Catch um `setupGlobalExceptionHandler` (zwei Pfade) |
+| `:180`, `:264` | Catch um `setupGlobalExceptionHandler` (zwei Pfade) |
 | `:189` | StrictMode-Setup-Fallback |
-| `:269` | `handleUncaughtException` selbst |
-| `:294` | Catch innerhalb des Crash-Handlers |
-| `:368` | `onTerminate` (Process wird gekillt) |
-
-### Gruppe B — verbleibende `silentError`-Kandidaten
-
-- [ ] **`KolibriLauncherApp.kt`: 2 Aufrufe — BENÖTIGT SENIOR-SIGN-OFF**
-  - `:210` — Backup-Restore-Fehler (Quellcode-Kommentar sagt selbst
-    `// Continue anyway - not critical`)
-  - `:217` — Migration-Error
-  - **Warnung:** `KolibriLauncherApp` ist laut CLAUDE.md Regel 7 explizit
-    gegen Vereinfachung geschützt. Es ist möglich, dass die
-    `Timber.e`-Wahl hier Absicht ist, weil das Lifecycle-Setup auch im
-    Debug-Build nicht crashen darf, wenn etwas Unerwartetes reinkommt.
-  - Vor jedem Edit explizit beim Senior abklären. Falls Freigabe:
-    2 Aufrufe zu `silentError(e, ...)` umwandeln.
+| `:218` | DEBUG-only Backup-Restore-Fehler — Catch ist „Continue anyway, not critical" by design; ein `silentError`-Throw würde die anschließende Migration killen UND in den outer catch fallen, der dann fälschlich „Error during migration" loggt. Inline-Kommentar im Code erklärt es. |
+| `:277` | `handleUncaughtException` selbst |
+| `:302` | Catch innerhalb des Crash-Handlers |
+| `:376` | `onTerminate` (Process wird gekillt) |
 
 ---
 
