@@ -8,7 +8,22 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ---
 
-## 1. `Timber.e` vs. `silentError`: Severity-Audit — abgeschlossen
+## Aktueller Status
+
+| § | Titel | Status | Größe |
+|---|---|---|---|
+| 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
+| 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
+| 3 | `BackupRepositoryImpl` zerlegen | offen | ~1 Tag, eigenes Projekt |
+| 4 | `Manager` → `RepositoryImpl` Rename | offen, IDE-Job (Shift+F6) | ~5 min |
+| 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
+| 6 | Code-Hygiene-Sweep (Smells) | offen | klein |
+
+**Empfohlene Reihenfolge bei freier Wahl:** §6 (kleinste, schnelle Wins) → §4 (IDE-Job, Voraussetzung für sauberen §3) → §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §2 ist optional fortsetzbar, kein Blocker.
+
+---
+
+## 1. (Memo, abgeschlossen) `Timber.e` vs. `silentError`: Severity-Audit
 
 `TimberWrapper.silentError(...)` ist als „fail fast in DEBUG, fail safe in
 RELEASE" gebaut:
@@ -117,6 +132,11 @@ netz. NICHT mehr per nested try/catch maskieren.
 ---
 
 ## 3. `BackupRepositoryImpl` zerlegen
+
+> **Reihenfolge: §4 vor §3.** Das Rename der `Manager`-Felder (§4)
+> sollte vor dem Split passieren. Sonst muss der Rename nicht in
+> einer Klasse, sondern in drei neuen Klassen (Exporter / Importer /
+> ZipFormat) wiederholt werden — verdreifachter Aufwand ohne Gewinn.
 
 `data/BackupRepositoryImpl.kt` ist **1.356 Zeilen** mit **9 separaten
 Test-Files** (Doomsday, Security, Wallpaper, Isolation, etc.). Die
