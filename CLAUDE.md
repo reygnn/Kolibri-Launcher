@@ -139,6 +139,28 @@ activities.
     stays put — no test value to extract. Applies to both new code and
     existing classes; if you spot a violation, lift the logic out.
 
+11. **No `try/catch` around can't-throw operations.** Catches are for
+    real failure modes — I/O, system APIs, user-supplied callbacks,
+    layout inflation, fragment-state races. They are NOT a "just in
+    case" wrapper. Catches around pure operations (`.filter`, `.map`,
+    `.sortedBy`, `String.lowercase()`, `View.setText()`,
+    `Bundle.putInt()`, property writes) fire only on programmer error
+    — and silently swallowing programmer errors is exactly the failure
+    mode `silentError` (Rule 9) is built to surface in DEBUG. Let them
+    propagate to the layer's safety net (`Flow.catch`, `launchSafe`,
+    `coroutineExceptionHandler`) and `silentError` will make them loud.
+
+    The four-category decision frame from `HomeFragment.kt:157-208`
+    is the standard reference: expected error → catch the most specific
+    exception type, teardown race → restructure with `_binding?.let { }`
+    and `viewLifecycleOwner.lifecycleScope` instead of catching after
+    the fact, programmer error → don't catch, unrecoverable
+    (lying-state path) → `silentDeath` not `silentError`. Exception
+    to all of the above: `KolibriLauncherApp` keeps its multi-layer
+    paranoia per Rule 7. The throwable-audit (TODO §2) removed 79
+    such catches across nine files — don't re-add the pattern in
+    new code.
+
 ---
 
 ## StrictMode violations: known unfixables
