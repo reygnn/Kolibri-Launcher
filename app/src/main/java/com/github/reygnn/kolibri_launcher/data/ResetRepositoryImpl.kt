@@ -60,7 +60,7 @@ class ResetRepositoryImpl @Inject constructor(
             if (success) {
                 Timber.d("Complete data reset successful")
             } else {
-                Timber.e("Complete data reset completed with errors")
+                Timber.w("Complete data reset completed with errors")
             }
 
             success
@@ -182,7 +182,7 @@ class ResetRepositoryImpl @Inject constructor(
             if (allSuccessful) {
                 Timber.d("User data reset successful")
             } else {
-                Timber.e("User data reset completed with some errors")
+                Timber.w("User data reset completed with some errors")
             }
 
             allSuccessful

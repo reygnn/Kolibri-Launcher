@@ -21,7 +21,9 @@ Direktes `Timber.e(...)` hat dieses Verhalten **nicht** — es loggt in beiden
 Build-Typen still. Bug-Symptome im Debug-Build landen damit in der
 Logcat-Mülltonne, statt dem Senior aufzufallen.
 
-Aus 21 `Timber.e`-Aufrufen im Main-Source ergeben sich drei Gruppen.
+Nach den ersten Fixes verbleiben 11 von ursprünglich 21 `Timber.e`-Aufrufen
+im Main-Source: 7 in Gruppe A (bleiben aus Design), 4 in Gruppe B (warten
+auf Senior-Sign-off).
 
 ### Gruppe A — bleibt `Timber.e` (7 Aufrufe, kein Handlungsbedarf)
 
@@ -37,24 +39,7 @@ eigene Crash-Behandlung auslösen.
 | `:295` | Catch innerhalb des Crash-Handlers |
 | `:369` | `onTerminate` (Process wird gekillt) |
 
-### Gruppe B — Kandidaten für `Timber.e` → `silentError` (12 Aufrufe)
-
-Echte Bugs in nicht-kritischen Pfaden. Recovery möglich, App-Lifecycle
-nicht in Gefahr.
-
-- [ ] **`LayoutCustomizationDialogFragment.kt`: 8 Aufrufe (unkontrovers)**
-  - `:45` Failed to inflate LayoutCustomizationDialog
-  - `:55` Failed to configure dialog window
-  - `:66` Failed to setup LayoutCustomizationDialog
-  - `:94` Error in onDestroyView
-  - `:292` Error in drag handling
-  - `:306` Error in `$context` (generic helper)
-  - `:320` Error in coroutine: `$context` (generic helper)
-  - `:328` Failed to dismiss dialog
-  - Fix: alle 8 von `Timber.e(e, ...)` zu
-    `TimberWrapper.silentError(e, ...)`. Dialog-Bugs werden im Debug
-    sofort sichtbar; im Release-Build läuft die App weiter, ohne dass
-    der User einen kaputten Dialog erlebt.
+### Gruppe B — verbleibende `silentError`-Kandidaten
 
 - [ ] **`KolibriLauncherApp.kt`: 4 Aufrufe — BENÖTIGT SENIOR-SIGN-OFF**
   - `:199`, `:245` — PackageUpdateReceiver-Registrierung
@@ -66,20 +51,7 @@ nicht in Gefahr.
     `Timber.e`-Wahl hier Absicht ist, weil das Lifecycle-Setup auch im
     Debug-Build nicht crashen darf, wenn etwas Unerwartetes reinkommt.
   - Vor jedem Edit explizit beim Senior abklären. Falls Freigabe:
-    4 Aufrufe zu `silentError(e, ...)` umwandeln, gleicher Effekt wie in
-    Gruppe-B-Punkt 1.
-
-### Gruppe C — Kandidaten für `Timber.e` → `Timber.w` (2 Aufrufe)
-
-Keine Bugs, sondern erwartete Partial-Failure-Zustände.
-
-- [ ] **`data/ResetRepositoryImpl.kt`: zwei Aufrufe ohne Throwable**
-  - `:63` `Timber.e("Complete data reset completed with errors")`
-  - `:185` `Timber.e("User data reset completed with some errors")`
-  - Beide nutzen das `Timber.e(String)`-Overload ohne Exception.
-    Semantisch ist das eine Warnung über einen Teil-Reset, kein Crash.
-  - Fix: `Timber.e` → `Timber.w`. Verhindert in Production unnötige
-    ACRA-Reports für Nicht-Crash-Zustände.
+    4 Aufrufe zu `silentError(e, ...)` umwandeln.
 
 ---
 

@@ -15,6 +15,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -42,7 +43,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             _binding = DialogLayoutCustomizationBinding.inflate(inflater, container, false)
             binding.root
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to inflate LayoutCustomizationDialog")
+            TimberWrapper.silentError(e, "Failed to inflate LayoutCustomizationDialog")
             null
         }
     }
@@ -52,7 +53,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         try {
             configureDialogWindow()
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to configure dialog window")
+            TimberWrapper.silentError(e, "Failed to configure dialog window")
         }
     }
 
@@ -63,7 +64,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             observeViewModel()
             setupDragListener()
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to setup LayoutCustomizationDialog")
+            TimberWrapper.silentError(e, "Failed to setup LayoutCustomizationDialog")
             dismissSafe()
         }
     }
@@ -91,7 +92,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             _binding = null
 
         } catch (e: Throwable) {
-            Timber.e(e, "Error in onDestroyView")
+            TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
             super.onDestroyView()
         }
@@ -289,7 +290,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                     else -> false
                 }
             } catch (e: Throwable) {
-                Timber.e(e, "Error in drag handling")
+                TimberWrapper.silentError(e, "Error in drag handling")
                 // Fallback: Sicherstellen, dass Dialog sichtbar ist, falls was schiefgeht
                 animateDialogAlpha(1.0f)
                 false
@@ -303,7 +304,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         try {
             block()
         } catch (e: Throwable) {
-            Timber.e(e, "Error in $context")
+            TimberWrapper.silentError(e, "Error in $context")
         }
     }
 
@@ -317,7 +318,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             Timber.d("Coroutine cancelled: $context")
             throw e  // WICHTIG: Immer rethrowen!
         } catch (e: Throwable) {
-            Timber.e(e, "Error in coroutine: $context")
+            TimberWrapper.silentError(e, "Error in coroutine: $context")
         }
     }
 
@@ -325,7 +326,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         try {
             dismissAllowingStateLoss()
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to dismiss dialog")
+            TimberWrapper.silentError(e, "Failed to dismiss dialog")
         }
     }
 }
