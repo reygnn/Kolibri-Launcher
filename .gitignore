@@ -139,3 +139,6 @@ crashlytics-build.properties
 test-results/
 test-reports/
 
+# Claude Code (local AI tooling)
+.claude/
+
