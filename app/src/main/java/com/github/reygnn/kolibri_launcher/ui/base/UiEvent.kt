@@ -25,4 +25,12 @@ sealed class UiEvent {
     data object OpenWallpaperPicker : UiEvent()
     data object EnterWallpaperEditMode : UiEvent()
     data object ExitWallpaperEditMode : UiEvent()
+
+    /**
+     * The favorites order has been persisted successfully. The
+     * `FavoritesSortFragment` uses this to relay a `setFragmentResult`
+     * back to its parent so other screens can refresh. Only consumed by
+     * that fragment; other screens ignore it.
+     */
+    data object FavoritesOrderChanged : UiEvent()
 }

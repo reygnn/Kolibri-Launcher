@@ -9,7 +9,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -17,77 +20,33 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
-import com.github.reygnn.kolibri_launcher.di.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.launch
-import timber.log.Timber
-import javax.inject.Inject
 
 /**
- * @file FavoritesSortFragment.kt
- * @description A UI fragment responsible for allowing the user to reorder their favorite applications.
+ * UI shell for the favorites-reorder screen. The Fragment owns the
+ * RecyclerView + drag-and-drop wiring, the action-bar title juggling,
+ * the `setFragmentResult` callback to the parent screen, and toast
+ * rendering. The sort/reset/persist logic and the apps-list state live
+ * in [FavoritesSortViewModel] so they can be unit-tested on the JVM.
  *
- * ARCHITECTURAL DESIGN AND TESTABILITY:
- * This fragment is designed to be "test-agnostic but test-friendly." It does not contain any logic
- * specific to testing. Instead, it correctly follows modern Android architecture principles by delegating
- * asynchronous work and business logic.
- *
- * HOW IT INTERACTS WITH THE TEST INFRASTRUCTURE:
- * 1.  **Dependency Injection**: The fragment requests its dependencies, `FavoritesOrderRepository` and a
- *     `CoroutineDispatcher`, via Hilt's `@Inject` annotation. It has no knowledge of whether it's
- *     receiving a real or a fake implementation.
- *
- * 2.  **Coroutine Execution**: The `saveFavoritesOrder` function uses the injected `mainDispatcher` to launch
- *     a coroutine on the main thread via `lifecycleScope.launch(mainDispatcher)`. This is standard,
- *     production-quality code for performing background tasks tied to the UI lifecycle.
- *
- * THE EFFECT OF THE TEST SETUP:
- * When this fragment runs inside an instrumented test (orchestrated by `BaseAndroidTest`):
- * - The injected `mainDispatcher` is not the real `Dispatchers.Main`. Instead, it is the `TestDispatcher`
- *   provided by `TestDispatcherModule`.
- * - As a result, when `saveFavoritesOrder` is called, the code inside the `launch` block does not execute
- *   asynchronously. Instead, it is queued on the `TestDispatcher`.
- * - The `TestCoroutineRule` running the test immediately executes this queued work in a synchronous,
- *   deterministic manner.
- *
- * This design allows for robust testing. A test can simulate a user action (e.g., clicking a button),
- * which calls `saveFavoritesOrder`, and then immediately, on the very next line, assert that the
- * `FavoritesOrderRepository` was updated correctly. This eliminates the flakiness and complexity of dealing
- * with race conditions and manual waits (`Thread.sleep`).
- */
-
-/**
- * CRASH-SAFE VERSION
- *
- * Crash safety through:
- * - Nullable binding with proper cleanup
- * - Try-catch around all operations
- * - Safe ItemTouchHelper callbacks
- * - Lifecycle-aware coroutines with error handling
- * - Safe fragment result handling
- * - Defensive null checks
+ * Crash-safety pattern from the original implementation is preserved
+ * (try-catch around every callback, defensive null checks on the
+ * binding, lifecycle-aware coroutines for Flow collection).
  */
 @AndroidEntryPoint
 class FavoritesSortFragment : Fragment() {
 
-    // CRASH-SAFE: Nullable binding
     private var _binding: FragmentFavoritesSortBinding? = null
     private val binding get() = _binding!!
 
-    @Inject
-    lateinit var favoritesOrderManager: FavoritesOrderRepository
-
-    @Inject
-    @MainDispatcher
-    lateinit var mainDispatcher: CoroutineDispatcher
+    private val viewModel: FavoritesSortViewModel by viewModels()
 
     private var adapter: FavoritesAdapter? = null
     private var itemTouchHelper: ItemTouchHelper? = null
-    private var originalOrder: List<AppInfo> = emptyList()
 
     companion object {
         const val REQUEST_KEY = "favorites_order_changed_key"
@@ -108,14 +67,16 @@ class FavoritesSortFragment : Fragment() {
             val initialApps = try {
                 arguments?.getParcelableArrayList(
                     AppConstants.ARG_FAVORITES,
-                    AppInfo::class.java
+                    AppInfo::class.java,
                 ) ?: emptyList()
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error getting favorites from arguments")
                 emptyList()
             }
 
-            originalOrder = initialApps.toList()
+            // Idempotent — survives configuration change without
+            // overwriting in-progress drag-and-drop state in the VM.
+            viewModel.setInitialApps(initialApps)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onCreate")
         }
@@ -124,7 +85,7 @@ class FavoritesSortFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentFavoritesSortBinding.inflate(inflater, container, false)
         return binding.root
@@ -139,6 +100,7 @@ class FavoritesSortFragment : Fragment() {
 
             setupRecyclerView()
             setupButtons()
+            observeViewModel()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onViewCreated")
         }
@@ -148,7 +110,7 @@ class FavoritesSortFragment : Fragment() {
         try {
             adapter = FavoritesAdapter { newOrder ->
                 try {
-                    saveFavoritesOrder(newOrder)
+                    viewModel.onMoved(newOrder)
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in adapter callback")
                 }
@@ -156,12 +118,6 @@ class FavoritesSortFragment : Fragment() {
 
             binding.recyclerView.adapter = adapter
             binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
-
-            try {
-                adapter?.submitList(originalOrder)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error submitting initial list")
-            }
 
             val callback = createItemTouchHelperCallback()
             itemTouchHelper = ItemTouchHelper(callback)
@@ -174,19 +130,20 @@ class FavoritesSortFragment : Fragment() {
     private fun createItemTouchHelperCallback(): ItemTouchHelper.SimpleCallback {
         return object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN,
-            0
+            0,
         ) {
             override fun onMove(
                 recyclerView: RecyclerView,
                 viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
+                target: RecyclerView.ViewHolder,
             ): Boolean {
                 return try {
                     val fromPosition = viewHolder.bindingAdapterPosition
                     val toPosition = target.bindingAdapterPosition
 
                     if (fromPosition == RecyclerView.NO_POSITION ||
-                        toPosition == RecyclerView.NO_POSITION) {
+                        toPosition == RecyclerView.NO_POSITION
+                    ) {
                         false
                     } else {
                         adapter?.moveItem(fromPosition, toPosition)
@@ -204,7 +161,7 @@ class FavoritesSortFragment : Fragment() {
 
             override fun onSelectedChanged(
                 viewHolder: RecyclerView.ViewHolder?,
-                actionState: Int
+                actionState: Int,
             ) {
                 try {
                     super.onSelectedChanged(viewHolder, actionState)
@@ -218,7 +175,7 @@ class FavoritesSortFragment : Fragment() {
 
             override fun clearView(
                 recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder
+                viewHolder: RecyclerView.ViewHolder,
             ) {
                 try {
                     super.clearView(recyclerView, viewHolder)
@@ -235,7 +192,7 @@ class FavoritesSortFragment : Fragment() {
         try {
             binding.buttonAlphabetical.setOnClickListener {
                 try {
-                    sortFavoritesAlphabetically()
+                    viewModel.onSortAlphabetically()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in alphabetical button click")
                 }
@@ -247,7 +204,7 @@ class FavoritesSortFragment : Fragment() {
         try {
             binding.buttonReset.setOnClickListener {
                 try {
-                    resetToOriginalOrder()
+                    viewModel.onResetToOriginal()
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error in reset button click")
                 }
@@ -257,101 +214,64 @@ class FavoritesSortFragment : Fragment() {
         }
     }
 
-    private fun sortFavoritesAlphabetically() {
-        try {
-            val currentAdapter = adapter ?: return
-
-            val sortedList = try {
-                currentAdapter.currentList.sortedBy { it.displayName.lowercase() }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error sorting alphabetically")
-                currentAdapter.currentList
-            }
-
+    private fun observeViewModel() {
+        // Apps state → adapter. The drag-and-drop path emits the same
+        // list that the adapter already shows, but DiffUtil makes that a
+        // no-op. Sort and Reset emit a different list; that drives the
+        // adapter's animation.
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
-                currentAdapter.submitList(sortedList)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error submitting sorted list")
-            }
-
-            saveFavoritesOrder(sortedList)
-            showToast(getString(R.string.favorites_sorted_alphabetically))
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in sortFavoritesAlphabetically")
-        }
-    }
-
-    private fun resetToOriginalOrder() {
-        try {
-            try {
-                adapter?.submitList(originalOrder)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error submitting original order")
-            }
-
-            saveFavoritesOrder(originalOrder)
-            showToast(getString(R.string.favorites_order_reset))
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in resetToOriginalOrder")
-        }
-    }
-
-    /**
-     * Persists the current order of the favorite apps to the data layer.
-     *
-     * This operation is performed asynchronously within a coroutine to avoid blocking the main thread.
-     * The coroutine is launched using `viewLifecycleOwner.lifecycleScope`, ensuring it is automatically
-     * cancelled if the Fragment's view is destroyed, which prevents potential memory leaks.
-     *
-     * ARCHITECTURAL NOTE:
-     * This data-saving logic resides directly in the Fragment instead of a dedicated ViewModel. This is a
-     * deliberate design choice to keep this simple, self-contained screen lightweight and avoid the
-     * boilerplate of a full ViewModel class for a single responsibility.
-     *
-     * Consequently, the `mainDispatcher` is injected directly into this Fragment. This is crucial for
-     * testability, as it allows instrumented tests (via `TestDispatcherModule`) to replace it with a
-     * `TestDispatcher`. This makes the asynchronous save operation behave synchronously and deterministically
-     * during test execution, which is essential for reliable verification.
-     *
-     * @param favoriteApps The new, ordered list of AppInfo objects to be saved.
-     */
-    private fun saveFavoritesOrder(favoriteApps: List<AppInfo>) {
-        if (!isAdded || isDetached || !::favoritesOrderManager.isInitialized) {
-            Timber.Forest.w("Cannot save order - fragment not in valid state")
-            return
-        }
-
-        try {
-            viewLifecycleOwner.lifecycleScope.launch(mainDispatcher) {
-                try {
-                    val componentNames = favoriteApps.map { it.componentName }
-                    val success = favoritesOrderManager.saveOrder(componentNames)
-
-                    if (success) {
-                        Timber.Forest.d("Favorites order saved successfully")
-                        if (isAdded && !isDetached) {
-                            try {
-                                setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error setting fragment result")
-                            }
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.apps.collect { apps ->
+                        try {
+                            adapter?.submitList(apps)
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error submitting list to adapter")
                         }
-                    } else {
-                        if (isAdded && !isDetached) {
-                            showToast(getString(R.string.error_saving_order))
-                        }
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in saveFavoritesOrder coroutine")
-                    if (isAdded && !isDetached) {
-                        showToast(getString(R.string.error_saving_order))
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for apps")
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error launching coroutine")
+        }
+
+        // Events: toasts and the change-broadcast that becomes a fragment
+        // result. Other UiEvents (NavigateUp, etc.) are not emitted by
+        // this ViewModel, so the `else` branch is unreachable in practice.
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.event.collect { event ->
+                        try {
+                            handleEvent(event)
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "Error handling event: $event")
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for events")
+            }
+        }
+    }
+
+    private fun handleEvent(event: UiEvent) {
+        when (event) {
+            is UiEvent.ShowToast -> showToast(getString(event.messageResId))
+            is UiEvent.FavoritesOrderChanged -> {
+                try {
+                    setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error setting fragment result")
+                }
+            }
+            else -> {
+                // Unreachable for events emitted by FavoritesSortViewModel.
+            }
         }
     }
 

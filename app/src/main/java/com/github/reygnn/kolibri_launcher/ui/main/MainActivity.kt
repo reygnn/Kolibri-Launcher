@@ -592,6 +592,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 is UiEvent.RefreshAppDrawer -> {
                     // Intentionally empty - handled in BaseActivity
                 }
+
+                is UiEvent.FavoritesOrderChanged -> {
+                    // Emitted only by FavoritesSortViewModel (a separate
+                    // screen). MainActivity never receives it; declared here
+                    // only so the sealed `when` stays exhaustive.
+                }
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "[MAIN] Error in handleSpecificEvent")

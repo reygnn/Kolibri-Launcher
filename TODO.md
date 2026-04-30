@@ -69,13 +69,6 @@ anderen Gründen ohnehin offen ist.
   Vorschlag: `BuildAppContextMenuUseCase` retourniert
   `List<AppContextMenuAction>`, Fragment observiert und rendert.
 
-- [ ] **`FavoritesSortFragment.saveFavoritesOrder()` +
-  `sortFavoritesAlphabetically()` (`:260-282`, `:318-356`)** —
-  Multi-Step-Orchestrierung (Map → Repo → Fragment-Result → Toast). Das
-  aktuelle KDoc rechtfertigt explizit die ViewModel-Lücke; Rule 10 dreht
-  diesen Kalkül um (JVM-only Test-Target). Vorschlag:
-  `FavoritesSortViewModel`.
-
 Audit-Quelle: Sub-Agent-Review der Codebase. Vor jedem Refactoring
 selbst gegenlesen — Zeilennummern können durch andere Edits abweichen.
 
