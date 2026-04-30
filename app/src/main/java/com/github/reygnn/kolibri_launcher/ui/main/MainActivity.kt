@@ -665,84 +665,24 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private fun showCustomizationOptionsDialog() {
         try {
-            // 1. Vorherigen Dialog schließen
             currentDialog?.dismiss()
             currentDialog = null
 
-            val hasWallpaper = viewModel.wallpaperState.value.hasWallpaper
-            val isEditMode = viewModel.isWallpaperEditMode.value
+            val model = CustomizationDialogModel.build(
+                hasWallpaper = viewModel.wallpaperState.value.hasWallpaper,
+                isWallpaperEditMode = viewModel.isWallpaperEditMode.value,
+            )
 
-            // Dynamische Optionen basierend auf Wallpaper-Status
-            val options = mutableListOf<String>()
-            val actions = mutableListOf<() -> Unit>()
+            // Dialog wird im Edit-Mode unterdrückt — die Inline-Buttons
+            // sind dann ohnehin sichtbar.
+            val visible = model as? CustomizationDialogModel.Visible ?: return
 
-            // Im Edit-Mode: Dialog nicht öffnen (Buttons sind sichtbar)
-            if (isEditMode) {
-                return
-            }
+            val labels = visible.options.map { resolveCustomizationLabel(it) }
+            val actions = visible.options.map { resolveCustomizationAction(it) }
 
-            // Wallpaper Optionen
-            run {
-                // Normal: Wallpaper wählen
-                options.add(getString(R.string.wallpaper_choose))
-                actions.add {
-                    WallpaperImagePicker.launch(wallpaperPickerLauncher)
-                }
-
-                // Falls Wallpaper vorhanden: Edit & Remove Optionen
-                if (hasWallpaper) {
-                    options.add(getString(R.string.wallpaper_edit_mode))
-                    actions.add {
-                        viewModel.onSetWallpaperEditMode(true)
-                    }
-
-                    options.add(getString(R.string.wallpaper_remove))
-                    actions.add {
-                        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
-                            .setTitle(getString(R.string.wallpaper_remove))
-                            .setMessage(getString(R.string.wallpaper_remove_confirm))
-                            .setPositiveButton(getString(R.string.wallpaper_remove_yes)) { _, _ ->
-                                viewModel.onClearWallpaper()
-                            }
-                            .setNegativeButton(getString(R.string.cancel), null)
-                            .show()
-                    }
-                }
-            }
-
-            // Bestehende Optionen
-            options.add(getString(R.string.customize_colors_and_shadow))
-            actions.add {
-                try {
-                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing color customization")
-                }
-            }
-
-            options.add(getString(R.string.customize_layout_title))
-            actions.add {
-                try {
-                    LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing layout customization")
-                }
-            }
-
-            options.add(getString(R.string.more_settings))
-            actions.add {
-                try {
-                    val intent = Intent(this, SettingsActivity::class.java)
-                    startActivity(intent)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "[MAIN] Error starting settings")
-                }
-            }
-
-            // 2. Dialog bauen
             currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
                 .setTitle(getString(R.string.customize_title))
-                .setItems(options.toTypedArray()) { _, which ->
+                .setItems(labels.toTypedArray()) { _, which ->
                     try {
                         actions.getOrNull(which)?.invoke()
                     } catch (e: Throwable) {
@@ -759,6 +699,72 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error showing customization options dialog")
+        }
+    }
+
+    private fun resolveCustomizationLabel(option: CustomizationOption): String =
+        getString(
+            when (option) {
+                CustomizationOption.ChooseWallpaper -> R.string.wallpaper_choose
+                CustomizationOption.EditWallpaper -> R.string.wallpaper_edit_mode
+                CustomizationOption.RemoveWallpaper -> R.string.wallpaper_remove
+                CustomizationOption.CustomizeColors -> R.string.customize_colors_and_shadow
+                CustomizationOption.CustomizeLayout -> R.string.customize_layout_title
+                CustomizationOption.MoreSettings -> R.string.more_settings
+            },
+        )
+
+    private fun resolveCustomizationAction(option: CustomizationOption): () -> Unit =
+        when (option) {
+            CustomizationOption.ChooseWallpaper -> ::launchWallpaperPicker
+            CustomizationOption.EditWallpaper -> ::enterWallpaperEditMode
+            CustomizationOption.RemoveWallpaper -> ::confirmRemoveWallpaper
+            CustomizationOption.CustomizeColors -> ::showColorCustomizationDialog
+            CustomizationOption.CustomizeLayout -> ::showLayoutCustomizationDialog
+            CustomizationOption.MoreSettings -> ::openSettingsActivity
+        }
+
+    private fun launchWallpaperPicker() {
+        WallpaperImagePicker.launch(wallpaperPickerLauncher)
+    }
+
+    private fun enterWallpaperEditMode() {
+        viewModel.onSetWallpaperEditMode(true)
+    }
+
+    private fun confirmRemoveWallpaper() {
+        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            .setTitle(getString(R.string.wallpaper_remove))
+            .setMessage(getString(R.string.wallpaper_remove_confirm))
+            .setPositiveButton(getString(R.string.wallpaper_remove_yes)) { _, _ ->
+                viewModel.onClearWallpaper()
+            }
+            .setNegativeButton(getString(R.string.cancel), null)
+            .show()
+    }
+
+    private fun showColorCustomizationDialog() {
+        try {
+            ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing color customization")
+        }
+    }
+
+    private fun showLayoutCustomizationDialog() {
+        try {
+            LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error showing layout customization")
+        }
+    }
+
+    private fun openSettingsActivity() {
+        try {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "[MAIN] Error starting settings")
         }
     }
 

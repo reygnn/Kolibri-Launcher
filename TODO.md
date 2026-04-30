@@ -62,12 +62,6 @@ explizit nur für neuen Code — diese Punkte sind pre-existing Tech-Debt,
 kein Block-Refactor. Einzeln angehen, wenn die jeweilige Klasse aus
 anderen Gründen ohnehin offen ist.
 
-- [ ] **`MainActivity.showCustomizationOptionsDialog()` (`:662-759`)** —
-  baut eine dynamische Dialog-Liste anhand von `hasWallpaper` ×
-  `isEditMode`. Reine Entscheidung. Vorschlag: `CustomizationDialogModel`-
-  Helper analog zum existierenden `LayerButtonsState`-Muster, Fragment
-  rendert die fertige Liste.
-
 - [ ] **`AppContextMenuDialogFragment.loadActions()` (`:192-346`)** —
   koordiniert vier Repositories (`shortcutManager`, `favoritesManager`,
   `appNamesManager`, `visibilityManager`) und branched auf
