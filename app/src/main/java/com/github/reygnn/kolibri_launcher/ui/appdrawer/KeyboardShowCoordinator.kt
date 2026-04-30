@@ -12,8 +12,6 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
  * Diese Klasse kapselt die Entscheidungslogik für Unit-Tests.
  * Die tatsächliche Framework-Interaktion (InputMethodManager, View-Operationen)
  * bleibt im Fragment.
- *
- * @see <a href="https://github.com/user/kolibri/issues/XXX">GitHub Issue: Keyboard not showing</a>
  */
 class KeyboardShowCoordinator {
 

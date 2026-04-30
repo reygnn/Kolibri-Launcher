@@ -8,7 +8,6 @@ import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -312,18 +311,10 @@ class HomeFragment : Fragment() {
     private var lastSpacingInput: SpacingInput? = null
 
     // ===========================================
-    // UI CACHE - DRAWABLES
-    // ===========================================
-
-    /** Reused to avoid allocations on every border update */
-    private var cachedBorderDrawable: GradientDrawable? = null
-
-    // ===========================================
     // SPLIT MODE TRACKING
     // ===========================================
 
     private var wasInSplitMode = false
-    private val showBorder = false  // TODO: Feature flag for future border implementation
 
     // ===========================================
     // GESTURE HANDLING
@@ -362,6 +353,7 @@ class HomeFragment : Fragment() {
     private val splitWeightCalculator = SplitWeightCalculator()
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
+    private val borderDecorator = ScrollViewBorderDecorator()
     private val swipeAnalyzer = SwipeGestureAnalyzer()
     private val timeFormatter = TimeEventFormatter()
     private val orientationSynchronizer by lazy {
@@ -993,8 +985,7 @@ class HomeFragment : Fragment() {
             } else {
                 // FULL MODE
                 binding.gestureZone.isVisible = false
-                binding.favoritesScrollView.background = null
-                binding.favoritesScrollView.setPadding(0, 0, 0, 0)
+                borderDecorator.remove(binding.favoritesScrollView)
 
                 if (wasInSplitMode) {
                     try {
@@ -1005,8 +996,6 @@ class HomeFragment : Fragment() {
                     }
                 }
                 wasInSplitMode = false
-
-                // applyScrollViewBorder()   // TODO: Später reaktivieren – Code intakt, bitte behalten.
 
                 // ScrollView MUSS das Abfangen von Touches verhindern
                 customScrollView.allowIntercept = false
@@ -1019,8 +1008,6 @@ class HomeFragment : Fragment() {
                 customScrollView.setOnTouchListener(null)
                 binding.gestureZone.setOnTouchListener(null)
 
-                // removeScrollViewBorder()   // TODO: Später reaktivieren – Code intakt, bitte behalten.
-
                 Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
             }
 
@@ -1031,107 +1018,6 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error adjusting ScrollView width")
         }
     }
-
-    // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
-    // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
-    // Er ist Teil einer geplanter Funktionalität (Future Implementation).
-    // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
-    // -> applyScrollViewBorder() behalten!
-    /*
-        private fun applyScrollViewBorder(textColor: Int) {   // DO NOT DELETE !!!
-            try {
-                // 1. Farbe berechnen (das ist billig, primitives int)
-                val frameColor = Color.argb(
-                    AppConstants.BORDER_ALPHA,
-                    Color.red(textColor),
-                    Color.green(textColor),
-                    Color.blue(textColor)
-                )
-
-                // 2. MONK-OPTIMIERUNG: Instanz wiederverwenden!
-                // Wir erstellen das Objekt nur, wenn es noch null ist.
-                if (cachedBorderDrawable == null) {
-                    cachedBorderDrawable = GradientDrawable().apply {
-                        setColor(Color.TRANSPARENT) // Muss nur einmal gesetzt werden
-                    }
-                }
-
-                // 3. Eigenschaften auf der *existierenden* Instanz aktualisieren
-                cachedBorderDrawable?.apply {
-                    val strokeWidth = try {
-                        resources.getDimensionPixelSize(R.dimen.split_screen_border_width)
-                    } catch (e: Throwable) {
-                        AppConstants.FALLBACK_BORDER_WIDTH_PX
-                    }
-                    // Hier ändern wir nur den State des existierenden Objekts -> 0 Allocation
-                    setStroke(strokeWidth, frameColor)
-
-                    val cornerRadius = try {
-                        resources.getDimension(R.dimen.split_screen_corner_radius)
-                    } catch (e: Throwable) {
-                        AppConstants.FALLBACK_CORNER_RADIUS_PX
-                    }
-                    setCornerRadius(cornerRadius)
-                }
-
-                // 4. Nur neu zuweisen, wenn es nicht schon der Hintergrund ist
-                // (Vermeidet unnötige Invalidation-Calls im View)
-                if (binding.favoritesScrollView.background !== cachedBorderDrawable) {
-                    binding.favoritesScrollView.background = cachedBorderDrawable
-                }
-
-                val borderPadding = try {
-                    resources.getDimensionPixelSize(R.dimen.split_screen_border_inset)
-                } catch (e: Throwable) {
-                    AppConstants.FALLBACK_DIMEN_PX
-                }
-
-                binding.favoritesScrollView.setPadding(
-                    0,
-                    borderPadding,
-                    borderPadding,
-                    borderPadding
-                )
-
-                binding.favoritesScrollView.clipToPadding =
-                    true // Behalten, um den Inhalt im Rahmen zu halten
-
-                val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-
-                params.setMargins(0, 0, 0, 0)
-
-                binding.favoritesScrollView.layoutParams = params
-
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error applying border")
-            }
-        }
-
-        // HINWEIS FÜR ENTWICKLER UND KI-REFACTORING:
-        // Dieser auskommentierte Code ist KEIN toter Code (Dead Code).
-        // Er ist Teil einer geplanter Funktionalität (Future Implementation).
-        // Das Löschen führt zu Mehraufwand bei der Wiederherstellung.
-        // -> removeScrollViewBorder() behalten!
-        private fun removeScrollViewBorder() {
-            try {
-                if (_binding == null) return
-
-                // 1. Hintergrund (Rahmen) entfernen
-                binding.favoritesScrollView.background = null
-
-                // 2. Padding zurücksetzen (falls es für den Rahmen gesetzt wurde)
-                binding.favoritesScrollView.setPadding(0, 0, 0, 0)
-
-                // 3. Negative Margins entfernen und auf 0 setzen
-                val params = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-                params.setMargins(0, 0, 0, 0)
-                binding.favoritesScrollView.layoutParams = params
-
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error removing border")
-            }
-        }
-    */
 
     private fun clearAllViews() {
         try {
@@ -1192,13 +1078,9 @@ class HomeFragment : Fragment() {
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
 
-        /*        if (_needsSplit.value) {   // TODO: Später reaktivieren – Code intakt, bitte behalten.
-                    try {
-                        applyScrollViewBorder(textColor)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating border color")
-                    }
-                }*/
+        if (_needsSplit.value) {
+            borderDecorator.apply(binding.favoritesScrollView, textColor)
+        }
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -2769,7 +2651,7 @@ class HomeFragment : Fragment() {
             gestureDetector = null
             longClickedApp = null
             lastSpacingInput = null
-            cachedBorderDrawable = null
+            borderDecorator.clear()
 
             try {
                 binding.wallpaperTouchInterceptor.setOnTouchListener(null)
