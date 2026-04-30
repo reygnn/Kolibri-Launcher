@@ -30,19 +30,24 @@ import javax.inject.Singleton
  * == BACKWARD COMPATIBILITY ==
  * Bestehende Single-Layer Daten (KEY_WALLPAPER_URI etc.) werden beim Lesen
  * automatisch erkannt und als WallpaperState ohne Layer-Liste geladen.
- * Beim ersten Multi-Layer-Speichern werden die alten Keys beibehalten
- * UND die Layer-Liste zusätzlich gespeichert.
+ * Beim Multi-Layer-Speichern werden die Legacy-Keys mit den Werten von
+ * Layer 0 synchronisiert — als Notbett für den Korruptions-Fallback in
+ * [parseWallpaperState], wenn LAYERS_JSON unparsbar zurückkommt.
  *
  * == MULTI-LAYER ==
  * Layer werden als JSON-Array in einem einzigen DataStore-Key gespeichert.
  * Jedes Layer enthält: id, imageUri, scale, translateX/Y, alpha, blendMode,
  * isVisible, label.
  *
- * Migrations-Pfad:
+ * Migrations- und Fallback-Pfade:
  * 1. App-Start: Alte Keys vorhanden, kein LAYERS_JSON → Single-Layer (wie bisher)
- * 2. User fügt Layer hinzu → LAYERS_JSON wird geschrieben
+ * 2. User fügt Layer hinzu → LAYERS_JSON wird geschrieben, Legacy-Keys
+ *    werden mit Layer 0 synchronisiert
  * 3. Nächster App-Start: LAYERS_JSON vorhanden → Multi-Layer
  * 4. User entfernt alle Layer → LAYERS_JSON wird entfernt, zurück zu Single/None
+ * 5. Korruptions-Fallback: LAYERS_JSON existiert, ist aber unparsbar →
+ *    Repository fällt auf die Layer-0-Synchronisation in den Legacy-Keys
+ *    zurück. User sieht in dem Fall nur Layer 0 statt der vollen Komposition.
  */
 @Singleton
 class WallpaperRepositoryImpl @Inject constructor(
@@ -99,7 +104,14 @@ class WallpaperRepositoryImpl @Inject constructor(
                 val layers = parseLayersFromJson(layersJson)
                 if (layers.isNotEmpty()) {
                     val validLayers = layers.filter { layer ->
-                        val uri = layer.imageUri ?: return@filter true
+                        val uri = layer.imageUri
+                        // A layer without a URI shows nothing — keeping it would
+                        // create a state that is technically multi-layer but
+                        // displays no wallpaper (isMultiLayer && !hasWallpaper).
+                        if (uri == null) {
+                            Timber.w("Dropping layer without image URI (id='${layer.id}')")
+                            return@filter false
+                        }
                         // Defensive: non-file URIs should not exist in the
                         // state (copyToInternal converts everything to file://
                         // before persistence). If one slips through — old
@@ -231,13 +243,22 @@ class WallpaperRepositoryImpl @Inject constructor(
         val jsonArray = layersToJson(state.layers)
         preferences[KEY_LAYERS_JSON] = jsonArray.toString()
 
-        // Legacy-Keys mit Layer 0 füllen (Fallback für ältere Code-Pfade)
+        // Legacy-Keys mit Layer 0 synchronisieren (Korruptions-Fallback).
         val firstLayer = state.layers.firstOrNull { it.hasImage }
         if (firstLayer != null) {
             preferences[KEY_WALLPAPER_URI] = firstLayer.imageUri.toString()
             preferences[KEY_WALLPAPER_SCALE] = firstLayer.scale
             preferences[KEY_WALLPAPER_TRANSLATE_X] = firstLayer.translateX
             preferences[KEY_WALLPAPER_TRANSLATE_Y] = firstLayer.translateY
+        } else {
+            // Kein Layer hat ein Bild → Legacy-Keys räumen, sonst würde
+            // ein späterer Korruptions-Fallback in parseWallpaperState
+            // ein altes Single-Layer-Wallpaper aus einer längst beendeten
+            // Konfiguration zurückbringen.
+            preferences.remove(KEY_WALLPAPER_URI)
+            preferences.remove(KEY_WALLPAPER_SCALE)
+            preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
+            preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
         }
 
         Timber.d("Saved ${state.layers.size} wallpaper layers")

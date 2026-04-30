@@ -124,69 +124,11 @@ gelassen:
 
 ---
 
-## 3. Wallpaper-State: Single/Multi-Layer-Inkonsistenzen
+## 3. Wallpaper-State: verbleibende Aufgaben
 
-Sherlock-Review von `WallpaperState`, `WallpaperRepositoryImpl` und der
-Edit-Session im `WallpaperDelegate`. Drei reale Bugs/Inkonsistenzen,
-zwei Doku-Lügen, ein Zombie-State.
-
-### Logik-Befunde
-
-- [ ] **Dual-State-Schatten in `domain/model/WallpaperState.kt`**
-  - Single-Layer-Felder (`imageUri`, `scale`, `translateX`, `translateY`)
-    und `layers: List<...>` leben parallel im selben data class.
-  - Class-KDoc Zeile 128: „Wird ignoriert wenn layers nicht leer."
-  - `toMultiLayer()` Zeile 277-280: „Single-Layer Felder bleiben für
-    Fallback" — der Fallback wird **nirgendwo** im Code aktiv gelesen.
-  - `referencedUris` Zeile 200-208 zählt **beide** Sets — heute
-    harmlos, weil `toMultiLayer` dasselbe URI doppelt einträgt; eine
-    Codepfad-Veränderung könnte daraus aber ein echtes Orphan-GC-Problem
-    machen.
-  - Fix: in `toMultiLayer()` Single-Layer-Felder zu Defaults
-    zurücksetzen, „Fallback"-Kommentar streichen, Class-KDoc auf
-    „müssen bei `isMultiLayer == true` Default sein" verschärfen.
-
-- [ ] **`saveMultiLayerState` cleanst Legacy-Keys nicht**
-  - Anker: `data/WallpaperRepositoryImpl.kt:229-244`
-  - Wenn `state.layers` nicht leer ist, aber **kein** Layer ein Bild
-    hat, bleiben `KEY_WALLPAPER_URI`/`SCALE`/`TRANSLATE_X/Y` aus einer
-    früheren Single-Layer-Konfig unverändert.
-  - Spiegel-Operation `saveSingleLayerState` macht den Cleanup
-    korrekt (`preferences.remove(KEY_LAYERS_JSON)`); die andere
-    Richtung fehlt.
-  - Reale Folge: bei korrumpiertem LAYERS_JSON greift der Fallback
-    in `parseWallpaperState`, der dann ein **uraltes** Single-Layer-Bild
-    statt Layer 0 zeigt.
-  - Fix: im `else`-Zweig (kein Layer mit Bild) die vier Legacy-Keys
-    entfernen.
-
-- [ ] **Zombie-State: `isMultiLayer == true && hasWallpaper == false`**
-  - Anker: `data/WallpaperRepositoryImpl.kt:101-116`
-  - Filter `val uri = layer.imageUri ?: return@filter true` lässt
-    Layer ohne URI durch. Wenn ein Layer nur als Label-Platzhalter
-    persistiert wäre, bleibt er → State mit Multi-Modus aktiv, aber
-    nichts anzuzeigen.
-  - Fix: Filter umstellen auf
-    `if (layer.imageUri == null) return@filter false`.
-
-### Doku-Lügen
-
-- [ ] **`WallpaperRepositoryImpl` KDoc Zeile 33-34**
-  - Behauptet: „die alten Keys werden **beibehalten**"
-  - Realität (Zeile 234-241): alte Keys werden **überschrieben** mit
-    den Werten aus `firstLayer`. Wenn vorher `scale = 2.5` und neuer
-    Layer 0 `scale = 1.0`, steht danach `1.0` in den Legacy-Keys.
-  - Fix: KDoc auf „werden mit Layer 0 synchronisiert" umformulieren —
-    plus den Zweck (Notbett für korrumpiertes LAYERS_JSON) klarstellen.
-
-- [ ] **`WallpaperRepositoryImpl` Migrations-Pfad ohne Korruptions-Fallback**
-  - KDoc Zeile 41-46 listet 4 Migrations-Schritte. Es gibt aber einen
-    fünften Pfad (Zeile 132-143): bei korrumpiertem LAYERS_JSON greift
-    der Korruptions-Fallback und liest Layer 0 aus den Legacy-Keys
-    zurück. Das ist nur im inneren Code-Kommentar dokumentiert.
-  - Fix: den Fallback im KDoc als 5. Schritt nennen.
-
-### `forPersistence()` Legacy-No-op (vorab notiert, separat)
+Verdacht 1-5 aus dem Sherlock-Review wurden auf Branch
+`fix/wallpaper-state-coherence` umgesetzt. Übrig bleibt der
+`forPersistence`-Cleanup.
 
 - [ ] **`WallpaperState.forPersistence()` aufräumen**
   - Anker: `domain/model/WallpaperState.kt:287-294`

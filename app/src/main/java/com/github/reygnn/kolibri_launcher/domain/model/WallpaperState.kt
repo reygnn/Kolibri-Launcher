@@ -124,17 +124,26 @@ data class WallpaperLayerState(
  */
 data class WallpaperState(
     // --- Single-Layer Felder (Backward Compatibility) ---
+    //
+    // Invariant: when [layers] is non-empty, ALL four single-layer fields
+    // MUST hold their default values (null URI, default scale, zero
+    // translates). The codebase keys every read on [isMultiLayer] and
+    // never falls back to these fields in multi-mode, so any non-default
+    // value here would be a shadow state — invisible in the UI but counted
+    // by [referencedUris] and exported by callers that walk both branches.
+    // [toMultiLayer] enforces this when migrating; constructed states
+    // should respect it too.
 
-    /** URI zum Bild – null = kein Custom Wallpaper. Wird ignoriert wenn layers nicht leer. */
+    /** URI zum Bild – null = kein Custom Wallpaper. MUSS null sein wenn layers nicht leer. */
     val imageUri: Uri? = null,
 
-    /** Zoom-Faktor (Single-Layer) */
+    /** Zoom-Faktor (Single-Layer). MUSS Default sein wenn layers nicht leer. */
     val scale: Float = WallpaperLayerState.DEFAULT_SCALE,
 
-    /** Horizontale Verschiebung (Single-Layer) */
+    /** Horizontale Verschiebung (Single-Layer). MUSS 0f sein wenn layers nicht leer. */
     val translateX: Float = 0f,
 
-    /** Vertikale Verschiebung (Single-Layer) */
+    /** Vertikale Verschiebung (Single-Layer). MUSS 0f sein wenn layers nicht leer. */
     val translateY: Float = 0f,
 
     // --- Multi-Layer Felder ---
@@ -261,6 +270,11 @@ data class WallpaperState(
     /**
      * Konvertiert einen Single-Layer State in einen Multi-Layer State.
      * Nützlich beim ersten Mal "Add Layer".
+     *
+     * Setzt die Single-Layer-Felder explizit auf Defaults zurück. Aus
+     * Sicht des Konsumenten ist der State danach komplett durch [layers]
+     * beschrieben; die alten Felder zu lassen wäre Schatten-State, das
+     * niemand liest, aber [referencedUris] und JSON-Exporter mitziehen.
      */
     fun toMultiLayer(): WallpaperState {
         if (isMultiLayer) return this
@@ -275,7 +289,10 @@ data class WallpaperState(
         )
 
         return copy(
-            // Single-Layer Felder bleiben für Fallback
+            imageUri = null,
+            scale = DEFAULT_SCALE,
+            translateX = 0f,
+            translateY = 0f,
             layers = listOf(singleLayer)
         )
     }
