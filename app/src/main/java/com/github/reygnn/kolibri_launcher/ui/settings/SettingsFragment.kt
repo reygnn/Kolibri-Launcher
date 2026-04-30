@@ -59,6 +59,15 @@ import javax.inject.Inject
 /**
  * CRASH-SAFE VERSION
  * (Inklusive Kalender-Berechtigungslogik)
+ *
+ * Throwable-Audit-Notiz: Die früher um jede `findPreference + setOn*Listener`-
+ * Verdrahtung gewickelten Outer-Catches sind entfernt — sowohl `findPreference`
+ * (gibt null zurück) als auch `setOn*Listener` auf einer Safe-Call-Receiver
+ * werfen nicht. Inner-Catches im Listener-Body bleiben überall, weil dort
+ * echte Arbeit passiert (startActivity / Fragment-Transaktion / suspend
+ * Repo-Call). Gleiches Muster für die Flow-Observer in `observeSettings`:
+ * der `?.isChecked = X`-Setter im inneren Block kann nicht werfen, der
+ * Outer-Catch um die `.collect { }` schon (weshalb der bleibt).
  */
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -142,507 +151,445 @@ class SettingsFragment : PreferenceFragmentCompat() {
             setupPreferenceListeners()
 
         } catch (e: Throwable) {
+            // setPreferencesFromResource liest XML — echter I/O-Pfad.
             TimberWrapper.silentError(e, "Error in onCreatePreferences")
         }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        try {
-            calendarSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
-            calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: false
 
-                    if (shouldEnable) {
-                        handleCalendarPermissionRequest()
-                        // Rückgabe 'false' verhindert das automatische Toggle.
-                        // Der Switch wird erst auf 'true' gesetzt, wenn die
-                        // Berechtigung erteilt wurde (siehe observeSettings).
-                        false
-                    } else {
-                        // User möchte Feature deaktivieren -> direkt speichern
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            settingsManager.setShowCalendarEvent(false)
-                        }
-                        true // Erlaube das Toggle auf 'false'
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in calendar change listener")
+        // Listener-Wiring selbst wirft nicht — alle Inner-Catches in den
+        // Listener-Bodies machen die echte Defensive.
+        calendarSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
+        calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+
+                if (shouldEnable) {
+                    handleCalendarPermissionRequest()
+                    // Rückgabe 'false' verhindert das automatische Toggle.
+                    // Der Switch wird erst auf 'true' gesetzt, wenn die
+                    // Berechtigung erteilt wurde (siehe observeSettings).
                     false
-                }
-            }
-
-            alarmSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_ALARM)
-            alarmSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: true
+                } else {
+                    // User möchte Feature deaktivieren -> direkt speichern
                     viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setShowAlarm(shouldEnable)
+                        settingsManager.setShowCalendarEvent(false)
                     }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in alarm change listener")
-                    false
+                    true // Erlaube das Toggle auf 'false'
                 }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in calendar change listener")
+                false
             }
+        }
 
-            autoKeyboardSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
-            autoKeyboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: false
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setAutoShowKeyboard(shouldEnable)
-                    }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
-                    false
+        alarmSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_ALARM)
+        alarmSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: true
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setShowAlarm(shouldEnable)
                 }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in alarm change listener")
+                false
             }
+        }
 
-            autoLaunchAppSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
-            autoLaunchAppSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: false
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setAutoLaunchApp(shouldEnable)
-                    }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
-                    false
+        autoKeyboardSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
+        autoKeyboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setAutoShowKeyboard(shouldEnable)
                 }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
+                false
             }
+        }
 
-            splitModeThresholdPreference =
-                findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
-            splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val thresholdString =
-                        newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
-                    val threshold =
-                        thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
+        autoLaunchAppSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
+        autoLaunchAppSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setAutoLaunchApp(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
+                false
+            }
+        }
 
-                    if (threshold !in AppConstants.SPLIT_MODE_THRESHOLD_MIN..AppConstants.SPLIT_MODE_THRESHOLD_MAX) {
-                        Toast.makeText(
-                            requireContext(),
-                            R.string.split_mode_threshold_invalid,
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        false // Verhindere das Update
-                    } else {
-                        // Speichere den validen Wert
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            settingsManager.setSplitModeThreshold(threshold)
+        splitModeThresholdPreference =
+            findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
+        splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val thresholdString =
+                    newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
+                val threshold =
+                    thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
 
-                            // Zeige Bestätigung
-                            Toast.makeText(
-                                requireContext(),
-                                getString(R.string.split_mode_threshold_saved, threshold),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        true // Erlaube das Update
-                    }
-                } catch (e: NumberFormatException) {
-                    TimberWrapper.silentError(e, "Invalid number format for split-mode threshold")
+                if (threshold !in AppConstants.SPLIT_MODE_THRESHOLD_MIN..AppConstants.SPLIT_MODE_THRESHOLD_MAX) {
                     Toast.makeText(
                         requireContext(),
                         R.string.split_mode_threshold_invalid,
                         Toast.LENGTH_SHORT
                     ).show()
-                    false
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in split-mode threshold change listener")
-                    false
-                }
-            }
-
-            // Secure Window / Anti-Ghosting
-            secureWindowSwitchPreference = findPreference(AppConstants.PrefKeys.SECURE_WINDOW)
-            secureWindowSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: false
+                    false // Verhindere das Update
+                } else {
+                    // Speichere den validen Wert
                     viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setSecureWindow(shouldEnable)
+                        settingsManager.setSplitModeThreshold(threshold)
 
-                        // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
-                        if (shouldEnable) {
-                            Toast.makeText(requireContext(), "Screenshots disabled", Toast.LENGTH_SHORT).show()
-                        }
+                        // Zeige Bestätigung
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.split_mode_threshold_saved, threshold),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in secure window change listener")
-                    false
+                    true // Erlaube das Update
                 }
+            } catch (e: NumberFormatException) {
+                TimberWrapper.silentError(e, "Invalid number format for split-mode threshold")
+                Toast.makeText(
+                    requireContext(),
+                    R.string.split_mode_threshold_invalid,
+                    Toast.LENGTH_SHORT
+                ).show()
+                false
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in split-mode threshold change listener")
+                false
             }
+        }
 
-            // Rotation Lock
-            rotationLockedSwitchPreference = findPreference(AppConstants.PrefKeys.ROTATION_LOCKED)
-            rotationLockedSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    val shouldEnable = newValue as? Boolean ?: false
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setRotationLocked(shouldEnable)
+        // Secure Window / Anti-Ghosting
+        secureWindowSwitchPreference = findPreference(AppConstants.PrefKeys.SECURE_WINDOW)
+        secureWindowSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setSecureWindow(shouldEnable)
+
+                    // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
+                    if (shouldEnable) {
+                        Toast.makeText(requireContext(), "Screenshots disabled", Toast.LENGTH_SHORT).show()
                     }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in rotation lock change listener")
-                    false
                 }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in secure window change listener")
+                false
             }
+        }
 
-            observeSettings()
-            viewLifecycleOwner.lifecycleScope.launch {
-                updateCrashReportSummary()
+        // Rotation Lock
+        rotationLockedSwitchPreference = findPreference(AppConstants.PrefKeys.ROTATION_LOCKED)
+        rotationLockedSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsManager.setRotationLocked(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in rotation lock change listener")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
+        }
+
+        observeSettings()
+        viewLifecycleOwner.lifecycleScope.launch {
+            updateCrashReportSummary()
         }
     }
 
     override fun onResume() {
         super.onResume()
-
-        try {
-            updateDefaultLauncherStatus()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onResume")
-        }
+        // updateDefaultLauncherStatus hat eigene Catches für die echten
+        // System-API-Calls (RoleManager). Ein Outer-Catch hier wäre tot.
+        updateDefaultLauncherStatus()
     }
 
     private fun setupPreferenceListeners() {
         // Wallpaper
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.SYSTEM_WALLPAPER)?.setOnPreferenceClickListener {
-                try {
-                    openSystemWallpaperPicker()
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in wallpaper preference click")
-                    false
-                }
+        findPreference<Preference>(AppConstants.PrefKeys.SYSTEM_WALLPAPER)?.setOnPreferenceClickListener {
+            try {
+                openSystemWallpaperPicker()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in wallpaper preference click")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting wallpaper preference listener")
         }
 
         // Edit Favorites
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.EDIT_FAVORITES)?.setOnPreferenceClickListener {
-                try {
-                    val intent = Intent(requireActivity(), OnboardingActivity::class.java).apply {
-                        putExtra(
-                            OnboardingActivity.Companion.EXTRA_LAUNCH_MODE,
-                            LaunchMode.EDIT_FAVORITES.name
-                        )
-                    }
-                    startActivity(intent)
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error starting edit favorites")
-                    false
+        findPreference<Preference>(AppConstants.PrefKeys.EDIT_FAVORITES)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireActivity(), OnboardingActivity::class.java).apply {
+                    putExtra(
+                        OnboardingActivity.Companion.EXTRA_LAUNCH_MODE,
+                        LaunchMode.EDIT_FAVORITES.name
+                    )
                 }
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error starting edit favorites")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting edit favorites listener")
         }
 
         // Sort Favorites
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)?.setOnPreferenceClickListener {
-                try {
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
+        findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)?.setOnPreferenceClickListener {
+            try {
+                if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
 
-                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-                        try {
-                            showSortFavoritesFragment()
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error showing sort favorites")
-                            viewModel.onAppListNotLoaded()
-                        } finally {
-                            if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                        }
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    try {
+                        showSortFavoritesFragment()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing sort favorites")
+                        viewModel.onAppListNotLoaded()
+                    } finally {
+                        if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                     }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in sort favorites click")
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                    false
                 }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in sort favorites click")
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting sort favorites listener")
         }
 
         // Hidden Apps
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)?.setOnPreferenceClickListener {
-                try {
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
+        findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)?.setOnPreferenceClickListener {
+            try {
+                if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
 
-                    val intent = Intent(requireContext(), HiddenAppsActivity::class.java)
-                    startActivity(intent)
+                val intent = Intent(requireContext(), HiddenAppsActivity::class.java)
+                startActivity(intent)
 
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error starting hidden apps")
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                    false
-                }
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error starting hidden apps")
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting hidden apps listener")
         }
 
         // Custom App Names
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.CUSTOM_APP_NAMES)?.setOnPreferenceClickListener {
-                try {
-                    val intent = Intent(requireActivity(), CustomNamesActivity::class.java)
-                    startActivity(intent)
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error starting app names activity")
-                    false
-                }
+        findPreference<Preference>(AppConstants.PrefKeys.CUSTOM_APP_NAMES)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireActivity(), CustomNamesActivity::class.java)
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error starting app names activity")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting custom app names listener")
         }
 
         // Backup & Restore
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.BACKUP_RESTORE)?.setOnPreferenceClickListener {
-                try {
-                    if (!isAdded || isStateSaved || isDetached) {
-                        Timber.Forest.w("Cannot show backup - invalid fragment state")
-                        return@setOnPreferenceClickListener false
-                    }
-
-                    val fragment = BackupFragment()
-
-                    parentFragmentManager.beginTransaction()
-                        .replace(android.R.id.content, fragment)
-                        .addToBackStack(null)
-                        .commitAllowingStateLoss()
-
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing backup fragment")
-                    false
-                }
-            }
-
+        findPreference<Preference>(AppConstants.PrefKeys.BACKUP_RESTORE)?.setOnPreferenceClickListener {
             try {
-                findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
-                    try {
-                        showFactoryResetDialog()
-                        true
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error showing factory reset dialog")
-                        false
-                    }
+                if (!isAdded || isStateSaved || isDetached) {
+                    Timber.Forest.w("Cannot show backup - invalid fragment state")
+                    return@setOnPreferenceClickListener false
                 }
+
+                val fragment = BackupFragment()
+
+                parentFragmentManager.beginTransaction()
+                    .replace(android.R.id.content, fragment)
+                    .addToBackStack(null)
+                    .commitAllowingStateLoss()
+
+                true
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting factory reset listener")
+                TimberWrapper.silentError(e, "Error showing backup fragment")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting backup listener")
+        }
+
+        // Factory Reset
+        findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
+            try {
+                showFactoryResetDialog()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error showing factory reset dialog")
+                false
+            }
         }
 
         // Usage Export
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.USAGE_EXPORT)?.setOnPreferenceClickListener {
-                try {
-                    if (!isAdded || isStateSaved || isDetached) {
-                        Timber.Forest.w("Cannot show usage export - invalid fragment state")
-                        return@setOnPreferenceClickListener false
-                    }
-
-                    val fragment = UsageExportFragment()
-
-                    parentFragmentManager.beginTransaction()
-                        .replace(android.R.id.content, fragment)
-                        .addToBackStack(null)
-                        .commitAllowingStateLoss()
-
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing usage export fragment")
-                    false
+        findPreference<Preference>(AppConstants.PrefKeys.USAGE_EXPORT)?.setOnPreferenceClickListener {
+            try {
+                if (!isAdded || isStateSaved || isDetached) {
+                    Timber.Forest.w("Cannot show usage export - invalid fragment state")
+                    return@setOnPreferenceClickListener false
                 }
+
+                val fragment = UsageExportFragment()
+
+                parentFragmentManager.beginTransaction()
+                    .replace(android.R.id.content, fragment)
+                    .addToBackStack(null)
+                    .commitAllowingStateLoss()
+
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error showing usage export fragment")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting usage export listener")
         }
 
         // App Info
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.APP_INFO)?.setOnPreferenceClickListener {
-                try {
-                    openUrlInCustomTab(
-                        requireContext(),
-                        AppConstants.URL_ABOUT_PAGE
-                    )
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error opening app info")
-                    false
-                }
+        findPreference<Preference>(AppConstants.PrefKeys.APP_INFO)?.setOnPreferenceClickListener {
+            try {
+                openUrlInCustomTab(
+                    requireContext(),
+                    AppConstants.URL_ABOUT_PAGE
+                )
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error opening app info")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting app info listener")
         }
 
         // Accessibility
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.ACCESSIBILITY)?.setOnPreferenceClickListener {
-                try {
-                    openAccessibilitySettings()
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error opening accessibility")
-                    false
-                }
+        findPreference<Preference>(AppConstants.PrefKeys.ACCESSIBILITY)?.setOnPreferenceClickListener {
+            try {
+                openAccessibilitySettings()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error opening accessibility")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting accessibility listener")
         }
 
         // Default Launcher
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
-                try {
-                    openDefaultLauncherSettings()
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error opening default launcher settings")
-                    false
-                }
+        findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
+            try {
+                openDefaultLauncherSettings()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error opening default launcher settings")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting default launcher listener")
         }
 
         // Double Tap to Lock
-        try {
-            val doubleTapPreference =
-                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
-            doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    if (newValue is Boolean) {
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            try {
-                                settingsManager.setDoubleTapToLock(newValue)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error setting double tap to lock")
-                            }
-                        }
-                    }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in double tap preference change")
-                    false
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting double tap listener")
-        }
-
-        // Swipe Down for Notifications
-        try {
-            val swipeDownPreference =
-                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
-            swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
-                try {
-                    if (newValue is Boolean) {
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            try {
-                                settingsManager.setSwipeDownToNotifications(newValue)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error setting swipe down to notifications"
-                                )
-                            }
-                        }
-                    }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in swipe down preference change")
-                    false
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting swipe down listener")
-        }
-
-        // Swipe Actions
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.SWIPE_ACTIONS)?.setOnPreferenceClickListener {
-                try {
-                    val intent = Intent(requireContext(), SwipeActionsActivity::class.java)
-                    startActivity(intent)
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error starting swipe actions activity")
-                    false
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting swipe actions listener")
-        }
-
-        // Crash Reports
-        try {
-            findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)?.setOnPreferenceClickListener {
-                try {
-                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-                        val activityContext = activity ?: return@launch
-
+        val doubleTapPreference =
+            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
+        doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                if (newValue is Boolean) {
+                    viewLifecycleOwner.lifecycleScope.launch {
                         try {
-                            CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
-                                // Hier aktualisieren wir ACRA sofort nach der Entscheidung des Benutzers
-                                ACRA.errorReporter.setEnabled(userGaveConsent)
-                                Timber.Forest.i("User consent for crash reports manually changed to: $userGaveConsent")
-
-                                // Optional: Dem Nutzer Feedback geben
-                                val feedbackMessage = if (userGaveConsent) {
-                                    getString(R.string.toast_crash_reports_enabled)
-                                } else {
-                                    getString(R.string.toast_crash_reports_disabled)
-                                }
-                                Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT)
-                                    .show()
-
-                                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-                                    updateCrashReportSummary()
-                                }
-                            }
+                            settingsManager.setDoubleTapToLock(newValue)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error showing forced consent dialog")
+                            TimberWrapper.silentError(e, "Error setting double tap to lock")
                         }
                     }
-                    true
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in crash reports preference click")
-                    false
                 }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in double tap preference change")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting crash reports listener")
+        }
+
+        // Swipe Down for Notifications
+        val swipeDownPreference =
+            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
+        swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                if (newValue is Boolean) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        try {
+                            settingsManager.setSwipeDownToNotifications(newValue)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(
+                                e,
+                                "Error setting swipe down to notifications"
+                            )
+                        }
+                    }
+                }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in swipe down preference change")
+                false
+            }
+        }
+
+        // Swipe Actions
+        findPreference<Preference>(AppConstants.PrefKeys.SWIPE_ACTIONS)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireContext(), SwipeActionsActivity::class.java)
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error starting swipe actions activity")
+                false
+            }
+        }
+
+        // Crash Reports
+        findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)?.setOnPreferenceClickListener {
+            try {
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    val activityContext = activity ?: return@launch
+
+                    try {
+                        CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
+                            // Hier aktualisieren wir ACRA sofort nach der Entscheidung des Benutzers
+                            ACRA.errorReporter.setEnabled(userGaveConsent)
+                            Timber.Forest.i("User consent for crash reports manually changed to: $userGaveConsent")
+
+                            // Optional: Dem Nutzer Feedback geben
+                            val feedbackMessage = if (userGaveConsent) {
+                                getString(R.string.toast_crash_reports_enabled)
+                            } else {
+                                getString(R.string.toast_crash_reports_disabled)
+                            }
+                            Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT)
+                                .show()
+
+                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                                updateCrashReportSummary()
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing forced consent dialog")
+                    }
+                }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in crash reports preference click")
+                false
+            }
         }
     }
 
@@ -706,27 +653,29 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun observeSettings() {
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Inner-Catches um die einzelnen `?.isChecked = X`-Setter
+                // sind entfernt — Boolean-Property-Writes auf nullable
+                // SwitchPreferenceCompat werfen nicht. Outer-Catches um
+                // die `.collect { }`-Aufrufe bleiben (legitime Flow-
+                // Failure-Pfade).
+
                 // Observer für App-Liste
                 launch {
                     try {
                         viewModel.installedApps.collect { apps ->
                             if (!isAdded || isDetached) return@collect
 
-                            try {
-                                Timber.Forest.d("[Fragment] Collected ${apps.size} apps")
+                            Timber.Forest.d("[Fragment] Collected ${apps.size} apps")
 
-                                val sortFavoritesPref =
-                                    findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
-                                val hiddenAppsPref =
-                                    findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
+                            val sortFavoritesPref =
+                                findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
+                            val hiddenAppsPref =
+                                findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
 
-                                val isAppListReady = apps.isNotEmpty()
+                            val isAppListReady = apps.isNotEmpty()
 
-                                sortFavoritesPref?.isEnabled = isAppListReady
-                                hiddenAppsPref?.isEnabled = isAppListReady
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating preference states")
-                            }
+                            sortFavoritesPref?.isEnabled = isAppListReady
+                            hiddenAppsPref?.isEnabled = isAppListReady
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -740,16 +689,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.showCalendarEventFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                // Aktualisiert den Schalter basierend auf dem
-                                // gespeicherten Wert im DataStore
-                                calendarSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating calendar switch preference"
-                                )
-                            }
+                            calendarSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -763,14 +703,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.showAlarmFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                alarmSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating alarm switch preference"
-                                )
-                            }
+                            alarmSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -784,13 +717,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.doubleTapToLockEnabledFlow.collect { isChecked ->
                             if (!isAdded || isDetached) return@collect
-
-                            try {
-                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)?.isChecked =
-                                    isChecked
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating double tap preference")
-                            }
+                            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)?.isChecked =
+                                isChecked
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -804,13 +732,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.swipeDownToNotificationsEnabledFlow.collect { isChecked ->
                             if (!isAdded || isDetached) return@collect
-
-                            try {
-                                findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)?.isChecked =
-                                    isChecked
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating swipe down preference")
-                            }
+                            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)?.isChecked =
+                                isChecked
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -824,14 +747,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.autoShowKeyboardFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                autoKeyboardSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating autoKeyboard switch preference"
-                                )
-                            }
+                            autoKeyboardSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -844,14 +760,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.autoLaunchAppFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                autoLaunchAppSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating autoLaunchApp switch preference"
-                                )
-                            }
+                            autoLaunchAppSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -865,39 +774,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.splitModeThresholdFlow.collect { threshold ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                splitModeThresholdPreference?.apply {
-                                    text = threshold.toString()
+                            splitModeThresholdPreference?.apply {
+                                text = threshold.toString()
 
-                                    val description = when {
-                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(
-                                            R.string.split_mode_threshold_desc_auto
-                                        )
-
-                                        threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(
-                                            R.string.split_mode_threshold_desc_max
-                                        )
-
-                                        threshold in (AppConstants.SPLIT_MODE_THRESHOLD_MIN + 1)..AppConstants.SPLIT_MODE_TINKERING_LIMIT ->
-                                            getString(R.string.split_mode_threshold_desc_tinkering)
-
-                                        else ->
-                                            getString(
-                                                R.string.split_mode_threshold_desc_custom,
-                                                threshold
-                                            )
-                                    }
-
-                                    summary = getString(
-                                        R.string.split_mode_threshold_summary,
-                                        "$threshold px",
-                                        description
+                                val description = when {
+                                    threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(
+                                        R.string.split_mode_threshold_desc_auto
                                     )
+
+                                    threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(
+                                        R.string.split_mode_threshold_desc_max
+                                    )
+
+                                    threshold in (AppConstants.SPLIT_MODE_THRESHOLD_MIN + 1)..AppConstants.SPLIT_MODE_TINKERING_LIMIT ->
+                                        getString(R.string.split_mode_threshold_desc_tinkering)
+
+                                    else ->
+                                        getString(
+                                            R.string.split_mode_threshold_desc_custom,
+                                            threshold
+                                        )
                                 }
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating split-mode threshold preference"
+
+                                summary = getString(
+                                    R.string.split_mode_threshold_summary,
+                                    "$threshold px",
+                                    description
                                 )
                             }
                         }
@@ -913,14 +815,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.secureWindowFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                secureWindowSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(
-                                    e,
-                                    "Error updating secure window preference"
-                                )
-                            }
+                            secureWindowSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -934,11 +829,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     try {
                         settingsManager.rotationLockedFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
-                            try {
-                                rotationLockedSwitchPreference?.isChecked = isEnabled
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error updating rotation lock preference")
-                            }
+                            rotationLockedSwitchPreference?.isChecked = isEnabled
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -959,80 +850,67 @@ class SettingsFragment : PreferenceFragmentCompat() {
             return
         }
 
-        try {
-            val allApps = try {
-                viewModel.installedApps.value
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting installed apps")
-                emptyList()
-            }
+        // viewModel.installedApps.value ist ein StateFlow-Read — wirft nicht.
+        val allApps = viewModel.installedApps.value
 
-            if (allApps.isEmpty()) {
-                viewModel.onAppListNotLoaded()
-                return
-            }
+        if (allApps.isEmpty()) {
+            viewModel.onAppListNotLoaded()
+            return
+        }
 
-            val favoriteComponents = try {
-                favoritesManager.favoriteComponentsFlow.first()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting favorite components")
-                emptySet()
-            }
-
-            val favoriteApps = try {
-                allApps.filter { favoriteComponents.contains(it.componentName) }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error filtering favorite apps")
-                emptyList()
-            }
-
-            if (favoriteApps.isEmpty()) {
-                viewModel.onNoFavoritesToSort()
-                return
-            }
-
-            val savedOrder = try {
-                favoritesOrderManager.favoriteComponentsOrderFlow.first()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting saved order")
-                emptyList()
-            }
-
-            val orderedFavoriteApps = try {
-                favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error sorting favorites")
-                favoriteApps
-            }
-
-            // CRASH-SAFE: Check state again before transaction
-            if (!isAdded || isStateSaved || isDetached) {
-                Timber.Forest.w("Fragment state changed during async operations")
-                return
-            }
-
-            try {
-                val fragment =
-                    FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
-
-                parentFragmentManager.beginTransaction()
-                    .replace(android.R.id.content, fragment)
-                    .addToBackStack(null)
-                    .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error committing fragment transaction")
-                viewModel.onAppListNotLoaded()
-            }
+        val favoriteComponents = try {
+            favoritesManager.favoriteComponentsFlow.first()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in showSortFavoritesFragment")
+            TimberWrapper.silentError(e, "Error getting favorite components")
+            emptySet()
+        }
+
+        // filter mit Set.contains auf Strings — wirft nicht.
+        val favoriteApps = allApps.filter { favoriteComponents.contains(it.componentName) }
+
+        if (favoriteApps.isEmpty()) {
+            viewModel.onNoFavoritesToSort()
+            return
+        }
+
+        val savedOrder = try {
+            favoritesOrderManager.favoriteComponentsOrderFlow.first()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error getting saved order")
+            emptyList()
+        }
+
+        val orderedFavoriteApps = try {
+            favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error sorting favorites")
+            favoriteApps
+        }
+
+        // CRASH-SAFE: Check state again before transaction
+        if (!isAdded || isStateSaved || isDetached) {
+            Timber.Forest.w("Fragment state changed during async operations")
+            return
+        }
+
+        try {
+            val fragment =
+                FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
+
+            parentFragmentManager.beginTransaction()
+                .replace(android.R.id.content, fragment)
+                .addToBackStack(null)
+                .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
+        } catch (e: Throwable) {
+            // Fragment-Transaktionen werfen IllegalStateException unter
+            // Race-Bedingungen mit dem Lifecycle.
+            TimberWrapper.silentError(e, "Error committing fragment transaction")
             viewModel.onAppListNotLoaded()
         }
     }
@@ -1065,42 +943,40 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun updateDefaultLauncherStatus() {
-        try {
-            val setDefaultLauncherPref =
-                findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
-            if (setDefaultLauncherPref == null) {
-                Timber.Forest.w("Default launcher preference not found")
-                return
-            }
+        // Inner-Catches schützen die echten System-API-Calls (RoleManager).
+        // Property-Writes danach werfen nicht; ein Outer-Catch wäre tot.
+        val setDefaultLauncherPref =
+            findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
+        if (setDefaultLauncherPref == null) {
+            Timber.Forest.w("Default launcher preference not found")
+            return
+        }
 
-            val roleManager = try {
-                requireContext().getSystemService(RoleManager::class.java)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting RoleManager")
-                return
-            }
-
-            if (roleManager == null) {
-                Timber.Forest.w("RoleManager is null")
-                return
-            }
-
-            val isDefault = try {
-                roleManager.isRoleHeld(RoleManager.ROLE_HOME)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error checking role")
-                false
-            }
-
-            if (isDefault) {
-                setDefaultLauncherPref.summary = getString(R.string.default_launcher_is_set)
-                setDefaultLauncherPref.isEnabled = false
-            } else {
-                setDefaultLauncherPref.summary = getString(R.string.set_default_launcher_summary)
-                setDefaultLauncherPref.isEnabled = true
-            }
+        val roleManager = try {
+            requireContext().getSystemService(RoleManager::class.java)
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating default launcher status")
+            TimberWrapper.silentError(e, "Error getting RoleManager")
+            return
+        }
+
+        if (roleManager == null) {
+            Timber.Forest.w("RoleManager is null")
+            return
+        }
+
+        val isDefault = try {
+            roleManager.isRoleHeld(RoleManager.ROLE_HOME)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error checking role")
+            false
+        }
+
+        if (isDefault) {
+            setDefaultLauncherPref.summary = getString(R.string.default_launcher_is_set)
+            setDefaultLauncherPref.isEnabled = false
+        } else {
+            setDefaultLauncherPref.summary = getString(R.string.set_default_launcher_summary)
+            setDefaultLauncherPref.isEnabled = true
         }
     }
 
@@ -1186,29 +1062,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     override fun onDestroyView() {
-        try {
-            // 1. Listener entfernen (bricht zyklische Referenzen)
-            calendarSwitchPreference?.onPreferenceChangeListener = null
-            alarmSwitchPreference?.onPreferenceChangeListener = null
-            autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
-            autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
-            splitModeThresholdPreference?.onPreferenceChangeListener = null
-            secureWindowSwitchPreference?.onPreferenceChangeListener = null
-            rotationLockedSwitchPreference?.onPreferenceChangeListener = null
+        // Property-Writes (Listener auf null setzen, Field auf null
+        // setzen) — werfen nicht. Frühere try/catch um den Body war
+        // CANT_THROW. super.onDestroyView() bleibt am Ende.
+        calendarSwitchPreference?.onPreferenceChangeListener = null
+        alarmSwitchPreference?.onPreferenceChangeListener = null
+        autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
+        autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
+        splitModeThresholdPreference?.onPreferenceChangeListener = null
+        secureWindowSwitchPreference?.onPreferenceChangeListener = null
+        rotationLockedSwitchPreference?.onPreferenceChangeListener = null
 
-            // 2. Referenzen nullen (damit der GC aufräumen kann)
-            calendarSwitchPreference = null
-            alarmSwitchPreference = null
-            autoKeyboardSwitchPreference = null
-            autoLaunchAppSwitchPreference = null
-            splitModeThresholdPreference = null
-            secureWindowSwitchPreference = null
-            rotationLockedSwitchPreference = null
+        calendarSwitchPreference = null
+        alarmSwitchPreference = null
+        autoKeyboardSwitchPreference = null
+        autoLaunchAppSwitchPreference = null
+        splitModeThresholdPreference = null
+        secureWindowSwitchPreference = null
+        rotationLockedSwitchPreference = null
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onDestroyView")
-        } finally {
-            super.onDestroyView()
-        }
+        super.onDestroyView()
     }
 }
