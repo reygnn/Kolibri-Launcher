@@ -103,55 +103,37 @@ class GetFavoriteAppsUseCase @Inject constructor(
         hiddenApps: Set<String>,
         savedOrder: List<String>
     ): UiState<FavoriteAppsResult> {
-        return try {
-            // Markiere Favoriten-Status
-            val appsWithFavoriteStatus = rawApps.map { app ->
-                app.copy(isFavorite = favorites.contains(app.componentName))
-            }
+        // Markiere Favoriten-Status — Set.contains(String), .map, .filter
+        // auf Non-Null-Datenklassen können nicht werfen.
+        val appsWithFavoriteStatus = rawApps.map { app ->
+            app.copy(isFavorite = favorites.contains(app.componentName))
+        }
+        val favoriteApps = appsWithFavoriteStatus.filter { it.isFavorite }
 
-            // Filter nur Favoriten
-            val favoriteApps = appsWithFavoriteStatus.filter { it.isFavorite }
-
-            // Sortiere nach gespeicherter Reihenfolge (suspend function!)
-            val orderedFavorites = try {
-                favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                Timber.Forest.w(e, "Sorting failed - using alphabetical fallback")
-                favoriteApps.sortedBy { it.displayName.lowercase() }
-            }
-
-            // Limitiere auf MAX_FAVORITES_ON_HOME
-            val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-
-            // Wenn Favoriten vorhanden: Diese verwenden
-            if (limitedOrderedFavorites.isNotEmpty()) {
-                Timber.Forest.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
-                UiState.Success(
-                    FavoriteAppsResult(
-                        apps = limitedOrderedFavorites,
-                        isFallback = false
-                    )
-                )
-            } else {
-                // Fallback: Top N sichtbare Apps
-                val fallbackApps = createFallbackApps(rawApps, hiddenApps)
-                Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
-                UiState.Success(
-                    FavoriteAppsResult(
-                        apps = fallbackApps,
-                        isFallback = true
-                    )
-                )
-            }
-
+        // Einziger Wurfkandidat: sortFavoriteComponents (suspend, Repo-Call).
+        val orderedFavorites = try {
+            favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // Unerwarteter Fehler in der Verarbeitung
-            Timber.Forest.e(e, "Error processing apps - returning fallback")
+            Timber.Forest.w(e, "Sorting failed - using alphabetical fallback")
+            favoriteApps.sortedBy { it.displayName.lowercase() }
+        }
+
+        val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+
+        return if (limitedOrderedFavorites.isNotEmpty()) {
+            Timber.Forest.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
+            UiState.Success(
+                FavoriteAppsResult(
+                    apps = limitedOrderedFavorites,
+                    isFallback = false
+                )
+            )
+        } else {
+            // Fallback: Top N sichtbare Apps
             val fallbackApps = createFallbackApps(rawApps, hiddenApps)
+            Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
             UiState.Success(
                 FavoriteAppsResult(
                     apps = fallbackApps,
@@ -159,21 +141,20 @@ class GetFavoriteAppsUseCase @Inject constructor(
                 )
             )
         }
+        // Programmierfehler-Pfad: nicht mehr inline; propagiert zum
+        // Flow-catch oben (Z. 88), der UiState.Error("Failed to load
+        // apps") emittiert.
     }
 
     private fun createFallbackApps(
         rawApps: List<AppInfo>,
         hiddenApps: Set<String>
     ): List<AppInfo> {
-        return try {
-            rawApps
-                .filter { !hiddenApps.contains(it.componentName) }
-                .sortedBy { it.displayName.lowercase() }
-                .take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-        } catch (e: Throwable) {
-            Timber.Forest.e(e, "Error creating fallback - using first ${AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME} apps")
-            rawApps.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-        }
+        // Filter / sortedBy / take auf String-Properties — kann nicht werfen.
+        return rawApps
+            .filter { !hiddenApps.contains(it.componentName) }
+            .sortedBy { it.displayName.lowercase() }
+            .take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
 
     suspend fun purgeRepository() {

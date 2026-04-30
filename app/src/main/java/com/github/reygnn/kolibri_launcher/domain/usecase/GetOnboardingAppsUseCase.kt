@@ -17,20 +17,13 @@ class GetOnboardingAppsUseCase @Inject constructor(
     val onboardingAppsFlow: Flow<List<AppInfo>> =
         installedAppsRepository.getInstalledApps()
             .map { apps ->
-                try {
-                    // Validierung: Entferne potentiell defekte Apps
-                    apps.filter { app ->
-                        try {
-                            app.packageName.isNotBlank() &&
-                                    app.displayName.isNotBlank()
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error validating app for onboarding")
-                            false
-                        }
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error filtering onboarding apps, returning all")
-                    apps
+                // String.isNotBlank() auf Non-Null-Properties einer
+                // Datenklasse — kann nicht werfen. Programmierfehler
+                // (sollten nie auftreten) propagieren zum Flow-catch
+                // unten, der in DEBUG via silentError laut wird.
+                apps.filter { app ->
+                    app.packageName.isNotBlank() &&
+                            app.displayName.isNotBlank()
                 }
             }
             .catch { e ->

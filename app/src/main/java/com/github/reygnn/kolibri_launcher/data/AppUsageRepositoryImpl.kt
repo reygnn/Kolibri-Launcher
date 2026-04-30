@@ -168,46 +168,35 @@ class AppUsageRepositoryImpl @Inject constructor(
     private fun calculateTimeWeightedScore(timestamps: List<Long>, currentTime: Long): Double {
         if (timestamps.isEmpty()) return 0.0
 
-        return try {
-            // PARANOID MODE: .distinct() verhindert Score-Inflation durch Duplikate
-            timestamps.distinct().sumOf { launchTime ->
-                try {
-                    val timeDifferenceMs = currentTime - launchTime
+        // Pure Long/Double-Arithmetik plus `kotlin.math.exp` (gibt NaN
+        // statt zu werfen) und die safe-coerce-Extensions. Die früheren
+        // Throwable-Catches hier konnten nichts fangen.
+        return timestamps.distinct().sumOf { launchTime ->
+            val timeDifferenceMs = currentTime - launchTime
 
-                    // Zukunfts-Schutz: Ignoriere Timestamps aus der Zukunft (Uhr umgestellt?)
-                    if (timeDifferenceMs < 0) return@sumOf 0.0
+            // Zukunfts-Schutz: Ignoriere Timestamps aus der Zukunft (Uhr umgestellt?)
+            if (timeDifferenceMs < 0) return@sumOf 0.0
 
-                    val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeastSafe(0.0)
-                    val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
+            val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeastSafe(0.0)
+            val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
 
-                    // Overflow-Schutz für exp()
-                    when {
-                        exponent < -100.0 -> 0.0 // Zu alt, Score ist praktisch 0
-                        exponent > 100.0 -> 1.0  // Sollte mathematisch bei negativem Lambda nicht passieren, aber sicher ist sicher
-                        else -> kotlin.math.exp(exponent).coerceInSafe(0.0, 1.0)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error calculating score for timestamp: $launchTime")
-                    0.0
-                }
-            }.coerceAtLeastSafe(0.0)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in calculateTimeWeightedScore")
-            0.0
-        }
+            // Overflow-Schutz für exp()
+            when {
+                exponent < -100.0 -> 0.0 // Zu alt, Score ist praktisch 0
+                exponent > 100.0 -> 1.0  // Sollte mathematisch bei negativem Lambda nicht passieren, aber sicher ist sicher
+                else -> kotlin.math.exp(exponent).coerceInSafe(0.0, 1.0)
+            }
+        }.coerceAtLeastSafe(0.0)
     }
 
     /**
-     * Validiert einen Timestamp auf Plausibilität
+     * Validiert einen Timestamp auf Plausibilität.
+     * Pure Long-Vergleiche und Subtraktion — werfen nicht.
      */
     private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
-        return try {
-            timestamp > 0 &&
-                    timestamp <= currentTime &&
-                    (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
-        } catch (e: Throwable) {
-            false
-        }
+        return timestamp > 0 &&
+                timestamp <= currentTime &&
+                (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
     }
 
     /**
