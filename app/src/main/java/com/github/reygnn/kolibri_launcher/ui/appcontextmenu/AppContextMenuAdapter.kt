@@ -67,7 +67,7 @@ class AppContextMenuAdapter(
         fun bind(action: AppContextMenuAction) {
             labelView.text = when (action) {
                 is AppContextMenuAction.Shortcut -> action.shortcutInfo.shortLabel
-                is AppContextMenuAction.LauncherAction -> action.label
+                is AppContextMenuAction.LauncherAction -> itemView.context.getString(action.labelRes)
                 // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
                 is AppContextMenuAction.Separator -> ""
             }

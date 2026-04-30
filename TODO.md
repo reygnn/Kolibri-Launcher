@@ -54,26 +54,6 @@ eigene Crash-Behandlung auslösen.
 
 ---
 
-## 2. Rule 10 — Logik aus Android-Runtime-Klassen extrahieren
-
-Audit am 2026-04-30 hat fünf Stellen identifiziert, an denen testbare
-Logik direkt in einer Activity oder einem Fragment lebt. Rule 10 gilt
-explizit nur für neuen Code — diese Punkte sind pre-existing Tech-Debt,
-kein Block-Refactor. Einzeln angehen, wenn die jeweilige Klasse aus
-anderen Gründen ohnehin offen ist.
-
-- [ ] **`AppContextMenuDialogFragment.loadActions()` (`:192-346`)** —
-  koordiniert vier Repositories (`shortcutManager`, `favoritesManager`,
-  `appNamesManager`, `visibilityManager`) und branched auf
-  `menuContext`/`hasUsageData`/`isFavorite`/`isHidden`/`hasCustomName`.
-  Vorschlag: `BuildAppContextMenuUseCase` retourniert
-  `List<AppContextMenuAction>`, Fragment observiert und rendert.
-
-Audit-Quelle: Sub-Agent-Review der Codebase. Vor jedem Refactoring
-selbst gegenlesen — Zeilennummern können durch andere Edits abweichen.
-
----
-
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
 - Keine Test-Referenz — siehe `app/src/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.

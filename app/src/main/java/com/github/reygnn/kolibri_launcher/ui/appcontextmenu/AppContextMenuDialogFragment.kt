@@ -18,10 +18,7 @@ import com.github.reygnn.kolibri_launcher.databinding.BottomSheetAppContextMenuB
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -70,16 +67,15 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
-    @Inject
-    lateinit var favoritesManager: FavoritesRepository
-    @Inject
-    lateinit var visibilityManager: HiddenAppsRepository
-    @Inject
-    lateinit var shortcutManager: ShortcutRepository
+    // appNamesManager is still used by handleActionClick for the rename
+    // and restore-original-name flows. The other three repositories that
+    // used to live here (favorites, hidden, shortcut) moved into
+    // BuildAppContextMenuUseCase.
     @Inject
     lateinit var appNamesManager: CustomNamesRepository
+
     @Inject
-    lateinit var installedAppsManager: InstalledAppsRepository
+    lateinit var buildAppContextMenuUseCase: BuildAppContextMenuUseCase
 
     // CRASH-SAFE: Nullable binding
     private var _binding: BottomSheetAppContextMenuBinding? = null
@@ -187,162 +183,16 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     }
 
     /**
-     * Loads actions. Now safe to be called on IO thread as it only uses data and resources, no Views.
+     * Loads actions. Safe to be called on IO thread — only repository
+     * calls, no Views. Logic moved to [BuildAppContextMenuUseCase] so
+     * the per-state branching is testable on the JVM.
      */
     private suspend fun loadActions(): List<AppContextMenuAction> {
-        val actions = mutableListOf<AppContextMenuAction>()
-
-        // CRASH-SAFE: Load shortcuts with error handling
-        try {
-            // This is where Samsung triggers the DiskRead
-            val shortcuts = try {
-                shortcutManager.getShortcutsForPackage(appInfo.packageName)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error loading shortcuts for ${appInfo.packageName}")
-                emptyList()
-            }
-
-            shortcuts.forEach { shortcutInfo ->
-                try {
-                    actions.add(AppContextMenuAction.Shortcut(shortcutInfo))
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error adding shortcut action")
-                }
-            }
-
-            if (actions.isNotEmpty()) {
-                actions.add(AppContextMenuAction.Separator)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error processing shortcuts")
-        }
-
-        // CRASH-SAFE: Check favorite status
-        try {
-            val isFavorite = try {
-                favoritesManager.isFavoriteComponent(appInfo.componentName)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error checking favorite status")
-                false
-            }
-
-            actions.add(
-                AppContextMenuAction.LauncherAction(
-                    id = AppContextMenuAction.Companion.ACTION_ID_TOGGLE_FAVORITE,
-                    label = if (isFavorite) {
-                        getString(R.string.remove_from_favorites)
-                    } else {
-                        getString(R.string.add_to_favorites)
-                    }
-                )
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding favorite action")
-        }
-
-        // CRASH-SAFE: Check custom name
-        try {
-            val hasCustomName = try {
-                appNamesManager.hasCustomNameForPackage(appInfo.packageName)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error checking custom name")
-                false
-            }
-
-            if (hasCustomName) {
-                actions.add(
-                    AppContextMenuAction.LauncherAction(
-                        id = AppContextMenuAction.Companion.ACTION_ID_RESTORE_NAME,
-                        label = getString(R.string.restore_original_name)
-                    )
-                )
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding restore name action")
-        }
-
-        // Rename action
-        try {
-            actions.add(
-                AppContextMenuAction.LauncherAction(
-                    id = AppContextMenuAction.Companion.ACTION_ID_RENAME_APP,
-                    label = getString(R.string.rename_app)
-                )
-            )
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding rename action")
-        }
-
-        // CRASH-SAFE: Check hidden status
-        try {
-            val isHidden = try {
-                visibilityManager.isComponentHidden(appInfo.componentName)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                TimberWrapper.silentError(e, "Error checking hidden status")
-                false
-            }
-
-            actions.add(
-                AppContextMenuAction.LauncherAction(
-                    id = if (isHidden) {
-                        AppContextMenuAction.Companion.ACTION_ID_UNHIDE_APP
-                    } else {
-                        AppContextMenuAction.Companion.ACTION_ID_HIDE_APP
-                    },
-                    label = if (isHidden) {
-                        getString(R.string.unhide_app_in_drawer)
-                    } else {
-                        getString(R.string.hide_app_from_drawer)
-                    }
-                )
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding hide/unhide action")
-        }
-
-        // Reset usage (only in drawer)
-        try {
-            if (menuContext == MenuContext.APP_DRAWER && hasUsageData) {
-                actions.add(
-                    AppContextMenuAction.LauncherAction(
-                        id = AppContextMenuAction.Companion.ACTION_ID_RESET_USAGE,
-                        label = getString(R.string.action_reset_sorting)
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding reset usage action")
-        }
-
-        // App Info
-        try {
-            actions.add(
-                AppContextMenuAction.LauncherAction(
-                    id = AppContextMenuAction.Companion.ACTION_ID_APP_INFO,
-                    label = getString(R.string.app_info)
-                )
-            )
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error adding app info action")
-        }
-
-        return actions
+        return buildAppContextMenuUseCase(
+            appInfo = appInfo,
+            menuContext = menuContext,
+            hasUsageData = hasUsageData,
+        )
     }
 
     private fun handleActionClick(action: AppContextMenuAction) {
