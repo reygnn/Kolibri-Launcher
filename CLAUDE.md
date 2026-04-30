@@ -128,6 +128,17 @@ activities.
    details and the test escape (`preventCrashForTesting`) live in
    `core/TimberWrapper.kt`.
 
+10. **Testable logic lives outside Android-runtime classes.** Activities,
+    Fragments, BroadcastReceivers, and Services are awkward to unit-test
+    on the JVM, and `androidTest/` is intentionally empty in this project
+    — JVM is the only test target. Anything worth pinning (state
+    transitions, decisions, parsing, side-effect orchestration) belongs in
+    a ViewModel, use case, helper, or `ui/main/delegate/` sibling. The
+    Android-runtime class becomes thin glue: collect StateFlow, render,
+    forward events. UI-only behavior (view inflation, animation callbacks)
+    stays put — no test value to extract. This applies to new code; not a
+    call to refactor existing classes.
+
 ---
 
 ## StrictMode violations: known unfixables
