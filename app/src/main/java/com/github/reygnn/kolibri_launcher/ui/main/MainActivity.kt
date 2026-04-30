@@ -415,38 +415,36 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        try {
-            navController?.currentDestination?.id?.let { destinationId ->
-                outState.putInt(STATE_CURRENT_DESTINATION, destinationId)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving navigation state")
+        // Bundle.putInt wirft nicht; der ?.-Chain ist null-safe.
+        navController?.currentDestination?.id?.let { destinationId ->
+            outState.putInt(STATE_CURRENT_DESTINATION, destinationId)
         }
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
-        try {
-            val destinationId = savedInstanceState.getInt(STATE_CURRENT_DESTINATION, R.id.homeFragment)
-            val currentNav = navController
+        // Bundle.getInt + Null-Checks werfen nicht. Der einzige echte
+        // Wurfpfad ist NavController.navigate (IllegalStateException
+        // wenn Destination nicht im Graph) — der hat seinen eigenen
+        // Catch direkt unten. Frühere Outer-Catch war DEAD_REDUNDANT.
+        val destinationId = savedInstanceState.getInt(STATE_CURRENT_DESTINATION, R.id.homeFragment)
+        val currentNav = navController
 
-            if (currentNav != null &&
-                destinationId != R.id.homeFragment &&
-                currentNav.currentDestination?.id != destinationId) {
+        if (currentNav != null &&
+            destinationId != R.id.homeFragment &&
+            currentNav.currentDestination?.id != destinationId
+        ) {
+            try {
+                currentNav.navigate(destinationId)
+            } catch (e: Throwable) {
+                Timber.Forest.w(e, "Failed to restore navigation state")
+                // Fallback to home
                 try {
-                    currentNav.navigate(destinationId)
-                } catch (e: Throwable) {
-                    Timber.Forest.w(e, "Failed to restore navigation state")
-                    // Fallback to home
-                    try {
-                        currentNav.popBackStack(R.id.homeFragment, false)
-                    } catch (fallbackError: Throwable) {
-                        TimberWrapper.silentError(fallbackError, "Failed to navigate to home fragment")
-                    }
+                    currentNav.popBackStack(R.id.homeFragment, false)
+                } catch (fallbackError: Throwable) {
+                    TimberWrapper.silentError(fallbackError, "Failed to navigate to home fragment")
                 }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onRestoreInstanceState")
         }
     }
 
@@ -547,22 +545,22 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         )
                     }
 
-                    try {
-                        if (action is AppLaunchAction.PopThenLaunch) {
-                            try {
-                                navController?.popBackStack()
-                                if (BuildConfig.DEBUG) {
-                                    Timber.Forest.d("[MAIN] Drawer closed")
-                                }
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
+                    // popBackStack hat eigenen Catch, launchApp hat
+                    // dreifach-Catch (ActivityNotFoundException /
+                    // SecurityException / Throwable). Ein zusätzlicher
+                    // Outer-Catch wäre DEAD_REDUNDANT.
+                    if (action is AppLaunchAction.PopThenLaunch) {
+                        try {
+                            navController?.popBackStack()
+                            if (BuildConfig.DEBUG) {
+                                Timber.Forest.d("[MAIN] Drawer closed")
                             }
+                        } catch (e: Throwable) {
+                            TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
                         }
-
-                        launchApp(action.app)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "[MAIN] Error handling launch app event")
                     }
+
+                    launchApp(action.app)
                 }
 
                 is UiEvent.ShowAccessibilityDialog -> {
