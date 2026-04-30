@@ -44,38 +44,7 @@ schluckende Logik kippen.
 
 ---
 
-## 2. XXL-Files: `HomeFragment` und `ZoomableImageView` zerlegen
-
-Code-Audit am 2026-04-30 hat zwei UI-Klassen identifiziert, deren
-Größe Review- und Merge-Surface unangemessen aufbläht:
-
-- `ui/home/HomeFragment.kt` — **2.694 Zeilen**
-- `ui/home/ZoomableImageView.kt` — **1.472 Zeilen**
-
-`HomeFragment` enthält bereits einen ~200-Zeilen-Selbstkommentar
-(`:75-267`), der das Problem benennt und einen Split-Plan skizziert:
-zuerst Throwable-Catch-Audit (§3), dann Delegate-Extraktion analog
-zu `ui/main/delegate/`. Der Plan steht; die Umsetzung fehlt.
-
-- [ ] **`HomeFragment.kt` aufspalten** entlang der im File-KDoc
-  beschriebenen Grenzen (Wallpaper-Edit-Logik, Favorites-Rendering,
-  Layout-Customization-Hooks). Ziel: jede neue Klasse < 600 Zeilen.
-  Existierende Helfer-Pattern als Vorlage: `LayerButtonsState`,
-  `WallpaperSaveAction`, `LayoutCalculator`. Erst nach §3, sonst
-  zerstreut man die Throwable-Catches über mehr Files.
-- [ ] **`ZoomableImageView.kt` aufspalten** in einen Touch/Gesture-
-  Handler und einen Matrix/Transform-Calculator. Tests entkoppeln,
-  damit der reine Transform-Pfad JVM-testbar wird (Rule 10).
-- [ ] **`HomeFragment.kt:2535/2545` Alias-Smell entfernen** —
-  `updateLayerButtonsVisibility()` und `updateLayerButtonStates()`
-  sind beide One-Liner, die `applyLayerButtonsState()` rufen.
-  Aliase „für Call-Site-Klarheit" sind hier zu klever; einer
-  davon (oder beide) verschwinden zugunsten eines direkten
-  Aufrufs. Bei Review erster Stolperer.
-
----
-
-## 3. Throwable-Catch-Religion: Failure-Maskerade auditieren
+## 2. Throwable-Catch-Religion: Failure-Maskerade auditieren
 
 Code-Audit hat **71 `catch (e: Throwable)`-Blöcke im Main-Sourceset**
 gezählt. Die Crash-Safety-Kultur ist Designziel (CLAUDE.md Rule 7
@@ -105,13 +74,10 @@ statt sie sichtbar zu machen.
   keinen Catch, die mittlere kann auf `silentError` heruntergehen,
   die äußere bleibt nur falls echte Cancellation-/IO-Pfade berührt
   werden.
-- [ ] **Vor §2.** Wenn `HomeFragment` zerlegt wird, bevor diese
-  Catches sortiert sind, multipliziert sich die Maskerade über
-  mehrere Files.
 
 ---
 
-## 4. `BackupRepositoryImpl` zerlegen
+## 3. `BackupRepositoryImpl` zerlegen
 
 `data/BackupRepositoryImpl.kt` ist **1.356 Zeilen** mit **9 separaten
 Test-Files** (Doomsday, Security, Wallpaper, Isolation, etc.). Die
@@ -135,7 +101,7 @@ dass die Klasse drei Verantwortlichkeiten in einer trägt.
 
 ---
 
-## 5. Naming-Konsistenz: `Manager` → `RepositoryImpl` zu Ende führen
+## 4. Naming-Konsistenz: `Manager` → `RepositoryImpl` zu Ende führen
 
 Die Hilt-Migration hat Production-Klassen von `XyzManager` auf
 `XyzRepositoryImpl` umbenannt (siehe `app/src/CLAUDE.md` →
@@ -160,7 +126,7 @@ die einen frischen Reviewer beim ersten Vorbeigang stolpern lässt.
 
 ---
 
-## 6. Test-Konsistenz: `MainDispatcherRule` flächendeckend prüfen
+## 5. Test-Konsistenz: `MainDispatcherRule` flächendeckend prüfen
 
 Die Test-Konvention ist klar (CLAUDE.md → „The dispatcher rule
 (non-negotiable)"): Tests, die Code auf `Dispatchers.Main` treiben,
@@ -186,12 +152,19 @@ will.
 
 ---
 
-## 7. Code-Hygiene-Sweep (Smells, sammelweise)
+## 6. Code-Hygiene-Sweep (Smells, sammelweise)
 
 Kleinere Auffälligkeiten aus dem Audit. Keine einzelne ist
 gravierend; in Summe drücken sie die Code-Note. Eine Sweep-PR
-nach §3 ist effizienter als sechs Einzel-Edits.
+nach §2 ist effizienter als sieben Einzel-Edits.
 
+- [ ] **Alias-Smell in `HomeFragment.kt:2535/2545`:**
+  `updateLayerButtonsVisibility()` und `updateLayerButtonStates()`
+  sind beide One-Liner, die `applyLayerButtonsState()` rufen.
+  Aliase „für Call-Site-Klarheit" sind hier zu klever; einer
+  davon (oder beide) verschwinden zugunsten eines direkten
+  Aufrufs. (Aus dem entfernten XXL-Split-Eintrag übernommen,
+  weil eigenständig sweep-würdig.)
 - [ ] **Toter Lehr-Kommentar:** `MainActivity.kt:116` —
   `// private var leaker: Context? = null` raus.
 - [ ] **Auskommentierter Code:**

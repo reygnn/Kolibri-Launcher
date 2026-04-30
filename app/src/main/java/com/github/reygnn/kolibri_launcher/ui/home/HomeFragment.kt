@@ -207,49 +207,33 @@ import javax.inject.Inject
  * legitimate subset (teardown races, OOM) separated from the rest.
  *
  *
- * Later, possibly: Fragment-delegate split
- * ----------------------------------------
- * After the try/catch audit is done, this file will land somewhere
- * around 1,400–1,600 lines — still not small, but substantially smaller
- * and with most of the bug-prone logic behind tests. At that point, the
- * question of a Fragment-delegate split (copying the ViewModel's
- * delegate pattern into a WallpaperEditController, FavoritesRenderer,
- * TimeChipsRenderer, etc.) becomes a real question rather than a
- * premature one.
+ * Fragment-delegate split: mostly cosmetic, deferred indefinitely
+ * ----------------------------------------------------------------
+ * After the try/catch audit lands, this file will be substantially
+ * smaller and most of the bug-prone logic will already live behind
+ * tests. At that point a Fragment-delegate split (mirroring the
+ * ViewModel's `delegate/` siblings — WallpaperEditController,
+ * FavoritesRenderer, TimeChipsRenderer) is largely cosmetic:
  *
- * The case for deferring it until then: Fragment-side delegates still
- * depend on View, binding, and LifecycleOwner. They cannot be
- * unit-tested with JUnit + MockK the way ViewModel delegates can —
- * testing them needs Robolectric or instrumented tests, both of which
- * this project deliberately avoids. A split improves readability,
- * merge-conflict surface, and review speed (all of which indirectly
- * reduce bugs), but it does not directly improve unit-test coverage.
- * After the earlier steps, the marginal gain from a split is expected
- * to be much smaller than it looks today.
+ *   - Fragment-side delegates still depend on View, binding, and
+ *     LifecycleOwner. They cannot be unit-tested with JUnit + MockK
+ *     the way ViewModel delegates can — testing them needs Robolectric
+ *     or instrumented tests, both of which this project deliberately
+ *     avoids. A split improves readability and review surface, but
+ *     does not directly improve unit-test coverage.
+ *   - The lines don't disappear; they move. Same total complexity,
+ *     spread over more files plus extra import / construction /
+ *     wiring boilerplate.
+ *   - Solo-developer project: merge-conflict surface is irrelevant.
  *
- * Triggers that would move a split from "maybe later" to "now":
+ * Triggers that would flip this from "won't do" to "do":
  *   - Multiple developers hitting merge conflicts in HomeFragment
  *     regularly.
  *   - Reviews on HomeFragment PRs consistently slow or shallow.
  *   - One UI region accumulating new features fast enough that
  *     isolating it would materially speed up feature work.
  *
- * If and when the split is done, the order is most self-contained
- * first, highest risk last:
- *   1. WallpaperEditController — ~570 lines (roughly 1956–2526). Enter
- *      / commit / cancel, snap buttons, layer ops, save / cancel.
- *   2. TimeChipsRenderer       — ~160 lines. Small; good pattern
- *      validation before the bigger ones.
- *   3. FavoritesRenderer       — ~490 lines (renderFavorites,
- *      adjustScrollViewWidth, createAppButton, updateAllColors,
- *      clearAllViews). Most entangled with layout-related flows;
- *      highest refactor risk.
- *
- * Each as its own PR, not bundled. A note on flow-collection ordering:
- * some observers here assume implicit ordering (e.g., colors applied
- * before chips re-render). The split would need to make those
- * assumptions explicit — which is a correctness win the split would
- * deliver, not a reason to avoid it.
+ * None of these currently apply.
  *
  *
  * Priority order (operational summary)
@@ -259,9 +243,9 @@ import javax.inject.Inject
  *      line reduction and a sharp drop in latent-bug surface.
  *      Design-level work, not mechanical.
  *
- *   2. Fragment-delegate split. Deferred. Re-evaluate against the
- *      triggers above once (1) is done. May look much less
- *      necessary at that point.
+ *   2. (no second item — Fragment-delegate split is deferred per
+ *      "mostly cosmetic" above. Pure-logic extractions per Rule 10
+ *      remain welcome whenever a new island surfaces.)
  *
  * =============================================================================
  */

@@ -73,6 +73,18 @@ import kotlin.math.sqrt
  * wallpaperView.isEditMode = true
  * wallpaperView.activeLayerIndex = 0
  * ```
+ *
+ * == SIZE NOTE ==
+ * This file is ~1,500 lines. A split (e.g. extracting a TouchHandler or
+ * MatrixCalculator) has been considered and rejected: the resulting
+ * classes would still need View, Matrix, and animator lifecycle, so they
+ * wouldn't become JVM-testable. The split would just rearrange the same
+ * lines across more files plus extra wiring.
+ *
+ * If genuine pure-logic islands appear (e.g. a snap-decision predicate
+ * that doesn't touch Matrix or animator state), extract them per
+ * CLAUDE.md Rule 10. That is the right lever — file-level cuts on
+ * View-bound code are mostly cosmetic.
  */
 class ZoomableImageView @JvmOverloads constructor(
     context: Context,
