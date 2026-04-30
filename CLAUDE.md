@@ -136,8 +136,8 @@ activities.
     a ViewModel, use case, helper, or `ui/main/delegate/` sibling. The
     Android-runtime class becomes thin glue: collect StateFlow, render,
     forward events. UI-only behavior (view inflation, animation callbacks)
-    stays put — no test value to extract. This applies to new code; not a
-    call to refactor existing classes.
+    stays put — no test value to extract. Applies to both new code and
+    existing classes; if you spot a violation, lift the logic out.
 
 ---
 
