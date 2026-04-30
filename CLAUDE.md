@@ -105,13 +105,28 @@ activities.
    `ExceptionHandler`, the global handler, OOM recovery, ACRA spam protection
    via `CrashReportLimiter`) is intentional — do not "clean it up" or
    simplify. New critical init paths follow the same pattern: wrap each
-   block in `try { … } catch (e: Throwable) { Timber.e(...); Log.e(...) }`.
+   block in `try { … } catch (e: Throwable) { TimberWrapper.silentError(e, ...) }`.
+   Inside the global crash handler itself, plain `Timber.e` is used —
+   see Rule 9 for why.
 
 8. **ACRA is opt-in (privacy-by-default).** Crash reporting is disabled
    immediately after init (`ACRA.errorReporter.setEnabled(false)`) and is
    only enabled when `CrashReportConsent.hasConsent()` returns `true`. Do
    not change this order. Reports go to a private server, never to a
    third-party service.
+
+9. **Error logging goes through `TimberWrapper`.** Plain `Timber.e(...)`
+   only logs — silent in DEBUG too. Use `TimberWrapper.silentError(e, ...)`
+   instead: same logging, plus throw in DEBUG so bugs are loud during
+   development. The exception is the global crash handler in
+   `KolibriLauncherApp` itself (~7 spots), where `silentError` would
+   recurse into its own crash path. For paths that must not continue with
+   a lying state (half-migrated DataStore, Activity without ViewModel,
+   HOME-Activity restart loop), use `silentDeath` — it logs FATAL and
+   `exitProcess(1)`s in every build, even DEBUG, because outer
+   `catch(Throwable)` blocks would otherwise swallow a throw. Both:
+   details and the test escape (`preventCrashForTesting`) live in
+   `core/TimberWrapper.kt`.
 
 ---
 
