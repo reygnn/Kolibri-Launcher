@@ -4,7 +4,7 @@ Project conventions for **Kolibri Launcher** (a minimalist Android launcher,
 GPLv3). Claude Code reads this file automatically at session start. Keep it
 short and actionable — not a marketing description (that's `README.md`'s job).
 
-For deep test conventions, see `app/src/CLAUDE.md` and
+For deep test conventions, see `app/src/test/CLAUDE.md` and
 `app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
 This file is the **project-wide** entry point; the other CLAUDE.md is the
 testing reference.
@@ -78,7 +78,7 @@ activities.
    `XyzManagerContractTest`. If fake and manager drift, the contract catches
    it. Exceptions (system-API managers like `BackupRepository`,
    `InstalledAppsRepository`, `TimeBasedEventsRepository`) are justified in
-   the corresponding contract KDoc. Details: `app/src/CLAUDE.md`.
+   the corresponding contract KDoc. Details: `app/src/test/CLAUDE.md`.
 
 3. **When a contract test goes red, the manager wins.** Align the fake to
    the manager, not the other way around — manager behavior is production
@@ -175,7 +175,7 @@ framework or Samsung modifications (OneUI `IdsController`, Knox
 
 ## Test conventions (short version)
 
-The full reference lives in `app/src/CLAUDE.md` and `TESTING_CONVENTIONS.kt`.
+The full reference lives in `app/src/test/CLAUDE.md` and `TESTING_CONVENTIONS.kt`.
 The non-negotiable points only:
 
 ### The dispatcher rule (non-negotiable)
@@ -265,7 +265,7 @@ or historical reference may still hang on the branch. Always confirm first.
 
 - Not a description of the project (see `README.md`).
 - Not a TODO list (see `TODO.md`).
-- Not the full testing reference (see `app/src/CLAUDE.md` and
+- Not the full testing reference (see `app/src/test/CLAUDE.md` and
   `TESTING_CONVENTIONS.kt`).
 - Not a holding pen for transient refactor notes — those belong in commit
   messages on short-lived feature branches.

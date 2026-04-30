@@ -2,7 +2,7 @@
 
 Orientierungshilfe für zukünftige Sessions, die sich mit den Unit-Tests
 dieses Projekts beschäftigen. Nicht als technisches Handbuch gedacht —
-dafür gibt es `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`,
+dafür gibt es `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`,
 und dort steht alles Konkrete. Diese Datei beantwortet die _Meta_-Fragen:
 Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 
@@ -14,7 +14,7 @@ Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 - Unit-Tests: JUnit4, MockK, kotlinx-coroutines-test, Turbine
 - Einige Tests brauchen Robolectric (alles was `android.net.Uri` berührt)
 - Test-Konventionen zementiert in
-  `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`
+  `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`
 - Rules für Tests: `MainDispatcherRule`, `TimberRule` (beide in `rule/`)
 
 Das Projekt hat eine bewusste Trennung zwischen:
@@ -129,7 +129,7 @@ in den Contract. Fake anpassen, dann rot→grün.
 
 ### Reihenfolge beim Einlesen
 
-1. **Zuerst** `test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
+1. **Zuerst** `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
    Das ist die technische Referenz. Coroutine-Konventionen, MockK→Mockito-
    Mapping, Contract-Test-Muster, MutableSharedFlow-Traps. Ist verpflichtend
    bevor du irgendeinen Test anfasst.

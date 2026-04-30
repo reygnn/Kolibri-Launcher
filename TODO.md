@@ -159,7 +159,7 @@ dass die Klasse drei Verantwortlichkeiten in einer trägt.
 ## 4. Naming-Konsistenz: `Manager` → `RepositoryImpl` zu Ende führen
 
 Die Hilt-Migration hat Production-Klassen von `XyzManager` auf
-`XyzRepositoryImpl` umbenannt (siehe `app/src/CLAUDE.md` →
+`XyzRepositoryImpl` umbenannt (siehe `app/src/test/CLAUDE.md` →
 „Namens-Historie"). An manchen Stellen ist die alte Schreibweise
 in Field-Namen aber stehengeblieben:
 
@@ -211,7 +211,7 @@ dem Rename Tests laufen lassen, Grep nach Reststand `Manager:` mit
 
 ### Bewusste Ausnahmen — nicht anfassen
 
-Per `app/src/CLAUDE.md` explizit dokumentiert:
+Per `app/src/test/CLAUDE.md` explizit dokumentiert:
 - **`WallpaperFileManager`** (kein Repo, reines File-Helper-Konstrukt)
 - **`DataMigrationManager`** (Migrations-Bootstrap, kein Repo)
 
@@ -288,7 +288,7 @@ nach §2 ist effizienter als sieben Einzel-Edits.
 ---
 
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
-- Keine Test-Referenz — siehe `app/src/CLAUDE.md` und
+- Keine Test-Referenz — siehe `app/src/test/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.
 - Kein Issue-Tracker-Ersatz — kleinere Bugs gehören in GitHub-Issues, nicht hier.
 
