@@ -69,11 +69,21 @@ object TimberWrapper {
     // Schleife einer Home-Activity nach finish()).
     //
     // Verhalten:
-    // - DEBUG (oder preventCrashForTesting==true): wirft RuntimeException.
-    //   Senior sieht den Bug sofort, Tests können den Pfad assert-en.
-    // - RELEASE: loggt FATAL, gibt dem ACRA-Sender ~100 ms zum Flushen,
-    //   dann exitProcess(1). Android startet HOME ggf. neu — aber sauber,
-    //   nicht in einem zombiehaft halb-toten State.
+    // - preventCrashForTesting==true: wirft RuntimeException, damit Tests
+    //   den Pfad assert-en können statt die JVM zu beenden.
+    // - sonst (DEBUG wie RELEASE): loggt FATAL, gibt dem ACRA-Sender ~100 ms
+    //   zum Flushen, dann exitProcess(1). Android startet HOME ggf. neu —
+    //   aber sauber, nicht in einem zombiehaft halb-toten State.
+    //
+    // Warum auch DEBUG exit statt throw: die Aufrufer von silentDeath sind
+    // typischerweise von paranoiden äußeren catch(Throwable)-Blöcken umgeben
+    // (KolibriLauncherApp, DataMigrationManager). Ein DEBUG-Throw wird dort
+    // geschluckt, der Senior sieht nichts Fatales, und die App läuft mit
+    // demselben lügenden State weiter, den silentDeath verhindern soll.
+    // exitProcess(1) ist uncatchable und damit der einzige verlässliche Tod.
+    // Die Symmetrie zu silentError (das in DEBUG wirft) geht damit verloren —
+    // bewusst, weil silentDeath semantisch ein anderes Tier ist (Tod statt
+    // Fail-Safe). ACRA liefert in beiden Build-Typen den FATAL-Report.
     //
     // Return-Typ Nothing: der Compiler weiß, dass nach silentDeath kein
     // Code mehr ausgeführt wird — keine if-else Verrenkungen am Aufrufort.
@@ -105,14 +115,16 @@ object TimberWrapper {
             }
         }
 
-        // Test-Modus und DEBUG verhalten sich gleich: Exception werfen.
-        // Tests können sie catchen und den Pfad verifizieren; im Debug-Build
-        // ploppt sie sofort auf und der Senior sieht das Symptom.
-        if (preventCrashForTesting.get() || BuildConfig.DEBUG) {
+        // Nur Tests werfen — sie wollen den Pfad assert-en, nicht die JVM
+        // beenden. Alle echten Builds (DEBUG wie RELEASE) sterben unten via
+        // exitProcess, weil ein Throw von äußeren catch(Throwable)-Blöcken
+        // geschluckt würde und silentDeath dann genau das nicht erreicht,
+        // wozu es da ist: den lügenden State zu beenden.
+        if (preventCrashForTesting.get()) {
             throw RuntimeException("SILENT_DEATH: $message", cause)
         }
 
-        // Release: dem ACRA-Sender (Worker-Thread) eine kleine Chance geben,
+        // Dem ACRA-Sender (Worker-Thread) eine kleine Chance geben,
         // den FATAL-Report rauszupusten, bevor der Process stirbt. 100 ms
         // ist ein Kompromiss — kürzer und der Sender steht noch im Queue;
         // länger und der User sieht eine fühlbare Pause.
