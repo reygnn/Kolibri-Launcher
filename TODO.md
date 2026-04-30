@@ -53,21 +53,6 @@ eigene Crash-Behandlung auslösen.
   - Vor jedem Edit explizit beim Senior abklären. Falls Freigabe:
     4 Aufrufe zu `silentError(e, ...)` umwandeln.
 
----
-
-## 2. Wallpaper-State: verbleibende Aufgaben
-
-Verdacht 1-5 aus dem Sherlock-Review wurden auf Branch
-`fix/wallpaper-state-coherence` umgesetzt. Übrig bleibt der
-`forPersistence`-Cleanup.
-
-- [ ] **`WallpaperState.forPersistence()` aufräumen**
-  - Anker: `domain/model/WallpaperState.kt:287-294`
-  - Self-deklariert als „Legacy no-op… wird beibehalten weil
-    bestehende Tests sie mocken."
-  - Fix: Tests umstellen, Methode entfernen. Keine Eile, aber gehört
-    in die nächste Test-Welle.
-
 
 
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.

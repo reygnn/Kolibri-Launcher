@@ -366,9 +366,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onAddWallpaperLayer copies file and saves state`() = runTest {
-        val addedState: WallpaperState = mockk(relaxed = true) {
-            every { forPersistence() } returns mockk()
-        }
+        val addedState: WallpaperState = mockk(relaxed = true) {        }
         val mockState: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
@@ -415,9 +413,7 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newState
@@ -479,9 +475,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onSwapWallpaperLayers swaps and saves`() = runTest {
-        val swappedState: WallpaperState = mockk {
-            every { forPersistence() } returns mockk()
-        }
+        val swappedState: WallpaperState = mockk {        }
         val currentState: WallpaperState = mockk {
             every { withSwappedLayers(0, 1) } returns swappedState
         }
@@ -507,9 +501,7 @@ class WallpaperDelegateTest {
     // ===========================================
 
     private fun createDelegateWithStatefulWallpaper(): WallpaperDelegate {
-        val updatedState: WallpaperState = mockk {
-            every { forPersistence() } returns mockk()
-        }
+        val updatedState: WallpaperState = mockk {        }
         val currentState: WallpaperState = mockk {
             every { withUpdatedLayer(any(), any()) } returns updatedState
         }
@@ -581,9 +573,7 @@ class WallpaperDelegateTest {
     @Test
     fun `onSaveAllLayerTransforms updates all layers and saves once`() = runTest {
         val updatedState: WallpaperState = mockk(relaxed = true) {
-            every { withUpdatedLayer(any(), any()) } returns this
-            every { forPersistence() } returns mockk()
-        }
+            every { withUpdatedLayer(any(), any()) } returns this        }
         val currentState: WallpaperState = mockk {
             every { withUpdatedLayer(any(), any()) } returns updatedState
         }
@@ -656,9 +646,7 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newState
@@ -691,9 +679,7 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newState
@@ -722,9 +708,7 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newState
@@ -760,14 +744,10 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val currentState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
-            every { withRemovedLayer(0) } returns newState
-            every { forPersistence() } returns mockk()
-        }
+            every { withRemovedLayer(0) } returns newState        }
 
         val stateFlow = MutableStateFlow(currentState)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
@@ -791,17 +771,13 @@ class WallpaperDelegateTest {
     fun `onCancelWallpaperEditMode restores snapshot state synchronously`() = runTest {
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns mockk()
         }
         val snapshotState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
-            every { withRemovedLayer(0) } returns newState
-            every { forPersistence() } returns mockk()
-        }
+            every { withRemovedLayer(0) } returns newState        }
 
         val stateFlow = MutableStateFlow(snapshotState)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
@@ -829,9 +805,7 @@ class WallpaperDelegateTest {
     fun `onCancelWallpaperEditMode persists restored snapshot`() = runTest {
         val newStateAfterRemove: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns mockk()
         }
@@ -931,14 +905,10 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true
-            every { forPersistence() } returns mockk()
-        }
+            every { hasWallpaper } returns true        }
         val snapshotState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
-            every { withRemovedLayer(0) } returns newState
-            every { forPersistence() } returns mockk()
-        }
+            every { withRemovedLayer(0) } returns newState        }
 
         val stateFlow = MutableStateFlow(snapshotState)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)

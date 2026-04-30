@@ -296,17 +296,4 @@ data class WallpaperState(
             layers = listOf(singleLayer)
         )
     }
-
-    // ===========================================
-    // PERSISTENCE
-    // ===========================================
-
-    /**
-     * Legacy no-op. Ursprünglich hat diese Methode das transiente Feld
-     * `isEditMode` auf false gesetzt, bevor der State persistiert wurde.
-     * Das Feld existiert nicht mehr; die Methode wird beibehalten, weil
-     * bestehende Tests sie mocken. Neuer Code muss sie nicht mehr aufrufen.
-     */
-    @Suppress("unused")
-    fun forPersistence(): WallpaperState = this
 }
