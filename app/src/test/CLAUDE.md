@@ -130,15 +130,23 @@ in den Contract. Fake anpassen, dann rot→grün.
 ### Reihenfolge beim Einlesen
 
 1. **Zuerst** `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
-   Das ist die technische Referenz. Coroutine-Konventionen, MockK→Mockito-
-   Mapping, Contract-Test-Muster, MutableSharedFlow-Traps. Ist verpflichtend
-   bevor du irgendeinen Test anfasst.
+   Das ist die technische Referenz. Coroutine-Konventionen, MockK-/MockK-
+   Naming, Contract-Test-Muster, MutableSharedFlow-Traps, plus seit
+   2026-05-01 die Robolectric+Hilt-Activity/Fragment-Test-Sektion. Ist
+   verpflichtend bevor du irgendeinen Test anfasst.
 2. **Dann** eine existierende Contract-Pair-Gruppe als Beispiel —
    `FavoritesRepositoryContract.kt` + `FakeFavoritesRepositoryContractTest.kt`
    + `FavoritesRepositoryImplContractTest.kt`. Das zeigt das Muster in seiner
    vollen Form, mit ausführlichem KDoc.
 3. **Bei Bedarf** `FavoritesRepositoryImplShareInTest.kt` für die `shareIn`-
    Infrastruktur-Test-Mechanik.
+4. **Bei Bedarf** `OnboardingActivityRobolectricTest.kt` als Vorlage für
+   Activity/Fragment-Tests via Robolectric + Hilt — eingeführt 2026-05-01
+   als Pilot, Pattern dokumentiert in `TESTING_CONVENTIONS.kt` →
+   „ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS". Sparsam einsetzen
+   (~10× langsamer als JVM-Unit-Tests wegen Robolectric-Boot), aber
+   wertvoll als Smoke-Test-Backstop für UI-Refactorings (z. B. den
+   try/catch-Sweep aus dem Roadmap-Punkt §2).
 
 ### Häufige Aufgaben und wo sie reingehören
 

@@ -505,3 +505,118 @@ package com.github.reygnn.kolibri_launcher
  *   - Event-Emission soll beobachtet werden (awaitItem/expectNoEvents) → Turbine
  * ============================================================================
  */
+
+/**
+ * ============================================================================
+ * ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS
+ * ============================================================================
+ *
+ * Reference: [com.github.reygnn.kolibri_launcher.ui.onboarding
+ *             .OnboardingActivityRobolectricTest]
+ *
+ * The project's default test target is JVM (per Rule 10 in the top-level
+ * CLAUDE.md). For most logic that is the right answer. But when the
+ * thing under test only reaches its bug under an actual Activity /
+ * Fragment lifecycle — onCreate inflation, ViewBinding, lifecycle-scoped
+ * coroutine collection, fragment teardown races — Robolectric + Hilt
+ * lets us cover it on the JVM, without an emulator.
+ *
+ *
+ * WHEN TO REACH FOR THIS PATTERN
+ * ------------------------------
+ * - You're about to remove try/catch wrappers from a Fragment / Activity
+ *   (the §2 sweep), and you want a smoke-test backstop that proves
+ *   onCreate still completes.
+ * - You're touching Activity/Fragment code that Pure-Logic extraction
+ *   (Rule 10) can't move out — view inflation, binding lifecycle,
+ *   ViewModel collection wiring.
+ *
+ * Don't reach for it when JVM tests on a ViewModel / use case / pure
+ * helper would cover the same risk. Robolectric tests are ~10x slower
+ * (Robolectric framework boot dominates the first test in a file —
+ * ~9s vs. <1s for JVM). Run them sparingly.
+ *
+ *
+ * THE PATTERN
+ * -----------
+ *
+ *   @RunWith(RobolectricTestRunner::class)
+ *   @HiltAndroidTest
+ *   @Config(application = HiltTestApplication::class)
+ *   class MyActivityRobolectricTest {
+ *
+ *       @get:Rule
+ *       val hiltRule = HiltAndroidRule(this)
+ *
+ *       @Test
+ *       fun `activity launches without crashing`() {
+ *           ActivityScenario.launch(MyActivity::class.java).use { scenario ->
+ *               scenario.onActivity { activity ->
+ *                   assertNotNull(activity)
+ *                   // assert specific UI bits if you care, e.g.
+ *                   // assertNotNull(activity.findViewById(R.id.search_field))
+ *               }
+ *           }
+ *       }
+ *   }
+ *
+ * For Fragments, swap `ActivityScenario` for `FragmentScenario`
+ * (`androidx.fragment:fragment-testing-manifest` may be needed depending
+ * on the fragment's host requirements). For activities that take an
+ * intent (e.g. OnboardingActivity reads `EXTRA_LAUNCH_MODE`), pass it
+ * via `ActivityScenario.launch(Intent(context, MyActivity::class.java)
+ * .apply { putExtra(...) })`.
+ *
+ *
+ * ABOUT @HiltAndroidTest + HiltTestApplication
+ * ---------------------------------------------
+ * - `HiltTestApplication` (from `dagger.hilt.android.testing`) is a
+ *   minimal Hilt-managed Application. It is *not* the production
+ *   `KolibriLauncherApp` — so production-only init code (ACRA, package
+ *   receiver registration, ANRWatchDog) does NOT run in tests. That's
+ *   intentional and what we want.
+ * - All production Hilt modules are in effect. The Activity's @Inject
+ *   dependencies wire from the real graph; the real Repositories,
+ *   UseCases etc. all initialise on Robolectric's in-memory filesystem.
+ *   In practice this just works for the smoke-test pattern above —
+ *   surprisingly little fights it.
+ * - HiltAndroidRule must be `@get:Rule` (not just `@Rule`) for Kotlin.
+ *   No `.inject()` call needed for Activity/Fragment tests; Hilt wires
+ *   the @AndroidEntryPoint as soon as the scenario launches.
+ *
+ *
+ * WHEN A REAL DEPENDENCY IS THE WRONG CHOICE
+ * -------------------------------------------
+ * If a production module is too heavy / slow / nondeterministic for the
+ * test (e.g. it network-touches, or runs a real package scan), replace
+ * it with a fake module via @TestInstallIn:
+ *
+ *   @Module
+ *   @TestInstallIn(
+ *       components = [SingletonComponent::class],
+ *       replaces   = [ProductionModule::class]
+ *   )
+ *   object FakeProductionModule {
+ *       @Provides @Singleton fun provideXyzRepository(): XyzRepository =
+ *           FakeXyzRepository()
+ *   }
+ *
+ * Place test modules under `app/src/test/.../testmodule/` or alongside
+ * the test that uses them. Don't add @TestInstallIn modules
+ * preemptively — only when a real dependency demonstrably blocks a test.
+ *
+ *
+ * DEPENDENCIES (already in `app/build.gradle.kts`)
+ * -------------------------------------------------
+ *   testImplementation org.robolectric:robolectric            // existing
+ *   testImplementation com.google.dagger:hilt-android-testing // existing
+ *   testImplementation androidx.test:core-ktx                 // for ActivityScenario
+ *   testImplementation androidx.test.ext:junit-ktx            // AndroidJUnit base
+ *   kaptTest          com.google.dagger:hilt-compiler         // existing
+ *
+ * For FragmentScenario: also `androidx.fragment:fragment-testing` as
+ * `testImplementation` (currently only added as `debugImplementation` /
+ * `androidTestImplementation` — would need a separate add when the
+ * first Fragment test lands).
+ * ============================================================================
+ */
