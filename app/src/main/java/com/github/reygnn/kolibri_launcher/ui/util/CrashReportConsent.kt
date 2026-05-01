@@ -4,48 +4,54 @@ import android.content.Context
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.edit
 import androidx.core.text.HtmlCompat
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.di.settingsDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
  * A robust, thread-safe, and cancellation-aware utility for managing ACRA crash report consent.
+ *
+ * Storage: DataStore Preferences (the project-wide [settingsDataStore]). Migrated from
+ * SharedPreferences in TODO §7; the legacy SP file `acra_consent` is read once and
+ * deleted by [com.github.reygnn.kolibri_launcher.data.DataMigrationManager] on the
+ * first launch after the migration ships. The keys are exposed (not private) so the
+ * migration step can write to them by the same name.
  */
 object CrashReportConsent {
-    private const val PREFS_NAME = "acra_consent"
-    private const val KEY_CONSENT = "has_consent"
-    private const val KEY_ASKED = "has_asked"
+
+    /** Whether the user has consented to ACRA crash reporting. */
+    val HAS_CONSENT_KEY = booleanPreferencesKey("acra_has_consent")
+
+    /** Whether the consent dialog has been shown at least once already. */
+    val HAS_ASKED_KEY = booleanPreferencesKey("acra_has_asked")
 
     suspend fun hasConsent(context: Context): Boolean {
         return try {
-            withContext(Dispatchers.IO) {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.getBoolean(KEY_CONSENT, false)
-            }
+            context.settingsDataStore.data.first()[HAS_CONSENT_KEY] ?: false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.e(e, "Failed to read consent status from SharedPreferences.")
+            Timber.e(e, "Failed to read consent status from DataStore.")
             false
         }
     }
 
     private suspend fun hasAsked(context: Context): Boolean {
         return try {
-            withContext(Dispatchers.IO) {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.getBoolean(KEY_ASKED, false)
-            }
+            context.settingsDataStore.data.first()[HAS_ASKED_KEY] ?: false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.e(e, "Failed to read 'has_asked' status from SharedPreferences.")
+            Timber.e(e, "Failed to read 'has_asked' status from DataStore.")
             false
         }
     }
@@ -136,16 +142,14 @@ object CrashReportConsent {
 
     /**
      * Resets the consent, forcing the dialog to be shown on the next app start.
-     * Uses the modern KTX SharedPreferences extension function.
      */
     suspend fun resetConsent(context: Context) {
         try {
-            withContext(Dispatchers.IO) {
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
-                    clear()
-                }
-                Timber.i("Crash report consent has been reset.")
+            context.settingsDataStore.edit { prefs ->
+                prefs.remove(HAS_CONSENT_KEY)
+                prefs.remove(HAS_ASKED_KEY)
             }
+            Timber.i("Crash report consent has been reset.")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -154,21 +158,18 @@ object CrashReportConsent {
     }
 
     /**
-     * Saves the user's consent choice to SharedPreferences on a background thread.
-     * Uses the modern KTX SharedPreferences extension function.
+     * Saves the user's consent choice to DataStore on a background thread.
      */
     private suspend fun saveConsent(context: Context, consent: Boolean) {
         try {
-            withContext(Dispatchers.IO) {
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
-                    putBoolean(KEY_CONSENT, consent)
-                    putBoolean(KEY_ASKED, true)
-                }
+            context.settingsDataStore.edit { prefs ->
+                prefs[HAS_CONSENT_KEY] = consent
+                prefs[HAS_ASKED_KEY] = true
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.e(e, "Failed to save consent choice to SharedPreferences.")
+            Timber.e(e, "Failed to save consent choice to DataStore.")
         }
     }
 }

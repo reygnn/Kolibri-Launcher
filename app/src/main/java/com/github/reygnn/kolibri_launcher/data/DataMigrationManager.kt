@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -17,9 +18,10 @@ import javax.inject.Singleton
 /**
  * Bootstraps schema migrations for the app's persisted user state on each
  * startup. Reads the currently-stored data version, compares it against
- * [TARGET_DATA_VERSION], and runs the migration path if needed.
+ * [TARGET_DATA_VERSION], and runs the migration path if needed. Migration
+ * steps are additive — see [runMigration].
  *
- * ## Why this class uses SharedPreferences
+ * ## Why this class uses SharedPreferences for the version flag
  *
  * CLAUDE.md Rule 5 says DataStore is the only app storage. This class is
  * the one explicit exception: the migration mechanism cannot bootstrap
@@ -30,7 +32,7 @@ import javax.inject.Singleton
  * be readable *before* anything else opens DataStore — if we kept the
  * version flag inside DataStore, then on a corrupted-DataStore launch
  * we would have no way to detect that we are starting fresh vs. that
- * a real version-1 DataStore has just failed to load. The
+ * a real version-N DataStore has just failed to load. The
  * SharedPreferences-on-disk file decouples "what version is the on-disk
  * state at" from "what state can we currently load".
  *
@@ -42,6 +44,17 @@ import javax.inject.Singleton
  * Don't try to migrate this away. If you spot the SharedPreferences
  * call in `getCurrentVersion` / `updateVersionInPreferences` and want
  * to "clean it up", read this KDoc and CLAUDE.md Rule 5 first.
+ *
+ * ## Per-step legacy-SP reads are different
+ *
+ * Some individual migration steps (currently: V1→V2 ACRA consent) also
+ * touch a different, *legacy* SharedPreferences file — one that this
+ * codebase used to write but no longer does. Those reads exist solely
+ * to copy the old value into DataStore and then delete the legacy file.
+ * They are not the version-flag exception above; they are scoped to a
+ * single migration run. New migration steps that touch legacy SP files
+ * follow the same shape: read, write to DataStore, delete the legacy
+ * file, never touch it again.
  */
 @Singleton
 class DataMigrationManager @Inject constructor(
@@ -51,7 +64,25 @@ class DataMigrationManager @Inject constructor(
     companion object {
         private const val VERSION_PREFS_NAME = "kolibri_data_version"
         private const val KEY_DATA_VERSION = "data_version"
-        private const val TARGET_DATA_VERSION = 1
+
+        /**
+         * Bump this when introducing a new schema/storage migration.
+         * Each `if (currentVersion < N) migrateToVN()` step in [runMigration]
+         * runs only when the on-disk version is below N, so migrations are
+         * additive and replayable across upgrades.
+         *
+         * Version history:
+         *   1 — initial DataStore schema (pre-§7 baseline)
+         *   2 — ACRA consent flag migrated from SharedPreferences (acra_consent)
+         *       to DataStore (TODO §7 / 2026-05-01)
+         */
+        private const val TARGET_DATA_VERSION = 2
+
+        // Legacy SharedPreferences names retained only so the V1→V2 migration
+        // can find and read them. Do not use these names from any new code.
+        private const val LEGACY_ACRA_CONSENT_PREFS = "acra_consent"
+        private const val LEGACY_ACRA_KEY_CONSENT = "has_consent"
+        private const val LEGACY_ACRA_KEY_ASKED = "has_asked"
     }
 
     // WICHTIG: Kein 'by lazy' hier, das den Main Thread blockieren könnte.
@@ -79,41 +110,71 @@ class DataMigrationManager @Inject constructor(
 
     private suspend fun runMigration(currentVersion: Int) {
         try {
-            when {
-                currentVersion == 0 -> {
-                    Timber.i("First launch detected, setting version without clearing DataStore")
-                }
-                currentVersion < TARGET_DATA_VERSION -> {
-                    Timber.i("Old data version detected: $currentVersion. Clearing DataStore...")
-                    try {
-                        dataStore.edit { it.clear() }
-                        Timber.i("DataStore cleared successfully")
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        // Cleanup hat möglicherweise mitten im DataStore aufgehört
-                        // (manche Keys gelöscht, andere nicht). Würden wir weiter
-                        // unten updateVersionInPreferences(TARGET) rufen, sähe der
-                        // nächste App-Start die Migration als erledigt — bei in
-                        // Wirklichkeit halb-leerem DataStore. Lieber kontrolliert
-                        // sterben, beim Neustart wird Migration ehrlich nochmal
-                        // versucht.
-                        TimberWrapper.silentDeath(
-                            e,
-                            "Migration cleanup failed — refusing to mark version as migrated"
-                        )
-                    }
-                }
-                else -> {
-                    return
-                }
+            if (currentVersion == 0) {
+                Timber.i("First launch detected — running schema migrations from initial state")
             }
+
+            // Additive migrations: each step runs if the on-disk version is below it.
+            // New steps go here as `if (currentVersion < N) migrateToVN()`.
+            if (currentVersion < 2) {
+                migrateAcraConsentToDataStore()
+            }
+
             updateVersionInPreferences(TARGET_DATA_VERSION)
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error during migration")
+        }
+    }
+
+    /**
+     * V1 → V2 migration: copy the ACRA consent flags from the legacy
+     * `acra_consent` SharedPreferences file into DataStore, then delete the
+     * legacy file.
+     *
+     * Idempotent: a missing legacy file is read as default false/false, which
+     * is the same as a no-op (DataStore stays at default since the keys also
+     * resolve to false on read). On the next launch the version is already 2,
+     * so this step does not run again — the legacy file deletion is the only
+     * side effect that matters across runs.
+     *
+     * Failure handling: any exception is caught + logged. The version still
+     * gets bumped (via [runMigration]'s `updateVersionInPreferences`), so we
+     * don't loop forever; the worst-case user-visible effect is the consent
+     * dialog showing once more on next launch (annoying, not a privacy
+     * violation since the default is "no consent").
+     */
+    private suspend fun migrateAcraConsentToDataStore() {
+        try {
+            val legacyPrefs = context.getSharedPreferences(
+                LEGACY_ACRA_CONSENT_PREFS, Context.MODE_PRIVATE
+            )
+            val hasConsent = legacyPrefs.getBoolean(LEGACY_ACRA_KEY_CONSENT, false)
+            val hasAsked = legacyPrefs.getBoolean(LEGACY_ACRA_KEY_ASKED, false)
+
+            dataStore.edit { prefs ->
+                prefs[CrashReportConsent.HAS_CONSENT_KEY] = hasConsent
+                prefs[CrashReportConsent.HAS_ASKED_KEY] = hasAsked
+            }
+
+            // Only delete after the DataStore write succeeded. On Android 24+
+            // (we ship SDK 36) `deleteSharedPreferences` removes both the in-
+            // memory cache and the on-disk XML. Best-effort: failure here just
+            // leaves a small unused file behind, no functional impact.
+            context.deleteSharedPreferences(LEGACY_ACRA_CONSENT_PREFS)
+
+            Timber.i(
+                "ACRA consent migrated to DataStore (consent=$hasConsent, asked=$hasAsked)"
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(
+                e,
+                "ACRA consent migration failed — DataStore stays at default false/false"
+            )
         }
     }
 

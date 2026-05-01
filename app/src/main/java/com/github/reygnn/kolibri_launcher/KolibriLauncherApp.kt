@@ -114,13 +114,11 @@ class KolibriLauncherApp : Application() {
      *
      * In DEBUG this triggers a DiskReadViolation. That's expected — it is
      * intentional code, not a bug to fix. Cross-reference `KNOWN_ISSUES.md`
-     * (section "Intentional violations") before chasing it.
-     *
-     * The current backing store for the consent flag is `SharedPreferences`,
-     * which violates Rule 5 (DataStore-only). See TODO §7 for the migration —
-     * it does not change the runBlocking story above (DataStore reads in
-     * `attachBaseContext` would also need `runBlocking { dataStore.data.first() }`),
-     * only the storage layer.
+     * (section "Intentional violations") before chasing it. The backing
+     * store is the project DataStore (see [CrashReportConsent.hasConsent]);
+     * the StrictMode noise comes from the synchronous file read, not from
+     * the storage choice — `runBlocking { dataStore.data.first() }` blocks
+     * the main thread the same way a `SharedPreferences.getBoolean` would.
      */
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)

@@ -12,7 +12,21 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+/**
+ * The single DataStore<Preferences> instance for the whole app.
+ *
+ * Internal visibility (not private) so a small number of bootstrap-time
+ * call sites that run before Hilt can reach it without a second
+ * provider:
+ *   - [com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent]
+ *     reads / writes the ACRA consent flag here. The methods are
+ *     called from KolibriLauncherApp.attachBaseContext, which runs
+ *     before Hilt is initialised, so they can't take it via @Inject.
+ *
+ * All other consumers must keep going through Hilt by injecting
+ * `DataStore<Preferences>` produced by [DataStoreModule.provideSettingsDataStore].
+ */
+internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = AppConstants.SETTINGS_DATASTORE_NAME
 )
 

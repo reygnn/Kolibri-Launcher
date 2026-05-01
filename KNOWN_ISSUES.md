@@ -108,16 +108,23 @@ lives in the KDoc on `attachBaseContext`.
 
 ### Cost vs. benefit
 
-The read is a single SharedPreferences key, effectively free on warm
-starts. Switching to `runBlocking(Dispatchers.IO)` would not help —
-the inner suspend already moves I/O off the calling thread; the outer
+The read is a single DataStore key, effectively free on warm starts
+(the protobuf file is small and the OS page cache stays warm).
+Switching to `runBlocking(Dispatchers.IO)` would not help — the inner
+suspend already moves I/O off the calling thread; the outer
 `runBlocking` always blocks its caller regardless.
 
 ### Reference Stacktrace
 
 StrictMode policy violation: android.os.strictmode.DiskReadViolation
     at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(...)
-    at android.app.SharedPreferencesImpl.awaitLoadedLocked(...)
+    at libcore.io.BlockGuardOs.read(...) | .access(...)
+    at androidx.datastore.core.SingleProcessDataStore  (read of preferences.preferences_pb)
     at com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent$hasConsent$2.invokeSuspend(...)
     at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(...)
     at com.github.reygnn.kolibri_launcher.KolibriLauncherApp.attachBaseContext(KolibriLauncherApp.kt)
+
+(Note: the storage backend changed from SharedPreferences to DataStore
+in TODO §7. The StrictMode violation moved with it — same root cause
+[blocking I/O on the main thread], different stack frames between the
+`runBlocking` and the `BlockGuardOs` syscall.)
