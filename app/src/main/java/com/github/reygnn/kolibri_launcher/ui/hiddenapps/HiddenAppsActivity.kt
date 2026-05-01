@@ -99,36 +99,20 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        try {
-            _binding?.let {
-                outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving instance state")
+        _binding?.let {
+            outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
         }
     }
 
     override fun onDestroy() {
+        // Outer catch kept: lifecycle teardown — finally{} super.onDestroy()
         try {
             if (_binding != null) {
-                try {
-                    // GC-OPTIMIERUNG: Chips und deren Listener entfernen
-                    // (Hält Referenz auf 'viewModel' und 'app')
-                    binding.selectionChipGroup.removeAllViews()
-
-                    // Adapter vom RecyclerView trennen
-                    binding.allAppsRecyclerView.adapter = null
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing views")
-                }
+                binding.selectionChipGroup.removeAllViews()
+                binding.allAppsRecyclerView.adapter = null
             }
-
-            // Referenz auf Adapter (und damit den Callback-Lambda) löschen
             appSelectionAdapter = null
-
-            // Binding nullen (Kappt Verbindung Activity <-> View)
             _binding = null
-
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
@@ -137,41 +121,26 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
     }
 
     private fun handleWindowInsets() {
-        try {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.updatePadding(
-                    left = insets.left,
-                    top = insets.top,
-                    right = insets.right,
-                    bottom = insets.bottom
-                )
-                WindowInsetsCompat.CONSUMED
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling window insets")
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(
+                left = insets.left,
+                top = insets.top,
+                right = insets.right,
+                bottom = insets.bottom
+            )
+            WindowInsetsCompat.CONSUMED
         }
     }
 
     private fun setupRecyclerView() {
-        try {
-            appSelectionAdapter = OnboardingAppListAdapter { appInfo ->
-                try {
-                    viewModel.onAppToggled(appInfo)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error toggling app: ${appInfo.packageName}")
-                }
-            }
-
-            binding.allAppsRecyclerView.apply {
-                adapter = appSelectionAdapter
-                layoutManager = LinearLayoutManager(this@HiddenAppsActivity)
-                setHasFixedSize(true)
-                // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
-                itemAnimator = null
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        appSelectionAdapter = OnboardingAppListAdapter { appInfo -> viewModel.onAppToggled(appInfo) }
+        binding.allAppsRecyclerView.apply {
+            adapter = appSelectionAdapter
+            layoutManager = LinearLayoutManager(this@HiddenAppsActivity)
+            setHasFixedSize(true)
+            // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
+            itemAnimator = null
         }
     }
 
@@ -180,51 +149,33 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
         binding.searchEditText.doOnTextChanged { text, _, _, _ ->
             searchQueryFlow.value = text?.toString() ?: ""
         }
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 searchQueryFlow
                     .debounce(SEARCH_DEBOUNCE_MS)
-                    .collect { query ->
-                        try {
-                            viewModel.onSearchQueryChanged(query)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in search query changed")
-                        }
-                    }
+                    .collect { query -> viewModel.onSearchQueryChanged(query) }
             }
         }
     }
 
     private fun setupClickListeners() {
-        try {
-            binding.doneButton.setOnClickListener {
-                try {
-                    viewModel.onDoneClicked()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in done button click")
-                    finish() // Fallback: einfach schließen
-                }
+        binding.doneButton.setOnClickListener {
+            // Inner catch kept: viewModel.onDoneClicked is the user-facing
+            // commit path; finish() fallback gives the user an exit if it
+            // throws.
+            try {
+                viewModel.onDoneClicked()
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in done button click")
+                finish()
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up click listeners")
         }
     }
 
     private fun observeViewModel() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
-                    try {
-                        updateUi(state)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating UI")
-                    }
-                }
+                viewModel.uiState.collect { state -> updateUi(state) }
             }
         }
     }
@@ -235,51 +186,26 @@ class HiddenAppsActivity : BaseActivity<UiEvent, HiddenAppsViewModel>() {
             Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
-
-        try {
-            binding.titleText.setText(state.titleResId)
-            binding.subtitleText.setText(state.subtitleResId)
-
-            // CRASH-SAFE: Check ob adapter noch existiert
-            appSelectionAdapter?.submitList(state.selectableApps) ?: run {
-                Timber.w("Adapter is null, cannot submit list")
-            }
-
-            updateSelectionChips(state.selectedApps)
-        } catch (e: IllegalStateException) {
-            TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating UI")
+        binding.titleText.setText(state.titleResId)
+        binding.subtitleText.setText(state.subtitleResId)
+        appSelectionAdapter?.submitList(state.selectableApps) ?: run {
+            Timber.w("Adapter is null, cannot submit list")
         }
+        updateSelectionChips(state.selectedApps)
     }
 
     private fun updateSelectionChips(selectedApps: List<AppInfo>) {
         if (_binding == null) return
+        binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.INVISIBLE else View.VISIBLE
+        binding.selectionChipGroup.removeAllViews()
 
-        try {
-            binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.INVISIBLE else View.VISIBLE
-            binding.selectionChipGroup.removeAllViews()
-
-            for (app in selectedApps) {
-                try {
-                    val chip = Chip(this).apply {
-                        text = app.displayName
-                        isCloseIconVisible = true
-                        setOnCloseIconClickListener {
-                            try {
-                                viewModel.onAppToggled(app)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error toggling app from chip")
-                            }
-                        }
-                    }
-                    binding.selectionChipGroup.addView(chip)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
-                }
+        for (app in selectedApps) {
+            val chip = Chip(this).apply {
+                text = app.displayName
+                isCloseIconVisible = true
+                setOnCloseIconClickListener { viewModel.onAppToggled(app) }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating selection chips")
+            binding.selectionChipGroup.addView(chip)
         }
     }
 
