@@ -33,9 +33,11 @@ testing reference.
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
 
-Gradle is bundled via wrapper. `androidTest/` is currently empty —
-instrumentation/UI tests are described in the README but no live tests are
-in the tree.
+Gradle is bundled via wrapper. `androidTest/` is currently empty — see
+Rule 10 below for the historical reason and the conditions under which
+new instrumented or Robolectric-based tests would be welcome. Robolectric
+is already in use in the JVM `test/` set for `android.net.Uri`-touching
+code (e.g. `WallpaperRepositoryImplTest`).
 
 ---
 
@@ -152,14 +154,25 @@ activities.
 
 10. **Testable logic lives outside Android-runtime classes.** Activities,
     Fragments, BroadcastReceivers, and Services are awkward to unit-test
-    on the JVM, and `androidTest/` is intentionally empty in this project
-    — JVM is the only test target. Anything worth pinning (state
-    transitions, decisions, parsing, side-effect orchestration) belongs in
-    a ViewModel, use case, helper, or `ui/main/delegate/` sibling. The
-    Android-runtime class becomes thin glue: collect StateFlow, render,
-    forward events. UI-only behavior (view inflation, animation callbacks)
-    stays put — no test value to extract. Applies to both new code and
-    existing classes; if you spot a violation, lift the logic out.
+    on the JVM. Anything worth pinning (state transitions, decisions,
+    parsing, side-effect orchestration) belongs in a ViewModel, use case,
+    helper, or `ui/main/delegate/` sibling. The Android-runtime class
+    becomes thin glue: collect StateFlow, render, forward events. UI-only
+    behavior (view inflation, animation callbacks) stays put — no test
+    value to extract.
+
+    JVM is the default test target — fast, deterministic, and covers
+    everything the rule above puts there. `androidTest/` is currently
+    empty for *historical* reasons: a past round of unreliable
+    instrumented tests was abandoned (constant flakiness, debug sessions
+    that ate days). The directory is empty by accident of history, not
+    by principle. Clean instrumented tests or Robolectric-based tests
+    (Robolectric is already used in `test/` for `android.net.Uri`-
+    touching code) are welcome when a real need arises and the patterns
+    prove demonstrably stable.
+
+    Applies to both new code and existing classes; if you spot a
+    violation, lift the logic out.
 
 11. **No `try/catch` around can't-throw operations.** Catches are for
     real failure modes — I/O, system APIs, user-supplied callbacks,
