@@ -123,62 +123,49 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        try {
-            binding.appNameText.text = appInfo.displayName
+        binding.appNameText.text = appInfo.displayName
 
-            val adapter = AppContextMenuAdapter { action ->
-                try {
-                    handleActionClick(action)
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error handling action click")
+        val adapter = AppContextMenuAdapter { action -> handleActionClick(action) }
+
+        binding.contextMenuItemsRecyclerView.layoutManager =
+            LinearLayoutManager(requireContext())
+        binding.contextMenuItemsRecyclerView.adapter = adapter
+
+        if (BuildConfig.DEBUG) {
+            EspressoIdlingResource.increment()
+        }
+
+        // Starts on Main, but we switch inside.
+        // Inner catch kept: loadActions() runs the use case which talks to
+        // multiple repositories (Samsung Knox via PackageManager included);
+        // dismiss() on failure gives the user an exit instead of an empty
+        // dialog.
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // FIX: Move heavy lifting (and Samsung DB reads) to IO thread
+                val actions = withContext(Dispatchers.IO) {
+                    loadActions()
                 }
-            }
 
-            binding.contextMenuItemsRecyclerView.layoutManager =
-                LinearLayoutManager(requireContext())
-            binding.contextMenuItemsRecyclerView.adapter = adapter
-
-            if (BuildConfig.DEBUG) {
-                EspressoIdlingResource.increment()
-            }
-
-            // Starts on Main, but we switch inside
-            viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    // FIX: Move heavy lifting (and Samsung DB reads) to IO thread
-                    val actions = withContext(Dispatchers.IO) {
-                        loadActions()
-                    }
-
-                    // Back on Main Thread here
-                    if (!isAdded || isDetached) {
-                        if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                        return@launch
-                    }
-
-                    adapter.submitList(actions) {
-                        if (BuildConfig.DEBUG) {
-                            EspressoIdlingResource.decrement()
-                        }
-                    }
-                } catch (e: CancellationException) {
+                // Back on Main Thread here
+                if (!isAdded || isDetached) {
                     if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
-                    throw e
-                } catch (e: Exception) {
-                    TimberWrapper.silentError(e, "Error loading actions")
-                    if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                    return@launch
+                }
 
-                    // Dismiss bei kritischem Fehler
-                    try {
-                        dismiss()
-                    } catch (dismissError: Exception) {
-                        TimberWrapper.silentError(dismissError, "Error dismissing after load error")
+                adapter.submitList(actions) {
+                    if (BuildConfig.DEBUG) {
+                        EspressoIdlingResource.decrement()
                     }
                 }
+            } catch (e: CancellationException) {
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                throw e
+            } catch (e: Exception) {
+                TimberWrapper.silentError(e, "Error loading actions")
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                dismiss()
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
-            dismiss()
         }
     }
 
@@ -202,66 +189,55 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             return
         }
 
-        try {
-            when (action) {
-                is AppContextMenuAction.Shortcut -> {
-                    try {
-                        setFragmentResult(REQUEST_KEY, bundleOf(
-                            RESULT_KEY_ACTION to "launch_shortcut",
-                            RESULT_KEY_SHORTCUT to action.shortcutInfo
-                        )
-                        )
-                        dismiss()
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error handling shortcut action")
-                    }
-                }
-                is AppContextMenuAction.LauncherAction -> {
-                    when (action.id) {
-                        AppContextMenuAction.Companion.ACTION_ID_RENAME_APP -> {
-                            showRenameDialog()
-                            return
-                        }
-                        AppContextMenuAction.Companion.ACTION_ID_RESTORE_NAME -> {
-                            viewLifecycleOwner.lifecycleScope.launch {
-                                try {
-                                    customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
-                                    dismiss()
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                    TimberWrapper.silentError(e, "Error removing custom name")
-                                    dismiss()
-                                }
-                            }
-                        }
-                        else -> {
-                            try {
-                                setFragmentResult(REQUEST_KEY,
-                                    bundleOf(RESULT_KEY_ACTION to action.id)
-                                )
-                                dismiss()
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error handling launcher action")
-                            }
-                        }
-                    }
-                }
-                is AppContextMenuAction.Separator -> return
+        when (action) {
+            is AppContextMenuAction.Shortcut -> {
+                setFragmentResult(REQUEST_KEY, bundleOf(
+                    RESULT_KEY_ACTION to "launch_shortcut",
+                    RESULT_KEY_SHORTCUT to action.shortcutInfo
+                ))
+                dismiss()
             }
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error in handleActionClick")
+            is AppContextMenuAction.LauncherAction -> {
+                when (action.id) {
+                    AppContextMenuAction.Companion.ACTION_ID_RENAME_APP -> {
+                        showRenameDialog()
+                        return
+                    }
+                    AppContextMenuAction.Companion.ACTION_ID_RESTORE_NAME -> {
+                        // EXPECTED: customNamesRepository call is suspend
+                        // (DataStore I/O); on failure we still dismiss to
+                        // give the user an exit.
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            try {
+                                customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
+                                dismiss()
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                TimberWrapper.silentError(e, "Error removing custom name")
+                                dismiss()
+                            }
+                        }
+                    }
+                    else -> {
+                        setFragmentResult(REQUEST_KEY, bundleOf(RESULT_KEY_ACTION to action.id))
+                        dismiss()
+                    }
+                }
+            }
+            is AppContextMenuAction.Separator -> return
         }
     }
 
     private fun showRenameDialog() {
-        // CRASH-SAFE: Dismiss previous dialog
+        // dismiss() can throw IllegalArgumentException if the dialog's view
+        // is no longer attached to a window — specific, ignorable.
         try {
             currentDialog?.dismiss()
-            currentDialog = null
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Error dismissing previous dialog")
+        } catch (e: IllegalArgumentException) {
+            // Dialog already gone, ignore
         }
+        currentDialog = null
 
         val ctx = context
         if (ctx == null) {
@@ -269,6 +245,9 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             return
         }
 
+        // Outer catch kept: AlertDialog.Builder + show() can throw
+        // BadTokenException / IllegalStateException when the activity is
+        // finishing.
         try {
             val editText = EditText(ctx).apply {
                 setText(appInfo.displayName)
@@ -279,45 +258,33 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 .setTitle(getString(R.string.rename_app_title, appInfo.displayName))
                 .setView(editText)
                 .setPositiveButton(R.string.rename) { _, _ ->
-                    try {
-                        val newName = editText.text.toString().trim()
-
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            try {
-                                if (newName.isNotBlank() && newName != appInfo.originalName) {
-                                    customNamesRepository.setCustomNameForPackage(
-                                        appInfo.packageName,
-                                        newName
-                                    )
-                                } else {
-                                    customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
-                                }
-                                dismiss()
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                TimberWrapper.silentError(e, "Error setting custom name")
-                                dismiss()
+                    val newName = editText.text.toString().trim()
+                    // Inner launch catch kept: customNamesRepository
+                    // calls are suspend (DataStore I/O); dismiss on
+                    // failure gives the user an exit.
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        try {
+                            if (newName.isNotBlank() && newName != appInfo.originalName) {
+                                customNamesRepository.setCustomNameForPackage(
+                                    appInfo.packageName,
+                                    newName
+                                )
+                            } else {
+                                customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
                             }
+                            dismiss()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            TimberWrapper.silentError(e, "Error setting custom name")
+                            dismiss()
                         }
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in rename positive button")
                     }
                 }
-                .setNegativeButton(R.string.cancel) { dialog, _ ->
-                    try {
-                        dialog.cancel()
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error canceling dialog")
-                    }
-                }
+                .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.cancel() }
                 .setOnDismissListener {
-                    try {
-                        if (currentDialog?.isShowing == false) {
-                            currentDialog = null
-                        }
-                    } catch (e: Exception) {
-                        TimberWrapper.silentError(e, "Error in dismiss listener")
+                    if (currentDialog?.isShowing == false) {
+                        currentDialog = null
                     }
                 }
                 .create()
@@ -329,11 +296,10 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     }
 
     override fun onDestroyView() {
+        // Outer catch kept: lifecycle teardown — finally{} super.onDestroyView()
         try {
-            // CRASH-SAFE: Cleanup dialog
             currentDialog?.dismiss()
             currentDialog = null
-
             _binding = null
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
