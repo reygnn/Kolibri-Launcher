@@ -17,9 +17,9 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 3 | `BackupRepositoryImpl` zerlegen | offen | ~1 Tag, eigenes Projekt |
 | 4 | `Manager` → `RepositoryImpl` Rename | offen, IDE-Job (Shift+F6) | ~5 min |
 | 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
-| 6 | Code-Hygiene-Sweep (Smells) | offen | klein |
+| 7 | `CrashReportConsent` von SharedPreferences nach DataStore migrieren (Rule-5-Verstoß) | offen | mittel |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §6 (kleinste, schnelle Wins) → §4 (IDE-Job, Voraussetzung für sauberen §3) → §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** §4 (IDE-Job, Voraussetzung für sauberen §3) → §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 ist orthogonal zum Rest und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -249,17 +249,48 @@ will.
 
 ---
 
-## 6. Code-Hygiene-Sweep (Smells, sammelweise)
+## 7. `CrashReportConsent` von SharedPreferences nach DataStore migrieren
 
-Kleinere Auffälligkeiten aus dem Audit. Keine einzelne ist
-gravierend; in Summe drücken sie die Code-Note. Eine Sweep-PR
-nach §2 ist effizienter als sieben Einzel-Edits.
+Aufgedeckt während der §6(g)-Analyse: `ui/util/CrashReportConsent.kt`
+liest und schreibt den ACRA-Consent-Flag direkt über
+`context.getSharedPreferences(...)`. Das ist der einzige verbliebene
+SharedPreferences-Pfad im App-Code — und damit ein **Verstoß gegen
+Rule 5** („DataStore Preferences is the only app storage").
 
-- [ ] **`runBlocking` in `attachBaseContext`** —
-  `KolibriLauncherApp.kt:120`. Defensible (DataStore-Read vor
-  Hilt verfügbar, ACRA-Init braucht das Result), aber StrictMode-
-  relevant. Prüfen, ob der Pfad sich auf `runBlocking(Dispatchers.IO)`
-  verbessern lässt, oder den Grund im KDoc verewigen.
+Die `runBlocking`-Frage selbst (§6(g)) ist erledigt — KDoc auf
+`KolibriLauncherApp.attachBaseContext` erklärt, warum der Sync-Read
+dort intentional ist. Die Wahl der Storage-Schicht ist davon
+unabhängig.
+
+### Was zu tun ist
+
+- [ ] DataStore-Preferences-Schema für den Consent-Flag in
+  `di/DataStoreModule.kt` ergänzen (eigener `Preferences.Key`).
+- [ ] `CrashReportConsent` von `SharedPreferences` auf das DataStore-
+  API umstellen. `hasConsent` / `setConsent` / `resetConsent` /
+  `hasAsked` (private) sind die Aufrufstellen.
+- [ ] **Migration:** bestehende Installationen müssen den alten
+  Wert übernehmen. Pfad: `DataMigrationManager` bekommt einen
+  Migrations-Schritt, der die Legacy-`SharedPreferences` ausliest
+  und in DataStore schreibt, dann die XML-Datei löscht.
+- [ ] In `attachBaseContext` weiter `runBlocking { … }` benutzen —
+  DataStore-Read ist genauso async, der KDoc-Block bleibt korrekt.
+  Nur die Aufruf-Form ändert sich (`dataStore.data.first()` statt
+  `prefs.getBoolean(...)`).
+- [ ] Den Hinweis im `attachBaseContext`-KDoc auf "TODO §7"
+  entfernen, sobald die Migration im Code steht.
+- [ ] KNOWN_ISSUES.md §3 textlich anpassen, falls die DataStore-
+  Implementation einen anderen StrictMode-Pfad triggert (vermutlich
+  ähnlicher DiskRead, aber mit anderem Stack).
+
+### Warum mittel und nicht klein
+
+Ein Migrations-Schritt im `DataMigrationManager` braucht: Read der
+alten XML, Write in DataStore, Delete der XML, Idempotenz für
+mehrfache Aufrufe, Test in `DataMigrationManagerTest`. Dazu der
+Refactor in `CrashReportConsent` (alle vier Methoden) plus der
+Test-Update — `CrashReportConsent` hat aktuell wenig direkten
+Test, müsste evtl. ergänzt werden. Eine Stunde, vielleicht zwei.
 
 ---
 

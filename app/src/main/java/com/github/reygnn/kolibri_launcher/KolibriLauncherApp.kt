@@ -84,6 +84,44 @@ class KolibriLauncherApp : Application() {
         }
     }
 
+    /**
+     * ACRA must be initialised here — `attachBaseContext` runs before `onCreate`
+     * and before any other Application code, so it's the only safe place to install
+     * the global crash handler before something else can crash.
+     *
+     * ## Why `runBlocking` is intentional here
+     *
+     * `initAcra { ... }` enables crash reporting by default. We disable it
+     * immediately afterwards (Rule 8: privacy-by-default) and only re-enable
+     * it when the user has given consent. The consent state lives in disk
+     * storage, so reading it is unavoidably I/O. We block the main thread
+     * for that read deliberately:
+     *
+     * - Reading async (e.g. by launching a coroutine in `onCreate`) would
+     *   open a micro-window between the disable in this method and the
+     *   re-enable in `onCreate` during which ACRA stays disabled even when
+     *   the user has consented. Small window, but real — and the whole
+     *   point of Rule 8 is that the consent decision is the source of truth,
+     *   not "consented but the launcher missed it".
+     * - The read is small (single key) and effectively free on warm starts.
+     * - `runBlocking(Dispatchers.IO)` would not help: the inner
+     *   `withContext(Dispatchers.IO)` in [CrashReportConsent.hasConsent]
+     *   already moves the actual I/O off the calling thread of the suspend
+     *   function, but `runBlocking` always blocks its caller. Wrapping it
+     *   in another IO dispatcher just adds a hop with no benefit.
+     *
+     * ## StrictMode noise
+     *
+     * In DEBUG this triggers a DiskReadViolation. That's expected — it is
+     * intentional code, not a bug to fix. Cross-reference `KNOWN_ISSUES.md`
+     * (section "Intentional violations") before chasing it.
+     *
+     * The current backing store for the consent flag is `SharedPreferences`,
+     * which violates Rule 5 (DataStore-only). See TODO §7 for the migration —
+     * it does not change the runBlocking story above (DataStore reads in
+     * `attachBaseContext` would also need `runBlocking { dataStore.data.first() }`),
+     * only the storage layer.
+     */
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
 

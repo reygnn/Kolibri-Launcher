@@ -1,8 +1,18 @@
 # Known StrictMode Violations
 
-This document tracks known `StrictMode` violations that are caused by the Android Framework, OEM modifications (Samsung, etc.), or third-party libraries, and cannot be fixed within the application code.
+This document tracks known `StrictMode` violations seen in DEBUG. Two categories:
+
+1. **Framework / OEM / library violations** — caused by code outside the
+   application (Android, Samsung OneUI, Knox, third-party libraries).
+   We cannot fix these in app code; one is mitigated via a workaround.
+2. **Intentional app-side violations** — code we wrote that knowingly
+   triggers StrictMode because the alternative would compromise a
+   stronger guarantee (privacy, correctness, etc.). These are not bugs;
+   the rationale lives in the KDoc of the offending method.
 
 ---
+
+# Framework / OEM / library violations
 
 ## 1. Samsung Framework: IdsController & SharedPreferences
 
@@ -71,3 +81,43 @@ StrictMode policy violation; ~duration=10 ms: android.os.strictmode.DiskReadViol
     at android.app.ApplicationPackageManager.resolveActivity(...)
     at com.github.reygnn.kolibri_launcher.data.ShortcutManager.isDefaultLauncher(...)
     at com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment.loadActions(...)
+
+
+---
+
+# Intentional app-side violations
+
+## 3. ACRA consent read in `attachBaseContext`
+
+- **Status:** 🟡 Intentional / Documented
+- **Context:** `KolibriLauncherApp.attachBaseContext`
+- **Affected Devices:** All
+
+### Explanation
+
+`attachBaseContext` synchronously reads the ACRA crash-report consent
+flag from disk via `runBlocking { CrashReportConsent.hasConsent(base) }`.
+StrictMode reports this as a `DiskReadViolation` on the main thread.
+
+This is deliberate. ACRA is initialised here and immediately disabled
+(privacy-by-default per CLAUDE.md Rule 8). Re-enabling it asynchronously
+in `onCreate` would open a micro-window where ACRA stays disabled even
+though the user has consented — and the consent decision is the source
+of truth, not "consented but the launcher missed it". The full rationale
+lives in the KDoc on `attachBaseContext`.
+
+### Cost vs. benefit
+
+The read is a single SharedPreferences key, effectively free on warm
+starts. Switching to `runBlocking(Dispatchers.IO)` would not help —
+the inner suspend already moves I/O off the calling thread; the outer
+`runBlocking` always blocks its caller regardless.
+
+### Reference Stacktrace
+
+StrictMode policy violation: android.os.strictmode.DiskReadViolation
+    at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(...)
+    at android.app.SharedPreferencesImpl.awaitLoadedLocked(...)
+    at com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent$hasConsent$2.invokeSuspend(...)
+    at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(...)
+    at com.github.reygnn.kolibri_launcher.KolibriLauncherApp.attachBaseContext(KolibriLauncherApp.kt)
