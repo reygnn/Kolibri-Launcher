@@ -16,9 +16,8 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
-| 7 | SharedPreferences-Reststände bereinigen (Rule-5-Verstöße): `CrashReportConsent` + `CrashReportLimiter` migrieren, `AppModule.provideSharedPreferences` löschen, `DataMigrationManager` als Bootstrap-Ausnahme dokumentieren | offen | mittel |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §7 als Hauptaufgabe (in vier Subtasks, siehe §7). §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -218,89 +217,6 @@ beim Auftauchen einer flaky Test-Vermutung sofort weiß dass das
 Audit gelaufen ist und das Pattern intakt ist, und (b) der
 Self-Enforcement-Insight nicht beim nächsten Refactor verloren
 geht.
-
----
-
-## 7. SharedPreferences-Reststände bereinigen (Rule-5-Verstöße)
-
-Ursprünglich als „nur `CrashReportConsent` migrieren" notiert
-(während der §6(g)-Analyse aufgedeckt). Beim Verifizieren am
-2026-05-01 stellte sich heraus: SharedPreferences taucht an
-**vier** Stellen im Main-Code auf, nicht an einer.
-
-### Inventar (Stand 2026-05-01)
-
-| File | Was | Status |
-|---|---|---|
-| `ui/util/CrashReportConsent.kt` | ACRA-Consent-Flag (5 SP-Stellen) | klarer Rule-5-Verstoß — migrieren |
-| `ui/util/CrashReportLimiter.kt` | ACRA-Spam-Protection (Rate-Limit-State, eigene SP-Datei) | klarer Rule-5-Verstoß — migrieren |
-| `data/DataMigrationManager.kt` (Z. 96, 114) | `VERSION_PREFS_NAME` Bootstrap-Versions-Tracking | **Henne-Ei-Ausnahme** — der Migrations-Mechanismus selbst kann nicht über DataStore laufen, sonst müsste die Migration sich selbst bootstrappen. Pragmatisch behalten, aber **explizit in CLAUDE.md Rule 5 als Exception festhalten**. |
-| `di/AppModule.kt:39` | Hilt-Provider `provideSharedPreferences` (default-prefs via PreferenceManager) | **Toter Code** — kein `@Inject`-Konsument im Main, einfach löschen (plus Imports). Verifiziert am 2026-05-01. |
-
-Die `runBlocking`-Frage selbst (§6(g)) ist erledigt — KDoc auf
-`KolibriLauncherApp.attachBaseContext` erklärt, warum der Sync-Read
-dort intentional ist. Die Wahl der Storage-Schicht ist davon
-unabhängig.
-
-### Was zu tun ist
-
-**Storage-Migration `CrashReportConsent`:**
-- [ ] DataStore-Preferences-Schema für den Consent-Flag in
-  `di/DataStoreModule.kt` ergänzen (eigener `Preferences.Key`).
-- [ ] `CrashReportConsent` von `SharedPreferences` auf das DataStore-
-  API umstellen. `hasConsent` / `setConsent` / `resetConsent` /
-  `hasAsked` (private) sind die Aufrufstellen.
-- [ ] **Migration der Legacy-Daten:** `DataMigrationManager` bekommt
-  einen Schritt, der die alte `acra_consent`-XML ausliest, in
-  DataStore schreibt, dann die XML-Datei löscht. Idempotent.
-- [ ] In `attachBaseContext` weiter `runBlocking { … }` benutzen —
-  DataStore-Read ist genauso async, der KDoc-Block bleibt korrekt.
-  Nur die Aufruf-Form ändert sich (`dataStore.data.first()` statt
-  `prefs.getBoolean(...)`).
-- [ ] Den Hinweis im `attachBaseContext`-KDoc auf „TODO §7"
-  entfernen, sobald die Migration im Code steht.
-- [ ] KNOWN_ISSUES.md §3 textlich anpassen, falls die DataStore-
-  Implementation einen anderen StrictMode-Pfad triggert (vermutlich
-  ähnlicher DiskRead, aber mit anderem Stack).
-
-**Storage-Migration `CrashReportLimiter`:**
-- [ ] Zweiter `Preferences.Key` (oder eigenes Schema) für den
-  Rate-Limit-State.
-- [ ] Refactor analog zu `CrashReportConsent`. Achtung: wird in
-  `KolibriLauncherApp.onCreate` synchron initialisiert, ähnliche
-  `runBlocking`-Frage könnte aufkommen.
-- [ ] Migrations-Schritt für die Legacy-XML in `DataMigrationManager`.
-
-**Hilt-Provider löschen:**
-- [ ] `AppModule.provideSharedPreferences` raus (Z. 37–41), plus die
-  zwei dann ungenutzten Imports (`SharedPreferences`,
-  `androidx.preference.PreferenceManager`).
-- [ ] Verifizieren: build + tests grün, kein neuer Konsument
-  versteckt sich (nochmal `: SharedPreferences`-Grep).
-
-**`DataMigrationManager` als Exception dokumentieren:**
-- [ ] In CLAUDE.md Rule 5 einen Satz: „Eine bewusste Ausnahme:
-  `DataMigrationManager` selbst nutzt SharedPreferences für das
-  Versions-Tracking, weil der Migrations-Mechanismus sich nicht
-  selbst über DataStore bootstrappen kann."
-- [ ] Im File-Header-KDoc von `DataMigrationManager.kt` denselben
-  Hinweis (kürzer) verewigen, damit Reviewer das nicht versuchen
-  zu „fixen".
-
-### Warum mittel und nicht klein
-
-Zwei Migrations-Schritte im `DataMigrationManager`, zwei
-Code-Refactors (Consent + Limiter), drei Doku-Stellen, plus Test-
-Updates. Plus subtile `runBlocking`-Frage bei `CrashReportLimiter`.
-Eine bis zwei Stunden, eher zwei.
-
-### Subtask-Reihenfolge (empfohlen)
-
-1. **Hilt-Provider löschen** (5 min, kein Risiko, Quick-Win).
-2. **DataMigrationManager-Exception dokumentieren** (10 min, kein
-   Code-Change in DMM selbst, nur CLAUDE.md + KDoc).
-3. **CrashReportConsent-Migration** (Hauptarbeit, ~1 h).
-4. **CrashReportLimiter-Migration** (analog, ~30 min).
 
 ---
 
