@@ -61,65 +61,60 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
     }
 
     private fun setupUI() {
-        try {
-            // CRASH-SAFE: ActionBar kann null sein
-            supportActionBar?.apply {
-                setDisplayHomeAsUpEnabled(true)
-                title = getString(R.string.settings_title)
-            } ?: run {
-                Timber.w("ActionBar is null, skipping toolbar setup")
-            }
+        // CRASH-SAFE: ActionBar kann null sein
+        supportActionBar?.apply {
+            setDisplayHomeAsUpEnabled(true)
+            title = getString(R.string.settings_title)
+        } ?: run {
+            Timber.w("ActionBar is null, skipping toolbar setup")
+        }
 
-            // CRASH-SAFE: Safe findViewById mit null check
-            findViewById<View>(android.R.id.content)?.let { contentView ->
-                ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->
-                    try {
-                        val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                        view.setPadding(
-                            systemBars.left,
-                            systemBars.top,
-                            systemBars.right,
-                            systemBars.bottom
-                        )
-                        insets
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error applying window insets")
-                        insets
-                    }
-                }
-            } ?: run {
-                Timber.w("Content view not found")
+        // CRASH-SAFE: Safe findViewById mit null check
+        findViewById<View>(android.R.id.content)?.let { contentView ->
+            ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                view.setPadding(
+                    systemBars.left,
+                    systemBars.top,
+                    systemBars.right,
+                    systemBars.bottom
+                )
+                insets
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up UI")
+        } ?: run {
+            Timber.w("Content view not found")
         }
     }
 
     private fun setupBackPressHandling() {
-        try {
-            backPressedCallback = object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    try {
-                        if (supportFragmentManager.backStackEntryCount > 0) {
-                            supportFragmentManager.popBackStack()
-                        } else {
-                            finish()
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error handling back press")
-                        finish() // Fallback
+        backPressedCallback = object : OnBackPressedCallback(true) {
+            // Inner catch kept: FragmentManager.popBackStack can throw
+            // IllegalStateException after onSaveInstanceState; finish()
+            // gives the user an exit if back-press handling itself
+            // breaks down.
+            override fun handleOnBackPressed() {
+                try {
+                    if (supportFragmentManager.backStackEntryCount > 0) {
+                        supportFragmentManager.popBackStack()
+                    } else {
+                        finish()
                     }
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error handling back press")
+                    finish() // Fallback
                 }
             }
-            onBackPressedDispatcher.addCallback(this, backPressedCallback!!)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up back press handling")
         }
+        onBackPressedDispatcher.addCallback(this, backPressedCallback!!)
     }
 
     private fun loadSettingsFragment() {
+        // EXPECTED: FragmentTransaction.commitAllowingStateLoss can still
+        // throw IllegalStateException in edge cases (Activity destroyed
+        // between onCreate and the commit). Activity remains usable
+        // without the SettingsFragment shown — partially-broken is
+        // better than crash.
         try {
-            // CRASH-SAFE: commitAllowingStateLoss statt commit
             supportFragmentManager.beginTransaction()
                 .replace(
                     android.R.id.content,
@@ -129,21 +124,15 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                 .commitAllowingStateLoss()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error loading settings fragment")
-            // Nicht finish() aufrufen - Activity kann trotzdem funktionieren
         }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return try {
-            if (item.itemId == android.R.id.home) {
-                onBackPressedDispatcher.onBackPressed()
-                true
-            } else {
-                super.onOptionsItemSelected(item)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onOptionsItemSelected")
-            false
+        return if (item.itemId == android.R.id.home) {
+            onBackPressedDispatcher.onBackPressed()
+            true
+        } else {
+            super.onOptionsItemSelected(item)
         }
     }
 
