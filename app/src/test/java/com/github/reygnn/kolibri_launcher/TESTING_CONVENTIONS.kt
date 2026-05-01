@@ -108,6 +108,36 @@ package com.github.reygnn.kolibri_launcher
  * See: MainDispatcherRule.kt, AppManagementDelegateTest.kt (reference impl
  *      for delegate scope), OnboardingViewModelTest.kt (reference impl
  *      for init-time event)
+ *
+ *
+ * SELF-ENFORCEMENT — WHY THE CONVENTION HOLDS
+ * --------------------------------------------
+ * Audit on 2026-05-01 (TODO §5) found zero gaps: every test that needs
+ * MainDispatcherRule has it, every test that doesn't have it doesn't
+ * need it. This is not luck — the convention enforces itself through
+ * the architecture.
+ *
+ * The mechanism: every ViewModel takes its `mainDispatcher` as a
+ * constructor parameter (typed `CoroutineDispatcher`, qualified with
+ * `@MainDispatcher` from `di/DispatcherModule.kt`). When you write a
+ * test for a new ViewModel, the constructor signature forces you to
+ * pass a dispatcher — and the obvious right answer is
+ * `mainDispatcherRule.testDispatcher`, which immediately implies
+ * adding the rule. The compiler funnels you toward the convention.
+ *
+ * `BaseViewModel(mainDispatcher: CoroutineDispatcher)` makes this
+ * non-optional for all subclasses. Repository tests that use
+ * `shareIn`/`stateIn` follow a parallel pattern: they take an
+ * `externalScope` constructor parameter so tests can pass `null` and
+ * sidestep Main entirely (see FavoritesRepositoryImplShareInTest for
+ * the case where the test does want Main and uses the rule).
+ *
+ * If a future ViewModel skips the constructor-injected dispatcher
+ * (hard-coding `Dispatchers.Main` in the body, say), the
+ * self-enforcement breaks for that VM and the convention drifts
+ * silently — by the time anyone notices, the test is already flaky.
+ * Reject that pattern in review. Every ViewModel must take its
+ * dispatcher via constructor.
  * ============================================================================
  */
 

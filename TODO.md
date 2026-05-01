@@ -15,10 +15,10 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
 | 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
-| 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
+| 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 7 | SharedPreferences-Reststände bereinigen (Rule-5-Verstöße): `CrashReportConsent` + `CrashReportLimiter` migrieren, `AppModule.provideSharedPreferences` löschen, `DataMigrationManager` als Bootstrap-Ausnahme dokumentieren | offen | mittel |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §5 (Test-Konsistenz). §7 ist orthogonal und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** §7 als Hauptaufgabe (in vier Subtasks, siehe §7). §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -175,29 +175,49 @@ Pattern ist analog zum HomeFragment-Header.
 
 ---
 
-## 5. Test-Konsistenz: `MainDispatcherRule` flächendeckend prüfen
+## 5. (Memo, abgeschlossen) `MainDispatcherRule`-Audit über Tests
 
-Die Test-Konvention ist klar (CLAUDE.md → „The dispatcher rule
-(non-negotiable)"): Tests, die Code auf `Dispatchers.Main` treiben,
-**MÜSSEN** den Rule + `runTest(mainDispatcherRule.testDispatcher)`
-benutzen. Sonst werden sie flaky, ohne dass es im Output sichtbar
-wäre.
+Audit am 2026-05-01 systematisch über alle ~130 Test-Files
+durchgeführt (per Subagent-Klassifizierung, danach Cross-Check via
+Grep). **Ergebnis: 0 Lücken.**
 
-Aktuelle Verteilung: `MainDispatcherRule` taucht in **26 Treffern
-in 10 Files** auf — bei ~70 Test-Files insgesamt. Die Konvention
-ist „MUSS, wenn Main berührt", nicht „immer", also ist die niedrige
-Quote nicht per se falsch — aber pro Test vom Reviewer zu prüfen,
-und das ist ein Risiko, das man nicht bei jedem PR neu durchgehen
-will.
+### Zahlen
 
-- [ ] **Audit pro Test-File:** ViewModels, Coroutine-driven Repos
-  (`shareIn`/`stateIn` mit `mainDispatcher`), und alles was
-  `viewModelScope` oder `lifecycleScope` mockt — diese MÜSSEN den
-  Rule haben.
-- [ ] **Bei fehlendem Rule:** entweder ergänzen oder einen
-  Ein-Zeilen-Kommentar setzen, warum der Test ihn explizit nicht
-  braucht (z. B. reine `Repository.saveOrder`-Pfade, die nicht auf
-  Main laufen).
+- 42 Files haben `@get:Rule val mainDispatcherRule = MainDispatcherRule()`
+- Davon nutzen 40 ihn legitim (alle ViewModel-Tests, alle Delegate-Tests,
+  `PackageUpdateReceiverTest`, `FavoritesRepositoryImplShareInTest`)
+  plus 2 in abstract Contract-Klassen für Vererbung
+- Die übrigen ~88 Test-Files brauchen ihn nicht: pure-logic
+  (Calculator/Formatter/State/Resolver), use-case-Wrapper um
+  einzelne `suspend fun`s die direkt mit `runTest` getrieben werden,
+  Repository-Impl-Tests die `externalScope = null` setzen oder
+  `backgroundScope` aus `runTest` nutzen.
+
+### Warum die Konvention sich von selbst hält
+
+Der Audit hat ein Pattern aufgedeckt: jedes ViewModel nimmt seinen
+`mainDispatcher` per Konstruktor (typed `CoroutineDispatcher`,
+qualifiziert mit `@MainDispatcher`). Wer einen Test für ein neues
+ViewModel schreibt, MUSS einen Dispatcher übergeben — und die
+naheliegende Antwort ist `mainDispatcherRule.testDispatcher`,
+was sofort den Rule mit ergänzt. Der Compiler trichtert in die
+Konvention. `BaseViewModel(mainDispatcher: ...)` macht das für alle
+Subklassen verpflichtend.
+
+Das Self-Enforcement-Pattern ist jetzt explizit in
+`TESTING_CONVENTIONS.kt` unter „SELF-ENFORCEMENT — WHY THE
+CONVENTION HOLDS" verewigt, plus Warnung: wenn ein zukünftiges
+ViewModel den Konstruktor-Dispatcher überspringt (z. B. `Dispatchers.Main`
+hardgecodet im Body), bricht die Self-Enforcement und die
+Konvention driftet still. In Reviews ablehnen.
+
+### Memo-Zweck
+
+Sektion bleibt im TODO als Referenz, damit (a) ein neuer Reviewer
+beim Auftauchen einer flaky Test-Vermutung sofort weiß dass das
+Audit gelaufen ist und das Pattern intakt ist, und (b) der
+Self-Enforcement-Insight nicht beim nächsten Refactor verloren
+geht.
 
 ---
 
