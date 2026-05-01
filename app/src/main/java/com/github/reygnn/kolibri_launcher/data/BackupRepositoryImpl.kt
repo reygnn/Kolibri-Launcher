@@ -74,14 +74,14 @@ import javax.inject.Singleton
  */
 @Singleton
 class BackupRepositoryImpl @Inject constructor(
-    private val favoritesManager: FavoritesRepository,
-    private val favoritesOrderManager: FavoritesOrderRepository,
-    private val appVisibilityManager: HiddenAppsRepository,
-    private val appNamesManager: CustomNamesRepository,
-    private val installedAppsManager: InstalledAppsRepository,
-    private val swipeActionsManager: SwipeActionsRepository,
-    private val settingsManager: SettingsRepository,
-    private val wallpaperManager: WallpaperRepository,
+    private val favoritesRepository: FavoritesRepository,
+    private val favoritesOrderRepository: FavoritesOrderRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository,
+    private val customNamesRepository: CustomNamesRepository,
+    private val installedAppsRepository: InstalledAppsRepository,
+    private val swipeActionsRepository: SwipeActionsRepository,
+    private val settingsRepository: SettingsRepository,
+    private val wallpaperRepository: WallpaperRepository,
     private val wallpaperFileManager: WallpaperFileManager,
     @param:ApplicationContext private val context: Context
 ) : BackupRepository {
@@ -113,32 +113,32 @@ class BackupRepositoryImpl @Inject constructor(
      * Wird sowohl von exportToJson() als auch von saveBackupToFile() verwendet.
      */
     private suspend fun buildBackupData(): BackupData {
-        val favoriteComponents = favoritesManager.favoriteComponentsFlow.first()
-        val favoritesOrder = favoritesOrderManager.favoriteComponentsOrderFlow.first()
-        val hiddenComponents = appVisibilityManager.hiddenAppsFlow.first()
-        val customAppNames = appNamesManager.getAllCustomNames()
-        val swipeLeftApp = swipeActionsManager.swipeLeftAppFlow.first()
-        val swipeRightApp = swipeActionsManager.swipeRightAppFlow.first()
+        val favoriteComponents = favoritesRepository.favoriteComponentsFlow.first()
+        val favoritesOrder = favoritesOrderRepository.favoriteComponentsOrderFlow.first()
+        val hiddenComponents = hiddenAppsRepository.hiddenAppsFlow.first()
+        val customAppNames = customNamesRepository.getAllCustomNames()
+        val swipeLeftApp = swipeActionsRepository.swipeLeftAppFlow.first()
+        val swipeRightApp = swipeActionsRepository.swipeRightAppFlow.first()
 
-        val textColor = settingsManager.textColorFlow.first()
-        val textShadowEnabled = settingsManager.textShadowEnabledFlow.first()
-        val chipBackgroundColor = settingsManager.chipBackgroundColorFlow.first()
-        val layoutScale = settingsManager.layoutScaleStateFlow.first()
-        val verticalPaddingScale = settingsManager.verticalPaddingStateFlow.first()
-        val isFontBold = settingsManager.isFontBoldStateFlow.first()
-        val contentTopMarginScale = settingsManager.contentTopMarginScaleFlow.first()
+        val textColor = settingsRepository.textColorFlow.first()
+        val textShadowEnabled = settingsRepository.textShadowEnabledFlow.first()
+        val chipBackgroundColor = settingsRepository.chipBackgroundColorFlow.first()
+        val layoutScale = settingsRepository.layoutScaleStateFlow.first()
+        val verticalPaddingScale = settingsRepository.verticalPaddingStateFlow.first()
+        val isFontBold = settingsRepository.isFontBoldStateFlow.first()
+        val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
 
-        val wallpaperState = wallpaperManager.getWallpaperStateSync()
+        val wallpaperState = wallpaperRepository.getWallpaperStateSync()
 
-        val showCalendarEvent = settingsManager.showCalendarEventFlow.first()
-        val showAlarm = settingsManager.showAlarmFlow.first()
-        val doubleTapToLockEnabled = settingsManager.doubleTapToLockEnabledFlow.first()
-        val swipeDownToNotificationsEnabled = settingsManager.swipeDownToNotificationsEnabledFlow.first()
-        val autoShowKeyboard = settingsManager.autoShowKeyboardFlow.first()
-        val autoLaunchApp = settingsManager.autoLaunchAppFlow.first()
-        val splitModeThreshold = settingsManager.splitModeThresholdFlow.first()
-        val secureWindow = settingsManager.secureWindowFlow.first()
-        val rotationLocked = settingsManager.rotationLockedFlow.first()
+        val showCalendarEvent = settingsRepository.showCalendarEventFlow.first()
+        val showAlarm = settingsRepository.showAlarmFlow.first()
+        val doubleTapToLockEnabled = settingsRepository.doubleTapToLockEnabledFlow.first()
+        val swipeDownToNotificationsEnabled = settingsRepository.swipeDownToNotificationsEnabledFlow.first()
+        val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
+        val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
+        val splitModeThreshold = settingsRepository.splitModeThresholdFlow.first()
+        val secureWindow = settingsRepository.secureWindowFlow.first()
+        val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
         // ===== Wallpaper: Multi-Layer Export =====
         val wallpaperUri: String?
@@ -838,7 +838,7 @@ class BackupRepositoryImpl @Inject constructor(
     // ===========================================
 
     private suspend fun performImport(backup: BackupData, options: ImportOptions): ImportResult {
-        val installedApps = installedAppsManager.getInstalledApps().first()
+        val installedApps = installedAppsRepository.getInstalledApps().first()
         val installedComponents = installedApps.map { it.componentName }.toSet()
 
         val installedComponentsSet = installedComponents.toHashSet()
@@ -867,20 +867,20 @@ class BackupRepositoryImpl @Inject constructor(
                 )
             }
 
-            favoritesManager.saveFavoriteComponents(validFavorites.toList())
+            favoritesRepository.saveFavoriteComponents(validFavorites.toList())
             importedCount += validFavorites.size
             Timber.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
         }
 
         // ===== PHASE 2: Import Order =====
         if (options.importOrder) {
-            val currentFavorites = favoritesManager.favoriteComponentsFlow.first()
+            val currentFavorites = favoritesRepository.favoriteComponentsFlow.first()
             val currentFavoritesSet = currentFavorites.toHashSet()
 
             val validOrder = backup.settings.favoritesOrder
                 .filter { it in currentFavoritesSet && it in installedComponentsSet }
 
-            favoritesOrderManager.saveOrder(validOrder)
+            favoritesOrderRepository.saveOrder(validOrder)
             Timber.i("Imported order: ${validOrder.size} items")
         }
 
@@ -890,7 +890,7 @@ class BackupRepositoryImpl @Inject constructor(
                 .filterTo(HashSet()) { it in installedComponentsSet }
 
             val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
-            appVisibilityManager.updateComponentVisibilities(
+            hiddenAppsRepository.updateComponentVisibilities(
                 componentsToHide = validHidden,
                 componentsToShow = emptySet()
             )
@@ -903,7 +903,7 @@ class BackupRepositoryImpl @Inject constructor(
                 .filterKeys { it in installedPackagesSet }
 
             if (validNames.isNotEmpty()) {
-                appNamesManager.setCustomNamesInBatch(validNames)
+                customNamesRepository.setCustomNamesInBatch(validNames)
                 Timber.i("Imported custom names: ${validNames.size}")
             }
         }
@@ -914,20 +914,20 @@ class BackupRepositoryImpl @Inject constructor(
             val leftApp = backup.settings.swipeLeftApp
             if (leftApp != null) {
                 if (leftApp in installedComponentsSet) {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, leftApp)
+                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, leftApp)
                     swipeImportedCount++
                 } else {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
+                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
                     missingApps.add(leftApp)
                 }
             }
             val rightApp = backup.settings.swipeRightApp
             if (rightApp != null) {
                 if (rightApp in installedComponentsSet) {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, rightApp)
+                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, rightApp)
                     swipeImportedCount++
                 } else {
-                    swipeActionsManager.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
+                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
                     missingApps.add(rightApp)
                 }
             }
@@ -936,25 +936,25 @@ class BackupRepositoryImpl @Inject constructor(
 
         // ===== PHASE 6: Import Gesture Settings =====
         if (options.importGestureSettings) {
-            backup.settings.doubleTapToLockEnabled?.let { settingsManager.setDoubleTapToLock(it) }
-            backup.settings.swipeDownToNotificationsEnabled?.let { settingsManager.setSwipeDownToNotifications(it) }
+            backup.settings.doubleTapToLockEnabled?.let { settingsRepository.setDoubleTapToLock(it) }
+            backup.settings.swipeDownToNotificationsEnabled?.let { settingsRepository.setSwipeDownToNotifications(it) }
         }
 
         // ===== PHASE 7: Import Theme Settings (inkl. Wallpaper) =====
         if (options.importThemeSettings) {
-            backup.settings.textColor?.let { settingsManager.setTextColor(it) }
-            backup.settings.chipBackgroundColor?.let { settingsManager.setChipBackgroundColor(it) }
-            backup.settings.textShadowEnabled?.let { settingsManager.setTextShadowEnabled(it) }
-            backup.settings.isFontBold?.let { settingsManager.setFontBold(it) }
+            backup.settings.textColor?.let { settingsRepository.setTextColor(it) }
+            backup.settings.chipBackgroundColor?.let { settingsRepository.setChipBackgroundColor(it) }
+            backup.settings.textShadowEnabled?.let { settingsRepository.setTextShadowEnabled(it) }
+            backup.settings.isFontBold?.let { settingsRepository.setFontBold(it) }
 
             backup.settings.layoutScale?.let {
-                settingsManager.setLayoutScale(it.coerceInSafe(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
+                settingsRepository.setLayoutScale(it.coerceInSafe(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
             }
             backup.settings.verticalPaddingScale?.let {
-                settingsManager.setVerticalPadding(it.coerceInSafe(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))
+                settingsRepository.setVerticalPadding(it.coerceInSafe(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))
             }
             backup.settings.contentTopMarginScale?.let {
-                settingsManager.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
+                settingsRepository.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
             }
 
             importWallpaper(backup.settings)
@@ -962,23 +962,23 @@ class BackupRepositoryImpl @Inject constructor(
 
         // ===== PHASE 8: Import Time-Based Events =====
         if (options.importTimeBasedEvents) {
-            backup.settings.showCalendarEvent?.let { settingsManager.setShowCalendarEvent(it) }
-            backup.settings.showAlarm?.let { settingsManager.setShowAlarm(it) }
+            backup.settings.showCalendarEvent?.let { settingsRepository.setShowCalendarEvent(it) }
+            backup.settings.showAlarm?.let { settingsRepository.setShowAlarm(it) }
         }
 
         // ===== PHASE 9: Import Quality-of-Life Settings =====
         if (options.importQualityOfLife) {
-            backup.settings.autoShowKeyboard?.let { settingsManager.setAutoShowKeyboard(it) }
-            backup.settings.autoLaunchApp?.let { settingsManager.setAutoLaunchApp(it) }
+            backup.settings.autoShowKeyboard?.let { settingsRepository.setAutoShowKeyboard(it) }
+            backup.settings.autoLaunchApp?.let { settingsRepository.setAutoLaunchApp(it) }
         }
 
         // ===== PHASE 10: Import Power-User Settings =====
         if (options.importPowerUserSettings) {
             backup.settings.splitModeThreshold?.let { threshold ->
-                settingsManager.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
+                settingsRepository.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
             }
-            backup.settings.secureWindow?.let { settingsManager.setSecureWindow(it) }
-            backup.settings.rotationLocked?.let { settingsManager.setRotationLocked(it) }
+            backup.settings.secureWindow?.let { settingsRepository.setSecureWindow(it) }
+            backup.settings.rotationLocked?.let { settingsRepository.setRotationLocked(it) }
         }
 
         return ImportResult.Success(
@@ -997,7 +997,7 @@ class BackupRepositoryImpl @Inject constructor(
         // Dateien werden in importMultiLayer/importSingleLayer durch
         // copyToInternal() überschrieben. Alte Waisen werden danach aufgeräumt
         // indem nur die tatsächlich referenzierten Dateien behalten werden.
-        wallpaperManager.clearWallpaper()
+        wallpaperRepository.clearWallpaper()
 
         if (settings.wallpaperLayers.isNotEmpty()) {
             importMultiLayerWallpaper(settings.wallpaperLayers)
@@ -1041,7 +1041,7 @@ class BackupRepositoryImpl @Inject constructor(
 
         if (validLayerStates.isNotEmpty()) {
             val wallpaperState = WallpaperState.multiLayer(validLayerStates)
-            wallpaperManager.saveWallpaperState(wallpaperState)
+            wallpaperRepository.saveWallpaperState(wallpaperState)
             Timber.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers")
         } else {
             Timber.w("No valid wallpaper layers found, wallpaper not restored")
@@ -1069,7 +1069,7 @@ class BackupRepositoryImpl @Inject constructor(
                         translateX = settings.wallpaperTranslateX ?: 0.0f,
                         translateY = settings.wallpaperTranslateY ?: 0.0f
                     )
-                    wallpaperManager.saveWallpaperState(wallpaperState)
+                    wallpaperRepository.saveWallpaperState(wallpaperState)
                     Timber.i("Imported wallpaper settings (single-layer)")
                 } else {
                     Timber.w("Failed to copy wallpaper to internal storage")

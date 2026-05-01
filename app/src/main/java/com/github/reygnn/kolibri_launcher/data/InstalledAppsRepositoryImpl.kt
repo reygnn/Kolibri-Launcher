@@ -60,7 +60,7 @@ import javax.inject.Singleton
  *
  * @property context Application context for accessing system services
  * @property packageManager Android PackageManager for querying installed apps
- * @property appNamesManager Repository for custom app name mappings
+ * @property customNamesRepository Repository for custom app name mappings
  * @property appsUpdateTrigger Shared flow for triggering refresh operations
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -68,7 +68,7 @@ import javax.inject.Singleton
 class InstalledAppsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val packageManager: PackageManager,
-    private val appNamesManager: CustomNamesRepository,
+    private val customNamesRepository: CustomNamesRepository,
     private val appsUpdateTrigger: MutableSharedFlow<Unit>
 ) : InstalledAppsRepository {
 
@@ -198,7 +198,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                 }
 
                 val displayName = try {
-                    appNamesManager.getDisplayNameForPackage(packageName, originalName)
+                    customNamesRepository.getDisplayNameForPackage(packageName, originalName)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

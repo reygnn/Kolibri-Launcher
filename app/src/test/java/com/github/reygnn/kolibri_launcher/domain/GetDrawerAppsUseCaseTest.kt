@@ -42,11 +42,11 @@ class GetDrawerAppsUseCaseTest {
     @MockK
     private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
     @MockK
-    private lateinit var appUsageManager: AppUsageRepository
+    private lateinit var appUsageRepository: AppUsageRepository
     @MockK
-    private lateinit var appVisibilityManager: HiddenAppsRepository
+    private lateinit var hiddenAppsRepository: HiddenAppsRepository
     @MockK
-    private lateinit var settingsManager: SettingsRepository
+    private lateinit var settingsRepository: SettingsRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var hiddenAppsFlow: MutableStateFlow<Set<String>>
@@ -68,14 +68,14 @@ class GetDrawerAppsUseCaseTest {
         sortOrderFlow = MutableStateFlow(SortOrder.ALPHABETICAL)
 
         every { installedAppsStateRepository.rawAppsFlow } returns rawAppsFlow
-        every { appVisibilityManager.hiddenAppsFlow } returns hiddenAppsFlow
-        every { settingsManager.sortOrderFlow } returns sortOrderFlow
+        every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
+        every { settingsRepository.sortOrderFlow } returns sortOrderFlow
 
         useCase = GetDrawerAppsUseCase(
-            appUsageManager,
+            appUsageRepository,
             installedAppsStateRepository,
-            appVisibilityManager,
-            settingsManager,
+            hiddenAppsRepository,
+            settingsRepository,
             dispatcher = mainDispatcherRule.testDispatcher
         )
     }
@@ -134,7 +134,7 @@ class GetDrawerAppsUseCaseTest {
         val observer = Observer<List<AppInfo>> { results.add(it) }
 
         val timeWeightedSortedList = listOf(app2, app3, app1)
-        coEvery { appUsageManager.sortAppsByTimeWeightedUsage(any()) } returns timeWeightedSortedList
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } returns timeWeightedSortedList
 
         useCase.drawerApps.observeForever(observer)
 
@@ -151,7 +151,7 @@ class GetDrawerAppsUseCaseTest {
             assertEquals("App B", drawerApps[1].displayName)
             assertEquals("App A", drawerApps[2].displayName)
 
-            coVerify(atLeast = 1) { appUsageManager.sortAppsByTimeWeightedUsage(any()) }
+            coVerify(atLeast = 1) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
         } finally {
             useCase.drawerApps.removeObserver(observer)
         }
@@ -175,7 +175,7 @@ class GetDrawerAppsUseCaseTest {
             assertEquals("App A", initialDrawerApps[0].displayName)
 
             val timeWeightedSortedList = listOf(app2, app3, app1)
-            coEvery { appUsageManager.sortAppsByTimeWeightedUsage(any()) } returns timeWeightedSortedList
+            coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } returns timeWeightedSortedList
 
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
             advanceUntilIdle()
@@ -199,7 +199,7 @@ class GetDrawerAppsUseCaseTest {
 
             val drawerApps = results.last()
             assertTrue(drawerApps.isEmpty())
-            coVerify(exactly = 0) { appUsageManager.sortAppsByTimeWeightedUsage(any()) }
+            coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
         } finally {
             useCase.drawerApps.removeObserver(observer)
         }
@@ -208,11 +208,11 @@ class GetDrawerAppsUseCaseTest {
     // ========== NEW CRASH-RESISTANCE TESTS ==========
 
     @Test
-    fun `drawerApps - when appUsageManager throws exception - falls back to alphabetical`() = runTest {
+    fun `drawerApps - when appUsageRepository throws exception - falls back to alphabetical`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
         val observer = Observer<List<AppInfo>> { results.add(it) }
 
-        coEvery { appUsageManager.sortAppsByTimeWeightedUsage(any()) } answers {
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } answers {
             throw RuntimeException("Sorting failed")
         }
 
@@ -236,11 +236,11 @@ class GetDrawerAppsUseCaseTest {
     }
 
     @Test
-    fun `drawerApps - when appUsageManager throws IOException - falls back to alphabetical`() = runTest {
+    fun `drawerApps - when appUsageRepository throws IOException - falls back to alphabetical`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
         val observer = Observer<List<AppInfo>> { results.add(it) }
 
-        coEvery { appUsageManager.sortAppsByTimeWeightedUsage(any()) } answers {
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } answers {
             throw IOException("Cannot read usage data")
         }
 
@@ -338,7 +338,7 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             assertTrue(results.last().isEmpty())
-            coVerify(exactly = 0) { appUsageManager.sortAppsByTimeWeightedUsage(any()) }
+            coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
         } finally {
             useCase.drawerApps.removeObserver(observer)
         }

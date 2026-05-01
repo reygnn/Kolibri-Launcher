@@ -3,8 +3,8 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
-import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
@@ -37,11 +37,11 @@ class GetFavoriteAppsUseCaseTest {
     @MockK
     private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
     @MockK
-    private lateinit var favoritesManager: FavoritesRepository
+    private lateinit var favoritesRepository: FavoritesRepository
     @MockK
-    private lateinit var favoritesOrderManager: FavoritesOrderRepositoryImpl
+    private lateinit var favoritesOrderRepository: FavoritesOrderRepository
     @MockK
-    private lateinit var appVisibilityManager: HiddenAppsRepository
+    private lateinit var hiddenAppsRepository: HiddenAppsRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var favoritesFlow: MutableStateFlow<Set<String>>
@@ -65,15 +65,15 @@ class GetFavoriteAppsUseCaseTest {
         orderFlow = MutableStateFlow(emptyList())
 
         every { installedAppsStateRepository.rawAppsFlow } returns rawAppsFlow
-        every { favoritesManager.favoriteComponentsFlow } returns favoritesFlow
-        every { appVisibilityManager.hiddenAppsFlow } returns hiddenAppsFlow
-        every { favoritesOrderManager.favoriteComponentsOrderFlow } returns orderFlow
+        every { favoritesRepository.favoriteComponentsFlow } returns favoritesFlow
+        every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
+        every { favoritesOrderRepository.favoriteComponentsOrderFlow } returns orderFlow
 
         useCase = GetFavoriteAppsUseCase(
             installedAppsStateRepository,
-            favoritesManager,
-            favoritesOrderManager,
-            appVisibilityManager
+            favoritesRepository,
+            favoritesOrderRepository,
+            hiddenAppsRepository
         )
     }
 
@@ -82,7 +82,7 @@ class GetFavoriteAppsUseCaseTest {
     @Test
     fun `favoriteApps returns correctly identified and sorted apps`() = runTest {
         val customSortedFavorites = listOf(app2, app1)
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns customSortedFavorites
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns customSortedFavorites
 
         useCase.favoriteApps.test {
             assertEquals(UiState.Loading, awaitItem())
@@ -95,7 +95,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(2, result.apps.size)
             assertEquals("App C", result.apps[0].displayName)
             assertEquals("App A", result.apps[1].displayName)
@@ -105,7 +105,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps returns default fallback apps when no favorites are set`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns emptyList()
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
         useCase.favoriteApps.test {
             assertEquals(UiState.Loading, awaitItem())
@@ -116,7 +116,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             val expectedFallbackSize = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME.coerceAtMostSafe(allApps.size)
 
             assertEquals(expectedFallbackSize, result.apps.size)
@@ -139,7 +139,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when sortFavoriteComponents throws exception - falls back to alphabetical`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             throw RuntimeException("Sorting failed")
         }
 
@@ -153,7 +153,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(2, result.apps.size)
             assertEquals("App A", result.apps[0].displayName)
             assertEquals("App C", result.apps[1].displayName)
@@ -162,7 +162,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when sortFavoriteComponents throws IOException - handles gracefully`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             throw IOException("Cannot read order")
         }
 
@@ -176,7 +176,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(1, result.apps.size)
             assertEquals("App B", result.apps[0].displayName)
         }
@@ -184,16 +184,16 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when favoritesFlow crashes - uses empty set fallback and shows fallback apps`() = runTest {
-        every { favoritesManager.favoriteComponentsFlow } returns flow {
+        every { favoritesRepository.favoriteComponentsFlow } returns flow {
             throw IOException("Cannot read favorites")
         }
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns emptyList()
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
         val crashingUseCase = GetFavoriteAppsUseCase(
             installedAppsStateRepository,
-            favoritesManager,
-            favoritesOrderManager,
-            appVisibilityManager
+            favoritesRepository,
+            favoritesOrderRepository,
+            hiddenAppsRepository
         )
 
         crashingUseCase.favoriteApps.test {
@@ -204,7 +204,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertTrue(result.isFallback, "Should be fallback since favorites crashed")
             assertTrue(result.apps.isNotEmpty(), "Should have fallback apps")
         }
@@ -212,18 +212,18 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when hiddenAppsFlow crashes - treats all apps as visible`() = runTest {
-        every { appVisibilityManager.hiddenAppsFlow } returns flow {
+        every { hiddenAppsRepository.hiddenAppsFlow } returns flow {
             throw RuntimeException("Cannot read hidden apps")
         }
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
 
         val crashingUseCase = GetFavoriteAppsUseCase(
             installedAppsStateRepository,
-            favoritesManager,
-            favoritesOrderManager,
-            appVisibilityManager
+            favoritesRepository,
+            favoritesOrderRepository,
+            hiddenAppsRepository
         )
 
         crashingUseCase.favoriteApps.test {
@@ -236,7 +236,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertNotNull(result.apps)
             assertEquals(1, result.apps.size)
         }
@@ -244,7 +244,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - with all favorites hidden - returns fallback`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns emptyList()
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
         useCase.favoriteApps.test {
             assertEquals(UiState.Loading, awaitItem())
@@ -261,7 +261,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertTrue(result.isFallback)
             assertEquals(1, result.apps.size)
             assertEquals("App B", result.apps[0].displayName)
@@ -270,7 +270,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - with malformed componentNames in favorites - filters them out`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
 
@@ -284,7 +284,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(2, result.apps.size)
         }
     }
@@ -297,7 +297,7 @@ class GetFavoriteAppsUseCaseTest {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns largeFavoritesList
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns largeFavoritesList
 
         useCase.favoriteApps.test {
             assertEquals(UiState.Loading, awaitItem())
@@ -309,14 +309,14 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 
     @Test
     fun `favoriteApps - when only some favorites exist in installed apps - returns existing ones`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
 
@@ -331,7 +331,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertEquals(2, result.apps.size)
             assertFalse(result.isFallback)
         }
@@ -339,7 +339,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - rapid flow updates - handles correctly`() = runTest {
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } answers {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
 
@@ -349,17 +349,17 @@ class GetFavoriteAppsUseCaseTest {
             rawAppsFlow.value = allApps
             val initial = awaitItem()
             assertTrue(initial is UiState.Success)
-            assertEquals(3, (initial as UiState.Success).data.apps.size)
+            assertEquals(3, initial.data.apps.size)
 
             favoritesFlow.value = setOf(app1.componentName)
             val first = awaitItem()
             assertTrue(first is UiState.Success)
-            assertEquals(1, (first as UiState.Success).data.apps.size)
+            assertEquals(1, first.data.apps.size)
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
             val second = awaitItem()
             assertTrue(second is UiState.Success)
-            assertEquals(2, (second as UiState.Success).data.apps.size)
+            assertEquals(2, second.data.apps.size)
         }
     }
 
@@ -383,7 +383,7 @@ class GetFavoriteAppsUseCaseTest {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
         }
 
-        coEvery { favoritesOrderManager.sortFavoriteComponents(any(), any()) } returns emptyList()
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
         useCase.favoriteApps.test {
             assertEquals(UiState.Loading, awaitItem())
@@ -394,7 +394,7 @@ class GetFavoriteAppsUseCaseTest {
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
-            val result = (successState as UiState.Success).data
+            val result = successState.data
             assertTrue(result.isFallback)
             assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
         }

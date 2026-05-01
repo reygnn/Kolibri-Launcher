@@ -5,7 +5,6 @@ import io.mockk.mockk
 
 import android.content.ContentResolver
 import android.content.Context
-import androidx.navigation.ui.AppBarConfiguration
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -74,14 +73,14 @@ class BackupRepositoryImplSecurityTest {
         every { mockContext.contentResolver } returns mockContentResolver
 
         backupManager = BackupRepositoryImpl(
-            favoritesManager = fakeFavoritesRepo,
-            favoritesOrderManager = fakeFavoritesOrderRepo,
-            appVisibilityManager = fakeHiddenAppsRepo,
-            appNamesManager = fakeCustomNamesRepo,
-            installedAppsManager = fakeInstalledAppsRepo,
-            swipeActionsManager = fakeSwipeActionsRepo,
-            settingsManager = fakeSettingsRepo,
-            wallpaperManager = fakeWallpaperRepo,
+            favoritesRepository = fakeFavoritesRepo,
+            favoritesOrderRepository = fakeFavoritesOrderRepo,
+            hiddenAppsRepository = fakeHiddenAppsRepo,
+            customNamesRepository = fakeCustomNamesRepo,
+            installedAppsRepository = fakeInstalledAppsRepo,
+            swipeActionsRepository = fakeSwipeActionsRepo,
+            settingsRepository = fakeSettingsRepo,
+            wallpaperRepository = fakeWallpaperRepo,
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )

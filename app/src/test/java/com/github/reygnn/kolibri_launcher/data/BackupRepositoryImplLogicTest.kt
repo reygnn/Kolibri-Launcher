@@ -65,14 +65,14 @@ class BackupRepositoryImplLogicTest {
         every { mockContext.contentResolver } returns mockContentResolver
 
         backupManager = BackupRepositoryImpl(
-            favoritesManager = fakeFavoritesRepo,
-            favoritesOrderManager = fakeFavoritesOrderRepo,
-            appVisibilityManager = fakeHiddenAppsRepo,
-            appNamesManager = fakeCustomNamesRepo,
-            installedAppsManager = fakeInstalledAppsRepo,
-            swipeActionsManager = fakeSwipeActionsRepo,
-            settingsManager = fakeSettingsRepo,
-            wallpaperManager = fakeWallpaperRepo,
+            favoritesRepository = fakeFavoritesRepo,
+            favoritesOrderRepository = fakeFavoritesOrderRepo,
+            hiddenAppsRepository = fakeHiddenAppsRepo,
+            customNamesRepository = fakeCustomNamesRepo,
+            installedAppsRepository = fakeInstalledAppsRepo,
+            swipeActionsRepository = fakeSwipeActionsRepo,
+            settingsRepository = fakeSettingsRepo,
+            wallpaperRepository = fakeWallpaperRepo,
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )

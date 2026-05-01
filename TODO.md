@@ -15,11 +15,11 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
 | 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | offen | ~1 Tag, eigenes Projekt |
-| 4 | `Manager` → `RepositoryImpl` Rename | offen, IDE-Job (Shift+F6) | ~5 min |
 | 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
 | 7 | `CrashReportConsent` von SharedPreferences nach DataStore migrieren (Rule-5-Verstoß) | offen | mittel |
+| 8 | `@MockK`-Variablen-Naming vereinheitlichen (mock-Präfix oder nicht) | offen | klein |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §4 (IDE-Job, Voraussetzung für sauberen §3) → §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 ist orthogonal zum Rest und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 und §8 sind orthogonal zum Rest und können jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -129,11 +129,6 @@ stellen (siehe Rule 11 + `HomeFragment.kt:157-208`).
 
 ## 3. `BackupRepositoryImpl` zerlegen
 
-> **Reihenfolge: §4 vor §3.** Das Rename der `Manager`-Felder (§4)
-> sollte vor dem Split passieren. Sonst muss der Rename nicht in
-> einer Klasse, sondern in drei neuen Klassen (Exporter / Importer /
-> ZipFormat) wiederholt werden — verdreifachter Aufwand ohne Gewinn.
-
 `data/BackupRepositoryImpl.kt` ist **1.356 Zeilen** mit **9 separaten
 Test-Files** (Doomsday, Security, Wallpaper, Isolation, etc.). Die
 Test-Disziplin ist exzellent — und genau das ist auch das Symptom:
@@ -153,73 +148,6 @@ dass die Klasse drei Verantwortlichkeiten in einer trägt.
 - [ ] **`BackupRepository`-Interface bleibt eine Facade**, falls
   Aufrufer das vereinheitlichte API brauchen — die Implementierung
   delegiert dann an die drei Klassen.
-
----
-
-## 4. Naming-Konsistenz: `Manager` → `RepositoryImpl` zu Ende führen
-
-Die Hilt-Migration hat Production-Klassen von `XyzManager` auf
-`XyzRepositoryImpl` umbenannt (siehe `app/src/test/CLAUDE.md` →
-„Namens-Historie"). An manchen Stellen ist die alte Schreibweise
-in Field-Namen aber stehengeblieben:
-
-`data/BackupRepositoryImpl.kt`-Konstruktor injiziert u. a.:
-- `favoritesManager: FavoritesRepository`
-- `appVisibilityManager: HiddenAppsRepository`
-- `appNamesManager: CustomNamesRepository`
-
-Cosmetic, aber „Tagesform der Migration" ist genau die Art Detail,
-die einen frischen Reviewer beim ersten Vorbeigang stolpern lässt.
-
-### Werkzeug: Android Studio, nicht Claude
-
-**Diese Aufgabe gehört in die IDE, nicht in eine Edit-Session mit Claude.**
-Android Studio's Refactor → Rename (Shift+F6 auf dem Field-Namen)
-macht den Rename atomar projektweit:
-
-- alle Aufrufstellen in derselben Klasse
-- Imports und Hilt-Bindings
-- KDoc-`[link]`-Referenzen
-- String-Templates (`"Failed to query $favoritesManager"`)
-- Named-Argument-Call-Sites in Tests
-
-Aufwand pro Field: Cursor → Shift+F6 → neuer Name → Enter. Für die
-~22 Fields gesamt **~5 Minuten**. Per Hand (oder via Claude-Edits)
-wären das ~1-2h plus reales Risiko, eine Referenz zu übersehen
-(KDoc, String-Template). Falsches Werkzeug.
-
-Claude kann unterstützen: vor dem Rename den Plan validieren, nach
-dem Rename Tests laufen lassen, Grep nach Reststand `Manager:` mit
-`*Repository`-Typ, Commit-Message + Merge-Ablauf.
-
-### Inventar (~22 Fields, alle mit Typ `*Repository`)
-
-- [ ] **`data/BackupRepositoryImpl.kt`** (Z. 77-84) — 8 Fields:
-  `favoritesManager`, `favoritesOrderManager`, `appVisibilityManager`,
-  `appNamesManager`, `installedAppsManager`, `swipeActionsManager`,
-  `settingsManager`, `wallpaperManager`. Größtes File, dichtest
-  benutzt — eigener PR.
-- [ ] **`ui/settings/SettingsFragment.kt`** (Z. 78-90) — 5 Fields:
-  `appVisibilityManager`, `favoritesManager`, `favoritesOrderManager`,
-  `settingsManager`, `screenLockManager`. Eigener PR.
-- [ ] **Sammel-PR** für die übrigen 9 Fields:
-  - `domain/usecase/GetDrawerAppsUseCase.kt` (3)
-  - `domain/usecase/GetFavoriteAppsUseCase.kt` (3)
-  - `data/InstalledAppsRepositoryImpl.kt` (1)
-  - `data/TimeBasedEventsRepositoryImpl.kt` (1)
-  - `ui/appcontextmenu/AppContextMenuDialogFragment.kt` (1)
-
-### Bewusste Ausnahmen — nicht anfassen
-
-Per `app/src/test/CLAUDE.md` explizit dokumentiert:
-- **`WallpaperFileManager`** (kein Repo, reines File-Helper-Konstrukt)
-- **`DataMigrationManager`** (Migrations-Bootstrap, kein Repo)
-
-Auch nicht anfassen — Android-System-Klassen die *Manager* heißen,
-weil Android sie so nennt: `PackageManager`, `RoleManager`,
-`AlarmManager`, `WallpaperManager`, `FragmentManager`,
-`LayoutManager`, `LauncherApps`. Das Distinktions-Kriterium ist
-trivial: nur Felder umbenennen, deren **Typ** `*Repository` ist.
 
 ---
 
@@ -291,6 +219,55 @@ mehrfache Aufrufe, Test in `DataMigrationManagerTest`. Dazu der
 Refactor in `CrashReportConsent` (alle vier Methoden) plus der
 Test-Update — `CrashReportConsent` hat aktuell wenig direkten
 Test, müsste evtl. ergänzt werden. Eine Stunde, vielleicht zwei.
+
+---
+
+## 8. `@MockK`-Variablen-Naming vereinheitlichen
+
+Während des §4-Sweeps aufgefallen: in den Test-Files ist nicht
+konsistent, ob MockK-Variablen einen `mock`-Präfix bekommen oder
+nicht. Pro File ist es meist konsistent, zwischen Files inkonsistent
+— klassischer Drift-by-Author-Daytime.
+
+### Beispiele
+
+**Mit `mock`-Präfix:**
+- `mockContext`, `mockPackageManager`, `mockAlarmManager`,
+  `mockContentResolver`, `mockIntent` (Android-System-Mocks)
+- `mockSettingsRepository`, `mockCustomNamesRepository`,
+  `mockLauncherService`, `mockShortcut` (eigene Klassen)
+
+**Ohne Präfix:**
+- `context`, `sharedPreferences`, `launcherApps`, `packageManager`
+  (Android-System-Mocks)
+- `repository`, `timeBasedEventsRepository` (eigene Klassen)
+
+Ganze Files sind durchgängig in einem Stil, aber nebeneinander
+existieren z. B. `TimeBasedEventsRepositoryImplTest.kt` (alle
+mit `mock`-Präfix) und `ShortcutRepositoryImplTest.kt` (alle ohne).
+
+### Was zu entscheiden ist
+
+- [ ] **Konvention wählen:** `mock`-Präfix oder nicht.
+  - **Pro Präfix:** explizit, sofort sichtbar dass es ein Mock ist;
+    de-facto-Standard in vielen MockK-Codebases.
+  - **Contra Präfix:** Type-Annotation (`: HiddenAppsRepository`)
+    sagt schon was es ist; `@MockK` über der Variable auch;
+    Präfix ist redundant.
+- [ ] **Sweep:** alle Test-Files auf die gewählte Konvention
+  bringen. Per-File Shift+F6 in Android Studio. Klein, aber breit
+  verteilt — alle ~60 Test-Files mit MockK-Variablen.
+- [ ] **Konvention in `app/src/test/CLAUDE.md` festhalten** unter
+  „Test conventions", damit zukünftige Tests nicht wieder driften.
+
+### Bonus-Fund (gleicher Sweep, Rule-1-Verstoß)
+
+`GetFavoriteAppsUseCaseTest.kt:42` deklariert
+`favoritesOrderManager: FavoritesOrderRepositoryImpl` — also den
+**konkreten Impl**-Type, nicht das Interface. Verstößt gegen Rule 1
+(„ViewModels und use cases depend only on the interface, never on
+the concrete manager"). Sollte beim Sweep auf `: FavoritesOrderRepository`
+korrigiert werden.
 
 ---
 

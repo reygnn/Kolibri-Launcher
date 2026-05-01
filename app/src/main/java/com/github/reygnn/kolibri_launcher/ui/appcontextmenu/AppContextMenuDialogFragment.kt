@@ -72,7 +72,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     // used to live here (favorites, hidden, shortcut) moved into
     // BuildAppContextMenuUseCase.
     @Inject
-    lateinit var appNamesManager: CustomNamesRepository
+    lateinit var customNamesRepository: CustomNamesRepository
 
     @Inject
     lateinit var buildAppContextMenuUseCase: BuildAppContextMenuUseCase
@@ -225,7 +225,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                         AppContextMenuAction.Companion.ACTION_ID_RESTORE_NAME -> {
                             viewLifecycleOwner.lifecycleScope.launch {
                                 try {
-                                    appNamesManager.removeCustomNameForPackage(appInfo.packageName)
+                                    customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
                                     dismiss()
                                 } catch (e: CancellationException) {
                                     throw e
@@ -285,12 +285,12 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                         viewLifecycleOwner.lifecycleScope.launch {
                             try {
                                 if (newName.isNotBlank() && newName != appInfo.originalName) {
-                                    appNamesManager.setCustomNameForPackage(
+                                    customNamesRepository.setCustomNameForPackage(
                                         appInfo.packageName,
                                         newName
                                     )
                                 } else {
-                                    appNamesManager.removeCustomNameForPackage(appInfo.packageName)
+                                    customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
                                 }
                                 dismiss()
                             } catch (e: CancellationException) {

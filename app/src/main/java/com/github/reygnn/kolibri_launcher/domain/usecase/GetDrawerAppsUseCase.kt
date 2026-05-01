@@ -22,10 +22,10 @@ import javax.inject.Singleton
 
 @Singleton
 class GetDrawerAppsUseCase @Inject constructor(
-    private val appUsageManager: AppUsageRepository,
+    private val appUsageRepository: AppUsageRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val appVisibilityManager: HiddenAppsRepository,
-    private val settingsManager: SettingsRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository,
+    private val settingsRepository: SettingsRepository,
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) {
 
@@ -36,11 +36,11 @@ class GetDrawerAppsUseCase @Inject constructor(
         installedAppsStateRepository.rawAppsFlow,
 
         // Non-critical Flows: Mit individuellen Fallbacks
-        settingsManager.sortOrderFlow.catch { e ->
+        settingsRepository.sortOrderFlow.catch { e ->
             Timber.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
             emit(SortOrder.ALPHABETICAL)
         },
-        appVisibilityManager.hiddenAppsFlow.catch { e ->
+        hiddenAppsRepository.hiddenAppsFlow.catch { e ->
             Timber.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
@@ -67,7 +67,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                 // DataStore via Manager). Fallback auf Alphabetical ist
                 // bewusster Graceful-Degrade. Dies ist der einzige
                 // legitime Catch in diesem Block.
-                appUsageManager.sortAppsByTimeWeightedUsage(visibleApps)
+                appUsageRepository.sortAppsByTimeWeightedUsage(visibleApps)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

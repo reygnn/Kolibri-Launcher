@@ -51,14 +51,14 @@ class BackupRepositoryImplNamingConventionTest {
         every { mockContext.contentResolver } returns mockk(relaxed = true)
 
         backupManager = BackupRepositoryImpl(
-            favoritesManager = fakeFavoritesRepo,
-            favoritesOrderManager = fakeFavoritesOrderRepo,
-            appVisibilityManager = fakeHiddenAppsRepo,
-            appNamesManager = fakeCustomNamesRepo,
-            installedAppsManager = fakeInstalledAppsRepo,
-            swipeActionsManager = fakeSwipeActionsRepo,
-            settingsManager = fakeSettingsRepo,
-            wallpaperManager = fakeWallpaperRepo,
+            favoritesRepository = fakeFavoritesRepo,
+            favoritesOrderRepository = fakeFavoritesOrderRepo,
+            hiddenAppsRepository = fakeHiddenAppsRepo,
+            customNamesRepository = fakeCustomNamesRepo,
+            installedAppsRepository = fakeInstalledAppsRepo,
+            swipeActionsRepository = fakeSwipeActionsRepo,
+            settingsRepository = fakeSettingsRepo,
+            wallpaperRepository = fakeWallpaperRepo,
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )

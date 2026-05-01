@@ -27,12 +27,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 
 /**
@@ -113,14 +111,14 @@ class BackupRepositoryImplWallpaperTest {
         coEvery { mockWallpaperFileManager.copyToInternal(any()) } answers { firstArg<Uri>() }
 
         backupManager = BackupRepositoryImpl(
-            favoritesManager = fakeFavoritesRepo,
-            favoritesOrderManager = fakeFavoritesOrderRepo,
-            appVisibilityManager = fakeHiddenAppsRepo,
-            appNamesManager = fakeCustomNamesRepo,
-            installedAppsManager = fakeInstalledAppsRepo,
-            swipeActionsManager = fakeSwipeActionsRepo,
-            settingsManager = fakeSettingsRepo,
-            wallpaperManager = fakeWallpaperRepo,
+            favoritesRepository = fakeFavoritesRepo,
+            favoritesOrderRepository = fakeFavoritesOrderRepo,
+            hiddenAppsRepository = fakeHiddenAppsRepo,
+            customNamesRepository = fakeCustomNamesRepo,
+            installedAppsRepository = fakeInstalledAppsRepo,
+            swipeActionsRepository = fakeSwipeActionsRepo,
+            settingsRepository = fakeSettingsRepo,
+            wallpaperRepository = fakeWallpaperRepo,
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )

@@ -32,7 +32,7 @@ import javax.inject.Singleton
 @Singleton
 class TimeBasedEventsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val settingsManager: SettingsRepository
+    private val settingsRepository: SettingsRepository
 ) : TimeBasedEventsRepository {
 
     companion object {
@@ -45,7 +45,7 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
 
         // 1. Einstellungen laden (Safely)
         val showAlarm = try {
-            settingsManager.showAlarmFlow.first()
+            settingsRepository.showAlarmFlow.first()
         } catch (e: CancellationException) {
             throw e // Abbruch sofort weiterleiten!
         } catch (e: Throwable) {
@@ -54,7 +54,7 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
         }
 
         val showCalendarEvents = try {
-            settingsManager.showCalendarEventFlow.first()
+            settingsRepository.showCalendarEventFlow.first()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

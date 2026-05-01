@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import io.mockk.every
 import io.mockk.mockk
 
 import android.content.Context
@@ -74,14 +73,14 @@ class BackupRepositoryImplStrictTest {
 
         // 3. Initialize BackupRepositoryImpl with Fakes
         backupManager = BackupRepositoryImpl(
-            favoritesManager = favoritesRepo,
-            favoritesOrderManager = favoritesOrderRepo,
-            appVisibilityManager = hiddenAppsRepo,
-            appNamesManager = customNamesRepo,
-            installedAppsManager = installedAppsRepo,
-            swipeActionsManager = swipeActionsRepo,
-            settingsManager = settingsRepo,
-            wallpaperManager = fakeWallpaperRepo,
+            favoritesRepository = favoritesRepo,
+            favoritesOrderRepository = favoritesOrderRepo,
+            hiddenAppsRepository = hiddenAppsRepo,
+            customNamesRepository = customNamesRepo,
+            installedAppsRepository = installedAppsRepo,
+            swipeActionsRepository = swipeActionsRepo,
+            settingsRepository = settingsRepo,
+            wallpaperRepository = fakeWallpaperRepo,
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )

@@ -57,22 +57,22 @@ import javax.inject.Singleton
  */
 class GetFavoriteAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val favoritesManager: FavoritesRepository,
-    private val favoritesOrderManager: FavoritesOrderRepository,
-    private val appVisibilityManager: HiddenAppsRepository
+    private val favoritesRepository: FavoritesRepository,
+    private val favoritesOrderRepository: FavoritesOrderRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository
 ) {
 
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
         installedAppsStateRepository.rawAppsFlow,
-        favoritesManager.favoriteComponentsFlow.catch { e ->
+        favoritesRepository.favoriteComponentsFlow.catch { e ->
             Timber.w(e, "favoriteComponentsFlow error - using empty set fallback")
             emit(emptySet())
         },
-        appVisibilityManager.hiddenAppsFlow.catch { e ->
+        hiddenAppsRepository.hiddenAppsFlow.catch { e ->
             Timber.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
-        favoritesOrderManager.favoriteComponentsOrderFlow.catch { e ->
+        favoritesOrderRepository.favoriteComponentsOrderFlow.catch { e ->
             Timber.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
         }
@@ -112,7 +112,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         // Einziger Wurfkandidat: sortFavoriteComponents (suspend, Repo-Call).
         val orderedFavorites = try {
-            favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
+            favoritesOrderRepository.sortFavoriteComponents(favoriteApps, savedOrder)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

@@ -75,19 +75,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private val viewModel: SettingsViewModel by viewModels({ requireActivity() })
 
     @Inject
-    lateinit var appVisibilityManager: HiddenAppsRepository
+    lateinit var hiddenAppsRepository: HiddenAppsRepository
 
     @Inject
-    lateinit var favoritesManager: FavoritesRepository
+    lateinit var favoritesRepository: FavoritesRepository
 
     @Inject
-    lateinit var favoritesOrderManager: FavoritesOrderRepository
+    lateinit var favoritesOrderRepository: FavoritesOrderRepository
 
     @Inject
-    lateinit var settingsManager: SettingsRepository
+    lateinit var settingsRepository: SettingsRepository
 
     @Inject
-    lateinit var screenLockManager: ScreenLockRepository
+    lateinit var screenLockRepository: ScreenLockRepository
 
     // 1. Deklaration für die Preference
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
@@ -109,7 +109,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             if (isGranted) {
                 // Nutzer hat zugestimmt! Jetzt die Einstellung speichern.
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setShowCalendarEvent(true)
+                    settingsRepository.setShowCalendarEvent(true)
                 }
             } else {
                 // Nutzer hat abgelehnt. Zeige Feedback.
@@ -175,7 +175,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 } else {
                     // User möchte Feature deaktivieren -> direkt speichern
                     viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setShowCalendarEvent(false)
+                        settingsRepository.setShowCalendarEvent(false)
                     }
                     true // Erlaube das Toggle auf 'false'
                 }
@@ -190,7 +190,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val shouldEnable = newValue as? Boolean ?: true
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setShowAlarm(shouldEnable)
+                    settingsRepository.setShowAlarm(shouldEnable)
                 }
                 true
             } catch (e: Throwable) {
@@ -204,7 +204,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val shouldEnable = newValue as? Boolean ?: false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setAutoShowKeyboard(shouldEnable)
+                    settingsRepository.setAutoShowKeyboard(shouldEnable)
                 }
                 true
             } catch (e: Throwable) {
@@ -218,7 +218,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val shouldEnable = newValue as? Boolean ?: false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setAutoLaunchApp(shouldEnable)
+                    settingsRepository.setAutoLaunchApp(shouldEnable)
                 }
                 true
             } catch (e: Throwable) {
@@ -246,7 +246,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 } else {
                     // Speichere den validen Wert
                     viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setSplitModeThreshold(threshold)
+                        settingsRepository.setSplitModeThreshold(threshold)
 
                         // Zeige Bestätigung
                         Toast.makeText(
@@ -277,7 +277,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val shouldEnable = newValue as? Boolean ?: false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setSecureWindow(shouldEnable)
+                    settingsRepository.setSecureWindow(shouldEnable)
 
                     // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
                     if (shouldEnable) {
@@ -297,7 +297,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val shouldEnable = newValue as? Boolean ?: false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    settingsManager.setRotationLocked(shouldEnable)
+                    settingsRepository.setRotationLocked(shouldEnable)
                 }
                 true
             } catch (e: Throwable) {
@@ -501,7 +501,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 if (newValue is Boolean) {
                     viewLifecycleOwner.lifecycleScope.launch {
                         try {
-                            settingsManager.setDoubleTapToLock(newValue)
+                            settingsRepository.setDoubleTapToLock(newValue)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
@@ -524,7 +524,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 if (newValue is Boolean) {
                     viewLifecycleOwner.lifecycleScope.launch {
                         try {
-                            settingsManager.setSwipeDownToNotifications(newValue)
+                            settingsRepository.setSwipeDownToNotifications(newValue)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
@@ -687,7 +687,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Kalender-Einstellung
                 launch {
                     try {
-                        settingsManager.showCalendarEventFlow.collect { isEnabled ->
+                        settingsRepository.showCalendarEventFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             calendarSwitchPreference?.isChecked = isEnabled
                         }
@@ -701,7 +701,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Alarm-Einstellung
                 launch {
                     try {
-                        settingsManager.showAlarmFlow.collect { isEnabled ->
+                        settingsRepository.showAlarmFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             alarmSwitchPreference?.isChecked = isEnabled
                         }
@@ -715,7 +715,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Double Tap Setting
                 launch {
                     try {
-                        settingsManager.doubleTapToLockEnabledFlow.collect { isChecked ->
+                        settingsRepository.doubleTapToLockEnabledFlow.collect { isChecked ->
                             if (!isAdded || isDetached) return@collect
                             findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)?.isChecked =
                                 isChecked
@@ -730,7 +730,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Swipe Down to Notifications Setting
                 launch {
                     try {
-                        settingsManager.swipeDownToNotificationsEnabledFlow.collect { isChecked ->
+                        settingsRepository.swipeDownToNotificationsEnabledFlow.collect { isChecked ->
                             if (!isAdded || isDetached) return@collect
                             findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)?.isChecked =
                                 isChecked
@@ -745,7 +745,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für show Keyboard Setting
                 launch {
                     try {
-                        settingsManager.autoShowKeyboardFlow.collect { isEnabled ->
+                        settingsRepository.autoShowKeyboardFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             autoKeyboardSwitchPreference?.isChecked = isEnabled
                         }
@@ -758,7 +758,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                 launch {
                     try {
-                        settingsManager.autoLaunchAppFlow.collect { isEnabled ->
+                        settingsRepository.autoLaunchAppFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             autoLaunchAppSwitchPreference?.isChecked = isEnabled
                         }
@@ -772,7 +772,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Split-Mode Threshold
                 launch {
                     try {
-                        settingsManager.splitModeThresholdFlow.collect { threshold ->
+                        settingsRepository.splitModeThresholdFlow.collect { threshold ->
                             if (!isAdded || isDetached) return@collect
                             splitModeThresholdPreference?.apply {
                                 text = threshold.toString()
@@ -813,7 +813,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Secure Window Setting
                 launch {
                     try {
-                        settingsManager.secureWindowFlow.collect { isEnabled ->
+                        settingsRepository.secureWindowFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             secureWindowSwitchPreference?.isChecked = isEnabled
                         }
@@ -827,7 +827,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer für Rotation Lock Setting
                 launch {
                     try {
-                        settingsManager.rotationLockedFlow.collect { isEnabled ->
+                        settingsRepository.rotationLockedFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             rotationLockedSwitchPreference?.isChecked = isEnabled
                         }
@@ -859,7 +859,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         val favoriteComponents = try {
-            favoritesManager.favoriteComponentsFlow.first()
+            favoritesRepository.favoriteComponentsFlow.first()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -876,7 +876,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         val savedOrder = try {
-            favoritesOrderManager.favoriteComponentsOrderFlow.first()
+            favoritesOrderRepository.favoriteComponentsOrderFlow.first()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -885,7 +885,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         val orderedFavoriteApps = try {
-            favoritesOrderManager.sortFavoriteComponents(favoriteApps, savedOrder)
+            favoritesOrderRepository.sortFavoriteComponents(favoriteApps, savedOrder)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -993,7 +993,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 ) == PackageManager.PERMISSION_GRANTED -> {
                     // Berechtigung bereits vorhanden.
                     viewLifecycleOwner.lifecycleScope.launch {
-                        settingsManager.setShowCalendarEvent(true)
+                        settingsRepository.setShowCalendarEvent(true)
                     }
                 }
 

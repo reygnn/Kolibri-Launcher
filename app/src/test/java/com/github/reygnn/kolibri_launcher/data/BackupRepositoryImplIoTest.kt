@@ -72,14 +72,14 @@ class BackupRepositoryImplIoTest {
         every { mockPfd.fileDescriptor } returns FileDescriptor()
 
         backupManager = BackupRepositoryImpl(
-            favoritesManager = FakeFavoritesRepository(),
-            favoritesOrderManager = FakeFavoritesOrderRepository(),
-            appVisibilityManager = FakeHiddenAppsRepository(),
-            appNamesManager = FakeCustomNamesRepository(),
-            installedAppsManager = FakeInstalledAppsRepository(),
-            swipeActionsManager = FakeSwipeActionsRepository(),
-            settingsManager = FakeSettingsRepository(),
-            wallpaperManager = FakeWallpaperRepository(),
+            favoritesRepository = FakeFavoritesRepository(),
+            favoritesOrderRepository = FakeFavoritesOrderRepository(),
+            hiddenAppsRepository = FakeHiddenAppsRepository(),
+            customNamesRepository = FakeCustomNamesRepository(),
+            installedAppsRepository = FakeInstalledAppsRepository(),
+            swipeActionsRepository = FakeSwipeActionsRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            wallpaperRepository = FakeWallpaperRepository(),
             wallpaperFileManager = mockWallpaperFileManager,
             context = mockContext
         )
