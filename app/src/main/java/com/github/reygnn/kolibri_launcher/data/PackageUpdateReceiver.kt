@@ -56,12 +56,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
     internal fun handleReceive(context: Context, intent: Intent, onFinish: () -> Unit) {
         try {
             val action = intent.action
-            val packageName = try {
-                intent.data?.schemeSpecificPart ?: "unknown"
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "[KOLIBRI] Error extracting package name")
-                "unknown"
-            }
+            val packageName = intent.data?.schemeSpecificPart ?: "unknown"
 
             Timber.d("[KOLIBRI] Receiver triggered. Action: $action, package: $packageName")
 
@@ -104,13 +99,12 @@ class PackageUpdateReceiver : BroadcastReceiver() {
 
     private suspend fun processPackageUpdate(context: Context, onFinish: () -> Unit) {
         try {
-            val appContext = try {
-                context.applicationContext ?: context
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "[KOLIBRI] Error getting application context")
-                context
-            }
+            val appContext = context.applicationContext ?: context
 
+            // EXPECTED: Hilt entry-point access can throw if Hilt is not yet
+            // initialised in the receiving process (cold-start race for
+            // package broadcasts). Bail early on failure — onFinish() still
+            // runs from the finally{} below.
             val hiltEntryPoint = try {
                 EntryPointAccessors.fromApplication(
                     appContext,
@@ -121,12 +115,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 return
             }
 
-            val appUpdateSignal = try {
-                hiltEntryPoint.getAppUpdateSignal()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "[KOLIBRI] Failed to get app update signal")
-                return
-            }
+            val appUpdateSignal = hiltEntryPoint.getAppUpdateSignal()
 
             try {
                 appUpdateSignal.sendUpdateSignal()
