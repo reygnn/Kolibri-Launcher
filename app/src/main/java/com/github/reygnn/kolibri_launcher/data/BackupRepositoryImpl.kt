@@ -47,6 +47,94 @@ import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/*
+ * =============================================================================
+ *               BackupRepositoryImpl — Size & Refactoring Notes
+ * =============================================================================
+ *
+ * This file is large — about 1,350 lines with nine separate test files
+ * (Doomsday, Security, Wallpaper, Isolation, Logic, Io, Strict, Malformed,
+ * NamingConvention). If you are here to split it into Exporter / Importer
+ * / ZipFormat to "fix the God-Class smell", please read this first — the
+ * split is NOT the right move, and the reasoning below explains why.
+ *
+ *
+ * Why the class is large
+ * ----------------------
+ * Backup/restore is inherently the dual of every persisted Repository in
+ * the app. To produce a backup, this class reads every Repository; to
+ * apply a backup, it writes every Repository. The 9 constructor
+ * dependencies (8 Repositories + WallpaperFileManager + Context) are
+ * not a smell — they are the domain. Any class that does what this
+ * class does will inject every Repository.
+ *
+ * On top of that, the class implements a hardened parser (kotlinx.
+ * serialization for forward-compat reads, org.json for strict
+ * validation, OOM/type-confusion/integer-overflow/Float-NaN protection)
+ * and a versioned ZIP format with embedded wallpaper images. None of
+ * these can be removed without losing functionality or safety.
+ *
+ *
+ * Why a 3-way split (Exporter / Importer / ZipFormat) would not help
+ * ------------------------------------------------------------------
+ * The split would NOT reduce the constructor-arg count — it would
+ * duplicate it:
+ *
+ *   - BackupExporter would need all 8 Repositories to read for export.
+ *   - BackupImporter would need all 8 Repositories to write for import.
+ *   - BackupZipFormat would need 0 Repositories (file I/O only).
+ *
+ * Net result: instead of one class with 9 deps, two classes with 8 deps
+ * each. Per-class arg list shorter; total injection complexity doubled;
+ * Hilt module gets more bindings; the class invocation graph gets one
+ * extra hop. That's pure cosmetics with negative engineering cost.
+ *
+ * The "many test files = God-Class" argument is also wrong here — the
+ * 9 test files are not 9 fragments of one missing decomposition, they
+ * are 9 *orthogonal test concerns* (security boundary, doomsday I/O,
+ * wallpaper edge cases, etc.) that all happen to exercise the same
+ * production class. Splitting the production class to match the test
+ * file names would be cargo-culting; the tests already prove the
+ * concerns are independently *testable* without needing the
+ * production class to be split.
+ *
+ *
+ * The one sub-extraction that *could* be worthwhile
+ * -------------------------------------------------
+ * `BackupZipFormat` (ZIP layout, magic bytes, version handling) has
+ * zero Repository dependencies and a clear single responsibility:
+ * format-on-disk concerns. If the format code grows substantially
+ * (new versions, migration paths between format versions, new
+ * embedded resource types), pulling it out would be net-positive.
+ * Until then, the format code is small and lives next to its only
+ * caller — extracting it now is busywork.
+ *
+ *
+ * Triggers that would flip "won't do" to "do"
+ * -------------------------------------------
+ *   - Format code (versioning + ZIP layout) grows past ~250 lines or
+ *     gains its own versioning state machine → extract `BackupZipFormat`.
+ *   - Export and import paths start needing genuinely different sets
+ *     of Repositories (currently they don't, both touch all 8).
+ *   - Multiple developers regularly hitting merge conflicts in this
+ *     file (currently solo project — irrelevant).
+ *
+ * None of these apply today. The class stays as one file.
+ *
+ *
+ * What's already in place that helps
+ * ----------------------------------
+ *   - In-file section markers (`// === EXPORT ===`, `// === IMPORT ===`,
+ *     `// === VALIDATION ===`) make the structure scannable.
+ *   - Tests are split by concern, so a focused test failure points to
+ *     a focused area without needing a class boundary.
+ *   - The class is `@Singleton` and stateless apart from the Json
+ *     instance — so callers don't need to track multiple instances
+ *     even if the class were split.
+ *
+ * =============================================================================
+ */
+
 /**
  * Backup & Restore Manager für Kolibri Launcher Settings.
  *

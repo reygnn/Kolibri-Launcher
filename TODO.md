@@ -14,11 +14,11 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
 | 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
-| 3 | `BackupRepositoryImpl` zerlegen | offen | ~1 Tag, eigenes Projekt |
+| 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
 | 7 | `CrashReportConsent` von SharedPreferences nach DataStore migrieren (Rule-5-Verstoß) | offen | mittel |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 ist orthogonal zum Rest und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** §5 (Test-Konsistenz). §7 ist orthogonal und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -126,27 +126,52 @@ stellen (siehe Rule 11 + `HomeFragment.kt:157-208`).
 
 ---
 
-## 3. `BackupRepositoryImpl` zerlegen
+## 3. (Memo, verworfen) `BackupRepositoryImpl` zerlegen
 
-`data/BackupRepositoryImpl.kt` ist **1.356 Zeilen** mit **9 separaten
-Test-Files** (Doomsday, Security, Wallpaper, Isolation, etc.). Die
-Test-Disziplin ist exzellent — und genau das ist auch das Symptom:
-eine Klasse, die so viele orthogonale Test-Themen anzieht, ist eine
-God-Class.
+Ursprüngliche Annahme: 1.356-Zeilen-Klasse mit 9 Repo-Dependencies +
+9 separaten Test-Files = klassischer God-Class-Smell, Split in
+`BackupExporter` / `BackupImporter` / `BackupZipFormat` empfohlen.
 
-Konstruktor-Smell: **9 Repository-Dependencies** — der erste Hinweis,
-dass die Klasse drei Verantwortlichkeiten in einer trägt.
+**Bei näherer Betrachtung verworfen.** Der Split würde den
+Konstruktor-Smell **nicht beheben, sondern duplizieren**:
 
-- [ ] **In drei Klassen splitten:**
-  - `BackupExporter` — schreibt User-State in das Backup-Format.
-  - `BackupImporter` — liest und applied ein Backup auf die Repos.
-  - `BackupZipFormat` — Versionierung, Magic-Bytes, Zip-Layout.
-- [ ] **Test-Files mit-splitten** — die 9 existierenden Tests
-  alignen auf die neuen Grenzen, nicht alles in einen
-  „BackupOrchestratorTest" verschmieren.
-- [ ] **`BackupRepository`-Interface bleibt eine Facade**, falls
-  Aufrufer das vereinheitlichte API brauchen — die Implementierung
-  delegiert dann an die drei Klassen.
+- `BackupExporter` bräuchte alle 8 Repositories zum *Lesen*.
+- `BackupImporter` bräuchte alle 8 Repositories zum *Schreiben*.
+- `BackupZipFormat` bräuchte 0 Repositories (reine File-IO).
+
+Statt einer Klasse mit 9 Deps hätten wir zwei Klassen mit je 8 Deps
+plus eine ohne. Per-Klasse-Konstruktor kürzer, Gesamt-Injection-
+Komplexität verdoppelt — pure Kosmetik mit negativer Engineering-
+Bilanz. Backup/Restore ist inhärent das Dual jedes persistierten
+Repositories: jede Klasse die das tut, *muss* alle Repos injecten.
+
+Auch das „9 Test-Files = God-Class"-Argument kippt: die Tests sind
+9 *orthogonale Concerns* (Security/Doomsday/Wallpaper/...) die
+zufällig dieselbe Production-Klasse exercieren. Splitting der
+Production-Klasse, um Test-File-Namen zu spiegeln, wäre Cargo-Cult.
+Die Tests beweisen schon, dass die Concerns unabhängig *testbar*
+sind — ohne dass die Production-Klasse split sein müsste.
+
+**Einzige potenziell sinnvolle Sub-Extraktion:** `BackupZipFormat`
+(ZIP-Layout, Magic-Bytes, Versionierung) — 0 Repo-Deps, klare
+Single-Responsibility. Aber lohnt sich erst wenn der Format-Code
+substantiell wächst (neue Versionen, Migrations-Pfade zwischen
+Format-Versionen). Aktueller Stand: zu klein, lebt neben seinem
+einzigen Aufrufer.
+
+**Trigger die das Verdikt umstoßen würden:**
+
+- Format-Code wächst auf >250 Zeilen oder bekommt eine eigene
+  Versionierungs-State-Machine → `BackupZipFormat` extrahieren.
+- Export- und Import-Pfade brauchen genuinely verschiedene Sets
+  von Repositories (heute: beide alle 8).
+- Multiple Entwickler treffen regelmäßig auf Merge-Konflikte in
+  der Datei (Solo-Projekt — irrelevant).
+
+Begründung dauerhaft im File-Header von `data/BackupRepositoryImpl.kt`
+(„Size & Refactoring Notes") verewigt, damit ein neuer Reviewer nicht
+beim ersten Blick reflexartig den Split nochmal vorschlägt. Das
+Pattern ist analog zum HomeFragment-Header.
 
 ---
 
