@@ -93,6 +93,12 @@ activities.
    no app-managed SQLite. Migrations run through `DataMigrationManager` on
    app start. Backup/restore goes through `BackupManager` + `DataStoreBackup`.
 
+   *One deliberate exception:* `DataMigrationManager` itself uses a small
+   `SharedPreferences` file (`kolibri_data_version`) for version tracking,
+   because the migration mechanism cannot bootstrap itself through the very
+   thing it might need to migrate. Chicken-and-egg by nature; the rationale
+   is documented in the file's KDoc. Don't try to "fix" it.
+
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
    (Hilt 2.57.2, ACRA 5.11.4, Timber 5.0.1, fragment-ktx 1.8.9, JUnit 4.13.2,

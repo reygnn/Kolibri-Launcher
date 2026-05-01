@@ -14,6 +14,35 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Bootstraps schema migrations for the app's persisted user state on each
+ * startup. Reads the currently-stored data version, compares it against
+ * [TARGET_DATA_VERSION], and runs the migration path if needed.
+ *
+ * ## Why this class uses SharedPreferences
+ *
+ * CLAUDE.md Rule 5 says DataStore is the only app storage. This class is
+ * the one explicit exception: the migration mechanism cannot bootstrap
+ * itself through the very thing it might need to migrate.
+ *
+ * Concretely, the version flag is stored in a tiny SharedPreferences
+ * file (`kolibri_data_version`, single Int key `data_version`). It must
+ * be readable *before* anything else opens DataStore — if we kept the
+ * version flag inside DataStore, then on a corrupted-DataStore launch
+ * we would have no way to detect that we are starting fresh vs. that
+ * a real version-1 DataStore has just failed to load. The
+ * SharedPreferences-on-disk file decouples "what version is the on-disk
+ * state at" from "what state can we currently load".
+ *
+ * Tradeoff: this is exactly the kind of `SharedPreferences` access that
+ * triggers StrictMode noise. It's accepted here because the read is
+ * tiny (one Int), happens once on app start in `Dispatchers.IO`, and
+ * the alternative (DataStore-bootstrap) is not safe.
+ *
+ * Don't try to migrate this away. If you spot the SharedPreferences
+ * call in `getCurrentVersion` / `updateVersionInPreferences` and want
+ * to "clean it up", read this KDoc and CLAUDE.md Rule 5 first.
+ */
 @Singleton
 class DataMigrationManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
