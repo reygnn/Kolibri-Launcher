@@ -113,7 +113,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
-        // private var leaker: Context? = null
     }
 
     private val onboardingLauncher = registerForActivityResult(
@@ -163,13 +162,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
 
         super.onCreate(savedInstanceState)
-
-//        // BÖSE: Wir weisen die aktuelle Activity-Instanz der statischen Variable zu.
-//        // Wenn man jetzt das Handy dreht oder "Zurück" drückt, bleibt 'this'
-//        // hier gespeichert und kann nicht gelöscht werden.
-//        if (leaker == null) {
-//            leaker = this
-//        }
 
         if (!setupMainContent()) {
             return

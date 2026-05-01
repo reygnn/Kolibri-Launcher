@@ -102,7 +102,6 @@ class KolibriLauncherApp : Application() {
                     }
 
                     reportContent = listOf(
-                        // ReportField.ANR_TRACE,
                         ReportField.PACKAGE_NAME,
                         ReportField.ANDROID_VERSION,
                         ReportField.APP_VERSION_CODE,
@@ -334,7 +333,7 @@ class KolibriLauncherApp : Application() {
                     .detectAll() // Erkennt Disk I/O, Network im Main Thread
                     .penaltyLog() // Schreibt in den Logcat
                     .penaltyFlashScreen()
-                    // .penaltyDeath()
+                    // .penaltyDeath() // Optional: bei Main-Thread I/O hart crashen (sehr strikt!)
                     .build()
             )
 

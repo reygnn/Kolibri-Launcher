@@ -1963,8 +1963,7 @@ class HomeFragment : Fragment() {
                     // Layer-Toolbar aktualisieren wenn im Edit-Mode
                     if (wallpaperView.isEditMode) {
                         try {
-                            updateLayerButtonsVisibility()
-                            updateLayerButtonStates()
+                            applyLayerButtonsState()
                             updateLayerIndicator()
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error refreshing layer toolbar")
@@ -2150,7 +2149,7 @@ class HomeFragment : Fragment() {
                 // LAYER MANAGEMENT BUTTONS
                 // ══════════════════════════════════════
 
-                updateLayerButtonsVisibility()
+                applyLayerButtonsState()
                 updateLayerIndicator()
 
                 // ── ADD LAYER (+) ──
@@ -2188,7 +2187,7 @@ class HomeFragment : Fragment() {
                             wallpaperView.moveLayerUp(activeIndex)
                             viewModel.onSwapWallpaperLayers(activeIndex, activeIndex + 1)
                             updateLayerIndicator()
-                            updateLayerButtonStates()
+                            applyLayerButtonsState()
                         }
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error moving layer up")
@@ -2205,7 +2204,7 @@ class HomeFragment : Fragment() {
                             wallpaperView.moveLayerDown(activeIndex)
                             viewModel.onSwapWallpaperLayers(activeIndex, activeIndex - 1)
                             updateLayerIndicator()
-                            updateLayerButtonStates()
+                            applyLayerButtonsState()
                         }
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error moving layer down")
@@ -2215,7 +2214,7 @@ class HomeFragment : Fragment() {
                 // ── Layer-Tap Callback: Aktualisiert Indikator ──
                 wallpaperView.onLayerTapped = { _, _ ->
                     updateLayerIndicator()
-                    updateLayerButtonStates()
+                    applyLayerButtonsState()
                 }
 
                 Timber.d("Wallpaper edit mode: ON (multiLayer=${viewModel.wallpaperState.value.isMultiLayer}, layers=${wallpaperView.layerCount})")
@@ -2476,8 +2475,7 @@ class HomeFragment : Fragment() {
 
     /**
      * Wendet den aus [LayerButtonsState] berechneten UI-Zustand auf die
-     * Layer-Buttons an (Visibility, Enabled, Alpha). Gemeinsame Quelle der
-     * Wahrheit für [updateLayerButtonsVisibility] und [updateLayerButtonStates].
+     * Layer-Buttons an (Visibility, Enabled, Alpha).
      *
      * Idempotent: mehrfacher Aufruf hintereinander ist unproblematisch.
      */
@@ -2508,25 +2506,6 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error applying layer buttons state")
         }
     }
-
-    /**
-     * Steuert die Sichtbarkeit der Layer-Buttons.
-     * Add-Button: Immer sichtbar (auch ohne Layer, um den ersten hinzuzufügen)
-     * Delete/Up/Down: Nur sichtbar wenn Layer vorhanden
-     *
-     * Delegiert an [applyLayerButtonsState] - Name erhalten für Call-Site-Klarheit.
-     */
-    private fun updateLayerButtonsVisibility() = applyLayerButtonsState()
-
-    /**
-     * Aktiviert/Deaktiviert Layer-Buttons basierend auf Position.
-     * - Up deaktiviert wenn Layer ganz oben
-     * - Down deaktiviert wenn Layer ganz unten
-     * - Delete deaktiviert wenn kein Layer selektiert
-     *
-     * Delegiert an [applyLayerButtonsState] - Name erhalten für Call-Site-Klarheit.
-     */
-    private fun updateLayerButtonStates() = applyLayerButtonsState()
 
     private fun updateSnapButtonIcon(isEnabled: Boolean) {
         if (_binding == null) return

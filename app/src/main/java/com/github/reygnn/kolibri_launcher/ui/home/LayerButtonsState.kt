@@ -7,9 +7,9 @@ package com.github.reygnn.kolibri_launcher.ui.home
  * (Add / Delete / Up / Down / Indicator) basierend auf dem aktuellen Zustand
  * der WallpaperView.
  *
- * Zuvor war diese Logik über zwei Fragment-Methoden (updateLayerButtonsVisibility,
- * updateLayerButtonStates) mit viel binding.* Boilerplate verteilt. Als reine
- * Datenklasse ist sie isoliert per JUnit testbar.
+ * Konsumiert wird das Ergebnis vom Fragment in `applyLayerButtonsState`, das die
+ * Boolean-Felder auf Visibility/Enabled/Alpha der echten Buttons abbildet. Als
+ * reine Datenklasse ist diese Berechnung isoliert per JUnit testbar.
  *
  * Regeln:
  *  - Add: immer sichtbar im Edit-Mode

@@ -1,6 +1,6 @@
 # Kolibri Launcher — TODO & Roadmap
 
-Lebendes Dokument. Stand: 2026-04-30, basierend auf einer vollständigen Source-Analyse
+Lebendes Dokument. Stand: 2026-05-01, basierend auf einer vollständigen Source-Analyse
 des Repos auf Branch `main` (Version `0.99.61` / versionCode `79`).
 
 Was hier steht, ist aus dem Code abgeleitet — kein Wunsch-Backlog. Dinge ohne
@@ -255,30 +255,15 @@ Kleinere Auffälligkeiten aus dem Audit. Keine einzelne ist
 gravierend; in Summe drücken sie die Code-Note. Eine Sweep-PR
 nach §2 ist effizienter als sieben Einzel-Edits.
 
-- [ ] **Alias-Smell in `HomeFragment.kt:2535/2545`:**
-  `updateLayerButtonsVisibility()` und `updateLayerButtonStates()`
-  sind beide One-Liner, die `applyLayerButtonsState()` rufen.
-  Aliase „für Call-Site-Klarheit" sind hier zu klever; einer
-  davon (oder beide) verschwinden zugunsten eines direkten
-  Aufrufs. (Aus dem entfernten XXL-Split-Eintrag übernommen,
-  weil eigenständig sweep-würdig.)
-- [ ] **Toter Lehr-Kommentar:** `MainActivity.kt:116` —
-  `// private var leaker: Context? = null` raus.
-- [ ] **Auskommentierter Code:**
-  - `MainActivity.kt:167-172` — Block raus oder erklären.
-  - `KolibriLauncherApp.kt:105` — `ReportField.ANR_TRACE`
-    auskommentiert; entweder reinziehen oder rausnehmen.
-  - Zwei `// .penaltyDeath()` im StrictMode-Setup — Kontext geht
-    aus dem Kommentar verloren; entweder Begründung
-    nachdokumentieren oder löschen.
 - [ ] **Logging-Stil-Konsistenz:** `Timber.Forest.tag(...)` vs.
   schlichtes `Timber.d` — eine der beiden Varianten als Regel
   setzen (oder begründen, warum beide koexistieren) und in
   CLAUDE.md festhalten.
 - [ ] **Kommentar-Sprache:** Mischung DE/EN im selben File ist
-  Tagesform der bisherigen Edits. Pro File **eine** Sprache
-  fixieren (Default Deutsch, da CLAUDE.md / TODO.md / KDoc-
-  Selbstkommentare bereits deutsch).
+  Tagesform der bisherigen Edits. Repo-Konvention ist
+  **Englisch** für Source-Code, README.md und CLAUDE.md
+  (TODO.md selbst darf DE oder EN sein). Pro File auf
+  Englisch vereinheitlichen.
 - [ ] **`runBlocking` in `attachBaseContext`** —
   `KolibriLauncherApp.kt:120`. Defensible (DataStore-Read vor
   Hilt verfügbar, ACRA-Init braucht das Result), aber StrictMode-
