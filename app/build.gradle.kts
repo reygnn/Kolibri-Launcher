@@ -300,6 +300,10 @@ dependencies {
 // MockK für Unit-Tests
     testImplementation("io.mockk:mockk:1.14.9")
 
+// AndroidX Test (für Robolectric-basierte Activity/Fragment-Tests)
+    testImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
+    testImplementation("androidx.test.ext:junit-ktx:$androidxTestJunitVersion")
+
 
 // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
     androidTestUtil("androidx.test:orchestrator:$orchestratorVersion")
