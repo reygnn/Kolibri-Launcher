@@ -46,17 +46,23 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * ULTRA CRASH-SAFE AppDrawerFragment
+ * AppDrawerFragment — the in-app launcher's app list / search screen.
  *
- * Multi-layer exception handling:
- * - All operations catch Throwable (Exception + Error)
- * - CoroutineExceptionHandler for all coroutines
- * - Safe RecyclerView operations with fallbacks
- * - Protected search with debounce error handling
- * - Safe dialog management with state checks
- * - Triple-layer observer protection
+ * Crash safety follows the four-category frame (CLAUDE.md Rule 11):
+ *  - EXTERNAL system calls (`startActivity`, `InputMethodManager.show*`)
+ *    keep their try/catch with surface-to-user fallback.
+ *  - Coroutines launched from view-lifecycle scope use `fragmentExceptionHandler`
+ *    plus structural `_binding?.let { } / isAdded` guards instead of nested
+ *    try/catch. The handler suppresses uncaught throwables there.
+ *  - Pure operations (ViewModel forwards, adapter setters, listener wiring)
+ *    are NOT wrapped — programmer errors should reach `silentError` (Rule 9)
+ *    and crash loudly in DEBUG. The TODO §2 sweep on this file removed ~22
+ *    such defensive wrappers in 2026-05-01.
+ *  - Lifecycle teardown (`onDestroyView`) keeps a single outer catch around
+ *    the cleanup block so the `finally { super.onDestroyView() }` always runs.
  *
- * Critical for launcher - without working app drawer, user cannot open apps!
+ * Critical for launcher — without a working app drawer, the user cannot
+ * reach non-favorite apps.
  */
 @AndroidEntryPoint
 //class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
@@ -163,59 +169,34 @@ class AppDrawerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        try {
-            setupRecyclerView()
-            setupSearch()
-            setupSortFab()
-            observeViewModel()
-            setupFragmentResultListener()
-
-            // throw RuntimeException("ACRA Test Crash")
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
-        }
+        // Each setup function below has its own internal catch where needed
+        // (real I/O / lifecycle paths). Wrapping the orchestrator in a
+        // catch(Throwable) was redundant — see TODO §2 / Rule 11.
+        setupRecyclerView()
+        setupSearch()
+        setupSortFab()
+        observeViewModel()
+        setupFragmentResultListener()
     }
 
     private fun observeViewModel() {
         // Observer 1: App list - Critical for drawer functionality
-        try {
-            viewModel.drawerApps.observe(viewLifecycleOwner) { sortedApps ->
-                try {
-                    if (sortedApps != null) {
-                        masterAppList = sortedApps
-                        displayFilteredApps(viewModel.appDrawerSearchQuery.value)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating master app list")
-                    // Don't clear masterAppList - keep showing old data
-                }
+        viewModel.drawerApps.observe(viewLifecycleOwner) { sortedApps ->
+            if (sortedApps != null) {
+                masterAppList = sortedApps
+                displayFilteredApps(viewModel.appDrawerSearchQuery.value)
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up drawerApps observer")
         }
 
         // Observer 2: Sort order
-        try {
-            viewModel.sortOrder.observe(viewLifecycleOwner) { order ->
-                if (_binding == null) return@observe
-
-                try {
-                    val iconRes = when (order) {
-                        SortOrder.ALPHABETICAL -> android.R.drawable.ic_menu_sort_alphabetically
-                        SortOrder.TIME_WEIGHTED_USAGE -> android.R.drawable.ic_menu_recent_history
-                        null -> return@observe
-                    }
-                    binding.fabSort.setImageResource(iconRes)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating sort icon")
-                    // Keep old icon - not critical
-                }
+        viewModel.sortOrder.observe(viewLifecycleOwner) { order ->
+            if (_binding == null) return@observe
+            val iconRes = when (order) {
+                SortOrder.ALPHABETICAL -> android.R.drawable.ic_menu_sort_alphabetically
+                SortOrder.TIME_WEIGHTED_USAGE -> android.R.drawable.ic_menu_recent_history
+                null -> return@observe
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up sortOrder observer")
+            binding.fabSort.setImageResource(iconRes)
         }
 
         // Observer 3: UI colors
@@ -225,124 +206,100 @@ class AppDrawerFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { colors ->
             if (_binding == null || !isAdded) return@collectOnStarted
-
-            try {
-                appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating adapter colors")
-                // Keep old colors - not critical
-            }
+            appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
         }
 
-        // Observer 4: Für die Suchanfrage
+        // Observer 4: search query → debounced filter
+        // The fragmentExceptionHandler on the launch covers any exceptions
+        // that escape the inner blocks; CancellationException needs no
+        // explicit catch in the inner search-job because `launch { delay; ... }`
+        // re-throws it to its parent automatically.
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
-            try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    viewModel.appDrawerSearchQuery.collect { query ->
-                        searchJob?.cancel()
-                        searchJob = launch {
-                            try {
-                                delay(AppConstants.SEARCH_DEBOUNCE_DELAY_MS)
-                                displayFilteredApps(query)
-                            } catch (e: CancellationException) {
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error in search delay")
-                                try {
-                                    displayFilteredApps(query)
-                                } catch (fallbackError: Throwable) {
-                                    TimberWrapper.silentError(
-                                        fallbackError,
-                                        "Error in search fallback"
-                                    )
-                                }
-                            }
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.appDrawerSearchQuery.collect { query ->
+                    searchJob?.cancel()
+                    searchJob = launch {
+                        try {
+                            delay(AppConstants.SEARCH_DEBOUNCE_DELAY_MS)
+                            displayFilteredApps(query)
+                        } catch (e: CancellationException) {
+                            // Expected on rapid query changes — searchJob.cancel()
                         }
                     }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for search query")
             }
         }
     }
 
     private fun setupFragmentResultListener() {
-        try {
-            childFragmentManager.setFragmentResultListener(
-                AppContextMenuDialogFragment.REQUEST_KEY,
-                viewLifecycleOwner
-            ) { _, bundle ->
-                try {
-                    val app = longClickedApp
-                    if (app == null) {
-                        Timber.w("Fragment result received but longClickedApp is null")
-                        return@setFragmentResultListener
-                    }
-
-                    val action = try {
-                        bundle.getString(AppContextMenuDialogFragment.Companion.RESULT_KEY_ACTION)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting action from bundle")
-                        null
-                    }
-
-                    when (val result = ContextMenuResult.parse(action)) {
-                        is ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
-                            bundle,
-                            viewModel,
-                            launchShortcutUseCase
-                        )
-                        is ContextMenuResult.AppInfo -> showAppInfo(app)
-                        is ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
-                        is ContextMenuResult.HideApp -> hideApp(app)
-                        is ContextMenuResult.ResetUsage -> resetAppUsage(app)
-                        // Structurally unreachable: per the architecture
-                        // rule (see GetFavoriteAppsUseCase KDoc), hidden
-                        // apps applies only to the AppDrawer, so
-                        // GetDrawerAppsUseCase (Z. 56) filters hidden
-                        // apps out of this listing. A hidden app cannot
-                        // be long-pressed here, so the dialog cannot
-                        // emit UNHIDE_APP from this fragment. The
-                        // branch exists for sealed-when exhaustiveness
-                        // only. Compare HomeFragment, where the same
-                        // action is live: a favorite that is also
-                        // hidden appears in the home screen's favorite
-                        // area, can be long-pressed there, and produces
-                        // UNHIDE_APP — handled via viewModel.onShowApp.
-                        is ContextMenuResult.UnhideApp -> Unit
-                        is ContextMenuResult.Unknown -> Timber.w(
-                            "Unknown context menu action: ${result.action}"
-                        )
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in fragment result listener")
+        childFragmentManager.setFragmentResultListener(
+            AppContextMenuDialogFragment.REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            // Inner catch kept: this lambda is invoked by the FragmentManager
+            // some time after registration, when the dialog produces a result.
+            // Anything in the body — bundle parsing, downstream when-branches
+            // routing into Activity/Intent calls — can plausibly throw at that
+            // later point, and there's no outer launchSafe / coroutine handler
+            // here to catch it.
+            try {
+                val app = longClickedApp
+                if (app == null) {
+                    Timber.w("Fragment result received but longClickedApp is null")
+                    return@setFragmentResultListener
                 }
+
+                val action = bundle.getString(AppContextMenuDialogFragment.Companion.RESULT_KEY_ACTION)
+
+                when (val result = ContextMenuResult.parse(action)) {
+                    is ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
+                        bundle,
+                        viewModel,
+                        launchShortcutUseCase
+                    )
+                    is ContextMenuResult.AppInfo -> showAppInfo(app)
+                    is ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
+                    is ContextMenuResult.HideApp -> hideApp(app)
+                    is ContextMenuResult.ResetUsage -> resetAppUsage(app)
+                    // Structurally unreachable: per the architecture
+                    // rule (see GetFavoriteAppsUseCase KDoc), hidden
+                    // apps applies only to the AppDrawer, so
+                    // GetDrawerAppsUseCase (Z. 56) filters hidden
+                    // apps out of this listing. A hidden app cannot
+                    // be long-pressed here, so the dialog cannot
+                    // emit UNHIDE_APP from this fragment. The
+                    // branch exists for sealed-when exhaustiveness
+                    // only. Compare HomeFragment, where the same
+                    // action is live: a favorite that is also
+                    // hidden appears in the home screen's favorite
+                    // area, can be long-pressed there, and produces
+                    // UNHIDE_APP — handled via viewModel.onShowApp.
+                    is ContextMenuResult.UnhideApp -> Unit
+                    is ContextMenuResult.Unknown -> Timber.w(
+                        "Unknown context menu action: ${result.action}"
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in fragment result listener")
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up fragment result listener")
         }
     }
 
     private fun toggleFavorite(app: AppInfo) {
-        try {
-            viewModel.onToggleFavorite(app)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
-        }
+        viewModel.onToggleFavorite(app)
     }
 
     private fun hideApp(app: AppInfo) {
-        try {
-            viewModel.onHideApp(app)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error hiding app ${app.packageName}")
-        }
+        viewModel.onHideApp(app)
     }
 
     private fun showAppInfo(app: AppInfo) {
+        // EXTERNAL: startActivity can throw ActivityNotFoundException
+        // if the user uninstalled the app between the long-press and this
+        // call. The catch falls back to a viewModel error path that
+        // surfaces the failure to the user, so we keep it.
         try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", app.packageName, null)
@@ -356,78 +313,42 @@ class AppDrawerFragment : Fragment() {
     }
 
     private fun resetAppUsage(app: AppInfo) {
-        try {
-            shouldScrollToTop = true
-            viewModel.onResetAppUsage(app)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error resetting app usage for ${app.packageName}")
-        }
+        shouldScrollToTop = true
+        viewModel.onResetAppUsage(app)
     }
 
     private fun setupRecyclerView() {
-        try {
-            appDrawerAdapter = AppDrawerAdapter(
-                onAppClicked = { app ->
-                    try {
-                        // Timber log removed for brevity if needed, or keep it
-                        viewModel.onAppClicked(app)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in app click for ${app.packageName}")
-                    }
-                },
-                onAppLongClicked = { app ->
-                    try {
-                        showAppContextMenu(app)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in app long click")
-                    }
-                }
-            )
+        appDrawerAdapter = AppDrawerAdapter(
+            onAppClicked = { app -> viewModel.onAppClicked(app) },
+            onAppLongClicked = { app -> showAppContextMenu(app) }
+        )
 
-            binding.appsRecyclerView.apply {
-                adapter = appDrawerAdapter
-                layoutManager = LinearLayoutManager(requireContext())
+        binding.appsRecyclerView.apply {
+            adapter = appDrawerAdapter
+            layoutManager = LinearLayoutManager(requireContext())
 
-                // CRASH-SAFE: Animationen aus (verhindert Bugs bei schnellen Updates)
-                itemAnimator = null
+            // CRASH-SAFE: Animationen aus (verhindert Bugs bei schnellen Updates)
+            itemAnimator = null
 
-                // PERFORMANCE (Monk Approved):
-                // Da der Drawer den Screen füllt (match_parent), ändert sich die
-                // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
-                // bei jedem einzelnen Tastenanschlag in der Suche!
-                setHasFixedSize(true)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error setting up RecyclerView")
-            // RecyclerView setup failed - drawer won't work, but app won't crash
+            // PERFORMANCE (Monk Approved):
+            // Da der Drawer den Screen füllt (match_parent), ändert sich die
+            // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
+            // bei jedem einzelnen Tastenanschlag in der Suche!
+            setHasFixedSize(true)
         }
     }
 
     private fun setupSearch() {
-        try {
-            binding.searchEditText.setText(viewModel.appDrawerSearchQuery.value)
-
-            binding.searchEditText.doOnTextChanged { text, _, _, _ ->
-                viewModel.onAppDrawerSearchQueryChanged(text.toString())
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up search")
+        binding.searchEditText.setText(viewModel.appDrawerSearchQuery.value)
+        binding.searchEditText.doOnTextChanged { text, _, _, _ ->
+            viewModel.onAppDrawerSearchQueryChanged(text.toString())
         }
     }
 
     private fun setupSortFab() {
-        try {
-            binding.fabSort.setOnClickListener {
-                try {
-                    shouldScrollToTop = true
-                    viewModel.toggleSortOrder()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error toggling sort order")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up sort FAB")
-            // FAB won't work, but apps still displayed
+        binding.fabSort.setOnClickListener {
+            shouldScrollToTop = true
+            viewModel.toggleSortOrder()
         }
     }
 
@@ -474,29 +395,22 @@ class AppDrawerFragment : Fragment() {
 
     /*
      * Extrahiert, um Codeduplizierung zu vermeiden. Sendet die Liste sicher an den Adapter.
+     * The `_binding != null` checks below are real lifecycle-race guards
+     * (the submitList callback runs after a DiffUtil round-trip on a
+     * background thread, so the fragment may have been torn down by then).
      */
     private fun submitListToAdapter(list: List<AppInfo>) {
-        try {
-            if (_binding != null && isAdded) {
-                appDrawerAdapter?.submitList(list.toList()) {
-                    try {
-                        if (shouldScrollToTop) {
-                            // Checken ob Binding noch da ist, um Crash beim schnellen Wechsel zu vermeiden
-                            if (_binding != null) {
-                                binding.appsRecyclerView.scrollToPosition(0)
-                            }
-                            shouldScrollToTop = false
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error scrolling to top after submit")
-                        shouldScrollToTop = false
+        if (_binding != null && isAdded) {
+            appDrawerAdapter?.submitList(list.toList()) {
+                if (shouldScrollToTop) {
+                    if (_binding != null) {
+                        binding.appsRecyclerView.scrollToPosition(0)
                     }
+                    shouldScrollToTop = false
                 }
-            } else {
-                Timber.w("Adapter not initialized or fragment not added")
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error submitting list to adapter")
+        } else {
+            Timber.w("Adapter not initialized or fragment not added")
         }
     }
 
@@ -527,21 +441,13 @@ class AppDrawerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        try {
-            showStatusBar()
-            handleAutoShowKeyboard()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onResume")
-        }
+        showStatusBar()
+        handleAutoShowKeyboard()  // launches its own coroutine with fragmentExceptionHandler
     }
 
     override fun onPause() {
         super.onPause()
-        try {
-            hideKeyboard()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onPause hiding keyboard")
-        }
+        hideKeyboard()  // has its own internal catch around the IMM call
     }
 
     private fun showStatusBar() {
@@ -560,52 +466,48 @@ class AppDrawerFragment : Fragment() {
      */
     private fun handleAutoShowKeyboard() {
         viewLifecycleOwner.lifecycleScope.launch(fragmentExceptionHandler) {
-            try {
-                // 1. Setting asynchron laden
-                val isAutoShowEnabled = try {
-                    viewModel.isAutoShowKeyboardEnabled()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error reading autoShowKeyboard setting")
-                    false // Fail-safe: nicht anzeigen
+            // 1. Setting asynchron laden — kept as Fallback-Pattern: a thrown
+            //    DataStore read defaults to "do not show keyboard", which is
+            //    the safer choice for the user.
+            val isAutoShowEnabled = try {
+                viewModel.isAutoShowKeyboardEnabled()
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error reading autoShowKeyboard setting")
+                false
+            }
+
+            // 2. Binding Check (könnte während suspend weg sein)
+            val currentBinding = _binding ?: return@launch
+            val editText = currentBinding.searchEditText
+
+            // 3. Strategie bestimmen (testbare Logik)
+            val strategy = keyboardShowCoordinator.determineStrategy(
+                isViewLaidOut = editText.isLaidOut,
+                isViewEffectivelyVisible = editText.canReceiveKeyboardInput(),
+                isFragmentAdded = isAdded,
+                isAutoShowEnabled = isAutoShowEnabled
+            )
+
+            // 4. Strategie ausführen
+            when (strategy) {
+                is KeyboardShowCoordinator.ShowKeyboardStrategy.ShowImmediately -> {
+                    Timber.d("Keyboard: View already laid out → showing immediately")
+                    showKeyboardNow(editText)
                 }
 
-                // 2. Binding Check (könnte während suspend weg sein)
-                val currentBinding = _binding ?: return@launch
-                val editText = currentBinding.searchEditText
-
-                // 3. Strategie bestimmen (testbare Logik)
-                val strategy = keyboardShowCoordinator.determineStrategy(
-                    isViewLaidOut = editText.isLaidOut,
-                    isViewEffectivelyVisible = editText.canReceiveKeyboardInput(),
-                    isFragmentAdded = isAdded,
-                    isAutoShowEnabled = isAutoShowEnabled
-                )
-
-                // 4. Strategie ausführen
-                when (strategy) {
-                    is KeyboardShowCoordinator.ShowKeyboardStrategy.ShowImmediately -> {
-                        Timber.d("Keyboard: View already laid out → showing immediately")
-                        showKeyboardNow(editText)
-                    }
-
-                    is KeyboardShowCoordinator.ShowKeyboardStrategy.WaitForLayout -> {
-                        Timber.d("Keyboard: Waiting for layout pass")
-                        editText.doOnLayout { view ->
-                            if (isAdded && _binding != null) {
-                                showKeyboardNow(view)
-                            }
+                is KeyboardShowCoordinator.ShowKeyboardStrategy.WaitForLayout -> {
+                    Timber.d("Keyboard: Waiting for layout pass")
+                    editText.doOnLayout { view ->
+                        if (isAdded && _binding != null) {
+                            showKeyboardNow(view)
                         }
                     }
-
-                    is KeyboardShowCoordinator.ShowKeyboardStrategy.Skip -> {
-                        Timber.d("Keyboard: Skipped (${strategy.reason})")
-                        // Nichts tun
-                    }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in handleAutoShowKeyboard")
+
+                is KeyboardShowCoordinator.ShowKeyboardStrategy.Skip -> {
+                    Timber.d("Keyboard: Skipped (${strategy.reason})")
+                    // Nichts tun
+                }
             }
         }
     }
@@ -677,18 +579,19 @@ class AppDrawerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // Outer catch kept: lifecycle teardown defensive — if anything in
+        // here throws (ContextMenuHelper.dismiss can race with the
+        // FragmentManager state, viewModel call could throw on a
+        // teardown sequence), we still need the finally{} to null the
+        // adapter and call super.
         try {
             searchJob?.cancel()
             searchJob = null
 
             ContextMenuHelper.dismiss(childFragmentManager)
 
-            try {
-                if (_binding != null) {
-                    binding.appsRecyclerView.adapter = null
-                }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error clearing adapter")
+            if (_binding != null) {
+                binding.appsRecyclerView.adapter = null
             }
 
             viewModel.onAppDrawerClosed()
