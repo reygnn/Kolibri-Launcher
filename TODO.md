@@ -13,7 +13,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | § | Titel | Status | Größe |
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
-| 2 | Throwable-Catch-Audit | 79 von 735 Catches weg, optionale Folge-Sweeps offen | klein-mittel pro Sweep |
+| 2 | Throwable-Catch-Audit | 180 von 735 Catches weg (über 14 Sweeps in 2 Wellen), optionale Folge-Sweeps offen | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 
@@ -71,8 +71,9 @@ selbst in `HomeFragment.kt:157-208` formuliert:
 
 ### Erledigt
 
-5 Sweep-PRs haben **79 nachweislich tote oder CANT_THROW-Catches**
-entfernt:
+Insgesamt **180 Catches in 14 Sweep-PRs** entfernt.
+
+**Erste Welle (vor Robolectric-Pattern):**
 
 | PR | Catches | Files |
 |---|---:|---|
@@ -81,47 +82,78 @@ entfernt:
 | Adapter-Sweep (App- + FavoritesAdapter) | 29 | 2 |
 | SettingsFragment-Sweep | 32 | 1 |
 | MainActivity-Mini | 3 | 1 |
-| **Total** | **79** | **9** |
+| **Subtotal** | **79** | **9** |
+
+**Zweite Welle (Marathon 2026-05-01, mit Robolectric-Backstop):**
+
+Nach dem Robolectric+Hilt-Test-Pilot (siehe [TESTING_CONVENTIONS.kt
+→ ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS]
+(app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt))
+war für UI-Files endlich ein Test-Backstop möglich. Damit konnte die
+Activity/Fragment-Surface gesweept werden:
+
+| PR | Catches | File |
+|---|---:|---|
+| AppDrawerFragment | 25 | 1 |
+| OnboardingActivity | 12 | 1 |
+| CustomNamesActivity | 14 | 1 |
+| HiddenAppsActivity | 12 | 1 |
+| SwipeActionsActivity | 11 | 1 |
+| SettingsActivity | 4 | 1 |
+| AppContextMenuDialogFragment | 8 | 1 |
+| WallpaperDelegate (JVM-test backstop) | 12 | 1 |
+| PackageUpdateReceiver | 3 | 1 |
+| **Subtotal** | **101** | **9** |
+
+Plus **6 neue Robolectric-Tests** (`MainActivityRobolectricTest`,
+`AppDrawerFragmentRobolectricTest`, `CustomNamesActivityRobolectricTest`,
+`HiddenAppsActivityRobolectricTest`, `SwipeActionsActivityRobolectricTest`,
+`SettingsActivityRobolectricTest`, `AppContextMenuDialogFragmentRobolectricTest`)
+zusätzlich zum Pilot `OnboardingActivityRobolectricTest`.
 
 In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
-### Reststand: ~656 Catches
+### Reststand: 557 Catches (Stand 2026-05-01)
 
-Verteilung laut Sub-Agent-Survey, abzüglich des Sweeps:
-- **~250 EXTERNAL** — echte System-/IO-/ContentResolver-/PackageManager-
-  Calls. Bleibt.
-- **~100 LIFECYCLE** in `HomeFragment` & co — formal CANT_THROW (View-
-  Setter), aber als Schutz gegen Teardown-Races platziert. **Gehört
-  in ein strukturelles Refactoring** (`_binding?.let { }` +
-  `viewLifecycleOwner.lifecycleScope`), nicht in einen Sweep. Das
-  HomeFragment-eigene KDoc Z. 157-208 beschreibt diesen Pfad.
-- **~120-150 weitere CANT_THROW/DEAD** in den UI-Files, die wir noch
-  nicht angefasst haben (`AppDrawerFragment` ~36, `OnboardingActivity`
-  ~19, `HiddenAppsActivity` ~15, etc.). Lohn-Surface aber kleinteilig
-  pro File.
-- **~30 in `KolibriLauncherApp`** — Rule-7-Whitelist, **bleibt
+- **HomeFragment (~105)** — eigenes Lifecycle-Restructure-Projekt,
+  KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
+  wartet auf strukturelles Refactoring (`_binding?.let { }` +
+  `viewLifecycleOwner.lifecycleScope`).
+- **Repository-Files** — `BackupRepositoryImpl` (16),
+  `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (9),
+  `FavoritesRepositoryImpl` (7) etc. — überwiegend echte EXTERNAL-
+  I/O-Catches. Lassen.
+- **`KolibriLauncherApp` (~21)** — Rule-7-Whitelist, **bleibt
   unangetastet**.
+- **`ScreenLockAccessibilityService` (16)** — AccessibilityService,
+  schwer zu testen. Mögliche zukünftige Welle.
+- **`CrashReportLimiter` (8)** — als 2. Rule-5-Exception dokumentiert
+  (sync API constraint von ACRA-Handler), bleibt.
+- **`CrashReportConsent` (5)** — Coroutine-Boundary + EXTERNAL.
+- **`LayoutCustomizationDialogFragment` (8)** — bereits clean
+  strukturiert mit eigenen `safeRun`/`launchSafe` Helpers.
+- **`PackageUpdateReceiver` (9)** — gerade gesweept, Reststand sind
+  legitime Receiver-Lifecycle/Hilt-init Catches.
+- Use cases (~1-3 pro File) — meistens defensive, klein.
 
 ### Optionale nächste Sweeps
 
-- [ ] **`AppDrawerFragment` (~36 Catches)** — laut Survey ähnliches
-  Profil wie die Adapter, etwa hälftiger Trivial-Anteil. Kandidat für
-  einen weiteren kleinen PR.
-- [ ] **`OnboardingActivity` / `HiddenAppsActivity` / `CustomNamesActivity`
-  / weitere Activities** — Repetitive Doppelschalung um setOn*Listener.
-  Pattern ist exakt der SettingsFragment-Sweep, vermutlich 30-50%
-  Reduktion pro File.
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
+- [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
+  Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
+- [ ] Restliche Repository-Files können vereinzelt CANT_THROW-Catches
+  haben — File-für-File-Audit lohnt sich kaum.
 
 ### Default-Disposition
 
 Siehe **CLAUDE.md Rule 11** — die Default-Regel für neue Catches lebt
 dort als projektweite Konvention. Im Review die Vier-Kategorien-Frage
-stellen (siehe Rule 11 + `HomeFragment.kt:157-208`).
+stellen (siehe Rule 11 + `HomeFragment.kt:157-208`). Robolectric-
+Pattern für UI-Tests siehe TESTING_CONVENTIONS.kt.
 
 ---
 
