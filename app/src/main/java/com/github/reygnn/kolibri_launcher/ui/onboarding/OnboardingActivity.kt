@@ -117,14 +117,10 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        try {
-            _binding?.let {
-                outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
-            }
-            outState.putSerializable(STATE_LAUNCH_MODE, launchMode)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving instance state")
+        _binding?.let {
+            outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
         }
+        outState.putSerializable(STATE_LAUNCH_MODE, launchMode)
     }
 
     /**
@@ -132,26 +128,18 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
      * Sorgt für sofortige Freigabe von Listenern und View-Referenzen.
      */
     override fun onDestroy() {
+        // Outer catch kept: lifecycle teardown defensive — finally{} must
+        // always reach super.onDestroy() even if a cleanup step throws.
         try {
             if (_binding != null) {
-                try {
-                    // 1. GC-OPTIMIERUNG: Dynamische Views und Listener entfernen
-                    // (Chips halten Referenzen auf ViewModel via Listener)
-                    binding.selectionChipGroup.removeAllViews()
-
-                    // 2. Adapter vom RecyclerView trennen
-                    binding.allAppsRecyclerView.adapter = null
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing views")
-                }
+                // GC-OPTIMIERUNG: Dynamische Views und Listener entfernen
+                // (Chips halten Referenzen auf ViewModel via Listener)
+                binding.selectionChipGroup.removeAllViews()
+                // Adapter vom RecyclerView trennen
+                binding.allAppsRecyclerView.adapter = null
             }
-
-            // 3. Eigene Referenzen aufräumen
             allAppsAdapter = null
-
-            // 4. Binding nullen (Kappt Verbindung Activity <-> View)
             _binding = null
-
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
@@ -160,41 +148,28 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     }
 
     private fun handleWindowInsets() {
-        try {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.updatePadding(
-                    left = insets.left,
-                    top = insets.top,
-                    right = insets.right,
-                    bottom = insets.bottom
-                )
-                WindowInsetsCompat.CONSUMED
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling window insets")
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(
+                left = insets.left,
+                top = insets.top,
+                right = insets.right,
+                bottom = insets.bottom
+            )
+            WindowInsetsCompat.CONSUMED
         }
     }
 
     private fun setupRecyclerViews() {
-        try {
-            allAppsAdapter = OnboardingAppListAdapter { appInfo ->
-                try {
-                    viewModel.onAppToggled(appInfo)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error toggling app: ${appInfo.packageName}")
-                }
-            }
-
-            binding.allAppsRecyclerView.apply {
-                adapter = allAppsAdapter
-                layoutManager = LinearLayoutManager(this@OnboardingActivity)
-                setHasFixedSize(true)
-                // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
-                itemAnimator = null
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        allAppsAdapter = OnboardingAppListAdapter { appInfo ->
+            viewModel.onAppToggled(appInfo)
+        }
+        binding.allAppsRecyclerView.apply {
+            adapter = allAppsAdapter
+            layoutManager = LinearLayoutManager(this@OnboardingActivity)
+            setHasFixedSize(true)
+            // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
+            itemAnimator = null
         }
     }
 
@@ -222,21 +197,21 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     }
 
     private fun setupClickListeners() {
-        try {
-            binding.doneButton.setOnClickListener {
-                try {
-                    viewModel.onDoneClicked()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in done button click")
-                    if (launchMode == LaunchMode.INITIAL_SETUP) {
-                        goToMainActivity()
-                    } else {
-                        finish()
-                    }
+        binding.doneButton.setOnClickListener {
+            // Inner catch kept: viewModel.onDoneClicked is the user-facing
+            // path that completes onboarding; if the underlying use case
+            // throws, the fallback navigation (goToMainActivity / finish)
+            // is the user's escape hatch.
+            try {
+                viewModel.onDoneClicked()
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in done button click")
+                if (launchMode == LaunchMode.INITIAL_SETUP) {
+                    goToMainActivity()
+                } else {
+                    finish()
                 }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up click listeners")
         }
     }
 
@@ -244,14 +219,8 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    try {
-                        viewModel.uiState.collect { state ->
-                            updateUi(state)
-                        }
-                    } catch (e: CancellationException) {
-                        throw e  // Re-throw
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error observing UI")
+                    viewModel.uiState.collect { state ->
+                        updateUi(state)
                     }
                 }
             }
@@ -264,89 +233,57 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
-
-        try {
-            binding.titleText.setText(state.titleResId)
-            binding.subtitleText.setText(state.subtitleResId)
-
-            allAppsAdapter?.submitList(state.selectableApps) ?: run {
-                Timber.w("Adapter is null, cannot submit list")
-            }
-
-            updateSelectionChips(state.selectedApps)
-        } catch (e: IllegalStateException) {
-            TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating UI")
+        binding.titleText.setText(state.titleResId)
+        binding.subtitleText.setText(state.subtitleResId)
+        allAppsAdapter?.submitList(state.selectableApps) ?: run {
+            Timber.w("Adapter is null, cannot submit list")
         }
+        updateSelectionChips(state.selectedApps)
     }
 
     override fun handleSpecificEvent(event: OnboardingEvent) {
-        try {
-            when (event) {
-                is OnboardingEvent.NavigateToMain -> {
-                    if (launchMode == LaunchMode.INITIAL_SETUP) {
-                        goToMainActivity()
-                    } else {
-                        finish()
-                    }
-                }
-                is OnboardingEvent.ShowError -> {
-                    try {
-                        Toast.makeText(
-                            this@OnboardingActivity,
-                            event.message,
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error showing error toast")
-                    }
-                }
-                is OnboardingEvent.ShowLimitReachedToast -> {
-                    try {
-                        val message = getString(R.string.favorites_limit_reached, event.limit)
-                        Toast.makeText(
-                            this@OnboardingActivity,
-                            message,
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error showing limit toast")
-                    }
+        // Toast.makeText/show is wrapped because Toast IPC has been observed
+        // to throw on Samsung devices under certain conditions (see
+        // BaseActivity.showToastSafe for context). Keeping the per-Toast
+        // catch here mirrors that defensiveness.
+        when (event) {
+            is OnboardingEvent.NavigateToMain -> {
+                if (launchMode == LaunchMode.INITIAL_SETUP) {
+                    goToMainActivity()
+                } else {
+                    finish()
                 }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling event")
+            is OnboardingEvent.ShowError -> {
+                try {
+                    Toast.makeText(this@OnboardingActivity, event.message, Toast.LENGTH_LONG).show()
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing error toast")
+                }
+            }
+            is OnboardingEvent.ShowLimitReachedToast -> {
+                try {
+                    val message = getString(R.string.favorites_limit_reached, event.limit)
+                    Toast.makeText(this@OnboardingActivity, message, Toast.LENGTH_SHORT).show()
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error showing limit toast")
+                }
+            }
         }
     }
 
     private fun updateSelectionChips(selectedApps: List<AppInfo>) {
         if (_binding == null) return
+        binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.INVISIBLE else View.VISIBLE
+        binding.selectionChipGroup.removeAllViews()
 
-        try {
-            binding.chipsScrollView.visibility = if (selectedApps.isEmpty()) View.INVISIBLE else View.VISIBLE
-            binding.selectionChipGroup.removeAllViews()
-
-            for (app in selectedApps) {
-                try {
-                    val chip = Chip(this).apply {
-                        text = app.displayName
-                        isCloseIconVisible = true
-                        setOnCloseIconClickListener {
-                            try {
-                                viewModel.onAppToggled(app)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error toggling app from chip")
-                            }
-                        }
-                    }
-                    binding.selectionChipGroup.addView(chip)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
-                }
+        for (app in selectedApps) {
+            val chip = Chip(this).apply {
+                text = app.displayName
+                isCloseIconVisible = true
+                setOnCloseIconClickListener { viewModel.onAppToggled(app) }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating selection chips")
+            binding.selectionChipGroup.addView(chip)
         }
     }
 
