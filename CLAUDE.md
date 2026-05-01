@@ -172,6 +172,19 @@ activities.
     "Convert Java to Kotlin" or auto-complete after typing
     `Timber.For…` — reject it in review.
 
+13. **New comments and KDoc are English; existing German comments
+    stay.** Source-code comments and KDoc that you add or rewrite
+    must be in English (the same goes for new log messages and
+    any other in-code text). Pre-existing German comments are
+    intentionally **not** swept — both maintainers read German
+    fluently, the diff would be enormous, and a half-finished sweep
+    would just create new mixed-language files. So: don't translate
+    German comments you happen to pass by; only the lines you
+    genuinely add or rewrite need to be English. UI strings always
+    live in `res/values/strings.xml` + `res/values-de/strings.xml`
+    (per the Localization section below) and are unaffected by
+    this rule.
+
 ---
 
 ## StrictMode violations: known unfixables
