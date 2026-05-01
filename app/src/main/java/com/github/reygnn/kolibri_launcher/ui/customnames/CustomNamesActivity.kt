@@ -97,37 +97,25 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        try {
-            _binding?.let {
-                outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving instance state")
+        _binding?.let {
+            outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
         }
     }
 
     override fun onDestroy() {
+        // Outer catch kept: lifecycle teardown — finally{} must always
+        // reach super.onDestroy() even on a cleanup throw.
         try {
-            // CRASH-SAFE: Dialog schließen
             currentDialog?.dismiss()
             currentDialog = null
 
             // GC-OPTIMIERUNG: Views leeren, um Listener-Referenzen zu kappen
             if (_binding != null) {
-                try {
-                    // Entfernt alle Chips und deren Listener
-                    binding.appNameChipGroup.removeAllViews()
-
-                    // Entfernt Listener vom EditText (indirekt durch Null-Setzen des Bindings, aber explizit schadet nicht)
-                    // binding.searchEditText.addTextChangedListener(null) // Geht leider nicht so einfach bei doOnTextChanged
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing views")
-                }
+                binding.appNameChipGroup.removeAllViews()
             }
 
             adapter = null
             _binding = null
-
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
@@ -136,45 +124,26 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     }
 
     private fun handleWindowInsets() {
-        try {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.updatePadding(
-                    left = insets.left,
-                    top = insets.top,
-                    right = insets.right,
-                    bottom = insets.bottom
-                )
-                WindowInsetsCompat.CONSUMED
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling window insets")
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(
+                left = insets.left,
+                top = insets.top,
+                right = insets.right,
+                bottom = insets.bottom
+            )
+            WindowInsetsCompat.CONSUMED
         }
     }
 
     private fun setupRecyclerView() {
-        try {
-            adapter = CustomNamesAdapter { appInfo ->
-                try {
-                    showRenameDialog(appInfo)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(
-                        e,
-                        "Error showing rename dialog for ${appInfo.packageName}"
-                    )
-                    showError(getString(R.string.error_generic))
-                }
-            }
-
-            binding.allAppsRecyclerView.apply {
-                adapter = this@CustomNamesActivity.adapter
-                layoutManager = LinearLayoutManager(this@CustomNamesActivity)
-                setHasFixedSize(true)
-                // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
-                itemAnimator = null
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        adapter = CustomNamesAdapter { appInfo -> showRenameDialog(appInfo) }
+        binding.allAppsRecyclerView.apply {
+            adapter = this@CustomNamesActivity.adapter
+            layoutManager = LinearLayoutManager(this@CustomNamesActivity)
+            setHasFixedSize(true)
+            // CRASH-SAFE: Verhindere IllegalStateException bei state restoration
+            itemAnimator = null
         }
     }
 
@@ -189,40 +158,20 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
                 searchQueryFlow
                     .debounce(SEARCH_DEBOUNCE_MS)
                     .collect { query ->
-                        try {
-                            viewModel.onSearchQueryChanged(query)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in search query changed")
-                        }
+                        viewModel.onSearchQueryChanged(query)
                     }
             }
         }
     }
 
     private fun setupClickListeners() {
-        try {
-            binding.doneButton.setOnClickListener {
-                finish()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up click listeners")
-        }
+        binding.doneButton.setOnClickListener { finish() }
     }
 
     private fun observeViewModelState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
-                    try {
-                        updateUi(state)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating UI")
-                    }
-                }
+                viewModel.uiState.collect { state -> updateUi(state) }
             }
         }
     }
@@ -233,81 +182,54 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
             Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
-
-        try {
-            adapter?.submitList(state.displayedApps) ?: run {
-                Timber.w("Adapter is null, cannot submit list")
-            }
-
-            updateCustomNameChips(state.appsWithCustomNames)
-        } catch (e: IllegalStateException) {
-            TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating UI")
+        adapter?.submitList(state.displayedApps) ?: run {
+            Timber.w("Adapter is null, cannot submit list")
         }
+        updateCustomNameChips(state.appsWithCustomNames)
     }
 
     private fun updateCustomNameChips(appsWithCustomNames: List<AppInfo>) {
         if (_binding == null) return
+        binding.chipsScrollView.visibility = if (appsWithCustomNames.isEmpty()) View.INVISIBLE else View.VISIBLE
+        binding.appNameChipGroup.removeAllViews()
 
-        try {
-            binding.chipsScrollView.visibility = if (appsWithCustomNames.isEmpty()) View.INVISIBLE else View.VISIBLE
-            binding.appNameChipGroup.removeAllViews()
-
-            for (app in appsWithCustomNames) {
-                try {
-                    val chip = Chip(this).apply {
-                        text = app.displayName
-                        isCloseIconVisible = true
-                        setOnCloseIconClickListener {
-                            try {
-                                viewModel.removeCustomName(app.packageName)
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error removing custom name for ${app.packageName}")
-                            }
-                        }
-                    }
-                    binding.appNameChipGroup.addView(chip)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip for ${app.displayName}")
-                }
+        for (app in appsWithCustomNames) {
+            val chip = Chip(this).apply {
+                text = app.displayName
+                isCloseIconVisible = true
+                setOnCloseIconClickListener { viewModel.removeCustomName(app.packageName) }
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating custom name chips")
+            binding.appNameChipGroup.addView(chip)
         }
     }
 
     private fun showRenameDialog(app: AppInfo) {
-        // 1. CRASH-SAFE: Vorherigen Dialog sicher schließen
+        // dismiss() can throw IllegalArgumentException if the dialog's view
+        // is no longer attached to a window. Specific, ignorable.
         try {
             currentDialog?.dismiss()
-        } catch (e: Throwable) {
-            // Ignorieren, falls Dialog schon weg ist
+        } catch (e: IllegalArgumentException) {
+            // Dialog schon weg, ignorieren
         }
         currentDialog = null
 
+        // Outer catch kept: AlertDialog.Builder + show() can fail when the
+        // activity is finishing (BadTokenException, IllegalStateException)
+        // and the showError fallback gives the user an explanation.
         try {
-            // 2. EditText vorbereiten
             val editText = EditText(this).apply {
                 setText(app.displayName)
                 setSelection(app.displayName.length)
                 hint = getString(R.string.rename_hint)
-                // Optional: InputType explizit setzen für bessere Tastatur-Steuerung
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             }
 
-            // 3. Dialog bauen
             currentDialog = AlertDialog.Builder(this)
                 .setTitle(getString(R.string.rename_dialog_title, app.originalName))
                 .setView(editText)
                 .setPositiveButton(R.string.save) { _, _ ->
-                    try {
-                        val newName = editText.text.toString().trim()
-                        handleRename(app, newName)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error handling rename click")
-                        showError(getString(R.string.error_generic))
-                    }
+                    val newName = editText.text.toString().trim()
+                    handleRename(app, newName)
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .setOnDismissListener {
@@ -320,25 +242,20 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
             currentDialog?.show()
 
-            // 4. GC & LIFECYCLE SAFE: Fokus & Tastatur setzen
-            // Statt 'postDelayed' nutzen wir eine Coroutine, die automatisch stirbt,
-            // wenn die Activity stirbt. Das verhindert Leaks und Crashes.
+            // Coroutine — ihre Lifecycle-Bindung über lifecycleScope reicht;
+            // CancellationException bei Activity-Death wird vom Scope selbst
+            // weitergeleitet. IMM showSoftInput ist EXTERNAL (system service IPC),
+            // daher der innere Catch dort.
             lifecycleScope.launch {
-                try {
-                    // Warte kurz, bis Dialog-Animation fertig ist
-                    kotlinx.coroutines.delay(100)
-
-                    // WICHTIG: Prüfen ob alles noch existiert!
-                    if (currentDialog?.isShowing == true && editText.isAttachedToWindow) {
-                        editText.requestFocus()
-                        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+                kotlinx.coroutines.delay(100)
+                if (currentDialog?.isShowing == true && editText.isAttachedToWindow) {
+                    editText.requestFocus()
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+                    try {
                         imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing keyboard in dialog")
                     }
-                } catch (e: CancellationException) {
-                    // Job wurde gecancelt (Activity zerstört) -> Alles gut.
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing keyboard in dialog")
                 }
             }
 
@@ -349,20 +266,17 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     }
 
     private fun handleRename(app: AppInfo, newName: String) {
-        try {
-            when (val decision = RenameDecision.decide(newName, app.originalName)) {
-                RenameDecision.Remove -> viewModel.removeCustomName(app.packageName)
-                is RenameDecision.TooLong ->
-                    showError(getString(R.string.error_name_too_long, decision.maxLength))
-                is RenameDecision.Set -> viewModel.setCustomName(app.packageName, decision.name)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in handleRename")
-            showError(getString(R.string.error_generic))
+        when (val decision = RenameDecision.decide(newName, app.originalName)) {
+            RenameDecision.Remove -> viewModel.removeCustomName(app.packageName)
+            is RenameDecision.TooLong ->
+                showError(getString(R.string.error_name_too_long, decision.maxLength))
+            is RenameDecision.Set -> viewModel.setCustomName(app.packageName, decision.name)
         }
     }
 
     private fun showError(message: String) {
+        // Defensive Toast — Samsung IPC has been observed to throw
+        // (see BaseActivity.showToastSafe).
         try {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         } catch (e: Throwable) {
