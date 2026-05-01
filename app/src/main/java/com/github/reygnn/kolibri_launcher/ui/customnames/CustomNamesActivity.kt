@@ -230,13 +230,13 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     private fun updateUi(state: CustomNamesUiState) {
         // CRASH-SAFE: Check ob binding noch gültig ist
         if (_binding == null) {
-            Timber.Forest.w("Attempted to update UI after binding was destroyed")
+            Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
 
         try {
             adapter?.submitList(state.displayedApps) ?: run {
-                Timber.Forest.w("Adapter is null, cannot submit list")
+                Timber.w("Adapter is null, cannot submit list")
             }
 
             updateCustomNameChips(state.appsWithCustomNames)

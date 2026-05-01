@@ -327,7 +327,7 @@ class BackupRepositoryImpl @Inject constructor(
         } ?: throw BackupException("Cannot write to selected location")
 
         val imageCount = imageEntries.size
-        Timber.Forest.i("ZIP backup saved: ${imageCount} image(s) embedded")
+        Timber.i("ZIP backup saved: ${imageCount} image(s) embedded")
     }
 
     /**
@@ -377,7 +377,7 @@ class BackupRepositoryImpl @Inject constructor(
                                 val internalUri = wallpaperFileManager.copyFromInputStream(zipIn)
                                 if (internalUri != null) {
                                     extractedImages[entry.name] = internalUri
-                                    Timber.Forest.d("Extracted ${entry.name} → $internalUri")
+                                    Timber.d("Extracted ${entry.name} → $internalUri")
                                 }
                             }
                         }
@@ -395,7 +395,7 @@ class BackupRepositoryImpl @Inject constructor(
 
         val jsonContent = jsonString
         if (jsonContent.isNullOrBlank()) {
-            Timber.Forest.e("ZIP backup does not contain backup.json")
+            Timber.e("ZIP backup does not contain backup.json")
             return ImportResult.InvalidFormat
         }
 
@@ -410,7 +410,7 @@ class BackupRepositoryImpl @Inject constructor(
         val resolvedBackup = resolveZipImages(backup, extractedImages)
 
         // 4. Normalen Import durchführen
-        Timber.Forest.i("ZIP import: ${extractedImages.size} images extracted, starting import")
+        Timber.i("ZIP import: ${extractedImages.size} images extracted, starting import")
         return performImport(resolvedBackup, options)
     }
 
@@ -481,7 +481,7 @@ class BackupRepositoryImpl @Inject constructor(
 
     private fun parseBackupData(jsonString: String): BackupData? {
         if (!validateJsonTypes(jsonString)) {
-            Timber.Forest.w("Type validation failed - rejecting malformed backup")
+            Timber.w("Type validation failed - rejecting malformed backup")
             return null
         }
 
@@ -616,7 +616,7 @@ class BackupRepositoryImpl @Inject constructor(
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
                     if (value !is Number) {
-                        Timber.Forest.w("Type validation failed: $field is not a number")
+                        Timber.w("Type validation failed: $field is not a number")
                         return false
                     }
                 }
@@ -630,12 +630,12 @@ class BackupRepositoryImpl @Inject constructor(
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
                     if (value !is Number) {
-                        Timber.Forest.w("Type validation failed: $field is not a number")
+                        Timber.w("Type validation failed: $field is not a number")
                         return false
                     }
                     val doubleVal = (value as Number).toDouble()
                     if (!doubleVal.isFinite()) {
-                        Timber.Forest.w("Type validation failed: $field is Infinity or NaN")
+                        Timber.w("Type validation failed: $field is Infinity or NaN")
                         return false
                     }
                 }
@@ -650,7 +650,7 @@ class BackupRepositoryImpl @Inject constructor(
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
                     if (value !is Boolean) {
-                        Timber.Forest.w("Type validation failed: $field is not a boolean")
+                        Timber.w("Type validation failed: $field is not a boolean")
                         return false
                     }
                 }
@@ -660,7 +660,7 @@ class BackupRepositoryImpl @Inject constructor(
             for (field in stringFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     if (settings.get(field) !is String) {
-                        Timber.Forest.w("Type validation failed: $field is not a string")
+                        Timber.w("Type validation failed: $field is not a string")
                         return false
                     }
                 }
@@ -671,11 +671,11 @@ class BackupRepositoryImpl @Inject constructor(
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)
                     if (value !is JSONArray) {
-                        Timber.Forest.w("Type validation failed: $field is not an array")
+                        Timber.w("Type validation failed: $field is not an array")
                         return false
                     }
                     if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
-                        Timber.Forest.w("Array size limit exceeded for $field")
+                        Timber.w("Array size limit exceeded for $field")
                         return false
                     }
                 }
@@ -684,11 +684,11 @@ class BackupRepositoryImpl @Inject constructor(
             if (settings.has("customAppNames") && !settings.isNull("customAppNames")) {
                 val value = settings.get("customAppNames")
                 if (value !is JSONObject) {
-                    Timber.Forest.w("Type validation failed: customAppNames is not an object")
+                    Timber.w("Type validation failed: customAppNames is not an object")
                     return false
                 }
                 if ((value as JSONObject).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
-                    Timber.Forest.w("Map size limit exceeded for customAppNames")
+                    Timber.w("Map size limit exceeded for customAppNames")
                     return false
                 }
             }
@@ -701,11 +701,11 @@ class BackupRepositoryImpl @Inject constructor(
             if (layersKey != null && !settings.isNull(layersKey)) {
                 val value = settings.get(layersKey)
                 if (value !is JSONArray) {
-                    Timber.Forest.w("Type validation failed: $layersKey is not an array")
+                    Timber.w("Type validation failed: $layersKey is not an array")
                     return false
                 }
                 if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
-                    Timber.Forest.w("Array size limit exceeded for $layersKey")
+                    Timber.w("Array size limit exceeded for $layersKey")
                     return false
                 }
                 if (!validateWallpaperLayerTypes(value)) {
@@ -732,12 +732,12 @@ class BackupRepositoryImpl @Inject constructor(
                 if (layer.has(field) && !layer.isNull(field)) {
                     val value = layer.get(field)
                     if (value !is Number) {
-                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a number")
+                        Timber.w("Type validation failed: wallpaperLayers[$i].$field is not a number")
                         return false
                     }
                     val doubleVal = (value as Number).toDouble()
                     if (!doubleVal.isFinite()) {
-                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is Infinity or NaN")
+                        Timber.w("Type validation failed: wallpaperLayers[$i].$field is Infinity or NaN")
                         return false
                     }
                 }
@@ -745,7 +745,7 @@ class BackupRepositoryImpl @Inject constructor(
             for (field in layerBoolFields) {
                 if (layer.has(field) && !layer.isNull(field)) {
                     if (layer.get(field) !is Boolean) {
-                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a boolean")
+                        Timber.w("Type validation failed: wallpaperLayers[$i].$field is not a boolean")
                         return false
                     }
                 }
@@ -753,7 +753,7 @@ class BackupRepositoryImpl @Inject constructor(
             for (field in layerStringFields) {
                 if (layer.has(field) && !layer.isNull(field)) {
                     if (layer.get(field) !is String) {
-                        Timber.Forest.w("Type validation failed: wallpaperLayers[$i].$field is not a string")
+                        Timber.w("Type validation failed: wallpaperLayers[$i].$field is not a string")
                         return false
                     }
                 }
@@ -869,7 +869,7 @@ class BackupRepositoryImpl @Inject constructor(
 
             favoritesManager.saveFavoriteComponents(validFavorites.toList())
             importedCount += validFavorites.size
-            Timber.Forest.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
+            Timber.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
         }
 
         // ===== PHASE 2: Import Order =====
@@ -881,7 +881,7 @@ class BackupRepositoryImpl @Inject constructor(
                 .filter { it in currentFavoritesSet && it in installedComponentsSet }
 
             favoritesOrderManager.saveOrder(validOrder)
-            Timber.Forest.i("Imported order: ${validOrder.size} items")
+            Timber.i("Imported order: ${validOrder.size} items")
         }
 
         // ===== PHASE 3: Import Hidden Apps =====
@@ -894,7 +894,7 @@ class BackupRepositoryImpl @Inject constructor(
                 componentsToHide = validHidden,
                 componentsToShow = emptySet()
             )
-            Timber.Forest.i("Imported hidden apps: ${validHidden.size} (skipped $skippedHidden)")
+            Timber.i("Imported hidden apps: ${validHidden.size} (skipped $skippedHidden)")
         }
 
         // ===== PHASE 4: Import Custom App Names =====
@@ -904,7 +904,7 @@ class BackupRepositoryImpl @Inject constructor(
 
             if (validNames.isNotEmpty()) {
                 appNamesManager.setCustomNamesInBatch(validNames)
-                Timber.Forest.i("Imported custom names: ${validNames.size}")
+                Timber.i("Imported custom names: ${validNames.size}")
             }
         }
 
@@ -931,7 +931,7 @@ class BackupRepositoryImpl @Inject constructor(
                     missingApps.add(rightApp)
                 }
             }
-            if (swipeImportedCount > 0) Timber.Forest.i("Imported swipe actions")
+            if (swipeImportedCount > 0) Timber.i("Imported swipe actions")
         }
 
         // ===== PHASE 6: Import Gesture Settings =====
@@ -1012,7 +1012,7 @@ class BackupRepositoryImpl @Inject constructor(
         for ((index, layerBackup) in layerBackups.withIndex()) {
             val uriString = layerBackup.imageUri
             if (uriString.isNullOrBlank()) {
-                Timber.Forest.w("Wallpaper layer $index has no URI, skipping")
+                Timber.w("Wallpaper layer $index has no URI, skipping")
                 continue
             }
 
@@ -1029,10 +1029,10 @@ class BackupRepositoryImpl @Inject constructor(
                     if (internalUri != null) {
                         validLayerStates.add(layerBackup.toLayerState().copy(imageUri = internalUri))
                     } else {
-                        Timber.Forest.w("Failed to copy layer $index to internal storage, skipping")
+                        Timber.w("Failed to copy layer $index to internal storage, skipping")
                     }
                 } else {
-                    Timber.Forest.w("Wallpaper layer $index URI not accessible, skipping: $uriString")
+                    Timber.w("Wallpaper layer $index URI not accessible, skipping: $uriString")
                 }
             } catch (e: Exception) {
                 TimberWrapper.silentError(e, "Failed to validate wallpaper layer $index URI")
@@ -1042,9 +1042,9 @@ class BackupRepositoryImpl @Inject constructor(
         if (validLayerStates.isNotEmpty()) {
             val wallpaperState = WallpaperState.multiLayer(validLayerStates)
             wallpaperManager.saveWallpaperState(wallpaperState)
-            Timber.Forest.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers")
+            Timber.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers")
         } else {
-            Timber.Forest.w("No valid wallpaper layers found, wallpaper not restored")
+            Timber.w("No valid wallpaper layers found, wallpaper not restored")
         }
     }
 
@@ -1070,12 +1070,12 @@ class BackupRepositoryImpl @Inject constructor(
                         translateY = settings.wallpaperTranslateY ?: 0.0f
                     )
                     wallpaperManager.saveWallpaperState(wallpaperState)
-                    Timber.Forest.i("Imported wallpaper settings (single-layer)")
+                    Timber.i("Imported wallpaper settings (single-layer)")
                 } else {
-                    Timber.Forest.w("Failed to copy wallpaper to internal storage")
+                    Timber.w("Failed to copy wallpaper to internal storage")
                 }
             } else {
-                Timber.Forest.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
+                Timber.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
             }
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Failed to restore wallpaper")
@@ -1101,7 +1101,7 @@ class BackupRepositoryImpl @Inject constructor(
         return try {
             val doubleVal = this.getDouble(key)
             if (!doubleVal.isFinite()) {
-                Timber.Forest.w("Rejected non-finite float for $key: $doubleVal")
+                Timber.w("Rejected non-finite float for $key: $doubleVal")
                 null
             } else {
                 doubleVal.toFloat()
@@ -1136,20 +1136,20 @@ class BackupRepositoryImpl @Inject constructor(
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.Forest.e("Empty URI string provided")
+                Timber.e("Empty URI string provided")
                 throw BackupException("Invalid file location")
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.Forest.e(e, "Invalid URI format: $uriString")
+                Timber.e(e, "Invalid URI format: $uriString")
                 throw BackupException("Invalid file location format", e)
             }
 
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                Timber.Forest.e("Unsupported URI scheme: $scheme")
+                Timber.e("Unsupported URI scheme: $scheme")
                 throw BackupException("Unsupported file location type")
             }
 
@@ -1157,7 +1157,7 @@ class BackupRepositoryImpl @Inject constructor(
             val backupData = buildBackupData()
             writeZipBackup(uri, backupData)
 
-            Timber.Forest.i("Backup saved successfully as ZIP to: $uri")
+            Timber.i("Backup saved successfully as ZIP to: $uri")
             true
 
         } catch (e: CancellationException) {
@@ -1165,13 +1165,13 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: BackupException) {
             throw e
         } catch (e: SecurityException) {
-            Timber.Forest.e(e, "Permission denied for URI")
+            Timber.e(e, "Permission denied for URI")
             throw BackupException("No permission to write to this location", e)
         } catch (e: IOException) {
-            Timber.Forest.e(e, "I/O error while saving backup")
+            Timber.e(e, "I/O error while saving backup")
             throw BackupException("Failed to write file (storage full or unavailable?)", e)
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Unexpected error saving backup")
+            Timber.e(e, "Unexpected error saving backup")
             throw BackupException("Failed to save backup: ${e.message}", e)
         }
     }
@@ -1196,23 +1196,23 @@ class BackupRepositoryImpl @Inject constructor(
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
-                Timber.Forest.w(e, "Could not determine file size, proceeding with caution")
+                Timber.w(e, "Could not determine file size, proceeding with caution")
                 0L
             }
 
             if (fileSize > AppConstants.MAX_BACKUP_SIZE_BYTES) {
-                Timber.Forest.e("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
+                Timber.e("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
                 return@withContext ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
             }
 
             // Format-Erkennung: ZIP oder JSON?
             if (isZipFile(uri)) {
-                Timber.Forest.i("Detected ZIP backup format")
+                Timber.i("Detected ZIP backup format")
                 return@withContext importFromZip(uri, options)
             }
 
             // Legacy: Plain JSON
-            Timber.Forest.i("Detected legacy JSON backup format")
+            Timber.i("Detected legacy JSON backup format")
             val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
             } ?: return@withContext ImportResult.Error("Cannot read from selected location")
@@ -1228,7 +1228,7 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Error loading backup")
+            Timber.e(e, "Error loading backup")
             ImportResult.Error("Failed to load backup: ${e.message}")
         }
     }
@@ -1240,20 +1240,20 @@ class BackupRepositoryImpl @Inject constructor(
     override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.Forest.e("Empty URI string provided for preview")
+                Timber.e("Empty URI string provided for preview")
                 return@withContext null
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.Forest.e(e, "Invalid URI format for preview: $uriString")
+                Timber.e(e, "Invalid URI format for preview: $uriString")
                 return@withContext null
             }
 
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                Timber.Forest.e("Unsupported URI scheme for preview: $scheme")
+                Timber.e("Unsupported URI scheme for preview: $scheme")
                 return@withContext null
             }
 
@@ -1262,7 +1262,7 @@ class BackupRepositoryImpl @Inject constructor(
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
-                Timber.Forest.w(e, "Could not determine file size for preview")
+                Timber.w(e, "Could not determine file size for preview")
                 0L
             }
 
@@ -1272,7 +1272,7 @@ class BackupRepositoryImpl @Inject constructor(
                 AppConstants.MAX_PREVIEW_SIZE_BYTES
             }
             if (fileSize > sizeLimit) {
-                Timber.Forest.w("File too large for preview: $fileSize bytes (max: $sizeLimit)")
+                Timber.w("File too large for preview: $fileSize bytes (max: $sizeLimit)")
                 return@withContext null
             }
 
@@ -1286,19 +1286,19 @@ class BackupRepositoryImpl @Inject constructor(
             }
 
             if (jsonString.isNullOrBlank()) {
-                Timber.Forest.e("Could not read backup content for preview")
+                Timber.e("Could not read backup content for preview")
                 return@withContext null
             }
 
             if (!jsonString.trim().startsWith("{")) {
-                Timber.Forest.e("File does not appear to be valid JSON")
+                Timber.e("File does not appear to be valid JSON")
                 return@withContext null
             }
 
             val backup = try {
                 json.decodeFromString<BackupData>(jsonString)
             } catch (e: SerializationException) {
-                Timber.Forest.e(e, "Failed to parse backup file for preview")
+                Timber.e(e, "Failed to parse backup file for preview")
                 return@withContext null
             }
 
@@ -1337,16 +1337,16 @@ class BackupRepositoryImpl @Inject constructor(
                         backup.settings.rotationLocked != null
             )
 
-            Timber.Forest.i(
+            Timber.i(
                 "Preview created: version=${preview.version}, favorites=${preview.favoriteCount}, wallpaperLayers=${preview.wallpaperLayerCount}..."
             )
             return@withContext preview
 
         } catch (e: SecurityException) {
-            Timber.Forest.e(e, "Permission denied for preview")
+            Timber.e(e, "Permission denied for preview")
             null
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Unexpected error while creating preview")
+            Timber.e(e, "Unexpected error while creating preview")
             null
         }
     }

@@ -69,7 +69,7 @@ class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStat
 
     override fun updateApps(newApps: List<AppInfo>) {
         try {
-            Timber.Forest.d("[DATAFLOW] 5. StateManager is being updated. Size: ${newApps.size}")
+            Timber.d("[DATAFLOW] 5. StateManager is being updated. Size: ${newApps.size}")
 
             if (newApps.isNotEmpty()) {
                 lastSuccessfulAppList = newApps
@@ -85,7 +85,7 @@ class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStat
     override fun getCurrentApps(): List<AppInfo> {
         return try {
             _rawAppsFlow.value.ifEmpty {
-                Timber.Forest.d("Returning cached list with ${lastSuccessfulAppList.size} apps")
+                Timber.d("Returning cached list with ${lastSuccessfulAppList.size} apps")
                 lastSuccessfulAppList
             }
         } catch (e: Throwable) {
@@ -100,6 +100,6 @@ class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStat
         // Diese Daten kommen vom System-PackageManager und sollten nicht geleert werden.
         // Ein Reload wird über InstalledAppsRepository.triggerAppsUpdate() ausgelöst.
 
-        Timber.Forest.d("InstalledAppsStateRepositoryImpl: purge requested, but state manager does not purge system data")
+        Timber.d("InstalledAppsStateRepositoryImpl: purge requested, but state manager does not purge system data")
     }
 }

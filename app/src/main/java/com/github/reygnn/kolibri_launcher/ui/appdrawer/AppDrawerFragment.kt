@@ -276,7 +276,7 @@ class AppDrawerFragment : Fragment() {
                 try {
                     val app = longClickedApp
                     if (app == null) {
-                        Timber.Forest.w("Fragment result received but longClickedApp is null")
+                        Timber.w("Fragment result received but longClickedApp is null")
                         return@setFragmentResultListener
                     }
 
@@ -311,7 +311,7 @@ class AppDrawerFragment : Fragment() {
                         // area, can be long-pressed there, and produces
                         // UNHIDE_APP — handled via viewModel.onShowApp.
                         is ContextMenuResult.UnhideApp -> Unit
-                        is ContextMenuResult.Unknown -> Timber.Forest.w(
+                        is ContextMenuResult.Unknown -> Timber.w(
                             "Unknown context menu action: ${result.action}"
                         )
                     }
@@ -493,7 +493,7 @@ class AppDrawerFragment : Fragment() {
                     }
                 }
             } else {
-                Timber.Forest.w("Adapter not initialized or fragment not added")
+                Timber.w("Adapter not initialized or fragment not added")
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error submitting list to adapter")

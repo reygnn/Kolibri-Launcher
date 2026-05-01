@@ -49,13 +49,13 @@ object CrashReportLimiter {
                             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                             performCleanupIfNeeded()
                         } catch (e: Exception) {
-                            Timber.Forest.e(e, "Failed to load preferences in background")
+                            Timber.e(e, "Failed to load preferences in background")
                         }
                     }
                 }
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Failed to launch init coroutine")
+            Timber.e(e, "Failed to launch init coroutine")
         }
     }
 
@@ -69,7 +69,7 @@ object CrashReportLimiter {
         return try {
             val preferences = prefs
             if (preferences == null) {
-                Timber.Forest.w("CrashReportLimiter not initialized - allowing report")
+                Timber.w("CrashReportLimiter not initialized - allowing report")
                 return true
             }
 
@@ -85,19 +85,19 @@ object CrashReportLimiter {
                         preferences.edit {
                             putLong(reportKey, now)
                         }
-                        Timber.Forest.d("Report allowed for: ${exception::class.simpleName}")
+                        Timber.d("Report allowed for: ${exception::class.simpleName}")
                     } catch (e: Throwable) {
-                        Timber.Forest.e(e, "Failed to save report timestamp")
+                        Timber.e(e, "Failed to save report timestamp")
                     }
                 } else {
                     val hoursRemaining = ((REPORT_COOLDOWN_MS - (now - lastSent)) / (60 * 60 * 1000)).toInt()
-                    Timber.Forest.d("Report blocked (cooldown active): ${exception::class.simpleName} - $hoursRemaining hours remaining")
+                    Timber.d("Report blocked (cooldown active): ${exception::class.simpleName} - $hoursRemaining hours remaining")
                 }
 
                 shouldSend
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Error in shouldSendReport - allowing report by default")
+            Timber.e(e, "Error in shouldSendReport - allowing report by default")
             true // Fail-open: allow report if limiter fails
         }
     }
@@ -144,7 +144,7 @@ object CrashReportLimiter {
                     return // Cleanup not needed yet
                 }
 
-                Timber.Forest.d("Performing CrashReportLimiter cleanup...")
+                Timber.d("Performing CrashReportLimiter cleanup...")
 
                 val allEntries = preferences.all
                 var removedCount = 0
@@ -164,10 +164,10 @@ object CrashReportLimiter {
                     putLong(LAST_CLEANUP_KEY, now)
                 }
 
-                Timber.Forest.d("Cleanup complete - removed $removedCount old entries")
+                Timber.d("Cleanup complete - removed $removedCount old entries")
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Error during cleanup")
+            Timber.e(e, "Error during cleanup")
         }
     }
 
@@ -181,10 +181,10 @@ object CrashReportLimiter {
 
             synchronized(lock) {
                 preferences.edit { clear() }
-                Timber.Forest.w("All report limits have been reset")
+                Timber.w("All report limits have been reset")
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Failed to reset limits")
+            Timber.e(e, "Failed to reset limits")
         }
     }
 

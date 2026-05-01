@@ -406,7 +406,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>(AppConstants.PrefKeys.BACKUP_RESTORE)?.setOnPreferenceClickListener {
             try {
                 if (!isAdded || isStateSaved || isDetached) {
-                    Timber.Forest.w("Cannot show backup - invalid fragment state")
+                    Timber.w("Cannot show backup - invalid fragment state")
                     return@setOnPreferenceClickListener false
                 }
 
@@ -439,7 +439,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>(AppConstants.PrefKeys.USAGE_EXPORT)?.setOnPreferenceClickListener {
             try {
                 if (!isAdded || isStateSaved || isDetached) {
-                    Timber.Forest.w("Cannot show usage export - invalid fragment state")
+                    Timber.w("Cannot show usage export - invalid fragment state")
                     return@setOnPreferenceClickListener false
                 }
 
@@ -564,7 +564,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
                             // Hier aktualisieren wir ACRA sofort nach der Entscheidung des Benutzers
                             ACRA.errorReporter.setEnabled(userGaveConsent)
-                            Timber.Forest.i("User consent for crash reports manually changed to: $userGaveConsent")
+                            Timber.i("User consent for crash reports manually changed to: $userGaveConsent")
 
                             // Optional: Dem Nutzer Feedback geben
                             val feedbackMessage = if (userGaveConsent) {
@@ -600,7 +600,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 return typedValue.data
             }
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Failed to resolve theme color attribute: $attrRes")
+            Timber.e(e, "Failed to resolve theme color attribute: $attrRes")
         }
         // Fallback, wenn die Farbe nicht gefunden werden konnte
         return ContextCompat.getColor(context, android.R.color.black)
@@ -622,12 +622,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
             val customTabsIntent = builder.build()
             customTabsIntent.launchUrl(context, url.toUri())
         } catch (e: Throwable) {
-            Timber.Forest.e(e, "Could not open Custom Tab, falling back to standard browser.")
+            Timber.e(e, "Could not open Custom Tab, falling back to standard browser.")
             try {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 context.startActivity(intent)
             } catch (fallbackError: Throwable) {
-                Timber.Forest.e(fallbackError, "Even the fallback browser intent failed.")
+                Timber.e(fallbackError, "Even the fallback browser intent failed.")
             }
         }
     }
@@ -665,7 +665,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         viewModel.installedApps.collect { apps ->
                             if (!isAdded || isDetached) return@collect
 
-                            Timber.Forest.d("[Fragment] Collected ${apps.size} apps")
+                            Timber.d("[Fragment] Collected ${apps.size} apps")
 
                             val sortFavoritesPref =
                                 findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
@@ -846,7 +846,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private suspend fun showSortFavoritesFragment() {
         // CRASH-SAFE: Check Fragment state
         if (!isAdded || isStateSaved || isDetached) {
-            Timber.Forest.w("Cannot show sort favorites - invalid fragment state")
+            Timber.w("Cannot show sort favorites - invalid fragment state")
             return
         }
 
@@ -895,7 +895,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         // CRASH-SAFE: Check state again before transaction
         if (!isAdded || isStateSaved || isDetached) {
-            Timber.Forest.w("Fragment state changed during async operations")
+            Timber.w("Fragment state changed during async operations")
             return
         }
 
@@ -948,7 +948,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val setDefaultLauncherPref =
             findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
         if (setDefaultLauncherPref == null) {
-            Timber.Forest.w("Default launcher preference not found")
+            Timber.w("Default launcher preference not found")
             return
         }
 
@@ -960,7 +960,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         if (roleManager == null) {
-            Timber.Forest.w("RoleManager is null")
+            Timber.w("RoleManager is null")
             return
         }
 

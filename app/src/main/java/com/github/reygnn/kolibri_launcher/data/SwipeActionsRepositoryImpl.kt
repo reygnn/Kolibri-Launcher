@@ -141,7 +141,7 @@ open class SwipeActionsRepositoryImpl private constructor(
             SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> PreferencesKeys.SWIPE_LEFT_APP_COMPONENT
             SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT
             SwipeSlot.NONE -> {
-                Timber.Forest.w("setSwipeAction called with NONE, ignoring.")
+                Timber.w("setSwipeAction called with NONE, ignoring.")
                 return // Keine Aktion für "NONE"
             }
         }

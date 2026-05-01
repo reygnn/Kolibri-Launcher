@@ -255,10 +255,6 @@ Kleinere Auffälligkeiten aus dem Audit. Keine einzelne ist
 gravierend; in Summe drücken sie die Code-Note. Eine Sweep-PR
 nach §2 ist effizienter als sieben Einzel-Edits.
 
-- [ ] **Logging-Stil-Konsistenz:** `Timber.Forest.tag(...)` vs.
-  schlichtes `Timber.d` — eine der beiden Varianten als Regel
-  setzen (oder begründen, warum beide koexistieren) und in
-  CLAUDE.md festhalten.
 - [ ] **Kommentar-Sprache:** Mischung DE/EN im selben File ist
   Tagesform der bisherigen Edits. Repo-Konvention ist
   **Englisch** für Source-Code, README.md und CLAUDE.md

@@ -52,7 +52,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      */
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
-            Timber.Forest.e(throwable, "Uncaught coroutine exception in BaseActivity")
+            Timber.e(throwable, "Uncaught coroutine exception in BaseActivity")
         } catch (e: Throwable) {
             // Even logging can fail - silent fallback
         }
@@ -74,14 +74,14 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                                 throw e  // Coroutine control flow - must re-throw
                             } catch (e: Throwable) {
                                 // Catches Exception and Error (OutOfMemoryError, etc.)
-                                Timber.Forest.e(e, "Error handling error event")
+                                Timber.e(e, "Error handling error event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e  // Re-throw
                     } catch (e: Throwable) {
                         // Catches errors in Flow collection itself
-                        Timber.Forest.e(e, "Error collecting from ErrorEventBus")
+                        Timber.e(e, "Error collecting from ErrorEventBus")
                     }
                 }
 
@@ -102,13 +102,13 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                Timber.Forest.e(e, "Error handling UI event: $event")
+                                Timber.e(e, "Error handling UI event: $event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        Timber.Forest.e(e, "Error collecting from ViewModel eventFlow")
+                        Timber.e(e, "Error collecting from ViewModel eventFlow")
                     }
                 }
             }
@@ -121,7 +121,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      */
     protected open fun handleGenericUiEvent(event: UiEvent): Boolean {
         if (BuildConfig.DEBUG) {
-            Timber.Forest.d("handleUiEvent called with: $event")
+            Timber.d("handleUiEvent called with: $event")
         }
 
         return when (event) {
@@ -132,7 +132,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                     showToastSafe(getString(event.messageResId), Toast.LENGTH_LONG)
                 } else {
                     if (BuildConfig.DEBUG) {
-                        Timber.Forest.d("UiEvent toast throttled: ${getString(event.messageResId)}")
+                        Timber.d("UiEvent toast throttled: ${getString(event.messageResId)}")
                     }
                 }
                 true
@@ -145,7 +145,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                     showToastSafe(event.message, Toast.LENGTH_LONG)
                 } else {
                     if (BuildConfig.DEBUG) {
-                        Timber.Forest.d("UiEvent toast throttled: ${event.message}")
+                        Timber.d("UiEvent toast throttled: ${event.message}")
                     }
                 }
                 true
@@ -155,7 +155,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 try {
                     finish()
                 } catch (e: Exception) {
-                    Timber.Forest.e(e, "Error finishing activity")
+                    Timber.e(e, "Error finishing activity")
                 }
                 true
             }
@@ -163,7 +163,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
             else -> {
                 // Event is not generic - will be handled by handleSpecificEvent
                 if (BuildConfig.DEBUG) {
-                    Timber.Forest.d("Event not handled in BaseActivity: $event")
+                    Timber.d("Event not handled in BaseActivity: $event")
                 }
                 false
             }
@@ -190,7 +190,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
             // Throttle error toasts
             val now = System.currentTimeMillis()
             if (now - lastErrorToastTime < TOAST_THROTTLE_MS) {
-                Timber.Forest.d("Error toast throttled: ${errorData.message}")
+                Timber.d("Error toast throttled: ${errorData.message}")
                 return@let
             }
             lastErrorToastTime = now

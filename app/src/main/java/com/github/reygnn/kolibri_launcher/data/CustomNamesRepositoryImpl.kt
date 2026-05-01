@@ -333,7 +333,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
      */
     override suspend fun triggerCustomNameUpdate() {
         try {
-            Timber.Forest.d("[DATAFLOW] AppNamesManager is emitting an update event.")
+            Timber.d("[DATAFLOW] AppNamesManager is emitting an update event.")
             appsUpdateTrigger.emit(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -360,7 +360,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
                 }
             }
 
-            Timber.Forest.d("Retrieved ${customNames.size} custom app names")
+            Timber.d("Retrieved ${customNames.size} custom app names")
             customNames
 
         }.getOrElse { e ->
@@ -388,7 +388,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
                 }
             }
 
-            Timber.Forest.i("Batch set ${names.size} custom app names")
+            Timber.i("Batch set ${names.size} custom app names")
 
             // Trigger nur einmal am Ende
             triggerCustomNameUpdate()

@@ -146,7 +146,7 @@ class HiddenAppsRepositoryImpl @Inject constructor(
                 preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
             }
 
-            Timber.Forest.i("Component hidden: $componentName")
+            Timber.i("Component hidden: $componentName")
             true
 
         } catch (e: CancellationException) {
@@ -173,7 +173,7 @@ class HiddenAppsRepositoryImpl @Inject constructor(
                 preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
             }
 
-            Timber.Forest.i("Component shown: $componentName")
+            Timber.i("Component shown: $componentName")
             true
 
         } catch (e: CancellationException) {
@@ -199,7 +199,7 @@ class HiddenAppsRepositoryImpl @Inject constructor(
 
                 preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
             }
-            Timber.Forest.i("Component visibilities updated. Hidden: ${componentsToHide.size}, Shown: ${componentsToShow.size}")
+            Timber.i("Component visibilities updated. Hidden: ${componentsToHide.size}, Shown: ${componentsToShow.size}")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {  // Throwable statt Exception

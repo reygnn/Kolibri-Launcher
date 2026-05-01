@@ -26,7 +26,7 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
     override fun setServiceState(isAvailable: Boolean) {
         try {
             _isAvailable.value = isAvailable
-            Timber.Forest.d("Screen lock service state changed: available=$isAvailable")
+            Timber.d("Screen lock service state changed: available=$isAvailable")
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting screen lock service state")
         }
@@ -39,9 +39,9 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
         try {
             if (_isAvailable.value) {
                 _lockRequest.emit(Unit)
-                Timber.Forest.d("Screen lock requested")
+                Timber.d("Screen lock requested")
             } else {
-                Timber.Forest.w("Screen lock requested but service is not available")
+                Timber.w("Screen lock requested but service is not available")
             }
         } catch (e: CancellationException) {
             throw e
@@ -58,9 +58,9 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
             // Sende nur dann eine Anfrage, wenn der Service auch wirklich läuft
             if (_isAvailable.value) {
                 _openNotificationsRequest.emit(Unit)
-                Timber.Forest.d("Open notifications requested")
+                Timber.d("Open notifications requested")
             } else {
-                Timber.Forest.w("Open notifications requested but service is not available")
+                Timber.w("Open notifications requested but service is not available")
             }
         } catch (e: CancellationException) {
             throw e

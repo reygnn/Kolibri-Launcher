@@ -161,6 +161,17 @@ activities.
     such catches across nine files — don't re-add the pattern in
     new code.
 
+12. **Use the short Timber call form.** Write `Timber.d(...)`,
+    `Timber.w(...)`, `Timber.tag(...).e(...)` etc. — not
+    `Timber.Forest.d(...)`. `Forest` is the static inner class that
+    Timber's Java API exposes; the Kotlin compiler resolves the short
+    form to it, so both compile to identical bytecode. The short form
+    is what Timber's own README and Jake Wharton's examples use, and
+    it's what the rest of this codebase uses after the §6(e) sweep.
+    `Timber.Forest.*` typically sneaks in via Android Studio's
+    "Convert Java to Kotlin" or auto-complete after typing
+    `Timber.For…` — reject it in review.
+
 ---
 
 ## StrictMode violations: known unfixables

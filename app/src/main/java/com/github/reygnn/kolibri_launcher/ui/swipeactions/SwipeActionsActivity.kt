@@ -237,7 +237,7 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
      */
     private fun updateUi(state: SwipeActionsUiState) {
         if (_binding == null) {
-            Timber.Forest.w("Attempted to update UI after binding was destroyed")
+            Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
 
@@ -246,7 +246,7 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
             binding.subtitleText.setText(state.subtitleResId)
 
             appSelectionAdapter?.submitList(state.selectableApps) ?: run {
-                Timber.Forest.w("Adapter is null, cannot submit list")
+                Timber.w("Adapter is null, cannot submit list")
             }
 
             // Aktualisiere die Slot-Chips

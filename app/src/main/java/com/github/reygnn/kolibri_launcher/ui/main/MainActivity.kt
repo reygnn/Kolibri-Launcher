@@ -127,7 +127,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     }
                     else -> {
                         // Onboarding aborted - close app
-                        Timber.Forest.w("Onboarding aborted, closing app")
+                        Timber.w("Onboarding aborted, closing app")
                         finish()
                     }
                 }
@@ -178,7 +178,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             // After config change: restore flags
             isInitialized = true
             onboardingCheckCompleted = true
-            Timber.Forest.d("Activity recreated, skipping initialization")
+            Timber.d("Activity recreated, skipping initialization")
         }
     }
 
@@ -214,7 +214,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
      */
     private suspend fun handleInitialSetup() {
         if (onboardingCheckCompleted) {
-            Timber.Forest.d("Initial setup already completed, skipping")
+            Timber.d("Initial setup already completed, skipping")
             return
         }
 
@@ -276,14 +276,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
      */
     private suspend fun initializeMainApp() {
         if (isInitialized) {
-            Timber.Forest.d("App already initialized, skipping")
+            Timber.d("App already initialized, skipping")
             return
         }
 
         try {
             checkAndShowCrashReportConsent()
             isInitialized = true
-            Timber.Forest.d("Main app initialization completed")
+            Timber.d("Main app initialization completed")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -308,7 +308,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             lifecycleScope.launch(mainActivityExceptionHandler) {
                 try {
                     ACRA.errorReporter.setEnabled(userGaveConsent)
-                    Timber.Forest.i("User consent for crash reports is set to: $userGaveConsent")
+                    Timber.i("User consent for crash reports is set to: $userGaveConsent")
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting ACRA consent")
                 }
@@ -429,7 +429,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             try {
                 currentNav.navigate(destinationId)
             } catch (e: Throwable) {
-                Timber.Forest.w(e, "Failed to restore navigation state")
+                Timber.w(e, "Failed to restore navigation state")
                 // Fallback to home
                 try {
                     currentNav.popBackStack(R.id.homeFragment, false)
@@ -463,7 +463,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     override fun handleSpecificEvent(event: UiEvent) {
         if (BuildConfig.DEBUG) {
-            Timber.Forest.d("[MAIN] handleSpecificEvent called with: ${event.javaClass.simpleName}")
+            Timber.d("[MAIN] handleSpecificEvent called with: ${event.javaClass.simpleName}")
         }
 
         try {
@@ -473,13 +473,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         try {
                             navController?.navigate(R.id.appDrawerFragment)
                             if (BuildConfig.DEBUG) {
-                                Timber.Forest.d("[MAIN] Navigated to app drawer")
+                                Timber.d("[MAIN] Navigated to app drawer")
                             }
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "[MAIN] Error navigating to app drawer")
                         }
                     } else if (BuildConfig.DEBUG) {
-                        Timber.Forest.d("[MAIN] Not navigating - wrong destination: ${navController?.currentDestination?.id}")
+                        Timber.d("[MAIN] Not navigating - wrong destination: ${navController?.currentDestination?.id}")
                     }
                 }
 
@@ -531,7 +531,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     )
 
                     if (BuildConfig.DEBUG) {
-                        Timber.Forest.d(
+                        Timber.d(
                             "[MAIN] Processing LaunchApp for: ${event.app.displayName}, " +
                                 "action: ${action::class.simpleName}",
                         )
@@ -545,7 +545,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         try {
                             navController?.popBackStack()
                             if (BuildConfig.DEBUG) {
-                                Timber.Forest.d("[MAIN] Drawer closed")
+                                Timber.d("[MAIN] Drawer closed")
                             }
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
@@ -596,7 +596,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private fun launchApp(appInfo: AppInfo) {
         if (BuildConfig.DEBUG) {
-            Timber.Forest.d("[LAUNCH] Starting launch for: ${appInfo.displayName}")
+            Timber.d("[LAUNCH] Starting launch for: ${appInfo.displayName}")
         }
 
         try {
@@ -618,7 +618,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             launcherApps.startMainActivity(componentName, userHandle, null, options.toBundle())
 
             if (BuildConfig.DEBUG) {
-                Timber.Forest.d("[LAUNCH] Success: ${appInfo.displayName}")
+                Timber.d("[LAUNCH] Success: ${appInfo.displayName}")
             }
 
         } catch (e: ActivityNotFoundException) {

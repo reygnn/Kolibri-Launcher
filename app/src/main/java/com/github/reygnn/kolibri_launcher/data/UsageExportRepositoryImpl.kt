@@ -279,7 +279,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                 }
             }
 
-            Timber.Forest.i("Usage import complete: $packagesImported packages, $timestampsImported timestamps")
+            Timber.i("Usage import complete: $packagesImported packages, $timestampsImported timestamps")
 
             return UsageImportResult.Success(
                 packagesImported = packagesImported,
@@ -305,7 +305,7 @@ class UsageExportRepositoryImpl @Inject constructor(
 
             // Version muss String sein
             if (root.has("version") && root.get("version") !is String) {
-                Timber.Forest.w("Type validation failed: version is not a string")
+                Timber.w("Type validation failed: version is not a string")
                 return false
             }
 
@@ -318,7 +318,7 @@ class UsageExportRepositoryImpl @Inject constructor(
             if (timestampKey != null && !root.isNull(timestampKey)) {
                 val value = root.get(timestampKey)
                 if (value !is Number && value !is String) {
-                    Timber.Forest.w("Type validation failed: $timestampKey is not a number or string")
+                    Timber.w("Type validation failed: $timestampKey is not a number or string")
                     return false
                 }
             }
@@ -333,13 +333,13 @@ class UsageExportRepositoryImpl @Inject constructor(
             if (usageKey != null) {
                 val usageData = root.get(usageKey)
                 if (usageData !is JSONObject) {
-                    Timber.Forest.w("Type validation failed: $usageKey is not an object")
+                    Timber.w("Type validation failed: $usageKey is not an object")
                     return false
                 }
 
                 // DoS-Schutz: Nicht zu viele Packages
                 if (usageData.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
-                    Timber.Forest.w("Too many packages in $usageKey: ${usageData.length()}")
+                    Timber.w("Too many packages in $usageKey: ${usageData.length()}")
                     return false
                 }
 
@@ -350,19 +350,19 @@ class UsageExportRepositoryImpl @Inject constructor(
                     val value = usageData.get(key)
 
                     if (value !is org.json.JSONArray) {
-                        Timber.Forest.w("Type validation failed: $key is not an array")
+                        Timber.w("Type validation failed: $key is not an array")
                         return false
                     }
 
                     if (value.length() > AppConstants.MAX_TIMESTAMPS_PER_APP * 2) {
-                        Timber.Forest.w("Too many timestamps for $key: ${value.length()}")
+                        Timber.w("Too many timestamps for $key: ${value.length()}")
                         return false
                     }
 
                     for (i in 0 until value.length()) {
                         val item = value.get(i)
                         if (item !is Number && item !is String) {
-                            Timber.Forest.w("Type validation failed: timestamp at $key[$i] is not a number or string")
+                            Timber.w("Type validation failed: timestamp at $key[$i] is not a number or string")
                             return false
                         }
                     }
@@ -389,14 +389,14 @@ class UsageExportRepositoryImpl @Inject constructor(
     override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.Forest.e("Empty URI string provided")
+                Timber.e("Empty URI string provided")
                 return@withContext false
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.Forest.e(e, "Invalid URI format: $uriString")
+                Timber.e(e, "Invalid URI format: $uriString")
                 return@withContext false
             }
 
@@ -404,10 +404,10 @@ class UsageExportRepositoryImpl @Inject constructor(
 
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 output.write(jsonString.toByteArray())
-                Timber.Forest.i("Usage data saved to: $uri")
+                Timber.i("Usage data saved to: $uri")
                 true
             } ?: run {
-                Timber.Forest.e("Failed to open output stream for URI: $uri")
+                Timber.e("Failed to open output stream for URI: $uri")
                 false
             }
 
@@ -438,7 +438,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                         pfd.statSize
                     } ?: 0L
                 } catch (e: Throwable) {
-                    Timber.Forest.w(e, "Could not determine file size")
+                    Timber.w(e, "Could not determine file size")
                     0L
                 }
 

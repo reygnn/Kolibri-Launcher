@@ -29,17 +29,17 @@ object TimberWrapper {
      * In DEBUG-Builds wird zusätzlich eine Exception geworfen für sofortige Sichtbarkeit.
      */
     fun silentError(throwable: Throwable, message: String) {
-        Timber.Forest.tag(SILENT_LOG_TAG).e(throwable, message)
+        Timber.tag(SILENT_LOG_TAG).e(throwable, message)
         crashInDebug(throwable, message)
     }
 
     fun silentError(message: String) {
-        Timber.Forest.tag(SILENT_LOG_TAG).e(message)
+        Timber.tag(SILENT_LOG_TAG).e(message)
         crashInDebug(null, message)
     }
 
     fun silentError(throwable: Throwable) {
-        Timber.Forest.tag(SILENT_LOG_TAG).e(throwable)
+        Timber.tag(SILENT_LOG_TAG).e(throwable)
         crashInDebug(throwable, throwable.message ?: "Unknown error")
     }
 
@@ -102,9 +102,9 @@ object TimberWrapper {
         // Hinweis ins ACRA-Backend.
         try {
             if (cause != null) {
-                Timber.Forest.tag(SILENT_LOG_TAG).e(cause, "FATAL: $message")
+                Timber.tag(SILENT_LOG_TAG).e(cause, "FATAL: $message")
             } else {
-                Timber.Forest.tag(SILENT_LOG_TAG).e("FATAL: $message")
+                Timber.tag(SILENT_LOG_TAG).e("FATAL: $message")
             }
         } catch (ignored: Throwable) {
             // Last-resort Log via Android-Log; kein Throw nach oben.

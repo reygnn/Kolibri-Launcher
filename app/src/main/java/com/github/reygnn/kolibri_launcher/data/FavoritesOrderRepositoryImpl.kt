@@ -235,7 +235,7 @@ open class FavoritesOrderRepositoryImpl private constructor(
                 preferences[PreferencesKeys.ORDER_LIST] = orderString
             }
 
-            Timber.Forest.d("Favorites order saved: ${limitedList.size} components")
+            Timber.d("Favorites order saved: ${limitedList.size} components")
             true
 
         } catch (e: CancellationException) {

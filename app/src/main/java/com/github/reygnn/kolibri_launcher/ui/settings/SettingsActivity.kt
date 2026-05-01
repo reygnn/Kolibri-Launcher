@@ -67,7 +67,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                 setDisplayHomeAsUpEnabled(true)
                 title = getString(R.string.settings_title)
             } ?: run {
-                Timber.Forest.w("ActionBar is null, skipping toolbar setup")
+                Timber.w("ActionBar is null, skipping toolbar setup")
             }
 
             // CRASH-SAFE: Safe findViewById mit null check
@@ -88,7 +88,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                     }
                 }
             } ?: run {
-                Timber.Forest.w("Content view not found")
+                Timber.w("Content view not found")
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting up UI")

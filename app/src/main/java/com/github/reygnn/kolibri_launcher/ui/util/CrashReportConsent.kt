@@ -31,7 +31,7 @@ object CrashReportConsent {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Failed to read consent status from SharedPreferences.")
+            Timber.e(e, "Failed to read consent status from SharedPreferences.")
             false
         }
     }
@@ -45,7 +45,7 @@ object CrashReportConsent {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Failed to read 'has_asked' status from SharedPreferences.")
+            Timber.e(e, "Failed to read 'has_asked' status from SharedPreferences.")
             false
         }
     }
@@ -81,7 +81,7 @@ object CrashReportConsent {
         withContext(Dispatchers.Main) {
             // 1. Safety Check: Ohne Activity kein Dialog -> Absturz verhindern
             if (context !is android.app.Activity) {
-                Timber.Forest.e("Cannot show dialog: Context is not an Activity (is ${context::class.java.simpleName})")
+                Timber.e("Cannot show dialog: Context is not an Activity (is ${context::class.java.simpleName})")
                 onResult(false) // Fallback: Ablehnen
                 return@withContext
             }
@@ -124,7 +124,7 @@ object CrashReportConsent {
                 throw e
             } catch (e: Exception) {
                 // Fangnetz für alle UI-Fehler
-                Timber.Forest.e(e, "Error showing consent dialog")
+                Timber.e(e, "Error showing consent dialog")
                 onResult(false)
             }
         }
@@ -144,12 +144,12 @@ object CrashReportConsent {
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
                     clear()
                 }
-                Timber.Forest.i("Crash report consent has been reset.")
+                Timber.i("Crash report consent has been reset.")
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Failed to reset consent.")
+            Timber.e(e, "Failed to reset consent.")
         }
     }
 
@@ -168,7 +168,7 @@ object CrashReportConsent {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.Forest.e(e, "Failed to save consent choice to SharedPreferences.")
+            Timber.e(e, "Failed to save consent choice to SharedPreferences.")
         }
     }
 }

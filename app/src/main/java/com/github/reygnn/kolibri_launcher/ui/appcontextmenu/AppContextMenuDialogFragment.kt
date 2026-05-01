@@ -95,7 +95,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             @Suppress("DEPRECATION")
             appInfo = requireArguments().getParcelable(ARG_APP_INFO)
                 ?: run {
-                    Timber.Forest.w("Dialog created without AppInfo, dismissing")
+                    Timber.w("Dialog created without AppInfo, dismissing")
                     dismiss()
                     return
                 }
@@ -198,7 +198,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     private fun handleActionClick(action: AppContextMenuAction) {
         // CRASH-SAFE: Check fragment state
         if (!isAdded || isStateSaved) {
-            Timber.Forest.w("handleActionClick called in invalid state")
+            Timber.w("handleActionClick called in invalid state")
             return
         }
 
@@ -265,7 +265,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
 
         val ctx = context
         if (ctx == null) {
-            Timber.Forest.w("Context is null, cannot show rename dialog")
+            Timber.w("Context is null, cannot show rename dialog")
             return
         }
 

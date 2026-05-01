@@ -37,15 +37,15 @@ class GetDrawerAppsUseCase @Inject constructor(
 
         // Non-critical Flows: Mit individuellen Fallbacks
         settingsManager.sortOrderFlow.catch { e ->
-            Timber.Forest.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
+            Timber.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
             emit(SortOrder.ALPHABETICAL)
         },
         appVisibilityManager.hiddenAppsFlow.catch { e ->
-            Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
+            Timber.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
     ) { rawApps, sortOrder, hiddenComponents ->
-        Timber.Forest.d(
+        Timber.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
         )
@@ -79,7 +79,7 @@ class GetDrawerAppsUseCase @Inject constructor(
             }
         }
 
-        Timber.Forest.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
+        Timber.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
         sortedApps
     }
         .catch { e ->

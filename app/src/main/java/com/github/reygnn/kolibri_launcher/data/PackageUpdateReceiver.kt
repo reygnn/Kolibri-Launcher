@@ -23,7 +23,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         // Null-Checks für API-Kontrakt-Sicherheit
         if (context == null || intent == null) {
-            Timber.Forest.w("[KOLIBRI] Receiver called with null context or intent")
+            Timber.w("[KOLIBRI] Receiver called with null context or intent")
             return
         }
 
@@ -63,22 +63,22 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 "unknown"
             }
 
-            Timber.Forest.d("[KOLIBRI] Receiver triggered. Action: $action, package: $packageName")
+            Timber.d("[KOLIBRI] Receiver triggered. Action: $action, package: $packageName")
 
             if (action == null) {
-                Timber.Forest.w("[KOLIBRI] Received intent with null action")
+                Timber.w("[KOLIBRI] Received intent with null action")
                 safeOnFinish(onFinish)
                 return
             }
 
             if (action != Intent.ACTION_PACKAGE_ADDED && action != Intent.ACTION_PACKAGE_REMOVED) {
-                Timber.Forest.d("[KOLIBRI] Irrelevant action: $action")
+                Timber.d("[KOLIBRI] Irrelevant action: $action")
                 safeOnFinish(onFinish)
                 return
             }
 
             // Relevante Action erkannt
-            Timber.Forest.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
+            Timber.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
 
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -88,7 +88,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                         processPackageUpdate(context, onFinish)
                     }
                 } catch (e: CancellationException) {
-                    Timber.Forest.d("[KOLIBRI] Coroutine was cancelled")
+                    Timber.d("[KOLIBRI] Coroutine was cancelled")
                     throw e
                 } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "[KOLIBRI] Error in coroutine")
@@ -130,7 +130,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
 
             try {
                 appUpdateSignal.sendUpdateSignal()
-                Timber.Forest.d("[KOLIBRI] Update signal sent successfully")
+                Timber.d("[KOLIBRI] Update signal sent successfully")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

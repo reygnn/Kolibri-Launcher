@@ -28,7 +28,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
 
         try {
-            Timber.Forest.i("Accessibility service connected")
+            Timber.i("Accessibility service connected")
             isConnected = true
 
             // Prüfe ob Hilt erfolgreich injiziert hat
@@ -52,7 +52,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                         }
                         .collect { request ->
                             try {
-                                Timber.Forest.d("Lock request received, performing global action.")
+                                Timber.d("Lock request received, performing global action.")
                                 val success = try {
                                     performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
                                 } catch (e: Exception) {
@@ -61,7 +61,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 }
 
                                 if (!success) {
-                                    Timber.Forest.w("Failed to lock screen - action not successful")
+                                    Timber.w("Failed to lock screen - action not successful")
                                 }
                             } catch (e: Exception) {
                                 TimberWrapper.silentError(e, "Error processing lock request")
@@ -69,7 +69,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                             }
                         }
                 } catch (e: CancellationException) {
-                    Timber.Forest.d("Lock request collection cancelled")
+                    Timber.d("Lock request collection cancelled")
                     throw e
                 } catch (e: Exception) {
                     TimberWrapper.silentError(e, "Critical error in lock request coroutine")
@@ -84,7 +84,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                         }
                         .collect { request ->
                             try {
-                                Timber.Forest.d("Open notifications request received, performing global action.")
+                                Timber.d("Open notifications request received, performing global action.")
                                 val success = try {
                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
                                 } catch (e: Exception) {
@@ -93,14 +93,14 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 }
 
                                 if (!success) {
-                                    Timber.Forest.w("Failed to open notifications - action not successful")
+                                    Timber.w("Failed to open notifications - action not successful")
                                 }
                             } catch (e: Exception) {
                                 TimberWrapper.silentError(e, "Error processing open notifications request")
                             }
                         }
                 } catch (e: CancellationException) {
-                    Timber.Forest.d("Open notifications request collection cancelled")
+                    Timber.d("Open notifications request collection cancelled")
                     throw e
                 } catch (e: Exception) {
                     TimberWrapper.silentError(e, "Critical error in open notifications request coroutine")
@@ -114,7 +114,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         try {
-            Timber.Forest.i("Accessibility service unbound")
+            Timber.i("Accessibility service unbound")
             cleanupService()
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in onUnbind")
@@ -130,7 +130,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         try {
-            Timber.Forest.i("Accessibility service destroyed")
+            Timber.i("Accessibility service destroyed")
             cleanupService()
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in onDestroy")
@@ -178,7 +178,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         // No-op - aber absicherbar für zukünftige Implementierung
         try {
-            Timber.Forest.d("Accessibility service interrupted")
+            Timber.d("Accessibility service interrupted")
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error in onInterrupt")
         }

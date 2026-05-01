@@ -48,7 +48,7 @@ class BackupFragment : Fragment() {
 
     // Exception Handler für alle Coroutines in diesem Fragment
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Timber.Forest.e(throwable, "Uncaught coroutine exception in BackupFragment")
+        Timber.e(throwable, "Uncaught coroutine exception in BackupFragment")
         view?.let {
             showError(getString(R.string.error_generic))
         }
@@ -61,7 +61,7 @@ class BackupFragment : Fragment() {
             try {
                 viewModel.exportBackup(it.toString())
             } catch (e: Exception) {
-                Timber.Forest.e(e, "Export failed")
+                Timber.e(e, "Export failed")
                 showError(getString(R.string.backup_export_failed))
             }
         }
@@ -77,7 +77,7 @@ class BackupFragment : Fragment() {
                 viewModel.previewBackup(it.toString())
                 showImportOptionsDialog(it.toString())
             } catch (e: Exception) {
-                Timber.Forest.e(e, "Import preview failed")
+                Timber.e(e, "Import preview failed")
                 showError(getString(R.string.error_generic))
             }
         }
@@ -114,7 +114,7 @@ class BackupFragment : Fragment() {
     private fun showImportOptionsDialog(uriString: String) {
         // Fragment-State-Check
         if (!isAdded || isStateSaved || isDetached) {
-            Timber.Forest.w("Cannot show import dialog - invalid fragment state")
+            Timber.w("Cannot show import dialog - invalid fragment state")
             return
         }
 
@@ -129,7 +129,7 @@ class BackupFragment : Fragment() {
 
                 // Wenn preview null ist (Timeout) oder Fragment weg ist -> Abbruch
                 if (preview == null) {
-                    Timber.Forest.e("Preview timeout or loading failed")
+                    Timber.e("Preview timeout or loading failed")
                     hideLoading()
                     showError(getString(R.string.error_generic))
                     return@launch
@@ -225,7 +225,7 @@ class BackupFragment : Fragment() {
                     .show()
 
             } catch (e: Exception) {
-                Timber.Forest.e(e, "Error loading backup preview")
+                Timber.e(e, "Error loading backup preview")
                 hideLoading()
                 showError(getString(R.string.error_generic))
             }
@@ -327,7 +327,7 @@ class BackupFragment : Fragment() {
     private fun showSuccess(message: String) {
         _binding?.let {
             Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
-            Timber.Forest.i(message)
+            Timber.i(message)
         }
     }
 
@@ -353,14 +353,14 @@ class BackupFragment : Fragment() {
             }
 
             Snackbar.make(it.root, displayMessage, Snackbar.LENGTH_LONG).show()
-            Timber.Forest.i("Import success: $message, missing: ${missingApps.size}")
+            Timber.i("Import success: $message, missing: ${missingApps.size}")
         }
     }
 
     private fun showError(message: String) {
         _binding?.let {
             Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
-            Timber.Forest.e("Backup error: $message")
+            Timber.e("Backup error: $message")
         }
     }
 

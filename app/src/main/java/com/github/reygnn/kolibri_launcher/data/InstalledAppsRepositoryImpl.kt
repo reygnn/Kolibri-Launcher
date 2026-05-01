@@ -111,8 +111,8 @@ class InstalledAppsRepositoryImpl @Inject constructor(
 
     override suspend fun triggerAppsUpdate() {
         try {
-            Timber.Forest.d("App update triggered.")
-            Timber.Forest.d("[DATAFLOW] 2. Update triggered in InstalledAppsRepositoryImpl.")
+            Timber.d("App update triggered.")
+            Timber.d("[DATAFLOW] 2. Update triggered in InstalledAppsRepositoryImpl.")
             appsUpdateTrigger.emit(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -124,7 +124,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
 
     private fun loadAppsFromPackageManager(): Flow<List<AppInfo>> = flow {
         try {
-            Timber.Forest.d("!!! PROBE: Loading apps from PackageManager... Expensive operation is RUNNING!")
+            Timber.d("!!! PROBE: Loading apps from PackageManager... Expensive operation is RUNNING!")
 
             val intent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
@@ -151,7 +151,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                 emptyList()
             }
 
-            Timber.Forest.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
+            Timber.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
             emit(freshApps)
 
         } catch (e: CancellationException) {

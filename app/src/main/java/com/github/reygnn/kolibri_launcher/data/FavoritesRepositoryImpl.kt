@@ -204,7 +204,7 @@ class FavoritesRepositoryImpl : FavoritesRepository {
             if (currentFavoritePackages.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
                 val newPackageName = componentName.split('/')[0]
                 if (!currentFavoritePackages.contains(newPackageName)) {
-                    Timber.Forest.w("Favorites limit reached. Cannot add component from new package: $componentName")
+                    Timber.w("Favorites limit reached. Cannot add component from new package: $componentName")
                     return false
                 }
             }
@@ -284,10 +284,10 @@ class FavoritesRepositoryImpl : FavoritesRepository {
 
                 if (cleanedFavorites.size < currentFavorites.size) {
                     val removedCount = currentFavorites.size - cleanedFavorites.size
-                    Timber.Forest.w("Removed $removedCount invalid favorites")
+                    Timber.w("Removed $removedCount invalid favorites")
 
                     if (BuildConfig.DEBUG) {
-                        Timber.Forest.d("Backup favorites before cleanup: $currentFavorites")
+                        Timber.d("Backup favorites before cleanup: $currentFavorites")
                     }
 
                     preferences[PreferencesKeys.FAVORITES] = cleanedFavorites

@@ -55,7 +55,7 @@ class FavoritesAdapter(
         // ViewHolder.from fängt Inflate-Exceptions selbst und gibt null
         // zurück; ein zusätzlicher äußerer Catch wäre tot.
         return ViewHolder.from(parent) ?: run {
-            Timber.Forest.w("Failed to create normal ViewHolder, creating fallback")
+            Timber.w("Failed to create normal ViewHolder, creating fallback")
             createFallbackViewHolder(parent)
         }
     }
@@ -86,7 +86,7 @@ class FavoritesAdapter(
         if (item != null) {
             holder.bind(item)
         } else {
-            Timber.Forest.w("Null item at position $position")
+            Timber.w("Null item at position $position")
         }
     }
 
@@ -103,7 +103,7 @@ class FavoritesAdapter(
             toPosition < 0 ||
             toPosition >= list.size
         ) {
-            Timber.Forest.w("Invalid positions: from=$fromPosition, to=$toPosition, size=${list.size}")
+            Timber.w("Invalid positions: from=$fromPosition, to=$toPosition, size=${list.size}")
             return
         }
 

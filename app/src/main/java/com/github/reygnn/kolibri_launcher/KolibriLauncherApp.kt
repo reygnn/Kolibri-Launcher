@@ -345,11 +345,11 @@ class KolibriLauncherApp : Application() {
                     .build()
             )
 
-            Timber.Forest.d("StrictMode initialized successfully")
+            Timber.d("StrictMode initialized successfully")
 
         } catch (e: Throwable) {
             // Sollte eigentlich nie passieren, aber gut für Defensive Programming
-            Timber.Forest.e(e, "Error setting up StrictMode")
+            Timber.e(e, "Error setting up StrictMode")
         }
     }
 
@@ -361,7 +361,7 @@ class KolibriLauncherApp : Application() {
             .setReportMainThreadOnly() // Wir wollen nur wissen, warum UI hängt
             .setANRListener { error ->
                 // Hier übergeben wir den ANR an ACRA
-                Timber.Forest.e(error, "ANR detected!")
+                Timber.e(error, "ANR detected!")
                 ACRA.errorReporter.handleException(error)
             }
             .start()

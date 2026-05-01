@@ -47,7 +47,7 @@ abstract class BaseViewModel<E>(
         } catch (e: Throwable) {
             // Ultra paranoid: Catch everything
             try {
-                Timber.Forest.e(e, "Error sending event: $event")
+                Timber.e(e, "Error sending event: $event")
             } catch (loggingError: Throwable) {
                 // Even logging can fail - silent fallback
             }
@@ -64,7 +64,7 @@ abstract class BaseViewModel<E>(
         } catch (e: Throwable) {
             // Even error handler can fail - last resort logging
             try {
-                Timber.Forest.e(e, "CRITICAL: Error in exception handler")
+                Timber.e(e, "CRITICAL: Error in exception handler")
             } catch (ignored: Throwable) {
                 // Absolute last resort - nothing we can do
             }
@@ -113,7 +113,7 @@ abstract class BaseViewModel<E>(
             } catch (handlerError: Throwable) {
                 // Error handler itself failed
                 try {
-                    Timber.Forest.e(handlerError, "Error in custom error handler")
+                    Timber.e(handlerError, "Error in custom error handler")
                 } catch (ignored: Throwable) {
                     // Even logging can fail
                 }
@@ -139,19 +139,19 @@ abstract class BaseViewModel<E>(
         try {
             when (throwable) {
                 is OutOfMemoryError -> {
-                    Timber.Forest.e(throwable, "[$context] OUT OF MEMORY - Critical!")
+                    Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
                     try {
                         System.gc()
                     } catch (ignored: Throwable) { }
                 }
                 is StackOverflowError -> {
-                    Timber.Forest.e(throwable, "[$context] STACK OVERFLOW - Critical!")
+                    Timber.e(throwable, "[$context] STACK OVERFLOW - Critical!")
                 }
                 is CancellationException -> {
-                    Timber.Forest.d("[$context] Coroutine cancelled (normal)")
+                    Timber.d("[$context] Coroutine cancelled (normal)")
                 }
                 else -> {
-                    Timber.Forest.e(throwable, "[$context] Error in ViewModel")
+                    Timber.e(throwable, "[$context] Error in ViewModel")
                 }
             }
         } catch (loggingError: Throwable) {
@@ -194,10 +194,10 @@ abstract class BaseViewModel<E>(
                 throw e
             } catch (e: ClassCastException) {
                 // E is not UiEvent - that's okay, this ViewModel doesn't support error toasts
-                Timber.Forest.d("This ViewModel does not support UiEvent error toasts")
+                Timber.d("This ViewModel does not support UiEvent error toasts")
             } catch (e: Throwable) {
                 try {
-                    Timber.Forest.e(e, "Failed to send error toast event")
+                    Timber.e(e, "Failed to send error toast event")
                 } catch (ignored: Throwable) { }
             }
         }
@@ -206,7 +206,7 @@ abstract class BaseViewModel<E>(
     override fun onCleared() {
         try {
             super.onCleared()
-            Timber.Forest.d("${this::class.simpleName} cleared")
+            Timber.d("${this::class.simpleName} cleared")
         } catch (e: Throwable) {
             // Even onCleared can fail
             try {

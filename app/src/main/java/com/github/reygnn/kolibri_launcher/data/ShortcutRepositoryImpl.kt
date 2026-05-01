@@ -41,12 +41,12 @@ class ShortcutRepositoryImpl @Inject constructor(
 
     override fun getShortcutsForPackage(packageName: String): List<ShortcutInfo> {
         if (packageName.isBlank()) {
-            Timber.Forest.w("Attempted to get shortcuts for blank package name")
+            Timber.w("Attempted to get shortcuts for blank package name")
             return emptyList()
         }
 
         if (!isDefaultLauncher()) {
-            Timber.Forest.d("Not the default launcher - cannot access shortcuts for $packageName")
+            Timber.d("Not the default launcher - cannot access shortcuts for $packageName")
             return emptyList()
         }
 
@@ -68,7 +68,7 @@ class ShortcutRepositoryImpl @Inject constructor(
             service.getShortcuts(query, Process.myUserHandle()) ?: emptyList()
 
         } catch (e: SecurityException) {
-            Timber.Forest.i("Shortcut access denied for $packageName - launcher status may have changed")
+            Timber.i("Shortcut access denied for $packageName - launcher status may have changed")
             emptyList()
         } catch (e: IllegalStateException) {
             TimberWrapper.silentError(e, "User locked or LauncherApps unavailable for: $packageName")

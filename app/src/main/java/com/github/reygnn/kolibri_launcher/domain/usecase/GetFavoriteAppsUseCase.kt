@@ -65,19 +65,19 @@ class GetFavoriteAppsUseCase @Inject constructor(
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
         installedAppsStateRepository.rawAppsFlow,
         favoritesManager.favoriteComponentsFlow.catch { e ->
-            Timber.Forest.w(e, "favoriteComponentsFlow error - using empty set fallback")
+            Timber.w(e, "favoriteComponentsFlow error - using empty set fallback")
             emit(emptySet())
         },
         appVisibilityManager.hiddenAppsFlow.catch { e ->
-            Timber.Forest.w(e, "hiddenAppsFlow error - showing all apps")
+            Timber.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
         favoritesOrderManager.favoriteComponentsOrderFlow.catch { e ->
-            Timber.Forest.w(e, "favoriteComponentsOrderFlow error - using empty order")
+            Timber.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
         }
     ) { rawApps, favorites, hiddenApps, savedOrder ->
-        Timber.Forest.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
+        Timber.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
         // Leere App-Liste → Loading state
         if (rawApps.isEmpty()) {
@@ -86,7 +86,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         processApps(rawApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
-        Timber.Forest.e(e, "Critical error in favoriteApps flow")
+        Timber.e(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }
 
@@ -116,14 +116,14 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            Timber.Forest.w(e, "Sorting failed - using alphabetical fallback")
+            Timber.w(e, "Sorting failed - using alphabetical fallback")
             favoriteApps.sortedBy { it.displayName.lowercase() }
         }
 
         val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
 
         return if (limitedOrderedFavorites.isNotEmpty()) {
-            Timber.Forest.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
+            Timber.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
             UiState.Success(
                 FavoriteAppsResult(
                     apps = limitedOrderedFavorites,
@@ -133,7 +133,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } else {
             // Fallback: Top N sichtbare Apps
             val fallbackApps = createFallbackApps(rawApps, hiddenApps)
-            Timber.Forest.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
+            Timber.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
             UiState.Success(
                 FavoriteAppsResult(
                     apps = fallbackApps,

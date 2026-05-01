@@ -261,7 +261,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     private fun updateUi(state: OnboardingUiState) {
         // CRASH-SAFE: Check ob binding noch gültig ist
         if (_binding == null) {
-            Timber.Forest.w("Attempted to update UI after binding was destroyed")
+            Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
 
@@ -270,7 +270,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             binding.subtitleText.setText(state.subtitleResId)
 
             allAppsAdapter?.submitList(state.selectableApps) ?: run {
-                Timber.Forest.w("Adapter is null, cannot submit list")
+                Timber.w("Adapter is null, cannot submit list")
             }
 
             updateSelectionChips(state.selectedApps)

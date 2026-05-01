@@ -39,7 +39,7 @@ class SettingsViewModel @Inject constructor(
                 getInstalledAppsUseCase().collect { apps ->
                     try {
                         if (BuildConfig.DEBUG) {
-                            Timber.Forest.d("[ViewModel] Collected ${apps.size} apps")
+                            Timber.d("[ViewModel] Collected ${apps.size} apps")
                         }
                         _installedApps.value = apps
                     } catch (e: CancellationException) {
@@ -61,7 +61,7 @@ class SettingsViewModel @Inject constructor(
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_app_list_not_loaded))
             if (BuildConfig.DEBUG) {
-                Timber.Forest.w("App list not loaded when action attempted")
+                Timber.w("App list not loaded when action attempted")
             }
         }
     }
