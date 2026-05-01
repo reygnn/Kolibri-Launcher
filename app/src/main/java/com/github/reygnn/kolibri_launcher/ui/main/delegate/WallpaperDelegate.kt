@@ -306,20 +306,14 @@ class WallpaperDelegate(
         translateX: Float,
         translateY: Float
     ) = scope.launchSafe("Error saving wallpaper transform") {
-        try {
-            val currentState = _wallpaperState.value
-            if (currentState.hasWallpaper) {
-                saveWallpaperStateUseCase.updateTransform(
-                    currentState = currentState,
-                    scale = scale,
-                    translateX = translateX,
-                    translateY = translateY
-                )
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving wallpaper transform")
+        val currentState = _wallpaperState.value
+        if (currentState.hasWallpaper) {
+            saveWallpaperStateUseCase.updateTransform(
+                currentState = currentState,
+                scale = scale,
+                translateX = translateX,
+                translateY = translateY
+            )
         }
     }
 
@@ -374,18 +368,14 @@ class WallpaperDelegate(
         if (filesToDelete.isEmpty()) return
 
         scope.launchSafe("Error committing wallpaper edit") {
-            try {
-                filesToDelete.forEach { uri ->
-                    try {
-                        wallpaperFileManager.deleteFile(uri)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error deleting pending layer file")
-                    }
+            // Per-file catch kept: one failed delete must not abort the
+            // batch and leave subsequent orphan files behind.
+            filesToDelete.forEach { uri ->
+                try {
+                    wallpaperFileManager.deleteFile(uri)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error deleting pending layer file")
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error committing wallpaper edit")
             }
         }
     }
@@ -418,21 +408,16 @@ class WallpaperDelegate(
         if (snapshot == null && filesToDelete.isEmpty()) return
 
         scope.launchSafe("Error canceling wallpaper edit") {
-            try {
-                if (snapshot != null) {
-                    saveWallpaperStateUseCase(snapshot)
+            if (snapshot != null) {
+                saveWallpaperStateUseCase(snapshot)
+            }
+            // Per-file catch kept (same reason as commit-path).
+            filesToDelete.forEach { uri ->
+                try {
+                    wallpaperFileManager.deleteFile(uri)
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error deleting canceled layer file")
                 }
-                filesToDelete.forEach { uri ->
-                    try {
-                        wallpaperFileManager.deleteFile(uri)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error deleting canceled layer file")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error canceling wallpaper edit")
             }
         }
     }
@@ -457,68 +442,55 @@ class WallpaperDelegate(
 
     fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) =
         scope.launchSafe("Error adding wallpaper layer") {
-            try {
-                val internalUri = wallpaperFileManager.copyToInternal(imageUri)
-                if (internalUri == null) {
-                    TimberWrapper.silentError("Failed to copy layer image to internal storage")
-                    return@launchSafe
-                }
-
-                // While in edit mode, track this file so its orphan copy on
-                // disk gets cleaned up if the user cancels the session.
-                if (_isWallpaperEditMode.value) {
-                    pendingRemovalsOnCancel.add(internalUri)
-                }
-
-                val current = _wallpaperState.value
-
-                // Migration: Single → Multi beim ersten addLayer
-                val base = if (!current.isMultiLayer && current.hasWallpaper) {
-                    current.toMultiLayer()
-                } else {
-                    current
-                }
-
-                // Auto-label: pick the lowest unused "Layer N" number so that
-                // after a delete+add cycle we don't get "Layer 3" twice.
-                val resolvedLabel = label ?: nextFreeAutoLabel(base)
-
-                val newLayer = WallpaperLayerState(
-                    imageUri = internalUri,
-                    label = resolvedLabel
-                )
-
-                val newState = base.withAddedLayer(newLayer)
-
-                // Signal to the view that this new layer should be focused
-                // (selected as active) after the imminent rebuild. Consumer
-                // calls consumePendingFocusLayerId() after applying.
-                _pendingFocusLayerId.value = newLayer.id
-
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error adding wallpaper layer")
+            val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+            if (internalUri == null) {
+                TimberWrapper.silentError("Failed to copy layer image to internal storage")
+                return@launchSafe
             }
+
+            // While in edit mode, track this file so its orphan copy on
+            // disk gets cleaned up if the user cancels the session.
+            if (_isWallpaperEditMode.value) {
+                pendingRemovalsOnCancel.add(internalUri)
+            }
+
+            val current = _wallpaperState.value
+
+            // Migration: Single → Multi beim ersten addLayer
+            val base = if (!current.isMultiLayer && current.hasWallpaper) {
+                current.toMultiLayer()
+            } else {
+                current
+            }
+
+            // Auto-label: pick the lowest unused "Layer N" number so that
+            // after a delete+add cycle we don't get "Layer 3" twice.
+            val resolvedLabel = label ?: nextFreeAutoLabel(base)
+
+            val newLayer = WallpaperLayerState(
+                imageUri = internalUri,
+                label = resolvedLabel
+            )
+
+            val newState = base.withAddedLayer(newLayer)
+
+            // Signal to the view that this new layer should be focused
+            // (selected as active) after the imminent rebuild. Consumer
+            // calls consumePendingFocusLayerId() after applying.
+            _pendingFocusLayerId.value = newLayer.id
+
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     /**
      * Findet die kleinste freie Nummer N, so dass "Layer N" noch nicht im
      * [state] vorkommt. Verhindert Kollisionen nach Delete-then-Add-Zyklen.
-     *
-     * Defensiv gegen Mock-/Test-States: greift nicht blind auf layers zu,
-     * fällt bei Problemen auf "Layer 1" zurück.
      */
     private fun nextFreeAutoLabel(state: WallpaperState): String {
-        val used = try {
-            state.layers.mapNotNull { layer ->
-                layer.label?.removePrefix("Layer ")?.toIntOrNull()
-            }.toSet()
-        } catch (e: Throwable) {
-            emptySet()
-        }
+        val used = state.layers.mapNotNull { layer ->
+            layer.label?.removePrefix("Layer ")?.toIntOrNull()
+        }.toSet()
         var n = 1
         while (n in used) n++
         return "Layer $n"
@@ -526,47 +498,35 @@ class WallpaperDelegate(
 
     fun onRemoveWallpaperLayer(layerIndex: Int) =
         scope.launchSafe("Error removing wallpaper layer") {
-            try {
-                val current = _wallpaperState.value
-                val layerUri = current.getLayer(layerIndex)?.imageUri
+            val current = _wallpaperState.value
+            val layerUri = current.getLayer(layerIndex)?.imageUri
 
-                // In edit mode: defer the physical delete until commit so that
-                // a cancel can restore the snapshot including the file on disk.
-                // Outside edit mode: delete immediately as before.
-                if (layerUri != null) {
-                    if (_isWallpaperEditMode.value) {
-                        pendingRemovalsOnCommit.add(layerUri)
-                    } else {
-                        wallpaperFileManager.deleteFile(layerUri)
-                    }
+            // In edit mode: defer the physical delete until commit so that
+            // a cancel can restore the snapshot including the file on disk.
+            // Outside edit mode: delete immediately as before.
+            if (layerUri != null) {
+                if (_isWallpaperEditMode.value) {
+                    pendingRemovalsOnCommit.add(layerUri)
+                } else {
+                    wallpaperFileManager.deleteFile(layerUri)
                 }
-
-                val newState = current.withRemovedLayer(layerIndex)
-
-                // Unified persist path: set in-memory + persist. WallpaperRepositoryImpl's
-                // saveWallpaperState handles the "no wallpaper" case by wiping all
-                // keys, so we don't need a separate clearWallpaperUseCase call here.
-                // (That avoids a brief UI flicker when the last layer is removed.)
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error removing wallpaper layer")
             }
+
+            val newState = current.withRemovedLayer(layerIndex)
+
+            // Unified persist path: set in-memory + persist. WallpaperRepositoryImpl's
+            // saveWallpaperState handles the "no wallpaper" case by wiping all
+            // keys, so we don't need a separate clearWallpaperUseCase call here.
+            // (That avoids a brief UI flicker when the last layer is removed.)
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     fun onSwapWallpaperLayers(indexA: Int, indexB: Int) =
         scope.launchSafe("Error swapping wallpaper layers") {
-            try {
-                val newState = _wallpaperState.value.withSwappedLayers(indexA, indexB)
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error swapping wallpaper layers")
-            }
+            val newState = _wallpaperState.value.withSwappedLayers(indexA, indexB)
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     // ===========================================
@@ -579,36 +539,24 @@ class WallpaperDelegate(
         translateX: Float,
         translateY: Float
     ) = scope.launchSafe("Error saving layer transform") {
-        try {
-            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                it.copy(scale = scale, translateX = translateX, translateY = translateY)
-            }
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving layer transform")
+        val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+            it.copy(scale = scale, translateX = translateX, translateY = translateY)
         }
+        _wallpaperState.value = newState
+        saveWallpaperStateUseCase(newState)
     }
 
     fun onSaveAllLayerTransforms(
         transforms: List<Triple<Float, Float, Float>>
     ) = scope.launchSafe("Error saving all layer transforms") {
-        try {
-            var state = _wallpaperState.value
-            transforms.forEachIndexed { index, (scale, tx, ty) ->
-                state = state.withUpdatedLayer(index) {
-                    it.copy(scale = scale, translateX = tx, translateY = ty)
-                }
+        var state = _wallpaperState.value
+        transforms.forEachIndexed { index, (scale, tx, ty) ->
+            state = state.withUpdatedLayer(index) {
+                it.copy(scale = scale, translateX = tx, translateY = ty)
             }
-            _wallpaperState.value = state
-            saveWallpaperStateUseCase(state)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving all layer transforms")
         }
+        _wallpaperState.value = state
+        saveWallpaperStateUseCase(state)
     }
 
     // ===========================================
@@ -617,47 +565,29 @@ class WallpaperDelegate(
 
     fun onSetLayerAlpha(layerIndex: Int, alpha: Float) =
         scope.launchSafe("Error setting layer alpha") {
-            try {
-                val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                    it.copy(alpha = alpha.coerceIn(0f, 1f))
-                }
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting layer alpha")
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(alpha = alpha.coerceIn(0f, 1f))
             }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) =
         scope.launchSafe("Error setting layer blend mode") {
-            try {
-                val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                    it.copy(blendModeName = blendModeName)
-                }
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting layer blend mode")
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(blendModeName = blendModeName)
             }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     fun onSetLayerVisibility(layerIndex: Int, isVisible: Boolean) =
         scope.launchSafe("Error setting layer visibility") {
-            try {
-                val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                    it.copy(isVisible = isVisible)
-                }
-                _wallpaperState.value = newState
-                saveWallpaperStateUseCase(newState)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error setting layer visibility")
+            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
+                it.copy(isVisible = isVisible)
             }
+            _wallpaperState.value = newState
+            saveWallpaperStateUseCase(newState)
         }
 
     // ===========================================
