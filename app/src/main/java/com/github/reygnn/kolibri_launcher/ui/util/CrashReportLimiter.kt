@@ -19,6 +19,40 @@ import timber.log.Timber
  * - Automatic cleanup of old entries
  * - Thread-safe operations
  * - Ultra crash-safe (all operations wrapped in try-catch)
+ *
+ * ## Why this class uses SharedPreferences (CLAUDE.md Rule 5 exception)
+ *
+ * Rule 5 says DataStore is the only app storage. This class is one of the
+ * two explicit exceptions (the other is `DataMigrationManager`'s version
+ * flag — for unrelated reasons).
+ *
+ * The key constraint is that [shouldSendReport] is called *synchronously*
+ * from the ACRA crash handler, which runs on a plain thread, not a
+ * coroutine. DataStore's read/write API is `suspend`-only — there is no
+ * sync alternative. Two ways to bridge the gap, both worse than just
+ * keeping SharedPreferences:
+ *
+ *   1. Wrap each access in `runBlocking { dataStore.data.first() }`.
+ *      That's the StrictMode bug we want to avoid in the first place,
+ *      and on a crash hot path it would block the handler thread on
+ *      disk I/O — exactly when we want to be fast.
+ *
+ *   2. Maintain an in-memory `ConcurrentMap<String, Long>` cache,
+ *      hydrated once on init from DataStore, with fire-and-forget
+ *      async write-through. That doubles the source of truth (cache
+ *      + disk), opens race conditions on rapid successive crashes,
+ *      and adds a meaningful chunk of new code for what amounts to
+ *      ephemeral telemetry timestamps.
+ *
+ * The persisted data here is *not user state* — it's a 24-hour cooldown
+ * table for crash-report deduplication. Losing it on an app update or
+ * a crash mid-write is acceptable: worst case, one extra crash report
+ * gets sent. The Rule 5 spirit is "user state lives in DataStore so
+ * backup/restore covers it"; this data has no business in a backup.
+ *
+ * If you want to "clean this up" by migrating to DataStore, read this
+ * KDoc and CLAUDE.md Rule 5 first. The decision is documented; the
+ * sync-call constraint from ACRA is real.
  */
 object CrashReportLimiter {
 

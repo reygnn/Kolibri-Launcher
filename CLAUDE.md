@@ -89,15 +89,31 @@ activities.
    refactor. Modules are split by responsibility in `di/`. `Repository ↔
    Manager` bindings always go in `RepositoryModule.kt`.
 
-5. **DataStore Preferences is the only app storage.** No `SharedPreferences`,
-   no app-managed SQLite. Migrations run through `DataMigrationManager` on
-   app start. Backup/restore goes through `BackupManager` + `DataStoreBackup`.
+5. **DataStore Preferences is the only app storage for user state.** No
+   `SharedPreferences`, no app-managed SQLite. Migrations run through
+   `DataMigrationManager` on app start. Backup/restore goes through
+   `BackupManager` + `DataStoreBackup`.
 
-   *One deliberate exception:* `DataMigrationManager` itself uses a small
-   `SharedPreferences` file (`kolibri_data_version`) for version tracking,
-   because the migration mechanism cannot bootstrap itself through the very
-   thing it might need to migrate. Chicken-and-egg by nature; the rationale
-   is documented in the file's KDoc. Don't try to "fix" it.
+   *Two deliberate exceptions, both `SharedPreferences`-backed and both
+   intentional:*
+
+   - **`DataMigrationManager`** uses a small `SharedPreferences` file
+     (`kolibri_data_version`) for the schema-version flag, because the
+     migration mechanism cannot bootstrap itself through the very thing
+     it might need to migrate. Chicken-and-egg by nature.
+
+   - **`CrashReportLimiter`** uses `SharedPreferences` for ACRA crash-
+     report rate-limit timestamps (`acra_report_limiter`), because its
+     `shouldSendReport()` is called sync from the ACRA crash handler
+     (a non-coroutine thread). DataStore's API is suspend-only, so
+     migrating would require either a sync-blocking `runBlocking` (the
+     StrictMode bug we want to avoid) or an in-memory write-through
+     cache (extra source-of-truth, race-condition surface). Neither is
+     worth it for ephemeral telemetry timestamps that may be lost on
+     any app update.
+
+   Both exceptions are explained in detail in the respective files'
+   KDocs. Don't try to "fix" either.
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
