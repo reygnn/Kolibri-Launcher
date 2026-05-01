@@ -24,9 +24,7 @@ import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.IOException
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
@@ -39,7 +37,7 @@ class SettingsRepositoryImplTest {
     private lateinit var settingsManager: SettingsRepositoryImpl
 
     // mockContext wird nur als Konstruktor-Argument übergeben — kein Stubbing nötig
-    private val mockContext: Context = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
 
     private val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
     private val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
@@ -51,7 +49,7 @@ class SettingsRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        settingsManager = SettingsRepositoryImpl(fakeDataStore, mockContext)
+        settingsManager = SettingsRepositoryImpl(fakeDataStore, context)
     }
 
     // ========== EXISTING TESTS ==========
@@ -502,7 +500,7 @@ class SettingsRepositoryImplTest {
             throw ClassCastException("Expected Boolean but got String")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, mockContext)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, context)
 
         val result = doomsdayManager.showAlarmFlow.first()
 
@@ -516,7 +514,7 @@ class SettingsRepositoryImplTest {
             throw SecurityException("Read permission denied")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, mockContext)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, context)
 
         val result = doomsdayManager.sortOrderFlow.first()
 

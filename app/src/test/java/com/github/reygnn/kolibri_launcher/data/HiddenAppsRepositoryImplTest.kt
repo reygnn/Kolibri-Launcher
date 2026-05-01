@@ -30,7 +30,7 @@ class HiddenAppsRepositoryImplTest {
     private lateinit var fakeDataStore: FakeDataStore
 
     @MockK(relaxed = true)
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     private lateinit var hiddenAppsManager: HiddenAppsRepositoryImpl
 
@@ -40,7 +40,7 @@ class HiddenAppsRepositoryImplTest {
     fun setup() {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
-        hiddenAppsManager = HiddenAppsRepositoryImpl(fakeDataStore, mockContext)
+        hiddenAppsManager = HiddenAppsRepositoryImpl(fakeDataStore, context)
     }
 
     // ========== EXISTING TESTS ==========
@@ -101,7 +101,7 @@ class HiddenAppsRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw RuntimeException("Corrupted data") }
-        val manager = HiddenAppsRepositoryImpl(brokenStore, mockContext)
+        val manager = HiddenAppsRepositoryImpl(brokenStore, context)
 
         Assert.assertFalse(manager.isComponentHidden("com.test.app/Component"))
     }
@@ -110,7 +110,7 @@ class HiddenAppsRepositoryImplTest {
     fun `isComponentHidden - when CancellationException - propagates it`() = runTest {
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw CancellationException("Flow cancelled") }
-        val manager = HiddenAppsRepositoryImpl(brokenStore, mockContext)
+        val manager = HiddenAppsRepositoryImpl(brokenStore, context)
 
         assertFailsWith<CancellationException> {
             manager.isComponentHidden("com.test.app/Component")

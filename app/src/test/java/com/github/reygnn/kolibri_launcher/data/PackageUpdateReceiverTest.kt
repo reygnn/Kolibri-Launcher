@@ -27,10 +27,10 @@ class PackageUpdateReceiverTest {
     val timberRule = TimberRule()
 
     @MockK(relaxed = true)
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     @MockK
-    private lateinit var mockIntent: Intent
+    private lateinit var intent: Intent
 
     private lateinit var receiver: PackageUpdateReceiver
 
@@ -44,13 +44,13 @@ class PackageUpdateReceiverTest {
 
     @Test
     fun `onReceive - with null context - does not crash and returns early`() {
-        receiver.onReceive(null, mockIntent)
+        receiver.onReceive(null, intent)
         // Kein Crash = Test bestanden
     }
 
     @Test
     fun `onReceive - with null intent - does not crash and returns early`() {
-        receiver.onReceive(mockContext, null)
+        receiver.onReceive(context, null)
         // Kein Crash = Test bestanden
     }
 
@@ -58,35 +58,35 @@ class PackageUpdateReceiverTest {
 
     @Test
     fun `handleReceive - with null action - finishes immediately`() {
-        every { mockIntent.action } returns null
+        every { intent.action } returns null
         var finishCalled = false
 
-        receiver.handleReceive(mockContext, mockIntent) { finishCalled = true }
+        receiver.handleReceive(context, intent) { finishCalled = true }
 
         Assert.assertTrue("onFinish should be called for null action", finishCalled)
     }
 
     @Test
     fun `handleReceive - with irrelevant action - finishes immediately`() {
-        every { mockIntent.action } returns Intent.ACTION_BOOT_COMPLETED
+        every { intent.action } returns Intent.ACTION_BOOT_COMPLETED
         var finishCalled = false
 
-        receiver.handleReceive(mockContext, mockIntent) { finishCalled = true }
+        receiver.handleReceive(context, intent) { finishCalled = true }
 
         Assert.assertTrue("onFinish should be called for irrelevant action", finishCalled)
     }
 
     @Test
     fun `handleReceive - with relevant action - launches coroutine and eventually finishes`() = runTest {
-        every { mockIntent.action } returns Intent.ACTION_PACKAGE_ADDED
+        every { intent.action } returns Intent.ACTION_PACKAGE_ADDED
 
         val mockUri = mockk<Uri>()
         every { mockUri.schemeSpecificPart } returns "com.new.app"
-        every { mockIntent.data } returns mockUri
+        every { intent.data } returns mockUri
 
         var finishCalled = false
 
-        receiver.handleReceive(mockContext, mockIntent) { finishCalled = true }
+        receiver.handleReceive(context, intent) { finishCalled = true }
 
         advanceUntilIdle()
 
@@ -95,25 +95,25 @@ class PackageUpdateReceiverTest {
 
     @Test
     fun `handleReceive - when exception occurs during setup - fails safe and calls onFinish`() {
-        every { mockIntent.action } throws RuntimeException("Intent corrupted")
+        every { intent.action } throws RuntimeException("Intent corrupted")
         var finishCalled = false
 
-        receiver.handleReceive(mockContext, mockIntent) { finishCalled = true }
+        receiver.handleReceive(context, intent) { finishCalled = true }
 
         Assert.assertTrue("onFinish should be called even on critical error", finishCalled)
     }
 
     @Test
     fun `handleReceive - with package removed action - processes correctly`() = runTest {
-        every { mockIntent.action } returns Intent.ACTION_PACKAGE_REMOVED
+        every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
 
         val mockUri = mockk<Uri>()
         every { mockUri.schemeSpecificPart } returns "com.old.app"
-        every { mockIntent.data } returns mockUri
+        every { intent.data } returns mockUri
 
         var finishCalled = false
 
-        receiver.handleReceive(mockContext, mockIntent) { finishCalled = true }
+        receiver.handleReceive(context, intent) { finishCalled = true }
 
         advanceUntilIdle()
 

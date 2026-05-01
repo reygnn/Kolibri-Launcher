@@ -24,13 +24,13 @@ class InstalledAppsRepositoryImplTest {
     val timberRule = TimberRule()
 
     @MockK
-    private lateinit var mockPackageManager: PackageManager
+    private lateinit var packageManager: PackageManager
     @MockK
-    private lateinit var mockCustomNamesRepository: CustomNamesRepository
+    private lateinit var customNamesRepository: CustomNamesRepository
     @MockK
-    private lateinit var mockAppsUpdateTrigger: MutableSharedFlow<Unit>
+    private lateinit var appsUpdateTrigger: MutableSharedFlow<Unit>
     @MockK(relaxed = true)
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     private lateinit var installedAppsRepositoryImpl: InstalledAppsRepositoryImpl
 
@@ -69,10 +69,10 @@ class InstalledAppsRepositoryImplTest {
     fun setup() {
         MockKAnnotations.init(this)
         installedAppsRepositoryImpl = InstalledAppsRepositoryImpl(
-            mockContext,
-            mockPackageManager,
-            mockCustomNamesRepository,
-            mockAppsUpdateTrigger
+            context,
+            packageManager,
+            customNamesRepository,
+            appsUpdateTrigger
         )
     }
 
@@ -80,17 +80,17 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `triggerAppsUpdate emits an event to the trigger flow`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(Unit) } returns Unit
+        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
 
         installedAppsRepositoryImpl.triggerAppsUpdate()
 
-        coVerify { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
     fun `processResolveInfoList correctly converts and sorts a list of ResolveInfo`() = runTest {
         // getDisplayNameForPackage gibt den originalName (2. Argument) zurück
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("App B", "com.b", "com.b.MainActivity"),
@@ -111,7 +111,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with null activityInfo - skips item`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good App", "com.good", "com.good.MainActivity"),
@@ -126,7 +126,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with duplicate packages - keeps all entries`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("App A", "com.a", "com.a.MainActivity"),
@@ -142,7 +142,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with empty label - uses package name as fallback`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(FakeResolveInfo("", "com.test", "com.test.MainActivity"))
 
@@ -155,7 +155,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with very long app names - handles correctly`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val veryLongName = "A".repeat(500)
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(
@@ -168,7 +168,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with special characters in names - handles correctly`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val specialName = "App 🚀 Test & <Special> \"Chars\""
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(
@@ -181,7 +181,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with large list - handles efficiently`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val largeList = (1..1000).map {
             FakeResolveInfo("App $it", "com.app$it", "com.app$it.MainActivity")
@@ -195,7 +195,7 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - when multiple items fail - continues processing others`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good 1", "com.good1", "com.good1.MainActivity"),
@@ -217,16 +217,16 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `triggerAppsUpdate - when flow emit fails - does not crash`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(Unit) } throws RuntimeException("Flow error")
+        coEvery { appsUpdateTrigger.emit(Unit) } throws RuntimeException("Flow error")
 
         installedAppsRepositoryImpl.triggerAppsUpdate()
 
-        coVerify { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
     fun `processResolveInfoList - with null package name - skips item`() = runTest {
-        coEvery { mockCustomNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
+        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
 
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good App", "com.good", "com.good.MainActivity"),
@@ -244,6 +244,6 @@ class InstalledAppsRepositoryImplTest {
     fun `purgeRepository - does nothing and does not crash`() = runTest {
         installedAppsRepositoryImpl.purgeRepository()
 
-        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify(exactly = 0) { appsUpdateTrigger.emit(Unit) }
     }
 }

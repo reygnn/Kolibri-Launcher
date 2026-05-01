@@ -23,7 +23,7 @@ class UsageExportRepositoryImplTimeLordSpec {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val mockContext: Context = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var manager: UsageExportRepositoryImpl
     private val now = System.currentTimeMillis()
@@ -31,7 +31,7 @@ class UsageExportRepositoryImplTimeLordSpec {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        manager = UsageExportRepositoryImpl(fakeDataStore, mockContext)
+        manager = UsageExportRepositoryImpl(fakeDataStore, context)
     }
 
     @Test

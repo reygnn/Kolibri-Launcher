@@ -54,8 +54,8 @@ class BackupRepositoryImplSecurityTest {
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
-    private lateinit var mockContext: Context
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private lateinit var context: Context
 
     @Before
     fun setUp() {
@@ -68,9 +68,9 @@ class BackupRepositoryImplSecurityTest {
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
 
-        mockContext = mockk<Context>(relaxed = true)
+        context = mockk<Context>(relaxed = true)
         val mockContentResolver = mockk<ContentResolver>(relaxed = true)
-        every { mockContext.contentResolver } returns mockContentResolver
+        every { context.contentResolver } returns mockContentResolver
 
         backupManager = BackupRepositoryImpl(
             favoritesRepository = fakeFavoritesRepo,
@@ -81,8 +81,8 @@ class BackupRepositoryImplSecurityTest {
             swipeActionsRepository = fakeSwipeActionsRepo,
             settingsRepository = fakeSettingsRepo,
             wallpaperRepository = fakeWallpaperRepo,
-            wallpaperFileManager = mockWallpaperFileManager,
-            context = mockContext
+            wallpaperFileManager = wallpaperFileManager,
+            context = context
         )
     }
 

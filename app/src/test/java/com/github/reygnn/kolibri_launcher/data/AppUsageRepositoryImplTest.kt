@@ -23,7 +23,7 @@ class AppUsageRepositoryImplTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val mockContext: Context = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
 
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var appUsageManager: AppUsageRepositoryImpl
@@ -31,7 +31,7 @@ class AppUsageRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        appUsageManager = AppUsageRepositoryImpl(fakeDataStore, mockContext)
+        appUsageManager = AppUsageRepositoryImpl(fakeDataStore, context)
     }
 
     // ========== BASIC FUNCTIONALITY TESTS ==========

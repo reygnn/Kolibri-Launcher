@@ -52,11 +52,11 @@ class BackupRepositoryImplIoTest {
     val timberRule = TimberRule()
 
     @MockK
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
     @MockK
-    private lateinit var mockContentResolver: ContentResolver
-    private val mockPfd: ParcelFileDescriptor = mockk(relaxed = true)
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private lateinit var contentResolver: ContentResolver
+    private val parcelFileDescriptor: ParcelFileDescriptor = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
     private lateinit var backupManager: BackupRepositoryImpl
 
@@ -66,10 +66,10 @@ class BackupRepositoryImplIoTest {
     fun setup() {
         MockKAnnotations.init(this)
 
-        every { mockContext.contentResolver } returns mockContentResolver
+        every { context.contentResolver } returns contentResolver
 
-        every { mockPfd.statSize } returns 1024L
-        every { mockPfd.fileDescriptor } returns FileDescriptor()
+        every { parcelFileDescriptor.statSize } returns 1024L
+        every { parcelFileDescriptor.fileDescriptor } returns FileDescriptor()
 
         backupManager = BackupRepositoryImpl(
             favoritesRepository = FakeFavoritesRepository(),
@@ -80,15 +80,15 @@ class BackupRepositoryImplIoTest {
             swipeActionsRepository = FakeSwipeActionsRepository(),
             settingsRepository = FakeSettingsRepository(),
             wallpaperRepository = FakeWallpaperRepository(),
-            wallpaperFileManager = mockWallpaperFileManager,
-            context = mockContext
+            wallpaperFileManager = wallpaperFileManager,
+            context = context
         )
     }
 
     @Test
     fun `loadBackupFromFile - file not found (returns null stream) - returns Error`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
-        every { mockContentResolver.openInputStream(testUri) } returns null
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(testUri) } returns null
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
 
@@ -98,9 +98,9 @@ class BackupRepositoryImplIoTest {
 
     @Test
     fun `loadBackupFromFile - SecurityException (permission revoked) - returns Error`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } throws
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } throws
                 SecurityException("Permission denied")
-        every { mockContentResolver.openInputStream(testUri) } throws
+        every { contentResolver.openInputStream(testUri) } throws
                 SecurityException("Permission denied")
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
@@ -111,14 +111,14 @@ class BackupRepositoryImplIoTest {
 
     @Test
     fun `loadBackupFromFile - IOException during read (disk failure) - returns Error`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
 
         val boomStream = object : ByteArrayInputStream(ByteArray(0)) {
             override fun read(b: ByteArray, off: Int, len: Int): Int {
                 throw IOException("Disk on fire")
             }
         }
-        every { mockContentResolver.openInputStream(testUri) } returns boomStream
+        every { contentResolver.openInputStream(testUri) } returns boomStream
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
 
@@ -128,8 +128,8 @@ class BackupRepositoryImplIoTest {
 
     @Test
     fun `loadBackupFromFile - File too large (DoS protection) - returns Error`() = runTest {
-        every { mockPfd.statSize } returns AppConstants.MAX_BACKUP_SIZE_BYTES + 1
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
+        every { parcelFileDescriptor.statSize } returns AppConstants.MAX_BACKUP_SIZE_BYTES + 1
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
 
@@ -139,8 +139,8 @@ class BackupRepositoryImplIoTest {
 
     @Test
     fun `loadBackupFromFile - Empty file (0 bytes) - returns InvalidFormat`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
-        every { mockContentResolver.openInputStream(testUri) } returns ByteArrayInputStream(ByteArray(0))
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(testUri) } returns ByteArrayInputStream(ByteArray(0))
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
 

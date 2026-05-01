@@ -41,11 +41,11 @@ class UsageExportRepositoryImplDoomsdaySpec {
     val timberRule = TimberRule()
 
     @MockK
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
     @MockK
-    private lateinit var mockContentResolver: ContentResolver
+    private lateinit var contentResolver: ContentResolver
     @MockK
-    private lateinit var mockPfd: ParcelFileDescriptor
+    private lateinit var parcelFileDescriptor: ParcelFileDescriptor
 
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var manager: UsageExportRepositoryImpl
@@ -57,12 +57,12 @@ class UsageExportRepositoryImplDoomsdaySpec {
     fun setup() {
         MockKAnnotations.init(this)
 
-        every { mockContext.contentResolver } returns mockContentResolver
-        every { mockPfd.statSize } returns 1024L
-        every { mockPfd.fileDescriptor } returns FileDescriptor()
+        every { context.contentResolver } returns contentResolver
+        every { parcelFileDescriptor.statSize } returns 1024L
+        every { parcelFileDescriptor.fileDescriptor } returns FileDescriptor()
 
         fakeDataStore = FakeDataStore()
-        manager = UsageExportRepositoryImpl(fakeDataStore, mockContext)
+        manager = UsageExportRepositoryImpl(fakeDataStore, context)
     }
 
     // ============================================================================================
@@ -72,8 +72,8 @@ class UsageExportRepositoryImplDoomsdaySpec {
     @Test
     fun `doomsday - load - The Blob (File too large DoS attack)`() = runTest {
         val hugeSize = AppConstants.MAX_BACKUP_SIZE_BYTES + 1
-        every { mockPfd.statSize } returns hugeSize
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
+        every { parcelFileDescriptor.statSize } returns hugeSize
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
 
         val result = manager.loadFromFile(testUriString, false)
 
@@ -82,8 +82,8 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
     @Test
     fun `doomsday - load - The Vanishing Act (File deleted before read)`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
-        every { mockContentResolver.openInputStream(eq(testUri)) } returns null
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(eq(testUri)) } returns null
 
         val result = manager.loadFromFile(testUriString, false)
 
@@ -93,9 +93,9 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
     @Test
     fun `doomsday - load - The Firewall (Permission Denied SecurityException)`() = runTest {
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } throws
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } throws
                 SecurityException("Permission denied by OS")
-        every { mockContentResolver.openInputStream(eq(testUri)) } throws
+        every { contentResolver.openInputStream(eq(testUri)) } throws
                 SecurityException("Permission denied by OS")
 
         val result = manager.loadFromFile(testUriString, false)
@@ -112,8 +112,8 @@ class UsageExportRepositoryImplDoomsdaySpec {
             }
         }
 
-        every { mockContentResolver.openFileDescriptor(eq(testUri), any()) } returns mockPfd
-        every { mockContentResolver.openInputStream(eq(testUri)) } returns brokenStream
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(eq(testUri)) } returns brokenStream
 
         val result = manager.loadFromFile(testUriString, false)
 
@@ -142,7 +142,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
     fun `doomsday - save - The Full Disk (IOException on write)`() = runTest {
         val brokenOutputStream = mockk<OutputStream>()
         every { brokenOutputStream.write(any<ByteArray>()) } throws IOException("No space left on device")
-        every { mockContentResolver.openOutputStream(eq(testUri)) } returns brokenOutputStream
+        every { contentResolver.openOutputStream(eq(testUri)) } returns brokenOutputStream
 
         val success = manager.saveToFile(testUriString)
 
@@ -151,7 +151,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
     @Test
     fun `doomsday - save - The Locked File (Cannot open output stream)`() = runTest {
-        every { mockContentResolver.openOutputStream(eq(testUri)) } returns null
+        every { contentResolver.openOutputStream(eq(testUri)) } returns null
 
         val success = manager.saveToFile(testUriString)
 

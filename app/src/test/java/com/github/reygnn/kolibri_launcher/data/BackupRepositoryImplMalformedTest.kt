@@ -43,9 +43,9 @@ class BackupRepositoryImplMalformedTest {
     private lateinit var swipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var settingsRepo: FakeSettingsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
-    private val mockContext: Context = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
 
     private lateinit var backupManager: BackupRepositoryImpl
     private val testDispatcher = StandardTestDispatcher()
@@ -88,8 +88,8 @@ class BackupRepositoryImplMalformedTest {
             swipeActionsRepository = swipeActionsRepo,
             settingsRepository = settingsRepo,
             wallpaperRepository = fakeWallpaperRepo,
-            wallpaperFileManager = mockWallpaperFileManager,
-            context = mockContext
+            wallpaperFileManager = wallpaperFileManager,
+            context = context
         )
     }
 

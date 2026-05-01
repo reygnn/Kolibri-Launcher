@@ -31,13 +31,13 @@ class TimeBasedEventsRepositoryImplTest {
     val timberRule = TimberRule()
 
     @MockK
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
     @MockK
-    private lateinit var mockSettingsRepository: SettingsRepository
+    private lateinit var settingsRepository: SettingsRepository
     @MockK
-    private lateinit var mockAlarmManager: AlarmManager
+    private lateinit var alarmManager: AlarmManager
     @MockK
-    private lateinit var mockContentResolver: ContentResolver
+    private lateinit var contentResolver: ContentResolver
 
     private lateinit var manager: TimeBasedEventsRepositoryImpl
 
@@ -47,36 +47,36 @@ class TimeBasedEventsRepositoryImplTest {
 
         // MockK ist standardmäßig lenient — kein Äquivalent zu Mockito.lenient() nötig.
         // Stubs die nicht in jedem Test aufgerufen werden, verursachen keinen Fehler.
-        every { mockContext.getSystemService(Context.ALARM_SERVICE) } returns mockAlarmManager
-        every { mockContext.contentResolver } returns mockContentResolver
-        every { mockContext.checkPermission(any(), any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { context.getSystemService(Context.ALARM_SERVICE) } returns alarmManager
+        every { context.contentResolver } returns contentResolver
+        every { context.checkPermission(any(), any(), any()) } returns PackageManager.PERMISSION_GRANTED
 
-        manager = TimeBasedEventsRepositoryImpl(mockContext, mockSettingsRepository)
+        manager = TimeBasedEventsRepositoryImpl(context, settingsRepository)
     }
 
     // ========== ALARM TESTS ==========
 
     @Test
     fun `getUpcomingTimeBasedEvents - when alarm disabled - returns empty list`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(false)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(false)
+        every { settingsRepository.showAlarmFlow } returns flowOf(false)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
         Assert.assertTrue(result.isEmpty())
-        verify(exactly = 0) { mockAlarmManager.nextAlarmClock }
+        verify(exactly = 0) { alarmManager.nextAlarmClock }
     }
 
     @Test
     fun `getUpcomingTimeBasedEvents - with alarm enabled - returns alarm event`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(true)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(false)
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
 
         val triggerTime = System.currentTimeMillis() + 10000
 
         val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
         every { alarmInfo.triggerTime } returns triggerTime
-        every { mockAlarmManager.nextAlarmClock } returns alarmInfo
+        every { alarmManager.nextAlarmClock } returns alarmInfo
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
@@ -87,9 +87,9 @@ class TimeBasedEventsRepositoryImplTest {
 
     @Test
     fun `getUpcomingTimeBasedEvents - alarm enabled but none set - returns empty`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(true)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(false)
-        every { mockAlarmManager.nextAlarmClock } returns null
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+        every { alarmManager.nextAlarmClock } returns null
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
@@ -98,9 +98,9 @@ class TimeBasedEventsRepositoryImplTest {
 
     @Test
     fun `getUpcomingTimeBasedEvents - alarm manager throws exception - handles gracefully`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(true)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(false)
-        every { mockAlarmManager.nextAlarmClock } throws SecurityException("Not allowed")
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+        every { alarmManager.nextAlarmClock } throws SecurityException("Not allowed")
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
@@ -111,21 +111,21 @@ class TimeBasedEventsRepositoryImplTest {
 
     @Test
     fun `getUpcomingTimeBasedEvents - settings flow throws - uses safe fallbacks`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flow { throw IOException("Disk read error") }
-        every { mockSettingsRepository.showCalendarEventFlow } returns flow { throw RuntimeException("Error") }
-        every { mockAlarmManager.nextAlarmClock } returns null
+        every { settingsRepository.showAlarmFlow } returns flow { throw IOException("Disk read error") }
+        every { settingsRepository.showCalendarEventFlow } returns flow { throw RuntimeException("Error") }
+        every { alarmManager.nextAlarmClock } returns null
 
         manager.getUpcomingTimeBasedEvents(5)
 
         // Fallback alarm=true → soll Alarm versuchen
-        verify { mockAlarmManager.nextAlarmClock }
+        verify { alarmManager.nextAlarmClock }
         // Fallback calendar=false → soll contentResolver NICHT anfassen
-        verify(exactly = 0) { mockContext.contentResolver }
+        verify(exactly = 0) { context.contentResolver }
     }
 
     @Test
     fun `getUpcomingTimeBasedEvents - settings flow cancellation - propagates exception`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flow { throw CancellationException("Cancelled") }
+        every { settingsRepository.showAlarmFlow } returns flow { throw CancellationException("Cancelled") }
 
         assertFailsWith<CancellationException> {
             manager.getUpcomingTimeBasedEvents(5)
@@ -136,26 +136,26 @@ class TimeBasedEventsRepositoryImplTest {
 
     @Test
     fun `getUpcomingTimeBasedEvents - calendar permission denied - returns empty calendar events`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(false)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(true)
-        every { mockContext.checkPermission(any(), any(), any()) } returns PackageManager.PERMISSION_DENIED
+        every { settingsRepository.showAlarmFlow } returns flowOf(false)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(true)
+        every { context.checkPermission(any(), any(), any()) } returns PackageManager.PERMISSION_DENIED
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
         Assert.assertTrue(result.isEmpty())
-        verify(exactly = 0) { mockContentResolver.query(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { contentResolver.query(any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `getUpcomingTimeBasedEvents - sorts merged events correctly`() = runTest {
-        every { mockSettingsRepository.showAlarmFlow } returns flowOf(true)
-        every { mockSettingsRepository.showCalendarEventFlow } returns flowOf(false)
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
 
         val later = System.currentTimeMillis() + 5000
 
         val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
         every { alarmInfo.triggerTime } returns later
-        every { mockAlarmManager.nextAlarmClock } returns alarmInfo
+        every { alarmManager.nextAlarmClock } returns alarmInfo
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 

@@ -41,11 +41,11 @@ class BackupRepositoryImplLogicTest {
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
     // Mocks
-    private lateinit var mockContext: Context
-    private lateinit var mockContentResolver: ContentResolver
+    private lateinit var context: Context
+    private lateinit var contentResolver: ContentResolver
 
     @Before
     fun setUp() {
@@ -60,9 +60,9 @@ class BackupRepositoryImplLogicTest {
         fakeWallpaperRepo = FakeWallpaperRepository()
 
         // Mock Context
-        mockContext = mockk<Context>(relaxed = true)
-        mockContentResolver = mockk<ContentResolver>(relaxed = true)
-        every { mockContext.contentResolver } returns mockContentResolver
+        context = mockk<Context>(relaxed = true)
+        contentResolver = mockk<ContentResolver>(relaxed = true)
+        every { context.contentResolver } returns contentResolver
 
         backupManager = BackupRepositoryImpl(
             favoritesRepository = fakeFavoritesRepo,
@@ -73,8 +73,8 @@ class BackupRepositoryImplLogicTest {
             swipeActionsRepository = fakeSwipeActionsRepo,
             settingsRepository = fakeSettingsRepo,
             wallpaperRepository = fakeWallpaperRepo,
-            wallpaperFileManager = mockWallpaperFileManager,
-            context = mockContext
+            wallpaperFileManager = wallpaperFileManager,
+            context = context
         )
     }
 

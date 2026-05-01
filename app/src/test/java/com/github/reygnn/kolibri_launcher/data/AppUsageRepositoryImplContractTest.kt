@@ -24,7 +24,7 @@ class AppUsageRepositoryImplContractTest : AppUsageRepositoryContract() {
 
     override fun createRepository(): AppUsageRepository {
         val fakeDataStore = FakeDataStore()
-        val mockContext: Context = mockk(relaxed = true)
-        return AppUsageRepositoryImpl(fakeDataStore, mockContext)
+        val context: Context = mockk(relaxed = true)
+        return AppUsageRepositoryImpl(fakeDataStore, context)
     }
 }

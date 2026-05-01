@@ -37,8 +37,8 @@ class CustomNamesRepositoryImplContractTest : CustomNamesRepositoryContract() {
             extraBufferCapacity = 1,
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
-        val mockContext: Context = mockk(relaxed = true)
-        return CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger, mockContext)
+        val context: Context = mockk(relaxed = true)
+        return CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger, context)
     }
 }
 

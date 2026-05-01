@@ -367,13 +367,13 @@ class WallpaperDelegateTest {
     @Test
     fun `onAddWallpaperLayer copies file and saves state`() = runTest {
         val addedState: WallpaperState = mockk(relaxed = true) {        }
-        val mockState: WallpaperState = mockk(relaxed = true) {
+        val state: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns addedState
         }
 
-        val stateFlow = MutableStateFlow(mockState)
+        val stateFlow = MutableStateFlow(state)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
 
@@ -940,14 +940,14 @@ class WallpaperDelegateTest {
             every { label } returns "Layer 1"
         }
         val addedState: WallpaperState = mockk(relaxed = true)
-        val mockState: WallpaperState = mockk(relaxed = true) {
+        val state: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { layers } returns listOf(existingLayer)
             every { withAddedLayer(any()) } returns addedState
         }
 
-        val stateFlow = MutableStateFlow(mockState)
+        val stateFlow = MutableStateFlow(state)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
 
@@ -1022,13 +1022,13 @@ class WallpaperDelegateTest {
         val internalUri: Uri = mockk()
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
-        val mockState: WallpaperState = mockk(relaxed = true) {
+        val state: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
 
-        val stateFlow = MutableStateFlow(mockState)
+        val stateFlow = MutableStateFlow(state)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
 
@@ -1052,13 +1052,13 @@ class WallpaperDelegateTest {
         val internalUri: Uri = mockk()
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
-        val mockState: WallpaperState = mockk(relaxed = true) {
+        val state: WallpaperState = mockk(relaxed = true) {
             every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
 
-        val stateFlow = MutableStateFlow(mockState)
+        val stateFlow = MutableStateFlow(state)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
 

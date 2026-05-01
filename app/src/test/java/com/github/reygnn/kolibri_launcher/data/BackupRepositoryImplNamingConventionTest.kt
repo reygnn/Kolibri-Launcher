@@ -34,7 +34,7 @@ class BackupRepositoryImplNamingConventionTest {
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -59,7 +59,7 @@ class BackupRepositoryImplNamingConventionTest {
             swipeActionsRepository = fakeSwipeActionsRepo,
             settingsRepository = fakeSettingsRepo,
             wallpaperRepository = fakeWallpaperRepo,
-            wallpaperFileManager = mockWallpaperFileManager,
+            wallpaperFileManager = wallpaperFileManager,
             context = mockContext
         )
     }

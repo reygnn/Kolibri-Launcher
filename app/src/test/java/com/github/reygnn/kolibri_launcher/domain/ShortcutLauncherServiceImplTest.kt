@@ -28,13 +28,13 @@ class ShortcutLauncherServiceImplTest {
     // ===========================================
 
     @MockK
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     @MockK
-    private lateinit var mockLauncherApps: LauncherApps
+    private lateinit var launcherApps: LauncherApps
 
     @MockK
-    private lateinit var mockShortcut: ShortcutInfo
+    private lateinit var shortcutInfo: ShortcutInfo
 
     // ===========================================
     // SYSTEM UNDER TEST
@@ -50,7 +50,7 @@ class ShortcutLauncherServiceImplTest {
     fun setUp() {
         MockKAnnotations.init(this, relaxed = false)
         // Default: LauncherApps service is available
-        every { mockContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns mockLauncherApps
+        every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns launcherApps
     }
 
     // ===========================================
@@ -59,21 +59,21 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `isAvailable returns true when LauncherApps service exists`() {
-        service = ShortcutLauncherServiceImpl(mockContext)
+        service = ShortcutLauncherServiceImpl(context)
         assertTrue(service.isAvailable())
     }
 
     @Test
     fun `isAvailable returns false when LauncherApps service is null`() {
-        every { mockContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
-        service = ShortcutLauncherServiceImpl(mockContext)
+        every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
+        service = ShortcutLauncherServiceImpl(context)
         assertFalse(service.isAvailable())
     }
 
     @Test
     fun `isAvailable returns false when getSystemService throws`() {
-        every { mockContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) } throws SecurityException("Permission denied")
-        service = ShortcutLauncherServiceImpl(mockContext)
+        every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } throws SecurityException("Permission denied")
+        service = ShortcutLauncherServiceImpl(context)
 
         try {
             val result = service.isAvailable()
@@ -89,31 +89,31 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `startShortcut calls LauncherApps with correct parameters`() {
-        every { mockLauncherApps.startShortcut(any(), null, null) } just runs
-        service = ShortcutLauncherServiceImpl(mockContext)
+        every { launcherApps.startShortcut(any(), null, null) } just runs
+        service = ShortcutLauncherServiceImpl(context)
 
-        service.startShortcut(mockShortcut)
+        service.startShortcut(shortcutInfo)
 
-        verify(exactly = 1) { mockLauncherApps.startShortcut(mockShortcut, null, null) }
+        verify(exactly = 1) { launcherApps.startShortcut(shortcutInfo, null, null) }
     }
 
     @Test(expected = ShortcutLaunchException::class)
     fun `startShortcut throws ShortcutLaunchException when service unavailable`() {
-        every { mockContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
-        service = ShortcutLauncherServiceImpl(mockContext)
+        every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
+        service = ShortcutLauncherServiceImpl(context)
 
-        service.startShortcut(mockShortcut)
+        service.startShortcut(shortcutInfo)
     }
 
     @Test
     fun `startShortcut wraps LauncherApps exceptions in ShortcutLaunchException`() {
-        every { mockLauncherApps.startShortcut(any(), null, null) } throws IllegalStateException("Activity not found")
-        every { mockShortcut.id } returns "test-shortcut-id"
+        every { launcherApps.startShortcut(any(), null, null) } throws IllegalStateException("Activity not found")
+        every { shortcutInfo.id } returns "test-shortcut-id"
 
-        service = ShortcutLauncherServiceImpl(mockContext)
+        service = ShortcutLauncherServiceImpl(context)
 
         try {
-            service.startShortcut(mockShortcut)
+            service.startShortcut(shortcutInfo)
             fail("Expected ShortcutLaunchException")
         } catch (e: ShortcutLaunchException) {
             assertTrue(e.message!!.contains("test-shortcut-id"))
@@ -124,13 +124,13 @@ class ShortcutLauncherServiceImplTest {
     @Test
     fun `startShortcut includes shortcut id in error message`() {
         val shortcutId = "my-unique-shortcut-123"
-        every { mockLauncherApps.startShortcut(any(), null, null) } throws RuntimeException("Failed")
-        every { mockShortcut.id } returns shortcutId
+        every { launcherApps.startShortcut(any(), null, null) } throws RuntimeException("Failed")
+        every { shortcutInfo.id } returns shortcutId
 
-        service = ShortcutLauncherServiceImpl(mockContext)
+        service = ShortcutLauncherServiceImpl(context)
 
         try {
-            service.startShortcut(mockShortcut)
+            service.startShortcut(shortcutInfo)
             fail("Expected ShortcutLaunchException")
         } catch (e: ShortcutLaunchException) {
             assertTrue(e.message!!.contains(shortcutId))
@@ -143,22 +143,22 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `LauncherApps service is lazily initialized`() {
-        service = ShortcutLauncherServiceImpl(mockContext)
+        service = ShortcutLauncherServiceImpl(context)
 
         // getSystemService sollte noch nicht aufgerufen worden sein
-        verify(exactly = 0) { mockContext.getSystemService(any<String>()) }
+        verify(exactly = 0) { context.getSystemService(any<String>()) }
     }
 
     @Test
     fun `LauncherApps service is only fetched once`() {
-        every { mockLauncherApps.startShortcut(any(), null, null) } just runs
-        service = ShortcutLauncherServiceImpl(mockContext)
+        every { launcherApps.startShortcut(any(), null, null) } just runs
+        service = ShortcutLauncherServiceImpl(context)
 
         service.isAvailable()
         service.isAvailable()
-        service.startShortcut(mockShortcut)
-        service.startShortcut(mockShortcut)
+        service.startShortcut(shortcutInfo)
+        service.startShortcut(shortcutInfo)
 
-        verify(exactly = 1) { mockContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) }
+        verify(exactly = 1) { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) }
     }
 }

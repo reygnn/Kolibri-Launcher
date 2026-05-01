@@ -69,11 +69,11 @@ class BackupRepositoryImplWallpaperTest {
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
 
     @MockK
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
     @MockK
-    private lateinit var mockContentResolver: ContentResolver
+    private lateinit var contentResolver: ContentResolver
     @MockK
-    private lateinit var mockWallpaperFileManager: WallpaperFileManager
+    private lateinit var wallpaperFileManager: WallpaperFileManager
 
     private lateinit var backupManager: BackupRepositoryImpl
 
@@ -101,14 +101,14 @@ class BackupRepositoryImplWallpaperTest {
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
 
-        every { mockContext.contentResolver } returns mockContentResolver
+        every { context.contentResolver } returns contentResolver
 
         // Default: alle URIs sind zugänglich
-        every { mockContentResolver.openInputStream(any()) } returns ByteArrayInputStream(ByteArray(1))
+        every { contentResolver.openInputStream(any()) } returns ByteArrayInputStream(ByteArray(1))
 
         // WallpaperFileManager: kopiert URI in internen Speicher.
         // Für Tests geben wir die Quell-URI zurück damit Gleichheits-Assertions bestehen.
-        coEvery { mockWallpaperFileManager.copyToInternal(any()) } answers { firstArg<Uri>() }
+        coEvery { wallpaperFileManager.copyToInternal(any()) } answers { firstArg<Uri>() }
 
         backupManager = BackupRepositoryImpl(
             favoritesRepository = fakeFavoritesRepo,
@@ -119,8 +119,8 @@ class BackupRepositoryImplWallpaperTest {
             swipeActionsRepository = fakeSwipeActionsRepo,
             settingsRepository = fakeSettingsRepo,
             wallpaperRepository = fakeWallpaperRepo,
-            wallpaperFileManager = mockWallpaperFileManager,
-            context = mockContext
+            wallpaperFileManager = wallpaperFileManager,
+            context = context
         )
     }
 
@@ -210,7 +210,7 @@ class BackupRepositoryImplWallpaperTest {
     @Test
     fun `importFromJson - with inaccessible wallpaper URI - skips wallpaper gracefully`() = runTest {
         // Override: URI nicht zugänglich
-        every { mockContentResolver.openInputStream(any()) } returns null
+        every { contentResolver.openInputStream(any()) } returns null
 
         fakeWallpaperRepo.currentState = WallpaperState.NONE
 

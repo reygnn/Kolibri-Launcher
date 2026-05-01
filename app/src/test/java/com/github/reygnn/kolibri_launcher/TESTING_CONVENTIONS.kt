@@ -123,6 +123,32 @@ package com.github.reygnn.kolibri_launcher
  * Not:     import com.github.reygnn.kolibri_launcher.rules.TimberRule       ❌ (falsches Package)
  *
  *
+ * VARIABLE NAMING — NO `mock` PREFIX
+ * ----------------------------------
+ * Mock variables (both `@MockK lateinit var` and `val ... = mockk()`) are
+ * named after what they represent, NOT prefixed with `mock`.
+ *
+ *   // ✅ correct
+ *   @MockK private lateinit var context: Context
+ *   @MockK private lateinit var settingsRepository: SettingsRepository
+ *   private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+ *
+ *   // ❌ wrong (drift from older Mockito-style naming)
+ *   @MockK private lateinit var mockContext: Context
+ *   @MockK private lateinit var mockSettingsRepository: SettingsRepository
+ *   private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+ *
+ * Reason: the `@MockK` annotation on the left, or the `= mockk(...)`
+ * initializer on the right, already declares the variable as a mock.
+ * The Type annotation says what it represents. Adding a `mock` prefix
+ * is redundant boilerplate that worsens readability inside the test
+ * body — `every { settingsRepository.x } returns y` reads better than
+ * `every { mockSettingsRepository.x } returns y`.
+ *
+ * The codebase was unified to this convention in TODO §8 (sweep across
+ * 55 variables in 29 test files). New tests must follow it.
+ *
+ *
  * MOCKITO → MOCKK MIGRATION
  * -------------------------
  * Mapping reference for porting old Mockito-based tests. Default to

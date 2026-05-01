@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import io.mockk.every
 import io.mockk.mockk
 
 import android.content.Context
@@ -46,7 +45,7 @@ class BackupRepositoryImplDoomsdayTest {
     val timberRule = TimberRule()
 
     // Mocks und Fakes
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
     private lateinit var fakeFavoritesRepo: FakeFavoritesRepository
     private lateinit var fakeFavoritesOrderRepo: FakeFavoritesOrderRepository
     private lateinit var fakeVisibilityRepo: FakeHiddenAppsRepository
@@ -55,7 +54,7 @@ class BackupRepositoryImplDoomsdayTest {
     private lateinit var fakeSwipeActionsRepo: FakeSwipeActionsRepository
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
     private lateinit var backupManager: BackupRepositoryImpl
 
@@ -67,7 +66,7 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Before
     fun setUp() {
-        mockContext = mockk<Context>(relaxed = true)
+        context = mockk<Context>(relaxed = true)
         fakeInstalledAppsRepo = FakeInstalledAppsRepository()
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeFavoritesOrderRepo = FakeFavoritesOrderRepository()
@@ -86,8 +85,8 @@ class BackupRepositoryImplDoomsdayTest {
             fakeSwipeActionsRepo,
             fakeSettingsRepo,
             fakeWallpaperRepo,
-            mockWallpaperFileManager,
-            mockContext
+            wallpaperFileManager,
+            context
         )
     }
 

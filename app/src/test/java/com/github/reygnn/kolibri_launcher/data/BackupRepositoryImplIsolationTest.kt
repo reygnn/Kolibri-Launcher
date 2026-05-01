@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import io.mockk.every
 import io.mockk.mockk
 
 import android.content.Context
@@ -57,10 +56,10 @@ class BackupRepositoryImplIsolationTest {
     private lateinit var fakeSettingsRepo: FakeSettingsRepository
     private lateinit var fakeInstalledAppsRepo: FakeInstalledAppsRepository
     private lateinit var fakeWallpaperRepo: FakeWallpaperRepository
-    private val mockWallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
+    private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
 
     private lateinit var backupManager: BackupRepositoryImpl
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -124,7 +123,7 @@ class BackupRepositoryImplIsolationTest {
 
     @Before
     fun setup() {
-        mockContext = mockk<Context>(relaxed = true)
+        context = mockk<Context>(relaxed = true)
 
         fakeFavoritesRepo = FakeFavoritesRepository()
         fakeOrderRepo = FakeFavoritesOrderRepository()
@@ -157,8 +156,8 @@ class BackupRepositoryImplIsolationTest {
             fakeSwipeRepo,
             fakeSettingsRepo,
             fakeWallpaperRepo,
-            mockWallpaperFileManager,
-            mockContext
+            wallpaperFileManager,
+            context
         )
 
         setupBaselineState()

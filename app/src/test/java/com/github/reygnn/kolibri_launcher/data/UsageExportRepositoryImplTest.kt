@@ -27,7 +27,7 @@ class UsageExportRepositoryImplTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val mockContext: Context = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
 
     private lateinit var fakeDataStore: FakeDataStore
     private lateinit var appUsageExportManager: UsageExportRepositoryImpl
@@ -37,7 +37,7 @@ class UsageExportRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        appUsageExportManager = UsageExportRepositoryImpl(fakeDataStore, mockContext)
+        appUsageExportManager = UsageExportRepositoryImpl(fakeDataStore, context)
     }
 
     // ========== EXPORT TO JSON TESTS (ISO 8601) ==========

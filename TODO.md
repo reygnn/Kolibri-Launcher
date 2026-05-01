@@ -17,9 +17,8 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 3 | `BackupRepositoryImpl` zerlegen | offen | ~1 Tag, eigenes Projekt |
 | 5 | `MainDispatcherRule`-Audit über Tests | offen | mittel |
 | 7 | `CrashReportConsent` von SharedPreferences nach DataStore migrieren (Rule-5-Verstoß) | offen | mittel |
-| 8 | `@MockK`-Variablen-Naming vereinheitlichen (mock-Präfix oder nicht) | offen | klein |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 und §8 sind orthogonal zum Rest und können jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** §3 (Split, danach Test-Splitting) → §5 (Test-Konsistenz). §7 ist orthogonal zum Rest und kann jederzeit dazwischen. §2 ist optional fortsetzbar, kein Blocker.
 
 ---
 
@@ -219,55 +218,6 @@ mehrfache Aufrufe, Test in `DataMigrationManagerTest`. Dazu der
 Refactor in `CrashReportConsent` (alle vier Methoden) plus der
 Test-Update — `CrashReportConsent` hat aktuell wenig direkten
 Test, müsste evtl. ergänzt werden. Eine Stunde, vielleicht zwei.
-
----
-
-## 8. `@MockK`-Variablen-Naming vereinheitlichen
-
-Während des §4-Sweeps aufgefallen: in den Test-Files ist nicht
-konsistent, ob MockK-Variablen einen `mock`-Präfix bekommen oder
-nicht. Pro File ist es meist konsistent, zwischen Files inkonsistent
-— klassischer Drift-by-Author-Daytime.
-
-### Beispiele
-
-**Mit `mock`-Präfix:**
-- `mockContext`, `mockPackageManager`, `mockAlarmManager`,
-  `mockContentResolver`, `mockIntent` (Android-System-Mocks)
-- `mockSettingsRepository`, `mockCustomNamesRepository`,
-  `mockLauncherService`, `mockShortcut` (eigene Klassen)
-
-**Ohne Präfix:**
-- `context`, `sharedPreferences`, `launcherApps`, `packageManager`
-  (Android-System-Mocks)
-- `repository`, `timeBasedEventsRepository` (eigene Klassen)
-
-Ganze Files sind durchgängig in einem Stil, aber nebeneinander
-existieren z. B. `TimeBasedEventsRepositoryImplTest.kt` (alle
-mit `mock`-Präfix) und `ShortcutRepositoryImplTest.kt` (alle ohne).
-
-### Was zu entscheiden ist
-
-- [ ] **Konvention wählen:** `mock`-Präfix oder nicht.
-  - **Pro Präfix:** explizit, sofort sichtbar dass es ein Mock ist;
-    de-facto-Standard in vielen MockK-Codebases.
-  - **Contra Präfix:** Type-Annotation (`: HiddenAppsRepository`)
-    sagt schon was es ist; `@MockK` über der Variable auch;
-    Präfix ist redundant.
-- [ ] **Sweep:** alle Test-Files auf die gewählte Konvention
-  bringen. Per-File Shift+F6 in Android Studio. Klein, aber breit
-  verteilt — alle ~60 Test-Files mit MockK-Variablen.
-- [ ] **Konvention in `app/src/test/CLAUDE.md` festhalten** unter
-  „Test conventions", damit zukünftige Tests nicht wieder driften.
-
-### Bonus-Fund (gleicher Sweep, Rule-1-Verstoß)
-
-`GetFavoriteAppsUseCaseTest.kt:42` deklariert
-`favoritesOrderManager: FavoritesOrderRepositoryImpl` — also den
-**konkreten Impl**-Type, nicht das Interface. Verstößt gegen Rule 1
-(„ViewModels und use cases depend only on the interface, never on
-the concrete manager"). Sollte beim Sweep auf `: FavoritesOrderRepository`
-korrigiert werden.
 
 ---
 

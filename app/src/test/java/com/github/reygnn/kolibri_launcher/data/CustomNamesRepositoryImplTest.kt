@@ -34,9 +34,9 @@ class CustomNamesRepositoryImplTest {
     private lateinit var fakeDataStore: FakeDataStore
 
     @MockK
-    private lateinit var mockAppsUpdateTrigger: MutableSharedFlow<Unit>
+    private lateinit var appsUpdateTrigger: MutableSharedFlow<Unit>
     @MockK(relaxed = true)
-    private lateinit var mockContext: Context
+    private lateinit var context: Context
 
     private lateinit var customNamesManager: CustomNamesRepositoryImpl
 
@@ -44,7 +44,7 @@ class CustomNamesRepositoryImplTest {
     fun setup() {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
-        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, mockAppsUpdateTrigger, mockContext)
+        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger, context)
     }
 
     // ========== EXISTING TESTS ==========
@@ -132,7 +132,7 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw RuntimeException("Corrupted data") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, mockAppsUpdateTrigger, mockContext)
+        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger, context)
 
         val result = manager.getDisplayNameForPackage("com.test.app", "Original")
 
@@ -167,7 +167,7 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw CancellationException("Flow cancelled") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, mockAppsUpdateTrigger, mockContext)
+        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger, context)
 
         assertFailsWith<CancellationException> {
             manager.hasCustomNameForPackage("com.test.app")
@@ -176,11 +176,11 @@ class CustomNamesRepositoryImplTest {
 
     @Test
     fun `triggerCustomNameUpdate - calls emit on trigger flow`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(Unit) } returns Unit
+        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
 
         customNamesManager.triggerCustomNameUpdate()
 
-        coVerify { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify { appsUpdateTrigger.emit(Unit) }
     }
 
     // ========== MISSING TESTS (Batch & Cleanup) ==========
@@ -213,7 +213,7 @@ class CustomNamesRepositoryImplTest {
 
     @Test
     fun `setCustomNamesInBatch - saves multiple names and triggers ONCE`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(Unit) } returns Unit
+        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
 
         val result = customNamesManager.setCustomNamesInBatch(
             mapOf("com.app1" to "Name 1", "com.app2" to "Name 2")
@@ -222,7 +222,7 @@ class CustomNamesRepositoryImplTest {
         Assert.assertTrue(result)
         Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
         // WICHTIG: Trigger darf nur exakt 1x aufgerufen werden!
-        coVerify(exactly = 1) { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify(exactly = 1) { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
@@ -231,17 +231,17 @@ class CustomNamesRepositoryImplTest {
 
         Assert.assertTrue(result)
         Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
-        coVerify(exactly = 0) { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify(exactly = 0) { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
     fun `purgeRepository - removes keys and triggers update`() = runTest {
-        coEvery { mockAppsUpdateTrigger.emit(Unit) } returns Unit
+        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
 
         customNamesManager.purgeRepository()
 
         Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
-        coVerify { mockAppsUpdateTrigger.emit(Unit) }
+        coVerify { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test

@@ -21,10 +21,10 @@ class LaunchShortcutUseCaseTest {
     // ===========================================
 
     @MockK
-    private lateinit var mockLauncherService: ShortcutLauncherService
+    private lateinit var shortcutLauncherService: ShortcutLauncherService
 
     @MockK
-    private lateinit var mockShortcut: ShortcutInfo
+    private lateinit var shortcutInfo: ShortcutInfo
 
     // ===========================================
     // SYSTEM UNDER TEST
@@ -39,7 +39,7 @@ class LaunchShortcutUseCaseTest {
     @Before
     fun setUp() {
         MockKAnnotations.init(this)
-        useCase = LaunchShortcutUseCase(mockLauncherService)
+        useCase = LaunchShortcutUseCase(shortcutLauncherService)
     }
 
     // ===========================================
@@ -48,23 +48,23 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `execute with valid shortcut returns Success`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } just runs
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } just runs
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Success)
-        verify(exactly = 1) { mockLauncherService.startShortcut(mockShortcut) }
+        verify(exactly = 1) { shortcutLauncherService.startShortcut(shortcutInfo) }
     }
 
     @Test
     fun `execute calls service with correct shortcut`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } just runs
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } just runs
 
-        useCase.execute(mockShortcut)
+        useCase.execute(shortcutInfo)
 
-        verify { mockLauncherService.startShortcut(mockShortcut) }
+        verify { shortcutLauncherService.startShortcut(shortcutInfo) }
     }
 
     // ===========================================
@@ -86,8 +86,8 @@ class LaunchShortcutUseCaseTest {
     fun `execute with null shortcut does not call service`() {
         useCase.execute(null)
 
-        verify(exactly = 0) { mockLauncherService.startShortcut(any()) }
-        verify(exactly = 0) { mockLauncherService.isAvailable() }
+        verify(exactly = 0) { shortcutLauncherService.startShortcut(any()) }
+        verify(exactly = 0) { shortcutLauncherService.isAvailable() }
     }
 
     // ===========================================
@@ -96,9 +96,9 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `execute with unavailable service returns ServiceUnavailable error`() {
-        every { mockLauncherService.isAvailable() } returns false
+        every { shortcutLauncherService.isAvailable() } returns false
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Failure)
         assertEquals(
@@ -109,21 +109,21 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `execute with unavailable service does not attempt launch`() {
-        every { mockLauncherService.isAvailable() } returns false
+        every { shortcutLauncherService.isAvailable() } returns false
 
-        useCase.execute(mockShortcut)
+        useCase.execute(shortcutInfo)
 
-        verify(exactly = 0) { mockLauncherService.startShortcut(any()) }
+        verify(exactly = 0) { shortcutLauncherService.startShortcut(any()) }
     }
 
     @Test
     fun `execute checks service availability before launching`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } just runs
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } just runs
 
-        useCase.execute(mockShortcut)
+        useCase.execute(shortcutInfo)
 
-        verify { mockLauncherService.isAvailable() }
+        verify { shortcutLauncherService.isAvailable() }
     }
 
     // ===========================================
@@ -133,10 +133,10 @@ class LaunchShortcutUseCaseTest {
     @Test
     fun `execute with ShortcutLaunchException returns LaunchFailed error`() {
         val exception = ShortcutLaunchException("App not installed")
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws exception
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws exception
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Failure)
         val failure = result as LaunchShortcutUseCase.Result.Failure
@@ -148,10 +148,10 @@ class LaunchShortcutUseCaseTest {
     fun `execute with nested cause preserves exception chain`() {
         val rootCause = IllegalStateException("Activity not found")
         val exception = ShortcutLaunchException("Launch failed", rootCause)
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws exception
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws exception
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
         val launchError = failure.error as LaunchShortcutUseCase.Error.LaunchFailed
@@ -165,10 +165,10 @@ class LaunchShortcutUseCaseTest {
     @Test
     fun `execute with RuntimeException returns Unknown error`() {
         val exception = RuntimeException("Something unexpected")
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws exception
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws exception
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Failure)
         val failure = result as LaunchShortcutUseCase.Result.Failure
@@ -179,10 +179,10 @@ class LaunchShortcutUseCaseTest {
     @Test
     fun `execute with OutOfMemoryError returns Unknown error`() {
         val error = OutOfMemoryError("No memory left")
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws error
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws error
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Failure)
         assertTrue((result as LaunchShortcutUseCase.Result.Failure).error is LaunchShortcutUseCase.Error.Unknown)
@@ -191,10 +191,10 @@ class LaunchShortcutUseCaseTest {
     @Test
     fun `execute with SecurityException returns Unknown error`() {
         val exception = SecurityException("Permission denied")
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws exception
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws exception
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
         assertTrue(failure.error is LaunchShortcutUseCase.Error.Unknown)
@@ -211,17 +211,17 @@ class LaunchShortcutUseCaseTest {
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
         assertEquals(LaunchShortcutUseCase.Error.ShortcutNull, failure.error)
-        verify(exactly = 0) { mockLauncherService.isAvailable() }
+        verify(exactly = 0) { shortcutLauncherService.isAvailable() }
     }
 
     @Test
     fun `execute checks service availability before attempting launch`() {
-        every { mockLauncherService.isAvailable() } returns false
+        every { shortcutLauncherService.isAvailable() } returns false
 
-        useCase.execute(mockShortcut)
+        useCase.execute(shortcutInfo)
 
-        verify(exactly = 1) { mockLauncherService.isAvailable() }
-        verify(exactly = 0) { mockLauncherService.startShortcut(any()) }
+        verify(exactly = 1) { shortcutLauncherService.isAvailable() }
+        verify(exactly = 0) { shortcutLauncherService.startShortcut(any()) }
     }
 
     // ===========================================
@@ -230,11 +230,11 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `Success is a singleton object`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } just runs
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } just runs
 
-        val result1 = useCase.execute(mockShortcut)
-        val result2 = useCase.execute(mockShortcut)
+        val result1 = useCase.execute(shortcutInfo)
+        val result2 = useCase.execute(shortcutInfo)
 
         assertTrue(result1 === result2)
     }
@@ -260,10 +260,10 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `execute handles service becoming unavailable between checks gracefully`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } throws ShortcutLaunchException("Service died")
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } throws ShortcutLaunchException("Service died")
 
-        val result = useCase.execute(mockShortcut)
+        val result = useCase.execute(shortcutInfo)
 
         assertTrue(result is LaunchShortcutUseCase.Result.Failure)
         assertTrue((result as LaunchShortcutUseCase.Result.Failure).error is LaunchShortcutUseCase.Error.LaunchFailed)
@@ -271,16 +271,16 @@ class LaunchShortcutUseCaseTest {
 
     @Test
     fun `execute is idempotent for same shortcut`() {
-        every { mockLauncherService.isAvailable() } returns true
-        every { mockLauncherService.startShortcut(mockShortcut) } just runs
+        every { shortcutLauncherService.isAvailable() } returns true
+        every { shortcutLauncherService.startShortcut(shortcutInfo) } just runs
 
-        val result1 = useCase.execute(mockShortcut)
-        val result2 = useCase.execute(mockShortcut)
-        val result3 = useCase.execute(mockShortcut)
+        val result1 = useCase.execute(shortcutInfo)
+        val result2 = useCase.execute(shortcutInfo)
+        val result3 = useCase.execute(shortcutInfo)
 
         assertTrue(result1 is LaunchShortcutUseCase.Result.Success)
         assertTrue(result2 is LaunchShortcutUseCase.Result.Success)
         assertTrue(result3 is LaunchShortcutUseCase.Result.Success)
-        verify(exactly = 3) { mockLauncherService.startShortcut(mockShortcut) }
+        verify(exactly = 3) { shortcutLauncherService.startShortcut(shortcutInfo) }
     }
 }
