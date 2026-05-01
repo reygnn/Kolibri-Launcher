@@ -75,16 +75,13 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        try {
-            _binding?.let {
-                outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving instance state")
+        _binding?.let {
+            outState.putString(STATE_SEARCH_QUERY, it.searchEditText.text.toString())
         }
     }
 
     override fun onDestroy() {
+        // Outer catch kept: lifecycle teardown — finally{} super.onDestroy()
         try {
             if (_binding != null) {
                 // Listener entfernen (Referenz auf ViewModel kappen)
@@ -92,10 +89,8 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
                 binding.rightSlotChip.setOnCheckedChangeListener(null)
                 binding.leftSlotChip.setOnCloseIconClickListener(null)
                 binding.rightSlotChip.setOnCloseIconClickListener(null)
-
                 binding.allAppsRecyclerView.adapter = null
             }
-
             appSelectionAdapter = null
             _binding = null
         } catch (e: Throwable) {
@@ -106,42 +101,25 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
     }
 
     private fun handleWindowInsets() {
-        try {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.updatePadding(
-                    left = insets.left,
-                    top = insets.top,
-                    right = insets.right,
-                    bottom = insets.bottom
-                )
-                WindowInsetsCompat.CONSUMED
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling window insets")
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(
+                left = insets.left,
+                top = insets.top,
+                right = insets.right,
+                bottom = insets.bottom
+            )
+            WindowInsetsCompat.CONSUMED
         }
     }
 
     private fun setupRecyclerView() {
-        try {
-            // Initialisiere den neuen Adapter
-            appSelectionAdapter = SwipeActionsAppListAdapter { appInfo ->
-                try {
-                    // Informiere das VM, welche App ausgewählt wurde
-                    viewModel.onAppSelected(appInfo)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error selecting app: ${appInfo.packageName}")
-                }
-            }
-
-            binding.allAppsRecyclerView.apply {
-                adapter = appSelectionAdapter
-                layoutManager = LinearLayoutManager(this@SwipeActionsActivity)
-                setHasFixedSize(true)
-                itemAnimator = null
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        appSelectionAdapter = SwipeActionsAppListAdapter { appInfo -> viewModel.onAppSelected(appInfo) }
+        binding.allAppsRecyclerView.apply {
+            adapter = appSelectionAdapter
+            layoutManager = LinearLayoutManager(this@SwipeActionsActivity)
+            setHasFixedSize(true)
+            itemAnimator = null
         }
     }
 
@@ -150,84 +128,52 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
         binding.searchEditText.doOnTextChanged { text, _, _, _ ->
             searchQueryFlow.value = text?.toString() ?: ""
         }
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 searchQueryFlow
                     .debounce(SEARCH_DEBOUNCE_MS)
-                    .collect { query ->
-                        try {
-                            viewModel.onSearchQueryChanged(query)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in search query changed")
-                        }
-                    }
+                    .collect { query -> viewModel.onSearchQueryChanged(query) }
             }
         }
     }
 
     private fun setupClickListeners() {
-        try {
-            // Listener für den "Fertig"-Button
-            binding.doneButton.setOnClickListener {
-                try {
-                    viewModel.onDoneClicked()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in done button click")
-                    finish()
-                }
+        // doneButton inner catch kept: viewModel.onDoneClicked is the user-
+        // facing commit; finish() fallback is the user's exit if it throws.
+        binding.doneButton.setOnClickListener {
+            try {
+                viewModel.onDoneClicked()
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in done button click")
+                finish()
             }
+        }
 
-            // Listener für die Slot-Auswahl-Chips (welcher ist aktiv?)
-            binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) {
-                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
-                }
+        binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
             }
+        }
 
-            binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) {
-                    viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
-                }
+        binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
             }
+        }
 
-            // Listener für das "Löschen"-Icon (X) auf den Chips
-            binding.leftSlotChip.setOnCloseIconClickListener {
-                try {
-                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing left slot")
-                }
-            }
+        binding.leftSlotChip.setOnCloseIconClickListener {
+            viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        }
 
-            binding.rightSlotChip.setOnCloseIconClickListener {
-                try {
-                    viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error clearing right slot")
-                }
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up click listeners")
+        binding.rightSlotChip.setOnCloseIconClickListener {
+            viewModel.onSlotCleared(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
         }
     }
 
     private fun observeViewModel() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Beobachte den neuen UI-State
-                viewModel.uiState.collect { state ->
-                    try {
-                        updateUi(state)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating UI")
-                    }
-                }
+                viewModel.uiState.collect { state -> updateUi(state) }
             }
         }
     }
@@ -240,57 +186,36 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
             Timber.w("Attempted to update UI after binding was destroyed")
             return
         }
-
-        try {
-            binding.titleText.setText(state.titleResId)
-            binding.subtitleText.setText(state.subtitleResId)
-
-            appSelectionAdapter?.submitList(state.selectableApps) ?: run {
-                Timber.w("Adapter is null, cannot submit list")
-            }
-
-            // Aktualisiere die Slot-Chips
-            updateSlotChips(state)
-
-        } catch (e: IllegalStateException) {
-            TimberWrapper.silentError(e, "View not attached, skipping UI update")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating UI")
+        binding.titleText.setText(state.titleResId)
+        binding.subtitleText.setText(state.subtitleResId)
+        appSelectionAdapter?.submitList(state.selectableApps) ?: run {
+            Timber.w("Adapter is null, cannot submit list")
         }
+        updateSlotChips(state)
     }
 
     private fun updateSlotChips(state: SwipeActionsUiState) {
         if (_binding == null) return
 
-        try {
-            // Text setzen
-            val leftText = state.appForLeft?.displayName ?: getString(R.string.swipe_slot_empty)
-            binding.leftSlotChip.text = getString(R.string.swipe_slot_left_format, leftText)
+        val leftText = state.appForLeft?.displayName ?: getString(R.string.swipe_slot_empty)
+        binding.leftSlotChip.text = getString(R.string.swipe_slot_left_format, leftText)
 
-            val rightText = state.appForRight?.displayName ?: getString(R.string.swipe_slot_empty)
-            binding.rightSlotChip.text = getString(R.string.swipe_slot_right_format, rightText)
+        val rightText = state.appForRight?.displayName ?: getString(R.string.swipe_slot_empty)
+        binding.rightSlotChip.text = getString(R.string.swipe_slot_right_format, rightText)
 
-            // State setzen OHNE den Listener zu triggern
-            // Trick: Listener kurz entfernen, setzen, Listener wieder dran.
-            // ABER: Wir rufen NICHT setupClickListeners() auf (das setzt ALLE Listener neu).
-            // Wir definieren kleine Helper für die spezifischen Listener.
+        // State setzen OHNE den Listener zu triggern
+        // Trick: Listener kurz entfernen, setzen, Listener wieder dran.
+        binding.leftSlotChip.setOnCheckedChangeListener(null)
+        binding.rightSlotChip.setOnCheckedChangeListener(null)
 
-            binding.leftSlotChip.setOnCheckedChangeListener(null)
-            binding.rightSlotChip.setOnCheckedChangeListener(null)
+        binding.leftSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT
+        binding.rightSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT
 
-            binding.leftSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT
-            binding.rightSlotChip.isChecked = state.currentSlotBeingAssigned == SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT
-
-            // Listener wiederherstellen (nur diese beiden!)
-            binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
-            }
-            binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating selection chips")
+        binding.leftSlotChip.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        }
+        binding.rightSlotChip.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
         }
     }
 
