@@ -222,12 +222,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             }
         }
 
-        return try {
-            appInfoList.sortedBy { it.displayName.lowercase() }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error sorting app list")
-            appInfoList
-        }
+        return appInfoList.sortedBy { it.displayName.lowercase() }
     }
 
     override suspend fun purgeRepository() {

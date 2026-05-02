@@ -377,13 +377,9 @@ class UsageExportRepositoryImpl @Inject constructor(
     }
 
     private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
-        return try {
-            timestamp > 0 &&
-                    timestamp <= currentTime &&
-                    (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
-        } catch (e: Throwable) {
-            false
-        }
+        return timestamp > 0 &&
+                timestamp <= currentTime &&
+                (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
     }
 
     override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {

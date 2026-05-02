@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,16 +34,17 @@ import javax.inject.Singleton
  * - Ensures UI never receives empty list unless legitimately no apps exist
  *
  * **Thread-Safety:**
- * The manager uses [kotlinx.coroutines.flow.MutableStateFlow] for reactive updates and a `@Volatile`
- * cache variable to ensure visibility across threads. All operations are
- * protected with comprehensive try-catch blocks catching [Throwable].
+ * The manager uses [kotlinx.coroutines.flow.MutableStateFlow] for reactive
+ * updates and a `@Volatile` cache variable to ensure visibility across threads.
  *
- * **Error Handling & Fail-Safe Logic:**
- * If an error occurs during updates or retrieval, the manager falls back to
- * [lastSuccessfulAppList] to prevent UI disruptions. This ensures:
- * - UI never shows empty state due to transient errors
- * - App remains functional even if data loading fails temporarily
- * - Stale data is preferable to no data for user experience
+ * **Fail-Safe Logic:**
+ * [getCurrentApps] falls back to [lastSuccessfulAppList] when the live flow
+ * value is empty, so the UI never shows an empty state due to a transient
+ * loading hiccup. This is a *value-based* fallback (`.ifEmpty {}`), not a
+ * try/catch — the operations involved (StateFlow read, property writes,
+ * Timber.d) cannot throw in normal use. The earlier `catch (Throwable)`
+ * wrappers around `updateApps` / `getCurrentApps` were CANT_THROW and have
+ * been removed per CLAUDE.md Rule 11.
  *
  * **Why Not Combine with InstalledAppsRepositoryImpl?**
  * Separation provides:
@@ -68,28 +68,18 @@ class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStat
     private var lastSuccessfulAppList: List<AppInfo> = emptyList()
 
     override fun updateApps(newApps: List<AppInfo>) {
-        try {
-            Timber.d("[DATAFLOW] 5. StateManager is being updated. Size: ${newApps.size}")
+        Timber.d("[DATAFLOW] 5. StateManager is being updated. Size: ${newApps.size}")
 
-            if (newApps.isNotEmpty()) {
-                lastSuccessfulAppList = newApps
-            }
-
-            _rawAppsFlow.value = newApps
-
-        } catch (e: Throwable) {  // Throwable statt Exception
-            TimberWrapper.silentError(e, "Error updating apps in StateManager, keeping previous state")
+        if (newApps.isNotEmpty()) {
+            lastSuccessfulAppList = newApps
         }
+
+        _rawAppsFlow.value = newApps
     }
 
     override fun getCurrentApps(): List<AppInfo> {
-        return try {
-            _rawAppsFlow.value.ifEmpty {
-                Timber.d("Returning cached list with ${lastSuccessfulAppList.size} apps")
-                lastSuccessfulAppList
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error getting current apps, returning cached list")
+        return _rawAppsFlow.value.ifEmpty {
+            Timber.d("Returning cached list with ${lastSuccessfulAppList.size} apps")
             lastSuccessfulAppList
         }
     }
