@@ -18,7 +18,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker. Nächster Sweep-Kandidat: `MainActivity` (37 Catches, **konservativ** angehen wegen HOME-Activity-Sensibilität).
+**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker. Nächster Sweep-Kandidat: `SettingsFragment` (52 Catches, größter unbehandelter Brocken nach `HomeFragment`).
 
 ---
 
@@ -127,6 +127,21 @@ Base-Klassen-Pass + ein UI-Glue-Fragment ohne neuen Robolectric-Backstop
 Geprüft, aber kein Sweep nötig (alle Catches sind echte UX- oder
 Per-Item-Recovery, kein CANT_THROW): `AppManagementDelegate` (8 Catches).
 
+`MainActivity` (~37 Catches): konservativ geprüft 2026-05-02. Nach
+dem früheren MainActivity-Mini-Sweep (-3) sind die verbleibenden
+Catches alle echte Boundaries — System-API (`registerReceiver`,
+`startActivity`, `LauncherApps`, `WallpaperManager`), View-Inflation
+(`setContentView`, `installSplashScreen`), DataStore-I/O,
+Dialog-Lifecycle-Race (`MaterialAlertDialogBuilder.show`,
+`DialogFragment.show`), BroadcastReceiver-Callback,
+`silentDeath`-Pfade als HOME-Activity-Recovery, plus UX-Toasts
+in `handleSpecificEvent`. Keine eindeutigen CANT_THROW-Catches.
+Hinweis: `mainActivityExceptionHandler` (L82-93) hat einen nested
+Catch um `silentError + if(DEBUG) throw`, der die Rule-9-DEBUG-
+throw-Semantik lokal aufhebt — das ist ein Bug-Hint, kein Sweep-
+Material; wenn er gefixt wird, dann als bewusste Verhaltens-
+änderung im DEBUG-Build.
+
 In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
@@ -137,8 +152,8 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
   KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
   wartet auf strukturelles Refactoring (`_binding?.let { }` +
   `viewLifecycleOwner.lifecycleScope`).
-- **MainActivity (~37)** — nächster geplanter Sweep, **konservativ**
-  wegen HOME-Activity-Sensibilität.
+- **MainActivity (~37)** — geprüft 2026-05-02, nichts mehr zu sweepen
+  (siehe Notiz oben).
 - **Repository-Files** — `BackupRepositoryImpl` (16),
   `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (9),
   `FavoritesRepositoryImpl` (7) etc. — überwiegend echte EXTERNAL-
@@ -166,9 +181,11 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
 ### Optionale nächste Sweeps
 
-- [ ] **MainActivity (~37)** — konservativ (HOME-Activity, alles
-  rund um App-Start, Splash, Fragment-Wiring; Catches die Lifecycle-
-  Races schützen sind im Zweifel zu behalten).
+- [ ] **SettingsFragment (~52)** — größter unbehandelter Brocken
+  nach `HomeFragment`. Hat schon einen früheren -32-Sweep durchlaufen,
+  aber 52 verbleibend ist ungewöhnlich hoch — wahrscheinlich ein
+  Mix aus echten Settings-API/PreferenceManager-Boundaries und
+  weiterer Defensive-Religion.
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
