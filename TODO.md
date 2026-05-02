@@ -13,12 +13,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | § | Titel | Status | Größe |
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
-| 2 | Throwable-Catch-Audit | 202 von 735 Catches weg (über 17 Sweeps in 2 Wellen + Folge-Sweeps), optionale Folge-Sweeps offen | klein-mittel pro Sweep |
+| 2 | Throwable-Catch-Audit | 206 von 735 Catches weg (über 18 Sweeps in 2 Wellen + Folge-Sweeps), Sweep nähert sich dem natürlichen Ende | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker. Nächster Sweep-Kandidat: `SettingsFragment` (52 Catches, größter unbehandelter Brocken nach `HomeFragment`).
+**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 hat sein natürliches Ende erreicht — die großen Brocken sind alle gesweept oder als clean inspiziert. Was übrig ist, sind Files mit 6–11 Catches, deren Reststände in den meisten Fällen legitime EXTERNAL/Lifecycle-Pfade sind. File-für-File-Inspektion lohnt sich nur bei konkretem Verdacht.
 
 ---
 
@@ -72,7 +72,7 @@ selbst in `HomeFragment.kt:157-208` formuliert:
 
 ### Erledigt
 
-Insgesamt **202 Catches in 17 Sweep-PRs** entfernt.
+Insgesamt **206 Catches in 18 Sweep-PRs** entfernt.
 
 **Erste Welle (vor Robolectric-Pattern):**
 
@@ -115,14 +115,16 @@ zusätzlich zum Pilot `OnboardingActivityRobolectricTest`.
 **Folge-Sweeps (2026-05-02 ff.):**
 
 Base-Klassen-Pass + ein UI-Glue-Fragment ohne neuen Robolectric-Backstop
-(Logic ist schon im ViewModel-Test gepinnt):
+(Logic ist schon im ViewModel-Test gepinnt) + Nachklapp auf
+SettingsFragment, das in der Welle 1 schon -32 hatte:
 
 | PR | Catches | File |
 |---|---:|---|
 | BaseViewModel | 9 | 1 |
 | BaseActivity | 1 | 1 |
 | FavoritesSortFragment | 12 | 1 |
-| **Subtotal** | **22** | **3** |
+| SettingsFragment (Nachsweep) | 4 | 1 |
+| **Subtotal** | **26** | **4** |
 
 Geprüft, aber kein Sweep nötig (alle Catches sind echte UX- oder
 Per-Item-Recovery, kein CANT_THROW): `AppManagementDelegate` (8 Catches).
@@ -146,7 +148,7 @@ In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
-### Reststand: 533 Catches (Stand 2026-05-02)
+### Reststand: 529 Catches (Stand 2026-05-02)
 
 - **HomeFragment (~104)** — eigenes Lifecycle-Restructure-Projekt,
   KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
@@ -177,20 +179,26 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 - **`FavoritesSortFragment` (7)** — gesweept 2026-05-02, Reststand
   sind Bundle-Parsing, Flow-Collection-Wrapper, Per-Item-Recovery,
   setFragmentResult-Lifecycle-Race, Toast-IPC.
+- **`SettingsFragment` (48)** — Nachsweep 2026-05-02, Reststand
+  sind Listener-Bodies mit `viewLifecycleOwner`-Zugriff (Lifecycle-
+  Race), direkte System-API (`startActivity`, `parentFragmentManager`,
+  `RoleManager`, `setPreferencesFromResource` XML-I/O), 9 Flow-
+  Collection-Wrapper in `observeSettings`, Dialog-/View-Inflation,
+  plus die spezifische `NumberFormatException`-UX-Recovery für
+  splitModeThreshold.
 - Use cases (~1-3 pro File) — meistens defensive, klein.
 
 ### Optionale nächste Sweeps
 
-- [ ] **SettingsFragment (~52)** — größter unbehandelter Brocken
-  nach `HomeFragment`. Hat schon einen früheren -32-Sweep durchlaufen,
-  aber 52 verbleibend ist ungewöhnlich hoch — wahrscheinlich ein
-  Mix aus echten Settings-API/PreferenceManager-Boundaries und
-  weiterer Defensive-Religion.
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
 - [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
   Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
+- [ ] Mid-size-Reststände (`AppDrawerFragment` 11, `OnboardingActivity` 7,
+  `WallpaperDelegate` 6, `AppContextMenuDialogFragment` 6) wurden
+  jeweils schon einmal gesweept; wahrscheinlich 0–2 weitere CANT_THROW-
+  Catches pro File, kaum Lohn.
 - [ ] Restliche Repository-Files können vereinzelt CANT_THROW-Catches
   haben — File-für-File-Audit lohnt sich kaum.
 
