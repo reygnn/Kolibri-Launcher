@@ -37,16 +37,10 @@ class SettingsViewModel @Inject constructor(
             try {
                 // Nutzung des UseCases statt des Repositories
                 getInstalledAppsUseCase().collect { apps ->
-                    try {
-                        if (BuildConfig.DEBUG) {
-                            Timber.d("[ViewModel] Collected ${apps.size} apps")
-                        }
-                        _installedApps.value = apps
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating installed apps")
+                    if (BuildConfig.DEBUG) {
+                        Timber.d("[ViewModel] Collected ${apps.size} apps")
                     }
+                    _installedApps.value = apps
                 }
             } catch (e: CancellationException) {
                 throw e

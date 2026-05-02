@@ -39,48 +39,36 @@ class HiddenAppsViewModel @Inject constructor(
 
     init {
         launchSafe {
-            try {
-                combine(
-                    allAppsMasterList,
-                    selectedComponents,
-                    searchQuery
-                ) { allApps, selected, query ->
-                    val filteredApps = if (query.isBlank()) {
-                        allApps
-                    } else {
-                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
-                    }
-
-                    val selectableList = filteredApps.map { app ->
-                        SelectableAppInfo(
-                            appInfo = app,
-                            isSelected = selected.contains(app.componentName)
-                        )
-                    }
-
-                    val selectedAppInfos = allApps
-                        .filter { selected.contains(it.componentName) }
-                        .sortedBy { it.displayName.lowercase() }
-
-                    _uiState.value.copy(
-                        titleResId = R.string.hidden_apps_title_screen,
-                        subtitleResId = R.string.hidden_apps_subtitle_screen,
-                        selectableApps = selectableList,
-                        selectedApps = selectedAppInfos
-                    )
-                }.collect { newState ->
-                    try {
-                        _uiState.value = newState
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error updating UI state")
-                    }
+            combine(
+                allAppsMasterList,
+                selectedComponents,
+                searchQuery
+            ) { allApps, selected, query ->
+                val filteredApps = if (query.isBlank()) {
+                    allApps
+                } else {
+                    allApps.filter { it.displayName.contains(query, ignoreCase = true) }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in combine block")
+
+                val selectableList = filteredApps.map { app ->
+                    SelectableAppInfo(
+                        appInfo = app,
+                        isSelected = selected.contains(app.componentName)
+                    )
+                }
+
+                val selectedAppInfos = allApps
+                    .filter { selected.contains(it.componentName) }
+                    .sortedBy { it.displayName.lowercase() }
+
+                _uiState.value.copy(
+                    titleResId = R.string.hidden_apps_title_screen,
+                    subtitleResId = R.string.hidden_apps_subtitle_screen,
+                    selectableApps = selectableList,
+                    selectedApps = selectedAppInfos
+                )
+            }.collect { newState ->
+                _uiState.value = newState
             }
         }
     }

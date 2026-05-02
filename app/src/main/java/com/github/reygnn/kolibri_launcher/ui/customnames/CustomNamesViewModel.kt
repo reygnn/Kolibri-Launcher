@@ -46,12 +46,8 @@ class CustomNamesViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = true) }
 
                 getInstalledAppsUseCase().collect { fullyProcessedList ->
-                    try {
-                        masterAppList = fullyProcessedList
-                        updateUiFromMasterList()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error processing app list")
-                    }
+                    masterAppList = fullyProcessedList
+                    updateUiFromMasterList()
                 }
             } catch (e: CancellationException) {
                 throw e
