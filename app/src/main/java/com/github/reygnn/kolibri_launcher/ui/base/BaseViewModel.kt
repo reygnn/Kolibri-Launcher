@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.base
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
@@ -15,17 +14,18 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * ULTRA CRASH-SAFE Base ViewModel
+ * Base ViewModel with coroutine-boundary exception handling.
  *
- * Multi-layer exception handling:
- * - All operations catch Throwable (Exception + Error)
- * - CancellationException properly re-thrown
- * - CoroutineExceptionHandler as backup
- * - Safe event emission with fallback
- * - Protected error handling with triple-fallback logging
+ * Catches at real boundaries only (per CLAUDE.md Rule 11):
+ * - `launchSafe` and `executeSafe` wrap caller-supplied blocks (EXTERNAL).
+ * - `sendEvent` wraps `MutableSharedFlow.emit` (suspend boundary).
+ * - `coroutineExceptionHandler` is the last-resort backstop for coroutines
+ *   that escape the explicit try-catch blocks.
  *
- * This ensures ViewModels stay alive even under extreme conditions
- * like OutOfMemoryError, StackOverflowError, or corrupted state.
+ * `CancellationException` is always re-thrown to preserve coroutine
+ * control flow. Other `Throwable`s (including `Error`s like OOM) are
+ * routed to `handleError`, which logs and emits a generic error toast
+ * unless suppressed.
  */
 abstract class BaseViewModel<E>(
     private val mainDispatcher: CoroutineDispatcher
@@ -36,8 +36,8 @@ abstract class BaseViewModel<E>(
     override val event: SharedFlow<E> = _event.asSharedFlow()
 
     /**
-     * Sends an event to the UI layer with ultra-safe error handling.
-     * Even if event emission fails, the ViewModel stays alive.
+     * Sends an event to the UI layer. Failures during emission are
+     * logged but do not propagate.
      */
     protected suspend fun sendEvent(event: E) {
         try {
@@ -45,30 +45,16 @@ abstract class BaseViewModel<E>(
         } catch (e: CancellationException) {
             throw e  // Coroutine control flow - must re-throw
         } catch (e: Throwable) {
-            // Ultra paranoid: Catch everything
-            try {
-                Timber.e(e, "Error sending event: $event")
-            } catch (loggingError: Throwable) {
-                // Even logging can fail - silent fallback
-            }
+            Timber.e(e, "Error sending event: $event")
         }
     }
 
     /**
-     * Primary coroutine exception handler.
-     * This catches exceptions that escape the try-catch blocks.
+     * Last-resort handler for coroutine exceptions that escape the
+     * explicit try-catch blocks in `launchSafe`.
      */
     private val coroutineExceptionHandler = CoroutineExceptionHandler { context, throwable ->
-        try {
-            handleError(throwable, "CoroutineExceptionHandler: $context")
-        } catch (e: Throwable) {
-            // Even error handler can fail - last resort logging
-            try {
-                Timber.e(e, "CRITICAL: Error in exception handler")
-            } catch (ignored: Throwable) {
-                // Absolute last resort - nothing we can do
-            }
-        }
+        handleError(throwable, "CoroutineExceptionHandler: $context")
     }
 
     /**
@@ -107,60 +93,40 @@ abstract class BaseViewModel<E>(
         } catch (e: CancellationException) {
             throw e  // Coroutine control flow - must re-throw
         } catch (e: Throwable) {
-            // Ultra paranoid: Catch everything
             try {
                 onError?.invoke(e) ?: handleError(e, "executeSafe")
             } catch (handlerError: Throwable) {
-                // Error handler itself failed
-                try {
-                    Timber.e(handlerError, "Error in custom error handler")
-                } catch (ignored: Throwable) {
-                    // Even logging can fail
-                }
+                // The caller-supplied onError callback itself threw —
+                // log and swallow so executeSafe still returns null.
+                Timber.e(handlerError, "Error in custom error handler")
             }
             null
         }
     }
 
     /**
-     * Handles errors with triple-fallback logging and safe event emission.
-     * This method itself is protected against failures.
-     *
-     * @param throwable The error that occurred
-     * @param context Context information about where the error occurred
-     */
-
-    /**
-     * Handles errors with triple-fallback logging.
-     * Override shouldShowErrorToast() in child ViewModels if E is not UiEvent.
+     * Logs the error and emits a generic error toast unless the error
+     * type is one the user can't act on (cancellation, OOM, stack
+     * overflow). Override `showErrorToastIfSupported` in child
+     * ViewModels where `E` is not `UiEvent`.
      */
     protected open fun handleError(throwable: Throwable, context: String) {
-        // Triple-fallback logging
-        try {
-            when (throwable) {
-                is OutOfMemoryError -> {
-                    Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
-                    try {
-                        System.gc()
-                    } catch (ignored: Throwable) { }
-                }
-                is StackOverflowError -> {
-                    Timber.e(throwable, "[$context] STACK OVERFLOW - Critical!")
-                }
-                is CancellationException -> {
-                    Timber.d("[$context] Coroutine cancelled (normal)")
-                }
-                else -> {
-                    Timber.e(throwable, "[$context] Error in ViewModel")
-                }
+        when (throwable) {
+            is OutOfMemoryError -> {
+                Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
+                System.gc()
             }
-        } catch (loggingError: Throwable) {
-            try {
-                Log.e("BaseViewModel", "[$context] Error: ${throwable.message}", throwable)
-            } catch (ignored: Throwable) { }
+            is StackOverflowError -> {
+                Timber.e(throwable, "[$context] STACK OVERFLOW - Critical!")
+            }
+            is CancellationException -> {
+                Timber.d("[$context] Coroutine cancelled (normal)")
+            }
+            else -> {
+                Timber.e(throwable, "[$context] Error in ViewModel")
+            }
         }
 
-        // Show error toast if applicable
         if (!shouldSuppressErrorToast(throwable)) {
             showErrorToastIfSupported()
         }
@@ -186,8 +152,8 @@ abstract class BaseViewModel<E>(
     protected open fun showErrorToastIfSupported() {
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
-                // This will fail at runtime if E is not UiEvent, but that's okay
-                // Child ViewModels should override this method if needed
+                // The UNCHECKED_CAST will throw ClassCastException if E
+                // is not UiEvent — that case is handled below.
                 @Suppress("UNCHECKED_CAST")
                 sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
             } catch (e: CancellationException) {
@@ -195,25 +161,12 @@ abstract class BaseViewModel<E>(
             } catch (e: ClassCastException) {
                 // E is not UiEvent - that's okay, this ViewModel doesn't support error toasts
                 Timber.d("This ViewModel does not support UiEvent error toasts")
-            } catch (e: Throwable) {
-                try {
-                    Timber.e(e, "Failed to send error toast event")
-                } catch (ignored: Throwable) { }
             }
         }
     }
 
     override fun onCleared() {
-        try {
-            super.onCleared()
-            Timber.d("${this::class.simpleName} cleared")
-        } catch (e: Throwable) {
-            // Even onCleared can fail
-            try {
-                Log.d("BaseViewModel", "${this::class.simpleName} cleared with error", e)
-            } catch (ignored: Throwable) {
-                // Nothing we can do
-            }
-        }
+        super.onCleared()
+        Timber.d("${this::class.simpleName} cleared")
     }
 }
