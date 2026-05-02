@@ -13,12 +13,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | § | Titel | Status | Größe |
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
-| 2 | Throwable-Catch-Audit | 206 von 735 Catches weg (über 18 Sweeps in 2 Wellen + Folge-Sweeps), Sweep nähert sich dem natürlichen Ende | klein-mittel pro Sweep |
+| 2 | Throwable-Catch-Audit | 229 von 735 Catches weg (über 25 Sweeps in 2 Wellen + Folge-Sweeps), Sweep an seinem natürlichen Ende | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 hat sein natürliches Ende erreicht — die großen Brocken sind alle gesweept oder als clean inspiziert. Was übrig ist, sind Files mit 6–11 Catches, deren Reststände in den meisten Fällen legitime EXTERNAL/Lifecycle-Pfade sind. File-für-File-Inspektion lohnt sich nur bei konkretem Verdacht.
+**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 hat sein natürliches Ende erreicht — alle ui/-Files sind gesweept oder als clean inspiziert (außer den explizit ausgenommenen `HomeFragment` Lifecycle-Restructure und `ScreenLockAccessibilityService` Service-Test-Lücke), `core/`/`domain/usecase/` sind verifiziert clean, `data/` Repository-Layer ist gesweept. Reststand sind ausschließlich legitime EXTERNAL/Lifecycle/Per-Item-Boundaries.
 
 ---
 
@@ -72,7 +72,7 @@ selbst in `HomeFragment.kt:157-208` formuliert:
 
 ### Erledigt
 
-Insgesamt **206 Catches in 18 Sweep-PRs** entfernt.
+Insgesamt **229 Catches in 25 Sweep-PRs** entfernt.
 
 **Erste Welle (vor Robolectric-Pattern):**
 
@@ -114,20 +114,61 @@ zusätzlich zum Pilot `OnboardingActivityRobolectricTest`.
 
 **Folge-Sweeps (2026-05-02 ff.):**
 
-Base-Klassen-Pass + ein UI-Glue-Fragment ohne neuen Robolectric-Backstop
-(Logic ist schon im ViewModel-Test gepinnt) + Nachklapp auf
-SettingsFragment, das in der Welle 1 schon -32 hatte:
+Base-Klassen + UI-Glue-Fragment + Nachklapp auf SettingsFragment +
+data-layer-CANT_THROW-Reste + ui/-Bündel-Sweeps gruppiert nach
+gemeinsamem Pattern:
 
-| PR | Catches | File |
+| PR | Catches | File(s) |
 |---|---:|---|
 | BaseViewModel | 9 | 1 |
 | BaseActivity | 1 | 1 |
 | FavoritesSortFragment | 12 | 1 |
 | SettingsFragment (Nachsweep) | 4 | 1 |
-| **Subtotal** | **26** | **4** |
+| data-layer Layer-A Nachsweep | 7 | 4 |
+| ZoomableImageView (View-Math) | 4 | 1 |
+| UsageExportFragment (UI-Glue) | 1 | 1 |
+| ViewModels-Bündel (HiddenApps + CustomNames + Settings) | 4 | 3 |
+| Delegates-Bündel (Clock + Gesture) | 4 | 2 |
+| Utilities-Bündel (ShortcutLaunchExtensions) | 1 | 1 |
+| ScrollViewBorderDecorator (dead-code) | 2 | 1 |
+| **Subtotal** | **49** | **17** |
 
-Geprüft, aber kein Sweep nötig (alle Catches sind echte UX- oder
-Per-Item-Recovery, kein CANT_THROW): `AppManagementDelegate` (8 Catches).
+Verifiziert clean (ohne Sweep — entweder schon gesweept oder
+Defensive-Religion nicht vorhanden):
+
+- `core/` (1 catch in TextColorCalculator) — Bitmap/Drawable-API,
+  legitim.
+- `domain/usecase/` (19 catches in 14 Files) — alle DataStore I/O,
+  System-API, Flow-Boundary, oder graceful-degradation Fallbacks
+  (sortBy mit alphabetical fallback).
+- `data/` Repository-Files (Backup, Reset, Wallpaper, TimeBased,
+  Favorites, FavoritesOrder, AppUsage, HiddenApps, SwipeActions,
+  Settings, CustomNames, Shortcut, ShortcutLauncherService,
+  WallpaperFileManager, DataMigrationManager) — alle EXTERNAL I/O,
+  per-Item-Recovery in ResetRepository, oder `silentDeath`-Lifecycle-
+  Critical-Pfade in DataMigrationManager.
+
+Geprüft, aber kein Sweep nötig (alle Catches sind echte UX-/
+Lifecycle-/Per-Item-Recovery, kein CANT_THROW):
+
+- `AppManagementDelegate` (8) — UX-Toast-Recovery + Per-Item-Recovery
+  in Flow-Collection.
+- `WallpaperViewBinder` (4) — `view.post {}` + User-Callback Boundaries.
+- `ThemingDelegate` (3) — UX-Toast-Recovery um DataStore-UseCases.
+- `DelegateScope` (1) — die `launchSafe`-Methode selbst, Existenz-
+  berechtigung der Abstraktion.
+- `AppDrawerAdapter` (5) — RecyclerView-Race / getItem-Race / User-
+  Callback-Boundaries (Inline-dokumentiert).
+- `BackupFragment` (3) — Activity-Result-Callbacks + Dialog-Loading
+  mit User-facing Snackbar-Recovery.
+- `ContextMenuHelper` (2) — Fragment-Manager-Lifecycle-Race.
+- `FlowCollection` (4) — bewusste Two-Layer-Defense-Konstruktion mit
+  Inline-KDoc-Schutz.
+- `OnboardingViewModel` / `BackupViewModel` / `SwipeActionsViewModel` /
+  `FavoritesSortViewModel` (3+3+2+1) — sealed-Result-State-Machine-
+  Recovery + sendEvent-Toast.
+- `DoubleClickDetector` (1 grep-Treffer) — Catch ist im Klassen-
+  KDoc-Code-Beispiel, nicht im Code.
 
 `MainActivity` (~37 Catches): konservativ geprüft 2026-05-02. Nach
 dem früheren MainActivity-Mini-Sweep (-3) sind die verbleibenden
@@ -148,18 +189,17 @@ In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
-### Reststand: 529 Catches (Stand 2026-05-02)
+### Reststand: 506 Catches (Stand 2026-05-02)
 
 - **HomeFragment (~104)** — eigenes Lifecycle-Restructure-Projekt,
   KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
   wartet auf strukturelles Refactoring (`_binding?.let { }` +
   `viewLifecycleOwner.lifecycleScope`).
-- **MainActivity (~37)** — geprüft 2026-05-02, nichts mehr zu sweepen
-  (siehe Notiz oben).
+- **MainActivity (~37)** — geprüft 2026-05-02, nichts mehr zu sweepen.
 - **Repository-Files** — `BackupRepositoryImpl` (16),
-  `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (9),
-  `FavoritesRepositoryImpl` (7) etc. — überwiegend echte EXTERNAL-
-  I/O-Catches. Lassen.
+  `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (8),
+  `InstalledAppsRepositoryImpl` (8), `FavoritesRepositoryImpl` (7) etc. —
+  überwiegend echte EXTERNAL I/O. Verifiziert 2026-05-02.
 - **`KolibriLauncherApp` (~16)** — Rule-7-Whitelist, **bleibt
   unangetastet**.
 - **`ScreenLockAccessibilityService` (16)** — AccessibilityService,
@@ -174,7 +214,7 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 - **`PackageUpdateReceiver` (9)** — gesweept, Reststand sind
   legitime Receiver-Lifecycle/Hilt-init Catches.
 - **Base-Klassen** (`BaseViewModel`, `BaseActivity`) — gesweept
-  2026-05-02, Reststand (4 + 6) sind echte Coroutine-/Flow-/Toast-
+  2026-05-02, Reststand (3 + 6) sind echte Coroutine-/Flow-/Toast-
   Boundaries.
 - **`FavoritesSortFragment` (7)** — gesweept 2026-05-02, Reststand
   sind Bundle-Parsing, Flow-Collection-Wrapper, Per-Item-Recovery,
@@ -186,21 +226,37 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
   Collection-Wrapper in `observeSettings`, Dialog-/View-Inflation,
   plus die spezifische `NumberFormatException`-UX-Recovery für
   splitModeThreshold.
-- Use cases (~1-3 pro File) — meistens defensive, klein.
+- **`ZoomableImageView` (3)** — gesweept 2026-05-02, Reststand sind
+  `composeToBitmap` (OOM auf großen Bitmaps), `onTouchEvent`
+  (MotionEvent + ScaleGestureDetector), `ScaleListener.onScale`
+  (System-API).
+- **`UsageExportFragment` (6)** — gesweept 2026-05-02, Reststand sind
+  Activity-Result-Launcher, Dialog, Flow-Collection, Toast.
+- **ViewModels** (HiddenApps 2, CustomNames 3, Settings 1) —
+  gesweept 2026-05-02, Reststand sind UX-Toast / State-Machine
+  Recovery um DataStore I/O.
+- **`ClockDelegate` (2)** — gesweept 2026-05-02, Reststand sind
+  BroadcastReceiver-Intent-Boundary + `registerReceiver`-System-API.
+- **`ScrollViewBorderDecorator` (3)** — Dead-Code-Sweep 2026-05-02
+  (Datei bleibt deaktiviert), Reststand sind die Resource-API-
+  Catches um `getDimensionPixelSize` / `getDimension`.
+- Use cases (~1-3 pro File) — verifiziert 2026-05-02 als alles
+  echte EXTERNAL/Result-Wrapper, kein CANT_THROW.
 
 ### Optionale nächste Sweeps
+
+Nach der Verifikations-Welle 2026-05-02 sind die einzigen offenen
+Punkte strukturelle Projekte — keine Sweeps mehr im engeren Sinn:
 
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
 - [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
   Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
-- [ ] Mid-size-Reststände (`AppDrawerFragment` 11, `OnboardingActivity` 7,
-  `WallpaperDelegate` 6, `AppContextMenuDialogFragment` 6) wurden
-  jeweils schon einmal gesweept; wahrscheinlich 0–2 weitere CANT_THROW-
-  Catches pro File, kaum Lohn.
-- [ ] Restliche Repository-Files können vereinzelt CANT_THROW-Catches
-  haben — File-für-File-Audit lohnt sich kaum.
+- [ ] **`MainActivity.mainActivityExceptionHandler` Bug-Hint** — der
+  nested Catch um `silentError + if(DEBUG) throw` hebt die Rule-9-
+  DEBUG-throw-Semantik lokal auf. Fix wäre eine bewusste DEBUG-
+  Verhaltensänderung, kein reiner Sweep.
 
 ### Default-Disposition
 
