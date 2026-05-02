@@ -51,11 +51,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      * This catches any exceptions that escape the try-catch blocks.
      */
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        try {
-            Timber.e(throwable, "Uncaught coroutine exception in BaseActivity")
-        } catch (e: Throwable) {
-            // Even logging can fail - silent fallback
-        }
+        Timber.e(throwable, "Uncaught coroutine exception in BaseActivity")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
