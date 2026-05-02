@@ -53,12 +53,8 @@ class UsageExportFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        try {
-            setupButtons()
-            observeViewModel()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in UsageExportFragment.onViewCreated")
-        }
+        setupButtons()
+        observeViewModel()
     }
 
     private fun setupButtons() {
