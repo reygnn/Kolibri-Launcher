@@ -508,6 +508,86 @@ package com.github.reygnn.kolibri_launcher
 
 /**
  * ============================================================================
+ * ROBOLECTRIC APPLICATION CONFIG — TWO-LAYER STRATEGY
+ * ============================================================================
+ *
+ * Reference: `app/src/test/resources/robolectric.properties`
+ *
+ * THE PROBLEM (also documented in TODO.md §6)
+ * --------------------------------------------
+ * AndroidManifest.xml declares `android:name=".KolibriLauncherApp"`.
+ * Without an override, Robolectric loads that production Application for
+ * every test, and its `onCreate()` spins up an ANRWatchDog thread (non-
+ * daemon, leaks for the JVM lifetime), installs ACRA's global
+ * UncaughtExceptionHandler, plants Timber trees, registers a
+ * BroadcastReceiver, and creates a CoroutineScope. None of that is torn
+ * down between tests, so every Robolectric test class would leak one of
+ * each. With ~10+ Robolectric test classes and the test executor at
+ * -Xmx512m, accumulated ANRWatchDog threads sampling the main thread
+ * every 5s pushed the heap over the edge — locally and in CI.
+ *
+ *
+ * THE TWO-LAYER STRATEGY
+ * ----------------------
+ * Robolectric resolves the test Application class in this priority order:
+ *
+ *   1. Per-test `@Config(application = ...)` — highest priority, overrides
+ *      everything below.
+ *   2. `app/src/test/resources/robolectric.properties` `application=...` —
+ *      project-wide default for the test source set.
+ *   3. AndroidManifest.xml `android:name` — fallback (would load
+ *      KolibriLauncherApp; we never want this in tests).
+ *
+ * The project sets:
+ *
+ *   Layer 2 (default, in robolectric.properties):
+ *     application=android.app.Application
+ *
+ *     A no-op Application that brings up no production singletons.
+ *     Every Robolectric test that does NOT need Hilt automatically gets
+ *     this default — no `@Config` needed at the test side.
+ *
+ *   Layer 1 (per-test override, in @HiltAndroidTest classes):
+ *     @Config(application = HiltTestApplication::class)
+ *
+ *     A Hilt-managed minimal Application. Required for tests that
+ *     resolve `@AndroidEntryPoint` / `@Inject` dependencies. Setting
+ *     this override is what lets the @HiltAndroidTest scenario
+ *     resolve the production Hilt graph at the test site.
+ *
+ *
+ * RULES OF THUMB
+ * --------------
+ *  - Need Hilt? Set `@Config(application = HiltTestApplication::class)`
+ *    and add `@HiltAndroidTest` plus `@get:Rule val hiltRule =
+ *    HiltAndroidRule(this)`. See the next section.
+ *  - Don't need Hilt? Don't set `application=`. The properties-default
+ *    gives you a no-op Application and KolibriLauncherApp stays out.
+ *  - NEVER let a test load `KolibriLauncherApp` — even one such test in
+ *    the run will spin up an ANRWatchDog thread that survives until the
+ *    JVM ends. The properties-default exists to prevent that.
+ *
+ *
+ * REGRESSION HAZARDS
+ * ------------------
+ * If `robolectric.properties` is ever deleted, the only safety net is
+ * per-test `@Config(application = ...)` set on every Robolectric test
+ * class. New tests will inevitably forget it and reintroduce the leak.
+ * Treat the properties file as load-bearing infrastructure, not
+ * cosmetic config.
+ *
+ * If a future review notices the apparent redundancy ("we have BOTH a
+ * properties default AND per-test overrides — pick one"): the answer is
+ * that they cover different cases. The properties default is a global
+ * floor for tests that don't need Hilt; the per-test override is the
+ * only way to express "this test wants the Hilt-managed Application".
+ * Robolectric's @Config naturally takes priority — there is no conflict.
+ * Removing either layer reintroduces a class of bug we already paid for.
+ * ============================================================================
+ */
+
+/**
+ * ============================================================================
  * ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS
  * ============================================================================
  *
@@ -583,6 +663,13 @@ package com.github.reygnn.kolibri_launcher
  * - HiltAndroidRule must be `@get:Rule` (not just `@Rule`) for Kotlin.
  *   No `.inject()` call needed for Activity/Fragment tests; Hilt wires
  *   the @AndroidEntryPoint as soon as the scenario launches.
+ * - For Robolectric tests that do NOT need Hilt (e.g. plain Repository
+ *   / WallpaperFileManager / Wallpaper-Uri tests), do NOT set
+ *   `@Config(application = ...)`. The project-wide default in
+ *   `app/src/test/resources/robolectric.properties` resolves to
+ *   `android.app.Application`, which is correct for those tests. Only
+ *   `@HiltAndroidTest` classes need the override. See the previous
+ *   section ("ROBOLECTRIC APPLICATION CONFIG") for the rationale.
  *
  *
  * WHEN A REAL DEPENDENCY IS THE WRONG CHOICE
@@ -614,9 +701,17 @@ package com.github.reygnn.kolibri_launcher
  *   testImplementation androidx.test.ext:junit-ktx            // AndroidJUnit base
  *   kaptTest          com.google.dagger:hilt-compiler         // existing
  *
- * For FragmentScenario: also `androidx.fragment:fragment-testing` as
- * `testImplementation` (currently only added as `debugImplementation` /
- * `androidTestImplementation` — would need a separate add when the
- * first Fragment test lands).
+ * For Fragment tests, the existing approach is to host the fragment in
+ * the project's `HiltTestActivity` (under `src/debug/`) via
+ * `ActivityScenario.launch(HiltTestActivity::class.java)` plus a manual
+ * fragment transaction — see [com.github.reygnn.kolibri_launcher.ui
+ * .appdrawer.AppDrawerFragmentRobolectricTest]. That route is required
+ * when the fragment uses `activityViewModels()` to resolve a
+ * Hilt-scoped ViewModel, because `androidx.fragment:fragment-testing`'s
+ * default `EmptyFragmentActivity` is not `@AndroidEntryPoint`.
+ * Consequently `androidx.fragment:fragment-testing` is intentionally
+ * NOT a `testImplementation` — it would only pull in
+ * `fragment-testing-manifest`'s `EmptyActivity` registration without
+ * being usefully reachable from any test.
  * ============================================================================
  */
