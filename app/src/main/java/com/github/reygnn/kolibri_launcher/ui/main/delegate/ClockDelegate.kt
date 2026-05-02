@@ -109,15 +109,12 @@ class ClockDelegate(
     }
 
     fun updateBatteryLevel(level: Int, scale: Int) {
-        try {
-            if (level != -1 && scale != -1 && scale > 0) {
-                val batteryPercent = (level.toLong() * 100 / scale).toInt()
-                _batteryString.value = "${batteryPercent}%"
-            } else {
-                _batteryString.value = DEFAULT_BATTERY
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to calculate battery level")
+        // The `scale > 0` guard rules out divide-by-zero; the rest is
+        // pure integer math on Long. CANT_THROW.
+        if (level != -1 && scale != -1 && scale > 0) {
+            val batteryPercent = (level.toLong() * 100 / scale).toInt()
+            _batteryString.value = "${batteryPercent}%"
+        } else {
             _batteryString.value = DEFAULT_BATTERY
         }
     }
@@ -125,30 +122,22 @@ class ClockDelegate(
     // --- Internal ---
 
     private fun updateTimeAndDate() {
-        try {
-            val now = System.currentTimeMillis()
-            val is24Hour = DateFormat.is24HourFormat(context)
+        val now = System.currentTimeMillis()
+        val is24Hour = DateFormat.is24HourFormat(context)
 
-            val timeFormat = if (is24Hour) {
-                SimpleDateFormat("HH:mm", Locale.getDefault())
-            } else {
-                SimpleDateFormat("h:mm a", Locale.getDefault())
-            }
-            val dateFormat = SimpleDateFormat("E, d MMM", Locale.getDefault())
-
-            val newTime = timeFormat.format(now)
-            val newDate = dateFormat.format(now)
-
-            // Smart Update: Nur emittieren wenn sich was geändert hat
-            _timeString.update { current -> if (current == newTime) current else newTime }
-            _dateString.update { current -> if (current == newDate) current else newDate }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to update time and date")
-            if (_timeString.value == DEFAULT_TIME) {
-                _timeString.value = DEFAULT_TIME
-                _dateString.value = DEFAULT_DATE
-            }
+        val timeFormat = if (is24Hour) {
+            SimpleDateFormat("HH:mm", Locale.getDefault())
+        } else {
+            SimpleDateFormat("h:mm a", Locale.getDefault())
         }
+        val dateFormat = SimpleDateFormat("E, d MMM", Locale.getDefault())
+
+        val newTime = timeFormat.format(now)
+        val newDate = dateFormat.format(now)
+
+        // Smart Update: Nur emittieren wenn sich was geändert hat
+        _timeString.update { current -> if (current == newTime) current else newTime }
+        _dateString.update { current -> if (current == newDate) current else newDate }
     }
 
     private fun getInitialBatteryState() {

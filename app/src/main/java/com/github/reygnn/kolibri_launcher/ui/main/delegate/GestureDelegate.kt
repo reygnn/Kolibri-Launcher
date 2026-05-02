@@ -11,13 +11,11 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,34 +74,22 @@ class GestureDelegate(
     // --- Swipe ---
 
     fun onSwipeFromRightToLeft() = scope.launchSafe("Error in onSwipeFromRightToLeft") {
-        try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)) {
-                is HandleSwipeActionUseCase.Result.LaunchApp -> {
-                    scope.sendEvent(UiEvent.LaunchApp(result.app))
-                }
-                is HandleSwipeActionUseCase.Result.NoAction -> {
-                }
+        when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)) {
+            is HandleSwipeActionUseCase.Result.LaunchApp -> {
+                scope.sendEvent(UiEvent.LaunchApp(result.app))
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onSwipeFromRightToLeft")
+            is HandleSwipeActionUseCase.Result.NoAction -> {
+            }
         }
     }
 
     fun onSwipeFromLeftToRight() = scope.launchSafe("Error in onSwipeFromLeftToRight") {
-        try {
-            when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)) {
-                is HandleSwipeActionUseCase.Result.LaunchApp -> {
-                    scope.sendEvent(UiEvent.LaunchApp(result.app))
-                }
-                is HandleSwipeActionUseCase.Result.NoAction -> {
-                }
+        when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)) {
+            is HandleSwipeActionUseCase.Result.LaunchApp -> {
+                scope.sendEvent(UiEvent.LaunchApp(result.app))
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onSwipeFromLeftToRight")
+            is HandleSwipeActionUseCase.Result.NoAction -> {
+            }
         }
     }
 
