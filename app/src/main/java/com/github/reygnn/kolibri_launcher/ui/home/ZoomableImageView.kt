@@ -324,25 +324,21 @@ class ZoomableImageView @JvmOverloads constructor(
      * Multi-Layer: Transformiert das aktive Layer.
      */
     fun applyTransform(scale: Float, translateX: Float, translateY: Float) {
-        try {
-            cancelSnapBackAnimation()
+        cancelSnapBackAnimation()
 
-            if (isMultiLayerMode) {
-                val layer = activeLayer ?: return
-                layer.scale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
-                layer.translateX = translateX
-                layer.translateY = translateY
-                invalidate()
-            } else {
-                // Base Scale aktualisieren bevor wir clampen
-                updateSingleBaseScale()
-                _singleScale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
-                _singleTranslateX = translateX
-                _singleTranslateY = translateY
-                rebuildSingleMatrix()
-            }
-        } catch (e: Exception) {
-            resetTransform()
+        if (isMultiLayerMode) {
+            val layer = activeLayer ?: return
+            layer.scale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
+            layer.translateX = translateX
+            layer.translateY = translateY
+            invalidate()
+        } else {
+            // Base Scale aktualisieren bevor wir clampen
+            updateSingleBaseScale()
+            _singleScale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
+            _singleTranslateX = translateX
+            _singleTranslateY = translateY
+            rebuildSingleMatrix()
         }
     }
 
@@ -373,22 +369,18 @@ class ZoomableImageView @JvmOverloads constructor(
         val drawable = drawable ?: return
         if (width == 0 || height == 0) return
 
-        try {
-            cancelSnapBackAnimation()
-            val dWidth = drawable.intrinsicWidth.toFloat()
-            val dHeight = drawable.intrinsicHeight.toFloat()
-            val vWidth = width.toFloat()
-            val vHeight = height.toFloat()
-            val scale = max(vWidth / dWidth, vHeight / dHeight)
+        cancelSnapBackAnimation()
+        val dWidth = drawable.intrinsicWidth.toFloat()
+        val dHeight = drawable.intrinsicHeight.toFloat()
+        val vWidth = width.toFloat()
+        val vHeight = height.toFloat()
+        val scale = max(vWidth / dWidth, vHeight / dHeight)
 
-            _singleBaseScale = scale  // Base Scale merken für dynamische Zoom-Grenzen
-            _singleScale = scale
-            _singleTranslateX = (vWidth - dWidth * scale) / 2f
-            _singleTranslateY = (vHeight - dHeight * scale) / 2f
-            rebuildSingleMatrix()
-        } catch (e: Exception) {
-            resetTransform()
-        }
+        _singleBaseScale = scale  // Base Scale merken für dynamische Zoom-Grenzen
+        _singleScale = scale
+        _singleTranslateX = (vWidth - dWidth * scale) / 2f
+        _singleTranslateY = (vHeight - dHeight * scale) / 2f
+        rebuildSingleMatrix()
     }
 
     /**
@@ -413,15 +405,11 @@ class ZoomableImageView @JvmOverloads constructor(
         val drawable = drawable ?: return
         if (width == 0 || height == 0) return
 
-        try {
-            cancelSnapBackAnimation()
-            _singleScale = 1.0f
-            _singleTranslateX = (width - drawable.intrinsicWidth) / 2f
-            _singleTranslateY = (height - drawable.intrinsicHeight) / 2f
-            rebuildSingleMatrix()
-        } catch (e: Exception) {
-            resetTransform()
-        }
+        cancelSnapBackAnimation()
+        _singleScale = 1.0f
+        _singleTranslateX = (width - drawable.intrinsicWidth) / 2f
+        _singleTranslateY = (height - drawable.intrinsicHeight) / 2f
+        rebuildSingleMatrix()
     }
 
     /**
@@ -438,19 +426,15 @@ class ZoomableImageView @JvmOverloads constructor(
         val drawable = drawable ?: return
         if (width == 0 || height == 0) return
 
-        try {
-            cancelSnapBackAnimation()
-            val dWidth = drawable.intrinsicWidth.toFloat()
-            val dHeight = drawable.intrinsicHeight.toFloat()
+        cancelSnapBackAnimation()
+        val dWidth = drawable.intrinsicWidth.toFloat()
+        val dHeight = drawable.intrinsicHeight.toFloat()
 
-            _singleScale = width / dWidth
-            _singleBaseScale = _singleScale
-            _singleTranslateX = 0f
-            _singleTranslateY = (height - dHeight * _singleScale) / 2f
-            rebuildSingleMatrix()
-        } catch (e: Exception) {
-            resetTransform()
-        }
+        _singleScale = width / dWidth
+        _singleBaseScale = _singleScale
+        _singleTranslateX = 0f
+        _singleTranslateY = (height - dHeight * _singleScale) / 2f
+        rebuildSingleMatrix()
     }
 
     fun fitToWidthLayer(layerIndex: Int) {
