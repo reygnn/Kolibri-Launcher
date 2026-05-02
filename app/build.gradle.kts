@@ -303,7 +303,6 @@ dependencies {
 // AndroidX Test (für Robolectric-basierte Activity/Fragment-Tests)
     testImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
     testImplementation("androidx.test.ext:junit-ktx:$androidxTestJunitVersion")
-    testImplementation("androidx.fragment:fragment-testing:$fragmentVersion")
 
 
 // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
