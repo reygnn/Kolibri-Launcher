@@ -68,6 +68,14 @@ import javax.inject.Inject
  * Repo-Call). Gleiches Muster für die Flow-Observer in `observeSettings`:
  * der `?.isChecked = X`-Setter im inneren Block kann nicht werfen, der
  * Outer-Catch um die `.collect { }` schon (weshalb der bleibt).
+ *
+ * 2026-05-02: Nachgesweept — Listener-Bodies, die nur eine Sub-Methode mit
+ * eigenem try/catch aufrufen (`openSystemWallpaperPicker`,
+ * `showFactoryResetDialog`, `openAccessibilitySettings`,
+ * `openDefaultLauncherSettings`), brauchen keinen zusätzlichen Outer-Catch.
+ * Listener mit `viewLifecycleOwner`-Zugriff oder direkter System-API
+ * (`startActivity`, `parentFragmentManager`) behalten ihren Inner-Catch
+ * (Lifecycle-Race-Schutz).
  */
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -320,15 +328,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun setupPreferenceListeners() {
-        // Wallpaper
+        // Wallpaper — openSystemWallpaperPicker has its own try/catch + fallback path.
         findPreference<Preference>(AppConstants.PrefKeys.SYSTEM_WALLPAPER)?.setOnPreferenceClickListener {
-            try {
-                openSystemWallpaperPicker()
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in wallpaper preference click")
-                false
-            }
+            openSystemWallpaperPicker()
+            true
         }
 
         // Edit Favorites
@@ -424,15 +427,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // Factory Reset
+        // Factory Reset — showFactoryResetDialog has its own try/catch.
         findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
-            try {
-                showFactoryResetDialog()
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error showing factory reset dialog")
-                false
-            }
+            showFactoryResetDialog()
+            true
         }
 
         // Usage Export
@@ -471,26 +469,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // Accessibility
+        // Accessibility — openAccessibilitySettings has its own try/catch.
         findPreference<Preference>(AppConstants.PrefKeys.ACCESSIBILITY)?.setOnPreferenceClickListener {
-            try {
-                openAccessibilitySettings()
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error opening accessibility")
-                false
-            }
+            openAccessibilitySettings()
+            true
         }
 
-        // Default Launcher
+        // Default Launcher — openDefaultLauncherSettings has its own try/catch.
         findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
-            try {
-                openDefaultLauncherSettings()
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error opening default launcher settings")
-                false
-            }
+            openDefaultLauncherSettings()
+            true
         }
 
         // Double Tap to Lock
