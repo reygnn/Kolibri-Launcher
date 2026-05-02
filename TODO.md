@@ -1,6 +1,6 @@
 # Kolibri Launcher — TODO & Roadmap
 
-Lebendes Dokument. Stand: 2026-05-01, basierend auf einer vollständigen Source-Analyse
+Lebendes Dokument. Stand: 2026-05-02, basierend auf einer vollständigen Source-Analyse
 des Repos auf Branch `main` (Version `0.99.61` / versionCode `79`).
 
 Was hier steht, ist aus dem Code abgeleitet — kein Wunsch-Backlog. Dinge ohne
@@ -13,11 +13,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | § | Titel | Status | Größe |
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
-| 2 | Throwable-Catch-Audit | 180 von 735 Catches weg (über 14 Sweeps in 2 Wellen), optionale Folge-Sweeps offen | klein-mittel pro Sweep |
+| 2 | Throwable-Catch-Audit | 202 von 735 Catches weg (über 17 Sweeps in 2 Wellen + Folge-Sweeps), optionale Folge-Sweeps offen | klein-mittel pro Sweep |
 | 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
+| 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker.
+**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 ist optional fortsetzbar, kein Blocker. Nächster Sweep-Kandidat: `MainActivity` (37 Catches, **konservativ** angehen wegen HOME-Activity-Sensibilität).
 
 ---
 
@@ -71,7 +72,7 @@ selbst in `HomeFragment.kt:157-208` formuliert:
 
 ### Erledigt
 
-Insgesamt **180 Catches in 14 Sweep-PRs** entfernt.
+Insgesamt **202 Catches in 17 Sweep-PRs** entfernt.
 
 **Erste Welle (vor Robolectric-Pattern):**
 
@@ -111,21 +112,38 @@ Plus **6 neue Robolectric-Tests** (`MainActivityRobolectricTest`,
 `SettingsActivityRobolectricTest`, `AppContextMenuDialogFragmentRobolectricTest`)
 zusätzlich zum Pilot `OnboardingActivityRobolectricTest`.
 
+**Folge-Sweeps (2026-05-02 ff.):**
+
+Base-Klassen-Pass + ein UI-Glue-Fragment ohne neuen Robolectric-Backstop
+(Logic ist schon im ViewModel-Test gepinnt):
+
+| PR | Catches | File |
+|---|---:|---|
+| BaseViewModel | 9 | 1 |
+| BaseActivity | 1 | 1 |
+| FavoritesSortFragment | 12 | 1 |
+| **Subtotal** | **22** | **3** |
+
+Geprüft, aber kein Sweep nötig (alle Catches sind echte UX- oder
+Per-Item-Recovery, kein CANT_THROW): `AppManagementDelegate` (8 Catches).
+
 In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
-### Reststand: 557 Catches (Stand 2026-05-01)
+### Reststand: 533 Catches (Stand 2026-05-02)
 
-- **HomeFragment (~105)** — eigenes Lifecycle-Restructure-Projekt,
+- **HomeFragment (~104)** — eigenes Lifecycle-Restructure-Projekt,
   KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
   wartet auf strukturelles Refactoring (`_binding?.let { }` +
   `viewLifecycleOwner.lifecycleScope`).
+- **MainActivity (~37)** — nächster geplanter Sweep, **konservativ**
+  wegen HOME-Activity-Sensibilität.
 - **Repository-Files** — `BackupRepositoryImpl` (16),
   `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (9),
   `FavoritesRepositoryImpl` (7) etc. — überwiegend echte EXTERNAL-
   I/O-Catches. Lassen.
-- **`KolibriLauncherApp` (~21)** — Rule-7-Whitelist, **bleibt
+- **`KolibriLauncherApp` (~16)** — Rule-7-Whitelist, **bleibt
   unangetastet**.
 - **`ScreenLockAccessibilityService` (16)** — AccessibilityService,
   schwer zu testen. Mögliche zukünftige Welle.
@@ -134,12 +152,23 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 - **`CrashReportConsent` (5)** — Coroutine-Boundary + EXTERNAL.
 - **`LayoutCustomizationDialogFragment` (8)** — bereits clean
   strukturiert mit eigenen `safeRun`/`launchSafe` Helpers.
-- **`PackageUpdateReceiver` (9)** — gerade gesweept, Reststand sind
+- **`AppManagementDelegate` (8)** — geprüft 2026-05-02, alle
+  Catches sind echte UX-/Per-Item-Recovery, kein CANT_THROW.
+- **`PackageUpdateReceiver` (9)** — gesweept, Reststand sind
   legitime Receiver-Lifecycle/Hilt-init Catches.
+- **Base-Klassen** (`BaseViewModel`, `BaseActivity`) — gesweept
+  2026-05-02, Reststand (4 + 6) sind echte Coroutine-/Flow-/Toast-
+  Boundaries.
+- **`FavoritesSortFragment` (7)** — gesweept 2026-05-02, Reststand
+  sind Bundle-Parsing, Flow-Collection-Wrapper, Per-Item-Recovery,
+  setFragmentResult-Lifecycle-Race, Toast-IPC.
 - Use cases (~1-3 pro File) — meistens defensive, klein.
 
 ### Optionale nächste Sweeps
 
+- [ ] **MainActivity (~37)** — konservativ (HOME-Activity, alles
+  rund um App-Start, Splash, Fragment-Wiring; Catches die Lifecycle-
+  Races schützen sind im Zweifel zu behalten).
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
@@ -249,6 +278,46 @@ beim Auftauchen einer flaky Test-Vermutung sofort weiß dass das
 Audit gelaufen ist und das Pattern intakt ist, und (b) der
 Self-Enforcement-Insight nicht beim nächsten Refactor verloren
 geht.
+
+---
+
+## 6. (Memo, abgeschlossen) Robolectric-Test-Application-Leak
+
+Erkannt und behoben am 2026-05-02. **Symptom:** GitHub-CI grün vor
+2026-05-01, danach rot. Lokal hängende Test-Suite mit
+`OutOfMemoryError thrown from the UncaughtExceptionHandler in thread
+"|ANR-WatchDog|"` (mehrfach gleichzeitig), plus
+`java.lang.instrument ASSERTION FAILED ... can't create name string`.
+User-Beobachtung am Build-Server: 100% CPU, mehrere hängende
+Java-Prozesse.
+
+**Ursache:** `AndroidManifest.xml` deklariert
+`android:name=".KolibriLauncherApp"`. Robolectric-Tests ohne
+explizites `@Config(application = ...)`-Override luden die echte
+`KolibriLauncherApp`, deren `onCreate()` startete einen
+`ANRWatchDog`-Thread (von `com.github.anrwatchdog`, `extends Thread`,
+non-daemon) plus ACRA's globalen `UncaughtExceptionHandler`, Timber-
+Trees, `BroadcastReceiver`-Registration und einen
+`CoroutineScope`/`SupervisorJob`. Nichts davon wird zwischen
+Robolectric-Tests aufgeräumt — jede Test-Klasse leakte je einen.
+
+Bei Test-Executor `-Xmx512m` und ~10+ Robolectric-Test-Klassen
+(Wallpaper, Backup, plus die 6 Activity-Robolectric-Tests aus dem
+2026-05-01-Marathon) sammelten sich genug ANRWatchDog-Threads (jeder
+sampelt alle 5 s den Main-Thread) um den Heap zu sprengen.
+
+**Fix:** `app/src/test/resources/robolectric.properties` mit
+`application=android.app.Application` als globaler Default. Hilt-
+Tests setzen weiterhin per-test `@Config(application =
+HiltTestApplication::class)` — per-test schlägt Properties-Default.
+
+**Verifikation:** Volle Test-Suite davor: hing 4 min+ und brach mit
+OOM ab. Nach Fix: 35 s, 157 Klassen, 2202 Tests, 0 Failures.
+
+Memo bleibt damit ein neuer Reviewer beim Auftauchen ähnlicher
+„hängende Tests / OOM in Watchdog-Thread"-Symptome sofort den
+zentralen Fix-Punkt findet (`robolectric.properties`) und nicht ad
+hoc per-Test `@Config`-Overrides streut.
 
 ---
 
