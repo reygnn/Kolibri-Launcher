@@ -33,9 +33,9 @@ import kotlinx.coroutines.launch
  * rendering. The sort/reset/persist logic and the apps-list state live
  * in [FavoritesSortViewModel] so they can be unit-tested on the JVM.
  *
- * Crash-safety pattern from the original implementation is preserved
- * (try-catch around every callback, defensive null checks on the
- * binding, lifecycle-aware coroutines for Flow collection).
+ * Catches are kept only at real boundaries (Bundle-parcelable parsing,
+ * Flow collection wrappers, per-item recovery in collect{}, Toast IPC,
+ * setFragmentResult lifecycle race) — see CLAUDE.md Rule 11.
  */
 @AndroidEntryPoint
 class FavoritesSortFragment : Fragment() {
@@ -63,23 +63,21 @@ class FavoritesSortFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        try {
-            val initialApps = try {
-                arguments?.getParcelableArrayList(
-                    AppConstants.ARG_FAVORITES,
-                    AppInfo::class.java,
-                ) ?: emptyList()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error getting favorites from arguments")
-                emptyList()
-            }
-
-            // Idempotent — survives configuration change without
-            // overwriting in-progress drag-and-drop state in the VM.
-            viewModel.setInitialApps(initialApps)
+        val initialApps = try {
+            arguments?.getParcelableArrayList(
+                AppConstants.ARG_FAVORITES,
+                AppInfo::class.java,
+            ) ?: emptyList()
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onCreate")
+            // Bundle parcelable deserialization is EXTERNAL — a malformed
+            // Parcel can throw BadParcelableException et al.
+            TimberWrapper.silentError(e, "Error getting favorites from arguments")
+            emptyList()
         }
+
+        // Idempotent — survives configuration change without
+        // overwriting in-progress drag-and-drop state in the VM.
+        viewModel.setInitialApps(initialApps)
     }
 
     override fun onCreateView(
@@ -94,37 +92,25 @@ class FavoritesSortFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        try {
-            (activity as? AppCompatActivity)?.supportActionBar?.title =
-                getString(R.string.favorites_sort_title)
+        (activity as? AppCompatActivity)?.supportActionBar?.title =
+            getString(R.string.favorites_sort_title)
 
-            setupRecyclerView()
-            setupButtons()
-            observeViewModel()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
-        }
+        setupRecyclerView()
+        setupButtons()
+        observeViewModel()
     }
 
     private fun setupRecyclerView() {
-        try {
-            adapter = FavoritesAdapter { newOrder ->
-                try {
-                    viewModel.onMoved(newOrder)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in adapter callback")
-                }
-            }
-
-            binding.recyclerView.adapter = adapter
-            binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
-
-            val callback = createItemTouchHelperCallback()
-            itemTouchHelper = ItemTouchHelper(callback)
-            itemTouchHelper?.attachToRecyclerView(binding.recyclerView)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up RecyclerView")
+        adapter = FavoritesAdapter { newOrder ->
+            viewModel.onMoved(newOrder)
         }
+
+        binding.recyclerView.adapter = adapter
+        binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        val callback = createItemTouchHelperCallback()
+        itemTouchHelper = ItemTouchHelper(callback)
+        itemTouchHelper?.attachToRecyclerView(binding.recyclerView)
     }
 
     private fun createItemTouchHelperCallback(): ItemTouchHelper.SimpleCallback {
@@ -137,21 +123,16 @@ class FavoritesSortFragment : Fragment() {
                 viewHolder: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder,
             ): Boolean {
-                return try {
-                    val fromPosition = viewHolder.bindingAdapterPosition
-                    val toPosition = target.bindingAdapterPosition
+                val fromPosition = viewHolder.bindingAdapterPosition
+                val toPosition = target.bindingAdapterPosition
 
-                    if (fromPosition == RecyclerView.NO_POSITION ||
-                        toPosition == RecyclerView.NO_POSITION
-                    ) {
-                        false
-                    } else {
-                        adapter?.moveItem(fromPosition, toPosition)
-                        true
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in onMove")
+                return if (fromPosition == RecyclerView.NO_POSITION ||
+                    toPosition == RecyclerView.NO_POSITION
+                ) {
                     false
+                } else {
+                    adapter?.moveItem(fromPosition, toPosition)
+                    true
                 }
             }
 
@@ -163,13 +144,9 @@ class FavoritesSortFragment : Fragment() {
                 viewHolder: RecyclerView.ViewHolder?,
                 actionState: Int,
             ) {
-                try {
-                    super.onSelectedChanged(viewHolder, actionState)
-                    if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
-                        viewHolder?.itemView?.alpha = 0.7f
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in onSelectedChanged")
+                super.onSelectedChanged(viewHolder, actionState)
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                    viewHolder?.itemView?.alpha = 0.7f
                 }
             }
 
@@ -177,40 +154,20 @@ class FavoritesSortFragment : Fragment() {
                 recyclerView: RecyclerView,
                 viewHolder: RecyclerView.ViewHolder,
             ) {
-                try {
-                    super.clearView(recyclerView, viewHolder)
-                    viewHolder.itemView.alpha = 1.0f
-                    adapter?.onMoveFinished()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in clearView")
-                }
+                super.clearView(recyclerView, viewHolder)
+                viewHolder.itemView.alpha = 1.0f
+                adapter?.onMoveFinished()
             }
         }
     }
 
     private fun setupButtons() {
-        try {
-            binding.buttonAlphabetical.setOnClickListener {
-                try {
-                    viewModel.onSortAlphabetically()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in alphabetical button click")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting alphabetical button listener")
+        binding.buttonAlphabetical.setOnClickListener {
+            viewModel.onSortAlphabetically()
         }
 
-        try {
-            binding.buttonReset.setOnClickListener {
-                try {
-                    viewModel.onResetToOriginal()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in reset button click")
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting reset button listener")
+        binding.buttonReset.setOnClickListener {
+            viewModel.onResetToOriginal()
         }
     }
 
@@ -224,6 +181,8 @@ class FavoritesSortFragment : Fragment() {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     viewModel.apps.collect { apps ->
                         try {
+                            // Per-item recovery: a single failing submitList
+                            // must not tear down the whole subscription.
                             adapter?.submitList(apps)
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error submitting list to adapter")
@@ -233,6 +192,7 @@ class FavoritesSortFragment : Fragment() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // EXTERNAL: Flow collection wrapper.
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for apps")
             }
         }
@@ -245,6 +205,7 @@ class FavoritesSortFragment : Fragment() {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     viewModel.event.collect { event ->
                         try {
+                            // Per-item recovery: see apps-collect comment.
                             handleEvent(event)
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error handling event: $event")
@@ -254,6 +215,7 @@ class FavoritesSortFragment : Fragment() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // EXTERNAL: Flow collection wrapper.
                 TimberWrapper.silentError(e, "Error in repeatOnLifecycle for events")
             }
         }
@@ -266,6 +228,9 @@ class FavoritesSortFragment : Fragment() {
                 try {
                     setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
                 } catch (e: Throwable) {
+                    // Lifecycle race: setFragmentResult can throw
+                    // IllegalStateException if the FragmentManager is
+                    // already in a saved state when the event lands.
                     TimberWrapper.silentError(e, "Error setting fragment result")
                 }
             }
@@ -283,20 +248,18 @@ class FavoritesSortFragment : Fragment() {
                 }
             }
         } catch (e: Throwable) {
+            // EXTERNAL: Toast.makeText / .show() do IPC and have been
+            // observed to throw on Samsung devices (see BaseActivity.
+            // showToastSafe for the same pattern).
             TimberWrapper.silentError(e, "Error showing toast")
         }
     }
 
     override fun onDestroyView() {
-        try {
-            (activity as? AppCompatActivity)?.supportActionBar?.title =
-                getString(R.string.settings_title)
+        (activity as? AppCompatActivity)?.supportActionBar?.title =
+            getString(R.string.settings_title)
 
-            _binding = null
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onDestroyView")
-        } finally {
-            super.onDestroyView()
-        }
+        _binding = null
+        super.onDestroyView()
     }
 }
