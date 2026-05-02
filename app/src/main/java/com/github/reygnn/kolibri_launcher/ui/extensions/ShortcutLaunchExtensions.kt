@@ -20,25 +20,19 @@ fun Fragment.handleShortcutLaunch(
     viewModel: LauncherViewModel,
     launchShortcutUseCase: LaunchShortcutUseCase
 ) {
-    try {
-        // 1. Shortcut aus Bundle extrahieren
-        val shortcut = extractShortcutFromBundle(bundle)
+    // extractShortcutFromBundle catches BadParcelableException internally
+    // and returns null on failure. launchShortcutUseCase.execute returns
+    // a sealed Result, never throws. The when-block is exhaustive.
+    val shortcut = extractShortcutFromBundle(bundle)
+    val result = launchShortcutUseCase.execute(shortcut)
 
-        // 2. UseCase ausführen
-        val result = launchShortcutUseCase.execute(shortcut)
-
-        // 3. Ergebnis verarbeiten
-        when (result) {
-            is LaunchShortcutUseCase.Result.Success -> {
-                Timber.d("Shortcut launched successfully")
-            }
-            is LaunchShortcutUseCase.Result.Failure -> {
-                handleLaunchError(result.error, viewModel)
-            }
+    when (result) {
+        is LaunchShortcutUseCase.Result.Success -> {
+            Timber.d("Shortcut launched successfully")
         }
-    } catch (e: Throwable) {
-        TimberWrapper.silentError(e, "Error in handleShortcutLaunch")
-        viewModel.onAppInfoError()
+        is LaunchShortcutUseCase.Result.Failure -> {
+            handleLaunchError(result.error, viewModel)
+        }
     }
 }
 
