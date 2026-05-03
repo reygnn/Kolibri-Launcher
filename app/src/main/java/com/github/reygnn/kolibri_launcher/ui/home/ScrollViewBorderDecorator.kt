@@ -24,6 +24,27 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
  * Der Decorator hält intern ein gecachtes [GradientDrawable], das zwischen
  * Aufrufen wiederverwendet wird (Allocation-Vermeidung). [clear] wird beim
  * Tear-Down der haltenden View aufgerufen.
+ *
+ * No tests — rationale (audit §3.1, ADR-style):
+ * - The bodies of [apply] and [remove] are unreachable under the current
+ *   dormant config (`return` at line 1, `@Suppress("UNREACHABLE_CODE")`
+ *   on the rest). Testing a no-op is meaningless: it would only verify
+ *   that the early-return is in place, which the source already states.
+ * - The body, when reactivated, is pure view manipulation
+ *   (`GradientDrawable.setStroke`, `setCornerRadius`, `target.background =
+ *   …`, `target.setPadding`, `layoutParams =`). That all needs Robolectric
+ *   or instrumented tests to exercise honestly. Per CLAUDE.md Rule 10 —
+ *   "JVM is the default test target" — JVM mocking would only verify mock
+ *   interactions, not real behavior.
+ * - [clear] sets [cachedDrawable] to `null`. Under the dormant config the
+ *   field is *always* `null` (because [apply] never assigns it), so
+ *   `clear()` is a null-to-null no-op with no observable side effect — a
+ *   test would assert nothing.
+ *
+ * If/when the dormant body is reactivated, replace this paragraph with a
+ * Robolectric test (drawable manipulation needs a real `Resources` and
+ * a real `View.background` setter). Until then, this paragraph stands in
+ * for the missing test file.
  */
 class ScrollViewBorderDecorator {
 
