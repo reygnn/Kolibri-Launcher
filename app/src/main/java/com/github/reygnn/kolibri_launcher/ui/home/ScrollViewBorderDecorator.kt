@@ -12,9 +12,12 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
  * damit die scrollbare Region beim Entwickeln des Split-Layouts visuell von
  * der Touch-Zone getrennt ist.
  *
- * **Reine Debug-Hilfe — standardmäßig deaktiviert.** [apply] und [remove]
- * returnen sofort am Methoden-Anfang. Zum Aktivieren das `return` in der
- * jeweiligen Methode entfernen; der gesamte Body ist intakt.
+ * **Pure debug helper — disabled by default.** The [enabled] constructor
+ * flag gates [apply] and [remove]; production constructs the decorator
+ * with the default `enabled = false`, so neither method has any visible
+ * effect. Tests instantiate with `enabled = true` to exercise the body
+ * (see [ScrollViewBorderDecoratorTest]). To re-enable in production,
+ * flip the default — the body is ready to go.
  *
  * Die Funktion war ursprünglich Bestandteil des Layouts und wurde archiviert,
  * weil das Split-Mode-Verhalten heute auch ohne visuelle Hilfe stabil ist.
@@ -24,35 +27,15 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
  * Der Decorator hält intern ein gecachtes [GradientDrawable], das zwischen
  * Aufrufen wiederverwendet wird (Allocation-Vermeidung). [clear] wird beim
  * Tear-Down der haltenden View aufgerufen.
- *
- * No tests — rationale (audit §3.1, ADR-style):
- * - The bodies of [apply] and [remove] are unreachable under the current
- *   dormant config (`return` at line 1, `@Suppress("UNREACHABLE_CODE")`
- *   on the rest). Testing a no-op is meaningless: it would only verify
- *   that the early-return is in place, which the source already states.
- * - The body, when reactivated, is pure view manipulation
- *   (`GradientDrawable.setStroke`, `setCornerRadius`, `target.background =
- *   …`, `target.setPadding`, `layoutParams =`). That all needs Robolectric
- *   or instrumented tests to exercise honestly. Per CLAUDE.md Rule 10 —
- *   "JVM is the default test target" — JVM mocking would only verify mock
- *   interactions, not real behavior.
- * - [clear] sets [cachedDrawable] to `null`. Under the dormant config the
- *   field is *always* `null` (because [apply] never assigns it), so
- *   `clear()` is a null-to-null no-op with no observable side effect — a
- *   test would assert nothing.
- *
- * If/when the dormant body is reactivated, replace this paragraph with a
- * Robolectric test (drawable manipulation needs a real `Resources` and
- * a real `View.background` setter). Until then, this paragraph stands in
- * for the missing test file.
  */
-class ScrollViewBorderDecorator {
+class ScrollViewBorderDecorator(
+    private val enabled: Boolean = false,
+) {
 
     private var cachedDrawable: GradientDrawable? = null
 
-    @Suppress("UNREACHABLE_CODE")
     fun apply(target: ViewGroup, textColor: Int) {
-        return // Debug-Visualisierung deaktiviert. Siehe Klassen-KDoc.
+        if (!enabled) return
 
         // Body kept ready for reactivation. The inner Resource-catches
         // around getDimension* stay (Resources.NotFoundException is real
@@ -110,9 +93,8 @@ class ScrollViewBorderDecorator {
         target.layoutParams = params
     }
 
-    @Suppress("UNREACHABLE_CODE")
     fun remove(target: ViewGroup) {
-        return // Debug-Visualisierung deaktiviert. Siehe Klassen-KDoc.
+        if (!enabled) return
 
         target.background = null
         target.setPadding(0, 0, 0, 0)
