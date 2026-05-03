@@ -58,7 +58,7 @@
                     android:id="@+id/batteryText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="100%"
+                    android:text="@string/battery_placeholder"
                     android:textSize="@dimen/text_size_secondary_info"
                     android:textColor="@color/default_text_color"
                     android:padding="@dimen/touch_target_padding"

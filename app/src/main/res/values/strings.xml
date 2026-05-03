@@ -81,6 +81,7 @@
 
     <string name="time_placeholder" translatable="false">12:34</string>
     <string name="date_placeholder">Loading date…</string>
+    <string name="battery_placeholder" translatable="false">100%</string>
 
     <string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
 
