@@ -4,15 +4,13 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Android Library module hosting the layer that is conceptually free of UI
- * and data-source concerns. Two reasons it stays an Android Library rather
- * than a pure-Kotlin module:
- *   - `core/TextColorCalculator` uses Bitmap/Canvas/Drawable;
- *   - `core/AppConstants` uses DataStore preference keys;
- *   - `domain/model/AppInfo` is `@Parcelize`d.
- * Going pure-Kotlin would force a separate refactor of those sites — see
- * TODO.md §9.2 for the trade-off discussion. The compile-cache benefit
- * (incremental :app rebuilds skip when only :domain changes) is realised
- * regardless.
+ * and data-source concerns. The original §9.2 split kept it as an Android
+ * Library because three sites carried Android imports
+ * (`core/TextColorCalculator`, `core/AppConstants`'s DataStore keys,
+ * `domain/model/AppInfo`'s `@Parcelize`); the Brocken-C sweeps removed all
+ * three, so `src/main/` is now Android-free in source. Switching the module
+ * type to pure Kotlin is a separate build-config refactor — tracked in
+ * TODO.md.
  *
  * Hilt: this library declares modules (e.g. DispatcherModule). The
  * `kapt(libs.hilt.compiler)` invocation here generates the per-module
