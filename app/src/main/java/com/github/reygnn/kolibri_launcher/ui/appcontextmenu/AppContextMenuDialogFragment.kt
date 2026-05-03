@@ -20,6 +20,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
+import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
+import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -60,7 +62,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         ): AppContextMenuDialogFragment {
             return AppContextMenuDialogFragment().apply {
                 arguments = bundleOf(
-                    ARG_APP_INFO to appInfo,
+                    ARG_APP_INFO to appInfo.toParcelable(),
                     ARG_CONTEXT to context,
                     ARG_HAS_USAGE_DATA to hasUsageData
                 )
@@ -93,16 +95,17 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         super.onCreate(savedInstanceState)
 
         try {
-            @Suppress("DEPRECATION")
-            appInfo = requireArguments().getParcelable(ARG_APP_INFO)
+            appInfo = requireArguments()
+                .getParcelable(ARG_APP_INFO, AppInfoParcelable::class.java)
+                ?.toAppInfo()
                 ?: run {
                     Timber.w("Dialog created without AppInfo, dismissing")
                     dismiss()
                     return
                 }
 
-            @Suppress("DEPRECATION")
-            menuContext = requireArguments().getParcelable(ARG_CONTEXT)
+            menuContext = requireArguments()
+                .getParcelable(ARG_CONTEXT, MenuContext::class.java)
                 ?: MenuContext.HOME_SCREEN
 
             hasUsageData = requireArguments().getBoolean(ARG_HAS_USAGE_DATA, false)

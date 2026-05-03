@@ -20,6 +20,8 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBindi
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
+import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import dagger.hilt.android.AndroidEntryPoint
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -51,7 +53,10 @@ class FavoritesSortFragment : Fragment() {
         fun newInstance(favoriteApps: List<AppInfo>): FavoritesSortFragment {
             return FavoritesSortFragment().apply {
                 arguments = Bundle().apply {
-                    putParcelableArrayList(AppConstants.ARG_FAVORITES, ArrayList(favoriteApps))
+                    putParcelableArrayList(
+                        AppConstants.ARG_FAVORITES,
+                        ArrayList(favoriteApps.map { it.toParcelable() })
+                    )
                 }
             }
         }
@@ -60,11 +65,11 @@ class FavoritesSortFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val initialApps = try {
+        val initialApps: List<AppInfo> = try {
             arguments?.getParcelableArrayList(
                 AppConstants.ARG_FAVORITES,
-                AppInfo::class.java,
-            ) ?: emptyList()
+                AppInfoParcelable::class.java,
+            )?.map { it.toAppInfo() } ?: emptyList()
         } catch (e: Throwable) {
             // Bundle parcelable deserialization is EXTERNAL — a malformed
             // Parcel can throw BadParcelableException et al.

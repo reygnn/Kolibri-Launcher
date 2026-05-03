@@ -1,17 +1,12 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
-
 /**
- * Eine reine, unveränderliche Datenklasse für einen textbasierten Launcher.
- * Sie enthält nur die minimal notwendigen Informationen und hat KEINE Abhängigkeiten
- * zum Android Framework wie Context oder Drawable.
+ * Pure-Kotlin immutable data class for a text-based launcher entry.
  *
- * Die Parcelable-Implementierung wird automatisch vom kotlin-parcelize-Plugin generiert.
+ * Holds the minimum information about an installed app and has no Android-framework
+ * dependencies — neither Context/Drawable nor Parcelable. The UI layer wraps this
+ * type via `AppInfoParcelable` for Bundle/Intent transport.
  */
-
-@Parcelize
 data class AppInfo(
     val originalName: String,
     val displayName: String,
@@ -19,7 +14,7 @@ data class AppInfo(
     val className: String,
     val isSystemApp: Boolean = false,
     val isFavorite: Boolean = false
-) : Parcelable {
+) {
     /**
      * Ein eindeutiger Bezeichner für einen spezifischen Launcher-Eintrag.
      * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
