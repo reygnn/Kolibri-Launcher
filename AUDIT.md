@@ -404,9 +404,12 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 | ProGuard `keep class …** { *; }` | Stack-Trace-Treue für Crash-Reports | Projekt-Philosophie (GPLv3) |
 | `HomeFragment` 2657 Zeilen | Pure Logik bereits extrahiert; UI-Glue bleibt | CLAUDE.md |
 | `BackupRepositoryImpl` 1444 Zeilen | Split würde 9 Repo-Deps duplizieren, nicht reduzieren | TODO.md §3 |
+| `SettingsFragment` 1074 Zeilen (§2.2) | PreferenceFragmentCompat-Pattern; weiteres Aufteilen wäre rein kosmetisch — keine echte Komplexität | akzeptiert 2026-05-03 |
+| `AppDrawerFragment` 607 Zeilen (§2.2) | KeyboardShowCoordinator + Adapter sind bereits extrahiert; weiteres Aufteilen wäre rein kosmetisch | akzeptiert 2026-05-03 |
 | `androidTest/` leer | Historische Flakiness, JVM-First per Rule 10 | CLAUDE.md |
 | StrictMode-Violations (OneUI/Knox) | Plattform-Bug, nicht im App-Code behebbar | KNOWN_ISSUES.md |
 | 7× `@Suppress("unused")` in `ZoomableImageView` | Public-API-Stubs für externe Konsumenten | inline kommentiert |
+| `kotlin-kapt` statt KSP (§5.4) | Toolchain-Wechsel nur bei Major-Rewrite — Hilt-Pinning (2.57.2 DO NOT UPGRADE) plus kotlin-parcelize-Kompatibilität müssten geprüft werden, Nutzen ist rein Build-Performance | aufgeschoben 2026-05-03 |
 
 ---
 
