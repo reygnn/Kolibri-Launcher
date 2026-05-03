@@ -13,6 +13,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import com.github.reygnn.kolibri_launcher.core.AppConstants
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -254,6 +256,47 @@ class GestureDelegateTest {
 
         assertFalse(delegate.isLockingInProgress.value)
     }
+
+    /**
+     * Pins the lock-block delay duration in virtual time. Without this,
+     * a regression that sets the delay to `0` (or removes it entirely)
+     * would still pass the `sets and resets` test above — that test
+     * only checks the *final* state after `advanceUntilIdle()`. The
+     * convention is documented in `TESTING_CONVENTIONS.kt` →
+     * "TIME-BASED ASSERTIONS"; this test is one of the per-site
+     * applications.
+     */
+    @Test
+    fun `onDoubleTapToLock holds isLockingInProgress for LOCK_GESTURE_BLOCK_DURATION_MS — TIME-PIN`() =
+        runTest {
+            coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.Success
+
+            val delegate = createDelegate()
+
+            // UnconfinedTestDispatcher runs the launched coroutine
+            // synchronously up to the first suspending point
+            // (delay()). After this returns, the body has already
+            // executed `_isLockingInProgress.value = true`.
+            delegate.onDoubleTapToLock()
+            assertTrue(
+                "isLockingInProgress must be set before the delay starts",
+                delegate.isLockingInProgress.value,
+            )
+
+            // Just before the boundary the gate must still be closed.
+            advanceTimeBy(AppConstants.LOCK_GESTURE_BLOCK_DURATION_MS - 1)
+            assertTrue(
+                "Gate must still be closed at duration - 1 ms",
+                delegate.isLockingInProgress.value,
+            )
+
+            // Crossing the boundary releases the gate.
+            advanceTimeBy(2)
+            assertFalse(
+                "Gate must be released after duration ms have elapsed",
+                delegate.isLockingInProgress.value,
+            )
+        }
 
     @Test
     fun `onDoubleTapToLock shows accessibility dialog on ErrorAccessibility`() = runTest {

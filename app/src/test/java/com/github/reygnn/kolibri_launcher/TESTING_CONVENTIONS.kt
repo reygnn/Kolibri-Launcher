@@ -715,3 +715,140 @@ package com.github.reygnn.kolibri_launcher
  * being usefully reachable from any test.
  * ============================================================================
  */
+
+/**
+ * ============================================================================
+ * TIME-BASED ASSERTIONS — pinning delays, retries, timeouts, throttles
+ * ============================================================================
+ *
+ * Reference: `ObserveInstalledAppsUseCaseTest.retry counter resets between
+ *             invocations on IOException backoff` (commit f8a578b),
+ *             `FavoritesRepositoryImplShareInTest` (the older idiom).
+ *
+ *
+ * THE GAP THAT BIRTHED THIS CONVENTION
+ * ------------------------------------
+ * `ObserveInstalledAppsUseCase` had a class-field retry counter that only
+ * reset on success — after a fully failed first invocation it stayed at
+ * MAX_APP_LOAD_RETRIES, so the second invocation's first retry computed
+ * `delay = base * (max + 1)` instead of `base * 1`. The linear backoff
+ * silently scaled across invocations, producing 4–6× longer waits than
+ * the design intended.
+ *
+ * The bug was production code from file inception. Seven existing tests
+ * exercised the use case's flow logic. None of them caught the bug,
+ * because all seven tested *what* the flow emitted, not *when*. Backoff
+ * is a temporal property; it is invisible to result-only assertions.
+ *
+ *
+ * THE RULE
+ * --------
+ * Any production code that uses `delay(…)`, `withTimeout(…)`,
+ * `withTimeoutOrNull(…)`, `retry(…)` (with a delay-emitting predicate),
+ * `WhileSubscribed(timeout)` in `shareIn` / `stateIn`, or any other
+ * temporal primitive needs at least one test that asserts on virtual
+ * time, not just on the final emitted value.
+ *
+ * The test should:
+ *
+ *   1. Run inside `runTest { … }` so virtual time is in scope.
+ *   2. Either snapshot `testScheduler.currentTime` before and after the
+ *      behavior and assert on the difference, OR call
+ *      `advanceTimeBy(specific)` to set up a precise timing scenario
+ *      and assert the boundary behavior.
+ *   3. Carry a comment that names what the test pins — e.g. "linear
+ *      backoff per retry" or "share-in upstream stays alive for the
+ *      WhileSubscribed timeout window". This makes the test robust to
+ *      future refactors: the next reader knows whether to update the
+ *      assertion or restore the timing.
+ *
+ *
+ * WHICH IDIOM, WHEN
+ * -----------------
+ *
+ *   `testScheduler.currentTime` snapshot
+ *   ────────────────────────────────────
+ *   Use when the assertion is *relative* — comparing two durations
+ *   for equality, monotonicity, etc. Reference:
+ *
+ *     val firstStart = testScheduler.currentTime
+ *     useCase().test { awaitItem(); cancelAndIgnoreRemainingEvents() }
+ *     val firstDuration = testScheduler.currentTime - firstStart
+ *
+ *     val secondStart = testScheduler.currentTime
+ *     useCase().test { awaitItem(); cancelAndIgnoreRemainingEvents() }
+ *     val secondDuration = testScheduler.currentTime - secondStart
+ *
+ *     assertEquals(firstDuration, secondDuration)
+ *
+ *   Source: `ObserveInstalledAppsUseCaseTest.retry counter resets…`.
+ *   Pins symmetric timing without locking down the exact constants.
+ *
+ *
+ *   `advanceTimeBy(specific)` + boundary asserts
+ *   ────────────────────────────────────────────
+ *   Use when the assertion is *absolute* — proving behavior at a
+ *   timeout's edge (just before vs. just after). Reference:
+ *
+ *     advanceTimeBy(AppConstants.FLOW_SHARING_TIMEOUT_MS - 1000)
+ *     // upstream still alive — the cached value is still there
+ *     advanceTimeBy(2000)
+ *     // upstream has now timed out — next read goes to dataStore
+ *
+ *   Source: `FavoritesRepositoryImplShareInTest`. Pins the exact
+ *   timeout boundary so a later edit that changes the constant gets
+ *   noticed.
+ *
+ *
+ * BACKSTOP — what `advanceUntilIdle()` proves and what it doesn't
+ * ---------------------------------------------------------------
+ * `advanceUntilIdle()` runs every queued task to completion regardless
+ * of the time involved. Tests that use only `advanceUntilIdle()` prove
+ * "the operation finishes and produces the expected result", which is
+ * good and necessary — but is silent on whether a `delay(N)` actually
+ * advanced N or 0 (or 10×N). The retry-counter bug passed every
+ * `advanceUntilIdle()`-based test in the use case's suite.
+ *
+ * If the production code uses a temporal primitive *and* the
+ * correctness of that primitive is observable to the user (visible
+ * UI lag, throttle behavior, retry pacing, lock duration), the suite
+ * needs at least one assertion in virtual time on that site. If the
+ * primitive is internal plumbing whose duration the user can't
+ * observe (`SharingStarted.Lazily`, etc.), `advanceUntilIdle` is
+ * sufficient.
+ *
+ *
+ * SITES THAT EXIST IN THIS REPO
+ * -----------------------------
+ * Surveyed 2026-05-03. Each site uses a temporal primitive in
+ * production code; the column shows whether a virtual-time assertion
+ * exists today.
+ *
+ *   ObserveInstalledAppsUseCase  — retry/backoff       ✓ pinned
+ *   GestureDelegate              — lock-block-duration ✓ pinned
+ *   FavoritesRepositoryImpl      — share-in timeout    ✓ pinned (ShareInTest)
+ *   FavoritesOrderRepositoryImpl — share-in timeout    ✗ relies on contract
+ *   SwipeActionsRepositoryImpl   — share-in timeout    ✗ relies on contract
+ *   InstalledAppsRepositoryImpl  — share-in timeout    ✗ relies on contract
+ *   LayoutDelegate               — share-in timeout    ✗ relies on contract
+ *   AppManagementDelegate        — initial-load delay  ✗ low-risk (100ms)
+ *   PackageUpdateReceiver        — withTimeout 3s      ✗ system path
+ *   AppDrawerFragment            — search debounce     ✗ Fragment-side
+ *   HomeFragment                 — scroll-debounce     ✗ Fragment-side
+ *   BackupFragment               — preview timeout     ✗ Fragment-side
+ *
+ * "✗ relies on contract" means the share-in semantic is uniformly
+ * tested in `FavoritesRepositoryImplShareInTest` for one impl, and
+ * the others use the same `shareIn` builder with the same constant —
+ * a regression in any of them would show up in the contract test
+ * surface even without an isolated check. If the constant ever
+ * diverges across the impls, each of those needs its own
+ * ShareInTest mirror.
+ *
+ * "✗ Fragment-side" means the test would need Robolectric or a
+ * dedicated controller-extraction (per Rule 10) before a JVM test
+ * can pin the timing. Those bring their own cost — see the
+ * Robolectric+Hilt section above. Promote them only when a
+ * regression actually lands.
+ * ============================================================================
+ */
