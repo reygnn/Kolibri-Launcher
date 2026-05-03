@@ -121,10 +121,17 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 
 ### Was die 0.1 unter 9.0 deckelt
 
-1. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
-   Extraktion und Rule-11-Sweep. §2-Reststand nennt es als „eigenes
-   Lifecycle-Restructure-Projekt" — ehrlich, ändert aber nicht den
-   Smell. Bleibt der größte Einzel-Brocken zu 9+.
+1. **(erledigt 2026-05-03)** ~~HomeFragment ist 1997 Zeilen mit 59
+   try/catch (51 Throwable).~~ Brocken-A-Audit gelandet 2026-05-03:
+   sieben Region-Sweeps mit 4-Kategorien-Frame, Endstand 1972 Zeilen,
+   19 catches (-68%), 11 Throwable (-78%). Die verbleibenden Catches
+   sind I/O-Boundaries (`loadBitmapFromUri`, `Resources.NotFoundException`-
+   ProGuard-Stellen), system-callback boundaries für HOME-Activity-
+   Resilience (`setOnTouchListener`, `DoubleClickListener.onClick`,
+   `OnGlobalLayoutListener`-outer), oder per-Item-Recovery-Loops
+   (`renderFavorites`, `updateTimeBasedChips`, `createAppButton`,
+   `createAlarmChip` / `createCalendarChip`). Backstop-Test
+   (`HomeFragmentRobolectricTest`) bleibt grün.
 
 2. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
    gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
@@ -132,13 +139,13 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
    getestet. Robolectric ist guter Backstop, kein vollständiger
    Ersatz.
 
-3. **`:data:test` ist leer.** Repository-Impl-Tests stecken weiterhin
-   in `:app/src/test/`. Der AGP/KGP-Blocker ist seit 2026-05-03 weg
-   (siehe §13 und `data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`);
-   FakeDataStore ist schon umgezogen. Verbleibend: ~25 Impl-Test-Files
-   incrementell nach `:data/src/test/` schieben (~16 pure-JVM, ~9
-   Robolectric — Letztere brauchen `:data/src/test/resources/robolectric.properties`
-   plus Robolectric-Dep). Mittelschwer.
+3. **(erledigt 2026-05-03)** ~~`:data:test` ist leer.~~ Brocken-B-Move
+   für `:data` durchgezogen: 32 Repository-Impl-Test-Files sind aus
+   `:app/src/test/` nach `:data/src/test/` umgezogen, plus zwei
+   abstract Contract-Doku-Files (`WallpaperRepositoryContract`,
+   `UsageExportRepositoryContract`) sind nach `:domain/src/testFixtures/`
+   gewandert. `:data:testDebugUnitTest` läuft jetzt mit ~30s cold,
+   isoliert von `:app:test`. Details in §13.
 
 ### Folge-Schritt zu §11 (erledigt durch §12)
 
@@ -152,10 +159,10 @@ JVM-only-Dependencies. Memo unten.
   „nichts mehr zu sweepen" geprüft (alle Catches sind echte
   Boundaries). Catches sind Symptom, nicht Krankheit — die
   1000-Zeilen-Activity ist die Krankheit.
-- **Test-Isolation pro Modul nicht realisiert.** Tests bleiben in
-  `:app/src/test/`. `./gradlew :domain:test` läuft heute praktisch
-  leer. §9.2 hat den Compile-Cache-Win für `:app`, aber nicht den
-  Test-Time-Win den der ursprüngliche Plan beworben hat.
+- **(erledigt 2026-05-03)** ~~Test-Isolation pro Modul nicht realisiert.~~
+  Komplett: `:domain:test` (310 Tests, ~5s), `:data:test` (32 Tests,
+  ~30s), `:app:test` (Rest, UI/Hilt). Gesamter Test-Time-Win der §9.2-
+  Modul-Split-Story ist real.
 - **506 verbleibende `catch (Throwable)` im Main-Source.** Die
   meisten sind verifiziert legitim, aber Volumen ist im Branchen-
   vergleich hoch. Crash-Safety-Kultur gut; -Religion reduziert,
@@ -1172,56 +1179,69 @@ Hypothese, nicht den Flag finden konnte. JetBrains-Ticket: KT-50667.
   `testImplementation(testFixtures(project(":data")))`.
 - Full-Test-Suite grün nach dem Umzug.
 
-**Noch nicht erledigt (Folge-Schritte, jetzt unblockiert):**
+**Endstand `:data:test` 2026-05-03 (Repository-Impl-Test-Move erledigt):**
 
-Repository-Impl-Tests können jetzt nach `data/src/test/java/.../data/`
-verschoben werden, sind es aber noch nicht. ~25 Files insgesamt:
+Alle 32 Files aus `app/src/test/java/.../data/` sind nach
+`data/src/test/java/.../data/` umgezogen. Empty-Dir gelöscht.
 
-- **Pure-JVM (FakeDataStore-only, kein Robolectric):** ~16 Files —
-  `FavoritesRepositoryImpl*Test` (3 inkl. ShareIn + Contract),
-  `SettingsRepositoryImpl*Test` (2), `HiddenAppsRepositoryImpl*Test` (2),
-  `CustomNamesRepositoryImpl*Test` (2),
-  `FavoritesOrderRepositoryImpl*Test` (2),
-  `SwipeActionsRepositoryImplContractTest`,
-  `AppUsageRepositoryImpl*Test` (2),
-  `UsageExportRepositoryImplFormatSpec` /
-  `UsageExportRepositoryImplTimeLordSpec` /
-  `UsageExportRepositoryImplXenomorphSpec` / `UsageExportRepositoryImplTest`.
-  Voraussetzung: `:data/build.gradle.kts` braucht die Test-Deps
-  (`junit`, `mockk`, `kotlinx-coroutines-test`, `turbine`, `truth`,
-  `kotlin-test-junit`, `testImplementation(testFixtures(project(":domain")))`).
-- **Robolectric (Uri/ContentResolver/InputStream):** ~9 Files —
-  `BackupRepositoryImpl*Test` (9: Doomsday/Io/Isolation/Logic/Malformed/
-  NamingConvention/Security/Strict/Wallpaper) + `BackupRepositoryImplTestFactory`,
-  `WallpaperRepositoryImpl*Test` (2 inkl. Contract),
-  `UsageExportRepositoryImplDoomsdaySpec`, `DataMigrationManagerTest`.
-  Voraussetzung: zusätzlich `testImplementation(libs.robolectric)`,
-  `data/src/test/resources/robolectric.properties` als Duplikat von
-  `app/src/test/resources/robolectric.properties` (siehe §6-Memo zum
-  ANRWatchdog-Leak — ohne diesen Default lädt Robolectric
-  `KolibriLauncherApp` und leakt einen ANRWatchdog-Thread pro Test-Run).
-- **Stays in `:app`:** Tests die `HiltTestApplication` /
-  `@TestInstallIn` / Activity-Tests benutzen — `hilt-android`-Plugin
-  ist in `:data` nicht aktiv.
+- **Plumbing in `:data/build.gradle.kts`:** `testOptions.unitTests`-Block
+  mit `isIncludeAndroidResources = true` + `isReturnDefaultValues = true`
+  (Robolectric-Bedarf), Test-Deps-Set mirrors :domain (junit, mockk,
+  kotlinx-coroutines-test, turbine, truth, kotlin-test-junit, json,
+  robolectric, androidx.test.core.ktx, androidx.test.ext.junit.ktx) plus
+  `testImplementation(testFixtures(project(":domain")))` für TimberRule,
+  MainDispatcherRule, alle Fake*Repositories und Contract-Abstracts.
+- **`data/src/test/resources/robolectric.properties`** als per-Modul-
+  Duplikat (Application-Pin auf `android.app.Application`); Datei-
+  KDoc erklärt warum die :app-Begründung (ANRWatchDog-Leak) hier nicht
+  greift, die Pin-Disziplin aber trotzdem modul-weit gilt.
+- **Migrations-Folge-Move:** `WallpaperRepositoryContract.kt` und
+  `UsageExportRepositoryContract.kt` (beide abstract Contract-Doku-
+  Klassen) zogen mit nach `:domain/src/testFixtures/` (das Standard-
+  Repository für solche Klassen — `BackupRepositoryContract`,
+  `FavoritesRepositoryContract` etc. liegen dort schon). Damit haben
+  sowohl `FakeWallpaperRepositoryContractTest` (jetzt in `:data:test`)
+  als auch `WallpaperRepositoryImplContractTest` (jetzt in `:data:test`)
+  ihren gemeinsamen Eltern-Contract über `:domain/testFixtures/`.
 
-Erwarteter Test-Time-Win bei vollständigem Move: ~30s
-(Robolectric-Bootstraps in `:data:test` isoliert von `:app:test`,
-plus die ~16 pure-JVM Files laufen ohne Android-Test-Klassenpfad).
+**32 migrierte Files:**
 
-**Risiko-Punkte (relevant beim eigentlichen Datei-Move):**
+- **Pure-JVM (16):** `FavoritesRepositoryImpl*Test` (3 inkl. ShareIn +
+  Contract), `SettingsRepositoryImpl*Test` (2), `HiddenAppsRepositoryImpl*Test`
+  (2), `CustomNamesRepositoryImpl*Test` (2), `FavoritesOrderRepositoryImpl*Test`
+  (2), `SwipeActionsRepositoryImplContractTest`, `AppUsageRepositoryImpl*Test`
+  (2), `UsageExportRepositoryImplFormatSpec` / `*TimeLordSpec` /
+  `*XenomorphSpec` / `UsageExportRepositoryImplTest`.
+- **Robolectric (16 inkl. Helper):** `BackupRepositoryImpl*Test` (9 Files
+  + `BackupRepositoryImplTestFactory`), `WallpaperRepositoryImpl*Test`
+  (2 inkl. Contract-Test), `FakeWallpaperRepositoryContractTest`,
+  `UsageExportRepositoryImplDoomsdaySpec`, `DataMigrationManagerTest`,
+  `WallpaperFileManagerTest`, plus die kleinen Files `InstalledAppsRepositoryImplTest`,
+  `InstalledAppsStateRepositoryImpl*Test` (2), `PackageUpdateReceiverTest`,
+  `ResetRepositoryImplTest`, `ScreenLockRepositoryImpl*Test` (2),
+  `ShortcutRepositoryImplTest`, `TimeBasedEventsRepositoryImplTest`.
 
-- **Robolectric.properties-Duplikat:** ohne den Default lädt Robolectric
-  `KolibriLauncherApp` und leakt ANRWatchdog-Threads. Siehe §6.
-- **`@TestInstallIn`/Hilt-Test-Module:** bleiben in `:app`.
-- **Activity/Fragment-Tests:** bleiben in `:app` (UI-Layer).
-- **Test-Isolation ist nicht 100% erreichbar.** Tests, die Hilt-
-  Test-Machinery oder Activity-Lifecycle brauchen, bleiben in `:app`.
-  Das ist by design.
+**Test-Time-Win:**
+
+`./gradlew :data:testDebugUnitTest` rerun-tasks cold ~30s. Die ~32
+:data-Tests laufen jetzt isoliert vom :app-Test-Run; bei iterativen
+Änderungen am `:data`-Code muss `:app:test` nicht mehr durchcompilieren
+um diese Tests zu prüfen. Der theoretische Test-Time-Win der
+ursprünglichen §9.2-Modul-Split-Story ist jetzt vollständig real
+(`:domain:test` = 5s, `:data:test` = 30s, `:app:test` für UI/Hilt-
+Tests separat).
+
+**Was in `:app/test/` bleibt:**
+
+Tests die `HiltTestApplication`, `@TestInstallIn`, oder Activity-/
+Fragment-Lifecycle brauchen — das `hilt-android`-Plugin ist in `:data`
+nicht aktiv (Library-Module-Begrenzung), und Activity-Lifecycle ist
+UI-Layer-Concern. Das ist by design.
 
 Memo bleibt damit (a) ein neuer Reviewer das testFixtures-Pattern und
-seine Begründung versteht, (b) die Resolution für den (jetzt gelösten)
-AGP-Bug an einer Stelle dokumentiert ist, und (c) die
-Folge-Schritte beim eigentlichen Test-Move skizziert sind.
+seine Begründung versteht, (b) die Resolution für den (gelösten)
+AGP-Bug an einer Stelle dokumentiert ist, und (c) der Endstand des
+§13-Moves nachschlagbar ist.
 
 ---
 

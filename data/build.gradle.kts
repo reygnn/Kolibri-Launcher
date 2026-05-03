@@ -64,6 +64,17 @@ android {
             languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs Android resources on the test classpath; the
+            // BackupRepositoryImpl* / WallpaperRepositoryImpl* / DataMigrationManager
+            // tests run with @RunWith(RobolectricTestRunner::class). Mirrors
+            // the same flags in :app/build.gradle.kts.
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -87,12 +98,38 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
 
-    // testFixtures: shared test doubles consumed by :app's and (future)
-    // :data's test source sets. Currently exposes FakeDataStore. The
+    // testFixtures: shared test doubles consumed by :app's and :data's
+    // own test source sets. Currently exposes FakeDataStore. The
     // androidx.datastore + coroutines deps mirror the production usage
     // because FakeDataStore implements DataStore<Preferences> directly.
+    //
+    // The Kotlin compile task for testFixtures requires the
+    // `android.experimental.enableTestFixturesKotlinSupport=true` flag
+    // in gradle.properties — see data/TESTFIXTURES_KOTLIN_INVESTIGATION.md.
     testFixturesImplementation(libs.androidx.datastore.preferences)
     testFixturesImplementation(libs.kotlinx.coroutines.core)
+
+    // Test dependencies — Repository-Impl tests in :data/src/test/.
+    // Brocken B (Test-Isolation per Modul) — see TODO §13. The set
+    // mirrors :domain/build.gradle.kts's testImplementation block plus
+    // Robolectric, since some Repository-Impls touch Android URI/Uri-
+    // ContentResolver/InputStream APIs (BackupRepositoryImpl,
+    // WallpaperRepositoryImpl, UsageExportRepositoryImpl IO paths,
+    // DataMigrationManager).
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.turbine)
+    testImplementation(libs.json)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.test.ext.junit.ktx)
+
+    // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
+    // Fake*Repository, Contract abstract classes).
+    testImplementation(testFixtures(project(":domain")))
 }
 
 kapt {
