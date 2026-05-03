@@ -410,6 +410,7 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 | StrictMode-Violations (OneUI/Knox) | Plattform-Bug, nicht im App-Code behebbar | KNOWN_ISSUES.md |
 | 7× `@Suppress("unused")` in `ZoomableImageView` | Public-API-Stubs für externe Konsumenten | inline kommentiert |
 | `kotlin-kapt` statt KSP (§5.4) | Toolchain-Wechsel nur bei Major-Rewrite — Hilt-Pinning (2.57.2 DO NOT UPGRADE) plus kotlin-parcelize-Kompatibilität müssten geprüft werden, Nutzen ist rein Build-Performance | aufgeschoben 2026-05-03 |
+| Inkonsistente VM-Test-Patterns (§3.3) | Audit-Befund hält Re-Inspektion nicht stand: SettingsViewModelTest mockt UseCases (kein Fake-Pendant existiert, UseCase-Mocking ist hier legitim), nicht Repositories. Die Repo-Mock-Fälle (HiddenAppsViewModelTest) wurden in §3.2 auf Fakes umgestellt. Alle VM-Tests teilen heute `MainDispatcherRule` + `TimberRule`. Audit-Vorschlag „BaseViewModelTest"-Basisklasse wäre ~6 Zeilen Boilerplate-Reduktion × 12 Tests — separater QoL-Refactor, kein Audit-Fix | abgehakt 2026-05-03 |
 
 ---
 
