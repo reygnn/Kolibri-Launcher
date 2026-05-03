@@ -6,15 +6,10 @@ import java.util.Properties
  * WICHTIG FÜR KI-ASSISTENTEN (Gemini, Claude, etc.):
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Diese build.gradle.kts hat SPEZIFISCHE Versionsanforderungen!
- *
- * BEACHTE ALLE KOMMENTARE bei den Versionen:
- * - "DO NOT CHANGE" = Version NIEMALS ändern
- * - "DO NOT UPGRADE" = Version NICHT erhöhen
- * - "DO NOT DOWNGRADE" = Version NICHT verringern
- * - "OK to upgrade" = Version darf aktualisiert werden
- *
- * ⚠️ Das Ignorieren dieser Kommentare führt zu Build-Fehlern! ⚠️
+ * Versionen leben jetzt in `gradle/libs.versions.toml` — NICHT mehr hier
+ * im build.gradle.kts. Pinning-Marker (DO NOT UPGRADE / DO NOT DOWNGRADE
+ * / DO NOT CHANGE / OK to upgrade) stehen direkt neben den Versionen im
+ * Catalog. ⚠️ Das Ignorieren dieser Marker führt zu Build-Fehlern! ⚠️
  *
  * minSdk=36 und compileSdk=36 sind ABSICHTLICH so gesetzt (Android 16)!
  * Diese Werte NICHT ändern ohne explizite Anweisung!
@@ -22,40 +17,14 @@ import java.util.Properties
  */
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
+    alias(libs.plugins.hilt.android)
     id("kotlin-parcelize")
     id("jacoco")
-    //noinspection NewerVersionAvailable
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21" // DO NOT EVEN THINK ABOUT TO CHANGE !!!
+    alias(libs.plugins.kotlin.serialization)
 }
-
-// Version-Konstanten
-val materialVersion = "1.13.0"  // DO NOT DOWNGRADE !!!
-val hiltVersion = "2.57.2"  // DO NOT UPGRADE !!!
-val truthVersion = "1.4.5"  // OK to upgrade
-val lifecycleVersion = "2.10.0"  // OK to upgrade
-val navigationVersion = "2.9.7"  // OK to upgrade
-val coroutinesVersion = "1.10.2"  // OK to upgrade
-val kotlinTestVersion = "2.2.21"  // DO NOT DOWNGRADE !!! (1.9.23 causes compiler errors)
-val timberVersion = "5.0.1"  // DO NOT UPGRADE !!! (6.x breaking changes)
-val fragmentVersion = "1.8.9"  // DO NOT UPGRADE !!! (keep fragment-ktx and fragment-testing in sync)
-val junitVersion = "4.13.2"  // DO NOT UPGRADE !!! (JUnit 5 needs migration)
-val coreTestingVersion = "2.2.0"  // DO NOT CHANGE !!!
-val turbineVersion = "1.2.1"  // OK to upgrade
-val acraVersion = "5.11.4"  // DO NOT UPGRADE !!!    und proguard-rules.pro beachten!
-val jsonVersion = "20251224"
-
-// === AndroidX Test — keep ALL in sync ===
-val espressoVersion = "3.7.0"  // Updated for androidTest rewrite — keep in sync with test runner/rules
-val androidxTestJunitVersion = "1.3.0"
-val androidxTestVersion = "1.7.0"
-val androidxTestCoreVersion = "1.7.0"
-val orchestratorVersion = "1.6.1"
-val robolectricVersion = "4.16.1"  // OK to upgrade
-
 
 // Lädt die sensiblen Daten aus der keystore.properties-Datei
 // Diese Datei sollte im Stammverzeichnis des Projekts liegen und in .gitignore eingetragen sein
@@ -223,134 +192,91 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-// UI & Material  (MUST be loaded first or use resolutionStrategy below!)
-    implementation("com.google.android.material:material:${materialVersion}")  // MUSS VOR androidx.appcompat:appcompat !!!
+    // UI & Material  (MUST be loaded first or use resolutionStrategy below!)
+    implementation(libs.material)  // MUSS VOR androidx.appcompat:appcompat !!!
 
-// Core Android
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    implementation("androidx.core:core-ktx:1.17.0")
-    implementation("androidx.core:core-splashscreen:1.2.0")
-    implementation("androidx.appcompat:appcompat:1.7.1")  // Achtung: bringt älteres 'MaterialYou' mit
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    implementation("androidx.activity:activity:1.12.4")
-    //noinspection NewerVersionAvailable
-    implementation("androidx.fragment:fragment-ktx:$fragmentVersion")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
+    // Core Android
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.appcompat)  // Achtung: bringt älteres 'MaterialYou' mit
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.recyclerview)
 
-// Lifecycle & Navigation
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
-    implementation("androidx.navigation:navigation-fragment-ktx:$navigationVersion")
-    implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
+    // Lifecycle & Navigation
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.savedstate)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
 
-// Data & Async
-    implementation("androidx.datastore:datastore-preferences:1.2.1")
-    implementation("androidx.preference:preference-ktx:1.2.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
+    // Data & Async
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.preference.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 
-// Utilities
-    implementation("com.github.anrwatchdog:anrwatchdog:1.4.0")
-    //noinspection NewerVersionAvailable
-    implementation("com.jakewharton.timber:timber:$timberVersion")
-    //noinspection NewerVersionAvailable
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")  // 1.10.0 benötigt Kotlin 2.3.0
-    testImplementation("org.robolectric:robolectric:${robolectricVersion}")
+    // Utilities
+    implementation(libs.anrwatchdog)
+    implementation(libs.timber)
+    implementation(libs.kotlinx.serialization.json)  // 1.10.0 benötigt Kotlin 2.3.0
+    testImplementation(libs.robolectric)
 
-// Hilt
-    //noinspection NewerVersionAvailable
-    implementation("com.google.dagger:hilt-android:$hiltVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    implementation("androidx.browser:browser:1.9.0")
-    //noinspection NewerVersionAvailable
-    kapt("com.google.dagger:hilt-compiler:$hiltVersion")
+    // Hilt
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.browser)
+    kapt(libs.hilt.compiler)
 
-    //noinspection NewerVersionAvailable
-    implementation("ch.acra:acra-core:$acraVersion")
-    //noinspection NewerVersionAvailable
-    implementation("ch.acra:acra-http:$acraVersion")
+    implementation(libs.acra.core)
+    implementation(libs.acra.http)
 
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
+    debugImplementation(libs.leakcanary.android)
 
-// --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
+    // --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
+    testImplementation(libs.junit)
+    testImplementation(libs.androidx.arch.core.testing)
+    testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.truth)
+    testImplementation(libs.json)
 
+    // Hilt für Unit-Tests
+    testImplementation(libs.hilt.android.testing)
+    kaptTest(libs.hilt.compiler)
 
-    //noinspection NewerVersionAvailable
-    testImplementation("junit:junit:$junitVersion")
-    //noinspection NewerVersionAvailable
-    testImplementation("androidx.arch.core:core-testing:$coreTestingVersion")
-    //noinspection NewerVersionAvailable
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinTestVersion")
-    testImplementation("app.cash.turbine:turbine:$turbineVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
-    testImplementation("com.google.truth:truth:$truthVersion")
-    testImplementation("org.json:json:$jsonVersion")
+    // MockK für Unit-Tests
+    testImplementation(libs.mockk)
 
-// Hilt für Unit-Tests
-    //noinspection NewerVersionAvailable
-    testImplementation("com.google.dagger:hilt-android-testing:$hiltVersion")
-    //noinspection NewerVersionAvailable
-    kaptTest("com.google.dagger:hilt-compiler:$hiltVersion")
-
-// MockK für Unit-Tests
-    testImplementation("io.mockk:mockk:1.14.9")
-
-// AndroidX Test (für Robolectric-basierte Activity/Fragment-Tests)
-    testImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
-    testImplementation("androidx.test.ext:junit-ktx:$androidxTestJunitVersion")
+    // AndroidX Test (für Robolectric-basierte Activity/Fragment-Tests)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.test.ext.junit.ktx)
 
 
-// --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
-    androidTestUtil("androidx.test:orchestrator:$orchestratorVersion")
+    // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
+    androidTestUtil(libs.androidx.test.orchestrator)
 
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test:runner:$androidxTestVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test:rules:$androidxTestVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test.ext:junit:$androidxTestJunitVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test:core-ktx:$androidxTestCoreVersion")
-    androidTestImplementation("com.google.truth:truth:$truthVersion")
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core.ktx)
+    androidTestImplementation(libs.truth)
 
-    //noinspection NewerVersionAvailable
-    androidTestImplementation("androidx.arch.core:core-testing:$coreTestingVersion")
-    //noinspection NewerVersionAvailable
-    debugImplementation("androidx.fragment:fragment-testing:$fragmentVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-contrib:$espressoVersion")    //noinspection NewerVersionAvailable
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-intents:$espressoVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    androidTestImplementation("androidx.test.espresso:espresso-web:$espressoVersion")
-    //noinspection NewerVersionAvailable
-    //noinspection GradleDependency
-    debugImplementation ("androidx.test.espresso:espresso-idling-resource:$espressoVersion")
+    androidTestImplementation(libs.androidx.arch.core.testing)
+    debugImplementation(libs.androidx.fragment.testing)
+    androidTestImplementation(libs.androidx.test.espresso.contrib)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.espresso.intents)
+    androidTestImplementation(libs.androidx.test.espresso.web)
+    debugImplementation(libs.androidx.test.espresso.idling.resource)
 
-// Hilt für instrumentierte Tests
-    //noinspection NewerVersionAvailable
-    androidTestImplementation("com.google.dagger:hilt-android-testing:$hiltVersion")
-    //noinspection NewerVersionAvailable
-    kaptAndroidTest("com.google.dagger:hilt-compiler:$hiltVersion")
+    // Hilt für instrumentierte Tests
+    androidTestImplementation(libs.hilt.android.testing)
+    kaptAndroidTest(libs.hilt.compiler)
 
-// Mockito für instrumentierte Tests
-    //noinspection NewerVersionAvailable
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
+    // Mockito für instrumentierte Tests
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
 
 kapt {
@@ -360,12 +286,12 @@ kapt {
 configurations.all {
     resolutionStrategy {
         // DO NOT REMOVE !!!
-        // Erzwingt materialVersion auch wenn appcompat eine ältere Version mitbringt.
+        // Erzwingt material auch wenn appcompat eine ältere Version mitbringt.
         // Warnung: ohne diesen force WIRD es bei falscher Reihenfolge der Dependencies zu Dependency-Konflikten kommen!
-        force("com.google.android.material:material:$materialVersion")
+        force("com.google.android.material:material:${libs.versions.material.get()}")
 
-        force("androidx.test:runner:$androidxTestVersion")
-        force("androidx.test:monitor:$androidxTestVersion")
+        force("androidx.test:runner:${libs.versions.androidxTest.get()}")
+        force("androidx.test:monitor:${libs.versions.androidxTest.get()}")
     }
 }
 

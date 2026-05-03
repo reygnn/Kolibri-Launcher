@@ -1,0 +1,151 @@
+# =============================================================================
+# Kolibri Launcher — Gradle Version Catalog
+# =============================================================================
+#
+# IMPORTANT: pinning markers — DO NOT IGNORE
+#   - DO NOT CHANGE    = never modify
+#   - DO NOT UPGRADE   = do not raise version (breaks build or tests)
+#   - DO NOT DOWNGRADE = do not lower version (breaks build or tests)
+#   - OK to upgrade    = safe to raise version on the next pass
+#
+# minSdk = compileSdk = targetSdk = 36 (Android 16) are intentional and live
+# in `app/build.gradle.kts`, not in this catalog. Same for the jvmToolchain
+# (21) and the AndroidX Test runner / executor settings.
+#
+# Cross-cutting constraints to keep in mind when bumping anything:
+#   - `material` MUST resolve before `androidx.appcompat` — see the force()
+#     in `app/build.gradle.kts` resolutionStrategy.
+#   - `kotlin-test` (test) and the Kotlin compiler version MUST match;
+#     mismatching gives "compiler errors" rather than a clean test failure.
+#   - `acra` and `proguard-rules.pro` must stay in sync; changing one without
+#     the other can produce silent crash-report failures in release builds.
+#   - `fragment` (fragment-ktx and fragment-testing) MUST share one version.
+# =============================================================================
+
+[versions]
+# Build & Kotlin
+agp = "8.13.2"
+kotlin = "2.2.21"  # 2.2.x — safe to update; kotlin-test must match exactly
+ksp = "2.2.21-2.0.4"  # not currently used; kept for the eventual KSP migration
+
+# Hilt
+hilt = "2.57.2"  # DO NOT UPGRADE — keep proguard-rules.pro in sync if forced to bump
+
+# UI / Material
+material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts)
+appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang
+core-ktx = "1.17.0"
+core-splashscreen = "1.2.0"
+activity = "1.12.4"
+fragment = "1.8.9"  # DO NOT UPGRADE — fragment-ktx and fragment-testing share this
+recyclerview = "1.4.0"
+
+# Lifecycle & Navigation
+lifecycle = "2.10.0"  # OK to upgrade
+navigation = "2.9.7"  # OK to upgrade
+
+# Data & Async
+datastore = "1.2.1"
+preference = "1.2.1"
+coroutines = "1.10.2"  # OK to upgrade
+kotlinx-serialization = "1.9.0"  # 1.10.0 needs Kotlin 2.3.0 — bump together
+
+# Utilities
+anrwatchdog = "1.4.0"
+timber = "5.0.1"  # DO NOT UPGRADE — 6.x has breaking changes
+acra = "5.11.4"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync
+browser = "1.9.0"
+leakcanary = "2.14"
+json = "20251224"
+
+# Test (JVM)
+junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration
+core-testing = "2.2.0"  # DO NOT CHANGE
+kotlin-test = "2.2.21"  # DO NOT DOWNGRADE — 1.9.23 causes compiler errors; must match `kotlin`
+turbine = "1.2.1"  # OK to upgrade
+truth = "1.4.5"  # OK to upgrade
+robolectric = "4.16.1"  # OK to upgrade
+mockk = "1.14.9"
+
+# AndroidX Test (keep ALL in sync — runner/rules/core/junit-ktx)
+# `androidxTest` is camelCase to avoid an accessor-namespace clash with
+# `androidx-test-core` / `androidx-test-junit`: hyphen-keys are mapped to
+# dot-paths, so a leaf `androidx-test` would collide with the prefix.
+androidxTest = "1.7.0"
+androidx-test-core = "1.7.0"
+androidx-test-junit = "1.3.0"
+espresso = "3.7.0"
+orchestrator = "1.6.1"
+
+
+[libraries]
+# UI & Material
+material = { module = "com.google.android.material:material", version.ref = "material" }
+
+# Core Android
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "core-splashscreen" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
+androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
+androidx-fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref = "fragment" }
+androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
+
+# Lifecycle & Navigation
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-savedstate = { module = "androidx.lifecycle:lifecycle-viewmodel-savedstate", version.ref = "lifecycle" }
+androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
+androidx-navigation-fragment-ktx = { module = "androidx.navigation:navigation-fragment-ktx", version.ref = "navigation" }
+androidx-navigation-ui-ktx = { module = "androidx.navigation:navigation-ui-ktx", version.ref = "navigation" }
+
+# Data & Async
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preference" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# Utilities
+anrwatchdog = { module = "com.github.anrwatchdog:anrwatchdog", version.ref = "anrwatchdog" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+acra-core = { module = "ch.acra:acra-core", version.ref = "acra" }
+acra-http = { module = "ch.acra:acra-http", version.ref = "acra" }
+leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }
+
+# Hilt
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+
+# Test (JVM)
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-arch-core-testing = { module = "androidx.arch.core:core-testing", version.ref = "core-testing" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin-test" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }
+json = { module = "org.json:json", version.ref = "json" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+# AndroidX Test
+androidx-test-core-ktx = { module = "androidx.test:core-ktx", version.ref = "androidx-test-core" }
+androidx-test-ext-junit-ktx = { module = "androidx.test.ext:junit-ktx", version.ref = "androidx-test-junit" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTest" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTest" }
+androidx-test-orchestrator = { module = "androidx.test:orchestrator", version.ref = "orchestrator" }
+androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+androidx-test-espresso-contrib = { module = "androidx.test.espresso:espresso-contrib", version.ref = "espresso" }
+androidx-test-espresso-intents = { module = "androidx.test.espresso:espresso-intents", version.ref = "espresso" }
+androidx-test-espresso-web = { module = "androidx.test.espresso:espresso-web", version.ref = "espresso" }
+androidx-test-espresso-idling-resource = { module = "androidx.test.espresso:espresso-idling-resource", version.ref = "espresso" }
+
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
