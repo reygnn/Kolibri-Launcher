@@ -83,6 +83,22 @@
     <string name="date_placeholder">Loading date…</string>
     <string name="battery_placeholder" translatable="false">100%</string>
 
+    <!-- Blend mode labels (Wallpaper layer compositing). Industry-standard
+         names used by Photoshop / Krita / GIMP — translatable="false" because
+         the pro-tool ecosystem keeps these in English across locales. -->
+    <string name="blend_mode_normal" translatable="false">Normal</string>
+    <string name="blend_mode_multiply" translatable="false">Multiply</string>
+    <string name="blend_mode_screen" translatable="false">Screen</string>
+    <string name="blend_mode_overlay" translatable="false">Overlay</string>
+    <string name="blend_mode_soft_light" translatable="false">Soft Light</string>
+    <string name="blend_mode_hard_light" translatable="false">Hard Light</string>
+    <string name="blend_mode_darken" translatable="false">Darken</string>
+    <string name="blend_mode_lighten" translatable="false">Lighten</string>
+    <string name="blend_mode_difference" translatable="false">Difference</string>
+    <string name="blend_mode_exclusion" translatable="false">Exclusion</string>
+    <string name="blend_mode_color_dodge" translatable="false">Color Dodge</string>
+    <string name="blend_mode_color_burn" translatable="false">Color Burn</string>
+
     <string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
 
     <string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>

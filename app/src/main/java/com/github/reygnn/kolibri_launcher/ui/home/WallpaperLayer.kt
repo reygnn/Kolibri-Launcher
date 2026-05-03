@@ -5,6 +5,7 @@ import android.graphics.BlendMode
 import android.graphics.Matrix
 import android.graphics.RectF
 import android.net.Uri
+import com.github.reygnn.kolibri_launcher.R
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -85,22 +86,26 @@ data class WallpaperLayer(
             "layer_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
 
         /**
-         * Alle unterstützten Blend-Modi mit lesbaren Labels.
-         * Nützlich für eine UI-Auswahl (Spinner/BottomSheet).
+         * All supported blend modes with their label resource IDs (each Int
+         * is a `@StringRes`). Useful for a UI picker (Spinner / BottomSheet)
+         * — call sites resolve the display string via
+         * `context.getString(labelResId)`. Labels live in strings.xml as
+         * `blend_mode_*` (translatable="false", since these are
+         * industry-standard names kept in English across locales).
          */
-        val AVAILABLE_BLEND_MODES: List<Pair<String, BlendMode?>> = listOf(
-            "Normal" to null,
-            "Multiply" to BlendMode.MULTIPLY,
-            "Screen" to BlendMode.SCREEN,
-            "Overlay" to BlendMode.OVERLAY,
-            "Soft Light" to BlendMode.SOFT_LIGHT,
-            "Hard Light" to BlendMode.HARD_LIGHT,
-            "Darken" to BlendMode.DARKEN,
-            "Lighten" to BlendMode.LIGHTEN,
-            "Difference" to BlendMode.DIFFERENCE,
-            "Exclusion" to BlendMode.EXCLUSION,
-            "Color Dodge" to BlendMode.COLOR_DODGE,
-            "Color Burn" to BlendMode.COLOR_BURN
+        val AVAILABLE_BLEND_MODES: List<Pair<Int, BlendMode?>> = listOf(
+            R.string.blend_mode_normal to null,
+            R.string.blend_mode_multiply to BlendMode.MULTIPLY,
+            R.string.blend_mode_screen to BlendMode.SCREEN,
+            R.string.blend_mode_overlay to BlendMode.OVERLAY,
+            R.string.blend_mode_soft_light to BlendMode.SOFT_LIGHT,
+            R.string.blend_mode_hard_light to BlendMode.HARD_LIGHT,
+            R.string.blend_mode_darken to BlendMode.DARKEN,
+            R.string.blend_mode_lighten to BlendMode.LIGHTEN,
+            R.string.blend_mode_difference to BlendMode.DIFFERENCE,
+            R.string.blend_mode_exclusion to BlendMode.EXCLUSION,
+            R.string.blend_mode_color_dodge to BlendMode.COLOR_DODGE,
+            R.string.blend_mode_color_burn to BlendMode.COLOR_BURN,
         )
     }
 
