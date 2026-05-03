@@ -18,18 +18,18 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 3 | `BackupRepositoryImpl` zerlegen | umgesetzt 2026-05-03 via §9.1 mit anderem Argument als ursprünglich angesetzt — Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
-| 7 | Selbst-Linter für die 13 Rules | offen | mittel (1-2 Tage) |
+| 7 | Selbst-Linter für die 13 Rules | teilumgesetzt 2026-05-03 (3 von 6 Rules), Memo bleibt | — |
 | 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
 | 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 + 9.4 erledigt 2026-05-03; 9.2 offen | groß (2-3 Tage) |
 | 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §7 (Linter) zuerst — verhindert
-zukünftigen Drift, der die häufigste Defekt-Klasse in diesem Repo ist (post-
-audit-Session 2026-05-03 hat sieben Doku-vs-Realität-Diskrepanzen aufgedeckt;
-ein dummer grep-Hook hätte sie nie entstehen lassen). Danach §8 (Tests-für-
-time-Code) als komplementäres Schließen einer Test-Lücke. §9 (Architektur)
-ist der größte Brocken und die einzige Möglichkeit, das Repo über 7.5/10
-Reife zu bringen — sequenziell, nicht parallel anfangen.
+**Empfohlene Reihenfolge bei freier Wahl:** §8 (Time-Tests, ~5 h) als
+nächster komplementärer Schritt nach §7 — schließt die Test-Lücke die
+den Retry-Counter-Bug in `ObserveInstalledAppsUseCase` durchgelassen
+hat. Danach §10 (Lib-Pinning-Revisit, prozessual). §9.2 (Modul-Split)
+ist der einzige verbleibende Architektur-Brocken aus §9 und der
+einzige Schritt, der das Repo über 7.5/10 Reife heben würde — größer
+und sequenziell, nicht ad-hoc starten.
 
 ---
 
@@ -415,58 +415,46 @@ hoc per-Test `@Config`-Overrides streut.
 
 ---
 
-## 7. Selbst-Linter für die 13 Rules
+## 7. (Memo, teilumgesetzt 2026-05-03) Selbst-Linter für die 13 Rules
 
-**Motivation:** Die post-audit-Sweep-Session 2026-05-03 hat sieben Stellen
-aufgedeckt, an denen die Doku Wahrheiten behauptete, die der Code nicht
-hielt — die mit Abstand häufigste Defekt-Klasse in diesem Repo. Konkrete
-Funde dieser einen Session:
+Doc-vs-Realität-Drift war die häufigste Defekt-Klasse im Audit-Sweep
+2026-05-03. Sieben separate positive Behauptungen in CLAUDE.md /
+AUDIT.md kollabierten auf grep — am schlimmsten Rule 9 mit 53 Verstößen
+in 9 Files. Linter wurde gebaut um diese Klasse dauerhaft zu beenden.
 
-- **Rule 9** behauptete „kein nacktes `Timber.e` außerhalb `KolibriLauncherApp`
-  und `TimberWrapper`" — 53 Verstöße gefunden, davon 29 echte App-Code-Drift.
-- **CLAUDE.md Rule 1+2+4+5** redeten von „Manager"-Schreibweise — alle 17
-  Production-Klassen sind seit Commit `0f9e7be` `*RepositoryImpl`.
-- **AUDIT.md §4.4** behauptete „Non-Null `!!` — null Vorkommen im Hauptcode" —
-  eines in `SettingsActivity.kt:108`.
-- **AUDIT.md §2.5** behauptete „AppConstants ist diszipliniert genutzt" —
-  Counterexample mit Magic-Numbers in `ObserveInstalledAppsUseCase`.
-- **AUDIT.md §5.8** behauptete „Hardcoded UI-Strings in Code — null
-  gefunden" — `WallpaperLayer.AVAILABLE_BLEND_MODES` mit 12 EN-Labels.
+**Implementiert:**
 
-**Pattern:** Negativ-Findings im Audit (313 `relaxed = true` etc.) waren
-empirisch belegt. Nur die positiven „alles in Ordnung"-Aussagen kollabierten
-auf grep. Die Doku wurde nicht stichprobenartig verifiziert.
+- `tools/check-conventions.sh` — Bash-Script mit Sektion pro Rule.
+- Gradle-Task `./gradlew checkConventions` — wrapt das Script via Exec.
+- CLAUDE.md Rule 9 verweist auf den Linter und nennt das Erweitern als
+  Nebenpflicht beim Hinzufügen neuer Crash-Infra-Files.
 
-**Was der Linter prüfen soll** (in Reihenfolge nach Wert / Drift-Risiko):
+**Geprüfte Rules (3 von 6 ursprünglich gelisteten):**
 
-- Rule 9 — kein nacktes `Timber.e(` außerhalb der erweiterten Exception-Liste
-  (`KolibriLauncherApp`, `TimberWrapper`, `BaseActivity`, `BaseViewModel`,
-  `CrashReportLimiter`, `CrashReportConsent`, `BackupFragment.kt:50`).
-  Pures Grep mit Negativ-Filter. Highest ROI.
-- Rule 12 — kein `Timber.Forest.`. Trivial mit Grep.
-- Naming-Konvention — keine `Manager`-Schreibweise außer den dokumentierten
-  Ausnahmen (`WallpaperFileManager`, `DataMigrationManager`).
-- Rule 13 — keine deutschen Kommentar-Zeilen in den letzten N Commits
-  geänderter Files. Würde nur neue Zeilen prüfen, bestehendes Deutsch in
-  alten Files ignorieren.
-- Rule 11 — keine `try { … } catch (Throwable)` um Pure-Calls. Heuristisch:
-  catch-Body ist nur silentError-Aufruf, try-Body enthält nur `.filter`/
-  `.map`/`.sortedBy`/`String.lowercase()` etc. Nicht 100% präzise, aber
-  fängt offensichtliche Verstöße.
-- Hardcoded UI-Strings im Kotlin — String-Literals in `data class`-Defaults
-  oder Konstanten, die in `res/values/strings.xml` gehören.
+- **Rule 9** — bare `Timber.e(` außerhalb der dokumentierten
+  Crash-Infra-Files. Match-by-Message für die BackupFragment-Carve-Out
+  (statt Line-Number-Pin).
+- **Rule 12** — kein `Timber.Forest.*`.
+- **Naming** — `*Manager`-Klassen in `data/` außer `WallpaperFileManager`
+  und `DataMigrationManager`.
 
-**Form:** Gradle-Task `./gradlew checkConventions` plus optional Pre-Commit-
-Hook. Keine CI-Erzwingung anfangs — soll lokal lauffähig bleiben.
-Output: Liste der Verstöße mit `file:line` und Rule-Referenz.
+**Bewusst nicht geprüft (jeweils mehr-als-Grep nötig):**
 
-**Aufwand:** 1-2 Tage initial. Danach selbst-wartend. Jede neue Rule wird
-beim Aufnehmen in CLAUDE.md gleich mit Linter-Check ergänzt — das ist die
-Disziplin, die fehlt.
+- **Rule 11** — try/catch um can't-throw-Operations. Bräuchte
+  semantische Analyse des catch-Body (welche Funktion wird gewrappt,
+  ist die pure?).
+- **Rule 13** — deutsche Kommentar-Zeilen in neu hinzugefügten Lines.
+  Bräuchte git-diff-Integration.
+- **Hardcoded UI-Strings** im Kotlin. Bräuchte String-Literal-
+  Klassifikation.
 
-**Wert:** Beendet die häufigste Defekt-Klasse dauerhaft. Die nächste Audit-
-Iteration findet keinen neuen Doku-Drift mehr. Den ROI sieht man bei jeder
-nächsten Session.
+Wenn diese drei je ihren Cost-of-Catch durch Reviews überschreiten,
+in das Script einbauen — die Sektionen-Struktur ist dafür offen. Bis
+dahin: catch-by-Review.
+
+Memo bleibt damit ein Reviewer den Linter findet, weiß was er prüft
+und was er nicht prüft, und das Pattern für neue Sektionen sieht
+(Sektion = Heading-Comment + grep + report-on-non-empty).
 
 ---
 
