@@ -10,9 +10,6 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -22,9 +19,9 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * UI shell for the favorites-reorder screen. The Fragment owns the
@@ -176,47 +173,33 @@ class FavoritesSortFragment : Fragment() {
         // list that the adapter already shows, but DiffUtil makes that a
         // no-op. Sort and Reset emit a different list; that drives the
         // adapter's animation.
-        viewLifecycleOwner.lifecycleScope.launch {
+        collectOnStarted(
+            flow = viewModel.apps,
+            errorTag = "apps",
+            coroutineContext = EmptyCoroutineContext,
+        ) { apps ->
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    viewModel.apps.collect { apps ->
-                        try {
-                            // Per-item recovery: a single failing submitList
-                            // must not tear down the whole subscription.
-                            adapter?.submitList(apps)
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error submitting list to adapter")
-                        }
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+                // Per-item recovery: a single failing submitList
+                // must not tear down the whole subscription.
+                adapter?.submitList(apps)
             } catch (e: Throwable) {
-                // EXTERNAL: Flow collection wrapper.
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for apps")
+                TimberWrapper.silentError(e, "Error submitting list to adapter")
             }
         }
 
         // Events: toasts and the change-broadcast that becomes a fragment
         // result. Other UiEvents (NavigateUp, etc.) are not emitted by
         // this ViewModel, so the `else` branch is unreachable in practice.
-        viewLifecycleOwner.lifecycleScope.launch {
+        collectOnStarted(
+            flow = viewModel.event,
+            errorTag = "events",
+            coroutineContext = EmptyCoroutineContext,
+        ) { event ->
             try {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    viewModel.event.collect { event ->
-                        try {
-                            // Per-item recovery: see apps-collect comment.
-                            handleEvent(event)
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error handling event: $event")
-                        }
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
+                // Per-item recovery: see apps-collect comment.
+                handleEvent(event)
             } catch (e: Throwable) {
-                // EXTERNAL: Flow collection wrapper.
-                TimberWrapper.silentError(e, "Error in repeatOnLifecycle for events")
+                TimberWrapper.silentError(e, "Error handling event: $event")
             }
         }
     }

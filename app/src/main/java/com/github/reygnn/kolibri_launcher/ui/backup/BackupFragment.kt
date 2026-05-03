@@ -8,15 +8,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -233,12 +232,12 @@ class BackupFragment : Fragment() {
     }
 
     private fun observeBackupState() {
-        viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.backupState.collect { state ->
-                    handleBackupState(state)
-                }
-            }
+        collectOnStarted(
+            flow = viewModel.backupState,
+            errorTag = "backupState",
+            coroutineContext = exceptionHandler,
+        ) { state ->
+            handleBackupState(state)
         }
     }
 
