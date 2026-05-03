@@ -22,7 +22,7 @@ testing reference.
 - Coroutines/Flows throughout; UI state as `StateFlow`, events as `SharedFlow`
 - Tests: JUnit 4, **MockK** (Mockito has been fully migrated away), Turbine,
   kotlinx-coroutines-test, Robolectric (only for `android.net.Uri`-touching
-  managers)
+  impls)
 
 ## Build & test
 
@@ -45,8 +45,8 @@ code (e.g. `WallpaperRepositoryImplTest`).
 
 ```
 core/                     AppConstants, TextColorCalculator, TimberWrapper, utils
-data/                     manager implementations (FavoritesManager, …)
-data/service/             ScreenLockManager pieces, service logic
+data/                     repository implementations (FavoritesRepositoryImpl, …)
+data/service/             service implementations (ShortcutLauncherServiceImpl)
 domain/repository/        interfaces (FavoritesRepository, …) — 20 of them
 domain/usecase/           ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
 domain/model/             data classes (AppInfo, HomeSettings, WallpaperState, …)
@@ -71,30 +71,30 @@ activities.
 
 1. **Repository interface, always.** Every data access goes through an
    interface in `domain/repository/`. Production implementations live in
-   `data/` as `XyzManager`; test doubles live in
+   `data/` as `XyzRepositoryImpl`; test doubles live in
    `app/src/test/.../fakes/` as `FakeXyz...`. ViewModels and use cases depend
-   only on the interface, never on the concrete manager.
+   only on the interface, never on the concrete impl.
 
 2. **Contract-test triple per repository.** `XyzRepositoryContract` (abstract,
    `@Test` methods) + `FakeXyzRepositoryContractTest` +
-   `XyzManagerContractTest`. If fake and manager drift, the contract catches
-   it. Exceptions (system-API managers like `BackupRepository`,
+   `XyzRepositoryImplContractTest`. If fake and impl drift, the contract
+   catches it. Exceptions (system-API impls like `BackupRepository`,
    `InstalledAppsRepository`, `TimeBasedEventsRepository`) are justified in
    the corresponding contract KDoc. Details: `app/src/test/CLAUDE.md`.
 
-3. **When a contract test goes red, the manager wins.** Align the fake to
-   the manager, not the other way around — manager behavior is production
+3. **When a contract test goes red, the impl wins.** Align the fake to
+   the impl, not the other way around — impl behavior is production
    truth. Intentional drifts get documented in the contract KDoc under
    "NOT IN CONTRACT — intentional drifts", **not** hidden.
 
 4. **Hilt is the DI framework.** No second DI framework, no manual-DI
    refactor. Modules are split by responsibility in `di/`. `Repository ↔
-   Manager` bindings always go in `RepositoryModule.kt`.
+   RepositoryImpl` bindings always go in `RepositoryModule.kt`.
 
 5. **DataStore Preferences is the only app storage for user state.** No
    `SharedPreferences`, no app-managed SQLite. Migrations run through
    `DataMigrationManager` on app start. Backup/restore goes through
-   `BackupManager` + `DataStoreBackup`.
+   `BackupRepositoryImpl` + `DataStoreBackup`.
 
    *Two deliberate exceptions, both `SharedPreferences`-backed and both
    intentional:*
@@ -262,7 +262,7 @@ Plain `runTest { }` creates its own `TestCoroutineScheduler`, so
   overflow.** The first emission suspends. Fix: `BufferOverflow.DROP_OLDEST`
   or Turbine.
 - **Repository takes a `shareIn` external-scope parameter?** In tests,
-  set `externalScope = null`. See `FavoritesManagerShareInTest.kt`.
+  set `externalScope = null`. See `FavoritesRepositoryImplShareInTest.kt`.
 - **Contract-test pattern for every new repository interface.** No
   shortcuts unless there is a justified exception in the contract KDoc.
 

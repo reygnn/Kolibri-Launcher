@@ -168,9 +168,9 @@ class AppUsageRepositoryImpl @Inject constructor(
     private fun calculateTimeWeightedScore(timestamps: List<Long>, currentTime: Long): Double {
         if (timestamps.isEmpty()) return 0.0
 
-        // Pure Long/Double-Arithmetik plus `kotlin.math.exp` (gibt NaN
-        // statt zu werfen) und die safe-coerce-Extensions. Die früheren
-        // Throwable-Catches hier konnten nichts fangen.
+        // Pure Long/Double arithmetic plus `kotlin.math.exp` (returns NaN
+        // instead of throwing) and the safe-coerce extensions. The former
+        // Throwable catches here had nothing to catch.
         return timestamps.distinct().sumOf { launchTime ->
             val timeDifferenceMs = currentTime - launchTime
 
@@ -190,8 +190,8 @@ class AppUsageRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Validiert einen Timestamp auf Plausibilität.
-     * Pure Long-Vergleiche und Subtraktion — werfen nicht.
+     * Validates a timestamp for plausibility.
+     * Pure Long comparisons and subtraction — these don't throw.
      */
     private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
         return timestamp > 0 &&
