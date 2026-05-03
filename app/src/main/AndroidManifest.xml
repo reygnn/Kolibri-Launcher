@@ -40,6 +40,18 @@
         android:largeHeap="false">
 
         <!-- MainActivity mit Splash Screen Support und DayNight -->
+        <!--
+            android:configChanges suppresses Activity recreation on
+            orientation / screen size / keyboard / uiMode changes.
+            Intentional: a launcher must not flicker when the user rotates
+            the device or the system flips dark/light. HomeFragment
+            handles the rotation manually via onConfigurationChanged()
+            (see HomeFragment.kt:429) — favorites scroll state, dynamic
+            margins, and the orientation StateFlow are all updated
+            in-place. Removing this would visibly recreate the home
+            screen on every rotation. tools:ignore silences Lint's
+            DiscouragedApi warning for this exact, deliberate use.
+        -->
         <activity
             android:name=".ui.main.MainActivity"
             android:exported="true"
@@ -84,12 +96,23 @@
             android:exported="false" />
 
         <!-- SettingsActivity mit DayNight Theme Support -->
+        <!--
+            android:configChanges mirrors MainActivity's choice for a
+            different reason: the SettingsFragment is a
+            PreferenceFragmentCompat — re-inflation on rotation /
+            uiMode flip would rebuild every preference row. The
+            Material 3 preference widgets adapt to the new
+            Configuration in-place, so suppressing recreation gives a
+            smoother experience without losing any state. Lint flags
+            this as DiscouragedApi; documented and accepted.
+        -->
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:exported="false"
             android:parentActivityName=".ui.main.MainActivity"
             android:theme="@style/SettingsTheme"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            tools:ignore="DiscouragedApi">
 
             <!-- Navigation Support -->
             <meta-data
