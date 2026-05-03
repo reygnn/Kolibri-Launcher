@@ -1218,7 +1218,11 @@ class HomeFragment : Fragment() {
 
         val layoutPadding = try {
             resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-        } catch (e: Throwable) {
+        } catch (e: Resources.NotFoundException) {
+            // Narrowed from Throwable — same tight-around-getDimensionPixelSize
+            // pattern used in applyTopMargin / applyLayoutToExistingViews /
+            // createAppButton above. Silent fallback to 0 means chips render
+            // with extra horizontal slack, no user-visible breakage.
             0
         }
 
@@ -1289,31 +1293,31 @@ class HomeFragment : Fragment() {
         colors: UiColorsState,
         chipMaxWidth: Int
     ): Chip? {
+        // Inner try/catch around timeFormatter removed per Rule 11 —
+        // formatAlarmTime is pure JVM Kotlin (covered by TimeEventFormatter
+        // tests), DateFormat.is24HourFormat is a system-API getter that
+        // does not throw. The previous "fallback to title-only on
+        // formatter crash" was a programmer-error swallow that papered
+        // over potential bugs while the silentError-DEBUG-throw made
+        // the fallback unreachable in DEBUG anyway. Outer catch around
+        // Chip(...).apply remains as per-item recovery (Chip construction
+        // can throw on resource lookup or themed-context issues).
         return try {
             Chip(context).apply {
-                try {
-                    // 1. Kontext-abhängige Info holen
-                    val is24Hour = DateFormat.is24HourFormat(context)
+                val is24Hour = DateFormat.is24HourFormat(context)
 
-                    // 2. PURE LOGIC DELEGATION:
-                    // Die Berechnung passiert jetzt isoliert und getestet im Formatter.
-                    // Wir übergeben nur Rohdaten.
-                    val timeString = timeFormatter.formatAlarmTime(
-                        triggerTimeMillis = event.triggerTimeMillis,
-                        is24Hour = is24Hour
-                        // locale nutzen wir default vom Device, optional hier übergeben
-                    )
+                // PURE LOGIC DELEGATION:
+                // Die Berechnung passiert jetzt isoliert und getestet im Formatter.
+                // Wir übergeben nur Rohdaten.
+                val timeString = timeFormatter.formatAlarmTime(
+                    triggerTimeMillis = event.triggerTimeMillis,
+                    is24Hour = is24Hour
+                    // locale nutzen wir default vom Device, optional hier übergeben
+                )
 
-                    // 3. UI Zusammensetzung
-                    text = "$timeString ${event.title}"
+                text = "$timeString ${event.title}"
 
-                } catch (e: Throwable) {
-                    // Fallback, falls Formatierung wider Erwarten crasht
-                    TimberWrapper.silentError(e, "Error formatting alarm time string")
-                    text = event.title
-                }
-
-                // 4. Visuelles Styling (existierende Methode)
+                // Visuelles Styling (existierende Methode)
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
@@ -1328,22 +1332,20 @@ class HomeFragment : Fragment() {
         colors: UiColorsState,
         chipMaxWidth: Int
     ): Chip? {
+        // Inner try/catch around timeFormatter removed per Rule 11 —
+        // same reasoning as createAlarmChip above. Outer per-item
+        // recovery catch retained.
         return try {
             Chip(context).apply {
-                try {
-                    val is24Hour = DateFormat.is24HourFormat(context)
+                val is24Hour = DateFormat.is24HourFormat(context)
 
-                    // PURE LOGIC DELEGATION:
-                    val timeString = timeFormatter.formatCalendarTime(
-                        triggerTimeMillis = event.triggerTimeMillis,
-                        is24Hour = is24Hour
-                    )
+                // PURE LOGIC DELEGATION:
+                val timeString = timeFormatter.formatCalendarTime(
+                    triggerTimeMillis = event.triggerTimeMillis,
+                    is24Hour = is24Hour
+                )
 
-                    text = "$timeString ${event.title}"
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error formatting calendar time string")
-                    text = event.title
-                }
+                text = "$timeString ${event.title}"
 
                 configureChip(this, colors, chipMaxWidth)
             }

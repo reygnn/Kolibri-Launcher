@@ -221,6 +221,17 @@ für die letzten 0.1, dann 9.0+.
   in 723/819 catchen weiter `Exception` (nicht `Resources.NotFoundException`)
   — kleine Inkonsistenz, bewusst aufgehoben für künftigen Consistency-
   Sweep statt Region-Scope-Creep.
+- **Aktueller Stand 2026-05-03 (Region 5: Time-Based Chips):**
+  ~2010 Zeilen, 50 catches (40 `Throwable`). Ein
+  Throwable→Resources.NotFoundException narrowed in
+  `updateTimeBasedChips` (innerer Resources-lookup). Zwei innere
+  Throwable-Catches um `timeFormatter.formatAlarmTime` /
+  `formatCalendarTime` entfernt — pure JVM Kotlin durch
+  TimeEventFormatter-Tests abgedeckt, der "fallback to title-only" war
+  ein Programmer-Error-Swallow der durch silentError-DEBUG-throw eh
+  unerreichbar war. Drei Catches als legit pattern erhalten:
+  per-item-Recovery-Loop in `updateTimeBasedChips`, outer
+  Chip-Construction-Catches in `createAlarmChip` / `createCalendarChip`.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.
