@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
-import android.net.Uri
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.flow.Flow

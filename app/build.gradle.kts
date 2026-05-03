@@ -196,8 +196,15 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
 
-    // Shared test fixtures from :domain (TimberRule, MainDispatcherRule, …).
-    // See `java-test-fixtures` block in domain/build.gradle.kts. Brocken B.
+    // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
+    // Fake*Repository, Contract abstract classes). See `java-test-fixtures`
+    // block in domain/build.gradle.kts. Brocken B.
+    //
+    // FakeDataStore stays in :app/src/test/java/.../fakes/ for now —
+    // moving it to :data/src/testFixtures/ would require the AGP-native
+    // testFixtures Kotlin compilation, which is currently broken for
+    // Android Library modules (no `compileDebugTestFixturesKotlin` task
+    // gets registered). See TODO §13 for status.
     testImplementation(testFixtures(project(":domain")))
 
     // UI & Material  (MUST be loaded first or use resolutionStrategy below!)

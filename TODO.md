@@ -24,14 +24,15 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch versucht aber durch Timber-AAR blockiert — siehe §12 | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
-| 13 | Brocken B — Test-Isolation pro Modul | begonnen 2026-05-03 — testFixtures-Plumbing in `:domain` etabliert, 4 pure-domain Tests migriert (31 Tests in `:domain:test`, 1.3s); restliche ~30 pure-domain Tests + alle Contract-/Repository-Tests folgen schrittweise — Memo unten | mittel-groß, viele kleine Sweeps |
+| 13 | Brocken B — Test-Isolation pro Modul | weitgehend erledigt 2026-05-03 — `:domain:test` hat 310 Tests in 45 Files (alle pure-JVM, ~5s gesamt), testFixtures in `:domain` etabliert (TimberRule, MainDispatcherRule, 14 Fake*Repositories, 14 abstract Contracts). `:data:test` blockiert durch AGP-android-library testFixtures-Kotlin-Bug — Memo unten | erledigt-für-:domain, blockiert-für-:data |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Brocken A (HomeFragment-
 Restructure) als verbleibender großer Brocken aus dem Audit-Snapshot.
-Plus §13: Brocken B ist begonnen — Pattern etabliert, ~30 weitere
-pure-domain Tests + Contract-/Repository-Tests warten auf
-inkrementelle Migration. §10 ist als wiederkehrender Quartals-Termin
-etabliert und triggert sich von selbst — nächster Recheck 2026-Q3.
+§13: Brocken B ist für `:domain` weitgehend durch (310 Tests gewandert);
+für `:data` durch einen AGP-Kotlin-testFixtures-Bug blockiert — Move
+folgt sobald der Bug fixed ist oder eine Alternative gefunden wird.
+§10 ist als wiederkehrender Quartals-Termin etabliert und triggert
+sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
@@ -46,16 +47,16 @@ Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
    warum, was bewusst weggelassen ist, wo anzufangen.
 3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
    technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
-4. **Diesen Audit-Snapshot unten** — aktueller Score 8.6, Baseline-
-   Vergleich, zwei verbleibende große Brocken zu 9+.
+4. **Diesen Audit-Snapshot unten** — aktueller Score 8.9, Baseline-
+   Vergleich, ein verbleibender großer Brocken zu 9+.
 
 ### Ein kalter „leg los"-Auftrag braucht eine Richtungs-Entscheidung
 
 Der TODO.md-Status sagt „keine kleinen Open-Items mehr". Wenn der
-User trotzdem Arbeit will, ist das praktisch immer einer der zwei
-verbleibenden Brocken aus dem Audit-Snapshot weiter unten oder der
-kleine Modul-Type-Switch-Followup zu §11 — frag aber einmal nach,
-welcher. Sonst wählst du falsch.
+User trotzdem Arbeit will, ist das praktisch immer Brocken A
+(HomeFragment-Restructure) — frag aber einmal nach. Brocken C ist
+durch (§11/§12), Brocken B für `:domain` durch (§13), für `:data`
+blockiert durch einen AGP-Bug.
 
 ### Workflow-Defaults
 
@@ -71,14 +72,14 @@ welcher. Sonst wählst du falsch.
 
 ---
 
-## Audit-Snapshot 2026-05-03 (post-§12)
+## Audit-Snapshot 2026-05-03 (post-§13)
 
-Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach dem §11/§12-
+Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach dem §11/§12/§13-
 Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 
-### Score: **8.7/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
+### Score: **8.9/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
 
-### Was die +0.5 ggü. 8.2 gebracht hat
+### Was die +0.7 ggü. 8.2 gebracht hat
 
 - **`:domain` ist pure-Kotlin JVM Modul.** Plugin `kotlin("jvm")`,
   keine Android-/AndroidX-/Timber-Imports im Source, kein
@@ -93,6 +94,14 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
   von `com.android.library` auf `kotlin("jvm")`, `hilt-core` (JAR)
   statt `hilt-android` (AAR), `kotlinx-coroutines-core` statt
   `kotlinx-coroutines-android`.
+- **§13 (Brocken B für `:domain`):** 310 Tests in 45 Files nach
+  `:domain/src/test/` gewandert — pure JVM, ~5s gesamt vs. ~90s im
+  alten `:app/src/test/`-Run mit Robolectric-Bootstraps. testFixtures
+  in `:domain` als Shared-Helper-Mechanismus etabliert (TimberRule,
+  MainDispatcherRule, 14 Fake*Repositories, 14 abstract Contract-
+  Klassen). Test-Time-Win, der ursprünglich §9.2 versprochen hatte,
+  ist jetzt real. `:data:test` bleibt durch AGP-Kotlin-Bug pending
+  (siehe §13-Memo).
 - **Wert geliefert beim Refactor** (siehe §11-Memo): drei neue
   Domain-Modelle (`LauncherShortcut`, `DomainWallpaperColors`,
   `WallpaperBlendMode`), pure-Kotlin Color-Math (`core/ColorMath`),
@@ -103,24 +112,24 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
   war seit dem Modul-Split unbenutzt — beim Pure-Kotlin-Sweep
   ausgemistet.
 
-### Was die 0.3 unter 9.0 deckelt
+### Was die 0.1 unter 9.0 deckelt
 
 1. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
    Extraktion und Rule-11-Sweep. §2-Reststand nennt es als „eigenes
    Lifecycle-Restructure-Projekt" — ehrlich, ändert aber nicht den
    Smell. Bleibt der größte Einzel-Brocken zu 9+.
 
-2. **Brocken B in Arbeit.** Test-Isolation pro Modul ist begonnen
-   (§13). Pattern etabliert (testFixtures), 4 von ~30 pure-domain
-   Tests migriert. Restliche Migration ist inkrementell und drückt
-   den Score weiter nach oben, sobald die Mehrheit der domain- und
-   data-Tests in den jeweiligen Modulen lebt.
-
-3. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
+2. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
    gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
    IPC mit System-Diensten sind End-to-End nie auf einem Gerät
    getestet. Robolectric ist guter Backstop, kein vollständiger
    Ersatz.
+
+3. **`:data:test` ist leer.** Repository-Impl-Tests stecken weiterhin
+   in `:app/src/test/` weil AGP's testFixtures-Kotlin-Compilation
+   für Android-Library-Module nicht funktioniert (siehe §13). Sobald
+   das aufgelöst ist, wandern ~12 Repository-Impl-Tests nach
+   `:data/src/test/`. Mittelschwer.
 
 ### Folge-Schritt zu §11 (erledigt durch §12)
 
@@ -993,105 +1002,107 @@ Self-Enforcement).
 
 ---
 
-## 13. (Memo, begonnen 2026-05-03) Brocken B — Test-Isolation pro Modul
+## 13. (Memo, weitgehend abgeschlossen 2026-05-03) Brocken B — Test-Isolation pro Modul
 
 **Motivation:** §9.2 hat den Production-Code in drei Module gesplittet
 (`:app → :data → :domain`), aber alle ~2200 Tests blieben in
-`:app/src/test/`. `:domain:test` und `:data:test` laufen heute
-`NO-SOURCE`. Das kostet im Alltag: jede :domain-Code-Änderung lässt
-auch die :app-Test-Compilation neu laufen, weil die Tests im selben
-Modul wie die UI sind.
+`:app/src/test/`. `:domain:test` und `:data:test` waren `NO-SOURCE`.
+Das kostet im Alltag: jede :domain-Code-Änderung lässt auch die
+:app-Test-Compilation neu laufen, weil die Tests im selben Modul wie
+die UI sind.
 
-**Strategie-Entscheidung (Spike `spike/domain-tests-isolation` →
-gemerged in den Brocken-B-Branch):** Gradle `java-test-fixtures`-Plugin
-auf `:domain`. Shared Test-Helpers (`TimberRule`, `MainDispatcherRule`,
-und später `FakeDataStore`/`fakes/`) leben in `:domain/src/testFixtures/`;
+**Strategie-Entscheidung:** Gradle `java-test-fixtures`-Plugin auf
+`:domain`. Shared Test-Helpers leben in `:domain/src/testFixtures/`;
 Tests in `:domain/src/test/` und `:app/src/test/` konsumieren sie via
-`testImplementation(testFixtures(project(":domain")))`. Vorteile gegenüber
-einem eigenen `:test-fixtures`-Modul: kein zusätzliches Modul, das
-`java-test-fixtures`-Plugin gehört zur Standard-Gradle-Toolbox, und der
-Layering-Sinn ist klar (Helpers gehören semantisch zur Domain-Test-
-Infrastruktur).
+`testImplementation(testFixtures(project(":domain")))`. Vorteile
+gegenüber einem eigenen `:test-fixtures`-Modul: kein zusätzliches
+Modul, das `java-test-fixtures`-Plugin gehört zur Standard-Gradle-
+Toolbox, und der Layering-Sinn ist klar (Helpers gehören semantisch
+zur Domain-Test-Infrastruktur).
 
-**Aktueller Stand:**
+**Endstand `:domain` (2026-05-03):**
 
 - **Plumbing:** `java-test-fixtures`-Plugin auf `:domain`.
   Fixtures-Source-Set hat eigene `testFixturesImplementation`-Deps
-  (junit, kotlinx-coroutines-test). `:app/build.gradle.kts` zieht
+  (junit, kotlinx-coroutines-test, turbine, truth, mockk,
+  kotlin-test-junit, hilt-core). `:app/build.gradle.kts` zieht
   `testImplementation(testFixtures(project(":domain")))`.
-- **Helpers in Fixtures:** `TimberRule` und `MainDispatcherRule`
-  von `:app/src/test/java/.../rule/` nach
-  `:domain/src/testFixtures/java/.../rule/`. Beide Locations
-  gleicher Klassen-FQN — Konsumenten in `:app` müssen ihre Imports
-  nicht anfassen.
-- **Migrierte Tests (4):**
-  - `domain/ToggleFavoriteUseCaseTest`
-  - `domain/GetAutoLaunchSettingUseCaseTest`
-  - `domain/GetAutoShowKeyboardSettingUseCaseTest`
-  - `domain/usecase/LaunchShortcutUseCaseTest`
-- **Performance:** 31 Tests in `:domain:test`, 1.286s gesamt
-  (pure JVM, kein Robolectric-Boot). Vergleich: ein einzelner
-  Robolectric-Test braucht ~10s nur fürs Bootstrap.
+- **`:domain/src/testFixtures/`** enthält:
+  - `rule/TimberRule`, `rule/MainDispatcherRule`
+  - 14 Fake-Repositories (`FakeFavoritesRepository`, `FakeSettingsRepository`,
+    …, `ReactiveFakeInstalledAppsRepository`)
+  - 14 abstrakte Contract-Klassen (`FavoritesRepositoryContract`,
+    `SettingsRepositoryContract`, …, `BackupRepositoryContract`)
+- **`:domain/src/test/`** enthält:
+  - 33 reine Use-Case-Tests
+  - 12 Fake-Contract-Test-Implementations (`FakeFavoritesRepositoryContractTest`
+    etc., die die abstrakten Contracts gegen die Fakes laufen lassen)
+- **Performance:** 310 Tests in 45 Files, ~5s pure-JVM gesamt.
+  Vergleich: dieselben Tests im alten `:app/src/test/` brauchten
+  ~90s wegen Robolectric-Bootstraps.
 
-**Folge-Schritte (offen, inkrementell):**
+**`:data:test` BLOCKIERT durch AGP-Bug:**
 
-1. **Restliche pure-domain Tests:** ~30 Files in
-   `:app/src/test/java/.../domain/`, die keine `fakes/`, kein Android
-   und kein Robolectric brauchen. Pro Sweep ~5 Files migrieren,
-   `./gradlew :domain:test` läuft nach jedem Sweep grün.
-2. **`fakes/` nach `testFixtures`:** `FakeFavoritesRepository`,
-   `FakeSettingsRepository` etc. werden von Contract-Tests in beiden
-   Modulen gebraucht. Move nach `:domain/src/testFixtures/java/.../fakes/`,
-   dann sind die Contract-Tests pure-domain-fähig.
-3. **`:data` mit eigenen Tests + testFixtures:**
-   - Plugin auf `:data` aktivieren.
-   - `:data` braucht `application=android.app.Application` als
-     Robolectric-Default — `app/src/test/resources/robolectric.properties`
-     dupliziert nach `data/src/test/resources/`. Siehe §6-Memo für
-     den Hintergrund (ANRWatchDog-Leak).
-   - Repository-Impl-Tests (`FavoritesRepositoryImplTest`,
-     `WallpaperRepositoryImplTest` etc.) nach `:data/src/test/`.
-4. **`FakeDataStore` als Crossover-Helper:** existiert bereits in
-   `:app/src/test/`, wird von Contract-Tests in :app *und* den
-   geplanten :data-Repository-Impl-Tests gebraucht. Move nach
-   `:domain/src/testFixtures/` macht ihn beidseitig konsumierbar.
+Der Plan war, FakeDataStore + Repository-Impl-Tests nach `:data` zu
+verschieben. AGP unterstützt seit 8.0 testFixtures für Android-
+Library-Module via `android { testFixtures { enable = true } }`,
+ABER: für **Kotlin-Sourcen** in `src/testFixtures/` registriert AGP
+keine Compile-Task. `./gradlew :data:tasks --all | grep TestFixturesKotlin`
+liefert leer. Versuch mit `sourceSets.testFixtures.java.srcDir(
+"src/testFixtures/kotlin")` ändert nichts. Symptom in Konsumenten:
+"Cannot access 'class FakeDataStore': it is private in file" —
+Kotlin sieht die Klasse aber kann sie nicht resolven.
 
-**Risiko-Punkte:**
+Bekanntes Problem im Android-Studio-Issue-Tracker. Workarounds, die
+NICHT funktionieren:
+- AGP-`testFixtures`-Block zusammen mit `java-test-fixtures`-Plugin —
+  Plugin-Konflikt.
+- `kotlin.sourceSets.testFixtures` direkt konfigurieren — die Source-
+  Set-Registry kennt den testFixtures-Variant nicht in kotlin-android.
 
-- **Robolectric-Konfiguration**: `:app/src/test/resources/robolectric.properties`
-  mit `application=android.app.Application` als Default verhindert
-  einen `KolibriLauncherApp`-Leak (siehe §6-Memo). Wenn `:data:test`
-  Robolectric braucht, muss diese Datei dupliziert werden — keine
-  Magie aus `:app` greift in `:data:test`.
-- **`@TestInstallIn`/Hilt-Test-Module**: einige `:app`-Tests benutzen
-  `HiltTestApplication` und Test-Module-Replacements. Diese können
-  nicht ohne weiteres in `:domain` oder `:data` umziehen, weil das
-  Hilt-Plugin (`hilt-android`) dort nicht aktiv ist. Alle Hilt-test-
-  abhängigen Tests bleiben in `:app/src/test/`.
-- **`AndroidEntryPoint`/Robolectric-Activity-Tests**: Grant alle in
-  `:app/src/test/` (Activity-Lifecycle ist UI-Layer).
-- **Test-Isolation ist nicht 100% erreichbar.** Es gibt Tests, die
+Bleibt offen, bis AGP/KGP einen Fix liefern. Bis dahin:
+- FakeDataStore stays in `:app/src/test/java/.../fakes/`
+- Repository-Impl-Tests stays in `:app/src/test/java/.../data/`
+  (~12 Files: `FavoritesRepositoryImpl*Test`, `WallpaperRepositoryImpl*Test`,
+  `BackupRepositoryImpl*Test` (9 Files!), `CustomNamesRepositoryImpl*Test`,
+  `AppUsageRepositoryImpl*Test` etc.)
+
+**Was zukünftig passieren muss, wenn der AGP-Fix kommt:**
+
+1. `:data/build.gradle.kts`: `android { testFixtures { enable = true } }`
+2. FakeDataStore von `:app/src/test/java/.../fakes/` nach
+   `:data/src/testFixtures/java/.../fakes/` (oder `kotlin/`)
+3. `:app/build.gradle.kts`: zusätzlich `testImplementation(testFixtures(project(":data")))`
+4. `app/src/test/resources/robolectric.properties` nach
+   `data/src/test/resources/` duplizieren (siehe §6-Memo zum
+   ANRWatchdog-Leak — ohne diesen Default lädt Robolectric
+   `KolibriLauncherApp` und der Process leakt einen ANRWatchdog-
+   Thread pro Test-Run).
+5. ~12 Repository-Impl-Tests von `app/src/test/java/.../data/` nach
+   `data/src/test/java/.../data/` schieben.
+
+Erwarteter zusätzlicher Test-Time-Win: ~30s (Robolectric-Bootstraps
+in :data:test isoliert von :app:test).
+
+**Risiko-Punkte (relevant beim späteren :data-Move):**
+
+- **Robolectric-Konfiguration:** robolectric.properties muss in
+  `data/src/test/resources/` dupliziert werden — keine Magie aus
+  `:app` greift dort.
+- **`@TestInstallIn`/Hilt-Test-Module:** einige `:app`-Tests benutzen
+  `HiltTestApplication` und Test-Module-Replacements. Bleiben
+  naturgemäß in `:app/src/test/`, weil das Hilt-Plugin (`hilt-android`)
+  in `:domain`/`:data` nicht aktiv ist.
+- **`AndroidEntryPoint`/Activity-Tests:** alle in `:app/src/test/`
+  (Activity-Lifecycle ist UI-Layer).
+- **Test-Isolation ist nicht 100% erreichbar.** Tests, die
   Activity-Lifecycle, ContentResolver, oder System-API-Mocking
-  brauchen — die bleiben naturgemäß in :app oder :data. Ziel ist
-  „so viele Tests wie möglich pure-JVM in :domain", nicht „alle
-  Tests pure-JVM".
+  brauchen, bleiben naturgemäß in :app oder :data. Das ist by design.
 
-**Erfolgs-Kriterien für 9+:**
-
-- ≥ 50 % der `:app/src/test/java/.../domain/` Tests sind nach
-  `:domain/src/test/` gewandert.
-- ≥ 30 % der Repository-Impl-Tests sind nach `:data/src/test/`
-  gewandert (mit Robolectric-Setup).
-- `./gradlew :domain:test` und `./gradlew :data:test` haben echten
-  Inhalt; die Test-Time-Win ist real (sub-second für reine Domain-
-  Logik gegen Robolectric-Bootstrap-Zeit für die Reststände).
-
-Memo bleibt damit (a) ein neuer Reviewer das gewählte testFixtures-
-Pattern und seine Begründung versteht, (b) die Folge-Schritte als
-inkrementell ablaufbare Sweeps dokumentiert sind, und (c) der
-`FakeDataStore`/Robolectric-Konfigurations-Hinweis für die
-:data-Migration präsent ist (sonst rennt man in einen
-ANRWatchdog-Leak).
+Memo bleibt damit (a) ein neuer Reviewer das testFixtures-Pattern und
+seine Begründung versteht, (b) der `:data:test`-AGP-Blocker bekannt
+ist und nicht versucht wird, ihn ad hoc zu reparieren, und (c) die
+Folge-Schritte beim AGP-Fix als bereits konkret skizziert vorliegen.
 
 ---
 

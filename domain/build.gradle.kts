@@ -67,6 +67,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.truth)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.turbine)
 
     // Shared test fixtures (TimberRule, MainDispatcherRule, …) consumed
     // by both :domain/src/test/ and :app/src/test/ via the
@@ -76,6 +77,14 @@ dependencies {
     // `testImplementation(testFixtures(project(":domain")))`.
     testFixturesImplementation(libs.junit)
     testFixturesImplementation(libs.kotlinx.coroutines.test)
+    testFixturesImplementation(libs.turbine)
+    testFixturesImplementation(libs.truth)
+    testFixturesImplementation(libs.mockk)
+    testFixturesImplementation(libs.kotlin.test.junit)
+    // hilt-core provides javax.inject — needed because some fake repositories
+    // are @Singleton @Inject constructor() (used as Hilt-test-replacements
+    // in :app's @TestInstallIn modules).
+    testFixturesImplementation(libs.hilt.core)
 }
 
 kapt {
