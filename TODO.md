@@ -24,11 +24,14 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch versucht aber durch Timber-AAR blockiert — siehe §12 | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
+| 13 | Brocken B — Test-Isolation pro Modul | begonnen 2026-05-03 — testFixtures-Plumbing in `:domain` etabliert, 4 pure-domain Tests migriert (31 Tests in `:domain:test`, 1.3s); restliche ~30 pure-domain Tests + alle Contract-/Repository-Tests folgen schrittweise — Memo unten | mittel-groß, viele kleine Sweeps |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Zwei Brocken offen aus
-dem Audit-Snapshot (A: HomeFragment-Restructure, B: Test-Isolation
-pro Modul). §10 ist als wiederkehrender Quartals-Termin etabliert
-und triggert sich von selbst — nächster Recheck 2026-Q3.
+**Empfohlene Reihenfolge bei freier Wahl:** Brocken A (HomeFragment-
+Restructure) als verbleibender großer Brocken aus dem Audit-Snapshot.
+Plus §13: Brocken B ist begonnen — Pattern etabliert, ~30 weitere
+pure-domain Tests + Contract-/Repository-Tests warten auf
+inkrementelle Migration. §10 ist als wiederkehrender Quartals-Termin
+etabliert und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
@@ -100,14 +103,20 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
   war seit dem Modul-Split unbenutzt — beim Pure-Kotlin-Sweep
   ausgemistet.
 
-### Was die 0.4 unter 9.0 deckelt — zwei verbleibende Brocken
+### Was die 0.3 unter 9.0 deckelt
 
 1. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
    Extraktion und Rule-11-Sweep. §2-Reststand nennt es als „eigenes
    Lifecycle-Restructure-Projekt" — ehrlich, ändert aber nicht den
-   Smell.
+   Smell. Bleibt der größte Einzel-Brocken zu 9+.
 
-2. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
+2. **Brocken B in Arbeit.** Test-Isolation pro Modul ist begonnen
+   (§13). Pattern etabliert (testFixtures), 4 von ~30 pure-domain
+   Tests migriert. Restliche Migration ist inkrementell und drückt
+   den Score weiter nach oben, sobald die Mehrheit der domain- und
+   data-Tests in den jeweiligen Modulen lebt.
+
+3. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
    gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
    IPC mit System-Diensten sind End-to-End nie auf einem Gerät
    getestet. Robolectric ist guter Backstop, kein vollständiger
@@ -182,30 +191,11 @@ für die letzten 0.1, dann 9.0+.
 
 #### Brocken B — Tests pro Modul redistribuieren
 
-- **Aktueller Zustand:** alle ~2200 Tests leben in `:app/src/test/`.
-  `:domain/test/` und `:data/test/` sind leer. §9.2 hat den
-  Compile-Cache-Win für Production-Code geliefert, aber nicht den
-  Test-Time-Win.
-- **Zwei nicht-triviale Sub-Probleme:**
-  - **Shared Test-Helpers:** `fakes/`, `rule/`, `TimberRule`,
-    `MainDispatcherRule`, `FakeDataStore` werden von Tests in allen
-    drei Modul-Domänen benutzt. Müssen in ein Shared-Modul
-    (`:test-fixtures` oder Gradle `testFixtures`-Feature) ODER
-    in `:domain/src/main/`-Test-Helper-Datein, ODER dupliziert
-    (schlechteste Option).
-  - **Robolectric-Konfiguration:** `app/src/test/resources/robolectric.properties`
-    setzt `application=android.app.Application` als Default
-    (siehe §6-Memo). Wenn Tests in `:data/test/` laufen, muss das
-    Setup mitwandern oder pro Modul dupliziert werden.
-- **Erster konkreter Schritt:** Shared-Test-Helpers-Strategie
-  entscheiden (testFixtures vs. eigenes Modul). Ohne diese
-  Entscheidung ist alles weitere Sand. Spike-Branch sinnvoll: ein
-  domain-Test allein nach `:domain/test/` schieben und sehen, was
-  ihm fehlt.
-- **Größenordnung:** 2-3 Tage, vergleichbar mit §9.2.
-- **Risiko:** mittel. Test-Konfiguration ist finicky, aber nicht
-  produktionsrelevant — Tests-grün bleibt der einzige Erfolgs-
-  Indikator.
+**Begonnen 2026-05-03** — Shared-Helper-Strategie entschieden
+(Gradle `java-test-fixtures`-Plugin), Pattern etabliert, 4 pure-
+domain Tests migriert. Memo in §13. Restliche Migration ist
+inkrementell — siehe §13 für die Liste der Folge-Schritte und das
+noch nicht-triggierte `:data`-Setup.
 
 #### Brocken C — `:domain` als pure-Kotlin Modul
 
@@ -1000,6 +990,108 @@ bearing markiert ist (Bootstrap-Reihenfolge), und (c) zukünftige
 domain-Files direkt `KolibriLog` benutzen statt versehentlich Timber
 zu importieren (was den Build sofort brechen würde — sicheres
 Self-Enforcement).
+
+---
+
+## 13. (Memo, begonnen 2026-05-03) Brocken B — Test-Isolation pro Modul
+
+**Motivation:** §9.2 hat den Production-Code in drei Module gesplittet
+(`:app → :data → :domain`), aber alle ~2200 Tests blieben in
+`:app/src/test/`. `:domain:test` und `:data:test` laufen heute
+`NO-SOURCE`. Das kostet im Alltag: jede :domain-Code-Änderung lässt
+auch die :app-Test-Compilation neu laufen, weil die Tests im selben
+Modul wie die UI sind.
+
+**Strategie-Entscheidung (Spike `spike/domain-tests-isolation` →
+gemerged in den Brocken-B-Branch):** Gradle `java-test-fixtures`-Plugin
+auf `:domain`. Shared Test-Helpers (`TimberRule`, `MainDispatcherRule`,
+und später `FakeDataStore`/`fakes/`) leben in `:domain/src/testFixtures/`;
+Tests in `:domain/src/test/` und `:app/src/test/` konsumieren sie via
+`testImplementation(testFixtures(project(":domain")))`. Vorteile gegenüber
+einem eigenen `:test-fixtures`-Modul: kein zusätzliches Modul, das
+`java-test-fixtures`-Plugin gehört zur Standard-Gradle-Toolbox, und der
+Layering-Sinn ist klar (Helpers gehören semantisch zur Domain-Test-
+Infrastruktur).
+
+**Aktueller Stand:**
+
+- **Plumbing:** `java-test-fixtures`-Plugin auf `:domain`.
+  Fixtures-Source-Set hat eigene `testFixturesImplementation`-Deps
+  (junit, kotlinx-coroutines-test). `:app/build.gradle.kts` zieht
+  `testImplementation(testFixtures(project(":domain")))`.
+- **Helpers in Fixtures:** `TimberRule` und `MainDispatcherRule`
+  von `:app/src/test/java/.../rule/` nach
+  `:domain/src/testFixtures/java/.../rule/`. Beide Locations
+  gleicher Klassen-FQN — Konsumenten in `:app` müssen ihre Imports
+  nicht anfassen.
+- **Migrierte Tests (4):**
+  - `domain/ToggleFavoriteUseCaseTest`
+  - `domain/GetAutoLaunchSettingUseCaseTest`
+  - `domain/GetAutoShowKeyboardSettingUseCaseTest`
+  - `domain/usecase/LaunchShortcutUseCaseTest`
+- **Performance:** 31 Tests in `:domain:test`, 1.286s gesamt
+  (pure JVM, kein Robolectric-Boot). Vergleich: ein einzelner
+  Robolectric-Test braucht ~10s nur fürs Bootstrap.
+
+**Folge-Schritte (offen, inkrementell):**
+
+1. **Restliche pure-domain Tests:** ~30 Files in
+   `:app/src/test/java/.../domain/`, die keine `fakes/`, kein Android
+   und kein Robolectric brauchen. Pro Sweep ~5 Files migrieren,
+   `./gradlew :domain:test` läuft nach jedem Sweep grün.
+2. **`fakes/` nach `testFixtures`:** `FakeFavoritesRepository`,
+   `FakeSettingsRepository` etc. werden von Contract-Tests in beiden
+   Modulen gebraucht. Move nach `:domain/src/testFixtures/java/.../fakes/`,
+   dann sind die Contract-Tests pure-domain-fähig.
+3. **`:data` mit eigenen Tests + testFixtures:**
+   - Plugin auf `:data` aktivieren.
+   - `:data` braucht `application=android.app.Application` als
+     Robolectric-Default — `app/src/test/resources/robolectric.properties`
+     dupliziert nach `data/src/test/resources/`. Siehe §6-Memo für
+     den Hintergrund (ANRWatchDog-Leak).
+   - Repository-Impl-Tests (`FavoritesRepositoryImplTest`,
+     `WallpaperRepositoryImplTest` etc.) nach `:data/src/test/`.
+4. **`FakeDataStore` als Crossover-Helper:** existiert bereits in
+   `:app/src/test/`, wird von Contract-Tests in :app *und* den
+   geplanten :data-Repository-Impl-Tests gebraucht. Move nach
+   `:domain/src/testFixtures/` macht ihn beidseitig konsumierbar.
+
+**Risiko-Punkte:**
+
+- **Robolectric-Konfiguration**: `:app/src/test/resources/robolectric.properties`
+  mit `application=android.app.Application` als Default verhindert
+  einen `KolibriLauncherApp`-Leak (siehe §6-Memo). Wenn `:data:test`
+  Robolectric braucht, muss diese Datei dupliziert werden — keine
+  Magie aus `:app` greift in `:data:test`.
+- **`@TestInstallIn`/Hilt-Test-Module**: einige `:app`-Tests benutzen
+  `HiltTestApplication` und Test-Module-Replacements. Diese können
+  nicht ohne weiteres in `:domain` oder `:data` umziehen, weil das
+  Hilt-Plugin (`hilt-android`) dort nicht aktiv ist. Alle Hilt-test-
+  abhängigen Tests bleiben in `:app/src/test/`.
+- **`AndroidEntryPoint`/Robolectric-Activity-Tests**: Grant alle in
+  `:app/src/test/` (Activity-Lifecycle ist UI-Layer).
+- **Test-Isolation ist nicht 100% erreichbar.** Es gibt Tests, die
+  Activity-Lifecycle, ContentResolver, oder System-API-Mocking
+  brauchen — die bleiben naturgemäß in :app oder :data. Ziel ist
+  „so viele Tests wie möglich pure-JVM in :domain", nicht „alle
+  Tests pure-JVM".
+
+**Erfolgs-Kriterien für 9+:**
+
+- ≥ 50 % der `:app/src/test/java/.../domain/` Tests sind nach
+  `:domain/src/test/` gewandert.
+- ≥ 30 % der Repository-Impl-Tests sind nach `:data/src/test/`
+  gewandert (mit Robolectric-Setup).
+- `./gradlew :domain:test` und `./gradlew :data:test` haben echten
+  Inhalt; die Test-Time-Win ist real (sub-second für reine Domain-
+  Logik gegen Robolectric-Bootstrap-Zeit für die Reststände).
+
+Memo bleibt damit (a) ein neuer Reviewer das gewählte testFixtures-
+Pattern und seine Begründung versteht, (b) die Folge-Schritte als
+inkrementell ablaufbare Sweeps dokumentiert sind, und (c) der
+`FakeDataStore`/Robolectric-Konfigurations-Hinweis für die
+:data-Migration präsent ist (sonst rennt man in einen
+ANRWatchdog-Leak).
 
 ---
 

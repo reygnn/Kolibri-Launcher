@@ -23,6 +23,7 @@
 plugins {
     kotlin("jvm")
     id("kotlin-kapt")
+    `java-test-fixtures`
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -66,6 +67,15 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.truth)
     testImplementation(libs.kotlin.test.junit)
+
+    // Shared test fixtures (TimberRule, MainDispatcherRule, …) consumed
+    // by both :domain/src/test/ and :app/src/test/ via the
+    // `java-test-fixtures` plugin. The fixtures source set lives in
+    // :domain/src/testFixtures/ and gets its own `implementation`-style
+    // configuration below; consumers reach it via
+    // `testImplementation(testFixtures(project(":domain")))`.
+    testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.kotlinx.coroutines.test)
 }
 
 kapt {

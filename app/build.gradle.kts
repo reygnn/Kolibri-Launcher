@@ -196,6 +196,10 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
 
+    // Shared test fixtures from :domain (TimberRule, MainDispatcherRule, …).
+    // See `java-test-fixtures` block in domain/build.gradle.kts. Brocken B.
+    testImplementation(testFixtures(project(":domain")))
+
     // UI & Material  (MUST be loaded first or use resolutionStrategy below!)
     implementation(libs.material)  // MUSS VOR androidx.appcompat:appcompat !!!
 
