@@ -20,14 +20,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 | 7 | Selbst-Linter für die 13 Rules | teilumgesetzt 2026-05-03 (3 von 6 Rules), Memo bleibt | — |
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
-| 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 + 9.4 erledigt 2026-05-03; 9.2 offen | groß (2-3 Tage) |
+| 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §9.2 (Modul-Split) ist der
-einzige verbleibende Architektur-Brocken aus §9 und der einzige
-Schritt, der das Repo über 7.5/10 Reife heben würde — größer und
-sequenziell, nicht ad-hoc starten. §10 ist als wiederkehrender
-Quartals-Termin etabliert (siehe Memo) und triggert sich von selbst.
+**Empfohlene Reihenfolge bei freier Wahl:** Keine offenen Punkte
+mehr. §10 ist als wiederkehrender Quartals-Termin etabliert (siehe
+Memo) und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
@@ -497,42 +495,96 @@ alle 12 Sites auf einmal gepinnt wurden.
 
 ---
 
-## 9. Architektur-Schritte für 9+ Score
+## 9. (Memo, abgeschlossen 2026-05-03) Architektur-Schritte für 9+ Score
 
-**Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10 eingeordnet.
-Stärken sind Architektur-Disziplin, Doku-Tiefe, Test-Disziplin. Was den
-Score deckelt, ist ein verbleibender Architektur-Brocken (§9.2 Modul-
-Split). §9.1 (`BackupRepositoryImpl`-Split, siehe §3-Memo), §9.3
-(`HomeFragment`-Edit-Submodul via `WallpaperEditController`,
-HomeFragment 2657 → 1997 Zeilen über zwei Sweeps), §9.4
-(`ResetRepositoryImpl` 226 → 134 Zeilen via `purgeAll`-Helper) — alle
+**Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10
+eingeordnet. Stärken sind Architektur-Disziplin, Doku-Tiefe,
+Test-Disziplin. Vier Architektur-Schritte aus dem Review — alle
 umgesetzt 2026-05-03.
 
-### 9.2. Modul-Split
+- **§9.1** — `BackupRepositoryImpl`-Split, siehe §3-Memo
+- **§9.3** — `HomeFragment`-Edit-Submodul via `WallpaperEditController`,
+  HomeFragment 2657 → 1997 Zeilen über zwei Sweeps
+- **§9.4** — `ResetRepositoryImpl` 226 → 134 Zeilen via
+  `purgeAll`-Helper
+- **§9.2** — Modul-Split (siehe unten)
 
-Single-Module bei 16 Repositories + 50 UseCases + 10 ViewModels ist groß
-genug, dass Build-Cache-Resilienz und Compile-Zeit deutlich darunter
-leiden.
+### 9.2 (Memo, umgesetzt 2026-05-03) Modul-Split
 
-**Vorgeschlagene Modul-Struktur:**
+**Hintergrund:** Single-Module bei 16 Repositories + 50 UseCases +
+10 ViewModels war groß genug, dass Build-Cache-Resilienz und
+Compile-Zeit deutlich darunter litten.
 
-- `:domain` — `domain/repository/`, `domain/usecase/`, `domain/model/`,
-  `core/`. Kein Android-SDK, nur Kotlin + Coroutines + Hilt-Annotations.
-- `:data` — `data/`, `di/RepositoryModule`, `di/DataStoreModule`. Nur
-  Datenzugriff.
-- `:app` (resp. `:ui`) — alles unter `ui/`, `KolibriLauncherApp`, alle
-  Activities + Fragments + ViewModels.
+**Anlauf-Realität:** Der ursprüngliche Plan („`:domain` als reines
+Kotlin-Modul ohne Android-SDK") war zu ambitioniert — die
+Feasibility-Studie fand 13 Domain-Files mit Android-Imports
+(`Parcelable`, `LiveData`, `WallpaperColors`, etc.) plus zwei
+Cycles (`data → ui` und `domain → di`). Stattdessen wurde Variante 1
+gewählt: `:domain` und `:data` als Android-Library-Module
+(Compile-Cache-Win bleibt, „Pure Kotlin"-Strenge fällt weg).
 
-AGP 8.13 unterstützt das nahtlos. Hilt-Multi-Module-Setup ist gut
-dokumentiert. `gradle/libs.versions.toml` ist schon da — Modul-Files
-würden sie wiederverwenden.
+**Vorbereitung in zwei Branches:**
 
-**Wert:** inkrementelle Builds nach Domain-Änderungen werden ~3× schneller,
-weil `:ui` nicht neu compiled wird wenn nur ein Repo ändert. Test-
-Isolation: `:domain`-Tests laufen ohne `:data`/`:ui`-Compile.
+- `refactor/cycle-elimination-data-to-ui` (Commits 5e0d9b3, 9f9b3d2,
+  695dd52) — `SwipeSlot` → `domain/model/`, `AppUpdateSignal` →
+  `core/`, `CrashReportConsent` aufgeteilt in
+  `data/CrashReportConsentStore` (DataStore-I/O) +
+  `ui/util/CrashReportConsent` (Dialog).
+- `refactor/cycle-elimination-domain-to-di` (Commit a5db526) — Hilt-
+  Qualifier-Annotationen (`@DefaultDispatcher` etc.) von `di/` nach
+  `core/` verschoben; `@Provides`-Bindings bleiben in `di/`.
 
-**Aufwand:** 2-3 Tage (initial Modul-Aufteilung + Hilt-Multi-Module-
-Wiring + ggf. einige zirkuläre Imports auflösen).
+**Eigentlicher Modul-Split (Branch `refactor/module-split`, Commits
+54eec88, 35eeda5):**
+
+- **`:domain`** (Android Library) — `core/`, `domain/`,
+  `DispatcherModule`. Eigene `R`-Klasse mit 12 Use-Case-Strings.
+  `BuildConfig` aktiv für `TimberWrapper.DEBUG`.
+- **`:data`** (Android Library) — `data/`, `RepositoryModule`,
+  `DataStoreModule`. `BuildConfig` aktiv für `FavoritesRepositoryImpl`.
+  `BackupDataAssembler` und `UsageExportRepositoryImpl` injizieren
+  `versionName` per `@Named("appVersionName")` aus `:app` (Single
+  Source of Truth statt Duplikat).
+- **`:app`** — Application-Modul, hängt von `:domain` und `:data` ab.
+
+**Spike-Vorlauf:** Ein Throw-Away-Worktree (`spike/module-split-feasibility`,
+nach Verifikation gelöscht) hat zuerst die Hilt-2.57.2-Multi-Module-
+Aggregation gegen die Realität geprüft, bevor der echte Branch begann.
+Damit wurde aus dem 6-11h-Risiko ein 4-6h-Plan. Pattern empfohlen für
+größere Refactorings mit Build-/DI-Risiko.
+
+**Latente Leaks während der Move-Phase aufgedeckt + gefixt:**
+
+- `ui.base.UiState` (generic Loading/Success/Error) → `domain/model/UiState`
+- `ui.appcontextmenu.AppContextMenuAction` (laut KDoc selbst
+  „rein datenbasiert") → `domain/model/AppContextMenuAction`
+
+**Visibility-Anpassung:** Zwei Test-Entry-Points in `:data` mussten ihr
+`internal`-Modifier verlieren (`PackageUpdateReceiver.handleReceive`,
+`SwipeActionsRepositoryImpl.Companion.createForTesting`), weil Tests
+weiterhin in `:app/src/test/` leben und `internal` keine
+Modul-Grenzen überschreitet. `@VisibleForTesting` bleibt als
+Lint-Schutz vor versehentlicher Produktions-Nutzung.
+
+**Linter-Update:** `tools/check-conventions.sh` scannt jetzt alle
+drei Modul-Source-Roots. Ohne diesen Fix wären Code-Stellen, die
+in `:domain` oder `:data` gewandert sind, still aus den Rule-9-/
+Rule-12-/Manager-Naming-Checks gefallen.
+
+**Wert geliefert:** Inkrementelle Builds nach Domain-Änderungen
+springen jetzt `:app`-Compilation, weil `:domain`/`:data` getrennt
+gecached sind. Die Test-Isolation pro Modul (was die ursprüngliche
+§9.2 erwähnt hatte) ist NICHT umgesetzt — alle Tests bleiben in
+`:app/src/test/`. Wenn Test-Isolation zukünftig gewünscht ist,
+ist das ein eigenes Folge-Projekt (Test-Helper-Modul oder
+`testFixtures`-Feature).
+
+Memo bleibt damit ein Reviewer (a) den Spike-vor-Implementierung als
+Pattern erkennt für DI-/Build-riskante Refactorings, (b) die
+versteckten Leaks dokumentiert sieht, (c) versteht warum
+`:data` weiterhin Tests in `:app` hat (Pragmatismus, nicht
+Versehen), und (d) den `BuildConfig.VERSION_NAME`-Hilt-Trick
+parat hat falls neue `:data`-Features die Version brauchen.
 
 ---
 

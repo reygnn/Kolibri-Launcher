@@ -43,22 +43,69 @@ code (e.g. `WallpaperRepositoryImplTest`).
 
 ## Architecture
 
+Three Gradle modules since the §9.2 split (2026-05-03). Production code is
+split across `:domain`, `:data`, and `:app`; all tests live in `:app/src/test/`
+for now.
+
 ```
-core/                     AppConstants, TextColorCalculator, TimberWrapper, utils
-data/                     repository implementations (FavoritesRepositoryImpl, …)
-data/service/             service implementations (ShortcutLauncherServiceImpl)
-domain/repository/        interfaces (FavoritesRepository, …) — 20 of them
-domain/usecase/           ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
-domain/model/             data classes (AppInfo, HomeSettings, WallpaperState, …)
-di/                       6 Hilt modules (App, DataStore, Dispatcher,
-                          Repository, ViewModel, AppUpdate)
-ui/                       features: home, appdrawer, settings, onboarding,
+:domain  (Android Library)
+  core/                   AppConstants, TextColorCalculator, TimberWrapper,
+                          AppUpdateSignal, Qualifiers, CoerceExtensions
+  domain/repository/      interfaces (FavoritesRepository, …) — 20 of them
+  domain/usecase/         ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
+  domain/model/           data classes (AppInfo, HomeSettings, UiState,
+                          AppContextMenuAction, WallpaperState, …)
+  di/DispatcherModule     @Provides for Default/IO/Main + ApplicationScope
+  res/values/strings.xml  12 strings owned by use cases (favorites limit,
+                          rename app, etc.)
+
+:data    (Android Library, depends on :domain)
+  data/                   repository implementations (FavoritesRepositoryImpl,
+                          BackupRepositoryImpl, …), CrashReportConsentStore,
+                          PackageUpdateReceiver, DataMigrationManager
+  data/service/           ShortcutLauncherServiceImpl
+  di/RepositoryModule     @Binds for every repository interface
+  di/DataStoreModule      single Preferences DataStore + the internal
+                          Context.settingsDataStore extension
+
+:app     (Android Application, depends on :domain + :data)
+  ui/                     features: home, appdrawer, settings, onboarding,
                           swipeactions, customnames, hiddenapps, backup,
-                          colorcustomization, layoutcustomization, usageexport,
-                          appcontextmenu, main (with delegate/ subpackage)
-KolibriLauncherApp.kt     Application: Hilt entry, ACRA init, Timber trees,
+                          colorcustomization, layoutcustomization,
+                          usageexport, appcontextmenu, main (with delegate/
+                          subpackage)
+  di/                     AppModule (PackageManager, WallpaperManager,
+                          @Named("appVersionName") from BuildConfig),
+                          AppUpdateModule, ViewModelModule
+  KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
                           ANRWatchDog, migration bootstrap
 ```
+
+Key points to remember when adding code:
+
+- **Modules form a one-way dependency chain.** `:app → :data → :domain`.
+  `:data` cannot import from `:app`/`ui/`; `:domain` cannot import from
+  `:data` or `:app`. The two cycles that existed before the split
+  (`data → ui` via `SwipeSlot`/`AppUpdateSignal`/`CrashReportConsent`,
+  `domain → di` via `@DefaultDispatcher`) are gone — don't reintroduce.
+- **`:domain` is an Android Library, not pure Kotlin.** It holds
+  `Parcelize`d models, `Bitmap`-using utilities (`TextColorCalculator`),
+  and DataStore preference keys (`AppConstants`). The compile-cache win
+  is the goal; strict purity was traded off — see TODO.md §9.2 memo.
+- **Each module has its own `BuildConfig`.** `:domain` and `:data` enable
+  `buildFeatures.buildConfig`. The app's `versionName` is *not* duplicated
+  as a `buildConfigField`; it flows from `:app/AppModule` via
+  `@Named("appVersionName") String` to `BackupDataAssembler` and
+  `UsageExportRepositoryImpl`. Single source of truth.
+- **`:domain` has its own `R` class** (12 use-case strings live in
+  `:domain/res/`). Use cases that need a string ID use
+  `com.github.reygnn.kolibri_launcher.domain.R`. UI consumers read
+  the resulting `Int` via `context.getString(messageResId)` — no
+  compile-time R reference needed cross-module.
+- **`internal` does not cross module boundaries.** When tests in `:app`
+  need access to a test-only entry point in `:data`, the entry point
+  drops `internal` and keeps `@VisibleForTesting` (so out-of-test
+  usage still triggers the lint warning).
 
 `MainActivity` is registered as both `LAUNCHER` and `HOME` intent (a real
 default-launcher candidate). It hosts fragments via the Navigation Component.
