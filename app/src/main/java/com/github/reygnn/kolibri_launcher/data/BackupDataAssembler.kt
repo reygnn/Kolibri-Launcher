@@ -17,7 +17,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsReposit
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import javax.inject.Inject

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.Flow
 
 /**

@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.MockKAnnotations
 import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK

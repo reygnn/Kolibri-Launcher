@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 // TIMESTAMP 2025-12-03 19:50
 
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeSwipeActionsRepository : SwipeActionsRepository {

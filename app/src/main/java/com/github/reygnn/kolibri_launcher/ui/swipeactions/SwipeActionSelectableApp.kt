@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.swipeactions
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
 /**
  * Repräsentiert eine App in der "Swipe Actions"-Auswahlliste.

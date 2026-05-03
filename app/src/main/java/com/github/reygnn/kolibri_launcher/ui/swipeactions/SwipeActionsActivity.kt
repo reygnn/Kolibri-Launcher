@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivitySwipeActionsBinding
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.AndroidEntryPoint

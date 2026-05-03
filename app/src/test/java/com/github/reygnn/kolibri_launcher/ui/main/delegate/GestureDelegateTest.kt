@@ -7,7 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUse
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope

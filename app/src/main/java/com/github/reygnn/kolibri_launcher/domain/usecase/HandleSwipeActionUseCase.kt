@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import javax.inject.Inject

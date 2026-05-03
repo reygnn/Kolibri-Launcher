@@ -59,7 +59,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi

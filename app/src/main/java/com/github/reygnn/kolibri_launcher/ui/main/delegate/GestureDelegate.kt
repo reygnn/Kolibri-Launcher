@@ -15,7 +15,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

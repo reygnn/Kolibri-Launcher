@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import javax.inject.Inject
 
 class SetSwipeActionUseCase @Inject constructor(

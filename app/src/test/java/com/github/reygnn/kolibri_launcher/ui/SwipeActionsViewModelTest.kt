@@ -10,7 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsViewModel
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

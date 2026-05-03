@@ -9,7 +9,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest

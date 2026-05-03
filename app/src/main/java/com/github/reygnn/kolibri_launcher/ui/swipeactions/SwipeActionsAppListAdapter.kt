@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.databinding.ItemAppSelectableSwipeBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
 class SwipeActionsAppListAdapter(
     private val onAppClicked: (AppInfo) -> Unit
