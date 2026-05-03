@@ -47,29 +47,49 @@ für alle Repository-Interfaces abfängt. Namens-Schema:
 - `FakeXyzRepositoryContractTest.kt` — läuft die Tests gegen den Fake
 - `XyzRepositoryImplContractTest.kt` — läuft dieselben Tests gegen die Impl
 
-### Status je Repository (Stand: Ende der Contract-Test-Initiative)
+### Status je Repository
 
-Alle 13 Repository-Interfaces sind behandelt:
+Alle 16 Repository-Interfaces sind behandelt — 12 mit Contract-Pair,
+4 mit ADR-only-Begründung:
 
-| Interface              | Contract | Impl-Test | Kommentar |
-|------------------------|:--------:|:---------:|-----------|
-| FavoritesRepository    |    ✓     |     ✓     | + ShareIn-Infrastruktur-Test |
-| SettingsRepository     |    ✓     |     ✓     | — |
-| SwipeActionsRepository |    ✓     |     ✓     | — |
-| FavoritesOrderRepository |  ✓     |     ✓     | — |
-| HiddenAppsRepository   |    ✓     |     ✓     | — |
-| InstalledAppsRepository|    ✓     |     —     | Zwei Fake-Subklassen, keine Impl (PackageManager) |
-| AppUsageRepository     |    ✓     |     ✓     | Sort-Algorithmus NICHT im Vertrag (Clock-Problem) |
-| WallpaperRepository    |    ✓     |     ✓     | Robolectric (Uri) |
-| CustomNamesRepository  |    ✓     |     ✓     | — |
-| InstalledAppsStateRepository |  ✓ |     ✓     | — |
-| ScreenLockRepository   |    ✓     |     ✓     | — |
-| BackupRepository       |    ✓     |     —     | Fake-only (Uri + ContentResolver) |
-| TimeBasedEventsRepository | ADR only |   —    | Keine Tests — Begründung im File |
+| Interface              | Contract | Impl-CT | Kommentar |
+|------------------------|:--------:|:-------:|-----------|
+| FavoritesRepository    |    ✓     |    ✓    | + ShareIn-Infrastruktur-Test |
+| SettingsRepository     |    ✓     |    ✓    | — |
+| SwipeActionsRepository |    ✓     |    ✓    | — |
+| FavoritesOrderRepository |  ✓     |    ✓    | — |
+| HiddenAppsRepository   |    ✓     |    ✓    | — |
+| InstalledAppsRepository|    ✓     |    —    | Zwei Fake-Subklassen, keine Impl (PackageManager) |
+| AppUsageRepository     |    ✓     |    ✓    | Sort-Algorithmus NICHT im Vertrag (Clock-Problem) |
+| WallpaperRepository    |    ✓     |    ✓    | Robolectric (Uri) |
+| CustomNamesRepository  |    ✓     |    ✓    | — |
+| InstalledAppsStateRepository |  ✓ |    ✓    | — |
+| ScreenLockRepository   |    ✓     |    ✓    | — |
+| BackupRepository       |    ✓     |    —    | Fake-only (Uri + ContentResolver) |
+| TimeBasedEventsRepository | ADR only |  —   | System-API (AlarmManager + Calendar); ImplTest deckt Logik via MockK ab |
+| ShortcutRepository     | ADR only |    —    | System-API (LauncherApps); ImplTest deckt Logik via MockK ab |
+| ResetRepository        | ADR only |    —    | Komposition (orchestriert 11 Purgeable-Repos); ImplTest deckt Koordination ab |
+| UsageExportRepository  | ADR only |    —    | Mixed: pure JSON + Uri-File-I/O; 5 Spec-Files decken Format / Time / I/O / Adversarial ab |
 
-"ADR only" = `TimeBasedEventsRepositoryContract.kt` enthält ausschließlich
-KDoc, der begründet warum es keinen Test gibt. Kein ungeschriebener Test,
-sondern eine dokumentierte Entscheidung.
+Note: "Impl-CT" = Impl-Contract-Test, NOT generic ImplTest. Reguläre
+ImplTests existieren für alle ADR-only-Einträge — sie liegen ausserhalb
+der Contract-Suite und prüfen die System-API-getriebene Logik direkt.
+
+"ADR only" = der jeweilige `XyzRepositoryContract.kt` enthält ausschließlich
+KDoc, der begründet warum es keinen ausführbaren Contract-Test gibt. Kein
+ungeschriebener Test, sondern eine dokumentierte Entscheidung. Vier
+Begründungen:
+
+- **System-API**: Der Manager ist nicht ehrlich JVM-instanziierbar
+  (TimeBasedEvents: AlarmManager+Calendar; Shortcut: LauncherApps).
+  Selbe Begründung wie bei BackupRepository, dort aber mit Fake-only-
+  Contract als Drift-Schutz für eventuelle zweite Fakes.
+- **Komposition**: Surface zu dünn für Contract (Reset: Boolean-Returns
+  über Orchestrierung), Logik liegt in der Koordination — ImplTest
+  ist die richtige Test-Form.
+- **Mixed**: Teils testbar (JSON), teils system-API (Uri/ContentResolver);
+  Format-Logik wäre in einem Fake nur Selbst-Re-Implementierung
+  (UsageExport).
 
 ### Bugs, die die Contracts aufgedeckt haben
 
