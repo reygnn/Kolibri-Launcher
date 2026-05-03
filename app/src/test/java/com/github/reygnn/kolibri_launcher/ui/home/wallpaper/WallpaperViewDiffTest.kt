@@ -1,7 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
-import android.net.Uri
-import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import org.junit.Assert.assertEquals
@@ -34,11 +32,11 @@ class WallpaperViewDiffTest {
 
     // --- Fixtures ---
 
-    private fun uri(path: String): Uri = "file://$path".toUri()
+    private fun uri(path: String): String = "file://$path"
 
     private fun layer(
         id: String,
-        imageUri: Uri? = uri("/data/$id.jpg"),
+        imageUri: String? = uri("/data/$id.jpg"),
         scale: Float = 1f,
         translateX: Float = 0f,
         translateY: Float = 0f,

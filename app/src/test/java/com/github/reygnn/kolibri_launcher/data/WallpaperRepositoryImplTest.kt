@@ -68,7 +68,7 @@ class WallpaperRepositoryImplTest {
         dataStore = FakeDataStore()
         fileManager = mockk(relaxed = true)
         // Default: every file exists on disk. Individual tests override.
-        every { fileManager.fileExists(any()) } returns true
+        every { fileManager.fileExists(any<Uri>()) } returns true
 
         manager = WallpaperRepositoryImpl(dataStore, fileManager)
     }
@@ -103,7 +103,7 @@ class WallpaperRepositoryImplTest {
 
     @Test
     fun `parseWallpaperState with legacy keys but file missing yields NONE`() = runTest {
-        every { fileManager.fileExists(any()) } returns false
+        every { fileManager.fileExists(any<Uri>()) } returns false
         dataStore.seed {
             it[KEY_WALLPAPER_URI] = "file:///data/deleted.jpg"
             it[KEY_WALLPAPER_SCALE] = 1.5f
@@ -211,7 +211,7 @@ class WallpaperRepositoryImplTest {
 
     @Test
     fun `parseWallpaperState with all layer files missing yields NONE`() = runTest {
-        every { fileManager.fileExists(any()) } returns false
+        every { fileManager.fileExists(any<Uri>()) } returns false
         val json = """
             [
               {"id":"la","imageUri":"file:///data/a.jpg"},
@@ -267,7 +267,7 @@ class WallpaperRepositoryImplTest {
         dataStore.seed { it[KEY_LAYERS_JSON] = "[]" }
 
         val single = WallpaperState(
-            imageUri = "file:///data/x.jpg".toUri(),
+            imageUri = "file:///data/x.jpg",
             scale = 1.5f,
             translateX = 10f,
             translateY = 20f
@@ -289,12 +289,12 @@ class WallpaperRepositoryImplTest {
             listOf(
                 WallpaperLayerState(
                     id = "l1",
-                    imageUri = "file:///data/a.jpg".toUri(),
+                    imageUri = "file:///data/a.jpg",
                     scale = 2.0f
                 ),
                 WallpaperLayerState(
                     id = "l2",
-                    imageUri = "file:///data/b.jpg".toUri(),
+                    imageUri = "file:///data/b.jpg",
                     scale = 3.0f
                 )
             )
@@ -363,7 +363,7 @@ class WallpaperRepositoryImplTest {
             listOf(
                 WallpaperLayerState(
                     id = "abc_123",
-                    imageUri = "file:///data/a.jpg".toUri(),
+                    imageUri = "file:///data/a.jpg",
                     scale = 1.25f,
                     translateX = 7f,
                     translateY = -3f,
@@ -402,7 +402,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.getWallpaperStateSync()
 
-        assertEquals("file:///data/a.jpg", state.imageUri.toString())
+        assertEquals("file:///data/a.jpg", state.imageUri)
         assertEquals(2.0f, state.scale)
     }
 
@@ -461,12 +461,12 @@ class WallpaperRepositoryImplTest {
         // Guards against silent clamping (e.g. a future min/max validator).
         // 0.25f and 8.0f are both exactly representable as Float to avoid
         // precision noise in the round-trip via Double in the JSON path.
-        val tinyState = WallpaperState(imageUri = "file:///data/x.jpg".toUri(), scale = 0.25f)
+        val tinyState = WallpaperState(imageUri = "file:///data/x.jpg", scale = 0.25f)
         manager.saveWallpaperState(tinyState)
         advanceUntilIdle()
         assertEquals(0.25f, manager.wallpaperState.first().scale)
 
-        val hugeState = WallpaperState(imageUri = "file:///data/x.jpg".toUri(), scale = 8.0f)
+        val hugeState = WallpaperState(imageUri = "file:///data/x.jpg", scale = 8.0f)
         manager.saveWallpaperState(hugeState)
         advanceUntilIdle()
         assertEquals(8.0f, manager.wallpaperState.first().scale)
@@ -478,7 +478,7 @@ class WallpaperRepositoryImplTest {
         // covered by `with only legacy keys` (-100/-50); this guards the
         // SAVE-side specifically against future clamping at write time.
         val state = WallpaperState(
-            imageUri = "file:///data/x.jpg".toUri(),
+            imageUri = "file:///data/x.jpg",
             translateX = -999f,
             translateY = -1500f
         )

@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.SavedStateHandle
@@ -634,8 +633,7 @@ class LauncherViewModelContractTest {
 
         assertFalse(vm.wallpaperState.value.hasWallpaper)
 
-        val testUri: Uri = mockk()
-        wallpaperStateFlow.value = WallpaperState(imageUri = testUri, scale = 1.5f)
+        wallpaperStateFlow.value = WallpaperState(imageUri = "file:///test.jpg", scale = 1.5f)
         advanceUntilIdle()
 
         assertTrue(vm.wallpaperState.value.hasWallpaper)
@@ -805,8 +803,7 @@ class LauncherViewModelContractTest {
         layoutScaleFlow.value = 0.6f
         splitThresholdFlow.value = 42
         uiColorsFlow.value = UiColorsState(textColor = 0xFFFF00)
-        val testUri: Uri = mockk()
-        wallpaperStateFlow.value = WallpaperState(imageUri = testUri)
+        wallpaperStateFlow.value = WallpaperState(imageUri = "file:///test.jpg")
         timeBasedEventsFlow.value = listOf(
             TimeBasedEvent(System.currentTimeMillis(), "Standup", TimeBasedEventType.CALENDAR)
         )

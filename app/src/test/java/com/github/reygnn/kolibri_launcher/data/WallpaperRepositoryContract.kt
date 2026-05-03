@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -92,8 +91,8 @@ abstract class WallpaperRepositoryContract {
 
     // file://-URIs gewählt, weil der Manager content://-URIs auf NONE setzt
     // (siehe Klassen-KDoc, Drift Nr. 2). Damit testen wir die gemeinsame Basis.
-    private val testUri = "file:///data/wallpaper.jpg".toUri()
-    private val testUri2 = "file:///data/other.jpg".toUri()
+    private val testUri = "file:///data/wallpaper.jpg"
+    private val testUri2 = "file:///data/other.jpg"
 
     // ---------- Fresh state ----------
 

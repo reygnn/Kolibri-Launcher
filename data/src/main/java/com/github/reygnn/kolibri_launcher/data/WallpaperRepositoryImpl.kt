@@ -104,14 +104,15 @@ class WallpaperRepositoryImpl @Inject constructor(
                 val layers = parseLayersFromJson(layersJson)
                 if (layers.isNotEmpty()) {
                     val validLayers = layers.filter { layer ->
-                        val uri = layer.imageUri
+                        val uriString = layer.imageUri
                         // A layer without a URI shows nothing — keeping it would
                         // create a state that is technically multi-layer but
                         // displays no wallpaper (isMultiLayer && !hasWallpaper).
-                        if (uri == null) {
+                        if (uriString == null) {
                             Timber.w("Dropping layer without image URI (id='${layer.id}')")
                             return@filter false
                         }
+                        val uri = uriString.toUri()
                         // Defensive: non-file URIs should not exist in the
                         // state (copyToInternal converts everything to file://
                         // before persistence). If one slips through — old
@@ -186,7 +187,7 @@ class WallpaperRepositoryImpl @Inject constructor(
                 return WallpaperState.NONE
             }
             WallpaperState(
-                imageUri = uri,
+                imageUri = uriString,
                 scale = preferences[KEY_WALLPAPER_SCALE] ?: DEFAULT_SCALE,
                 translateX = preferences[KEY_WALLPAPER_TRANSLATE_X] ?: DEFAULT_TRANSLATE,
                 translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE
@@ -245,8 +246,9 @@ class WallpaperRepositoryImpl @Inject constructor(
 
         // Legacy-Keys mit Layer 0 synchronisieren (Korruptions-Fallback).
         val firstLayer = state.layers.firstOrNull { it.hasImage }
-        if (firstLayer != null) {
-            preferences[KEY_WALLPAPER_URI] = firstLayer.imageUri.toString()
+        val firstLayerUri = firstLayer?.imageUri
+        if (firstLayer != null && firstLayerUri != null) {
+            preferences[KEY_WALLPAPER_URI] = firstLayerUri
             preferences[KEY_WALLPAPER_SCALE] = firstLayer.scale
             preferences[KEY_WALLPAPER_TRANSLATE_X] = firstLayer.translateX
             preferences[KEY_WALLPAPER_TRANSLATE_Y] = firstLayer.translateY
@@ -269,7 +271,8 @@ class WallpaperRepositoryImpl @Inject constructor(
      * Entfernt den Multi-Layer JSON-Key.
      */
     private fun saveSingleLayerState(preferences: MutablePreferences, state: WallpaperState) {
-        preferences[KEY_WALLPAPER_URI] = state.imageUri.toString()
+        // saveWallpaperState only routes here when state.imageUri != null.
+        preferences[KEY_WALLPAPER_URI] = state.imageUri ?: ""
         preferences[KEY_WALLPAPER_SCALE] = state.scale
         preferences[KEY_WALLPAPER_TRANSLATE_X] = state.translateX
         preferences[KEY_WALLPAPER_TRANSLATE_Y] = state.translateY
@@ -345,7 +348,7 @@ class WallpaperRepositoryImpl @Inject constructor(
         for (layer in layers) {
             val obj = JSONObject().apply {
                 put("id", layer.id)
-                put("imageUri", layer.imageUri?.toString() ?: "")
+                put("imageUri", layer.imageUri ?: "")
                 put("scale", layer.scale.toDouble())
                 put("translateX", layer.translateX.toDouble())
                 put("translateY", layer.translateY.toDouble())
@@ -371,13 +374,12 @@ class WallpaperRepositoryImpl @Inject constructor(
             try {
                 val obj = array.getJSONObject(i)
 
-                val uriString = obj.optString("imageUri", "")
-                val uri = if (uriString.isNotBlank()) uriString.toUri() else null
+                val uriString = obj.optString("imageUri", "").takeIf { it.isNotBlank() }
 
                 layers.add(
                     WallpaperLayerState(
                         id = obj.optString("id", "layer_restored_$i"),
-                        imageUri = uri,
+                        imageUri = uriString,
                         scale = obj.optDouble("scale", DEFAULT_SCALE.toDouble()).toFloat(),
                         translateX = obj.optDouble("translateX", DEFAULT_TRANSLATE.toDouble()).toFloat(),
                         translateY = obj.optDouble("translateY", DEFAULT_TRANSLATE.toDouble()).toFloat(),

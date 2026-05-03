@@ -1,7 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import android.graphics.BlendMode
-import android.net.Uri
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -14,8 +12,8 @@ data class WallpaperLayerState(
     /** Unique ID für Identifikation */
     val id: String = newId(),
 
-    /** URI zum Bild (content:// oder file://) */
-    val imageUri: Uri? = null,
+    /** Image URI as string (`content://` or `file://`). UI-side consumers parse it on demand. */
+    val imageUri: String? = null,
 
     /** Zoom-Faktor (1.0 = Original) */
     val scale: Float = DEFAULT_SCALE,
@@ -59,7 +57,7 @@ data class WallpaperLayerState(
         fun fromMap(map: Map<String, Any?>): WallpaperLayerState {
             return WallpaperLayerState(
                 id = map["id"] as? String ?: newId(),
-                imageUri = (map["imageUri"] as? String)?.takeIf { it.isNotEmpty() }?.let { Uri.parse(it) },
+                imageUri = (map["imageUri"] as? String)?.takeIf { it.isNotEmpty() },
                 scale = (map["scale"] as? Number)?.toFloat() ?: DEFAULT_SCALE,
                 translateX = (map["translateX"] as? Number)?.toFloat() ?: 0f,
                 translateY = (map["translateY"] as? Number)?.toFloat() ?: 0f,
@@ -80,13 +78,14 @@ data class WallpaperLayerState(
         get() = imageUri != null
 
     /**
-     * BlendMode-Objekt (API 29+). Wird aus dem Namen aufgelöst.
-     * null = Normal (SRC_OVER).
+     * Domain blend mode resolved from the persisted [blendModeName].
+     * `null` = Normal (SRC_OVER) or an unknown name. UI consumers map this to
+     * `android.graphics.BlendMode` via `WallpaperBlendMode.toAndroidBlendMode()`.
      */
-    val blendMode: BlendMode?
+    val blendMode: WallpaperBlendMode?
         get() = blendModeName?.let { name ->
             try {
-                BlendMode.valueOf(name)
+                WallpaperBlendMode.valueOf(name)
             } catch (e: IllegalArgumentException) {
                 null
             }
@@ -97,7 +96,7 @@ data class WallpaperLayerState(
      */
     fun toMap(): Map<String, Any> = mapOf(
         "id" to id,
-        "imageUri" to (imageUri?.toString() ?: ""),
+        "imageUri" to (imageUri ?: ""),
         "scale" to scale,
         "translateX" to translateX,
         "translateY" to translateY,
@@ -134,8 +133,11 @@ data class WallpaperState(
     // [toMultiLayer] enforces this when migrating; constructed states
     // should respect it too.
 
-    /** URI zum Bild – null = kein Custom Wallpaper. MUSS null sein wenn layers nicht leer. */
-    val imageUri: Uri? = null,
+    /**
+     * Image URI as string — `null` = no custom wallpaper. MUST be `null` when [layers]
+     * is non-empty.
+     */
+    val imageUri: String? = null,
 
     /** Zoom-Faktor (Single-Layer). MUSS Default sein wenn layers nicht leer. */
     val scale: Float = WallpaperLayerState.DEFAULT_SCALE,
@@ -206,9 +208,9 @@ data class WallpaperState(
      * Nützlich für Orphan-File-GC: Dateien in `wallpapers/`, die nicht in diesem Set
      * vorkommen, sind Waisen und können weggeräumt werden.
      */
-    val referencedUris: Set<Uri>
+    val referencedUris: Set<String>
         get() {
-            val set = mutableSetOf<Uri>()
+            val set = mutableSetOf<String>()
             imageUri?.let { set.add(it) }
             for (layer in layers) {
                 layer.imageUri?.let { set.add(it) }

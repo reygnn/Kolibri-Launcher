@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import android.net.Uri
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import io.mockk.every
@@ -31,7 +32,7 @@ class WallpaperRepositoryImplContractTest : WallpaperRepositoryContract() {
     override fun createRepository(): WallpaperRepository {
         val fakeDataStore = FakeDataStore()
         val fileManager: WallpaperFileManager = mockk(relaxed = true)
-        every { fileManager.fileExists(any()) } returns true
+        every { fileManager.fileExists(any<Uri>()) } returns true
         return WallpaperRepositoryImpl(fakeDataStore, fileManager)
     }
 }

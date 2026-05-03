@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -131,7 +130,7 @@ class BackupRepositoryImplWallpaperTest {
     @Test
     fun `exportToJson - with wallpaper - includes all wallpaper fields`() = runTest {
         fakeWallpaperRepo.currentState = WallpaperState(
-            imageUri = testWallpaperUri.toUri(),
+            imageUri = testWallpaperUri,
             scale = testWallpaperScale,
             translateX = testWallpaperTranslateX,
             translateY = testWallpaperTranslateY
@@ -162,7 +161,7 @@ class BackupRepositoryImplWallpaperTest {
     @Test
     fun `exportToJson - wallpaper uses camelCase keys`() = runTest {
         fakeWallpaperRepo.currentState = WallpaperState(
-            imageUri = testWallpaperUri.toUri(),
+            imageUri = testWallpaperUri,
             scale = 1.0f,
             translateX = 0f,
             translateY = 0f
@@ -236,7 +235,7 @@ class BackupRepositoryImplWallpaperTest {
         // before attempting to restore — so existing wallpaper is always cleared
         // when importThemeSettings = true, even if the backup has no wallpaper URI.
         fakeWallpaperRepo.currentState = WallpaperState(
-            imageUri = testWallpaperUri.toUri(),
+            imageUri = testWallpaperUri,
             scale = 1.2f,
             translateX = 10f,
             translateY = 20f
@@ -565,7 +564,7 @@ class BackupRepositoryImplWallpaperTest {
     @Test
     fun `roundtrip - export then import wallpaper - preserves all values`() = runTest {
         val originalState = WallpaperState(
-            imageUri = testWallpaperUri.toUri(),
+            imageUri = testWallpaperUri,
             scale = 1.75f,
             translateX = 42.5f,
             translateY = -17.3f

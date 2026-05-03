@@ -2,8 +2,10 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
 import android.graphics.BlendMode
 import android.net.Uri
+import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.util.toAndroidBlendMode
 
 /**
  * =====================================================================================
@@ -116,14 +118,14 @@ data class LayerLoadSpec(
 ) {
     companion object {
         fun fromLayerState(state: WallpaperLayerState): LayerLoadSpec? {
-            val uri = state.imageUri ?: return null
+            val uriString = state.imageUri ?: return null
             return LayerLoadSpec(
                 id = state.id,
-                imageUri = uri,
+                imageUri = uriString.toUri(),
                 label = state.label,
                 centerCrop = !state.isTransformed,
                 alpha = state.alpha,
-                blendMode = state.blendMode
+                blendMode = state.blendMode?.toAndroidBlendMode()
             )
         }
     }
@@ -157,7 +159,7 @@ data class LayerPropertyUpdate(
                 layerIndex = index,
                 transform = transform,
                 alpha = state.alpha,
-                blendMode = state.blendMode,
+                blendMode = state.blendMode?.toAndroidBlendMode(),
                 isVisible = state.isVisible
             )
         }
@@ -221,7 +223,7 @@ object WallpaperViewDiff {
 
         // ── Case 2: single-layer target ──
         if (!target.isMultiLayer) {
-            val uri = target.imageUri ?: return RebuildPlan.HideAll
+            val uriString = target.imageUri ?: return RebuildPlan.HideAll
             val transform = if (target.isTransformed) {
                 LayerPropertyUpdate.Transform(
                     target.scale,
@@ -231,7 +233,7 @@ object WallpaperViewDiff {
             } else {
                 null
             }
-            return RebuildPlan.SwitchToSingleLayer(uri, transform)
+            return RebuildPlan.SwitchToSingleLayer(uriString.toUri(), transform)
         }
 
         // ── Case 3: multi-layer target ──

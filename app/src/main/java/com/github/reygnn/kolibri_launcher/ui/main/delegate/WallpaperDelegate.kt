@@ -191,14 +191,14 @@ class WallpaperDelegate(
      * The physical file deletion is deferred until commit so that a
      * cancel can fully restore the state – including the file on disk.
      */
-    private val pendingRemovalsOnCommit = mutableSetOf<Uri>()
+    private val pendingRemovalsOnCommit = mutableSetOf<String>()
 
     /**
      * URIs of internal files created by layers added during the current
      * edit session. If the session is canceled, these orphan files are
      * cleaned up; if committed, they are kept.
      */
-    private val pendingRemovalsOnCancel = mutableSetOf<Uri>()
+    private val pendingRemovalsOnCancel = mutableSetOf<String>()
 
     // --- Init ---
 
@@ -289,7 +289,7 @@ class WallpaperDelegate(
                 scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
                 return@launchSafe
             }
-            setWallpaperImageUseCase(internalUri)
+            setWallpaperImageUseCase(internalUri.toString())
 
             val message = displayName ?: context.getString(R.string.wallpaper_set_success)
             scope.sendEvent(UiEvent.ShowToastFromString(message))
@@ -451,7 +451,7 @@ class WallpaperDelegate(
             // While in edit mode, track this file so its orphan copy on
             // disk gets cleaned up if the user cancels the session.
             if (_isWallpaperEditMode.value) {
-                pendingRemovalsOnCancel.add(internalUri)
+                pendingRemovalsOnCancel.add(internalUri.toString())
             }
 
             val current = _wallpaperState.value
@@ -468,7 +468,7 @@ class WallpaperDelegate(
             val resolvedLabel = label ?: nextFreeAutoLabel(base)
 
             val newLayer = WallpaperLayerState(
-                imageUri = internalUri,
+                imageUri = internalUri.toString(),
                 label = resolvedLabel
             )
 

@@ -673,7 +673,9 @@ class LauncherViewModelTest {
     @Test
     fun `onSetWallpaperImage delegates to wallpaperDelegate`() = runTest {
         val uri: Uri = mockk()
-        val internalUri: Uri = mockk()
+        val internalUriString = "file:///internal/wallpaper.jpg"
+        val internalUri: Uri = mockk(relaxed = true)
+        every { internalUri.toString() } returns internalUriString
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
         val vm = createViewModel()
@@ -683,7 +685,7 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.copyToInternal(uri) }
-        coVerify { setWallpaperImageUseCase.invoke(internalUri) }
+        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
     }
 
     // ===========================================

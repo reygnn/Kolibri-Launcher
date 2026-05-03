@@ -56,11 +56,13 @@ class WallpaperDelegateTest {
     private lateinit var wallpaperFileManager: WallpaperFileManager
 
     private val testUri: Uri = mockk()
-    private val internalUri: Uri = mockk()
+    private val internalUriString = "file:///internal/wallpaper.jpg"
+    private val internalUri: Uri = mockk(relaxed = true)
 
     @Before
     fun setUp() {
         sentEvents.clear()
+        every { internalUri.toString() } returns internalUriString
 
         contentResolver = mockk {
             every { query(any(), any(), any(), any(), any()) } returns null
@@ -170,7 +172,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.copyToInternal(testUri) }
-        coVerify { setWallpaperImageUseCase.invoke(internalUri) }
+        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
     }
 
     @Test
@@ -407,7 +409,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onRemoveWallpaperLayer deletes file and saves state`() = runTest {
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -442,7 +444,7 @@ class WallpaperDelegateTest {
         // persists the resulting (empty) state. WallpaperRepositoryImpl.saveWallpaperState
         // treats the empty state as "no wallpaper" and wipes all keys.
         val layer: WallpaperLayerState = mockk {
-            every { imageUri } returns mockk()
+            every { imageUri } returns "file:///layer.jpg"
         }
         val emptyState: WallpaperState = mockk(relaxed = true) {
             every { layers } returns emptyList()
@@ -640,7 +642,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onRemoveWallpaperLayer in edit mode defers file deletion`() = runTest {
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -666,14 +668,15 @@ class WallpaperDelegateTest {
 
         // State was updated & persisted, but the physical file must NOT
         // be deleted yet — Cancel must still be able to restore it.
-        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
         coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 
     @Test
     fun `onRemoveWallpaperLayer outside edit mode deletes file immediately`() = runTest {
         // Regression guard: non-edit-mode behavior must be unchanged.
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -702,7 +705,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onCommitWallpaperEditMode deletes deferred-remove files`() = runTest {
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -727,7 +730,8 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Pre-commit: still not deleted
-        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
 
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
@@ -738,7 +742,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onCancelWallpaperEditMode does not delete deferred-remove files`() = runTest {
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -773,7 +777,7 @@ class WallpaperDelegateTest {
             every { layers } returns listOf(mockk())
             every { hasWallpaper } returns true        }
         val layer: WallpaperLayerState = mockk {
-            every { imageUri } returns mockk()
+            every { imageUri } returns "file:///layer.jpg"
         }
         val snapshotState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
@@ -807,7 +811,7 @@ class WallpaperDelegateTest {
             every { layers } returns listOf(mockk())
             every { hasWallpaper } returns true        }
         val layer: WallpaperLayerState = mockk {
-            every { imageUri } returns mockk()
+            every { imageUri } returns "file:///layer.jpg"
         }
         val snapshotState: WallpaperState = mockk(relaxed = true) {
             every { getLayer(0) } returns layer
@@ -835,7 +839,9 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onCancelWallpaperEditMode deletes files added during edit mode`() = runTest {
-        val addedLayerUri: Uri = mockk()
+        val addedLayerUriString = "file:///added-during-edit.jpg"
+        val addedLayerUri: Uri = mockk(relaxed = true)
+        every { addedLayerUri.toString() } returns addedLayerUriString
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns addedLayerUri
 
         val baseState: WallpaperState = mockk(relaxed = true) {
@@ -857,13 +863,14 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Still in session → no cleanup yet
-        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
 
         delegate.onCancelWallpaperEditMode()
         advanceUntilIdle()
 
         // On cancel the orphan file gets cleaned up
-        verify { wallpaperFileManager.deleteFile(addedLayerUri) }
+        verify { wallpaperFileManager.deleteFile(addedLayerUriString) }
     }
 
     @Test
@@ -892,14 +899,15 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // The added layer is kept → its backing file must stay on disk
-        verify(exactly = 0) { wallpaperFileManager.deleteFile(any()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
     }
 
     @Test
     fun `onSetWallpaperEditMode(true) behaves like onEnterWallpaperEditMode`() = runTest {
         // Regression guard: legacy API must still snapshot the state
         // so that Cancel can roll back removes done afterwards.
-        val layerUri: Uri = mockk()
+        val layerUri = "file:///layer.jpg"
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
@@ -981,12 +989,12 @@ class WallpaperDelegateTest {
 
         // Emit two more states — these represent routine saves during
         // normal operation (add layer, transform change, etc.).
-        stateFlow.value = WallpaperState(imageUri = mockk(relaxed = true))
+        stateFlow.value = WallpaperState(imageUri = "file:///x.jpg")
         advanceUntilIdle()
         stateFlow.value = WallpaperState.NONE
         advanceUntilIdle()
 
-        verify(exactly = 1) { wallpaperFileManager.gcOrphans(any()) }
+        verify(exactly = 1) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
     }
 
     @Test
@@ -1007,10 +1015,11 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Emit additional states too — still no GC while in session.
-        stateFlow.value = WallpaperState(imageUri = mockk(relaxed = true))
+        stateFlow.value = WallpaperState(imageUri = "file:///x.jpg")
         advanceUntilIdle()
 
-        verify(exactly = 0) { wallpaperFileManager.gcOrphans(any()) }
+        verify(exactly = 0) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
+        verify(exactly = 0) { wallpaperFileManager.gcOrphans(any<Set<Uri>>()) }
     }
 
     // ===========================================

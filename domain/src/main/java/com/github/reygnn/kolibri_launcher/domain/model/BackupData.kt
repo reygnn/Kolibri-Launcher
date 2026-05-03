@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import androidx.core.net.toUri
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -57,7 +56,7 @@ data class WallpaperLayerBackup(
     fun toLayerState(): WallpaperLayerState {
         return WallpaperLayerState(
             id = id ?: "layer_${System.currentTimeMillis()}_restored",
-            imageUri = imageUri?.takeIf { it.isNotEmpty() }?.toUri(),
+            imageUri = imageUri?.takeIf { it.isNotEmpty() },
             scale = scale,
             translateX = translateX,
             translateY = translateY,
@@ -72,7 +71,7 @@ data class WallpaperLayerBackup(
         fun fromLayerState(state: WallpaperLayerState): WallpaperLayerBackup {
             return WallpaperLayerBackup(
                 id = state.id,
-                imageUri = state.imageUri?.toString(),
+                imageUri = state.imageUri,
                 scale = state.scale,
                 translateX = state.translateX,
                 translateY = state.translateY,

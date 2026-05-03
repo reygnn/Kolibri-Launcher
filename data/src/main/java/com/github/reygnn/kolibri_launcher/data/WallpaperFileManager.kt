@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -137,6 +138,9 @@ class WallpaperFileManager @Inject constructor(
         return File(path).exists()
     }
 
+    /** String overload: lets pure-Kotlin domain state pass through without `Uri.parse` at the call site. */
+    fun fileExists(uriString: String): Boolean = fileExists(uriString.toUri())
+
     /**
      * Löscht eine interne Wallpaper-Datei.
      * Ignoriert URIs die nicht auf unseren internen Speicher zeigen.
@@ -153,6 +157,9 @@ class WallpaperFileManager @Inject constructor(
             TimberWrapper.silentError(e, "Error deleting wallpaper file: $uri")
         }
     }
+
+    /** String overload — see [fileExists] for the rationale. */
+    fun deleteFile(uriString: String) = deleteFile(uriString.toUri())
 
     /**
      * Löscht ALLE Wallpaper-Dateien im internen Speicher.
@@ -321,6 +328,12 @@ class WallpaperFileManager @Inject constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error running wallpaper orphan GC")
         }
+    }
+
+    /** String overload — see [fileExists] for the rationale. */
+    @JvmName("gcOrphansFromStrings")
+    fun gcOrphans(referencedUriStrings: Set<String>, minAgeMillis: Long = 60_000L) {
+        gcOrphans(referencedUriStrings.mapTo(mutableSetOf()) { it.toUri() }, minAgeMillis)
     }
 
     /**

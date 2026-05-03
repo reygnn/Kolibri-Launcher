@@ -404,7 +404,9 @@ class BackupRepositoryImpl @Inject constructor(
                 if (canAccess) {
                     val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                     if (internalUri != null) {
-                        validLayerStates.add(layerBackup.toLayerState().copy(imageUri = internalUri))
+                        validLayerStates.add(
+                            layerBackup.toLayerState().copy(imageUri = internalUri.toString())
+                        )
                     } else {
                         Timber.w("Failed to copy layer $index to internal storage, skipping")
                     }
@@ -441,7 +443,7 @@ class BackupRepositoryImpl @Inject constructor(
                 val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                 if (internalUri != null) {
                     val wallpaperState = WallpaperState(
-                        imageUri = internalUri,
+                        imageUri = internalUri.toString(),
                         scale = settings.wallpaperScale ?: 1.0f,
                         translateX = settings.wallpaperTranslateX ?: 0.0f,
                         translateY = settings.wallpaperTranslateY ?: 0.0f,
