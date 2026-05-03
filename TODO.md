@@ -20,7 +20,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 | 7 | Selbst-Linter für die 13 Rules | offen | mittel (1-2 Tage) |
 | 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
-| 9 | Architektur-Schritte für 9+ Score | 9.1 erledigt 2026-05-03; 9.2/9.3/9.4 offen | groß (mehrere Tage) |
+| 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 erledigt 2026-05-03; 9.2/9.4 offen | mittel-groß |
 | 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
 **Empfohlene Reihenfolge bei freier Wahl:** §7 (Linter) zuerst — verhindert
@@ -514,8 +514,10 @@ Class-Field-Counter wiederherstellt — also pinnt er das Verhalten korrekt.
 
 **Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10 eingeordnet.
 Stärken sind Architektur-Disziplin, Doku-Tiefe, Test-Disziplin. Was den
-Score deckelt, sind drei verbleibende Architektur-Brocken (§9.1
-`BackupRepositoryImpl`-Split ist umgesetzt — siehe §3-Memo). Sequenziell,
+Score deckelt, sind zwei verbleibende Architektur-Brocken (§9.1
+`BackupRepositoryImpl`-Split ist umgesetzt — siehe §3-Memo;
+§9.3 `HomeFragment`-Edit-Submodul ist umgesetzt 2026-05-03 via
+`WallpaperEditController`, HomeFragment 2657 → 2098 Zeilen). Sequenziell,
 nicht parallel anfangen.
 
 ### 9.2. Modul-Split
@@ -543,32 +545,6 @@ Isolation: `:domain`-Tests laufen ohne `:data`/`:ui`-Compile.
 
 **Aufwand:** 2-3 Tage (initial Modul-Aufteilung + Hilt-Multi-Module-
 Wiring + ggf. einige zirkuläre Imports auflösen).
-
-### 9.3. `HomeFragment`-Edit-Submodul
-
-2657 Zeilen, davon ~600-800 für den Wallpaper-Edit-Modus (Layer-
-Buttons, Snap-Controls, Save/Cancel-Toolbar, Touch-Interception,
-Drag-State). Diese Section ist eine **echte Boundary**, nicht UI-Glue:
-
-- Eigener State (`WallpaperEditState`, `WallpaperEditTransition` —
-  bereits extrahiert).
-- Eigene Lifecycle-Phasen (enter / commit / cancel).
-- Eigene Touch-Interception (`wallpaperTouchInterceptor`).
-- Eigene Toolbar mit eigener Logik.
-
-**Vorschlag:** `WallpaperEditFragment` (oder `WallpaperEditController` als
-Helper-Klasse) — bekommt `wallpaperContainer`, `wallpaperEditOverlay`,
-ein Callback für Save/Cancel. `HomeFragment` wäre dann auf ~1900-2000
-Zeilen reduziert und enthielte nur noch das Home-Render + die Wallpaper-
-Edit-Aktivierung.
-
-**Wert:** der Edit-Mode wird testbar (eigener Fragment-Test mit
-Robolectric+Hilt-Pattern wäre möglich), Home-Render wird isoliert.
-Reviewbar: heute ist „enter edit-mode → tap layer-up → cancel" ein
-Pfad durch 5 verschiedene Sections in einer Datei.
-
-**Aufwand:** 1-2 Tage. Mittleres Risiko (Lifecycle-States müssen
-korrekt mit-migriert werden).
 
 ### 9.4. `ResetRepositoryImpl`: Schleife statt Copy-Paste
 
