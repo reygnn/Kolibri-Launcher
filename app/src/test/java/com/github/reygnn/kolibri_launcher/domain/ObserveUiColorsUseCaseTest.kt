@@ -1,14 +1,12 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import android.app.WallpaperColors
 import android.graphics.Color
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -24,7 +22,7 @@ class ObserveUiColorsUseCaseTest {
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var useCase: ObserveUiColorsUseCase
-    private lateinit var wallpaperColorsFlow: MutableStateFlow<WallpaperColors?>
+    private lateinit var wallpaperColorsFlow: MutableStateFlow<DomainWallpaperColors?>
 
     @Before
     fun setup() {
@@ -58,10 +56,7 @@ class ObserveUiColorsUseCaseTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
 
-        val lightWallpaper = mockk<WallpaperColors> {
-            every { colorHints } returns WallpaperColors.HINT_SUPPORTS_DARK_TEXT
-        }
-        wallpaperColorsFlow.value = lightWallpaper
+        wallpaperColorsFlow.value = DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null)
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.BLACK)
@@ -74,10 +69,7 @@ class ObserveUiColorsUseCaseTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
 
-        val darkWallpaper = mockk<WallpaperColors> {
-            every { colorHints } returns 0
-        }
-        wallpaperColorsFlow.value = darkWallpaper
+        wallpaperColorsFlow.value = DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null)
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
@@ -106,13 +98,10 @@ class ObserveUiColorsUseCaseTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("adaptive_colors")
 
-        val secondaryColor = mockk<Color> {
-            every { toArgb() } returns Color.CYAN
-        }
-        val wallpaper = mockk<WallpaperColors> {
-            every { this@mockk.secondaryColor } returns secondaryColor
-        }
-        wallpaperColorsFlow.value = wallpaper
+        wallpaperColorsFlow.value = DomainWallpaperColors(
+            supportsDarkText = false,
+            secondaryColorArgb = Color.CYAN
+        )
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.CYAN)
@@ -210,10 +199,8 @@ class ObserveUiColorsUseCaseTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
 
-        val darkWallpaper = mockk<WallpaperColors> { every { colorHints } returns 0 }
-        val lightWallpaper = mockk<WallpaperColors> {
-            every { colorHints } returns WallpaperColors.HINT_SUPPORTS_DARK_TEXT
-        }
+        val darkWallpaper = DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null)
+        val lightWallpaper = DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null)
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)

@@ -12,6 +12,7 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 import android.app.WallpaperColors
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
@@ -45,7 +46,7 @@ class ThemingDelegate(
 
     // --- Internal: WallpaperColors als Input für den UseCase ---
 
-    private val wallpaperColorsFlow = MutableStateFlow<WallpaperColors?>(null)
+    private val wallpaperColorsFlow = MutableStateFlow<DomainWallpaperColors?>(null)
 
     // --- Init ---
 
@@ -60,7 +61,12 @@ class ThemingDelegate(
     // --- Public API: Update WallpaperColors ---
 
     fun updateUiColors(wallpaperColors: WallpaperColors? = null) {
-        wallpaperColorsFlow.value = wallpaperColors
+        wallpaperColorsFlow.value = wallpaperColors?.let {
+            DomainWallpaperColors(
+                supportsDarkText = (it.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0,
+                secondaryColorArgb = it.secondaryColor?.toArgb()
+            )
+        }
     }
 
     // --- Public API: Set Colors ---

@@ -131,7 +131,10 @@ class ThemingDelegateTest {
 
     @Test
     fun `updateUiColors accepts WallpaperColors`() {
-        val wallpaperColors: WallpaperColors = mockk()
+        // The delegate maps WallpaperColors → DomainWallpaperColors and reads
+        // colorHints + secondaryColor in the process; relaxed mock returns the
+        // type's primitive defaults (0 / null) which is fine for this smoke test.
+        val wallpaperColors: WallpaperColors = mockk(relaxed = true)
         val delegate = createDelegate()
         delegate.updateUiColors(wallpaperColors)
     }
