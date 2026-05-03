@@ -1,7 +1,8 @@
 # Kolibri Launcher — TODO & Roadmap
 
-Lebendes Dokument. Stand: 2026-05-02, basierend auf einer vollständigen Source-Analyse
-des Repos auf Branch `main` (Version `0.99.61` / versionCode `79`).
+Lebendes Dokument. Stand: 2026-05-03 (post-audit-Sweep-Session), basierend auf
+einer vollständigen Source-Analyse des Repos auf Branch `main` (Version
+`0.99.61` / versionCode `79`).
 
 Was hier steht, ist aus dem Code abgeleitet — kein Wunsch-Backlog. Dinge ohne
 konkreten Anker im Repo gehören in Issues, nicht hierher.
@@ -14,11 +15,21 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
 | 2 | Throwable-Catch-Audit | 229 von 735 Catches weg (über 25 Sweeps in 2 Wellen + Folge-Sweeps), Sweep an seinem natürlichen Ende | klein-mittel pro Sweep |
-| 3 | `BackupRepositoryImpl` zerlegen | verworfen, Memo bleibt | — |
+| 3 | `BackupRepositoryImpl` zerlegen | verworfen, aber siehe §9.1 (Reopen-Vorschlag) | groß |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
+| 7 | Selbst-Linter für die 13 Rules | offen | mittel (1-2 Tage) |
+| 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
+| 9 | Architektur-Schritte für 9+ Score | offen | groß (mehrere Tage) |
+| 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Aktuell keine offene Hauptaufgabe. §2 hat sein natürliches Ende erreicht — alle ui/-Files sind gesweept oder als clean inspiziert (außer den explizit ausgenommenen `HomeFragment` Lifecycle-Restructure und `ScreenLockAccessibilityService` Service-Test-Lücke), `core/`/`domain/usecase/` sind verifiziert clean, `data/` Repository-Layer ist gesweept. Reststand sind ausschließlich legitime EXTERNAL/Lifecycle/Per-Item-Boundaries.
+**Empfohlene Reihenfolge bei freier Wahl:** §7 (Linter) zuerst — verhindert
+zukünftigen Drift, der die häufigste Defekt-Klasse in diesem Repo ist (post-
+audit-Session 2026-05-03 hat sieben Doku-vs-Realität-Diskrepanzen aufgedeckt;
+ein dummer grep-Hook hätte sie nie entstehen lassen). Danach §8 (Tests-für-
+time-Code) als komplementäres Schließen einer Test-Lücke. §9 (Architektur)
+ist der größte Brocken und die einzige Möglichkeit, das Repo über 7.5/10
+Reife zu bringen — sequenziell, nicht parallel anfangen.
 
 ---
 
@@ -399,6 +410,227 @@ Memo bleibt damit ein neuer Reviewer beim Auftauchen ähnlicher
 „hängende Tests / OOM in Watchdog-Thread"-Symptome sofort den
 zentralen Fix-Punkt findet (`robolectric.properties`) und nicht ad
 hoc per-Test `@Config`-Overrides streut.
+
+---
+
+## 7. Selbst-Linter für die 13 Rules
+
+**Motivation:** Die post-audit-Sweep-Session 2026-05-03 hat sieben Stellen
+aufgedeckt, an denen die Doku Wahrheiten behauptete, die der Code nicht
+hielt — die mit Abstand häufigste Defekt-Klasse in diesem Repo. Konkrete
+Funde dieser einen Session:
+
+- **Rule 9** behauptete „kein nacktes `Timber.e` außerhalb `KolibriLauncherApp`
+  und `TimberWrapper`" — 53 Verstöße gefunden, davon 29 echte App-Code-Drift.
+- **CLAUDE.md Rule 1+2+4+5** redeten von „Manager"-Schreibweise — alle 17
+  Production-Klassen sind seit Commit `0f9e7be` `*RepositoryImpl`.
+- **AUDIT.md §4.4** behauptete „Non-Null `!!` — null Vorkommen im Hauptcode" —
+  eines in `SettingsActivity.kt:108`.
+- **AUDIT.md §2.5** behauptete „AppConstants ist diszipliniert genutzt" —
+  Counterexample mit Magic-Numbers in `ObserveInstalledAppsUseCase`.
+- **AUDIT.md §5.8** behauptete „Hardcoded UI-Strings in Code — null
+  gefunden" — `WallpaperLayer.AVAILABLE_BLEND_MODES` mit 12 EN-Labels.
+
+**Pattern:** Negativ-Findings im Audit (313 `relaxed = true` etc.) waren
+empirisch belegt. Nur die positiven „alles in Ordnung"-Aussagen kollabierten
+auf grep. Die Doku wurde nicht stichprobenartig verifiziert.
+
+**Was der Linter prüfen soll** (in Reihenfolge nach Wert / Drift-Risiko):
+
+- Rule 9 — kein nacktes `Timber.e(` außerhalb der erweiterten Exception-Liste
+  (`KolibriLauncherApp`, `TimberWrapper`, `BaseActivity`, `BaseViewModel`,
+  `CrashReportLimiter`, `CrashReportConsent`, `BackupFragment.kt:50`).
+  Pures Grep mit Negativ-Filter. Highest ROI.
+- Rule 12 — kein `Timber.Forest.`. Trivial mit Grep.
+- Naming-Konvention — keine `Manager`-Schreibweise außer den dokumentierten
+  Ausnahmen (`WallpaperFileManager`, `DataMigrationManager`).
+- Rule 13 — keine deutschen Kommentar-Zeilen in den letzten N Commits
+  geänderter Files. Würde nur neue Zeilen prüfen, bestehendes Deutsch in
+  alten Files ignorieren.
+- Rule 11 — keine `try { … } catch (Throwable)` um Pure-Calls. Heuristisch:
+  catch-Body ist nur silentError-Aufruf, try-Body enthält nur `.filter`/
+  `.map`/`.sortedBy`/`String.lowercase()` etc. Nicht 100% präzise, aber
+  fängt offensichtliche Verstöße.
+- Hardcoded UI-Strings im Kotlin — String-Literals in `data class`-Defaults
+  oder Konstanten, die in `res/values/strings.xml` gehören.
+
+**Form:** Gradle-Task `./gradlew checkConventions` plus optional Pre-Commit-
+Hook. Keine CI-Erzwingung anfangs — soll lokal lauffähig bleiben.
+Output: Liste der Verstöße mit `file:line` und Rule-Referenz.
+
+**Aufwand:** 1-2 Tage initial. Danach selbst-wartend. Jede neue Rule wird
+beim Aufnehmen in CLAUDE.md gleich mit Linter-Check ergänzt — das ist die
+Disziplin, die fehlt.
+
+**Wert:** Beendet die häufigste Defekt-Klasse dauerhaft. Die nächste Audit-
+Iteration findet keinen neuen Doku-Drift mehr. Den ROI sieht man bei jeder
+nächsten Session.
+
+---
+
+## 8. Time-basierte Test-Konvention
+
+**Motivation:** Der Retry-Counter-Bug in `ObserveInstalledAppsUseCase` (siehe
+Commit `f8a578b`) — ein Class-Field-State der über Flow-Invocations hinweg
+persistierte und Backoff-Delays falsch skaliert hat — war Production-Code seit
+File-Erstellung. Bestehende Tests haben ihn nicht gepinnt: alle 7 Tests testen
+„passt das Resultat?" aber keiner testet „passt die Zeit-Differenz?".
+
+**Symptomatisch:** time-basierte Verhalten brauchen explizite zeit-bezogene
+Asserts. Im Repo betrifft das:
+
+- Retry-Backoffs (`ObserveInstalledAppsUseCase` — jetzt gepinnt)
+- Debounces (`AppDrawerFragment` Search-Debounce, `HomeFragment` Spacing-Cache)
+- Timeouts (`PackageUpdateReceiver` `withTimeout`, `BackupFragment` Preview-Timeout)
+- Throttles und WhileSubscribed-Timeouts (`shareIn`-Repos in `data/`)
+
+**Konvention:** Jeder neuer/touched Code-Pfad mit `delay()`, `withTimeout`,
+`retry()` braucht einen Test, der:
+
+1. `runTest { … }` mit `testScheduler.currentTime` snapshottet vor und nach
+   dem Verhalten.
+2. Asserted, dass die virtuelle Zeit-Differenz dem erwarteten Backoff
+   entspricht — exakter Wert oder symmetrische Eigenschaft (z. B. „beide
+   Invocations kosten gleich viel").
+3. Im Body-Comment dokumentiert, *was* die Test-Zeit pinnt — sonst sind
+   solche Tests bei Änderungen schwer zu lesen.
+
+**Reference-Implementation:** `ObserveInstalledAppsUseCaseTest` →
+„retry counter resets between invocations on IOException backoff" zeigt das
+Pattern. Verifiziert mit Bug-restore: Test wird rot, wenn man den
+Class-Field-Counter wiederherstellt — also pinnt er das Verhalten korrekt.
+
+**Aufwand:** ~30 min pro Test. Bei aktuell ~10 retry/delay/timeout-Sites in
+`app/src/main/` ist das ~5 h Gesamtarbeit, gut parallelisierbar.
+
+**In CLAUDE.md / TESTING_CONVENTIONS.kt aufnehmen:** Eine neue Section
+„TIME-BASED ASSERTIONS" mit der obigen Konvention plus dem Reference-Test.
+
+---
+
+## 9. Architektur-Schritte für 9+ Score
+
+**Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10 eingeordnet.
+Stärken sind Architektur-Disziplin, Doku-Tiefe, Test-Disziplin. Was den
+Score deckelt, sind vier konkrete Architektur-Brocken. Sequenziell, nicht
+parallel anfangen.
+
+### 9.1. `BackupRepositoryImpl` entkoppeln (TODO §3 reopen)
+
+§3 hat den Split als „würde 9 Repo-Deps duplizieren" verworfen. Die
+Begründung hält bei genauerem Hinsehen nicht: das Argument behandelt
+die Frage „wie viele Constructor-Args braucht's?", aber das ist nicht
+das Problem. Das Problem ist, dass eine 1444-Zeilen-Klasse drei
+Verantwortlichkeiten mischt:
+
+1. **Daten sammeln** (lese alle 9 Repos, baue `BackupData`)
+2. **Daten serialisieren / deserialisieren** (JSON, ZIP, Validation)
+3. **Datei-I/O** (URI, ContentResolver, Streams)
+
+Sauberer Split:
+
+- `BackupDataAssembler` (Composition-Schicht) — bekommt die 9 Repos,
+  baut `BackupData`, ist gegen Fakes vollständig testbar ohne URI.
+- `BackupSerializer` — Pure-Logic, JSON↔BackupData, keine Repos, keine
+  I/O. Trivially testbar.
+- `BackupRepositoryImpl` (verbleibend) — Datei-I/O, Uri-Validation,
+  Permission-Handling, Größen-Caps. Der Robolectric-Smoke-Test reicht.
+
+**Wert:** drei Klassen mit je einer Verantwortung, 1444 → ~3× 400-500
+Zeilen. Tests werden pointierter: der Assembler testet „werden alle
+Felder befüllt?" gegen Fakes, der Serializer testet „round-trip + alle
+Edge-Cases" als Pure-Logic, der Repo-Rest testet nur die wenigen
+URI/Stream-Sites mit Robolectric.
+
+**Aufwand:** 2-3 Tage (inkl. Test-Migration der 5 Spec-Files).
+
+### 9.2. Modul-Split
+
+Single-Module bei 16 Repositories + 50 UseCases + 10 ViewModels ist groß
+genug, dass Build-Cache-Resilienz und Compile-Zeit deutlich darunter
+leiden.
+
+**Vorgeschlagene Modul-Struktur:**
+
+- `:domain` — `domain/repository/`, `domain/usecase/`, `domain/model/`,
+  `core/`. Kein Android-SDK, nur Kotlin + Coroutines + Hilt-Annotations.
+- `:data` — `data/`, `di/RepositoryModule`, `di/DataStoreModule`. Nur
+  Datenzugriff.
+- `:app` (resp. `:ui`) — alles unter `ui/`, `KolibriLauncherApp`, alle
+  Activities + Fragments + ViewModels.
+
+AGP 8.13 unterstützt das nahtlos. Hilt-Multi-Module-Setup ist gut
+dokumentiert. `gradle/libs.versions.toml` ist schon da — Modul-Files
+würden sie wiederverwenden.
+
+**Wert:** inkrementelle Builds nach Domain-Änderungen werden ~3× schneller,
+weil `:ui` nicht neu compiled wird wenn nur ein Repo ändert. Test-
+Isolation: `:domain`-Tests laufen ohne `:data`/`:ui`-Compile.
+
+**Aufwand:** 2-3 Tage (initial Modul-Aufteilung + Hilt-Multi-Module-
+Wiring + ggf. einige zirkuläre Imports auflösen).
+
+### 9.3. `HomeFragment`-Edit-Submodul
+
+2657 Zeilen, davon ~600-800 für den Wallpaper-Edit-Modus (Layer-
+Buttons, Snap-Controls, Save/Cancel-Toolbar, Touch-Interception,
+Drag-State). Diese Section ist eine **echte Boundary**, nicht UI-Glue:
+
+- Eigener State (`WallpaperEditState`, `WallpaperEditTransition` —
+  bereits extrahiert).
+- Eigene Lifecycle-Phasen (enter / commit / cancel).
+- Eigene Touch-Interception (`wallpaperTouchInterceptor`).
+- Eigene Toolbar mit eigener Logik.
+
+**Vorschlag:** `WallpaperEditFragment` (oder `WallpaperEditController` als
+Helper-Klasse) — bekommt `wallpaperContainer`, `wallpaperEditOverlay`,
+ein Callback für Save/Cancel. `HomeFragment` wäre dann auf ~1900-2000
+Zeilen reduziert und enthielte nur noch das Home-Render + die Wallpaper-
+Edit-Aktivierung.
+
+**Wert:** der Edit-Mode wird testbar (eigener Fragment-Test mit
+Robolectric+Hilt-Pattern wäre möglich), Home-Render wird isoliert.
+Reviewbar: heute ist „enter edit-mode → tap layer-up → cancel" ein
+Pfad durch 5 verschiedene Sections in einer Datei.
+
+**Aufwand:** 1-2 Tage. Mittleres Risiko (Lifecycle-States müssen
+korrekt mit-migriert werden).
+
+### 9.4. `ResetRepositoryImpl`: Schleife statt Copy-Paste
+
+11 strukturidentische try/catch-Blöcke um `child.purgeRepository()`-
+Calls. Wenn Repo Nr. 12 dazukommt, vergisst jemand den Block.
+
+**Fix:** ein `Purgeable.purgeAllSafely(repos: List<Pair<String, Purgeable>>)`
+als Extension oder ein lokaler `forEach`-Helper, der den `try/catch
+(CancellationException) throw e catch (Throwable) silentError(...)`-
+Block einmal kapselt.
+
+**Aufwand:** 1 Stunde. Datei wird drittel-en. Drift-Resistenz.
+
+---
+
+## 10. Lib-Pinning regelmäßig revisit
+
+**Motivation:** ANRWatchdog `1.4.0` ist von 2018 ohne aktive Maintenance.
+Hilt `2.57.2` mit „DO NOT UPGRADE" — der ursprüngliche Grund (welche
+Major-Breaking-Änderung?) ist im `libs.versions.toml`-Kommentar nicht
+festgehalten. Pins werden zu Tech-Debt, je länger sie ohne Re-Check
+stehen.
+
+**Action:** Quartalsweiser Review-Termin (~30 min):
+
+1. Für jedes „DO NOT UPGRADE"/„DO NOT DOWNGRADE" prüfen, ob die
+   Begründung noch aktuell ist (z. B. Hilt 2.58+ released — Migration
+   noch problematisch?).
+2. Für jede außer-Maintenance-Lib (ANRWatchdog) prüfen, ob es eingebaute
+   Alternativen gibt (z. B. Android's eigenes ANR-Tracing seit API 30+).
+3. Findings im `libs.versions.toml`-Kommentar als Datum einarbeiten:
+   `# DO NOT UPGRADE — letzter Recheck 2026-Q3, Grund: <kurz>`.
+
+**Ohne diesen Prozess** ist die Pinning-Disziplin selbst ein Drift-Risiko:
+heute ist „DO NOT UPGRADE" begründet, in 12 Monaten ist es Karawanen-
+Aberglaube.
 
 ---
 
