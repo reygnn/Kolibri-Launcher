@@ -295,6 +295,23 @@ configurations.all {
     }
 }
 
+// Project-convention linter — checks the CLAUDE.md rules whose drift was
+// the biggest defect class in the post-audit-Sweep-Session 2026-05-03.
+// Source script: `tools/check-conventions.sh`. Add new checks there, not here.
+//
+// Currently checks:
+//   - Rule 9   — bare `Timber.e(` outside the documented crash-infra files
+//   - Rule 12  — `Timber.Forest.*` (use the short form)
+//   - Naming   — `*Manager` classes inside `data/` (use `*RepositoryImpl`)
+//
+// Run via `./gradlew checkConventions` or invoke the script directly.
+tasks.register<Exec>("checkConventions") {
+    group = "verification"
+    description = "Runs the project-convention linter (CLAUDE.md rules)."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/check-conventions.sh")
+}
+
 // Code Coverage Configuration mit JaCoCo
 tasks.register<JacocoReport>("jacocoTestReport") {
     dependsOn("testDebugUnitTest")

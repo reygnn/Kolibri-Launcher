@@ -179,6 +179,13 @@ activities.
    otherwise swallow a throw. Both: details and the test escape
    (`preventCrashForTesting`) live in `core/TimberWrapper.kt`.
 
+   This rule is enforced by `./gradlew checkConventions` — the linter
+   reports any bare `Timber.e(` outside the exception list, so a new
+   crash-infra file added here also needs an entry in
+   `tools/check-conventions.sh`. Same task also catches Rule 12 and
+   the data/ Manager-naming drift; see TODO.md §7 for the full list
+   of automated checks.
+
 10. **Testable logic lives outside Android-runtime classes.** Activities,
     Fragments, BroadcastReceivers, and Services are awkward to unit-test
     on the JVM. Anything worth pinning (state transitions, decisions,
