@@ -21,13 +21,13 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 7 | Selbst-Linter für die 13 Rules | teilumgesetzt 2026-05-03 (3 von 6 Rules), Memo bleibt | — |
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 + 9.4 erledigt 2026-05-03; 9.2 offen | groß (2-3 Tage) |
-| 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
+| 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §10 (Lib-Pinning-Revisit,
-prozessual). §9.2 (Modul-Split) ist der einzige verbleibende
-Architektur-Brocken aus §9 und der einzige Schritt, der das Repo über
-7.5/10 Reife heben würde — größer und sequenziell, nicht ad-hoc
-starten.
+**Empfohlene Reihenfolge bei freier Wahl:** §9.2 (Modul-Split) ist der
+einzige verbleibende Architektur-Brocken aus §9 und der einzige
+Schritt, der das Repo über 7.5/10 Reife heben würde — größer und
+sequenziell, nicht ad-hoc starten. §10 ist als wiederkehrender
+Quartals-Termin etabliert (siehe Memo) und triggert sich von selbst.
 
 ---
 
@@ -536,27 +536,39 @@ Wiring + ggf. einige zirkuläre Imports auflösen).
 
 ---
 
-## 10. Lib-Pinning regelmäßig revisit
+## 10. (Memo, Format etabliert 2026-05-03) Lib-Pinning regelmäßig revisit
 
 **Motivation:** ANRWatchdog `1.4.0` ist von 2018 ohne aktive Maintenance.
 Hilt `2.57.2` mit „DO NOT UPGRADE" — der ursprüngliche Grund (welche
-Major-Breaking-Änderung?) ist im `libs.versions.toml`-Kommentar nicht
-festgehalten. Pins werden zu Tech-Debt, je länger sie ohne Re-Check
-stehen.
+Major-Breaking-Änderung?) ist nicht festgehalten. Pins werden zu
+Tech-Debt, je länger sie ohne Re-Check stehen.
 
-**Action:** Quartalsweiser Review-Termin (~30 min):
+**Etabliert 2026-05-03 (Inaugural-Pass):** Im Header von
+`gradle/libs.versions.toml` lebt jetzt eine „QUARTERLY RECHECK
+PROCESS"-Sektion, die den Recheck-Ablauf, das Annotations-Format
+(`# DO NOT UPGRADE — Recheck YYYY-Qn: <kurz>`), das Time-Budget (~30
+min/Quartal) und die Trennung „Recheck vs. Upgrade" (Recheck entscheidet
+nur, Upgrade ist eigene Branch) definiert. Das letzte-Recheck-/
+Nächste-Recheck-Datum steht ebenfalls im Header — wer den Catalog
+öffnet, sieht sofort wann der nächste Termin fällig ist.
 
-1. Für jedes „DO NOT UPGRADE"/„DO NOT DOWNGRADE" prüfen, ob die
-   Begründung noch aktuell ist (z. B. Hilt 2.58+ released — Migration
-   noch problematisch?).
-2. Für jede außer-Maintenance-Lib (ANRWatchdog) prüfen, ob es eingebaute
-   Alternativen gibt (z. B. Android's eigenes ANR-Tracing seit API 30+).
-3. Findings im `libs.versions.toml`-Kommentar als Datum einarbeiten:
-   `# DO NOT UPGRADE — letzter Recheck 2026-Q3, Grund: <kurz>`.
+**Inaugural-Pass-Scope:** Format-Etablierung only. Die einzelnen Pins
+wurden 2026-Q2 bewusst NICHT durchgegangen — der Recheck-Prozess
+braucht ein web-fähiges Tool für die Upstream-Recherche
+(Hilt-Changelog, ANRWatchdog-Alternativen, kotlinx-serialization 1.10
+Status), das im Inaugural-Pass nicht verfügbar war. Erste echte
+inhaltliche Durchlauf passiert 2026-Q3.
 
-**Ohne diesen Prozess** ist die Pinning-Disziplin selbst ein Drift-Risiko:
-heute ist „DO NOT UPGRADE" begründet, in 12 Monaten ist es Karawanen-
-Aberglaube.
+**Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
+Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,
+Version bumpen) auf einen abgelaufenen Termin stößt, triggert den
+Recheck — kein externer Kalender nötig.
+
+**Ohne diesen Prozess** ist die Pinning-Disziplin selbst ein
+Drift-Risiko: heute ist „DO NOT UPGRADE" begründet, in 12 Monaten ist
+es Karawanen-Aberglaube. Memo bleibt damit (a) der Header-Kommentar
+seinen Kontext behält und (b) ein neuer Reviewer direkt versteht,
+warum der Inaugural-Pass nur das Format etabliert hat.
 
 ---
 

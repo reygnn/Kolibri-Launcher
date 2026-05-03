@@ -20,6 +20,37 @@
 #   - `acra` and `proguard-rules.pro` must stay in sync; changing one without
 #     the other can produce silent crash-report failures in release builds.
 #   - `fragment` (fragment-ktx and fragment-testing) MUST share one version.
+#
+# -----------------------------------------------------------------------------
+# QUARTERLY RECHECK PROCESS  (TODO.md §10)
+# -----------------------------------------------------------------------------
+#
+# Pins decay: a "DO NOT UPGRADE" that was correct in 2025 may be karavanen-
+# aberglaube in 2027. To keep pin discipline from rotting into cargo cult,
+# every quarter (~30 min) walk every pin and either re-confirm or lift it.
+#
+# Recheck format (annotate next to the marker, replace the previous date):
+#   # DO NOT UPGRADE — Recheck YYYY-Qn: <kurz, was geprüft>
+#
+# What a recheck IS:
+#   - Re-read the pin's stated reason. Is it still load-bearing?
+#   - Spot-check upstream (changelog of the lib, GitHub release notes) for
+#     a published fix that would make the pin lift safely.
+#   - For unmaintained libs (currently: anrwatchdog), check if a built-in
+#     Android API now covers the use case (ANR-Tracing seit API 30+).
+#   - If the reason still holds, just bump the date.
+#   - If the reason no longer holds, plan the lift as a separate change —
+#     not as part of the recheck itself.
+#
+# What a recheck is NOT:
+#   - Not the upgrade itself. The recheck only DECIDES whether an upgrade
+#     is warranted. The actual lift goes on its own branch with its own
+#     test pass.
+#   - Not exhaustive. ~30 min per quarter is the budget; if a single pin
+#     needs deep investigation, capture it as a separate TODO item.
+#
+# Latest recheck: 2026-Q2 (2026-05-03) — inaugural pass, format established.
+# Next recheck:   2026-Q3.
 # =============================================================================
 
 [versions]
