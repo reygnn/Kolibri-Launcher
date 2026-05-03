@@ -147,7 +147,7 @@ class BackupRepositoryImplIsolationTest {
             createApp("com.target", "SwipeRight")
         )
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             fakeFavoritesRepo,
             fakeOrderRepo,
             fakeHiddenRepo,

@@ -79,7 +79,7 @@ class BackupRepositoryImplMalformedTest {
         val dummyApp = AppInfo("App", "App", "com.test", "cls")
         installedAppsRepo.installedApps = listOf(dummyApp)
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = favoritesRepo,
             favoritesOrderRepository = favoritesOrderRepo,
             hiddenAppsRepository = hiddenAppsRepo,

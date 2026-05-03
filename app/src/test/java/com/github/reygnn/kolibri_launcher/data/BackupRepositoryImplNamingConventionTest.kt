@@ -50,7 +50,7 @@ class BackupRepositoryImplNamingConventionTest {
         val mockContext = mockk<Context>(relaxed = true)
         every { mockContext.contentResolver } returns mockk(relaxed = true)
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = fakeFavoritesRepo,
             favoritesOrderRepository = fakeFavoritesOrderRepo,
             hiddenAppsRepository = fakeHiddenAppsRepo,

@@ -64,7 +64,7 @@ class BackupRepositoryImplLogicTest {
         contentResolver = mockk<ContentResolver>(relaxed = true)
         every { context.contentResolver } returns contentResolver
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = fakeFavoritesRepo,
             favoritesOrderRepository = fakeFavoritesOrderRepo,
             hiddenAppsRepository = fakeHiddenAppsRepo,

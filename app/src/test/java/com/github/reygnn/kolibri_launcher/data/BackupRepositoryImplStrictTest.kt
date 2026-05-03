@@ -72,7 +72,7 @@ class BackupRepositoryImplStrictTest {
         installedAppsRepo.installedApps = listOf(dummyApp)
 
         // 3. Initialize BackupRepositoryImpl with Fakes
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = favoritesRepo,
             favoritesOrderRepository = favoritesOrderRepo,
             hiddenAppsRepository = hiddenAppsRepo,

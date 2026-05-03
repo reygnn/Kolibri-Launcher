@@ -71,7 +71,7 @@ class BackupRepositoryImplIoTest {
         every { parcelFileDescriptor.statSize } returns 1024L
         every { parcelFileDescriptor.fileDescriptor } returns FileDescriptor()
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = FakeFavoritesRepository(),
             favoritesOrderRepository = FakeFavoritesOrderRepository(),
             hiddenAppsRepository = FakeHiddenAppsRepository(),

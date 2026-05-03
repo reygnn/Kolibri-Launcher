@@ -72,7 +72,7 @@ class BackupRepositoryImplSecurityTest {
         val mockContentResolver = mockk<ContentResolver>(relaxed = true)
         every { context.contentResolver } returns mockContentResolver
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = fakeFavoritesRepo,
             favoritesOrderRepository = fakeFavoritesOrderRepo,
             hiddenAppsRepository = fakeHiddenAppsRepo,

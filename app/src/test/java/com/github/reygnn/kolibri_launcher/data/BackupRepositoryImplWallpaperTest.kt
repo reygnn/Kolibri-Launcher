@@ -110,7 +110,7 @@ class BackupRepositoryImplWallpaperTest {
         // Für Tests geben wir die Quell-URI zurück damit Gleichheits-Assertions bestehen.
         coEvery { wallpaperFileManager.copyToInternal(any()) } answers { firstArg<Uri>() }
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = fakeFavoritesRepo,
             favoritesOrderRepository = fakeFavoritesOrderRepo,
             hiddenAppsRepository = fakeHiddenAppsRepo,

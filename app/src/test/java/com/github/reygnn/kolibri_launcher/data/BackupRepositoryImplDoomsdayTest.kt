@@ -76,7 +76,7 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
 
-        backupManager = BackupRepositoryImpl(
+        backupManager = BackupRepositoryImplTestFactory.create(
             fakeFavoritesRepo,
             fakeFavoritesOrderRepo,
             fakeVisibilityRepo,
