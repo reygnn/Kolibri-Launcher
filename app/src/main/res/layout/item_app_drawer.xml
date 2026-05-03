@@ -17,7 +17,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="18sp" 
-        android:textColor="@android:color/white"
+        android:textColor="@color/default_text_color"
         tools:text="Beispiel App Name" />
 
 </LinearLayout>

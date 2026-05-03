@@ -20,6 +20,10 @@
     <dimen name="text_size_time">60sp</dimen>
     <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
     <dimen name="text_size_app_button">18sp</dimen>
+    <dimen name="text_size_hint">14sp</dimen> <!-- Wallpaper-edit hint TextView -->
+
+    <!-- Elevations -->
+    <dimen name="elevation_card">4dp</dimen>
      
     <!-- =============================================================== -->
     <!-- == APP DRAWER                                                == -->

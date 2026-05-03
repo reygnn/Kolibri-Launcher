@@ -136,14 +136,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="48dp"
+            android:layout_marginTop="@dimen/spacing_xlarge"
             android:text="@string/wallpaper_edit_hint"
-            android:textColor="@android:color/white"
-            android:textSize="14sp"
+            android:textColor="@color/wallpaper_edit_foreground"
+            android:textSize="@dimen/text_size_hint"
             android:background="@drawable/bg_hint_rounded"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:elevation="4dp" />
+            android:paddingHorizontal="@dimen/spacing_large"
+            android:paddingVertical="@dimen/spacing_medium"
+            android:elevation="@dimen/elevation_card" />
 
         <!-- Button-Leiste unten (2 Zeilen) -->
         <LinearLayout
@@ -174,7 +174,7 @@
                     android:layout_height="40dp"
                     android:contentDescription="@string/toolbar_dock_toggle"
                     app:icon="@drawable/ic_dock_top"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Add Layer -->
@@ -185,7 +185,7 @@
                     android:layout_height="40dp"
                     android:contentDescription="@string/wallpaper_add_layer"
                     app:icon="@drawable/ic_add"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Delete Layer -->
@@ -197,7 +197,7 @@
                     android:contentDescription="@string/wallpaper_delete_layer"
                     android:visibility="gone"
                     app:icon="@drawable/ic_delete"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Layer Down (Z-Order runter) -->
@@ -209,7 +209,7 @@
                     android:contentDescription="@string/wallpaper_move_layer_down"
                     android:visibility="gone"
                     app:icon="@drawable/ic_arrow_down"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Layer Up (Z-Order hoch) -->
@@ -221,7 +221,7 @@
                     android:contentDescription="@string/wallpaper_move_layer_up"
                     android:visibility="gone"
                     app:icon="@drawable/ic_arrow_up"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Original Size (1:1) -->
@@ -232,7 +232,7 @@
                     android:layout_height="40dp"
                     android:contentDescription="@string/wallpaper_original_size"
                     app:icon="@drawable/ic_one_to_one"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
                     
                     <!-- Fit to Width -->
@@ -243,7 +243,7 @@
                     android:layout_height="40dp"
                     android:contentDescription="@string/wallpaper_fit_width"
                     app:icon="@drawable/ic_fit_width"
-                    app:iconTint="@android:color/white"
+                    app:iconTint="@color/wallpaper_edit_foreground"
                     app:iconSize="20dp" />
 
                 <!-- Layer Indicator: "Layer 1/3" -->
@@ -252,7 +252,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/wallpaper_edit_foreground"
                     android:textSize="12sp"
                     android:visibility="gone" />
 
@@ -273,7 +273,7 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_snap_toggle"
                 app:icon="@drawable/ic_magnet_on"
-                app:iconTint="@android:color/white"
+                app:iconTint="@color/wallpaper_edit_foreground"
                 app:iconSize="24dp" />
 
             <!-- 2. Snap-Modus (Edge ↔ Center) -->
@@ -284,7 +284,7 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_snap_mode_toggle"
                 app:icon="@drawable/ic_rectangle_on"
-                app:iconTint="@android:color/white"
+                app:iconTint="@color/wallpaper_edit_foreground"
                 app:iconSize="24dp" />
 
             <!-- 3. Horizontal Snap -->
@@ -295,7 +295,7 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_horizontal_snap_toggle"
                 app:icon="@drawable/ic_horizontal_on"
-                app:iconTint="@android:color/white"
+                app:iconTint="@color/wallpaper_edit_foreground"
                 app:iconSize="24dp" />
 
             <!-- 4. Vertical Snap -->
@@ -306,7 +306,7 @@
                 android:layout_height="48dp"
                 android:contentDescription="@string/wallpaper_vertical_snap_toggle"
                 app:icon="@drawable/ic_vertical_on"
-                app:iconTint="@android:color/white"
+                app:iconTint="@color/wallpaper_edit_foreground"
                 app:iconSize="24dp" />
 
             <!-- Spacer -->
@@ -322,7 +322,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/wallpaper_cancel"
-                android:textColor="@android:color/white" />
+                android:textColor="@color/wallpaper_edit_foreground" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWallpaperSave"

@@ -2,4 +2,9 @@
 <resources>
     <color name="color_primary">#FF3F51B5</color>
     <color name="default_text_color">#FFFFFF</color>
+    <!-- Wallpaper-edit overlay (toolbar icons, hint text). Intentionally
+         decoupled from default_text_color: that one is user-customizable
+         via the theme calculator; this one must stay white because it
+         renders on top of an arbitrary wallpaper image. -->
+    <color name="wallpaper_edit_foreground">#FFFFFF</color>
 </resources>
