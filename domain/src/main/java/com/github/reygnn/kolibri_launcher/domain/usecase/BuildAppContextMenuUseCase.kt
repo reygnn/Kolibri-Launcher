@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import android.content.pm.ShortcutInfo
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.domain.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
@@ -9,7 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
-import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 

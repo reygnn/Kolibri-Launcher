@@ -28,4 +28,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Kolibri Launcher"
 include(":app")
+include(":domain")
  

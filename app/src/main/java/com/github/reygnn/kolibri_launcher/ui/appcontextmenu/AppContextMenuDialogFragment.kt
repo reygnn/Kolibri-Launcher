@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 
 import android.os.Bundle
 import android.view.LayoutInflater

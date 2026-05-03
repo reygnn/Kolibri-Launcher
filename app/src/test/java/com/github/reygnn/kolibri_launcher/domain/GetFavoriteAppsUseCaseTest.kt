@@ -10,7 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.base.UiState
+import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.every

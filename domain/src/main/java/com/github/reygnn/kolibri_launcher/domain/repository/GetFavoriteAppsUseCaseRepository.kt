@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
-import com.github.reygnn.kolibri_launcher.ui.base.UiState
+import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import kotlinx.coroutines.flow.Flow
 
 /**

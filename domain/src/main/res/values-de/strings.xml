@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add_to_favorites">Zu Favoriten hinzufügen</string>
+    <string name="remove_from_favorites">Aus Favoriten entfernen</string>
+    <string name="app_added_to_favorites">%s zu Favoriten hinzugefügt</string>
+    <string name="app_removed_from_favorites">%s aus Favoriten entfernt</string>
+    <string name="rename_app">App umbenennen</string>
+    <string name="restore_original_name">Originalnamen wiederherstellen</string>
+    <string name="app_info">App-Info</string>
+    <string name="error_app_list_not_loaded">App-Liste ist noch nicht geladen. Bitte versuche es gleich noch einmal.</string>
+    <string name="favorites_limit_reached">Limit erreicht (max. %1$d Favoriten)</string>
+    <string name="unhide_app_in_drawer">Im App Drawer anzeigen</string>
+    <string name="hide_app_from_drawer">Im App Drawer ausblenden</string>
+    <string name="action_reset_sorting">Sortierung zurücksetzen</string>
+</resources>

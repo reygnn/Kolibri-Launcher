@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

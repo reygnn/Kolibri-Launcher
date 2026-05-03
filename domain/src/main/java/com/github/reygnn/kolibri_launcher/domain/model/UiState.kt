@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.base
+package com.github.reygnn.kolibri_launcher.domain.model
 
 /**
  * Eine generische sealed class, die den Zustand einer UI-Komponente darstellt,

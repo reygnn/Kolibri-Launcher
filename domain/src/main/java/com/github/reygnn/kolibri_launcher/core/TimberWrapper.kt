@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.github.reygnn.kolibri_launcher.domain.BuildConfig
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess

@@ -10,10 +10,6 @@
     <string name="settings_title">Einstellungen</string>
 
     <!-- App Actions -->
-    <string name="add_to_favorites">Zu Favoriten hinzufügen</string>
-    <string name="remove_from_favorites">Aus Favoriten entfernen</string>
-    <string name="app_added_to_favorites">%s zu Favoriten hinzugefügt</string>
-    <string name="app_removed_from_favorites">%s aus Favoriten entfernt</string>
 
     <!-- General -->
     <string name="cancel">Abbrechen</string>
@@ -30,8 +26,6 @@
     <string name="error_no_calendar_app">Keine Kalender-App gefunden</string>
 
     <!-- App Renaming Strings -->
-    <string name="rename_app">App umbenennen</string>
-    <string name="restore_original_name">Originalnamen wiederherstellen</string>
     <string name="new_app_name_hint">Neuer App-Name</string>
 
     <!-- Favorites Sorting Strings -->
@@ -55,7 +49,6 @@
     <string name="hidden_apps_title">Versteckte Apps</string>
 
     <!-- App Info -->
-    <string name="app_info">App-Info</string>
 
     <!-- Sort Favorites -->
     <string name="sort_favorites">Favoriten sortieren</string>
@@ -81,14 +74,10 @@
 
     <string name="date_placeholder">Lade Datum…</string>
 
-    <string name="error_app_list_not_loaded">App-Liste ist noch nicht geladen. Bitte versuche es gleich noch einmal.</string>
 
-    <string name="favorites_limit_reached">Limit erreicht (max. %1$d Favoriten)</string>
 
     <string name="sort_apps">Apps sortieren</string>
 
-    <string name="unhide_app_in_drawer">Im App Drawer anzeigen</string>
-    <string name="hide_app_from_drawer">Im App Drawer ausblenden</string>
     <string name="app_now_hidden_in_drawer">%1$s wird nun im App Drawer versteckt</string>
     <string name="app_now_visible_in_drawer">%1$s wird nun im App Drawer angezeigt</string>
 	
@@ -115,7 +104,6 @@
 
     <string name="toast_enable_double_tap_to_lock">Doppeltipp zum Sperren ist deaktiviert. Du kannst die Funktion in den Launcher-Einstellungen aktivieren.</string>
 
-    <string name="action_reset_sorting">Sortierung zurücksetzen</string>
     <string name="usage_data_reset_success">Sortierung für %1$s zurückgesetzt</string>
 
     <string name="set_default_launcher_title">Standard-Launcher festlegen</string>

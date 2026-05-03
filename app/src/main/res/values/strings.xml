@@ -10,10 +10,6 @@
     <string name="settings_title">Settings</string>
 
     <!-- App Actions -->
-    <string name="add_to_favorites">Add to favorites</string>
-    <string name="remove_from_favorites">Remove from favorites</string>
-    <string name="app_added_to_favorites">Added %s to favorites</string>
-    <string name="app_removed_from_favorites">Removed %s from favorites</string>
 
     <!-- General -->
     <string name="cancel">Cancel</string>
@@ -30,8 +26,6 @@
     <string name="error_no_calendar_app">No calendar app found</string>
 
     <!-- App Renaming Strings -->
-    <string name="rename_app">Rename app</string>
-    <string name="restore_original_name">Restore original name</string>
     <string name="new_app_name_hint">New app name</string>
 
     <!-- Favorites Sorting Strings -->
@@ -55,7 +49,6 @@
     <string name="hidden_apps_title">Hidden Apps</string>
 
     <!-- App Info -->
-    <string name="app_info">App info</string>
 
     <!-- Sort Favorites -->
     <string name="sort_favorites">Sort favorites</string>
@@ -99,14 +92,10 @@
     <string name="blend_mode_color_dodge" translatable="false">Color Dodge</string>
     <string name="blend_mode_color_burn" translatable="false">Color Burn</string>
 
-    <string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
 
-    <string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>
 
     <string name="sort_apps">Sort apps</string>
 
-    <string name="unhide_app_in_drawer">Show in app drawer</string>
-    <string name="hide_app_from_drawer">Hide from app drawer</string>
     <string name="app_now_hidden_in_drawer">%1$s is now hidden from the app drawer</string>
     <string name="app_now_visible_in_drawer">%1$s will now be shown in the app drawer</string>
 
@@ -136,7 +125,6 @@
 
     <string name="toast_enable_double_tap_to_lock">Double tap to lock is disabled. Please enable it in settings.</string>
 
-    <string name="action_reset_sorting">Reset sorting</string>
     <string name="usage_data_reset_success">Sorting for %1$s reset</string>
 
     <string name="set_default_launcher_title">Set Default Launcher</string>

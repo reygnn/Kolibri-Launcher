@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 
 /**
  * Parsed shape of the action string sent by [AppContextMenuDialogFragment]

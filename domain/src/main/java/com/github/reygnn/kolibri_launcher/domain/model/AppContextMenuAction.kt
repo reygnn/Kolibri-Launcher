@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
+package com.github.reygnn.kolibri_launcher.domain.model
 
 import android.content.pm.ShortcutInfo
 import androidx.annotation.StringRes

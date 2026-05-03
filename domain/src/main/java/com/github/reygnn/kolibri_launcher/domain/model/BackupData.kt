@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.BuildConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -10,7 +9,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 data class BackupData(
     val version: String = "1.0.0",
     val timestamp: Long = 0L,
-    val appVersion: String = BuildConfig.VERSION_NAME,
+    val appVersion: String = "",
     val settings: LauncherSettings
 )
 

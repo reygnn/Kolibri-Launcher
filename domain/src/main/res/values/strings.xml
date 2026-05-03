@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  String resources owned by the :domain module.
+
+  These are referenced from use cases (BuildAppContextMenuUseCase,
+  ObserveInstalledAppsUseCase, ToggleFavoriteUseCase) which produce
+  user-visible messages as `Int` resource IDs. The R class generated
+  here is `com.github.reygnn.kolibri_launcher.domain.R`. The :app
+  module reads the IDs at the UI layer via `context.getString(id)`,
+  no compile-time R reference needed.
+-->
+<resources>
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="app_added_to_favorites">Added %s to favorites</string>
+    <string name="app_removed_from_favorites">Removed %s from favorites</string>
+    <string name="rename_app">Rename app</string>
+    <string name="restore_original_name">Restore original name</string>
+    <string name="app_info">App info</string>
+    <string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
+    <string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>
+    <string name="unhide_app_in_drawer">Show in app drawer</string>
+    <string name="hide_app_from_drawer">Hide from app drawer</string>
+    <string name="action_reset_sorting">Reset sorting</string>
+</resources>

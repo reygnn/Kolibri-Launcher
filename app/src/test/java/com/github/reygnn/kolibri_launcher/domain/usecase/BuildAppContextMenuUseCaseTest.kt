@@ -13,7 +13,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
