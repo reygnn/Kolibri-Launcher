@@ -248,6 +248,37 @@ für die letzten 0.1, dann 9.0+.
   system-callback-Boundary-Logik). `setupBackPressHandler`-Catch
   entfernt — Body ist nur addCallback + Timber.d in handleOnBackPressed.
   Backstop-Test grün, Full-Test-Suite grün.
+- **Aktueller Stand 2026-05-03 (Region 7: Wallpaper + Bitmap + WindowInsets):**
+  1972 Zeilen (-21), 19 catches (11 `Throwable`). Neuer Region-Rekord:
+  20 Catches und 20 Throwable raus, dazu 1 Throwable→ActivityNotFound-
+  Exception narrowed. Entfernt:
+  `setupFragmentResultListener` (3 verschachtelte Catches inkl. dead
+  CancellationException-rethrow in synchronem Bundle-Callback —
+  CancellationException-Import auch raus),
+  `toggleFavorite` (single-line viewModel-Call),
+  `setupHomeWindowInsets` (Padding-Reads + Inset-Listener-Registrierung),
+  `checkScrollStateAfterNextLayout` (outer Registration + zwei innere
+  Catches; restrukturiert mit `_binding`-Snapshot in `onGlobalLayout`,
+  damit der `!!`-NPE durch `binding?.x` gar nicht erst entsteht),
+  `scheduleScrollVerification` (lifecycleScope.launch ist eigene
+  Safety-Net), `safePost` (beide Catches; restrukturiert mit
+  `_binding`-Snapshot), `verifyAndFixScrollState` (pure Kotlin nach
+  Null-Guard), `updateWallpaper` (WallpaperViewBinder hat eigene
+  interne Catches an den I/O-Boundaries), `onStart` / `onResume` /
+  `onPause` (Lifecycle-Wrapper um Internal-Helpers), `onDestroyView`
+  (outer + zwei innere Catches; `binding.setListener(null)` und
+  Property-Nullings können nicht throwen).
+  Geändert: `showAppInfo` Throwable→ActivityNotFoundException
+  (echte Failure-Mode auf stripped-down OEM-ROMs).
+  Erhalten + dokumentiert: `loadBitmapFromUri` (echte I/O-Boundary —
+  FileNotFoundException + SecurityException + OutOfMemoryError; null
+  als Caller-Behandlung).
+- **Brocken-A-Audit-Endstand 2026-05-03:**
+  1972 Zeilen (von 1997 Baseline; -25 absolute oder -1.3%, dazu viele
+  +Lines durch Erklärungs-Kommentare — der echte Catch-Verlust ist
+  -68%), 19 catches (von 59; -68%), 11 Throwable-Catches (von 51; -78%).
+  4-Kategorien-Frame angewandt auf alle 7 Regionen; Test-Backstop
+  grün an jedem Sweep-Ende.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.

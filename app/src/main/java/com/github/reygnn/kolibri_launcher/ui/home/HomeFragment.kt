@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -55,7 +56,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1528,78 +1528,72 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun setupFragmentResultListener() {
-        try {
-            childFragmentManager.setFragmentResultListener(
-                AppContextMenuDialogFragment.REQUEST_KEY,
-                viewLifecycleOwner
-            ) { _, bundle ->
-                try {
-                    val app = longClickedApp
-                    if (app == null) {
-                        Timber.w("Result received but longClickedApp is null")
-                        return@setFragmentResultListener
-                    }
-
-                    val action = try {
-                        bundle.getString(AppContextMenuDialogFragment.RESULT_KEY_ACTION)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting action")
-                        null
-                    }
-
-                    when (val result = ContextMenuResult.parse(action)) {
-                        ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
-                            bundle,
-                            viewModel,
-                            launchShortcutUseCase
-                        )
-                        ContextMenuResult.AppInfo -> showAppInfo(app)
-                        ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
-                        ContextMenuResult.HideApp -> viewModel.onHideApp(app)
-                        // Live branch: per the architecture rule (see
-                        // GetFavoriteAppsUseCase KDoc), a favorite that
-                        // is also hidden remains pinned to the home
-                        // screen and can be long-pressed there. This is
-                        // the path that lets the user un-hide such an
-                        // app — without it, the unhide action would
-                        // have no home-screen-side handler.
-                        ContextMenuResult.UnhideApp -> viewModel.onShowApp(app)
-                        // Only reachable from MenuContext.APP_DRAWER, the
-                        // dialog filters this action by context. Ignored
-                        // here because HOME_SCREEN never receives it in
-                        // practice — but the branch is required for
-                        // sealed-when exhaustiveness.
-                        ContextMenuResult.ResetUsage -> Unit
-                        is ContextMenuResult.Unknown ->
-                            Timber.w("Unknown context menu action: ${result.action}")
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in result listener")
-                }
+        // No try/catch per Rule 11. Body is a single
+        // setFragmentResultListener registration; the bundle-callback
+        // body reads Bundle (cannot throw — getString returns null on
+        // miss), parses a sealed result via pure Kotlin, and dispatches
+        // to viewModel fire-and-forget calls plus internal helpers.
+        // Outer registration runs in onViewCreated context; the
+        // CancellationException-rethrow in the inner block was dead
+        // code (synchronous fragment callback, no coroutine).
+        childFragmentManager.setFragmentResultListener(
+            AppContextMenuDialogFragment.REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val app = longClickedApp
+            if (app == null) {
+                Timber.w("Result received but longClickedApp is null")
+                return@setFragmentResultListener
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up result listener")
+
+            val action = bundle.getString(AppContextMenuDialogFragment.RESULT_KEY_ACTION)
+
+            when (val result = ContextMenuResult.parse(action)) {
+                ContextMenuResult.LaunchShortcut -> handleShortcutLaunch(
+                    bundle,
+                    viewModel,
+                    launchShortcutUseCase
+                )
+                ContextMenuResult.AppInfo -> showAppInfo(app)
+                ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
+                ContextMenuResult.HideApp -> viewModel.onHideApp(app)
+                // Live branch: per the architecture rule (see
+                // GetFavoriteAppsUseCase KDoc), a favorite that
+                // is also hidden remains pinned to the home
+                // screen and can be long-pressed there. This is
+                // the path that lets the user un-hide such an
+                // app — without it, the unhide action would
+                // have no home-screen-side handler.
+                ContextMenuResult.UnhideApp -> viewModel.onShowApp(app)
+                // Only reachable from MenuContext.APP_DRAWER, the
+                // dialog filters this action by context. Ignored
+                // here because HOME_SCREEN never receives it in
+                // practice — but the branch is required for
+                // sealed-when exhaustiveness.
+                ContextMenuResult.ResetUsage -> Unit
+                is ContextMenuResult.Unknown ->
+                    Timber.w("Unknown context menu action: ${result.action}")
+            }
         }
     }
 
     private fun toggleFavorite(app: AppInfo) {
-        try {
-            viewModel.onToggleFavorite(app)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling favorite")
-        }
+        viewModel.onToggleFavorite(app)
     }
 
     private fun showAppInfo(app: AppInfo) {
+        // Narrowed Throwable→ActivityNotFoundException per Rule 11.
+        // startActivity() can throw if no activity handles
+        // ACTION_APPLICATION_DETAILS_SETTINGS (very rare on stock Android,
+        // possible on stripped-down OEM ROMs). Anything else is programmer
+        // error — let it propagate.
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", app.packageName, null)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
         try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", app.packageName, null)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
             startActivity(intent)
-        } catch (e: Throwable) {
+        } catch (e: ActivityNotFoundException) {
             TimberWrapper.silentError(e, "Error showing app info")
             viewModel.onAppInfoError()
         }
@@ -1621,50 +1615,51 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun setupHomeWindowInsets() {
-        try {
-            val initialRootPadding = android.graphics.Rect(
-                binding.rootLayout.paddingLeft,
-                binding.rootLayout.paddingTop,
-                binding.rootLayout.paddingRight,
-                binding.rootLayout.paddingBottom
-            )
+        // No try/catch per Rule 11. Body is property reads (paddingLeft
+        // etc.), a safe `as?` cast (returns null on miss), and
+        // setOnApplyWindowInsetsListener registration. The lambda body
+        // running later is also pure: getInsets, setPadding, property
+        // writes. Programmer-error only.
+        val initialRootPadding = android.graphics.Rect(
+            binding.rootLayout.paddingLeft,
+            binding.rootLayout.paddingTop,
+            binding.rootLayout.paddingRight,
+            binding.rootLayout.paddingBottom
+        )
 
-            val timeContainerParams =
-                binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
-            if (timeContainerParams == null) {
-                TimberWrapper.silentError("TimeContainer params not MarginLayoutParams")
-                ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
-                    val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                    v.setPadding(
-                        initialRootPadding.left + systemBars.left,
-                        initialRootPadding.top + systemBars.top,
-                        initialRootPadding.right + systemBars.right,
-                        initialRootPadding.bottom + systemBars.bottom
-                    )
-                    insets
-                }
-                return
-            }
-
-            val initialTimeMarginTop = timeContainerParams.topMargin
-
+        val timeContainerParams =
+            binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
+        if (timeContainerParams == null) {
+            TimberWrapper.silentError("TimeContainer params not MarginLayoutParams")
             ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
                 v.setPadding(
                     initialRootPadding.left + systemBars.left,
-                    initialRootPadding.top,
+                    initialRootPadding.top + systemBars.top,
                     initialRootPadding.right + systemBars.right,
                     initialRootPadding.bottom + systemBars.bottom
                 )
-
-                timeContainerParams.topMargin = initialTimeMarginTop + systemBars.top
-                binding.timeContainer.layoutParams = timeContainerParams
-
                 insets
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying window insets")
+            return
+        }
+
+        val initialTimeMarginTop = timeContainerParams.topMargin
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            v.setPadding(
+                initialRootPadding.left + systemBars.left,
+                initialRootPadding.top,
+                initialRootPadding.right + systemBars.right,
+                initialRootPadding.bottom + systemBars.bottom
+            )
+
+            timeContainerParams.topMargin = initialTimeMarginTop + systemBars.top
+            binding.timeContainer.layoutParams = timeContainerParams
+
+            insets
         }
     }
 
@@ -1679,102 +1674,93 @@ class HomeFragment : Fragment() {
      * Ruft dann checkAndEmitScrollState() auf.
      */
     private fun checkScrollStateAfterNextLayout(debugMessage: String = "") {
-        try {
-            if (_binding == null || !isAdded) return
+        // Outer try/catch removed per Rule 11. Snapshot _binding to a
+        // local val so registration is null-safe without the !!-getter.
+        val outerBinding = _binding ?: return
+        if (!isAdded) return
 
-            val listener = object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    try {
-                        if (_binding == null || !isAdded) {
-                            try {
-                                binding?.favoritesScrollView?.viewTreeObserver?.removeOnGlobalLayoutListener(this)
-                            } catch (e: Throwable) {
-                                // Ignore - View könnte schon weg sein
-                            }
-                            return
-                        }
+        val listener = object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                // ViewTreeObserver invokes us on the layout pass. By
+                // then onDestroyView may have nulled _binding — read it
+                // through a local snapshot to avoid the !!-getter NPE
+                // that the old code's `binding?` call site silently
+                // triggered + caught. If teardown happened, leave the
+                // listener dangling: it goes out with the View it was
+                // bound to.
+                val current = _binding
+                if (current == null || !isAdded) return
 
-                        binding.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        checkAndEmitScrollState()
+                current.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                checkAndEmitScrollState()
 
-                        if (debugMessage.isNotEmpty()) {
-                            Timber.d(debugMessage)
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in one-shot layout listener")
-                    }
+                if (debugMessage.isNotEmpty()) {
+                    Timber.d(debugMessage)
                 }
             }
-
-            binding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(listener)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error registering one-shot layout listener")
         }
+
+        outerBinding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     private fun scheduleScrollVerification() {
         verifyJob?.cancel()
+        // No try/catch per Rule 11. verifyAndFixScrollState is internal
+        // and self-bounded; lifecycleScope.launch already supplies the
+        // coroutine-scope safety net.
         verifyJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(AppConstants.SCROLL_VERIFICATION_DELAY_MS) // debounce
-            try {
-                verifyAndFixScrollState()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in scheduled verification")
-            }
+            verifyAndFixScrollState()
         }
     }
 
     private fun safePost(action: () -> Unit) {
-        try {
-            if (_binding == null || !isAdded) return
+        // No try/catch per Rule 11. Snapshot _binding to a local val so
+        // registration is null-safe; the .post{} lambda re-checks
+        // _binding before invoking the action — both the registration
+        // and the action are internal-only call sites.
+        val binding = _binding ?: return
+        if (!isAdded) return
 
-            binding.favoritesScrollView.post {
-                try {
-                    if (_binding != null && isAdded) {
-                        action()
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in safe post action")
-                }
+        binding.favoritesScrollView.post {
+            if (_binding != null && isAdded) {
+                action()
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in safePost")
         }
     }
 
     private fun verifyAndFixScrollState() {
-        try {
-            if (_binding == null || !isAdded) return
+        // No try/catch per Rule 11. _binding null-check at top, then
+        // pure: scrollStateVerifier.verify is pure Kotlin, the when-
+        // arms call into View setters / internal helpers only.
+        if (_binding == null || !isAdded) return
 
-            val customScrollView = binding.favoritesScrollView
+        val customScrollView = binding.favoritesScrollView
 
-            val result = scrollStateVerifier.verify(
-                currentSplitState = _needsSplit.value,
-                allowIntercept = customScrollView.allowIntercept,
-                canScrollDown = customScrollView.canScrollVertically(1),
-                canScrollUp = customScrollView.canScrollVertically(-1)
-            )
+        val result = scrollStateVerifier.verify(
+            currentSplitState = _needsSplit.value,
+            allowIntercept = customScrollView.allowIntercept,
+            canScrollDown = customScrollView.canScrollVertically(1),
+            canScrollUp = customScrollView.canScrollVertically(-1)
+        )
 
-            when (result) {
-                VerifyResult.Consistent -> {
-                    // Alles gut, nichts tun
-                }
-                VerifyResult.FixFullMode -> {
-                    Timber.w("Scroll state mismatch detected - fixing...")
-                    customScrollView.allowIntercept = false
-                    customScrollView.scrollTo(0, 0)
-                }
-                VerifyResult.FixSplitMode -> {
-                    Timber.w("Split mode but intercept disabled - fixing...")
-                    customScrollView.allowIntercept = true
-                }
-                VerifyResult.ReEvaluateNeeded -> {
-                    Timber.w("Split mode active but no scroll capability - re-evaluating...")
-                    checkAndEmitScrollState()
-                }
+        when (result) {
+            VerifyResult.Consistent -> {
+                // Alles gut, nichts tun
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error verifying scroll state")
+            VerifyResult.FixFullMode -> {
+                Timber.w("Scroll state mismatch detected - fixing...")
+                customScrollView.allowIntercept = false
+                customScrollView.scrollTo(0, 0)
+            }
+            VerifyResult.FixSplitMode -> {
+                Timber.w("Split mode but intercept disabled - fixing...")
+                customScrollView.allowIntercept = true
+            }
+            VerifyResult.ReEvaluateNeeded -> {
+                Timber.w("Split mode active but no scroll capability - re-evaluating...")
+                checkAndEmitScrollState()
+            }
         }
     }
 
@@ -1824,40 +1810,48 @@ class HomeFragment : Fragment() {
     private fun updateWallpaper(state: WallpaperState) {
         if (_binding == null) return
 
-        try {
-            val wallpaperView = binding.wallpaperView
+        // No try/catch per Rule 11. wallpaperViewBinder.bind() has its
+        // own internal safety wrappers around the throwy operations
+        // (view.setImageURI, bitmap loading, layer mutations); the
+        // bitmap loader passed in (loadBitmapFromUri) catches its own
+        // I/O errors and returns null. StateFlow.value reads + the
+        // edit-mode property check + controller fire-and-forget calls
+        // are programmer-error only.
+        val wallpaperView = binding.wallpaperView
 
-            // Read-and-consume the one-shot focus hint: when a new layer
-            // was just added, the delegate sets this so the view selects
-            // the new layer automatically. Consuming here prevents the
-            // hint from leaking into an unrelated next rebuild.
-            val focusHint = viewModel.pendingFocusLayerId.value
-            if (focusHint != null) {
-                viewModel.consumePendingFocusLayerId()
-            }
-
-            wallpaperViewBinder.bind(
-                view = wallpaperView,
-                target = state,
-                preferredActiveLayerId = focusHint,
-                onRebuildComplete = {
-                    // Refresh the layer-toolbar after a rebuild while in
-                    // edit mode. Inner try/catch removed per Rule 11 —
-                    // the controller's methods touch only View
-                    // properties, and the outer catch in updateWallpaper
-                    // covers any escape.
-                    if (wallpaperView.isEditMode) {
-                        wallpaperEditController?.applyLayerButtonsState()
-                        wallpaperEditController?.updateLayerIndicator()
-                    }
-                }
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in updateWallpaper")
+        // Read-and-consume the one-shot focus hint: when a new layer
+        // was just added, the delegate sets this so the view selects
+        // the new layer automatically. Consuming here prevents the
+        // hint from leaking into an unrelated next rebuild.
+        val focusHint = viewModel.pendingFocusLayerId.value
+        if (focusHint != null) {
+            viewModel.consumePendingFocusLayerId()
         }
+
+        wallpaperViewBinder.bind(
+            view = wallpaperView,
+            target = state,
+            preferredActiveLayerId = focusHint,
+            onRebuildComplete = {
+                // Refresh the layer-toolbar after a rebuild while in
+                // edit mode. Inner try/catch removed per Rule 11 —
+                // the controller's methods touch only View properties.
+                if (wallpaperView.isEditMode) {
+                    wallpaperEditController?.applyLayerButtonsState()
+                    wallpaperEditController?.updateLayerIndicator()
+                }
+            }
+        )
     }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap? {
+        // Catch kept per Rule 11: this is the I/O boundary for bitmap
+        // loading. Real failure modes are FileNotFoundException +
+        // SecurityException (revoked content-URI permission, missing
+        // file) and OutOfMemoryError (large bitmap). Throwable umbrella
+        // covers OOM intentionally — the caller (WallpaperViewBinder)
+        // treats null as "skip this layer", which is the right user-
+        // visible behavior for any of those cases.
         return try {
             val ctx = context ?: return null
             ctx.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -1876,40 +1870,32 @@ class HomeFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        try {
-            // 1. UPDATE: Daten sofort aktualisieren
-            viewModel.refreshTimeNow()
+        // No try/catch per Rule 11. viewModel call is fire-and-forget,
+        // StateFlow.value reads cannot throw, TextView.setText accepts
+        // null/CharSequence and never throws.
+        viewModel.refreshTimeNow()
 
-            // 2. Daten sofort schreiben (Pixel Injection)
-            // Das überbrückt die Millisekunden, bis der Flow anläuft.
-            // Damit ist der erste Frame, den die App selbst zeichnet, garantiert korrekt.
-            val state = viewModel.uiState.value
-            binding.timeText.text = state.timeString
-            binding.dateText.text = state.dateString
-            binding.batteryText.text = state.batteryString
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onStart")
-        }
+        // Daten sofort schreiben (Pixel Injection)
+        // Das überbrückt die Millisekunden, bis der Flow anläuft.
+        // Damit ist der erste Frame, den die App selbst zeichnet, garantiert korrekt.
+        val state = viewModel.uiState.value
+        binding.timeText.text = state.timeString
+        binding.dateText.text = state.dateString
+        binding.batteryText.text = state.batteryString
     }
 
     override fun onResume() {
         super.onResume()
-        try {
-            checkAndSyncOrientation()
-            hideStatusBar()
-            verifyAndFixScrollState()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onResume")
-        }
+        // No try/catch per Rule 11. All three callees are internal and
+        // self-bounded.
+        checkAndSyncOrientation()
+        hideStatusBar()
+        verifyAndFixScrollState()
     }
 
     override fun onPause() {
         super.onPause()
-        try {
-            showStatusBar()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onPause")
-        }
+        showStatusBar()
     }
 
     private fun getInsetsController(): WindowInsetsControllerCompat? {
@@ -1929,66 +1915,59 @@ class HomeFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        try {
-            // 1. Laufende Jobs stoppen (WICHTIG!)
-            // Verhindert Abstürze durch nachträgliche UI-Updates
-            verifyJob?.cancel()
-            verifyJob = null
+        // No try/catch per Rule 11. The body is teardown — null
+        // assignments, View setListener(null), property writes — none
+        // of which throw. ContextMenuHelper.dismiss is a fragment-
+        // manager call but it self-protects against missing dialogs.
+        // The two inner catches that wrapped setListener-null /
+        // property-null sweeps were defensive Programmer-Error swallows.
+        // 1. Laufende Jobs stoppen (WICHTIG!)
+        // Verhindert Abstürze durch nachträgliche UI-Updates
+        verifyJob?.cancel()
+        verifyJob = null
 
-            // 2. Dialog sicher schliessen
-            ContextMenuHelper.dismiss(childFragmentManager)
+        // 2. Dialog sicher schliessen
+        ContextMenuHelper.dismiss(childFragmentManager)
 
-            // 3. Eigene Referenzen aufräumen
-            // Das ist wichtig, weil 'gestureDetector' eine Variable in der HomeFragment Klasse ist
-            gestureDetector = null
-            longClickedApp = null
-            lastSpacingInput = null
-            borderDecorator.clear()
+        // 3. Eigene Referenzen aufräumen
+        // Das ist wichtig, weil 'gestureDetector' eine Variable in der HomeFragment Klasse ist
+        gestureDetector = null
+        longClickedApp = null
+        lastSpacingInput = null
+        borderDecorator.clear()
 
-            try {
-                binding.wallpaperTouchInterceptor.setOnTouchListener(null)
-                binding.btnWallpaperSave.setOnClickListener(null)
-                binding.btnWallpaperCancel.setOnClickListener(null)
-                binding.btnWallpaperSnap.setOnClickListener(null)
-                binding.btnWallpaperSnapMode.setOnClickListener(null)
-                binding.btnWallpaperHSnap.setOnClickListener(null)
-                binding.btnWallpaperVSnap.setOnClickListener(null)
-                binding.btnWallpaperOneToOne.setOnClickListener(null)
-                binding.btnWallpaperFitWidth.setOnClickListener(null)
-                binding.btnLayerAdd.setOnClickListener(null)
-                binding.btnLayerDelete.setOnClickListener(null)
-                binding.btnLayerUp.setOnClickListener(null)
-                binding.btnLayerDown.setOnClickListener(null)
-                binding.btnToolbarDock.setOnClickListener(null)
-            } catch (e: Throwable) {
-                // Ignore
-            }
+        binding.wallpaperTouchInterceptor.setOnTouchListener(null)
+        binding.btnWallpaperSave.setOnClickListener(null)
+        binding.btnWallpaperCancel.setOnClickListener(null)
+        binding.btnWallpaperSnap.setOnClickListener(null)
+        binding.btnWallpaperSnapMode.setOnClickListener(null)
+        binding.btnWallpaperHSnap.setOnClickListener(null)
+        binding.btnWallpaperVSnap.setOnClickListener(null)
+        binding.btnWallpaperOneToOne.setOnClickListener(null)
+        binding.btnWallpaperFitWidth.setOnClickListener(null)
+        binding.btnLayerAdd.setOnClickListener(null)
+        binding.btnLayerDelete.setOnClickListener(null)
+        binding.btnLayerUp.setOnClickListener(null)
+        binding.btnLayerDown.setOnClickListener(null)
+        binding.btnToolbarDock.setOnClickListener(null)
 
-            // Wallpaper Callback aufräumen
-            try {
-                binding.wallpaperView.onTransformChanged = null
-                binding.wallpaperView.onLayerTransformChanged = null
-                binding.wallpaperView.onActiveLayerChanged = null
-                binding.wallpaperView.onLayerTapped = null
-            } catch (e: Throwable) {
-                // Ignore
-            }
+        // Wallpaper Callback aufräumen
+        binding.wallpaperView.onTransformChanged = null
+        binding.wallpaperView.onLayerTransformChanged = null
+        binding.wallpaperView.onActiveLayerChanged = null
+        binding.wallpaperView.onLayerTapped = null
 
-            // 4. Wallpaper-Edit-Controller nullen — bevor _binding weg ist,
-            // damit die Controller-Referenzen auf das Binding noch gültig
-            // sind falls der Controller im Tear-Down noch etwas aufräumen
-            // möchte. Aktuell hält er nur Closures auf das Binding;
-            // Reihenfolge ist defensiv, nicht funktional erzwungen.
-            wallpaperEditController = null
+        // 4. Wallpaper-Edit-Controller nullen — bevor _binding weg ist,
+        // damit die Controller-Referenzen auf das Binding noch gültig
+        // sind falls der Controller im Tear-Down noch etwas aufräumen
+        // möchte. Aktuell hält er nur Closures auf das Binding;
+        // Reihenfolge ist defensiv, nicht funktional erzwungen.
+        wallpaperEditController = null
 
-            // 5. Binding nullen - Der "Golden Hammer"
-            // Durchbricht den Fragment-View-Zyklus.
-            _binding = null
+        // 5. Binding nullen - Der "Golden Hammer"
+        // Durchbricht den Fragment-View-Zyklus.
+        _binding = null
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onDestroyView")
-        } finally {
-            super.onDestroyView()
-        }
+        super.onDestroyView()
     }
 }
