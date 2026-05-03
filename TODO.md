@@ -20,7 +20,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 | 7 | Selbst-Linter für die 13 Rules | offen | mittel (1-2 Tage) |
 | 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
-| 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 erledigt 2026-05-03; 9.2/9.4 offen | mittel-groß |
+| 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 + 9.4 erledigt 2026-05-03; 9.2 offen | groß (2-3 Tage) |
 | 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
 **Empfohlene Reihenfolge bei freier Wahl:** §7 (Linter) zuerst — verhindert
@@ -514,11 +514,12 @@ Class-Field-Counter wiederherstellt — also pinnt er das Verhalten korrekt.
 
 **Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10 eingeordnet.
 Stärken sind Architektur-Disziplin, Doku-Tiefe, Test-Disziplin. Was den
-Score deckelt, sind zwei verbleibende Architektur-Brocken (§9.1
-`BackupRepositoryImpl`-Split ist umgesetzt — siehe §3-Memo;
-§9.3 `HomeFragment`-Edit-Submodul ist umgesetzt 2026-05-03 via
-`WallpaperEditController`, HomeFragment 2657 → 2098 Zeilen). Sequenziell,
-nicht parallel anfangen.
+Score deckelt, ist ein verbleibender Architektur-Brocken (§9.2 Modul-
+Split). §9.1 (`BackupRepositoryImpl`-Split, siehe §3-Memo), §9.3
+(`HomeFragment`-Edit-Submodul via `WallpaperEditController`,
+HomeFragment 2657 → 1997 Zeilen über zwei Sweeps), §9.4
+(`ResetRepositoryImpl` 226 → 134 Zeilen via `purgeAll`-Helper) — alle
+umgesetzt 2026-05-03.
 
 ### 9.2. Modul-Split
 
@@ -545,18 +546,6 @@ Isolation: `:domain`-Tests laufen ohne `:data`/`:ui`-Compile.
 
 **Aufwand:** 2-3 Tage (initial Modul-Aufteilung + Hilt-Multi-Module-
 Wiring + ggf. einige zirkuläre Imports auflösen).
-
-### 9.4. `ResetRepositoryImpl`: Schleife statt Copy-Paste
-
-11 strukturidentische try/catch-Blöcke um `child.purgeRepository()`-
-Calls. Wenn Repo Nr. 12 dazukommt, vergisst jemand den Block.
-
-**Fix:** ein `Purgeable.purgeAllSafely(repos: List<Pair<String, Purgeable>>)`
-als Extension oder ein lokaler `forEach`-Helper, der den `try/catch
-(CancellationException) throw e catch (Throwable) silentError(...)`-
-Block einmal kapselt.
-
-**Aufwand:** 1 Stunde. Datei wird drittel-en. Drift-Resistenz.
 
 ---
 
