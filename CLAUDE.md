@@ -159,11 +159,14 @@ activities.
      throw here escapes the safety-net coroutine and lands at the global
      uncaught handler, which is exactly what these wrappers exist to
      prevent.
-   - `CrashReportLimiter.kt` and `CrashReportConsent.kt` — both are
-     called synchronously from ACRA's pipeline (the limiter from the
-     crash-handler thread per Rule 5; the consent reader from
-     `attachBaseContext` before ACRA is initialised). A throw inside
-     ACRA's own machinery silently breaks crash reporting.
+   - `CrashReportLimiter.kt`, `CrashReportConsentStore.kt`,
+     `CrashReportConsent.kt` — all are on the bootstrap path. The
+     limiter is called synchronously from ACRA's crash-handler thread
+     (per Rule 5). The store's reads happen via `runBlocking` in
+     `attachBaseContext` before Hilt and ACRA are initialised; a DEBUG
+     throw there crashes the app before the reporter is wired. The
+     dialog file is the UI passthrough and stays grandfathered for
+     consistency until its catches migrate to `silentError`.
    - `BackupFragment.kt` — its fragment-scoped
      `CoroutineExceptionHandler` (one site only — the rest of the file
      uses `silentError`). Same recursion shape as `BaseActivity`.

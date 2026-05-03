@@ -30,6 +30,7 @@ import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -625,7 +626,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)
                     ?: return@withContext
-                val isEnabled = CrashReportConsent.hasConsent(requireContext())
+                val isEnabled = CrashReportConsentStore.hasConsent(requireContext())
 
                 if (isEnabled) {
                     preference.summary = getString(R.string.crash_report_summary_enabled)

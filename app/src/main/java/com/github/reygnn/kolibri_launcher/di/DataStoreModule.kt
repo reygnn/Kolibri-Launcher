@@ -18,7 +18,7 @@ import javax.inject.Singleton
  * Internal visibility (not private) so a small number of bootstrap-time
  * call sites that run before Hilt can reach it without a second
  * provider:
- *   - [com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent]
+ *   - [com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore]
  *     reads / writes the ACRA consent flag here. The methods are
  *     called from KolibriLauncherApp.attachBaseContext, which runs
  *     before Hilt is initialised, so they can't take it via @Inject.

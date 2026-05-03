@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -241,8 +240,8 @@ class DataMigrationManagerTest {
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        Assert.assertEquals(false, data[CrashReportConsent.HAS_CONSENT_KEY])
-        Assert.assertEquals(false, data[CrashReportConsent.HAS_ASKED_KEY])
+        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_CONSENT_KEY])
+        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_ASKED_KEY])
         verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
     }
 
@@ -255,8 +254,8 @@ class DataMigrationManagerTest {
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        Assert.assertEquals(true, data[CrashReportConsent.HAS_CONSENT_KEY])
-        Assert.assertEquals(true, data[CrashReportConsent.HAS_ASKED_KEY])
+        Assert.assertEquals(true, data[CrashReportConsentStore.HAS_CONSENT_KEY])
+        Assert.assertEquals(true, data[CrashReportConsentStore.HAS_ASKED_KEY])
     }
 
     @Test
@@ -290,8 +289,8 @@ class DataMigrationManagerTest {
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        Assert.assertEquals(false, data[CrashReportConsent.HAS_CONSENT_KEY])
-        Assert.assertEquals(false, data[CrashReportConsent.HAS_ASKED_KEY])
+        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_CONSENT_KEY])
+        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_ASKED_KEY])
         verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
     }
 

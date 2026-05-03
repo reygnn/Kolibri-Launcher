@@ -17,9 +17,9 @@ import android.os.Process
 import android.util.Log
 import com.github.anrwatchdog.ANRWatchDog
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
@@ -105,7 +105,7 @@ class KolibriLauncherApp : Application() {
      *   not "consented but the launcher missed it".
      * - The read is small (single key) and effectively free on warm starts.
      * - `runBlocking(Dispatchers.IO)` would not help: the inner
-     *   `withContext(Dispatchers.IO)` in [CrashReportConsent.hasConsent]
+     *   `withContext(Dispatchers.IO)` in [CrashReportConsentStore.hasConsent]
      *   already moves the actual I/O off the calling thread of the suspend
      *   function, but `runBlocking` always blocks its caller. Wrapping it
      *   in another IO dispatcher just adds a hop with no benefit.
@@ -115,7 +115,7 @@ class KolibriLauncherApp : Application() {
      * In DEBUG this triggers a DiskReadViolation. That's expected — it is
      * intentional code, not a bug to fix. Cross-reference `KNOWN_ISSUES.md`
      * (section "Intentional violations") before chasing it. The backing
-     * store is the project DataStore (see [CrashReportConsent.hasConsent]);
+     * store is the project DataStore (see [CrashReportConsentStore.hasConsent]);
      * the StrictMode noise comes from the synchronous file read, not from
      * the storage choice — `runBlocking { dataStore.data.first() }` blocks
      * the main thread the same way a `SharedPreferences.getBoolean` would.
@@ -153,7 +153,7 @@ class KolibriLauncherApp : Application() {
 
                 // Check consent status
                 val userHasGivenConsent = runBlocking {
-                    CrashReportConsent.hasConsent(base)
+                    CrashReportConsentStore.hasConsent(base)
                 }
 
                 // Only enable if user has given consent

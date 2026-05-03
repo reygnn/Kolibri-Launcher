@@ -6,7 +6,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -155,8 +154,8 @@ class DataMigrationManager @Inject constructor(
             val hasAsked = legacyPrefs.getBoolean(LEGACY_ACRA_KEY_ASKED, false)
 
             dataStore.edit { prefs ->
-                prefs[CrashReportConsent.HAS_CONSENT_KEY] = hasConsent
-                prefs[CrashReportConsent.HAS_ASKED_KEY] = hasAsked
+                prefs[CrashReportConsentStore.HAS_CONSENT_KEY] = hasConsent
+                prefs[CrashReportConsentStore.HAS_ASKED_KEY] = hasAsked
             }
 
             // Only delete after the DataStore write succeeded. On Android 24+
