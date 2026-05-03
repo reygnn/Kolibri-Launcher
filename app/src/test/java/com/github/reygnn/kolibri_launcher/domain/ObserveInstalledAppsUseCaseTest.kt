@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ObserveInstalledAppsUseCaseTest {
@@ -190,6 +191,50 @@ class ObserveInstalledAppsUseCaseTest {
                 .isEqualTo(R.string.error_app_list_not_loaded)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // =========================================================================
+    // Retry-Counter — across invocations
+    // =========================================================================
+
+    /**
+     * Pins the regression: with the previous class-field counter that only
+     * reset on success, a fully failed first invocation left the counter at
+     * MAX_APP_LOAD_RETRIES; the second invocation's first retry then computed
+     * `delay = base * (max + 1)` instead of `base * 1`, scaling the linear
+     * backoff up across invocations. The counter is now a local var inside
+     * `flow { … }`, so each invocation starts fresh.
+     *
+     * Verified via runTest's virtual time: both invocations consume the same
+     * total duration. With the bug, the second would take ~2.5× as long
+     * (delays of 4+5+6 = 15× base vs. 1+2+3 = 6× base).
+     */
+    @Test
+    fun `retry counter resets between invocations on IOException backoff`() = runTest {
+        val errorRepository = ErrorThrowingInstalledAppsRepository(IOException("boom"))
+        val useCase = ObserveInstalledAppsUseCase(
+            errorRepository,
+            installedAppsStateRepository,
+            favoritesRepository,
+        )
+
+        val firstStart = testScheduler.currentTime
+        useCase().test {
+            val result = awaitItem()
+            assertThat(result).isInstanceOf(AppLoadResult.Error::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+        val firstDuration = testScheduler.currentTime - firstStart
+
+        val secondStart = testScheduler.currentTime
+        useCase().test {
+            val result = awaitItem()
+            assertThat(result).isInstanceOf(AppLoadResult.Error::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+        val secondDuration = testScheduler.currentTime - secondStart
+
+        assertThat(secondDuration).isEqualTo(firstDuration)
     }
 
     // =========================================================================

@@ -234,6 +234,12 @@ object AppConstants {
 
     const val INITIAL_APP_LOAD_DELAY_MS = 100L
 
+    // App-load retry policy (ObserveInstalledAppsUseCase). Total upstream attempts =
+    // 1 + MAX_APP_LOAD_RETRIES. Backoff is linear: APP_LOAD_RETRY_BASE_DELAY_MS *
+    // attempt-index — so retry 1 waits 1 s, retry 2 waits 2 s, retry 3 waits 3 s.
+    const val MAX_APP_LOAD_RETRIES = 3
+    const val APP_LOAD_RETRY_BASE_DELAY_MS = 1000L
+
     // SavedStateHandle Keys
     const val KEY_SEARCH_QUERY = "KEY_SEARCH_QUERY"
     const val KEY_FALLBACK_TOAST_SHOWN = "key_fallback_toast_shown"

@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -21,24 +22,31 @@ class ObserveInstalledAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val favoritesRepository: FavoritesRepository
 ) {
-    private var appLoadRetryCount = 0
-    private val maxAppLoadRetries = 3
 
     /**
      * Aktiviert den Flow, der die installierten Apps lädt, verarbeitet und den State aktualisiert.
      * Gibt ein 'AppLoadResult' aus, das dem ViewModel signalisiert, ob ein Fehler
      * aufgetreten ist, der dem Benutzer angezeigt werden muss.
+     *
+     * The retry counter is a local var per flow invocation. Earlier the
+     * counter was a class field that only reset on success — after a fully
+     * failed invocation it stayed at MAX_APP_LOAD_RETRIES, so the next
+     * invocation's first retry computed `delay = base * (count+1)` instead
+     * of `base * 1`. Local var also removes a latent race if two consumers
+     * ever collected this UseCase concurrently.
      */
     operator fun invoke(): Flow<AppLoadResult> = flow {
+        var retryCount = 0
+
         try {
             // Die gesamte Logik aus 'observeInstalledApps' ist jetzt HIER
             installedAppsRepository.getInstalledApps()
-                .retry(maxAppLoadRetries.toLong()) { cause ->
+                .retry(AppConstants.MAX_APP_LOAD_RETRIES.toLong()) { cause ->
                     try {
                         if (cause is IOException) {
-                            appLoadRetryCount++
-                            Timber.w("App loading failed, retry ${appLoadRetryCount}/${maxAppLoadRetries}")
-                            delay(1000L * appLoadRetryCount)
+                            retryCount++
+                            Timber.w("App loading failed, retry $retryCount/${AppConstants.MAX_APP_LOAD_RETRIES}")
+                            delay(AppConstants.APP_LOAD_RETRY_BASE_DELAY_MS * retryCount)
                             true
                         } else {
                             false
@@ -83,7 +91,9 @@ class ObserveInstalledAppsUseCase @Inject constructor(
 
                         // Wichtig: Den zentralen State aktualisieren
                         installedAppsStateRepository.updateApps(realApps)
-                        appLoadRetryCount = 0
+                        // Reset the linear-backoff counter so a later mid-stream
+                        // failure restarts the delay sequence at base * 1.
+                        retryCount = 0
 
                         // Signalisiere Erfolg (das UI muss nichts tun)
                         emit(AppLoadResult.Success)
