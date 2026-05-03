@@ -87,7 +87,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
     }
 
     private fun setupBackPressHandling() {
-        backPressedCallback = object : OnBackPressedCallback(true) {
+        val callback = object : OnBackPressedCallback(true) {
             // Inner catch kept: FragmentManager.popBackStack can throw
             // IllegalStateException after onSaveInstanceState; finish()
             // gives the user an exit if back-press handling itself
@@ -105,7 +105,8 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
                 }
             }
         }
-        onBackPressedDispatcher.addCallback(this, backPressedCallback!!)
+        backPressedCallback = callback
+        onBackPressedDispatcher.addCallback(this, callback)
     }
 
     private fun loadSettingsFragment() {
