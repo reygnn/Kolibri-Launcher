@@ -63,7 +63,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             return AppContextMenuDialogFragment().apply {
                 arguments = bundleOf(
                     ARG_APP_INFO to appInfo.toParcelable(),
-                    ARG_CONTEXT to context,
+                    ARG_CONTEXT to context.name,
                     ARG_HAS_USAGE_DATA to hasUsageData
                 )
             }
@@ -104,8 +104,8 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                     return
                 }
 
-            menuContext = requireArguments()
-                .getParcelable(ARG_CONTEXT, MenuContext::class.java)
+            menuContext = requireArguments().getString(ARG_CONTEXT)
+                ?.let { MenuContext.valueOf(it) }
                 ?: MenuContext.HOME_SCREEN
 
             hasUsageData = requireArguments().getBoolean(ARG_HAS_USAGE_DATA, false)
