@@ -1,9 +1,5 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 
 /**
