@@ -58,7 +58,13 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             val action = intent.action
             val packageName = intent.data?.schemeSpecificPart ?: "unknown"
 
-            Timber.d("[KOLIBRI] Receiver triggered. Action: $action, package: $packageName")
+            // Log a stable hash of the package name rather than the raw value.
+            // Raw package names are PII (e.g. "com.gambling.bigwin") and
+            // even though Timber.d() is filtered to debug builds, the
+            // launcher's install list shouldn't end up in anyone's logcat.
+            // Hex hashCode keeps add/remove pairs correlatable across log lines.
+            val packageHash = packageName.hashCode().toString(16)
+            Timber.d("[KOLIBRI] Receiver triggered. Action: $action, packageHash: $packageHash")
 
             if (action == null) {
                 Timber.w("[KOLIBRI] Received intent with null action")

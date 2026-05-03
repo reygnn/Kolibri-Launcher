@@ -46,7 +46,8 @@ class ShortcutRepositoryImpl @Inject constructor(
         }
 
         if (!isDefaultLauncher()) {
-            Timber.d("Not the default launcher - cannot access shortcuts for $packageName")
+            // Hash the package — see PackageUpdateReceiver for rationale.
+            Timber.d("Not the default launcher - cannot access shortcuts for packageHash: ${packageName.hashCode().toString(16)}")
             return emptyList()
         }
 
