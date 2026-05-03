@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -43,184 +44,92 @@ class ResetRepositoryImpl @Inject constructor(
 ) : ResetRepository {
 
     override suspend fun resetAllData(): Boolean {
-        return try {
-            Timber.d("Starting complete data reset")
+        // Outer try/catch removed per Rule 11 — the three reset
+        // methods each return Boolean (purgeAll handles their failures
+        // internally and never throws); Boolean composition + Timber
+        // logs are pure code paths.
+        Timber.d("Starting complete data reset")
 
-            // User-Daten zurücksetzen
-            val userDataSuccess = resetUserData()
+        val userDataSuccess = resetUserData()
+        val settingsSuccess = resetSettings()
+        val appUsageSuccess = resetAppUsageData()
 
-            // Settings zurücksetzen
-            val settingsSuccess = resetSettings()
+        val success = userDataSuccess && settingsSuccess && appUsageSuccess
 
-            // AppUsage-Daten zurücksetzen
-            val appUsageSuccess = resetAppUsageData()
-
-            val success = userDataSuccess && settingsSuccess && appUsageSuccess
-
-            if (success) {
-                Timber.d("Complete data reset successful")
-            } else {
-                Timber.w("Complete data reset completed with errors")
-            }
-
-            success
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error during complete data reset")
-            false
+        if (success) {
+            Timber.d("Complete data reset successful")
+        } else {
+            Timber.w("Complete data reset completed with errors")
         }
+        return success
     }
 
     override suspend fun resetUserData(): Boolean {
-        return try {
-            Timber.d("Starting user data reset")
+        Timber.d("Starting user data reset")
 
-            var allSuccessful = true
+        // appUsageRepository is intentionally absent — it survives a
+        // user-data reset and is only purged via [resetAppUsageData].
+        val allSuccessful = purgeAll(
+            listOf(
+                "favorites" to favoritesRepository,
+                "favorites order" to favoritesOrderRepository,
+                "hidden apps" to hiddenAppsRepository,
+                "custom names" to customNamesRepository,
+                "swipe actions" to swipeActionsRepository,
+                "wallpaper" to wallpaperRepository,
+                "installed apps state" to installedAppsStateRepository,
+                "screen lock" to screenLockRepository,
+                "time-based events" to timeBasedEventsRepository,
+            ),
+        )
 
-            // Favoriten
-            try {
-                favoritesRepository.purgeRepository()
-                Timber.d("Favorites purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging favorites")
-                allSuccessful = false
-            }
-
-            // Favorites Order
-            try {
-                favoritesOrderRepository.purgeRepository()
-                Timber.d("Favorites order purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging favorites order")
-                allSuccessful = false
-            }
-
-            // Hidden Apps
-            try {
-                hiddenAppsRepository.purgeRepository()
-                Timber.d("Hidden apps purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging hidden apps")
-                allSuccessful = false
-            }
-
-            // Custom Names
-            try {
-                customNamesRepository.purgeRepository()
-                Timber.d("Custom names purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging custom names")
-                allSuccessful = false
-            }
-
-            // Das appUsageRepository.purgeRepository() hier NICHT purgen !!!
-
-            // Swipe Actions
-            try {
-                swipeActionsRepository.purgeRepository()
-                Timber.d("Swipe actions purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging swipe actions")
-                allSuccessful = false
-            }
-
-            // Wallpaper
-            try {
-                wallpaperRepository.purgeRepository()
-                Timber.d("Wallpaper purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging wallpaper")
-                allSuccessful = false
-            }
-
-            // Installed Apps State
-            try {
-                installedAppsStateRepository.purgeRepository()
-                Timber.d("Installed apps state purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging installed apps state")
-                allSuccessful = false
-            }
-
-            // Screen Lock (falls gewünscht)
-            try {
-                screenLockRepository.purgeRepository()
-                Timber.d("Screen lock purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging screen lock")
-                allSuccessful = false
-            }
-
-            // Time-Based Events
-            try {
-                timeBasedEventsRepository.purgeRepository()
-                Timber.d("Time-based events purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging time-based events")
-                allSuccessful = false
-            }
-
-            if (allSuccessful) {
-                Timber.d("User data reset successful")
-            } else {
-                Timber.w("User data reset completed with some errors")
-            }
-
-            allSuccessful
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error during user data reset")
-            false
+        if (allSuccessful) {
+            Timber.d("User data reset successful")
+        } else {
+            Timber.w("User data reset completed with some errors")
         }
+        return allSuccessful
     }
 
     override suspend fun resetSettings(): Boolean {
-        return try {
-            Timber.d("Starting settings reset")
-
-            settingsRepository.purgeRepository()
-
-            Timber.d("Settings reset successful")
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error during settings reset")
-            false
-        }
+        Timber.d("Starting settings reset")
+        return purgeAll(listOf("settings" to settingsRepository))
     }
 
     override suspend fun resetAppUsageData(): Boolean {
-        return try {
-            Timber.d("Starting App Usage data reset")
-            appUsageRepository.purgeRepository()
-            Timber.d("App usage purged successfully")
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error purging app usage")
-            false
+        Timber.d("Starting App Usage data reset")
+        return purgeAll(listOf("app usage" to appUsageRepository))
+    }
+
+    /**
+     * Purges every [Purgeable] in [repos], in order, with per-item
+     * error isolation: a single failing purge logs via
+     * [TimberWrapper.silentError] but does not stop the remaining
+     * purges from running. Returns `true` only if every purge
+     * succeeded.
+     *
+     * Replaces eleven structurally identical try/catch blocks across
+     * `resetUserData` / `resetSettings` / `resetAppUsageData`. Adding
+     * a twelfth Purgeable to a reset path is now a one-line list
+     * entry rather than a copy-pasted nine-line catch block —
+     * nothing to forget.
+     *
+     * `CancellationException` propagates unchanged so coroutine
+     * cancellation still works correctly.
+     */
+    private suspend fun purgeAll(repos: List<Pair<String, Purgeable>>): Boolean {
+        var allSuccessful = true
+        for ((name, repo) in repos) {
+            try {
+                repo.purgeRepository()
+                Timber.d("$name purged successfully")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error purging $name")
+                allSuccessful = false
+            }
         }
+        return allSuccessful
     }
 }
