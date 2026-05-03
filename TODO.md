@@ -184,15 +184,20 @@ für die letzten 0.1, dann 9.0+.
   klassifizieren, dann die Programmer-Error-Catches entfernen, die
   Teardown-Race-Catches durch `_binding?.let { }` +
   `viewLifecycleOwner.lifecycleScope` ersetzen.
+- **Baseline 2026-05-03:** 1997 Zeilen, 59 `catch (`-Anweisungen,
+  davon 51 `catch (e: Throwable)`. Jede Sweep-Runde sollte diese
+  Zahlen drücken; Backstop-Test als Regression-Indikator.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.
 - **Risiko:** mittel-hoch. Jeder Catch-Wegfall ist ein potentielles
   Crash-Risiko in der HOME-Activity. Robolectric-Test-Backstop für
-  HomeFragment ist Pflicht vor dem Sweep — aktuell fehlt der noch.
-  **Spike-Vorlauf empfohlen:** ein Robolectric-Test für eine
-  HomeFragment-Region, um zu sehen ob der Setup überhaupt
-  praktikabel ist.
+  HomeFragment ist Pflicht vor dem Sweep — **Spike erledigt
+  2026-05-03**: `app/src/testDebug/java/.../ui/home/HomeFragmentRobolectricTest`
+  attached die Fragment in HiltTestActivity ohne Crash, smoke-test
+  läuft in 8s. Pattern parallel zu AppDrawerFragmentRobolectricTest.
+  Ab jetzt kann pro-Region-Sweep starten (jeweils mit
+  Backstop-Run vor und nach jedem Sweep).
 - **Was nicht zu machen ist:** den im Header dokumentierten
   „Fragment-delegate split" (FavoritesRenderer, TimeChipsRenderer
   etc.). Das ist der Cargo-Cult-Move — der Header begründet bewusst
