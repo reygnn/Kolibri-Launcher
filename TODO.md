@@ -19,17 +19,15 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 | 7 | Selbst-Linter für die 13 Rules | teilumgesetzt 2026-05-03 (3 von 6 Rules), Memo bleibt | — |
-| 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
+| 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | 9.1 + 9.3 + 9.4 erledigt 2026-05-03; 9.2 offen | groß (2-3 Tage) |
 | 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
-**Empfohlene Reihenfolge bei freier Wahl:** §8 (Time-Tests, ~5 h) als
-nächster komplementärer Schritt nach §7 — schließt die Test-Lücke die
-den Retry-Counter-Bug in `ObserveInstalledAppsUseCase` durchgelassen
-hat. Danach §10 (Lib-Pinning-Revisit, prozessual). §9.2 (Modul-Split)
-ist der einzige verbleibende Architektur-Brocken aus §9 und der
-einzige Schritt, der das Repo über 7.5/10 Reife heben würde — größer
-und sequenziell, nicht ad-hoc starten.
+**Empfohlene Reihenfolge bei freier Wahl:** §10 (Lib-Pinning-Revisit,
+prozessual). §9.2 (Modul-Split) ist der einzige verbleibende
+Architektur-Brocken aus §9 und der einzige Schritt, der das Repo über
+7.5/10 Reife heben würde — größer und sequenziell, nicht ad-hoc
+starten.
 
 ---
 
@@ -458,43 +456,44 @@ und was er nicht prüft, und das Pattern für neue Sektionen sieht
 
 ---
 
-## 8. Time-basierte Test-Konvention
+## 8. (Memo, erledigt 2026-05-03) Time-basierte Test-Konvention
 
 **Motivation:** Der Retry-Counter-Bug in `ObserveInstalledAppsUseCase` (siehe
 Commit `f8a578b`) — ein Class-Field-State der über Flow-Invocations hinweg
 persistierte und Backoff-Delays falsch skaliert hat — war Production-Code seit
 File-Erstellung. Bestehende Tests haben ihn nicht gepinnt: alle 7 Tests testen
-„passt das Resultat?" aber keiner testet „passt die Zeit-Differenz?".
+„passt das Resultat?", keiner testet „passt die Zeit-Differenz?".
 
-**Symptomatisch:** time-basierte Verhalten brauchen explizite zeit-bezogene
-Asserts. Im Repo betrifft das:
+**Umgesetzt 2026-05-03:**
 
-- Retry-Backoffs (`ObserveInstalledAppsUseCase` — jetzt gepinnt)
-- Debounces (`AppDrawerFragment` Search-Debounce, `HomeFragment` Spacing-Cache)
-- Timeouts (`PackageUpdateReceiver` `withTimeout`, `BackupFragment` Preview-Timeout)
-- Throttles und WhileSubscribed-Timeouts (`shareIn`-Repos in `data/`)
+- Neue Sektion „TIME-BASED ASSERTIONS" in `TESTING_CONVENTIONS.kt` —
+  dokumentiert zwei Patterns: `testScheduler.currentTime`-Snapshot
+  (relativ, gut für Retry-Backoff-Sequenzen) und
+  `advanceTimeBy(BOUNDARY ± 1)` (absolut, gut für single-shot Delays).
+  Plus Survey-Tabelle aller 12 time-basierten Sites im Repo mit
+  Pin-Status (`✓` = explizit gepinnt, `✗` = nur kontraktuelles
+  Vertrauen ohne Drift-Backstop).
+- `GestureDelegateTest` neuer Test `TIME-PIN` für
+  `LOCK_GESTURE_BLOCK_DURATION_MS` — der pre-existing-Test hat nur
+  `advanceUntilIdle()` gemacht, was bei Konstanten-Drift still grün
+  geblieben wäre. Der neue Test asserted Boundary - 1 ms (Flag noch
+  gesetzt) und Boundary + 1 ms (Flag gecleart).
+- Reference-Test `ObserveInstalledAppsUseCaseTest` →
+  „retry counter resets between invocations on IOException backoff"
+  bleibt der Lehr-Test für das `currentTime`-Snapshot-Pattern.
 
-**Konvention:** Jeder neuer/touched Code-Pfad mit `delay()`, `withTimeout`,
-`retry()` braucht einen Test, der:
+**Was bewusst nicht gepinnt wurde:** Die Survey-Tabelle in
+`TESTING_CONVENTIONS.kt` listet ~7 weitere Sites (AppDrawer-Search-
+Debounce, HomeFragment Spacing-Cache, etc.) als „kontraktuelles
+Vertrauen" — diese werden nicht ad-hoc nachgepinnt, sondern im Touch
+(neue Tests / Refactor) auf die Pin-Konvention gehoben. Die Konvention
+ist jetzt Reviewer-fassbar; Drift wird beim nächsten Touch gefixt
+statt in einem Big-Bang-Sweep.
 
-1. `runTest { … }` mit `testScheduler.currentTime` snapshottet vor und nach
-   dem Verhalten.
-2. Asserted, dass die virtuelle Zeit-Differenz dem erwarteten Backoff
-   entspricht — exakter Wert oder symmetrische Eigenschaft (z. B. „beide
-   Invocations kosten gleich viel").
-3. Im Body-Comment dokumentiert, *was* die Test-Zeit pinnt — sonst sind
-   solche Tests bei Änderungen schwer zu lesen.
-
-**Reference-Implementation:** `ObserveInstalledAppsUseCaseTest` →
-„retry counter resets between invocations on IOException backoff" zeigt das
-Pattern. Verifiziert mit Bug-restore: Test wird rot, wenn man den
-Class-Field-Counter wiederherstellt — also pinnt er das Verhalten korrekt.
-
-**Aufwand:** ~30 min pro Test. Bei aktuell ~10 retry/delay/timeout-Sites in
-`app/src/main/` ist das ~5 h Gesamtarbeit, gut parallelisierbar.
-
-**In CLAUDE.md / TESTING_CONVENTIONS.kt aufnehmen:** Eine neue Section
-„TIME-BASED ASSERTIONS" mit der obigen Konvention plus dem Reference-Test.
+Memo bleibt damit ein Reviewer (a) das `TIME-PIN`-Suffix als
+Konventions-Marker erkennt, (b) die zwei Patterns aus
+`TESTING_CONVENTIONS.kt` direkt sieht, und (c) versteht, warum nicht
+alle 12 Sites auf einmal gepinnt wurden.
 
 ---
 
