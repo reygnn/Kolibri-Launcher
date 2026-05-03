@@ -142,15 +142,42 @@ activities.
 9. **Error logging goes through `TimberWrapper`.** Plain `Timber.e(...)`
    only logs — silent in DEBUG too. Use `TimberWrapper.silentError(e, ...)`
    instead: same logging, plus throw in DEBUG so bugs are loud during
-   development. The exception is the global crash handler in
-   `KolibriLauncherApp` itself (~7 spots), where `silentError` would
-   recurse into its own crash path. For paths that must not continue with
-   a lying state (half-migrated DataStore, Activity without ViewModel,
-   HOME-Activity restart loop), use `silentDeath` — it logs FATAL and
-   `exitProcess(1)`s in every build, even DEBUG, because outer
-   `catch(Throwable)` blocks would otherwise swallow a throw. Both:
-   details and the test escape (`preventCrashForTesting`) live in
-   `core/TimberWrapper.kt`.
+   development.
+
+   **Crash-handling-infrastructure exception list.** A handful of files
+   sit *inside* the crash-reporting pipeline: a `silentError` throw there
+   would either recurse into the same path it's supposed to be the safety
+   net for, or land in ACRA's own machinery. These files keep plain
+   `Timber.e`:
+
+   - `KolibriLauncherApp.kt` — the global `UncaughtExceptionHandler` and
+     ACRA init (~7 spots). The original Rule 9 exception.
+   - `TimberWrapper.kt` itself — `silentError` calling itself is a literal
+     loop.
+   - `BaseActivity.kt` and `BaseViewModel.kt` — the
+     `CoroutineExceptionHandler` and the `ErrorEventBus` collector. A
+     throw here escapes the safety-net coroutine and lands at the global
+     uncaught handler, which is exactly what these wrappers exist to
+     prevent.
+   - `CrashReportLimiter.kt` and `CrashReportConsent.kt` — both are
+     called synchronously from ACRA's pipeline (the limiter from the
+     crash-handler thread per Rule 5; the consent reader from
+     `attachBaseContext` before ACRA is initialised). A throw inside
+     ACRA's own machinery silently breaks crash reporting.
+   - `BackupFragment.kt` — its fragment-scoped
+     `CoroutineExceptionHandler` (one site only — the rest of the file
+     uses `silentError`). Same recursion shape as `BaseActivity`.
+
+   New code in any other file: use `silentError`. Adding a new file to
+   this list requires the same recursion-into-the-error-pipeline
+   justification.
+
+   For paths that must not continue with a lying state (half-migrated
+   DataStore, Activity without ViewModel, HOME-Activity restart loop),
+   use `silentDeath` — it logs FATAL and `exitProcess(1)`s in every
+   build, even DEBUG, because outer `catch(Throwable)` blocks would
+   otherwise swallow a throw. Both: details and the test escape
+   (`preventCrashForTesting`) live in `core/TimberWrapper.kt`.
 
 10. **Testable logic lives outside Android-runtime classes.** Activities,
     Fragments, BroadcastReceivers, and Services are awkward to unit-test
