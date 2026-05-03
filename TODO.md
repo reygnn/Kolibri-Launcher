@@ -1,6 +1,6 @@
 # Kolibri Launcher — TODO & Roadmap
 
-Lebendes Dokument. Stand: 2026-05-03 (post-audit-Sweep-Session), basierend auf
+Lebendes Dokument. Stand: 2026-05-03 (post-Brocken-C-Sweep), basierend auf
 einer vollständigen Source-Analyse des Repos auf Branch `main` (Version
 `0.99.61` / versionCode `79`).
 
@@ -22,10 +22,15 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
+| 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch noch offen — Memo unten | — |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Keine offenen Punkte
-mehr. §10 ist als wiederkehrender Quartals-Termin etabliert (siehe
-Memo) und triggert sich von selbst — nächster Recheck 2026-Q3.
+**Empfohlene Reihenfolge bei freier Wahl:** Zwei Brocken offen aus
+dem Audit-Snapshot (A: HomeFragment-Restructure, B: Test-Isolation
+pro Modul). Plus ein kleiner Folgeschritt zu §11: das `:domain`-
+Modul von Android Library auf pure-Kotlin umstellen — ist nur noch
+ein build.gradle.kts-Eingriff und der Move der 12 Use-Case-Strings
+aus `:domain/res/`. §10 ist als wiederkehrender Quartals-Termin
+etabliert und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
@@ -40,14 +45,15 @@ Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
    warum, was bewusst weggelassen ist, wo anzufangen.
 3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
    technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
-4. **Diesen Audit-Snapshot unten** — aktueller Score 8.2, Baseline-
-   Vergleich, drei große Brocken zu 9+.
+4. **Diesen Audit-Snapshot unten** — aktueller Score 8.6, Baseline-
+   Vergleich, zwei verbleibende große Brocken zu 9+.
 
 ### Ein kalter „leg los"-Auftrag braucht eine Richtungs-Entscheidung
 
 Der TODO.md-Status sagt „keine kleinen Open-Items mehr". Wenn der
-User trotzdem Arbeit will, ist das praktisch immer einer der drei
-Brocken aus dem Audit-Snapshot weiter unten — frag aber einmal nach,
+User trotzdem Arbeit will, ist das praktisch immer einer der zwei
+verbleibenden Brocken aus dem Audit-Snapshot weiter unten oder der
+kleine Modul-Type-Switch-Followup zu §11 — frag aber einmal nach,
 welcher. Sonst wählst du falsch.
 
 ### Workflow-Defaults
@@ -64,47 +70,60 @@ welcher. Sonst wählst du falsch.
 
 ---
 
-## Audit-Snapshot 2026-05-03 (post-§9.2)
+## Audit-Snapshot 2026-05-03 (post-Brocken-C)
 
-Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot direkt nach §9.2-
-Merge gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
+Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach Brocken-C-
+Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 
-### Score: **8.2/10** (vor §9.2: 7.5/10)
+### Score: **8.6/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
 
-### Was die +0.7 ggü. 7.5 gebracht hat
+### Was die +0.4 ggü. 8.2 gebracht hat
 
-- **Modul-Split sauber gelandet.** Drei Module, einseitige Dependency-
-  Kette, `data → ui` und `domain → di` Cycles weg. Das war der
-  explizite 7.5→9-Hebel und er hat geliefert.
-- **Linter erweitert auf alle drei Module.** Drift in `core/`,
-  `domain/`, `data/` würde jetzt aus den Rule-9/12/Naming-Checks
-  gefangen, nicht still entkommen.
-- **Spike-vor-Implementation als Pattern bewiesen** (siehe §9.2-
-  Memo, „Spike-Vorlauf"). Hat aus 6-11h-Risiko 4-6h-Plan gemacht.
-  Geht in dauerhaftes Repertoire über.
-- **Latente UI→domain-Leaks gefunden** (`UiState`,
-  `AppContextMenuAction`) — Bonus-Signal: das Refactor hat Defekte
-  aufgedeckt, nicht nur welche eingeführt.
+- **Brocken C abgehakt — `:domain/src/main/` ist Android-frei.**
+  Alle 16 Files aus der 9.2-Variante-1-Schuldenliste sind durch.
+  `grep -rn "^import android\|^import androidx" domain/src/main/`
+  liefert leer. Die ursprünglich „bewusst abgegebenen 0.5 Punkte"
+  sind zurückgewonnen — bis auf den letzten Schritt (Modul-Type-
+  Switch von Android Library auf pure-Kotlin), der noch ein
+  build.gradle.kts-Eingriff ist. Daher 0.4 statt der vollen 0.5.
+- **Wert geliefert beim Refactor** (siehe §11-Memo): drei neue
+  Domain-Modelle (`LauncherShortcut`, `DomainWallpaperColors`,
+  `WallpaperBlendMode`), pure-Kotlin Color-Math (`core/ColorMath`),
+  Bundle-Wrapper-Pattern (`AppInfoParcelable`,
+  `LauncherShortcutParcelable`). String-Overloads im
+  `WallpaperFileManager` als saubere Daten-/UI-Boundary.
+- **Dead-Code-Fund:** `TextColorCalculator` (86 LOC + 291 Test-LOC)
+  war seit dem Modul-Split unbenutzt — beim Pure-Kotlin-Sweep
+  ausgemistet.
 
-### Was die 0.8 unter 9.0 deckelt — die drei großen Brocken
+### Was die 0.4 unter 9.0 deckelt — zwei verbleibende Brocken
 
-1. **Variante-1-Kompromiss bei §9.2.** `:domain` ist Android Library,
-   nicht pure Kotlin. Die 13 Domain-Files mit `Parcelable`/`LiveData`/
-   `WallpaperColors`/`Intent`/`Uri`-Imports sind nicht refactored. Der
-   originale §9.2-Plan hätte „Architektur über 9" geliefert. Variante 1
-   liefert „Architektur 8.something". Trade-off ehrlich, aber ~0.5
-   Punkte wurden bewusst abgegeben.
-
-2. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
+1. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
    Extraktion und Rule-11-Sweep. §2-Reststand nennt es als „eigenes
    Lifecycle-Restructure-Projekt" — ehrlich, ändert aber nicht den
    Smell.
 
-3. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
+2. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
    gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
    IPC mit System-Diensten sind End-to-End nie auf einem Gerät
    getestet. Robolectric ist guter Backstop, kein vollständiger
    Ersatz.
+
+### Folge-Schritt zu §11 (klein, sollte erledigt werden)
+
+- **Modul-Type-Switch `:domain` Android Library → pure-Kotlin.**
+  Source ist Android-frei, der Schritt ist jetzt mechanisch:
+  Plugin von `com.android.library` auf `kotlin("jvm")`,
+  `kotlin-parcelize` raus (kein @Parcelize-User mehr in `:domain`),
+  Hilt-kapt bleibt, `BuildConfig` raus oder ersetzen, namespace/
+  compileSdk raus. Risiko-Punkt: die 12 Use-Case-Strings in
+  `:domain/res/values/strings.xml` müssen nach `:app` ziehen — das
+  ist der substanzielle Sub-Step (Use Cases geben heute `Int`-IDs
+  aus `domain.R.string.*` zurück; nach Move kommen sie aus
+  `app.R.string.*`, was die Use Cases nicht referenzieren können
+  ohne Layering-Inversion). Eine Lösung: Use Cases geben statt
+  `@StringRes Int` einen Sealed-Type-Identifier zurück, UI mappt.
+  Größenordnung: 2-3h. Bringt die letzten ~0.1 Punkte.
 
 ### Mittelschwere Deckler
 
@@ -127,15 +146,18 @@ Merge gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 
 Der Doku-Apparat (CLAUDE.md, TODO.md, AUDIT.md, KNOWN_ISSUES.md,
 TESTING_CONVENTIONS.kt, Memos) ist überdurchschnittlich gut für ein
-Solo-GPLv3-Projekt. Hebt den Score nicht über 8.5 — ein industrieller
-Reviewer wertet Doku als „nice but secondary"; Code- und Test-
-Qualität schlagen Doku-Qualität bei der Note.
+Solo-GPLv3-Projekt — fließt aber nicht direkt in die Note ein.
+Ein industrieller Reviewer wertet Doku als „nice but secondary";
+Code- und Test-Qualität schlagen Doku-Qualität bei der Note. Die
++0.4 von Brocken C sind explizit aus Code-Refactoring gekommen,
+nicht aus Doku-Pflege.
 
 ### Pfad zu 9+
 
-Brauchst genau **einen** der drei großen Brocken sauber, um über 9
-zu kommen. Drei davon halb wäre Score-neutral. Eins davon sauber
-bringt 0.8-1.0.
+Brauchst genau **einen** der zwei verbleibenden großen Brocken sauber,
+um über 9 zu kommen. Beide halb wäre Score-neutral. Eins davon sauber
+bringt 0.4-0.5 — plus der oben beschriebene §11-Modul-Type-Followup
+für die letzten 0.1, dann 9.0+.
 
 #### Brocken A — HomeFragment try/catch-Audit + Lifecycle-Restructure
 
@@ -191,45 +213,12 @@ bringt 0.8-1.0.
   produktionsrelevant — Tests-grün bleibt der einzige Erfolgs-
   Indikator.
 
-#### Brocken C — `:domain` als pure-Kotlin Modul (Variante-2 nachholen)
+#### Brocken C — `:domain` als pure-Kotlin Modul
 
-§9.2 wurde als Variante 1 (Android-Library) umgesetzt, weil 16
-Domain-Files Android-SDK-Imports haben. Die ursprüngliche Vision
-(`:domain` ohne Android-SDK) wäre die saubere Architektur-Antwort,
-braucht aber alle 16 Files refactored.
-
-**Die 16 Pure-Kotlin-Blocker-Files (Stand 2026-05-03):**
-
-| File | Was leakt | Idee zur Auflösung |
-|---|---|---|
-| `core/AppConstants.kt` | `androidx.datastore.preferences.core.*` Keys | Keys nach `:data` ziehen, AppConstants behält nur reine Konstanten |
-| `core/TextColorCalculator.kt` | `Bitmap`/`Canvas`/`Color`/`Drawable` | Pure-Kotlin Color-Math extrahieren, Bitmap-Pfad in `:app` halten |
-| `domain/model/AppInfo.kt` | `Parcelable` (`@Parcelize`) | Plain data class; UI-Layer wrappt für Parcel-Bedarf |
-| `domain/model/MenuContext.kt` | `Parcelable` | dito |
-| `domain/model/BackupData.kt` | `androidx.core.net.toUri` | String-URIs im Modell, Konvertierung in Konsumenten |
-| `domain/model/UiColorsState.kt` | `android.graphics.Color` | Int-RGB statt Color-Klasse |
-| `domain/model/WallpaperState.kt` | `BlendMode` + `Uri` | Domain-Enum für BlendMode, String-URI |
-| `domain/model/AppContextMenuAction.kt` | `ShortcutInfo` + `@StringRes` | Eigene Domain-Shortcut-Repräsentation, Int statt @StringRes |
-| `domain/repository/GetDrawerAppsUseCaseRepository.kt` | `LiveData` | Flow-Return; UI konvertiert via `asLiveData()` |
-| `domain/repository/ShortcutRepository.kt` | `ShortcutInfo` | Domain-Shortcut-Modell, Mapper in `:data` |
-| `domain/service/ShortcutLauncherService.kt` | `ShortcutInfo` | dito |
-| `domain/usecase/GetDrawerAppsUseCase.kt` | `LiveData`/`asLiveData` | Flow-Return |
-| `domain/usecase/BuildAppContextMenuUseCase.kt` | `ShortcutInfo` | Domain-Shortcut-Modell |
-| `domain/usecase/LaunchShortcutUseCase.kt` | `ShortcutInfo` | dito |
-| `domain/usecase/ObserveUiColorsUseCase.kt` | `WallpaperColors`/`Color`/`ColorUtils` | Domain-Color-Modell, Color-Math in `:domain`-Pure-Kotlin |
-| `domain/usecase/SetWallpaperImageUseCase.kt` | `Uri` | String-URI, Konvertierung in Konsumenten |
-
-- **Erster konkreter Schritt:** mit dem einfachsten anfangen
-  (`AppInfo.kt` Parcelable → plain data class). Cycle-Elimination-
-  Branches als Vorbild — pro Datei ein Branch, ff-merge, weiter.
-- **Größenordnung:** ~5-7 Tage, einzeln aber jeder Schritt klein
-  und low-risk. Nach allen 16 kann `:domain` von Android-Library
-  auf pure-Kotlin umgeschaltet werden — eigener Branch, Test:
-  `./gradlew :domain:test` ohne Android-Anteil.
-- **Risiko:** niedrig pro Schritt, akkumuliert mittel. Gefahr ist
-  nicht Compile-Failure (sofort sichtbar) sondern Verhaltens-Drift
-  (z. B. wenn `Uri`-Validierung wegfällt und String-URI nicht
-  validiert wird).
+**Source-Sweep erledigt 2026-05-03** über alle 16 ursprünglich
+gelisteten Files. Memo unten in §11. Modul-Type-Switch (Android
+Library → pure-Kotlin) ist der noch ausstehende Folge-Schritt —
+beschrieben oben unter „Folge-Schritt zu §11".
 
 ---
 
@@ -825,6 +814,88 @@ Drift-Risiko: heute ist „DO NOT UPGRADE" begründet, in 12 Monaten ist
 es Karawanen-Aberglaube. Memo bleibt damit (a) der Header-Kommentar
 seinen Kontext behält und (b) ein neuer Reviewer direkt versteht,
 warum der Inaugural-Pass nur das Format etabliert hat.
+
+---
+
+## 11. (Memo, Source-Sweep abgeschlossen 2026-05-03) Brocken C — `:domain` Source Pure-Kotlin
+
+**Motivation:** §9.2 (Modul-Split) hatte zwei Varianten zur Auswahl —
+`:domain` als Android Library (Variante 1, gewählt) oder als pure-
+Kotlin Modul (Variante 2). Variante 2 wurde damals zurückgestellt,
+weil 16 Domain-Files Android-Imports hatten (`Parcelable`,
+`LiveData`, `WallpaperColors`, `Uri`, `Color`, `BlendMode`, etc.) —
+zu viele Refactor-Frontiers für einen einzigen §9.2-Branch. Der
+Audit-Snapshot direkt nach §9.2 hat das ehrlich als „~0.5 Punkte
+bewusst abgegeben" markiert. Brocken C holt diese Schuld zurück.
+
+**Vorgehen (2026-05-03):** Pro-File-pro-Branch, Reihenfolge nach
+Risiko/Größe sortiert, ff-merge nach jedem grünem Build+Test+Linter.
+Acht Branches insgesamt — einige Files ließen sich in einen Branch
+clustern, weil sie strukturell verflochten waren:
+
+| Branch | Files |
+|---|---|
+| `appinfo` | `domain/model/AppInfo.kt` |
+| `menucontext` | `domain/model/MenuContext.kt` |
+| `wallpaper` | `domain/model/WallpaperState.kt` + `BackupData.kt` (Uri-Aspekt) + `usecase/SetWallpaperImageUseCase.kt` |
+| `livedata` | `repository/GetDrawerAppsUseCaseRepository.kt` + `usecase/GetDrawerAppsUseCase.kt` |
+| `appconstants` | `core/AppConstants.kt` (Trivial: 4 unused DataStore-Imports) |
+| `uicolorsstate` | `domain/model/UiColorsState.kt` |
+| `shortcut` | `model/AppContextMenuAction.kt` + `repository/ShortcutRepository.kt` + `service/ShortcutLauncherService.kt` + `usecase/BuildAppContextMenuUseCase.kt` + `usecase/LaunchShortcutUseCase.kt` |
+| `uicolors` | `usecase/ObserveUiColorsUseCase.kt` (mit neuem `core/ColorMath` und `model/DomainWallpaperColors`) |
+| `textcolorcalculator` | `core/TextColorCalculator.kt` (Dead-Code-Fund — komplett gelöscht) |
+
+**Verifikation des Endzustands:** `grep -rn "^import android\|^import androidx" domain/src/main/`
+liefert leer. `:domain/src/main/` enthält nur noch reines Kotlin
+plus `kotlinx.*`, `javax.inject.*`, `dagger.*`, `timber.log.Timber`.
+
+**Eingeführte Domain-Patterns:**
+
+- **Bundle-Wrapper-Pattern** für Parcelable-Transport: `:domain` hält
+  pure Kotlin data classes, `:app/ui/util/` wrappt sie in
+  `@Parcelize`-Mirror-Klassen mit `toX()`/`toParcelable()`-Mappern.
+  Beispiele: `AppInfoParcelable`, `LauncherShortcutParcelable`.
+- **String-Overloads an der Daten-Boundary** statt verteilter
+  `Uri.parse`-Calls: `WallpaperFileManager` hat jetzt sowohl
+  `deleteFile(Uri)` als auch `deleteFile(String)`, `:app`-Konsumenten
+  rufen die String-Variante auf, intern parst sie der Manager. Bei
+  `gcOrphans` mit `Set<Uri>` vs. `Set<String>` brauchte's `@JvmName`
+  wegen Type-Erasure-Clash.
+- **Domain-Mirror-Modelle** für System-API-Strukturen wo nur ein
+  paar Felder gebraucht werden: `LauncherShortcut(id, packageName,
+  shortLabel)` statt `ShortcutInfo`, `DomainWallpaperColors(supportsDarkText,
+  secondaryColorArgb)` statt `WallpaperColors`. Mapping in `:data`/`:app`
+  an der Boundary.
+- **Pure-Kotlin Color-Math** (`core/ColorMath`) als Drop-In für
+  `android.graphics.Color`-Konstanten und -Funktionen. Identische
+  Bit-Patterns für `WHITE`/`BLACK`/`TRANSPARENT`, identische WCAG-
+  Formel für `calculateLuminance` (matcht
+  `androidx.core.graphics.ColorUtils.calculateLuminance` zur
+  Floating-Point-Genauigkeit).
+
+**Verhaltens-Drift-Wachen:** Das Risiko-Profil aus dem TODO-Eintrag
+(„nicht Compile-Failure, sondern Verhaltens-Drift") hat sich
+einmal manifestiert — `WallpaperRepositoryImpl`'s Scheme-Validierung
+für `imageUri` hätte mit dem String-Switch verloren gehen können.
+Lösung: lokales `uriString.toUri()` direkt vor dem Scheme-Check, der
+Rest der Pipeline bleibt String. Sub-Step in `WallpaperRepositoryImpl`
+explizit dokumentiert.
+
+**Was noch fehlt:** Modul-Type-Switch von Android Library auf pure-
+Kotlin (siehe Audit-Snapshot „Folge-Schritt zu §11"). Source ist
+Android-frei, der Switch ist mechanisch — der einzige substantielle
+Sub-Step ist der Move der 12 Use-Case-Strings aus `:domain/res/` nach
+`:app/res/`, was einen kleinen Use-Case-API-Refactor braucht (heute
+geben einige Use Cases `messageResId: Int` aus `domain.R.string.*`
+zurück; nach dem Switch geht das nicht mehr — Use Cases müssen
+Sealed-Type-Identifier exposen, UI mappt zu Strings).
+
+Memo bleibt damit (a) ein neuer Reviewer beim Lesen des Audit-
+Snapshots versteht, was Brocken C konkret bewegt hat, (b) die
+Bundle-Wrapper- und String-Overload-Patterns als wiederverwendbare
+Domain-Tools dokumentiert sind, und (c) der noch ausstehende
+Modul-Type-Switch klar als kleiner Folge-Schritt umrissen ist
+(nicht als „neuer großer Brocken").
 
 ---
 
