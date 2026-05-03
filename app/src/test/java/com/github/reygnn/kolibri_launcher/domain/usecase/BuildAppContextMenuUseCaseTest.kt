@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import android.content.pm.ShortcutInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
@@ -116,8 +116,8 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `shortcuts are emitted before a separator and the rest of the menu`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val s1: ShortcutInfo = mockk()
-            val s2: ShortcutInfo = mockk()
+            val s1 = LauncherShortcut(id = "s1", packageName = app.packageName, shortLabel = "S1")
+            val s2 = LauncherShortcut(id = "s2", packageName = app.packageName, shortLabel = "S2")
             every { shortcutRepository.getShortcutsForPackage(app.packageName) } returns listOf(s1, s2)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
@@ -343,7 +343,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `full menu in app drawer with all features active matches expected order`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val s1: ShortcutInfo = mockk()
+            val s1 = LauncherShortcut(id = "s1", packageName = app.packageName, shortLabel = "S1")
             every { shortcutRepository.getShortcutsForPackage(any()) } returns listOf(s1)
             fakeFavorites.favorites = setOf(app.componentName)
             fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")

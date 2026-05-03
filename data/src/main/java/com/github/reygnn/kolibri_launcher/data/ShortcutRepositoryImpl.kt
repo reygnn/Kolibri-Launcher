@@ -3,9 +3,9 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
-import android.content.pm.ShortcutInfo
 import android.os.Process
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
@@ -39,7 +39,7 @@ class ShortcutRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getShortcutsForPackage(packageName: String): List<ShortcutInfo> {
+    override fun getShortcutsForPackage(packageName: String): List<LauncherShortcut> {
         if (packageName.isBlank()) {
             Timber.w("Attempted to get shortcuts for blank package name")
             return emptyList()
@@ -66,7 +66,13 @@ class ShortcutRepositoryImpl @Inject constructor(
                 )
             }
 
-            service.getShortcuts(query, Process.myUserHandle()) ?: emptyList()
+            (service.getShortcuts(query, Process.myUserHandle()) ?: emptyList()).map { info ->
+                LauncherShortcut(
+                    id = info.id,
+                    packageName = info.`package`,
+                    shortLabel = info.shortLabel?.toString()
+                )
+            }
 
         } catch (e: SecurityException) {
             Timber.i("Shortcut access denied for $packageName - launcher status may have changed")

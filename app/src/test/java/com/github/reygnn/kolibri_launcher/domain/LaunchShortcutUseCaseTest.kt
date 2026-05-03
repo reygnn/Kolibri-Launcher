@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import android.content.pm.ShortcutInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLaunchException
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import io.mockk.MockKAnnotations
@@ -23,8 +23,11 @@ class LaunchShortcutUseCaseTest {
     @MockK
     private lateinit var shortcutLauncherService: ShortcutLauncherService
 
-    @MockK
-    private lateinit var shortcutInfo: ShortcutInfo
+    private val shortcutInfo = LauncherShortcut(
+        id = "test_shortcut",
+        packageName = "com.example.test",
+        shortLabel = "Test"
+    )
 
     // ===========================================
     // SYSTEM UNDER TEST

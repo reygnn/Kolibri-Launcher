@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
-import android.content.pm.ShortcutInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 
 /**
  * Ein Interface, das die Logik zum Abrufen von App-Verknüpfungen (Shortcuts) abstrahiert.
@@ -11,8 +11,8 @@ interface ShortcutRepository : Purgeable {
     /**
      * Ruft die dynamischen und manifest-basierten Shortcuts für ein bestimmtes App-Paket ab.
      * @param packageName Der Paketname der App (z.B. "com.google.android.gm").
-     * @return Eine Liste von ShortcutInfo-Objekten oder eine leere Liste, wenn keine gefunden wurden
-     *         oder die Berechtigung fehlt.
+     * @return Eine Liste von [LauncherShortcut]-Objekten oder eine leere Liste, wenn keine
+     *         gefunden wurden oder die Berechtigung fehlt.
      */
-    fun getShortcutsForPackage(packageName: String): List<ShortcutInfo>
+    fun getShortcutsForPackage(packageName: String): List<LauncherShortcut>
 }

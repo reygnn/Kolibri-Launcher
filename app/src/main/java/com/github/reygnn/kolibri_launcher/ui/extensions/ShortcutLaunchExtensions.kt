@@ -1,12 +1,13 @@
 package com.github.reygnn.kolibri_launcher.ui.extensions
 
-import android.content.pm.ShortcutInfo
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
+import com.github.reygnn.kolibri_launcher.ui.util.LauncherShortcutParcelable
 import timber.log.Timber
 
 /**
@@ -37,16 +38,16 @@ fun Fragment.handleShortcutLaunch(
 }
 
 /**
- * Extrahiert ShortcutInfo aus einem Bundle.
+ * Extrahiert einen [LauncherShortcut] aus einem Bundle.
  *
- * @return ShortcutInfo oder null bei Fehler
+ * @return [LauncherShortcut] oder null bei Fehler
  */
-private fun extractShortcutFromBundle(bundle: Bundle): ShortcutInfo? {
+private fun extractShortcutFromBundle(bundle: Bundle): LauncherShortcut? {
     return try {
         bundle.getParcelable(
             AppContextMenuDialogFragment.RESULT_KEY_SHORTCUT,
-            ShortcutInfo::class.java
-        )
+            LauncherShortcutParcelable::class.java
+        )?.toLauncherShortcut()
     } catch (e: Throwable) {
         TimberWrapper.silentError(e, "Error getting shortcut from bundle")
         null

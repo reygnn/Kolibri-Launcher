@@ -58,13 +58,23 @@ class ShortcutRepositoryImplTest {
 
     @Test
     fun `getShortcutsForPackage - when successful - returns list of shortcuts`() {
-        val fakeShortcuts = listOf(mockk<ShortcutInfo>(relaxed = true), mockk<ShortcutInfo>(relaxed = true))
-        every { launcherApps.getShortcuts(any(), any()) } returns fakeShortcuts
+        val fakeShortcut1 = mockk<ShortcutInfo> {
+            every { id } returns "id1"
+            every { `package` } returns "com.test.app"
+            every { shortLabel } returns "Label 1"
+        }
+        val fakeShortcut2 = mockk<ShortcutInfo> {
+            every { id } returns "id2"
+            every { `package` } returns "com.test.app"
+            every { shortLabel } returns "Label 2"
+        }
+        every { launcherApps.getShortcuts(any(), any()) } returns listOf(fakeShortcut1, fakeShortcut2)
 
         val result = shortcutManager.getShortcutsForPackage("com.test.app")
 
-        assertEquals(fakeShortcuts, result)
         assertEquals(2, result.size)
+        assertEquals("id1", result[0].id)
+        assertEquals("id2", result[1].id)
     }
 
     @Test

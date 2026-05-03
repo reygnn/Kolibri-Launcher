@@ -197,7 +197,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             is AppContextMenuAction.Shortcut -> {
                 setFragmentResult(REQUEST_KEY, bundleOf(
                     RESULT_KEY_ACTION to "launch_shortcut",
-                    RESULT_KEY_SHORTCUT to action.shortcutInfo
+                    RESULT_KEY_SHORTCUT to action.shortcut.toParcelable()
                 ))
                 dismiss()
             }

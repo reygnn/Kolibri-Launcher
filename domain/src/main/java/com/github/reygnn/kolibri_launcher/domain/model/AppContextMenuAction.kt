@@ -1,8 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import android.content.pm.ShortcutInfo
-import androidx.annotation.StringRes
-
 /**
  * Eine sealed class, die alle möglichen Aktionen im App-Kontextmenü repräsentiert.
  * Sie ist rein datenbasiert und enthält keine UI-Elemente wie Icons.
@@ -11,17 +8,21 @@ sealed class AppContextMenuAction {
 
     /**
      * Stellt eine von einer App bereitgestellte Verknüpfung dar.
-     * Enthält die Original-ShortcutInfo, um sie später starten zu können.
+     * Enthält den [LauncherShortcut], um ihn später starten zu können.
      */
-    data class Shortcut(val shortcutInfo: ShortcutInfo) : AppContextMenuAction()
+    data class Shortcut(val shortcut: LauncherShortcut) : AppContextMenuAction()
 
     /**
      * Stellt eine Standard-Launcher-Aktion dar, die durch eine ID und einen
      * String-Resource-Verweis definiert ist. Der Adapter löst den Verweis am
      * Render-Zeitpunkt via `Context.getString` auf — so kann der Build-Pfad
      * dieser Liste auf JVM-Seite getestet werden, ohne Android-Runtime.
+     *
+     * `labelRes` is a string-resource id — kept as a plain `Int` here so the
+     * domain layer doesn't depend on `androidx.annotation`. UI-side consumers
+     * still pass it through `context.getString(...)` as before.
      */
-    data class LauncherAction(val id: String, @param:StringRes val labelRes: Int) : AppContextMenuAction()
+    data class LauncherAction(val id: String, val labelRes: Int) : AppContextMenuAction()
 
     /**
      * Stellt einen nicht klickbaren, visuellen Trenner dar.

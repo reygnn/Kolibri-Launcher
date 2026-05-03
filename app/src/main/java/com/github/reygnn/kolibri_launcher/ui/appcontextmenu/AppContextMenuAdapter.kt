@@ -67,7 +67,7 @@ class AppContextMenuAdapter(
 
         fun bind(action: AppContextMenuAction) {
             labelView.text = when (action) {
-                is AppContextMenuAction.Shortcut -> action.shortcutInfo.shortLabel
+                is AppContextMenuAction.Shortcut -> action.shortcut.shortLabel
                 is AppContextMenuAction.LauncherAction -> itemView.context.getString(action.labelRes)
                 // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
                 is AppContextMenuAction.Separator -> ""
@@ -87,7 +87,7 @@ class AppContextMenuAdapter(
         override fun areItemsTheSame(oldItem: AppContextMenuAction, newItem: AppContextMenuAction): Boolean {
             return when {
                 oldItem is AppContextMenuAction.Shortcut && newItem is AppContextMenuAction.Shortcut ->
-                    oldItem.shortcutInfo.id == newItem.shortcutInfo.id
+                    oldItem.shortcut.id == newItem.shortcut.id
                 oldItem is AppContextMenuAction.LauncherAction && newItem is AppContextMenuAction.LauncherAction ->
                     oldItem.id == newItem.id
                 oldItem is AppContextMenuAction.Separator && newItem is AppContextMenuAction.Separator ->

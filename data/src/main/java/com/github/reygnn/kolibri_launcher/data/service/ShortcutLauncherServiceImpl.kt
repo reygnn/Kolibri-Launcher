@@ -2,7 +2,8 @@ package com.github.reygnn.kolibri_launcher.data.service
 
 import android.content.Context
 import android.content.pm.LauncherApps
-import android.content.pm.ShortcutInfo
+import android.os.Process
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLaunchException
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -23,12 +24,20 @@ class ShortcutLauncherServiceImpl @Inject constructor(
         context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
     }
 
-    override fun startShortcut(shortcut: ShortcutInfo) {
+    override fun startShortcut(shortcut: LauncherShortcut) {
         val service = launcherApps
             ?: throw ShortcutLaunchException("LauncherApps service is not available")
 
         try {
-            service.startShortcut(shortcut, null, null)
+            // LauncherApps looks up the live ShortcutInfo by (packageName, id) at
+            // launch time, so we don't need to keep the platform handle around.
+            service.startShortcut(
+                shortcut.packageName,
+                shortcut.id,
+                null,
+                null,
+                Process.myUserHandle()
+            )
         } catch (e: Exception) {
             throw ShortcutLaunchException("Failed to start shortcut: ${shortcut.id}", e)
         }

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import android.content.pm.ShortcutInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLaunchException
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import javax.inject.Inject
@@ -51,7 +51,7 @@ class LaunchShortcutUseCase @Inject constructor(
      * @param shortcut Der zu startende Shortcut (kann null sein)
      * @return Result.Success oder Result.Failure mit spezifischem Error
      */
-    fun execute(shortcut: ShortcutInfo?): Result {
+    fun execute(shortcut: LauncherShortcut?): Result {
         // 1. Null-Check
         if (shortcut == null) {
             return Result.Failure(Error.ShortcutNull)

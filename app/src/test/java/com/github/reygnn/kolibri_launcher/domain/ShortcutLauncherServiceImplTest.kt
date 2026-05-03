@@ -2,14 +2,19 @@ package com.github.reygnn.kolibri_launcher.data.service
 
 import android.content.Context
 import android.content.pm.LauncherApps
-import android.content.pm.ShortcutInfo
+import android.os.UserHandle
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLaunchException
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.just
+import io.mockk.mockkStatic
 import io.mockk.runs
+import io.mockk.unmockkStatic
 import io.mockk.verify
+import android.os.Process
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -34,7 +39,13 @@ class ShortcutLauncherServiceImplTest {
     private lateinit var launcherApps: LauncherApps
 
     @MockK
-    private lateinit var shortcutInfo: ShortcutInfo
+    private lateinit var userHandle: UserHandle
+
+    private val shortcutInfo = LauncherShortcut(
+        id = "test-shortcut-id",
+        packageName = "com.example.test",
+        shortLabel = "Test"
+    )
 
     // ===========================================
     // SYSTEM UNDER TEST
@@ -51,6 +62,14 @@ class ShortcutLauncherServiceImplTest {
         MockKAnnotations.init(this, relaxed = false)
         // Default: LauncherApps service is available
         every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns launcherApps
+        // Process.myUserHandle() is a static call — stub it so the platform call doesn't crash on JVM.
+        mockkStatic(Process::class)
+        every { Process.myUserHandle() } returns userHandle
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Process::class)
     }
 
     // ===========================================
@@ -89,12 +108,22 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `startShortcut calls LauncherApps with correct parameters`() {
-        every { launcherApps.startShortcut(any(), null, null) } just runs
+        every {
+            launcherApps.startShortcut(any<String>(), any<String>(), null, null, any())
+        } just runs
         service = ShortcutLauncherServiceImpl(context)
 
         service.startShortcut(shortcutInfo)
 
-        verify(exactly = 1) { launcherApps.startShortcut(shortcutInfo, null, null) }
+        verify(exactly = 1) {
+            launcherApps.startShortcut(
+                shortcutInfo.packageName,
+                shortcutInfo.id,
+                null,
+                null,
+                userHandle
+            )
+        }
     }
 
     @Test(expected = ShortcutLaunchException::class)
@@ -107,8 +136,9 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `startShortcut wraps LauncherApps exceptions in ShortcutLaunchException`() {
-        every { launcherApps.startShortcut(any(), null, null) } throws IllegalStateException("Activity not found")
-        every { shortcutInfo.id } returns "test-shortcut-id"
+        every {
+            launcherApps.startShortcut(any<String>(), any<String>(), null, null, any())
+        } throws IllegalStateException("Activity not found")
 
         service = ShortcutLauncherServiceImpl(context)
 
@@ -123,17 +153,22 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `startShortcut includes shortcut id in error message`() {
-        val shortcutId = "my-unique-shortcut-123"
-        every { launcherApps.startShortcut(any(), null, null) } throws RuntimeException("Failed")
-        every { shortcutInfo.id } returns shortcutId
+        val customShortcut = LauncherShortcut(
+            id = "my-unique-shortcut-123",
+            packageName = "com.example.test",
+            shortLabel = "Test"
+        )
+        every {
+            launcherApps.startShortcut(any<String>(), any<String>(), null, null, any())
+        } throws RuntimeException("Failed")
 
         service = ShortcutLauncherServiceImpl(context)
 
         try {
-            service.startShortcut(shortcutInfo)
+            service.startShortcut(customShortcut)
             fail("Expected ShortcutLaunchException")
         } catch (e: ShortcutLaunchException) {
-            assertTrue(e.message!!.contains(shortcutId))
+            assertTrue(e.message!!.contains("my-unique-shortcut-123"))
         }
     }
 
@@ -151,7 +186,9 @@ class ShortcutLauncherServiceImplTest {
 
     @Test
     fun `LauncherApps service is only fetched once`() {
-        every { launcherApps.startShortcut(any(), null, null) } just runs
+        every {
+            launcherApps.startShortcut(any<String>(), any<String>(), null, null, any())
+        } just runs
         service = ShortcutLauncherServiceImpl(context)
 
         service.isAvailable()

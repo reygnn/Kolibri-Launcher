@@ -1,9 +1,9 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import android.content.pm.ShortcutInfo
 import com.github.reygnn.kolibri_launcher.domain.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -122,7 +122,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
         return actions
     }
 
-    private fun safelyGetShortcuts(packageName: String): List<ShortcutInfo> = try {
+    private fun safelyGetShortcuts(packageName: String): List<LauncherShortcut> = try {
         shortcutRepository.getShortcutsForPackage(packageName)
     } catch (e: CancellationException) {
         throw e

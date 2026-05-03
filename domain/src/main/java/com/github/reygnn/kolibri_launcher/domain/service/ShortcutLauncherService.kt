@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.service
 
-import android.content.pm.ShortcutInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 
 /**
  * Implementierung von ShortcutLauncherService.
@@ -8,7 +8,8 @@ import android.content.pm.ShortcutInfo
  * Wrapped den Android LauncherApps System Service.
  *
  * ⚠️ NICHT DIREKT VERWENDEN!
- * Immer über [LaunchShortcutUseCase] gehen - der UseCase bietet:
+ * Immer über [com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase] gehen
+ * - der UseCase bietet:
  * - Null-Safety
  * - Vollständiges Error-Handling
  * - Typsichere Result-Objekte
@@ -23,7 +24,7 @@ interface ShortcutLauncherService {
      * @param shortcut Der zu startende Shortcut
      * @throws ShortcutLaunchException wenn der Launch fehlschlägt
      */
-    fun startShortcut(shortcut: ShortcutInfo)
+    fun startShortcut(shortcut: LauncherShortcut)
 
     /**
      * Prüft ob der Service verfügbar ist.
