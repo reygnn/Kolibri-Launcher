@@ -58,6 +58,14 @@ dependencies {
     // aggregating glue runs in :app via the hilt-android plugin.
     implementation(libs.hilt.core)
     kapt(libs.hilt.compiler)
+
+    // Test dependencies — pure-JVM tests in :domain/src/test/. Brocken-B
+    // (Test-Isolation per Modul) starts here; see TODO §13 for status.
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlin.test.junit)
 }
 
 kapt {

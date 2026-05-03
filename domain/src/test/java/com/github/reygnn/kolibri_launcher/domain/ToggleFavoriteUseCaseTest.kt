@@ -1,23 +1,20 @@
 package com.github.reygnn.kolibri_launcher.domain
 
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ToggleFavoriteUseCaseTest {
-
-    @get:Rule
-    val timberRule = TimberRule()
 
     private lateinit var favoritesRepository: TestToggleFavoritesRepository
     private lateinit var useCase: ToggleFavoriteUseCase
@@ -27,8 +24,20 @@ class ToggleFavoriteUseCaseTest {
 
     @Before
     fun setup() {
+        // Inlined equivalent of :app's TimberRule (which lives in
+        // :app/src/test/rule/). The Brocken-B spike intentionally avoids
+        // the shared-fixtures decision for now — once the strategy is
+        // settled (testFixtures vs separate :test-fixtures module), the
+        // rule moves to one of those locations and this inline call
+        // collapses back to a `@get:Rule val timberRule = TimberRule()`.
+        TimberWrapper.preventCrashForTesting.set(true)
         favoritesRepository = TestToggleFavoritesRepository()
         useCase = ToggleFavoriteUseCase(favoritesRepository)
+    }
+
+    @After
+    fun teardown() {
+        TimberWrapper.preventCrashForTesting.set(false)
     }
 
     // =========================================================================
