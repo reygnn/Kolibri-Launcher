@@ -1044,7 +1044,10 @@ zur Domain-Test-Infrastruktur).
 **`:data:test` BLOCKIERT durch AGP-Bug:**
 
 Der Plan war, FakeDataStore + Repository-Impl-Tests nach `:data` zu
-verschieben. AGP unterstützt seit 8.0 testFixtures für Android-
+verschieben. Vollständige Investigation in
+[`data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`](data/TESTFIXTURES_KOTLIN_INVESTIGATION.md)
+(Reproduktion, geprüfte Workarounds, Re-Check-Anleitung beim nächsten
+AGP/KGP-Bump). AGP unterstützt seit 8.0 testFixtures für Android-
 Library-Module via `android { testFixtures { enable = true } }`,
 ABER: für **Kotlin-Sourcen** in `src/testFixtures/` registriert AGP
 keine Compile-Task. `./gradlew :data:tasks --all | grep TestFixturesKotlin`
