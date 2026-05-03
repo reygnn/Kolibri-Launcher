@@ -29,6 +29,90 @@ Memo) und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
+## Audit-Snapshot 2026-05-03 (post-§9.2)
+
+Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot direkt nach §9.2-
+Merge gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
+
+### Score: **8.2/10** (vor §9.2: 7.5/10)
+
+### Was die +0.7 ggü. 7.5 gebracht hat
+
+- **Modul-Split sauber gelandet.** Drei Module, einseitige Dependency-
+  Kette, `data → ui` und `domain → di` Cycles weg. Das war der
+  explizite 7.5→9-Hebel und er hat geliefert.
+- **Linter erweitert auf alle drei Module.** Drift in `core/`,
+  `domain/`, `data/` würde jetzt aus den Rule-9/12/Naming-Checks
+  gefangen, nicht still entkommen.
+- **Spike-vor-Implementation als Pattern bewiesen** (siehe §9.2-
+  Memo, „Spike-Vorlauf"). Hat aus 6-11h-Risiko 4-6h-Plan gemacht.
+  Geht in dauerhaftes Repertoire über.
+- **Latente UI→domain-Leaks gefunden** (`UiState`,
+  `AppContextMenuAction`) — Bonus-Signal: das Refactor hat Defekte
+  aufgedeckt, nicht nur welche eingeführt.
+
+### Was die 0.8 unter 9.0 deckelt — die drei großen Brocken
+
+1. **Variante-1-Kompromiss bei §9.2.** `:domain` ist Android Library,
+   nicht pure Kotlin. Die 13 Domain-Files mit `Parcelable`/`LiveData`/
+   `WallpaperColors`/`Intent`/`Uri`-Imports sind nicht refactored. Der
+   originale §9.2-Plan hätte „Architektur über 9" geliefert. Variante 1
+   liefert „Architektur 8.something". Trade-off ehrlich, aber ~0.5
+   Punkte wurden bewusst abgegeben.
+
+2. **HomeFragment ist 1997 Zeilen.** Auch nach `WallpaperEditController`-
+   Extraktion und Rule-11-Sweep. §2-Reststand nennt es als „eigenes
+   Lifecycle-Restructure-Projekt" — ehrlich, ändert aber nicht den
+   Smell.
+
+3. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
+   gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
+   IPC mit System-Diensten sind End-to-End nie auf einem Gerät
+   getestet. Robolectric ist guter Backstop, kein vollständiger
+   Ersatz.
+
+### Mittelschwere Deckler
+
+- **MainActivity ~1000 Zeilen mit ~37 Catches.** 2026-05-02 als
+  „nichts mehr zu sweepen" geprüft (alle Catches sind echte
+  Boundaries). Catches sind Symptom, nicht Krankheit — die
+  1000-Zeilen-Activity ist die Krankheit.
+- **Test-Isolation pro Modul nicht realisiert.** Tests bleiben in
+  `:app/src/test/`. `./gradlew :domain:test` läuft heute praktisch
+  leer. §9.2 hat den Compile-Cache-Win für `:app`, aber nicht den
+  Test-Time-Win den der ursprüngliche Plan beworben hat.
+- **506 verbleibende `catch (Throwable)` im Main-Source.** Die
+  meisten sind verifiziert legitim, aber Volumen ist im Branchen-
+  vergleich hoch. Crash-Safety-Kultur gut; -Religion reduziert,
+  nicht eliminiert.
+- **`MainActivity.mainActivityExceptionHandler` Bug-Hint** (siehe
+  §2-Reststand). Echter Defekt, dokumentiert aber nicht gefixt.
+
+### Was *nicht* zählt für die Note
+
+Der Doku-Apparat (CLAUDE.md, TODO.md, AUDIT.md, KNOWN_ISSUES.md,
+TESTING_CONVENTIONS.kt, Memos) ist überdurchschnittlich gut für ein
+Solo-GPLv3-Projekt. Hebt den Score nicht über 8.5 — ein industrieller
+Reviewer wertet Doku als „nice but secondary"; Code- und Test-
+Qualität schlagen Doku-Qualität bei der Note.
+
+### Pfad zu 9+
+
+Brauchst genau **einen** der drei großen Brocken sauber, um über 9 zu
+kommen. Welcher davon ist nicht gleich:
+
+- **HomeFragment-Lifecycle-Restructure** (größtes Risiko, größter
+  Win sichtbar im täglichen Code).
+- **Tests pro Modul redistribuieren** (mittleres Risiko, Test-Zeit-
+  Win + Architektur-Konsistenz mit §9.2).
+- **13 Pure-Kotlin-Domain-Refactorings** (kleinstes Risiko pro
+  Schritt, aber 13× — und schließt §9.2-Variante-1 nachträglich
+  zur ursprünglichen Vision).
+
+Drei davon halb wäre Score-neutral. Eins davon sauber bringt 0.8-1.0.
+
+---
+
 ## 1. (Memo, abgeschlossen) `Timber.e` vs. `silentError`: Severity-Audit
 
 `TimberWrapper.silentError(...)` ist als „fail fast in DEBUG, fail safe in
