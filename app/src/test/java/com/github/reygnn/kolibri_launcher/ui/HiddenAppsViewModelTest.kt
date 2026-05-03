@@ -1,18 +1,19 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsViewModel
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,16 +35,12 @@ class HiddenAppsViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+
     @get:Rule
     val timberRule = TimberRule()
 
-    private lateinit var installedAppsRepository: InstalledAppsRepository
-    private lateinit var visibilityRepository: HiddenAppsRepository
-
-    // UseCases
-    private lateinit var getInstalledAppsUseCase: GetInstalledAppsUseCase
-    private lateinit var getHiddenAppsUseCase: GetHiddenAppsUseCase
-    private lateinit var updateHiddenAppsUseCase: UpdateHiddenAppsUseCase
+    private lateinit var fakeInstalledApps: FakeInstalledAppsRepository
+    private lateinit var fakeVisibility: FakeHiddenAppsRepository
 
     private lateinit var viewModel: HiddenAppsViewModel
 
@@ -54,21 +51,29 @@ class HiddenAppsViewModelTest {
 
     @Before
     fun setup() {
-        installedAppsRepository = mockk(relaxed = true)
-        visibilityRepository = mockk(relaxed = true)
+        fakeInstalledApps = FakeInstalledAppsRepository()
+        fakeVisibility = FakeHiddenAppsRepository()
     }
 
-    private fun setupViewModel() {
-        // UseCases mit Mocks initialisieren
-        getInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepository)
-        getHiddenAppsUseCase = GetHiddenAppsUseCase(visibilityRepository)
-        updateHiddenAppsUseCase = UpdateHiddenAppsUseCase(visibilityRepository)
+    /**
+     * Builds the ViewModel with the project's standard wiring. Both repository
+     * arguments default to the fakes from `@Before`. Failure-injection tests
+     * pass a `mockk<Interface>(relaxed = true)` for the broken side because
+     * `spyk` cannot intercept methods on a final fake class.
+     */
+    private fun setupViewModel(
+        installedAppsRepo: InstalledAppsRepository = fakeInstalledApps,
+        visibilityRepo: HiddenAppsRepository = fakeVisibility,
+    ) {
+        val getInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepo)
+        val getHiddenAppsUseCase = GetHiddenAppsUseCase(visibilityRepo)
+        val updateHiddenAppsUseCase = UpdateHiddenAppsUseCase(visibilityRepo)
 
         viewModel = HiddenAppsViewModel(
             getInstalledAppsUseCase,
             getHiddenAppsUseCase,
             updateHiddenAppsUseCase,
-            mainDispatcher = mainDispatcherRule.testDispatcher
+            mainDispatcher = mainDispatcherRule.testDispatcher,
         )
     }
 
@@ -76,9 +81,8 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `initialize - loads all apps and pre-selects hidden apps`() = runTest {
-        val initiallyHidden = setOf(app2.componentName)
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(initiallyHidden)
+        fakeInstalledApps.installedApps = testApps
+        fakeVisibility.hiddenApps = setOf(app2.componentName)
 
         setupViewModel()
 
@@ -94,8 +98,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onAppToggled - adds app to selection`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -110,8 +113,8 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onAppToggled - removes app from selection`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(setOf(app1.componentName))
+        fakeInstalledApps.installedApps = testApps
+        fakeVisibility.hiddenApps = setOf(app1.componentName)
         setupViewModel()
 
         viewModel.initialize()
@@ -126,8 +129,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onSearchQueryChanged - filters the app list`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -143,36 +145,26 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onDoneClicked - correctly updates visibilities in a single batch`() = runTest {
-        // Arrange
-        val initiallyHidden = setOf(app1.componentName)
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(initiallyHidden)
+        fakeInstalledApps.installedApps = testApps
+        fakeVisibility.hiddenApps = setOf(app1.componentName)
         setupViewModel()
 
         viewModel.initialize()
         advanceUntilIdle()
 
-        // Act: App1 wird sichtbar gemacht, App3 wird versteckt
+        // App1 wird sichtbar gemacht, App3 wird versteckt.
         viewModel.onAppToggled(app1)
         viewModel.onAppToggled(app3)
         advanceUntilIdle()
 
-        // Assert
         viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // Überprüfe den EINEN Aufruf der neuen Methode (via UseCase) — suspend → coVerify
-            coVerify {
-                visibilityRepository.updateComponentVisibilities(
-                    componentsToHide = setOf(app3.componentName), // App3 sollte versteckt werden
-                    componentsToShow = setOf(app1.componentName)  // App1 sollte sichtbar gemacht werden
-                )
-            }
-
-            // Stelle sicher, dass die alten Methoden NIE aufgerufen wurden
-            coVerify(exactly = 0) { visibilityRepository.hideComponent(any()) }
-            coVerify(exactly = 0) { visibilityRepository.showComponent(any()) }
+            // The fake's updateComponentVisibilities applies the (hide,show)
+            // delta atomically — assert the resulting set instead of mock
+            // call args.
+            assertEquals(setOf(app3.componentName), fakeVisibility.hiddenApps)
 
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
@@ -180,10 +172,13 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `initialize - when loading fails - emits error event`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flow { throw IOException("DB error") }
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        // Mock the interface for the failure path; the rest of the test
+        // class uses the fake.
+        val brokenInstalled = mockk<InstalledAppsRepository>(relaxed = true) {
+            every { getInstalledApps() } returns flow { throw IOException("DB error") }
+        }
 
-        setupViewModel()
+        setupViewModel(installedAppsRepo = brokenInstalled)
 
         viewModel.event.test {
             viewModel.initialize()
@@ -198,12 +193,14 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `initialize - when hiddenAppsFlow fails - emits error event`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flow {
-            throw IOException("Cannot read hidden apps")
+        fakeInstalledApps.installedApps = testApps
+        val brokenVisibility = mockk<HiddenAppsRepository>(relaxed = true) {
+            every { hiddenAppsFlow } returns flow {
+                throw IOException("Cannot read hidden apps")
+            }
         }
 
-        setupViewModel()
+        setupViewModel(visibilityRepo = brokenVisibility)
 
         viewModel.event.test {
             viewModel.initialize()
@@ -216,14 +213,21 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `initialize - when both flows fail - emits error event`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flow {
-            throw RuntimeException("Database corrupted")
+        val brokenInstalled = mockk<InstalledAppsRepository>(relaxed = true) {
+            every { getInstalledApps() } returns flow {
+                throw RuntimeException("Database corrupted")
+            }
         }
-        every { visibilityRepository.hiddenAppsFlow } returns flow {
-            throw IOException("Cannot read")
+        val brokenVisibility = mockk<HiddenAppsRepository>(relaxed = true) {
+            every { hiddenAppsFlow } returns flow {
+                throw IOException("Cannot read")
+            }
         }
 
-        setupViewModel()
+        setupViewModel(
+            installedAppsRepo = brokenInstalled,
+            visibilityRepo = brokenVisibility,
+        )
 
         viewModel.event.test {
             viewModel.initialize()
@@ -237,42 +241,35 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onDoneClicked - when visibility update fails - still navigates up`() = runTest {
-        // Arrange
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
-        // Simuliere, dass der neue Batch-Aufruf eine Exception wirft (suspend → coEvery)
-        coEvery { visibilityRepository.updateComponentVisibilities(any(), any()) } throws IOException("DataStore write failed")
-        setupViewModel()
+        fakeInstalledApps.installedApps = testApps
+        val brokenVisibility = mockk<HiddenAppsRepository>(relaxed = true) {
+            // Default empty hiddenAppsFlow so initialize() succeeds; the
+            // failure is in the write path.
+            every { hiddenAppsFlow } returns flowOf(emptySet())
+            coEvery {
+                updateComponentVisibilities(any(), any())
+            } throws IOException("DataStore write failed")
+        }
+        setupViewModel(visibilityRepo = brokenVisibility)
 
         viewModel.initialize()
         advanceUntilIdle()
 
-        // Act
-        viewModel.onAppToggled(app1) // Eine Änderung vornehmen, damit der Aufruf stattfindet
+        viewModel.onAppToggled(app1)
         advanceUntilIdle()
 
-        // Assert
         viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // Überprüfe, dass der Aufruf versucht wurde
-            coVerify {
-                visibilityRepository.updateComponentVisibilities(
-                    componentsToHide = setOf(app1.componentName),
-                    componentsToShow = emptySet()
-                )
-            }
-
-            // Das ViewModel sollte den Fehler fangen und trotzdem navigieren
+            // The ViewModel must catch and still navigate up.
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
 
     @Test
     fun `onSearchQueryChanged - with empty query - shows all apps`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -287,8 +284,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onSearchQueryChanged - with query that matches nothing - shows empty list`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -303,8 +299,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onSearchQueryChanged - case insensitive search works`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -319,16 +314,16 @@ class HiddenAppsViewModelTest {
     }
 
     @Test
-    fun `onAppToggled - with mock app - does not crash`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+    fun `onAppToggled - with arbitrary unknown app - does not crash`() = runTest {
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
         advanceUntilIdle()
 
-        val mockApp = mockk<AppInfo>(relaxed = true)
-        viewModel.onAppToggled(mockApp)
+        // An app the VM never saw during initialize.
+        val unknownApp = AppInfo("Unknown", "Unknown", "pkg.unknown", "class.unknown")
+        viewModel.onAppToggled(unknownApp)
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
@@ -336,36 +331,31 @@ class HiddenAppsViewModelTest {
     }
 
     @Test
-    fun `onDoneClicked - with no changes - navigates up without calling repository`() = runTest {
-        // Arrange
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+    fun `onDoneClicked - with no changes - navigates up without touching the repository`() = runTest {
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
         advanceUntilIdle()
 
-        // Assert
-        viewModel.event.test {
-            // 1. Lauschen ist aktiv.
+        // Snapshot the fake before the action — no toggles happened, so the
+        // VM must not call updateComponentVisibilities. That would mutate
+        // hiddenApps; we assert it stays empty.
+        val before = fakeVisibility.hiddenApps
 
-            // 2. Aktion auslösen.
+        viewModel.event.test {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // 3. Seiteneffekte überprüfen.
-            coVerify(exactly = 0) { visibilityRepository.updateComponentVisibilities(any(), any()) }
+            assertEquals(before, fakeVisibility.hiddenApps)
 
-            // 4. Event empfangen.
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
 
     @Test
     fun `initialize - with empty app list - creates empty UI state`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(emptyList())
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
-
+        // Both fakes already start empty; nothing to seed.
         setupViewModel()
 
         viewModel.initialize()
@@ -377,9 +367,8 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `initialize - with all apps hidden - all apps pre-selected`() = runTest {
-        val allHidden = testApps.map { it.componentName }.toSet()
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(allHidden)
+        fakeInstalledApps.installedApps = testApps
+        fakeVisibility.hiddenApps = testApps.map { it.componentName }.toSet()
 
         setupViewModel()
 
@@ -392,8 +381,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onSearchQueryChanged - rapid query changes - handles correctly`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -411,8 +399,7 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onAppToggled - toggle same app multiple times - works correctly`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
+        fakeInstalledApps.installedApps = testApps
         setupViewModel()
 
         viewModel.initialize()
@@ -433,13 +420,15 @@ class HiddenAppsViewModelTest {
 
     @Test
     fun `onDoneClicked - when repository throws exception - still navigates up`() = runTest {
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
-        every { visibilityRepository.hiddenAppsFlow } returns flowOf(emptySet())
-        coEvery {
-            visibilityRepository.updateComponentVisibilities(any(), any())
-        } throws IOException("Write failed")
+        fakeInstalledApps.installedApps = testApps
+        val brokenVisibility = mockk<HiddenAppsRepository>(relaxed = true) {
+            every { hiddenAppsFlow } returns flowOf(emptySet())
+            coEvery {
+                updateComponentVisibilities(any(), any())
+            } throws IOException("Write failed")
+        }
 
-        setupViewModel()
+        setupViewModel(visibilityRepo = brokenVisibility)
 
         viewModel.initialize()
         advanceUntilIdle()
@@ -451,7 +440,7 @@ class HiddenAppsViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // Should still navigate despite errors
+            // Should still navigate despite errors.
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }

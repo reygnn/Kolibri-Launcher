@@ -4,12 +4,12 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.favorites.FavoritesSortViewModel
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -26,6 +26,12 @@ import org.junit.Test
  * reset). The Fragment-side wiring (`setFragmentResult`, adapter
  * `submitList`, drag callbacks) is not exercised here — those live in
  * `FavoritesSortFragment` and require an Android runtime.
+ *
+ * Default repository is the project [FakeFavoritesOrderRepository]; happy-path
+ * persistence is asserted against `fake.savedOrder` rather than via mock
+ * verification. Failure-injection tests build a one-off
+ * `mockk<FavoritesOrderRepository>(relaxed = true)` because the fake exposes
+ * no failNextSave hook.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FavoritesSortViewModelTest {
@@ -36,7 +42,7 @@ class FavoritesSortViewModelTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private lateinit var repository: FavoritesOrderRepository
+    private lateinit var fakeRepository: FakeFavoritesOrderRepository
     private lateinit var viewModel: FavoritesSortViewModel
 
     // Three apps with display names ordered alphabetically as
@@ -50,13 +56,14 @@ class FavoritesSortViewModelTest {
 
     @Before
     fun setup() {
-        repository = mockk()
-        coEvery { repository.saveOrder(any()) } returns true
-        viewModel = FavoritesSortViewModel(
-            favoritesOrderRepository = repository,
-            mainDispatcher = mainDispatcherRule.testDispatcher,
-        )
+        fakeRepository = FakeFavoritesOrderRepository()
+        viewModel = newViewModel(fakeRepository)
     }
+
+    private fun newViewModel(repo: FavoritesOrderRepository) = FavoritesSortViewModel(
+        favoritesOrderRepository = repo,
+        mainDispatcher = mainDispatcherRule.testDispatcher,
+    )
 
     // ------------------------------------------------------------------
     // setInitialApps
@@ -101,11 +108,11 @@ class FavoritesSortViewModelTest {
                 advanceUntilIdle()
 
                 assertEquals(newOrder, viewModel.apps.value)
-                coVerify {
-                    repository.saveOrder(
-                        listOf(browser.componentName, camera.componentName, mail.componentName),
-                    )
-                }
+                assertEquals(
+                    listOf(browser.componentName, camera.componentName, mail.componentName),
+                    fakeRepository.savedOrder,
+                )
+                assertEquals(1, fakeRepository.saveOrderCallCount)
                 assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
@@ -114,7 +121,10 @@ class FavoritesSortViewModelTest {
     @Test
     fun `onMoved emits error toast and skips OrderChanged when saveOrder returns false`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { repository.saveOrder(any()) } returns false
+            val brokenRepo = mockk<FavoritesOrderRepository>(relaxed = true) {
+                coEvery { saveOrder(any()) } returns false
+            }
+            viewModel = newViewModel(brokenRepo)
             viewModel.setInitialApps(initialOrder)
 
             viewModel.event.test {
@@ -128,7 +138,10 @@ class FavoritesSortViewModelTest {
     @Test
     fun `onMoved emits error toast when saveOrder throws`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { repository.saveOrder(any()) } throws RuntimeException("disk full")
+            val brokenRepo = mockk<FavoritesOrderRepository>(relaxed = true) {
+                coEvery { saveOrder(any()) } throws RuntimeException("disk full")
+            }
+            viewModel = newViewModel(brokenRepo)
             viewModel.setInitialApps(initialOrder)
 
             viewModel.event.test {
@@ -153,9 +166,11 @@ class FavoritesSortViewModelTest {
                 advanceUntilIdle()
 
                 assertEquals(alphabeticalOrder, viewModel.apps.value)
-                coVerify {
-                    repository.saveOrder(alphabeticalOrder.map { it.componentName })
-                }
+                assertEquals(
+                    alphabeticalOrder.map { it.componentName },
+                    fakeRepository.savedOrder,
+                )
+                assertEquals(1, fakeRepository.saveOrderCallCount)
                 assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
                 assertEquals(
                     UiEvent.ShowToast(R.string.favorites_sorted_alphabetically),
@@ -168,7 +183,10 @@ class FavoritesSortViewModelTest {
     @Test
     fun `onSortAlphabetically emits only error toast when persistence fails`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { repository.saveOrder(any()) } returns false
+            val brokenRepo = mockk<FavoritesOrderRepository>(relaxed = true) {
+                coEvery { saveOrder(any()) } returns false
+            }
+            viewModel = newViewModel(brokenRepo)
             viewModel.setInitialApps(initialOrder)
 
             viewModel.event.test {
@@ -213,9 +231,10 @@ class FavoritesSortViewModelTest {
                 advanceUntilIdle()
 
                 assertEquals(initialOrder, viewModel.apps.value)
-                coVerify {
-                    repository.saveOrder(initialOrder.map { it.componentName })
-                }
+                assertEquals(
+                    initialOrder.map { it.componentName },
+                    fakeRepository.savedOrder,
+                )
                 assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
                 assertEquals(UiEvent.ShowToast(R.string.favorites_order_reset), awaitItem())
                 cancelAndIgnoreRemainingEvents()

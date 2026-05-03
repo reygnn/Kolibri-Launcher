@@ -8,6 +8,9 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuAction
@@ -23,10 +26,15 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * JVM tests for [BuildAppContextMenuUseCase]. Mocks all four repositories
- * (no real Android storage involvement) and verifies the action list
- * composition — content, ordering, branch labels, and the per-call
- * fallback when a repository throws.
+ * JVM tests for [BuildAppContextMenuUseCase]. Uses the project Fakes for the
+ * three Kolibri-owned repositories (favorites, custom names, hidden) and a
+ * MockK mock only for [ShortcutRepository] — it is system-API driven
+ * (LauncherApps) and has no fake (see `ShortcutRepositoryContract`).
+ *
+ * Failure-injection tests build a one-off `mockk<Interface>(relaxed = true)`
+ * for the broken side, because the project fakes have no
+ * "fail next call" hook on the read methods this use case touches
+ * (`isFavoriteComponent`, `hasCustomNameForPackage`, `isComponentHidden`).
  *
  * `ShortcutInfo` is mocked too because it's a final Android system class
  * with no public constructor; only its `id` is consulted indirectly via
@@ -42,9 +50,9 @@ class BuildAppContextMenuUseCaseTest {
     val timberRule = TimberRule()
 
     private lateinit var shortcutRepository: ShortcutRepository
-    private lateinit var favoritesRepository: FavoritesRepository
-    private lateinit var customNamesRepository: CustomNamesRepository
-    private lateinit var hiddenAppsRepository: HiddenAppsRepository
+    private lateinit var fakeFavorites: FakeFavoritesRepository
+    private lateinit var fakeCustomNames: FakeCustomNamesRepository
+    private lateinit var fakeHidden: FakeHiddenAppsRepository
     private lateinit var useCase: BuildAppContextMenuUseCase
 
     private val app = AppInfo(
@@ -57,24 +65,25 @@ class BuildAppContextMenuUseCaseTest {
     @Before
     fun setup() {
         shortcutRepository = mockk()
-        favoritesRepository = mockk()
-        customNamesRepository = mockk()
-        hiddenAppsRepository = mockk()
-
-        // Defaults: no extras (no shortcuts, not favorite, no custom name,
-        // not hidden). Individual tests override these.
         every { shortcutRepository.getShortcutsForPackage(any()) } returns emptyList()
-        coEvery { favoritesRepository.isFavoriteComponent(any()) } returns false
-        coEvery { customNamesRepository.hasCustomNameForPackage(any()) } returns false
-        coEvery { hiddenAppsRepository.isComponentHidden(any()) } returns false
 
-        useCase = BuildAppContextMenuUseCase(
-            shortcutRepository = shortcutRepository,
-            favoritesRepository = favoritesRepository,
-            customNamesRepository = customNamesRepository,
-            hiddenAppsRepository = hiddenAppsRepository,
-        )
+        fakeFavorites = FakeFavoritesRepository()
+        fakeCustomNames = FakeCustomNamesRepository()
+        fakeHidden = FakeHiddenAppsRepository()
+
+        useCase = newUseCase()
     }
+
+    private fun newUseCase(
+        favoritesRepo: FavoritesRepository = fakeFavorites,
+        customNamesRepo: CustomNamesRepository = fakeCustomNames,
+        hiddenRepo: HiddenAppsRepository = fakeHidden,
+    ) = BuildAppContextMenuUseCase(
+        shortcutRepository = shortcutRepository,
+        favoritesRepository = favoritesRepo,
+        customNamesRepository = customNamesRepo,
+        hiddenAppsRepository = hiddenRepo,
+    )
 
     private fun launcherAction(action: AppContextMenuAction): AppContextMenuAction.LauncherAction =
         action as AppContextMenuAction.LauncherAction
@@ -135,7 +144,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `favorite action label flips from add to remove when isFavorite is true`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { favoritesRepository.isFavoriteComponent(app.componentName) } returns true
+            fakeFavorites.favorites = setOf(app.componentName)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             val toggleFavorite = result.first {
@@ -163,7 +172,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `restore-original-name action is present when a custom name is set`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { customNamesRepository.hasCustomNameForPackage(app.packageName) } returns true
+            fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             assertTrue(
@@ -194,7 +203,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `hide action becomes unhide with switched id and label when isHidden is true`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { hiddenAppsRepository.isComponentHidden(app.componentName) } returns true
+            fakeHidden.hiddenApps = setOf(app.componentName)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             val hideAction = result.first {
@@ -278,7 +287,10 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `favorites repository failure falls back to add_to_favorites label`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { favoritesRepository.isFavoriteComponent(any()) } throws RuntimeException("boom")
+            val brokenFavorites = mockk<FavoritesRepository>(relaxed = true) {
+                coEvery { isFavoriteComponent(any()) } throws RuntimeException("boom")
+            }
+            useCase = newUseCase(favoritesRepo = brokenFavorites)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             val toggleFavorite = result.first {
@@ -292,7 +304,10 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `custom-names repository failure suppresses restore-original-name`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { customNamesRepository.hasCustomNameForPackage(any()) } throws RuntimeException("boom")
+            val brokenCustomNames = mockk<CustomNamesRepository>(relaxed = true) {
+                coEvery { hasCustomNameForPackage(any()) } throws RuntimeException("boom")
+            }
+            useCase = newUseCase(customNamesRepo = brokenCustomNames)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             assertTrue(
@@ -306,7 +321,10 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `hidden-apps repository failure falls back to hide id and label`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { hiddenAppsRepository.isComponentHidden(any()) } throws RuntimeException("boom")
+            val brokenHidden = mockk<HiddenAppsRepository>(relaxed = true) {
+                coEvery { isComponentHidden(any()) } throws RuntimeException("boom")
+            }
+            useCase = newUseCase(hiddenRepo = brokenHidden)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
             val hideAction = result.first {
@@ -327,9 +345,9 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val s1: ShortcutInfo = mockk()
             every { shortcutRepository.getShortcutsForPackage(any()) } returns listOf(s1)
-            coEvery { favoritesRepository.isFavoriteComponent(any()) } returns true
-            coEvery { customNamesRepository.hasCustomNameForPackage(any()) } returns true
-            coEvery { hiddenAppsRepository.isComponentHidden(any()) } returns true
+            fakeFavorites.favorites = setOf(app.componentName)
+            fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")
+            fakeHidden.hiddenApps = setOf(app.componentName)
 
             val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true)
 
