@@ -12,7 +12,7 @@ package com.github.reygnn.kolibri_launcher.ui.onboarding
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.di.MainDispatcher
+import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase

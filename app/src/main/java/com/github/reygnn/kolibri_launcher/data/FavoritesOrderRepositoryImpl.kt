@@ -10,7 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
-import com.github.reygnn.kolibri_launcher.di.ApplicationScope
+import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
