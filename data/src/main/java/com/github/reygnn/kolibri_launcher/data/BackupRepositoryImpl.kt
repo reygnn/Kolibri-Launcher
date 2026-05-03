@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe

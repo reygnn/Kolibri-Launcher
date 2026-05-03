@@ -31,7 +31,7 @@ class UsageExportRepositoryImplTimeLordSpec {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        manager = UsageExportRepositoryImpl(fakeDataStore, context)
+        manager = UsageExportRepositoryImpl(fakeDataStore, context, "test-version")
     }
 
     @Test

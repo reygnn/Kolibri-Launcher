@@ -36,12 +36,20 @@
 set -u
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-src_main="$repo_root/app/src/main/java"
 
-if [ ! -d "$src_main" ]; then
-  echo "ERROR: Source directory not found: $src_main" >&2
-  exit 2
-fi
+# Production sources live in three Gradle modules after the §9.2 split.
+src_roots=(
+  "$repo_root/app/src/main/java"
+  "$repo_root/domain/src/main/java"
+  "$repo_root/data/src/main/java"
+)
+
+for d in "${src_roots[@]}"; do
+  if [ ! -d "$d" ]; then
+    echo "ERROR: Source directory not found: $d" >&2
+    exit 2
+  fi
+done
 
 violations=0
 report() {
@@ -66,7 +74,7 @@ report() {
 rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|CrashReportLimiter\.kt|CrashReportConsent\.kt|CrashReportConsentStore\.kt'
 
 rule9_hits=$(
-  grep -rn 'Timber\.e(' "$src_main" --include='*.kt' \
+  grep -rn 'Timber\.e(' "${src_roots[@]}" --include='*.kt' \
     | grep -vE "/($rule9_allowed_files):" \
     | grep -vE 'BackupFragment\.kt:[0-9]+:.*Uncaught coroutine exception in BackupFragment' \
     || true
@@ -83,7 +91,7 @@ fi
 # action.
 # ─────────────────────────────────────────────────────────────────────────────
 rule12_hits=$(
-  grep -rn 'Timber\.Forest\.' "$src_main" --include='*.kt' || true
+  grep -rn 'Timber\.Forest\.' "${src_roots[@]}" --include='*.kt' || true
 )
 
 if [ -n "$rule12_hits" ]; then
@@ -98,7 +106,7 @@ fi
 #   - DataMigrationManager (migration-bootstrap, not a repository)
 # ─────────────────────────────────────────────────────────────────────────────
 naming_allowed='WallpaperFileManager\.kt|DataMigrationManager\.kt'
-data_dir="$src_main/com/github/reygnn/kolibri_launcher/data"
+data_dir="$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data"
 
 naming_hits=$(
   grep -rEn '^(internal |open |abstract |sealed )*class [A-Z][a-zA-Z0-9_]*Manager' \

@@ -37,7 +37,7 @@ class UsageExportRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        appUsageExportManager = UsageExportRepositoryImpl(fakeDataStore, context)
+        appUsageExportManager = UsageExportRepositoryImpl(fakeDataStore, context, "test-version")
     }
 
     // ========== EXPORT TO JSON TESTS (ISO 8601) ==========

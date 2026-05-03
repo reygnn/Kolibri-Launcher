@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
@@ -21,6 +20,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -57,6 +57,7 @@ class BackupDataAssembler @Inject constructor(
     private val swipeActionsRepository: SwipeActionsRepository,
     private val settingsRepository: SettingsRepository,
     private val wallpaperRepository: WallpaperRepository,
+    @param:Named("appVersionName") private val appVersionName: String,
 ) {
 
     // ===========================================
@@ -152,7 +153,7 @@ class BackupDataAssembler @Inject constructor(
         return BackupData(
             version = AppConstants.BACKUP_VERSION,
             timestamp = System.currentTimeMillis(),
-            appVersion = BuildConfig.VERSION_NAME,
+            appVersion = appVersionName,
             settings = settings,
         )
     }

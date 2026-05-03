@@ -51,6 +51,7 @@ internal object BackupRepositoryImplTestFactory {
             swipeActionsRepository = swipeActionsRepository,
             settingsRepository = settingsRepository,
             wallpaperRepository = wallpaperRepository,
+            appVersionName = "test-version",
         )
         val serializer = BackupSerializer()
         return BackupRepositoryImpl(

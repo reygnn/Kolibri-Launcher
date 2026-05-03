@@ -25,7 +25,7 @@ class UsageExportRepositoryImplFormatSpec {
     @Before
     fun setUp() {
         dataStore = FakeDataStore()
-        manager = UsageExportRepositoryImpl(dataStore, context)
+        manager = UsageExportRepositoryImpl(dataStore, context, "test-version")
     }
 
     private fun recentTimestamp(hoursAgo: Long = 1): Long =

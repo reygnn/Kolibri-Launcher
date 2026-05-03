@@ -62,7 +62,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
         every { parcelFileDescriptor.fileDescriptor } returns FileDescriptor()
 
         fakeDataStore = FakeDataStore()
-        manager = UsageExportRepositoryImpl(fakeDataStore, context)
+        manager = UsageExportRepositoryImpl(fakeDataStore, context, "test-version")
     }
 
     // ============================================================================================

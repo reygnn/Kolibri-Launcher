@@ -71,7 +71,7 @@ open class SwipeActionsRepositoryImpl private constructor(
          * Factory-Methode zur Erstellung einer Instanz für Unit-Tests.
          */
         @VisibleForTesting
-        internal fun createForTesting(
+        fun createForTesting(
             dataStore: DataStore<Preferences>,
             externalScope: CoroutineScope?,
             sharingStrategy: SharingStarted

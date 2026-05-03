@@ -194,6 +194,7 @@ tasks.withType<JavaCompile>().configureEach {
 dependencies {
     // Project modules
     implementation(project(":domain"))
+    implementation(project(":data"))
 
     // UI & Material  (MUST be loaded first or use resolutionStrategy below!)
     implementation(libs.material)  // MUSS VOR androidx.appcompat:appcompat !!!

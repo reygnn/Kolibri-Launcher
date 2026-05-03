@@ -6,7 +6,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
@@ -26,6 +25,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -53,7 +53,8 @@ import javax.inject.Singleton
 @Singleton
 class UsageExportRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    @param:Named("appVersionName") private val appVersionName: String,
 ) : UsageExportRepository {
 
     private val json = Json {
@@ -142,7 +143,7 @@ class UsageExportRepositoryImpl @Inject constructor(
         sb.appendLine("{")
         sb.appendLine("    \"version\": \"$USAGE_EXPORT_VERSION\",")
         sb.appendLine("    \"exportTimestamp\": ${JSONObject.quote(formatTimestamp(exportTimestamp))},")
-        sb.appendLine("    \"appVersion\": ${JSONObject.quote(BuildConfig.VERSION_NAME)},")
+        sb.appendLine("    \"appVersion\": ${JSONObject.quote(appVersionName)},")
         sb.appendLine("    \"usageData\": {")
 
         val entries = usageData.entries.toList()

@@ -53,7 +53,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
     }
 
     @VisibleForTesting
-    internal fun handleReceive(context: Context, intent: Intent, onFinish: () -> Unit) {
+    fun handleReceive(context: Context, intent: Intent, onFinish: () -> Unit) {
         try {
             val action = intent.action
             val packageName = intent.data?.schemeSpecificPart ?: "unknown"
