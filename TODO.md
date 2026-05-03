@@ -22,15 +22,16 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
-| 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch noch offen — Memo unten | — |
+| 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch versucht aber durch Timber-AAR blockiert — siehe §12 | — |
+| 12 | `:domain` Modul-Type-Switch (§11-Followup) | preparatorische Sub-Steps geliefert 2026-05-03 (Strings-Move, Sealed-Identifier, isDebugBuild), Plugin-Switch blockiert durch Timber-AAR — Memo unten | klein, gating refactor |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Zwei Brocken offen aus
 dem Audit-Snapshot (A: HomeFragment-Restructure, B: Test-Isolation
-pro Modul). Plus ein kleiner Folgeschritt zu §11: das `:domain`-
-Modul von Android Library auf pure-Kotlin umstellen — ist nur noch
-ein build.gradle.kts-Eingriff und der Move der 12 Use-Case-Strings
-aus `:domain/res/`. §10 ist als wiederkehrender Quartals-Termin
-etabliert und triggert sich von selbst — nächster Recheck 2026-Q3.
+pro Modul). Plus §12: der Modul-Type-Switch wartet auf einen
+TimberWrapper-Logger-Backend-Refactor (~1h), bevor `:domain` zu
+`kotlin("jvm")` werden kann. §10 ist als wiederkehrender Quartals-
+Termin etabliert und triggert sich von selbst — nächster Recheck
+2026-Q3.
 
 ---
 
@@ -109,21 +110,25 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
    getestet. Robolectric ist guter Backstop, kein vollständiger
    Ersatz.
 
-### Folge-Schritt zu §11 (klein, sollte erledigt werden)
+### Folge-Schritt zu §11 (Modul-Type-Switch — durch Timber-AAR blockiert)
 
 - **Modul-Type-Switch `:domain` Android Library → pure-Kotlin.**
-  Source ist Android-frei, der Schritt ist jetzt mechanisch:
-  Plugin von `com.android.library` auf `kotlin("jvm")`,
-  `kotlin-parcelize` raus (kein @Parcelize-User mehr in `:domain`),
-  Hilt-kapt bleibt, `BuildConfig` raus oder ersetzen, namespace/
-  compileSdk raus. Risiko-Punkt: die 12 Use-Case-Strings in
-  `:domain/res/values/strings.xml` müssen nach `:app` ziehen — das
-  ist der substanzielle Sub-Step (Use Cases geben heute `Int`-IDs
-  aus `domain.R.string.*` zurück; nach Move kommen sie aus
-  `app.R.string.*`, was die Use Cases nicht referenzieren können
-  ohne Layering-Inversion). Eine Lösung: Use Cases geben statt
-  `@StringRes Int` einen Sealed-Type-Identifier zurück, UI mappt.
-  Größenordnung: 2-3h. Bringt die letzten ~0.1 Punkte.
+  Versuch 2026-05-03 (siehe §12-Memo unten). Drei preparatorische
+  Sub-Steps geliefert und gemerged: Strings-Move nach `:app/res/`,
+  Sealed-Identifier statt `@StringRes Int` in drei Use Cases, plus
+  `TimberWrapper.isDebugBuild` statt `BuildConfig.DEBUG`. Der eigentliche
+  Plugin-Switch zu `kotlin("jvm")` ist am letzten Schritt durch
+  **Timber 5.0.1 als `.aar`-Distribution** blockiert — JVM-Module
+  können keine AARs auf den Compile-Classpath ziehen, und TimberWrapper
+  hängt direkt am `Timber.tag(...).e(...)`-Aufruf.
+  Vor dem Plugin-Switch muss TimberWrapper auf einen runtime-injected
+  Logger-Backend umgebaut werden (analog zum `isDebugBuild`-Pattern):
+  `:app` setzt beim Init eine Logger-Lambda, die Timber drinhängt;
+  `:domain` selbst hat keinen Timber-Import mehr.
+  Größenordnung: ~1h zusätzlicher Refactor + Plugin-Switch danach.
+  Bringt die letzten ~0.1 Punkte. Bis dahin bleibt `:domain` Android
+  Library — Source ist jedoch Android-frei, und die preparatorischen
+  Schritte sind eigenständig wertvoll.
 
 ### Mittelschwere Deckler
 
@@ -896,6 +901,94 @@ Bundle-Wrapper- und String-Overload-Patterns als wiederverwendbare
 Domain-Tools dokumentiert sind, und (c) der noch ausstehende
 Modul-Type-Switch klar als kleiner Folge-Schritt umrissen ist
 (nicht als „neuer großer Brocken").
+
+---
+
+## 12. (Memo, prep-arbeitsschritt 2026-05-03 geliefert; Plugin-Switch blockiert) `:domain` Modul-Type-Switch
+
+**Motivation:** §11 hat `:domain/src/main/` Android-frei gemacht,
+aber das Modul-Type bleibt `com.android.library`. Der Audit-Snapshot
+hat den eigentlichen Switch auf `kotlin("jvm")` als ~0.1-Punkte-
+Followup eingeplant. Versuch 2026-05-03.
+
+**Geliefert (in `refactor/domain-jvm-module`-Branch, gemerged):**
+
+- **Strings-Move:** alle 12 Use-Case-Strings aus `:domain/res/values/`
+  und `values-de/` nach `:app/res/values/strings.xml` und
+  `:app/res/values-de/strings.xml`. Beide Locales komplett.
+  `:domain/res/` ist gelöscht.
+- **Sealed-Identifier-Refactor in drei Use Cases**: statt
+  `@StringRes Int` exposen die Use Cases jetzt sealed-class-
+  Identifier; UI-Layer mappt zur `R.string.*`-Resource per
+  Extension-Funktion in `:app/ui/util/DomainMessageMappers.kt`.
+  - `ToggleFavoriteUseCase.Result` — `Success.Added` / `Success.Removed`
+    / `Error.LimitReached(maxFavorites: Int)`.
+  - `AppLoadResult.Error(failure: Failure)` mit `Failure.NotLoaded` als
+    einzigem Fall heute (sealed-class lässt Erweiterung zu).
+  - `AppContextMenuAction.LauncherAction(id, label: LauncherActionLabel)`
+    mit acht Subtypen für die acht möglichen Action-Labels.
+  Konsumenten in `AppManagementDelegate`, `AppContextMenuAdapter` und
+  `BaseActivity`-Toast lookup'en die Resource jetzt explizit am UI-
+  Boundary statt sie im Domain-Modell zu tragen.
+- **`TimberWrapper.isDebugBuild`-Flag** ersetzt den
+  `BuildConfig.DEBUG`-Lookup: pure-Kotlin-Module haben keinen eigenen
+  BuildConfig, der Flag wird vom `:app`-Modul beim Init in
+  `KolibriLauncherApp.onCreate` aus `BuildConfig.DEBUG` gesetzt.
+  Pattern-Vorbild: das schon existierende `preventCrashForTesting`-
+  AtomicBoolean. TimberWrapperTest setzt es im `@Before` auf `true`
+  für DEBUG-Semantik (und überschreibt es zu `false` für den einen
+  RELEASE-spezifischen Test, der die Negativ-Bedingung pinnt).
+
+**Blockiert beim eigentlichen Plugin-Switch:**
+
+Der finale Schritt — `domain/build.gradle.kts` von `com.android.library`
+auf `kotlin("jvm")` umstellen — scheitert an **Timber 5.0.1 als
+`.aar`-Distribution**. JVM-Module können keine AARs auf den Compile-
+Classpath ziehen (Gradle-Variant-Matching schlägt fehl mit
+„declares 'aar' library elements ... consumer needed class files").
+Timber 5.x hat keine JVM-only Variante.
+
+`TimberWrapper` ruft direkt `Timber.tag(...).e(...)` und
+`Timber.e(...)` auf — die statische Timber-API. Damit `:domain` ohne
+das Timber-AAR kompiliert, muss `TimberWrapper` einen runtime-
+injected Logger-Backend bekommen (Lambda oder funktionales Interface),
+das `:app` beim Init wired:
+
+```kotlin
+// In :domain/TimberWrapper.kt
+object TimberWrapper {
+    @Volatile var logError: (tag: String, throwable: Throwable?, message: String) -> Unit = { _, _, _ -> }
+    @Volatile var logFatal: (tag: String, message: String) -> Unit = { _, _ -> }
+    // …silentError ruft logError(SILENT_LOG_TAG, throwable, message) statt Timber.tag().e()
+}
+
+// In :app/KolibriLauncherApp.onCreate (vor allen anderen Init-Schritten)
+TimberWrapper.logError = { tag, t, msg -> Timber.tag(tag).e(t, msg) }
+TimberWrapper.logFatal = { tag, msg -> Timber.tag(tag).e(msg) }
+```
+
+Risiko-Punkt: silentError-Aufrufe auf dem Bootstrap-Pfad (vor
+`KolibriLauncherApp.onCreate`, z.B. in `attachBaseContext` oder
+`CrashReportConsentStore`-Lookup) wären mit dem Default-Lambda
+no-op statt Logging. Akzeptabel, weil der Default sicher ist (kein
+Crash) und KolibriLauncherApp den Wire-up direkt nach dem
+`isDebugBuild`-Setzen machen würde — ähnlich wie schon der
+ACRA-Init-Flow heute.
+
+**Größenordnung:** ~1h. Inkrementell gut testbar, weil der Logger-
+Backend-Pattern bereits durch `isDebugBuild` etabliert ist.
+
+**Was nicht zu machen ist:** Timber als JAR-only konsumieren via
+Gradle-Attribute-Hacks (`org.gradle.libraryelements = jar` o.ä.).
+AGP-AARs sind ZIP-Container mit `classes.jar` darin, kein direkter
+Klassenpfad. Hacks würden zur Laufzeit instabile Resourcen-Auflösung
+geben.
+
+Memo bleibt damit ein zukünftiger Reviewer (a) sieht, dass die
+preparatorischen Schritte landed sind und unabhängig vom Plugin-
+Switch wertvoll waren (Sealed-Identifier sind Type-Safety-Win),
+(b) den Timber-Blocker als bekannten Sub-Step kennt, und (c) den
+Logger-Backend-Pattern als nächste Schritt-Anweisung hat.
 
 ---
 

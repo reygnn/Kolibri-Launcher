@@ -241,7 +241,7 @@ class AppManagementDelegateTest {
     @Test
     fun `onToggleFavorite shows success toast on success`() = runTest {
         coEvery { toggleFavoriteUseCase(any<AppInfo>(), any<Int>()) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_now_hidden_in_drawer)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         val delegate = createDelegate()
 
@@ -254,7 +254,7 @@ class AppManagementDelegateTest {
     @Test
     fun `onToggleFavorite shows error toast on error`() = runTest {
         coEvery { toggleFavoriteUseCase(any<AppInfo>(), any<Int>()) } returns
-                ToggleFavoriteUseCase.Result.Error(R.string.error_generic)
+                ToggleFavoriteUseCase.Result.Error.LimitReached(maxFavorites = 5)
 
         val delegate = createDelegate()
 

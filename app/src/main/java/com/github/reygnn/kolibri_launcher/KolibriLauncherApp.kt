@@ -176,6 +176,11 @@ class KolibriLauncherApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Hand BuildConfig.DEBUG to :domain/TimberWrapper (which has no
+        // BuildConfig of its own as a pure-Kotlin module). Must run before
+        // any code path that may invoke silentError.
+        TimberWrapper.isDebugBuild = BuildConfig.DEBUG
+
         // Initialize ACRA spam protection FIRST (before any crashes can occur)
         try {
             CrashReportLimiter.init(this)

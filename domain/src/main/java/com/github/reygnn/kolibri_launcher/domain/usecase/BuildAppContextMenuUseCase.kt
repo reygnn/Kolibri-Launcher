@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
@@ -10,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherActionLabel
 import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
@@ -57,10 +57,10 @@ class BuildAppContextMenuUseCase @Inject constructor(
         actions.add(
             AppContextMenuAction.LauncherAction(
                 id = AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE,
-                labelRes = if (isFavorite) {
-                    R.string.remove_from_favorites
+                label = if (isFavorite) {
+                    LauncherActionLabel.RemoveFromFavorites
                 } else {
-                    R.string.add_to_favorites
+                    LauncherActionLabel.AddToFavorites
                 },
             ),
         )
@@ -71,7 +71,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
             actions.add(
                 AppContextMenuAction.LauncherAction(
                     id = AppContextMenuAction.ACTION_ID_RESTORE_NAME,
-                    labelRes = R.string.restore_original_name,
+                    label = LauncherActionLabel.RestoreOriginalName,
                 ),
             )
         }
@@ -80,7 +80,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
         actions.add(
             AppContextMenuAction.LauncherAction(
                 id = AppContextMenuAction.ACTION_ID_RENAME_APP,
-                labelRes = R.string.rename_app,
+                label = LauncherActionLabel.RenameApp,
             ),
         )
 
@@ -93,10 +93,10 @@ class BuildAppContextMenuUseCase @Inject constructor(
                 } else {
                     AppContextMenuAction.ACTION_ID_HIDE_APP
                 },
-                labelRes = if (isHidden) {
-                    R.string.unhide_app_in_drawer
+                label = if (isHidden) {
+                    LauncherActionLabel.UnhideAppInDrawer
                 } else {
-                    R.string.hide_app_from_drawer
+                    LauncherActionLabel.HideAppFromDrawer
                 },
             ),
         )
@@ -106,7 +106,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
             actions.add(
                 AppContextMenuAction.LauncherAction(
                     id = AppContextMenuAction.ACTION_ID_RESET_USAGE,
-                    labelRes = R.string.action_reset_sorting,
+                    label = LauncherActionLabel.ResetUsage,
                 ),
             )
         }
@@ -115,7 +115,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
         actions.add(
             AppContextMenuAction.LauncherAction(
                 id = AppContextMenuAction.ACTION_ID_APP_INFO,
-                labelRes = R.string.app_info,
+                label = LauncherActionLabel.AppInfo,
             ),
         )
 

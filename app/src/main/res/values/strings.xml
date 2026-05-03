@@ -361,4 +361,18 @@
 <string name="rotation_lock_title">Lock screen rotation</string>
 <string name="rotation_lock_summary">Keep the display in portrait orientation</string>
 
+<!-- Use-case messages (moved from :domain/res/ when :domain switched to pure-Kotlin) -->
+<string name="add_to_favorites">Add to favorites</string>
+<string name="remove_from_favorites">Remove from favorites</string>
+<string name="app_added_to_favorites">Added %s to favorites</string>
+<string name="app_removed_from_favorites">Removed %s from favorites</string>
+<string name="rename_app">Rename app</string>
+<string name="restore_original_name">Restore original name</string>
+<string name="app_info">App info</string>
+<string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
+<string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>
+<string name="unhide_app_in_drawer">Show in app drawer</string>
+<string name="hide_app_from_drawer">Hide from app drawer</string>
+<string name="action_reset_sorting">Reset sorting</string>
+
 </resources>

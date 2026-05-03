@@ -4,13 +4,20 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Android Library module hosting the layer that is conceptually free of UI
- * and data-source concerns. The original §9.2 split kept it as an Android
- * Library because three sites carried Android imports
- * (`core/TextColorCalculator`, `core/AppConstants`'s DataStore keys,
- * `domain/model/AppInfo`'s `@Parcelize`); the Brocken-C sweeps removed all
- * three, so `src/main/` is now Android-free in source. Switching the module
- * type to pure Kotlin is a separate build-config refactor — tracked in
- * TODO.md.
+ * and data-source concerns. The Brocken-C sweeps removed every Android
+ * import from `src/main/`, and the §11-Followup attempted to switch the
+ * module type to pure-Kotlin (`kotlin("jvm")`). The switch is blocked by
+ * Timber 5.x being distributed as `.aar` only — a JVM module cannot
+ * consume that artifact, and TimberWrapper depends on Timber's static
+ * API. Switching the module-type therefore requires a separate refactor
+ * that abstracts TimberWrapper's logging backend behind a runtime-
+ * injected delegate (so :domain can compile without the Timber AAR on
+ * its classpath, and :app wires the Timber implementation at startup).
+ * Left as a follow-up — see TODO.md §11.
+ *
+ * Source remains Android-free: `grep -rn "^import android\|^import androidx" src/main/`
+ * yields nothing, which is the bigger architectural win regardless of
+ * module-type.
  *
  * Hilt: this library declares modules (e.g. DispatcherModule). The
  * `kapt(libs.hilt.compiler)` invocation here generates the per-module
@@ -20,7 +27,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
-    id("kotlin-parcelize")
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
 }

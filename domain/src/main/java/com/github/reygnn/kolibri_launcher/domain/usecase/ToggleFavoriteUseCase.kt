@@ -1,21 +1,38 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 class ToggleFavoriteUseCase @Inject constructor(
-    private val favoritesRepository: FavoritesRepository // <-- Injiziert das Repo-Interface
+    private val favoritesRepository: FavoritesRepository
 ) {
     /**
      * Definiert das Ergebnis der Umschalt-Aktion, damit das ViewModel weiß,
      * welchen Toast es anzeigen soll.
+     *
+     * UI-Layer maps these sealed identifiers to `R.string.*` resources via
+     * `mapToStringResId(...)`. Keeping them as a sealed type instead of
+     * `@StringRes Int` lets the domain stay free of `androidx.annotation`
+     * and Android resource ids.
      */
     sealed class Result {
-        data class Success(val messageResId: Int) : Result()
-        data class Error(val messageResId: Int) : Result()
+        sealed class Success : Result() {
+            /** Favorite was added — UI shows toast with the app's display name. */
+            object Added : Success()
+
+            /** Favorite was removed — UI shows toast with the app's display name. */
+            object Removed : Success()
+        }
+
+        sealed class Error : Result() {
+            /**
+             * The user tried to add a favorite but the configured limit is
+             * already exhausted. UI shows toast with [maxFavorites].
+             */
+            data class LimitReached(val maxFavorites: Int) : Error()
+        }
     }
 
     /**
@@ -29,16 +46,10 @@ class ToggleFavoriteUseCase @Inject constructor(
         if (!favoritesRepository.isFavoriteComponent(app.componentName) &&
             realFavoritesCount >= currentMaxFavorites
         ) {
-            return Result.Error(R.string.favorites_limit_reached)
+            return Result.Error.LimitReached(currentMaxFavorites)
         }
 
         val wasAdded = favoritesRepository.toggleFavoriteComponent(app.componentName)
-
-        val messageResId = if (wasAdded) {
-            R.string.app_added_to_favorites
-        } else {
-            R.string.app_removed_from_favorites
-        }
-        return Result.Success(messageResId)
+        return if (wasAdded) Result.Success.Added else Result.Success.Removed
     }
 }

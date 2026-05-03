@@ -34,6 +34,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
+import com.github.reygnn.kolibri_launcher.ui.util.toStringResId
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
@@ -99,7 +100,7 @@ class AppManagementDelegate(
                 delay(AppConstants.INITIAL_APP_LOAD_DELAY_MS)
                 observeInstalledAppsUseCase().collect { result ->
                     if (result is AppLoadResult.Error) {
-                        scope.sendEvent(UiEvent.ShowToast(result.messageResId))
+                        scope.sendEvent(UiEvent.ShowToast(result.failure.toStringResId()))
                     }
                 }
             }
@@ -143,11 +144,12 @@ class AppManagementDelegate(
             val currentMax = maxFavoritesOnHome.value
             when (val result = toggleFavoriteUseCase(app, currentMax)) {
                 is ToggleFavoriteUseCase.Result.Success -> {
-                    val message = context.getString(result.messageResId, app.displayName)
+                    val message = context.getString(result.toStringResId(), app.displayName)
                     scope.sendEvent(UiEvent.ShowToastFromString(message))
                 }
                 is ToggleFavoriteUseCase.Result.Error -> {
-                    val message = context.getString(result.messageResId, currentMax)
+                    val limit = (result as ToggleFavoriteUseCase.Result.Error.LimitReached).maxFavorites
+                    val message = context.getString(result.toStringResId(), limit)
                     scope.sendEvent(UiEvent.ShowToastFromString(message))
                 }
             }

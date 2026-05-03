@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.ui.util.toStringResId
 
 class AppContextMenuAdapter(
     private val onItemClicked: (AppContextMenuAction) -> Unit
@@ -68,7 +69,8 @@ class AppContextMenuAdapter(
         fun bind(action: AppContextMenuAction) {
             labelView.text = when (action) {
                 is AppContextMenuAction.Shortcut -> action.shortcut.shortLabel
-                is AppContextMenuAction.LauncherAction -> itemView.context.getString(action.labelRes)
+                is AppContextMenuAction.LauncherAction ->
+                    itemView.context.getString(action.label.toStringResId())
                 // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
                 is AppContextMenuAction.Separator -> ""
             }

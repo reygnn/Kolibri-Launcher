@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
@@ -45,9 +44,7 @@ class ToggleFavoriteUseCaseTest {
         val result = useCase(testApp, currentMaxFavorites = 5)
 
         // Assert
-        assertThat(result).isInstanceOf(ToggleFavoriteUseCase.Result.Success::class.java)
-        assertThat((result as ToggleFavoriteUseCase.Result.Success).messageResId)
-            .isEqualTo(R.string.app_added_to_favorites)
+        assertThat(result).isEqualTo(ToggleFavoriteUseCase.Result.Success.Added)
     }
 
     @Test
@@ -75,9 +72,7 @@ class ToggleFavoriteUseCaseTest {
         val result = useCase(testApp, currentMaxFavorites = 5)
 
         // Assert
-        assertThat(result).isInstanceOf(ToggleFavoriteUseCase.Result.Success::class.java)
-        assertThat((result as ToggleFavoriteUseCase.Result.Success).messageResId)
-            .isEqualTo(R.string.app_removed_from_favorites)
+        assertThat(result).isEqualTo(ToggleFavoriteUseCase.Result.Success.Removed)
     }
 
     @Test
@@ -109,9 +104,7 @@ class ToggleFavoriteUseCaseTest {
         val result = useCase(testApp, currentMaxFavorites = 3)
 
         // Assert
-        assertThat(result).isInstanceOf(ToggleFavoriteUseCase.Result.Error::class.java)
-        assertThat((result as ToggleFavoriteUseCase.Result.Error).messageResId)
-            .isEqualTo(R.string.favorites_limit_reached)
+        assertThat(result).isEqualTo(ToggleFavoriteUseCase.Result.Error.LimitReached(maxFavorites = 3))
     }
 
     @Test
@@ -144,9 +137,7 @@ class ToggleFavoriteUseCaseTest {
         val result = useCase(testApp, currentMaxFavorites = 3)
 
         // Assert
-        assertThat(result).isInstanceOf(ToggleFavoriteUseCase.Result.Success::class.java)
-        assertThat((result as ToggleFavoriteUseCase.Result.Success).messageResId)
-            .isEqualTo(R.string.app_removed_from_favorites)
+        assertThat(result).isEqualTo(ToggleFavoriteUseCase.Result.Success.Removed)
         assertThat(favoritesRepository.favorites).doesNotContain(testApp.componentName)
     }
 

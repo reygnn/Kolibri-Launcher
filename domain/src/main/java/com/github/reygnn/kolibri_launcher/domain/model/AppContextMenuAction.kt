@@ -13,16 +13,14 @@ sealed class AppContextMenuAction {
     data class Shortcut(val shortcut: LauncherShortcut) : AppContextMenuAction()
 
     /**
-     * Stellt eine Standard-Launcher-Aktion dar, die durch eine ID und einen
-     * String-Resource-Verweis definiert ist. Der Adapter löst den Verweis am
-     * Render-Zeitpunkt via `Context.getString` auf — so kann der Build-Pfad
-     * dieser Liste auf JVM-Seite getestet werden, ohne Android-Runtime.
-     *
-     * `labelRes` is a string-resource id — kept as a plain `Int` here so the
-     * domain layer doesn't depend on `androidx.annotation`. UI-side consumers
-     * still pass it through `context.getString(...)` as before.
+     * Stellt eine Standard-Launcher-Aktion dar, die durch eine ID und ein
+     * Domain-Label-Identifier definiert ist. Der Adapter mappt das
+     * Identifier-Label am Render-Zeitpunkt zu einer `R.string.*`-Resource —
+     * so kann der Build-Pfad dieser Liste auf JVM-Seite getestet werden,
+     * ohne Android-Runtime und ohne dass die Domain `R.string`-Konstanten
+     * referenziert.
      */
-    data class LauncherAction(val id: String, val labelRes: Int) : AppContextMenuAction()
+    data class LauncherAction(val id: String, val label: LauncherActionLabel) : AppContextMenuAction()
 
     /**
      * Stellt einen nicht klickbaren, visuellen Trenner dar.
@@ -40,4 +38,20 @@ sealed class AppContextMenuAction {
         const val ACTION_ID_RENAME_APP = "rename_app"
         const val ACTION_ID_RESTORE_NAME = "restore_name"
     }
+}
+
+/**
+ * Domain identifiers for the labels of [AppContextMenuAction.LauncherAction].
+ * UI-side maps each variant to a string resource via
+ * `LauncherActionLabel.toStringResId()`.
+ */
+sealed class LauncherActionLabel {
+    object AddToFavorites : LauncherActionLabel()
+    object RemoveFromFavorites : LauncherActionLabel()
+    object RestoreOriginalName : LauncherActionLabel()
+    object RenameApp : LauncherActionLabel()
+    object UnhideAppInDrawer : LauncherActionLabel()
+    object HideAppFromDrawer : LauncherActionLabel()
+    object ResetUsage : LauncherActionLabel()
+    object AppInfo : LauncherActionLabel()
 }

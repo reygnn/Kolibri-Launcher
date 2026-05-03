@@ -498,7 +498,7 @@ class LauncherViewModelContractTest {
     @Test
     fun `ContextMenu - toggleFavorite shows feedback toast`() = runTest {
         coEvery { toggleFavoriteUseCase(any(), any()) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         val vm = createViewModel()
         advanceUntilIdle()
@@ -762,7 +762,7 @@ class LauncherViewModelContractTest {
     @Test
     fun `Fragment - multiple rapid actions don't crash`() = runTest {
         coEvery { toggleFavoriteUseCase(any(), any()) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         val vm = createViewModel()
         advanceUntilIdle()

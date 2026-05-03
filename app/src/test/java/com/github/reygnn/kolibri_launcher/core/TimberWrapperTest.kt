@@ -53,12 +53,17 @@ class TimberWrapperTest {
         }
         Timber.plant(captureTree)
         TimberWrapper.preventCrashForTesting.set(false)
+        // Tests below assume DEBUG semantics. Default is `false` because the
+        // wrapper now reads its build type from a flag set by KolibriLauncherApp;
+        // tests have to wire it themselves.
+        TimberWrapper.isDebugBuild = true
     }
 
     @After
     fun teardown() {
         Timber.uproot(captureTree)
         TimberWrapper.preventCrashForTesting.set(false)
+        TimberWrapper.isDebugBuild = false
     }
 
     // ------------------------------------------------------------------
@@ -159,6 +164,8 @@ class TimberWrapperTest {
     fun `silentError does not throw in RELEASE`() {
         Assume.assumeFalse("Only meaningful in RELEASE variant", BuildConfig.DEBUG)
         TimberWrapper.preventCrashForTesting.set(false)
+        // Override the @Before's `isDebugBuild = true` for this RELEASE-semantics test.
+        TimberWrapper.isDebugBuild = false
         // No fail() needed — assertion is implicit by lack of throw.
         TimberWrapper.silentError("release-no-throw")
     }

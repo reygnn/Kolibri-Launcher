@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
@@ -69,7 +68,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     } else {
                         installedAppsStateRepository.updateApps(emptyList())
                         // Nur einen Fehler senden, wenn der Cache auch leer ist
-                        emit(AppLoadResult.Error(R.string.error_app_list_not_loaded))
+                        emit(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
                     }
                 }
                 .collect { realApps ->

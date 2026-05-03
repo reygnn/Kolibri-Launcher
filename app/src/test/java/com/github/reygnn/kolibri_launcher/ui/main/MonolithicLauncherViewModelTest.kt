@@ -387,7 +387,7 @@ class MonolithicLauncherViewModelTest {
     fun `onToggleFavorite - when not favorite - calls UseCase and shows toast`() = runTest {
         // Mocke das ERGEBNIS des UseCase
         coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         setupViewModel()
         advanceUntilIdle()
@@ -412,7 +412,7 @@ class MonolithicLauncherViewModelTest {
                     app1,
                     AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
                 )
-            } returns ToggleFavoriteUseCase.Result.Error(R.string.favorites_limit_reached)
+            } returns ToggleFavoriteUseCase.Result.Error.LimitReached(maxFavorites = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
 
             setupViewModel()
             advanceUntilIdle()
@@ -610,7 +610,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `init - when observeInstalledAppsUseCase emits Error - shows toast`() = runTest {
         every { observeInstalledAppsUseCase.invoke() } returns
-                flowOf(AppLoadResult.Error(R.string.error_app_list_not_loaded))
+                flowOf(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
         setupViewModel(enableTestMode = false)
         viewModel.event.test {
             advanceUntilIdle()
@@ -743,7 +743,7 @@ class MonolithicLauncherViewModelTest {
     fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
         // Mocke das ERGEBNIS des UseCase für "Remove"
         coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_removed_from_favorites)
+                ToggleFavoriteUseCase.Result.Success.Removed
 
         setupViewModel()
         advanceUntilIdle()
@@ -1007,7 +1007,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onToggleFavorite - called twice quickly - both complete without crash`() = runTest {
         coEvery { toggleFavoriteUseCase.invoke(any(), any()) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         setupViewModel()
         advanceUntilIdle()
@@ -1027,7 +1027,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `multiple simultaneous operations - all complete successfully`() = runTest {
         coEvery { toggleFavoriteUseCase.invoke(any(), any()) } returns
-                ToggleFavoriteUseCase.Result.Success(R.string.app_added_to_favorites)
+                ToggleFavoriteUseCase.Result.Success.Added
 
         setupViewModel()
         advanceUntilIdle()

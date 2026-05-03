@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import com.github.reygnn.kolibri_launcher.domain.BuildConfig
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
@@ -23,6 +22,19 @@ object TimberWrapper {
     // AtomicBoolean für Thread-Safety, falls Tests parallel laufen.
     // val reicht, da AtomicBoolean intern mutable ist.
     val preventCrashForTesting = AtomicBoolean(false)
+
+    /**
+     * Whether the app is running a DEBUG build. The `:app` module sets this
+     * once at startup from `BuildConfig.DEBUG` (see `KolibriLauncherApp`),
+     * because :domain is a pure-Kotlin module without its own BuildConfig.
+     *
+     * Volatile because read from arbitrary threads via [silentError].
+     * Default `false` is the safe fallback — production behaviour for
+     * any caller that runs before [KolibriLauncherApp]'s init has wired
+     * the flag.
+     */
+    @Volatile
+    var isDebugBuild: Boolean = false
 
     /**
      * Loggt einen Fehler, der nur im Logcat erscheinen soll.
@@ -53,7 +65,7 @@ object TimberWrapper {
             return
         }
 
-        if (BuildConfig.DEBUG) {
+        if (isDebugBuild) {
             throw RuntimeException("SILENT_ERROR caught: $message", cause)
         }
     }

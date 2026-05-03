@@ -186,9 +186,7 @@ class ObserveInstalledAppsUseCaseTest {
         // Act & Assert
         useCaseWithError().test {
             val result = awaitItem()
-            assertThat(result).isInstanceOf(AppLoadResult.Error::class.java)
-            assertThat((result as AppLoadResult.Error).messageResId)
-                .isEqualTo(R.string.error_app_list_not_loaded)
+            assertThat(result).isEqualTo(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherActionLabel
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -151,7 +151,7 @@ class BuildAppContextMenuUseCaseTest {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
-            assertEquals(R.string.remove_from_favorites, toggleFavorite.labelRes)
+            assertEquals(LauncherActionLabel.RemoveFromFavorites, toggleFavorite.label)
         }
 
     @Test
@@ -162,7 +162,7 @@ class BuildAppContextMenuUseCaseTest {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
-            assertEquals(R.string.add_to_favorites, toggleFavorite.labelRes)
+            assertEquals(LauncherActionLabel.AddToFavorites, toggleFavorite.label)
         }
 
     // ------------------------------------------------------------------
@@ -179,7 +179,7 @@ class BuildAppContextMenuUseCaseTest {
                 result.any {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESTORE_NAME &&
-                        it.labelRes == R.string.restore_original_name
+                        it.label == LauncherActionLabel.RestoreOriginalName
                 },
             )
         }
@@ -212,7 +212,7 @@ class BuildAppContextMenuUseCaseTest {
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
             assertEquals(AppContextMenuAction.ACTION_ID_UNHIDE_APP, hideAction.id)
-            assertEquals(R.string.unhide_app_in_drawer, hideAction.labelRes)
+            assertEquals(LauncherActionLabel.UnhideAppInDrawer, hideAction.label)
         }
 
     @Test
@@ -225,7 +225,7 @@ class BuildAppContextMenuUseCaseTest {
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
             assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, hideAction.id)
-            assertEquals(R.string.hide_app_from_drawer, hideAction.labelRes)
+            assertEquals(LauncherActionLabel.HideAppFromDrawer, hideAction.label)
         }
 
     // ------------------------------------------------------------------
@@ -298,7 +298,7 @@ class BuildAppContextMenuUseCaseTest {
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
             // Fallback is `false` → "add_to_favorites".
-            assertEquals(R.string.add_to_favorites, toggleFavorite.labelRes)
+            assertEquals(LauncherActionLabel.AddToFavorites, toggleFavorite.label)
         }
 
     @Test
@@ -333,7 +333,7 @@ class BuildAppContextMenuUseCaseTest {
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
             assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, hideAction.id)
-            assertEquals(R.string.hide_app_from_drawer, hideAction.labelRes)
+            assertEquals(LauncherActionLabel.HideAppFromDrawer, hideAction.label)
         }
 
     // ------------------------------------------------------------------
