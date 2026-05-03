@@ -380,44 +380,47 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        try {
-            checkAndSyncOrientation()
+        // No try/catch: this is synchronous lifecycle init, not a coroutine
+        // body. Each call below is either a pure StateFlow read, a setter,
+        // a system-API call wrapped at its own boundary, or a coroutine
+        // launcher that has its own safety net via launchSafe / catchSafe.
+        // A bare catch(Throwable) here would swallow programmer errors
+        // (NPE, IllegalState) and turn them into invisible "home screen
+        // half-broken" states — exactly the failure mode the file-header
+        // try/catch-audit calls out. Real init failures (inflate, OOM)
+        // belong to silentDeath, not silentError.
+        checkAndSyncOrientation()
 
-            recalculateLayoutCache(
-                viewModel.layoutScaleState.value,
-                viewModel.verticalPaddingState.value,
-                viewModel.isFontBoldState.value
-            )
+        recalculateLayoutCache(
+            viewModel.layoutScaleState.value,
+            viewModel.verticalPaddingState.value,
+            viewModel.isFontBoldState.value
+        )
 
-            applyTopMargin(viewModel.contentTopMarginState.value)
-            applyLayoutToExistingViews()
+        applyTopMargin(viewModel.contentTopMarginState.value)
+        applyLayoutToExistingViews()
 
-            hideStatusBar()
-            setupBackPressHandler()
-            setupGestures()
-            setupDoubleTapActions()
-            setupFragmentResultListener()
-            setupHomeWindowInsets()
+        hideStatusBar()
+        setupBackPressHandler()
+        setupGestures()
+        setupDoubleTapActions()
+        setupFragmentResultListener()
+        setupHomeWindowInsets()
 
-            wallpaperEditController = WallpaperEditController(
-                binding = binding,
-                viewModel = viewModel,
-                resources = resources,
-                launchLayerPicker = {
-                    layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
-                },
-                rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
-            )
-            wallpaperEditController?.setupInsets()
+        wallpaperEditController = WallpaperEditController(
+            binding = binding,
+            viewModel = viewModel,
+            resources = resources,
+            launchLayerPicker = {
+                layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
+            },
+            rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
+        )
+        wallpaperEditController?.setupInsets()
 
-            registerLayerImagePicker()
-            observeViewModel()
-            observeLayoutChanges()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onViewCreated")
-        }
+        registerLayerImagePicker()
+        observeViewModel()
+        observeLayoutChanges()
     }
 
     /**
@@ -429,15 +432,15 @@ class HomeFragment : Fragment() {
             WallpaperImagePicker.contract()
         ) { uri ->
             if (uri != null) {
-                try {
-                    // The delegate copies the image to internal storage right
-                    // away, so takePersistableUriPermission would be wasted
-                    // effort here (the original content URI is never used again).
-                    viewModel.onAddWallpaperLayer(uri)
-                    Timber.d("Layer added from picker: $uri")
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error adding layer from picker")
-                }
+                // The delegate copies the image to internal storage right
+                // away, so takePersistableUriPermission would be wasted
+                // effort here (the original content URI is never used again).
+                //
+                // No try/catch: onAddWallpaperLayer is fire-and-forget
+                // (`scope.launchSafe { … }`) and Timber.d cannot throw —
+                // a bare catch(Throwable) here was dead code.
+                viewModel.onAddWallpaperLayer(uri)
+                Timber.d("Layer added from picker: $uri")
             }
         }
     }
@@ -445,24 +448,24 @@ class HomeFragment : Fragment() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
 
-        try {
-            Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
+        // No try/catch: cache reset, StateFlow update, and safePost-
+        // scheduled work do not throw. checkScrollStateAfterNextLayout
+        // posts via ViewTreeObserver — a setter, not a runner. Programmer
+        // errors propagate to the FragmentManager, where they belong.
+        Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
 
-            // 1. SICHERHEIT: Cache leeren.
-            // Damit garantieren wir, dass beim nächsten Layout-Pass
-            // auf jeden Fall neu gerechnet und der Margin neu gesetzt wird.
-            lastSpacingInput = null
+        // 1. SICHERHEIT: Cache leeren.
+        // Damit garantieren wir, dass beim nächsten Layout-Pass
+        // auf jeden Fall neu gerechnet und der Margin neu gesetzt wird.
+        lastSpacingInput = null
 
-            // Den Orientation-State sofort aktualisieren
-            _orientationState.value = newConfig.orientation
+        // Den Orientation-State sofort aktualisieren
+        _orientationState.value = newConfig.orientation
 
-            // Warte bis Layout wirklich fertig ist!
-            checkScrollStateAfterNextLayout("Scroll state checked after rotation")
+        // Warte bis Layout wirklich fertig ist!
+        checkScrollStateAfterNextLayout("Scroll state checked after rotation")
 
-            safePost { scheduleScrollVerification() }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onConfigurationChanged")
-        }
+        safePost { scheduleScrollVerification() }
     }
 
 // ============================================================================
@@ -470,47 +473,43 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun checkAndEmitScrollState() {
-        try {
-            if (_binding == null || !isAdded) return
+        // The structural teardown-race guard is the early-return below.
+        // After it, every operation reads/writes a non-null view or a
+        // pure StateFlow value — none can throw. The previous
+        // catch(Throwable) had a "force split mode on error" fallback
+        // which only helped hide invisible failures (no observable user
+        // signal) — removed in favour of letting real bugs surface.
+        if (_binding == null || !isAdded) return
 
-            val scrollView = binding.favoritesScrollView
-            val threshold = viewModel.splitModeThreshold.value
-            val childView = scrollView.getChildAt(0)
+        val scrollView = binding.favoritesScrollView
+        val threshold = viewModel.splitModeThreshold.value
+        val childView = scrollView.getChildAt(0)
 
-            val shouldSplit = splitModeCalculator.shouldSplit(
-                threshold = threshold,
-                canScrollDown = scrollView.canScrollVertically(1),
-                canScrollUp = scrollView.canScrollVertically(-1),
-                contentHeight = childView?.height ?: 0,
-                containerHeight = scrollView.height
-            )
+        val shouldSplit = splitModeCalculator.shouldSplit(
+            threshold = threshold,
+            canScrollDown = scrollView.canScrollVertically(1),
+            canScrollUp = scrollView.canScrollVertically(-1),
+            contentHeight = childView?.height ?: 0,
+            containerHeight = scrollView.height
+        )
 
-            // Debug Log nur bei Änderung
-            if (_needsSplit.value != shouldSplit) {
-                if (threshold == 0) {
-                    Timber.d("Scroll check (Auto): split=$shouldSplit")
-                } else {
-                    val scrollablePixels = splitModeCalculator.calculateScrollablePixels(
-                        childView?.height ?: 0,
-                        scrollView.height
-                    )
-                    Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
-                }
-
-                _needsSplit.value = shouldSplit
-
-                // Reset scroll position wenn kein Split Mode
-                if (!shouldSplit) {
-                    scrollView.scrollTo(0, 0)
-                }
+        // Debug Log nur bei Änderung
+        if (_needsSplit.value != shouldSplit) {
+            if (threshold == 0) {
+                Timber.d("Scroll check (Auto): split=$shouldSplit")
+            } else {
+                val scrollablePixels = splitModeCalculator.calculateScrollablePixels(
+                    childView?.height ?: 0,
+                    scrollView.height
+                )
+                Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
             }
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error checking scroll state")
-            // Fail-Safe: Im Zweifel split mode aktivieren (sicherer)
-            if (!_needsSplit.value) {
-                Timber.w("Error checking scroll - enabling split as safety fallback")
-                _needsSplit.value = true
+            _needsSplit.value = shouldSplit
+
+            // Reset scroll position wenn kein Split Mode
+            if (!shouldSplit) {
+                scrollView.scrollTo(0, 0)
             }
         }
     }

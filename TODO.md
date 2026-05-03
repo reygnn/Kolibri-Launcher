@@ -187,6 +187,16 @@ für die letzten 0.1, dann 9.0+.
 - **Baseline 2026-05-03:** 1997 Zeilen, 59 `catch (`-Anweisungen,
   davon 51 `catch (e: Throwable)`. Jede Sweep-Runde sollte diese
   Zahlen drücken; Backstop-Test als Regression-Indikator.
+- **Aktueller Stand 2026-05-03 (Region 1: Init/Lifecycle):**
+  1996 Zeilen, 54 catches (47 `Throwable`). Region 1 hat 4 Throwable-
+  Catches und einen dead `CancellationException`-Catch entfernt
+  (`onViewCreated`, `registerLayerImagePicker`, `onConfigurationChanged`,
+  `checkAndEmitScrollState`). Klassifizierung: alle waren
+  Programmer-Error-Catches im Sinn der Vier-Kategorien-Frage —
+  `silentError`-swallow, kein realistischer Throw-Vektor (synchroner
+  Lifecycle-Init, fire-and-forget-launchSafe-Bodies, oder strukturell
+  via `_binding == null`-Guard schon abgesichert). Backstop-Test bleibt
+  grün.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.
