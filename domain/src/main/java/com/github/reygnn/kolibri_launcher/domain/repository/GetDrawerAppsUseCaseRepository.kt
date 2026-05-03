@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
-import androidx.lifecycle.LiveData
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import kotlinx.coroutines.flow.Flow
 
 interface GetDrawerAppsUseCaseRepository : Purgeable {
-    val drawerApps: LiveData<List<AppInfo>>
+    val drawerApps: Flow<List<AppInfo>>
 }

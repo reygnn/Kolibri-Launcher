@@ -76,7 +76,7 @@ class AppManagementDelegate(
     private val _favoriteAppsState = MutableStateFlow<UiState<FavoriteAppsResult>>(UiState.Loading)
     val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> = _favoriteAppsState.asStateFlow()
 
-    val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps
+    val drawerApps: LiveData<List<AppInfo>> = getDrawerAppsUseCase.drawerApps.asLiveData()
 
     private val _homeSettings = MutableStateFlow(HomeSettings())
 

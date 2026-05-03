@@ -213,7 +213,7 @@ class MonolithicLauncherViewModelTest {
 
         every { getFavoriteAppsUseCase.favoriteApps } returns flowOf(UiState.Loading)
         every { getDrawerAppsUseCase.drawerApps } returns
-                MutableStateFlow<List<AppInfo>>(emptyList()).asLiveData()
+                MutableStateFlow<List<AppInfo>>(emptyList())
         every { observeTimeBasedEventsUseCase.invoke(any()) } returns flowOf(emptyList())
         every { observeUiColorsUseCase.invoke(any()) } returns flowOf(UiColorsState())
         every { observeInstalledAppsUseCase.invoke() } returns flowOf(AppLoadResult.Success)
@@ -579,7 +579,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `drawerApps - emits drawer apps from use case`() = runTest {
         val drawerAppsFlow = MutableStateFlow<List<AppInfo>>(testApps)
-        every { getDrawerAppsUseCase.drawerApps } returns drawerAppsFlow.asLiveData()
+        every { getDrawerAppsUseCase.drawerApps } returns drawerAppsFlow
 
         setupViewModel()
 

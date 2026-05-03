@@ -1,7 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.asLiveData
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -12,10 +10,10 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRe
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,9 +27,7 @@ class GetDrawerAppsUseCase @Inject constructor(
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) {
 
-    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
-
-    val drawerApps: LiveData<List<AppInfo>> = combine(
+    val drawerApps: Flow<List<AppInfo>> = combine(
         // Critical Flow: rawApps darf nicht crashen (kein .catch())
         installedAppsStateRepository.rawAppsFlow,
 
@@ -86,9 +82,9 @@ class GetDrawerAppsUseCase @Inject constructor(
             // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
             // was die obigen Catches nicht abdecken (Programmierfehler).
             // silentError macht das in DEBUG laut, in RELEASE landet
-            // emptyList() im LiveData.
+            // emptyList() im Flow.
             TimberWrapper.silentError(e, "Critical error in drawerApps flow, emitting empty list")
             emit(emptyList())
         }
-        .asLiveData(scope.coroutineContext)
+        .flowOn(dispatcher)
 }
