@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.util
+package com.github.reygnn.kolibri_launcher.core
 
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -7,14 +7,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ein einfacher, App-weiter Event-Bus (Signal), der von Hilt als Singleton verwaltet wird.
- * Er dient dazu, ein Signal vom Hilt-freien PackageUpdateReceiver an das
- * Hilt-verwaltete HomeViewModel zu senden, ohne dass diese sich direkt kennen müssen.
+ * App-wide event bus for the "package list changed" signal, managed by Hilt
+ * as a singleton. Bridges the non-Hilt PackageUpdateReceiver to the
+ * Hilt-managed HomeViewModel without making them know about each other.
  */
 @Singleton
 open class AppUpdateSignal @Inject constructor() : Purgeable {
 
-    // Ein SharedFlow ist perfekt für "Feuern und Vergessen"-Events.
     private val _events = MutableSharedFlow<Unit>()
     val events = _events.asSharedFlow()
 
@@ -22,6 +21,5 @@ open class AppUpdateSignal @Inject constructor() : Purgeable {
         _events.emit(Unit)
     }
 
-    // Der Fake im Test-Code wird diese dann mit der echten Reset-Logik überschreiben.
     override suspend fun purgeRepository() { }
 }

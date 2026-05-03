@@ -47,7 +47,7 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.base.UiState
-import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import io.mockk.coEvery
 import io.mockk.coVerify

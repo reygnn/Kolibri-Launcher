@@ -69,7 +69,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.delegate.GestureDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.LayoutDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.ThemingDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegate
-import com.github.reygnn.kolibri_launcher.ui.util.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
