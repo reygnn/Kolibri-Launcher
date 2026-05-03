@@ -243,14 +243,15 @@ class CustomNamesRepositoryImpl @Inject constructor(
             removeCustomNameInternal(packageName)
         } else {
             // Logik zum Setzen/Aktualisieren des Namens.
-            runCatching {
+            try {
                 val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
                 dataStore.edit { preferences ->
                     preferences[nameKey] = customName.trim()
                 }
                 true
-            }.getOrElse { e ->
-                if (e is CancellationException) throw e
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting custom name for package: $packageName")
                 false
             }
@@ -282,14 +283,15 @@ class CustomNamesRepositoryImpl @Inject constructor(
      * um von anderen Funktionen wiederverwendet zu werden.
      */
     private suspend fun removeCustomNameInternal(packageName: String): Boolean {
-        return runCatching {
+        return try {
             val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
             dataStore.edit { preferences ->
                 preferences.remove(nameKey)
             }
             true
-        }.getOrElse { e ->
-            if (e is CancellationException) throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error removing custom name for package: $packageName")
             false
         }
@@ -300,12 +302,13 @@ class CustomNamesRepositoryImpl @Inject constructor(
      * andernfalls den übergebenen Originalnamen.
      */
     override suspend fun getDisplayNameForPackage(packageName: String, originalName: String): String {
-        return runCatching {
+        return try {
             val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
             val preferences = dataStore.data.first()
             preferences[nameKey] ?: originalName
-        }.getOrElse { e ->
-            if (e is CancellationException) throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error getting display name for package: $packageName")
             originalName
         }
@@ -315,12 +318,13 @@ class CustomNamesRepositoryImpl @Inject constructor(
      * Prüft, ob für eine App ein benutzerdefinierter Name existiert.
      */
     override suspend fun hasCustomNameForPackage(packageName: String): Boolean {
-        return runCatching {
+        return try {
             val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
             val preferences = dataStore.data.first()
             preferences.contains(nameKey)
-        }.getOrElse { e ->
-            if (e is CancellationException) throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error checking custom name for package: $packageName")
             false
         }
@@ -347,7 +351,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
      * Für Backup/Export-Zwecke.
      */
     override suspend fun getAllCustomNames(): Map<String, String> {
-        return runCatching {
+        return try {
             val preferences = dataStore.data.first()
             val customNames = mutableMapOf<String, String>()
 
@@ -362,9 +366,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
 
             Timber.d("Retrieved ${customNames.size} custom app names")
             customNames
-
-        }.getOrElse { e ->
-            if (e is CancellationException) throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error getting all custom names")
             emptyMap()
         }
@@ -377,7 +381,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
     override suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean {
         if (names.isEmpty()) return true
 
-        return runCatching {
+        return try {
             // Alle Namen in einer DataStore-Transaction setzen
             dataStore.edit { preferences ->
                 names.forEach { (packageName, customName) ->
@@ -393,9 +397,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
             // Trigger nur einmal am Ende
             triggerCustomNameUpdate()
             true
-
-        }.getOrElse { e ->
-            if (e is CancellationException) throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error setting custom names in batch")
             false
         }
