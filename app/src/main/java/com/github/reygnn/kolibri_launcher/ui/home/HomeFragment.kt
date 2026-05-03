@@ -520,6 +520,13 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun observeViewModel() {
+        // Per-observer inner try/catch blocks removed in the §9.3
+        // follow-up sweep. `collectOnStarted` already wraps each
+        // observer body in its own two-layer catch (collect + lifecycle)
+        // — the inner per-collect catches were redundant Rule 11
+        // violations against pure View-property writes / when-pattern
+        // dispatch / state reads.
+
         // Observer 1: Favorites
         collectOnStarted(
             flow = viewModel.favoriteAppsState,
@@ -530,23 +537,17 @@ class HomeFragment : Fragment() {
 
             Timber.d("Favorites state: ${favState::class.simpleName}")
 
-            try {
-                when (favState) {
-                    is UiState.Loading -> clearAllViews()
-                    is UiState.Success -> {
-                        val colors = viewModel.uiColorsState.value
-                        renderFavorites(favState.data.apps, colors)
-                    }
-
-                    is UiState.Error -> {
-                        viewModel.onFavoriteAppsError(favState.message)
-                        clearAllViews()
-                    }
+            when (favState) {
+                is UiState.Loading -> clearAllViews()
+                is UiState.Success -> {
+                    val colors = viewModel.uiColorsState.value
+                    renderFavorites(favState.data.apps, colors)
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error handling favorites state")
+
+                is UiState.Error -> {
+                    viewModel.onFavoriteAppsError(favState.message)
+                    clearAllViews()
+                }
             }
         }
 
@@ -564,16 +565,11 @@ class HomeFragment : Fragment() {
         ) { (split, orientation) -> // Destrukturierung des Pairs
             if (_binding == null) return@collectOnStarted
 
-            try {
-                Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
-                val colors = viewModel.uiColorsState.value
-
-                // adjustScrollViewWidth(split, colors) wird aufgerufen,
-                // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
-                adjustScrollViewWidth(split, colors)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error adjusting layout")
-            }
+            Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
+            val colors = viewModel.uiColorsState.value
+            // adjustScrollViewWidth(split, colors) wird aufgerufen,
+            // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
+            adjustScrollViewWidth(split, colors)
         }
 
         // Observer 3: Time, date, battery
@@ -584,23 +580,9 @@ class HomeFragment : Fragment() {
         ) { state ->
             if (_binding == null) return@collectOnStarted
 
-            try {
-                binding.timeText.text = state.timeString
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating time")
-            }
-
-            try {
-                binding.dateText.text = state.dateString
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating date")
-            }
-
-            try {
-                binding.batteryText.text = state.batteryString
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating battery")
-            }
+            binding.timeText.text = state.timeString
+            binding.dateText.text = state.dateString
+            binding.batteryText.text = state.batteryString
         }
 
         // Observer 4: TimeBasedEvents
@@ -612,12 +594,7 @@ class HomeFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { events ->
             if (_binding == null) return@collectOnStarted
-
-            try {
-                updateTimeBasedChips(events)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating chips")
-            }
+            updateTimeBasedChips(events)
         }
 
         // Observer 5: Colors
@@ -627,33 +604,18 @@ class HomeFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { colors ->
             if (_binding == null) return@collectOnStarted
-
-            try {
-                updateAllColors(colors)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating colors")
-            }
+            updateAllColors(colors)
         }
 
         // Observer 6: Split Mode Threshold Changes
-        // Note: lifted to the resilient inner-catch pattern to match the
-        // other 7 observers. Original had only the outer catch, treated as
-        // an oversight rather than intentional one-shot semantics.
         collectOnStarted(
             flow = viewModel.splitModeThreshold,
             errorTag = "threshold",
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { threshold ->
-            try {
-                Timber.d("Split threshold changed to: $threshold")
-
-                checkScrollStateAfterNextLayout("Threshold changed check")
-                safePost { scheduleScrollVerification() }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error handling threshold change")
-            }
+            Timber.d("Split threshold changed to: $threshold")
+            checkScrollStateAfterNextLayout("Threshold changed check")
+            safePost { scheduleScrollVerification() }
         }
 
         // Observer 7: Wallpaper State
@@ -663,12 +625,7 @@ class HomeFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { wallpaperState ->
             if (_binding == null) return@collectOnStarted
-
-            try {
-                updateWallpaper(wallpaperState)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating wallpaper")
-            }
+            updateWallpaper(wallpaperState)
         }
 
         // Observer 8: Wallpaper Edit Mode
@@ -706,25 +663,16 @@ class HomeFragment : Fragment() {
         ) { config ->
             if (_binding == null) return@collectOnStarted
 
-            try {
-                // 1. Cache für Textgrösse/Padding neu berechnen
-                recalculateLayoutCache(
-                    config.scale,
-                    config.paddingFactor,
-                    config.isBold
-                )
-
-                // 2. Den neuen Abstand (Margin) anwenden
-                applyTopMargin(config.marginScale)
-
-                // 3. Alle existierenden Buttons aktualisieren (Textgrösse etc.)
-                applyLayoutToExistingViews()
-
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error applying layout config")
-            }
+            // Inner try/catch removed — collectOnStarted has its own
+            // outer catch; the three calls here are pure helpers
+            // (math + property writes).
+            recalculateLayoutCache(
+                config.scale,
+                config.paddingFactor,
+                config.isBold,
+            )
+            applyTopMargin(config.marginScale)
+            applyLayoutToExistingViews()
         }
     }
 
@@ -764,32 +712,31 @@ class HomeFragment : Fragment() {
 
     // Margin berechnen und anwenden
     private fun applyTopMargin(scale: Float) {
-        try {
-            if (_binding == null) return
+        if (_binding == null) return
 
-            val baseMargin = try {
-                resources.getDimensionPixelSize(R.dimen.spacing_medium)
-            } catch (e: Exception) { AppConstants.FALLBACK_DIMEN_PX }
-
-            val calculatedUserMargin = topMarginCalculator.calculate(
-                scale = scale,
-                baseMarginPx = baseMargin,
-                screenHeightPx = resources.displayMetrics.heightPixels
-            )
-
-            if (currentUserPreferredMarginPx != calculatedUserMargin) {
-                currentUserPreferredMarginPx = calculatedUserMargin
-                updateDynamicSpacing()
-            } else {
-                // Fallback: Auch wenn sich der User-Wert nicht geändert hat,
-                // wollen wir beim Initial-Start sicherstellen, dass updateDynamicSpacing einmal läuft
-                // um den Margin am View tatsächlich zu setzen (falls er im XML anders ist).
-                updateDynamicSpacing()
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying top margin")
+        // Outer catch removed per Rule 11 — calculate() is pure float
+        // math, the property compare + write are programmer-error-only,
+        // updateDynamicSpacing() has its own internal handling. The
+        // inner getDimensionPixelSize catch stays (real
+        // Resources.NotFoundException under ProGuard / themed-context).
+        val baseMargin = try {
+            resources.getDimensionPixelSize(R.dimen.spacing_medium)
+        } catch (e: Exception) {
+            AppConstants.FALLBACK_DIMEN_PX
         }
+
+        val calculatedUserMargin = topMarginCalculator.calculate(
+            scale = scale,
+            baseMarginPx = baseMargin,
+            screenHeightPx = resources.displayMetrics.heightPixels,
+        )
+
+        if (currentUserPreferredMarginPx != calculatedUserMargin) {
+            currentUserPreferredMarginPx = calculatedUserMargin
+        }
+        // Run unconditionally on initial start so the View's margin
+        // matches the calculated value even if the XML default differed.
+        updateDynamicSpacing()
     }
 
     /**
@@ -862,37 +809,43 @@ class HomeFragment : Fragment() {
 
     /**
      * Wendet die berechneten Cache-Werte auf die existierenden Views an.
+     *
+     * Outer catch removed per Rule 11 — body is pure View property
+     * writes / safe-cast loop. Inner getDimensionPixelSize catch stays
+     * (real Resources.NotFoundException under ProGuard).
      */
     private fun applyLayoutToExistingViews() {
-        try {
-            val horizPadding = try {
-                resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-            } catch (e: Exception) { AppConstants.FALLBACK_DIMEN_PX }
-
-            val targetTypeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-
-            for (i in 0 until binding.appList.childCount) {
-                val wrapper = binding.appList.getChildAt(i) as? LinearLayout
-                val button = wrapper?.getChildAt(0) as? Button
-
-                if (button != null) {
-                    button.setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
-
-                    button.minHeight = 0
-                    button.minimumHeight = 0
-                    button.includeFontPadding = false
-
-                    button.setPadding(horizPadding, currentVerticalPaddingPx, horizPadding, currentVerticalPaddingPx)
-
-                    button.typeface = targetTypeface
-                }
-            }
-
-            checkScrollStateAfterNextLayout("Layout resized")
-            safePost { scheduleScrollVerification() }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying layout to views")
+        val horizPadding = try {
+            resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+        } catch (e: Exception) {
+            AppConstants.FALLBACK_DIMEN_PX
         }
+
+        val targetTypeface = if (isCurrentFontBold) {
+            android.graphics.Typeface.DEFAULT_BOLD
+        } else {
+            android.graphics.Typeface.DEFAULT
+        }
+
+        for (i in 0 until binding.appList.childCount) {
+            val wrapper = binding.appList.getChildAt(i) as? LinearLayout
+            val button = wrapper?.getChildAt(0) as? Button
+
+            if (button != null) {
+                button.setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
+
+                button.minHeight = 0
+                button.minimumHeight = 0
+                button.includeFontPadding = false
+
+                button.setPadding(horizPadding, currentVerticalPaddingPx, horizPadding, currentVerticalPaddingPx)
+
+                button.typeface = targetTypeface
+            }
+        }
+
+        checkScrollStateAfterNextLayout("Layout resized")
+        safePost { scheduleScrollVerification() }
     }
 
     // ============================================================================
@@ -910,30 +863,27 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
         val ctx = context ?: return
 
-        try {
-            Timber.d("Rendering ${apps.size} favorites")
+        // Outer try/catch removed per Rule 11 — body is removeAllViews +
+        // a per-item createAppButton loop with its own catch + scroll-
+        // state callbacks (themselves with internal handling). Per-item
+        // recovery is preserved.
+        Timber.d("Rendering ${apps.size} favorites")
+        binding.appList.removeAllViews()
 
-            // Clear and populate
-            binding.appList.removeAllViews()
-
-            for (app in apps) {
-                try {
-                    val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
-                    if (button != null) {
-                        binding.appList.addView(button)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
+        for (app in apps) {
+            try {
+                val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
+                if (button != null) {
+                    binding.appList.addView(button)
                 }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
             }
-
-            // Warte bis Layout wirklich fertig ist!
-            checkScrollStateAfterNextLayout("Scroll state checked after rendering")
-            safePost { scheduleScrollVerification() }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error rendering favorites")
         }
+
+        // Warte bis Layout wirklich fertig ist!
+        checkScrollStateAfterNextLayout("Scroll state checked after rendering")
+        safePost { scheduleScrollVerification() }
     }
 
     /**
@@ -1017,12 +967,12 @@ class HomeFragment : Fragment() {
     }
 
     private fun clearAllViews() {
-        try {
-            if (_binding != null && isAdded && !isDetached) {
-                binding.appList.removeAllViews()
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error clearing views")
+        // try/catch removed per Rule 11 — removeAllViews is a pure View
+        // method and the lifecycle guards (_binding != null && isAdded
+        // && !isDetached) already preclude the only realistic failure
+        // mode (call after teardown).
+        if (_binding != null && isAdded && !isDetached) {
+            binding.appList.removeAllViews()
         }
     }
 
@@ -1036,41 +986,32 @@ class HomeFragment : Fragment() {
         val textColor = colors.textColor
         val shadowColor = colors.shadowColor
 
-        try {
-            binding.timeText.setTextColor(textColor)
-            binding.timeText.setShadowLayer(
-                AppConstants.SHADOW_RADIUS_TIME,
-                AppConstants.SHADOW_DX,
-                AppConstants.SHADOW_DY,
-                shadowColor
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating time color")
-        }
+        // Per-line try/catches removed per Rule 11 — setTextColor /
+        // setShadowLayer are pure property writes on never-null Views
+        // from the binding.
+        binding.timeText.setTextColor(textColor)
+        binding.timeText.setShadowLayer(
+            AppConstants.SHADOW_RADIUS_TIME,
+            AppConstants.SHADOW_DX,
+            AppConstants.SHADOW_DY,
+            shadowColor,
+        )
 
-        try {
-            binding.dateText.setTextColor(textColor)
-            binding.dateText.setShadowLayer(
-                AppConstants.SHADOW_RADIUS_DATE,
-                AppConstants.SHADOW_DX_SMALL,
-                AppConstants.SHADOW_DY_SMALL,
-                shadowColor
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating date color")
-        }
+        binding.dateText.setTextColor(textColor)
+        binding.dateText.setShadowLayer(
+            AppConstants.SHADOW_RADIUS_DATE,
+            AppConstants.SHADOW_DX_SMALL,
+            AppConstants.SHADOW_DY_SMALL,
+            shadowColor,
+        )
 
-        try {
-            binding.batteryText.setTextColor(textColor)
-            binding.batteryText.setShadowLayer(
-                AppConstants.SHADOW_RADIUS_BATTERY,
-                AppConstants.SHADOW_DX_SMALL,
-                AppConstants.SHADOW_DY_SMALL,
-                shadowColor
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating battery color")
-        }
+        binding.batteryText.setTextColor(textColor)
+        binding.batteryText.setShadowLayer(
+            AppConstants.SHADOW_RADIUS_BATTERY,
+            AppConstants.SHADOW_DX_SMALL,
+            AppConstants.SHADOW_DY_SMALL,
+            shadowColor,
+        )
 
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
@@ -1083,19 +1024,14 @@ class HomeFragment : Fragment() {
     private fun updateCalendarChipsColors(colors: UiColorsState) {
         if (_binding == null) return
 
-        try {
-            for (i in 0 until binding.calendarChipsContainer.childCount) {
-                try {
-                    val view = binding.calendarChipsContainer.getChildAt(i)
-                    if (view is Chip) {
-                        configureChipColorOnly(view, colors)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating chip $i")
-                }
+        // Both inner and outer try/catch blocks removed per Rule 11 —
+        // childCount + getChildAt + safe-cast + property writes are
+        // pure code paths.
+        for (i in 0 until binding.calendarChipsContainer.childCount) {
+            val view = binding.calendarChipsContainer.getChildAt(i)
+            if (view is Chip) {
+                configureChipColorOnly(view, colors)
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating chips colors")
         }
     }
 
@@ -1108,29 +1044,23 @@ class HomeFragment : Fragment() {
     private fun updateFavoriteButtonColors(textColor: Int, shadowColor: Int) {
         if (_binding == null) return
 
-        try {
-            for (i in 0 until binding.appList.childCount) {
-                try {
-                    // Wir müssen erst den Wrapper (LinearLayout) holen
-                    val wrapper = binding.appList.getChildAt(i) as? LinearLayout
-                    // Dann den Button aus dem Wrapper (Index 0)
-                    val button = wrapper?.getChildAt(0) as? Button
+        // Both inner and outer try/catch blocks removed per Rule 11 —
+        // childCount + getChildAt + safe-casts + property writes are
+        // pure code paths.
+        for (i in 0 until binding.appList.childCount) {
+            // Wrapper (LinearLayout) holen, dann Button (Index 0).
+            val wrapper = binding.appList.getChildAt(i) as? LinearLayout
+            val button = wrapper?.getChildAt(0) as? Button
 
-                    if (button != null) {
-                        button.setTextColor(createSubtlePressColor(textColor))
-                        button.setShadowLayer(
-                            AppConstants.SHADOW_RADIUS_APPS,
-                            AppConstants.SHADOW_DX,
-                            AppConstants.SHADOW_DY,
-                            shadowColor
-                        )
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error updating button $i")
-                }
+            if (button != null) {
+                button.setTextColor(createSubtlePressColor(textColor))
+                button.setShadowLayer(
+                    AppConstants.SHADOW_RADIUS_APPS,
+                    AppConstants.SHADOW_DX,
+                    AppConstants.SHADOW_DY,
+                    shadowColor,
+                )
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating button colors")
         }
     }
 
@@ -1144,77 +1074,68 @@ class HomeFragment : Fragment() {
         textColor: Int,
         shadowColor: Int
     ): View? {
+        // The two outer try/catches are per-item recovery boundaries
+        // (the audit's preserved pattern for per-item subscription
+        // resilience): if a single button or its wrapper fails to
+        // construct, the rest of the favorites list still renders.
+        //
+        // The inner try/catches that used to wrap pure View property
+        // writes / single-method click handlers / wrapper config were
+        // removed per Rule 11 — those bodies are programmer-error-only
+        // paths and are covered by the outer per-item catch.
+
         // 1. Button-Instanz erstellen
         val button: Button = try {
             Button(context).apply {
                 // --- UI Konfiguration ---
-                try {
-                    text = app.displayName
-                    background = null
+                text = app.displayName
+                background = null
 
-                    // WICHTIG: Mindestgrössen entfernen, damit Padding < 48dp funktioniert
-                    minHeight = 0
-                    minimumHeight = 0
-                    minWidth = 0
-                    minimumWidth = 0
+                // WICHTIG: Mindestgrössen entfernen, damit Padding < 48dp funktioniert
+                minHeight = 0
+                minimumHeight = 0
+                minWidth = 0
+                minimumWidth = 0
 
-                    // WICHTIG: Font Padding entfernen für exakte Abstände
-                    includeFontPadding = false
+                // WICHTIG: Font Padding entfernen für exakte Abstände
+                includeFontPadding = false
 
-                    setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
 
-                    val horizPaddingPx = try {
-                        resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error getting padding dimension")
-                        AppConstants.FALLBACK_DIMEN_PX // Fallback
-                    }
-                    setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
-
-                    typeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-
-                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
-
-                    setTextColor(createSubtlePressColor(textColor))
-
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-
-                    setShadowLayer(
-                        AppConstants.SHADOW_RADIUS_APPS,
-                        AppConstants.SHADOW_DX,
-                        AppConstants.SHADOW_DY,
-                        shadowColor
-                    )
-
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
+                val horizPaddingPx = try {
+                    resources.getDimensionPixelSize(R.dimen.touch_target_padding)
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(
-                        e,
-                        "Error configuring button UI for ${app.packageName}"
-                    )
+                    TimberWrapper.silentError(e, "Error getting padding dimension")
+                    AppConstants.FALLBACK_DIMEN_PX
                 }
+                setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
+
+                typeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+
+                setTextColor(createSubtlePressColor(textColor))
+
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+
+                setShadowLayer(
+                    AppConstants.SHADOW_RADIUS_APPS,
+                    AppConstants.SHADOW_DX,
+                    AppConstants.SHADOW_DY,
+                    shadowColor,
+                )
+
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                )
 
                 // --- Click Handler ---
-                setOnClickListener {
-                    try {
-                        viewModel.onAppClicked(app)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in click")
-                    }
-                }
-
+                setOnClickListener { viewModel.onAppClicked(app) }
                 setOnLongClickListener {
-                    try {
-                        showAppContextMenu(app)
-                        true
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in long click")
-                        false
-                    }
+                    showAppContextMenu(app)
+                    true
                 }
             }
         } catch (e: Throwable) {
@@ -1222,35 +1143,20 @@ class HomeFragment : Fragment() {
             return null
         }
 
-        // 2. Wrapper AUCH absichern!
+        // 2. Wrapper AUCH absichern (per-item recovery)
         return try {
             LinearLayout(context).apply {
-                try {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        setMargins(0, 0, 0, 0)
-                    }
-
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.START
-
-                    /*
-                                        // === DEBUG VISUALISIERUNG START ===
-                                        // Erstellt einen roten Rahmen um den gesamten Wrapper (inkl. Margin!)
-                                        val debugBorder = android.graphics.drawable.GradientDrawable().apply {
-                                            setColor(android.graphics.Color.TRANSPARENT) // Innen durchsichtig
-                                            setStroke(2, android.graphics.Color.RED) // 2px roter Rand
-                                        }
-                                        background = debugBorder
-                                        // === DEBUG VISUALISIERUNG ENDE ===
-                    */
-
-                    addView(button)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error configuring wrapper for ${app.packageName}")
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    setMargins(0, 0, 0, 0)
                 }
+
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.START
+
+                addView(button)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating wrapper for ${app.packageName}")
@@ -1287,93 +1193,86 @@ class HomeFragment : Fragment() {
     private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
         if (_binding == null) return
 
-        try {
-            binding.calendarEventsScroll.visibility = View.GONE
-            binding.calendarChipsContainer.removeAllViews()
+        // Outer try/catch removed per Rule 11 — body is View property
+        // writes + a per-item creation loop with its own catch. Inner
+        // getDimensionPixelSize and per-item chip-creation catches stay
+        // (legit Resources fallback + per-item recovery).
+        binding.calendarEventsScroll.visibility = View.GONE
+        binding.calendarChipsContainer.removeAllViews()
 
-            if (events.isEmpty()) {
-                updateDynamicSpacing()
-                return
-            }
-
-            val ctx = context ?: return
-            val colors = viewModel.uiColorsState.value
-
-            val layoutPadding = try {
-                resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-            } catch (e: Throwable) {
-                0
-            }
-
-            val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
-            val chipMaxWidth = (availableWidth * AppConstants.CHIP_MAX_WIDTH_FACTOR).toInt()
-
-            for (event in events) {
-                try {
-                    val chip = when (event.type) {
-                        TimeBasedEventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
-                        TimeBasedEventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
-                    }
-
-                    if (chip != null) {
-                        binding.calendarChipsContainer.addView(chip)
-                    }
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating chip")
-                }
-            }
-
-            binding.calendarEventsScroll.visibility = View.VISIBLE
+        if (events.isEmpty()) {
             updateDynamicSpacing()
-
-            // Warte bis Layout wirklich fertig ist!
-            checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
-
-            safePost { scheduleScrollVerification() }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating chips")
+            return
         }
+
+        val ctx = context ?: return
+        val colors = viewModel.uiColorsState.value
+
+        val layoutPadding = try {
+            resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
+        } catch (e: Throwable) {
+            0
+        }
+
+        val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
+        val chipMaxWidth = (availableWidth * AppConstants.CHIP_MAX_WIDTH_FACTOR).toInt()
+
+        for (event in events) {
+            try {
+                val chip = when (event.type) {
+                    TimeBasedEventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
+                    TimeBasedEventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
+                }
+
+                if (chip != null) {
+                    binding.calendarChipsContainer.addView(chip)
+                }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error creating chip")
+            }
+        }
+
+        binding.calendarEventsScroll.visibility = View.VISIBLE
+        updateDynamicSpacing()
+
+        // Warte bis Layout wirklich fertig ist!
+        checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
+
+        safePost { scheduleScrollVerification() }
     }
 
+    // Both methods below: try/catch removed per Rule 11 — body is
+    // pure View property writes + a pure calculator call. Chip is
+    // never null at the call sites (filtered by `is Chip` checks).
+
     private fun configureChip(chip: Chip, colors: UiColorsState, chipMaxWidth: Int) {
-        try {
-            chip.ellipsize = TextUtils.TruncateAt.END
-            chip.maxWidth = chipMaxWidth
-            chip.isSingleLine = true
+        chip.ellipsize = TextUtils.TruncateAt.END
+        chip.maxWidth = chipMaxWidth
+        chip.isSingleLine = true
 
-            val finalChipBgColor = chipBackgroundCalculator.calculate(
-                chipBackgroundColor = colors.chipBackgroundColor,
-                textColorInt = colors.textColor
-            )
-            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+        val finalChipBgColor = chipBackgroundCalculator.calculate(
+            chipBackgroundColor = colors.chipBackgroundColor,
+            textColorInt = colors.textColor,
+        )
+        chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
 
-            chip.setTextColor(colors.textColor)
-            chip.isCloseIconVisible = false
-            chip.isCheckable = false
-            chip.chipStrokeWidth = AppConstants.CHIP_STROKE_WIDTH
-            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, AppConstants.CHIP_TEXT_SIZE_SP)
-            chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error configuring chip")
-        }
+        chip.setTextColor(colors.textColor)
+        chip.isCloseIconVisible = false
+        chip.isCheckable = false
+        chip.chipStrokeWidth = AppConstants.CHIP_STROKE_WIDTH
+        chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
+        chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, AppConstants.CHIP_TEXT_SIZE_SP)
+        chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
     }
 
     private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
-        try {
-            val finalChipBgColor = chipBackgroundCalculator.calculate(
-                chipBackgroundColor = colors.chipBackgroundColor,
-                textColorInt = colors.textColor
-            )
-            chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-            chip.setTextColor(colors.textColor)
-            chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating chip color")
-        }
+        val finalChipBgColor = chipBackgroundCalculator.calculate(
+            chipBackgroundColor = colors.chipBackgroundColor,
+            textColorInt = colors.textColor,
+        )
+        chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
+        chip.setTextColor(colors.textColor)
+        chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
     }
 
     private fun createAlarmChip(
