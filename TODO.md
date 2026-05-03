@@ -15,12 +15,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 |---|---|---|---|
 | 1 | `Timber.e` vs. `silentError` Severity-Audit | erledigt, Memo bleibt | — |
 | 2 | Throwable-Catch-Audit | 229 von 735 Catches weg (über 25 Sweeps in 2 Wellen + Folge-Sweeps), Sweep an seinem natürlichen Ende | klein-mittel pro Sweep |
-| 3 | `BackupRepositoryImpl` zerlegen | verworfen, aber siehe §9.1 (Reopen-Vorschlag) | groß |
+| 3 | `BackupRepositoryImpl` zerlegen | umgesetzt 2026-05-03 via §9.1 mit anderem Argument als ursprünglich angesetzt — Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
 | 7 | Selbst-Linter für die 13 Rules | offen | mittel (1-2 Tage) |
 | 8 | Time-basierte Test-Konvention | offen | klein-mittel (~5 h) |
-| 9 | Architektur-Schritte für 9+ Score | offen | groß (mehrere Tage) |
+| 9 | Architektur-Schritte für 9+ Score | 9.1 erledigt 2026-05-03; 9.2/9.3/9.4 offen | groß (mehrere Tage) |
 | 10 | Lib-Pinning regelmäßig revisit | offen, prozessual | klein, periodisch |
 
 **Empfohlene Reihenfolge bei freier Wahl:** §7 (Linter) zuerst — verhindert
@@ -278,52 +278,54 @@ Pattern für UI-Tests siehe TESTING_CONVENTIONS.kt.
 
 ---
 
-## 3. (Memo, verworfen) `BackupRepositoryImpl` zerlegen
+## 3. (Memo, umgesetzt 2026-05-03) `BackupRepositoryImpl` zerlegen
 
-Ursprüngliche Annahme: 1.356-Zeilen-Klasse mit 9 Repo-Dependencies +
-9 separaten Test-Files = klassischer God-Class-Smell, Split in
-`BackupExporter` / `BackupImporter` / `BackupZipFormat` empfohlen.
-
-**Bei näherer Betrachtung verworfen.** Der Split würde den
-Konstruktor-Smell **nicht beheben, sondern duplizieren**:
+**Erste Runde — verworfen.** Ursprünglicher Vorschlag war ein
+`BackupExporter` / `BackupImporter` / `BackupZipFormat`-Split. Der
+würde den Konstruktor-Smell **nicht beheben, sondern duplizieren**:
 
 - `BackupExporter` bräuchte alle 8 Repositories zum *Lesen*.
 - `BackupImporter` bräuchte alle 8 Repositories zum *Schreiben*.
-- `BackupZipFormat` bräuchte 0 Repositories (reine File-IO).
+- `BackupZipFormat` bräuchte 0 Repositories.
 
 Statt einer Klasse mit 9 Deps hätten wir zwei Klassen mit je 8 Deps
-plus eine ohne. Per-Klasse-Konstruktor kürzer, Gesamt-Injection-
-Komplexität verdoppelt — pure Kosmetik mit negativer Engineering-
-Bilanz. Backup/Restore ist inhärent das Dual jedes persistierten
-Repositories: jede Klasse die das tut, *muss* alle Repos injecten.
+plus eine ohne — pure Kosmetik mit negativer Engineering-Bilanz.
 
-Auch das „9 Test-Files = God-Class"-Argument kippt: die Tests sind
-9 *orthogonale Concerns* (Security/Doomsday/Wallpaper/...) die
-zufällig dieselbe Production-Klasse exercieren. Splitting der
-Production-Klasse, um Test-File-Namen zu spiegeln, wäre Cargo-Cult.
-Die Tests beweisen schon, dass die Concerns unabhängig *testbar*
-sind — ohne dass die Production-Klasse split sein müsste.
+**Zweite Runde — umgesetzt mit anderem Argument.** Aufgesplittet
+entlang einer *anderen* Achse: nicht
+„export-vs-import-vs-format", sondern
+„pure-data-vs-repo-composition-vs-android-runtime":
 
-**Einzige potenziell sinnvolle Sub-Extraktion:** `BackupZipFormat`
-(ZIP-Layout, Magic-Bytes, Versionierung) — 0 Repo-Deps, klare
-Single-Responsibility. Aber lohnt sich erst wenn der Format-Code
-substantiell wächst (neue Versionen, Migrations-Pfade zwischen
-Format-Versionen). Aktueller Stand: zu klein, lebt neben seinem
-einzigen Aufrufer.
+- [`BackupSerializer`](app/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupSerializer.kt) — pure JSON, 0 Deps
+- [`BackupDataAssembler`](app/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupDataAssembler.kt) — 8 Repos (read+write in EINER Klasse, keine Duplikation)
+- [`BackupRepositoryImpl`](app/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt) — Context + WallpaperFileManager + ZIP-File-I/O
+- [`WallpaperRestorer`](app/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRestorer.kt) (Interface) — Bridge für Wallpaper-File-Restoration während Phase 7 Import
 
-**Trigger die das Verdikt umstoßen würden:**
+Jede Schicht hat genau eine Art von Dependency. Kein Layer braucht
+die Deps eines anderen. Die 8 Repos leben einmal (Assembler), Context
++ WallpaperFileManager leben einmal (RepositoryImpl). Das
+Duplikations-Argument der ersten Runde greift nicht.
 
-- Format-Code wächst auf >250 Zeilen oder bekommt eine eigene
-  Versionierungs-State-Machine → `BackupZipFormat` extrahieren.
-- Export- und Import-Pfade brauchen genuinely verschiedene Sets
-  von Repositories (heute: beide alle 8).
-- Multiple Entwickler treffen regelmäßig auf Merge-Konflikte in
-  der Datei (Solo-Projekt — irrelevant).
+Tests: die 9 BackupRepositoryImpl-Spec-Files
+(Doomsday/Io/Isolation/Logic/Malformed/NamingConvention/Security/
+Strict/Wallpaper) blieben unverändert — eine Zeile pro File:
+`BackupRepositoryImpl(...)` → `BackupRepositoryImplTestFactory.create(...)`.
+Die Factory baut die neue Layer-Struktur intern.
+
+**Folge-Arbeit (nicht blockierend):** Migration der Spec-Tests auf
+die neuen Klassen direkt — ein neuer `BackupSerializerTest` für die
+Strict/Malformed/Doomsday-Parser-Edge-Cases (pure-JVM, kein
+Robolectric mehr nötig), ein `BackupDataAssemblerTest` für
+Round-Trip-Tests gegen Fakes. Die existierende Coverage über die
+Test-Factory hält die Tests grün; die direkte Migration ist
+Optimierung, nicht Bugfix.
 
 Begründung dauerhaft im File-Header von `data/BackupRepositoryImpl.kt`
-(„Size & Refactoring Notes") verewigt, damit ein neuer Reviewer nicht
-beim ersten Blick reflexartig den Split nochmal vorschlägt. Das
-Pattern ist analog zum HomeFragment-Header.
+verewigt — der Header erklärt jetzt die neue Drei-Schicht-Struktur
+und warum die alte Ablehnungs-Argumentation nicht mehr greift. Memo
+bleibt damit ein Reviewer beide Runden sieht: warum der naive Split
+(Exporter/Importer) richtig abgelehnt wurde, und warum der andere
+Split (Serializer/Assembler/IO) doch funktioniert.
 
 ---
 
@@ -512,37 +514,9 @@ Class-Field-Counter wiederherstellt — also pinnt er das Verhalten korrekt.
 
 **Motivation:** Final-Review 2026-05-03 hat das Repo bei 7.5/10 eingeordnet.
 Stärken sind Architektur-Disziplin, Doku-Tiefe, Test-Disziplin. Was den
-Score deckelt, sind vier konkrete Architektur-Brocken. Sequenziell, nicht
-parallel anfangen.
-
-### 9.1. `BackupRepositoryImpl` entkoppeln (TODO §3 reopen)
-
-§3 hat den Split als „würde 9 Repo-Deps duplizieren" verworfen. Die
-Begründung hält bei genauerem Hinsehen nicht: das Argument behandelt
-die Frage „wie viele Constructor-Args braucht's?", aber das ist nicht
-das Problem. Das Problem ist, dass eine 1444-Zeilen-Klasse drei
-Verantwortlichkeiten mischt:
-
-1. **Daten sammeln** (lese alle 9 Repos, baue `BackupData`)
-2. **Daten serialisieren / deserialisieren** (JSON, ZIP, Validation)
-3. **Datei-I/O** (URI, ContentResolver, Streams)
-
-Sauberer Split:
-
-- `BackupDataAssembler` (Composition-Schicht) — bekommt die 9 Repos,
-  baut `BackupData`, ist gegen Fakes vollständig testbar ohne URI.
-- `BackupSerializer` — Pure-Logic, JSON↔BackupData, keine Repos, keine
-  I/O. Trivially testbar.
-- `BackupRepositoryImpl` (verbleibend) — Datei-I/O, Uri-Validation,
-  Permission-Handling, Größen-Caps. Der Robolectric-Smoke-Test reicht.
-
-**Wert:** drei Klassen mit je einer Verantwortung, 1444 → ~3× 400-500
-Zeilen. Tests werden pointierter: der Assembler testet „werden alle
-Felder befüllt?" gegen Fakes, der Serializer testet „round-trip + alle
-Edge-Cases" als Pure-Logic, der Repo-Rest testet nur die wenigen
-URI/Stream-Sites mit Robolectric.
-
-**Aufwand:** 2-3 Tage (inkl. Test-Migration der 5 Spec-Files).
+Score deckelt, sind drei verbleibende Architektur-Brocken (§9.1
+`BackupRepositoryImpl`-Split ist umgesetzt — siehe §3-Memo). Sequenziell,
+nicht parallel anfangen.
 
 ### 9.2. Modul-Split
 
