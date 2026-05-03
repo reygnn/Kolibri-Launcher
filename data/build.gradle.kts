@@ -42,6 +42,11 @@ android {
         buildConfig = true
     }
 
+    @Suppress("UnstableApiUsage")
+    testFixtures {
+        enable = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -81,6 +86,13 @@ dependencies {
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
+
+    // testFixtures: shared test doubles consumed by :app's and (future)
+    // :data's test source sets. Currently exposes FakeDataStore. The
+    // androidx.datastore + coroutines deps mirror the production usage
+    // because FakeDataStore implements DataStore<Preferences> directly.
+    testFixturesImplementation(libs.androidx.datastore.preferences)
+    testFixturesImplementation(libs.kotlinx.coroutines.core)
 }
 
 kapt {

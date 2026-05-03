@@ -1,8 +1,13 @@
 # `:data` testFixtures with Kotlin — investigation log
 
-**Status:** open / blocking. Last attempted **2026-05-03**.
+**Status:** **RESOLVED 2026-05-03.** A one-line `gradle.properties` flag
+unblocks the AGP/KGP integration gap. Documented in detail below so
+that a future maintainer who hits a regression on the same fingerprint
+recognizes it immediately. The original investigation history is kept
+verbatim under "History" because the symptom and the failed-workaround
+list remain useful diagnostic context.
 
-**Tool versions at time of investigation:**
+**Tool versions at time of resolution:**
 
 | Tool | Version |
 |---|---|
@@ -12,8 +17,118 @@
 | `kotlin-android` plugin | applied via `alias(libs.plugins.kotlin.android)` |
 
 If you are reading this in a future session and any of these have changed
-significantly, **re-run the reproduction below first** before assuming
-the conclusions still hold.
+significantly, the flag below may have become unnecessary (and may even
+have been renamed or removed if the feature graduated out of experimental
+status). **Re-check by trying the flag-free path first.**
+
+---
+
+## TL;DR — the fix
+
+Add this single line to `gradle.properties`:
+
+```properties
+android.experimental.enableTestFixturesKotlinSupport=true
+```
+
+That is the entire unblock. With the flag set:
+
+1. KGP registers `compileDebugTestFixturesKotlin` (and the release
+   sibling) for `com.android.library` modules that have
+   `android.testFixtures.enable = true`.
+2. `.kt` files in `src/testFixtures/` actually get compiled to bytecode.
+3. The variant artifact (`bundleDebugTestFixturesAar`) contains the
+   `.class` files.
+4. Consumers (`testImplementation(testFixtures(project(":data")))`)
+   resolve the symbols cleanly — no more "private in file".
+
+The flag has existed since AGP 8.5, so AGP 8.13 has had it for ~5
+releases. The reason it took an investigation to find: **the flag is
+not in the official Android Gradle DSL documentation** (because the
+feature is still gated behind `experimental.`). The undocumented status
+is the entire reason this was hard to discover offline.
+
+Verify with:
+
+```
+$ ./gradlew :data:tasks --all | grep -iE 'compile.*TestFixtures.*Kotlin'
+compileDebugTestFixturesKotlin
+compileReleaseTestFixturesKotlin
+```
+
+If those two lines appear, the integration is wired and Kotlin
+fixtures work as they would in any pure-`java-test-fixtures` setup.
+
+---
+
+## Caveats worth knowing about
+
+1. **`kotlin-stdlib` may need an explicit `testFixturesImplementation`
+   dep on older AGPs.** The Kotlin Gradle Plugin auto-adds stdlib for
+   normal source sets, but for the testFixtures source set this
+   auto-add was historically missing. Auto-add was scheduled for
+   AGP 8.9. On AGP 8.13.2 (which this project runs) it appears to be
+   automatic — we did **not** need an explicit
+   `testFixturesImplementation(libs.kotlin.stdlib)`. If a future bump
+   produces a `kotlin.Unit not found` style error, that's where to
+   look first.
+
+2. **The flag is experimental.** Future AGPs may rename it or drop it
+   once the feature graduates. If the flag stops being recognized after
+   a bump, search the AGP/KGP changelogs for the feature's promotion
+   path. Until that happens, this file is the reason the line stays
+   in `gradle.properties`.
+
+3. **`gradle.properties` placement matters.** Project root
+   (`/gradle.properties`), not module-level. The flag is read by AGP
+   at configuration time across the whole build.
+
+---
+
+## What this enabled
+
+Before the flag, the §13 plan was blocked: `FakeDataStore` had to live
+in `:app/src/test/java/.../fakes/` because `:data/src/testFixtures/`
+silently dropped Kotlin sources. After the flag landed:
+
+1. `:data/build.gradle.kts` got `android.testFixtures.enable = true`
+   plus `testFixturesImplementation` deps for
+   `androidx.datastore.preferences` and `kotlinx.coroutines.core`.
+2. `FakeDataStore.kt` moved from `:app/src/test/java/.../fakes/` to
+   `:data/src/testFixtures/java/.../fakes/`.
+3. `:app/build.gradle.kts` got
+   `testImplementation(testFixtures(project(":data")))`.
+4. All consumer imports stayed identical (same package
+   `com.github.reygnn.kolibri_launcher.fakes`).
+
+Full test suite green after the migration — no consumer test code had
+to change.
+
+The further §13 step (move `*RepositoryImpl*Test.kt` files from
+`:app/src/test/data/` to `:data/src/test/data/`) is now unblocked but
+not part of this fix. See `TODO.md` §13 for the remaining incremental
+move and the per-file Robolectric / Hilt-Test caveats.
+
+---
+
+## References
+
+- **JetBrains tracking ticket:** **KT-50667** — *Support compiling
+  android testFixtures sources in the kotlin-android gradle plugin*.
+- **Write-up of the undocumented-flag situation:**
+  `brightinventions.pl/blog/current-test-fixtures-support-android`.
+- AGP testFixtures DSL: the `android.testFixtures` block (the
+  enable-flag for the variant itself; the Kotlin support flag is the
+  separate undocumented one that this file is about).
+
+---
+
+# History
+
+The original investigation log follows verbatim from before the
+resolution — kept because the symptom fingerprint, the failed
+workarounds, and the hypothesis the investigation arrived at are still
+useful debugging context for future regressions.
 
 ---
 
@@ -39,8 +154,6 @@ For `:data` we wanted the same:
 
 That move is **blocked** by what looks like a
 `kotlin-android`/AGP integration gap.
-
----
 
 ## Symptom
 
@@ -70,11 +183,9 @@ get if the `.kt` file were missing entirely.) That mismatch is the
 fingerprint of *the source set is registered, but no Kotlin
 compilation task ran for it*.
 
----
-
 ## Reproducing it
 
-To reproduce in the current repo state:
+To reproduce in the (pre-fix) repo state:
 
 1. Apply the AGP-native testFixtures block in `data/build.gradle.kts`:
 
@@ -129,8 +240,6 @@ That last observation is the actual root cause of the
 `FakeDataStore` in the published testFixtures variant artefact, so
 `:app`'s test compile-classpath gets a class that exists in source but
 not in any `.class` form.
-
----
 
 ## What I tried (chronological, all rolled back)
 
@@ -200,9 +309,7 @@ to Java but no KGP task ran on it.
 This confirms the missing piece is the Kotlin compile task
 registration, not the source set definition itself.
 
----
-
-## Hypothesised root cause
+## Hypothesised root cause (now confirmed)
 
 The `kotlin-android` plugin integrates with AGP via the variants API
 (`androidComponents { onVariants { … } }`). It registers Kotlin
@@ -211,23 +318,19 @@ compile tasks for the variants it knows about: `debug`, `release`,
 **`testFixtures` variant** (`debugTestFixtures`,
 `releaseTestFixtures`) is a separate variant added by AGP 8+, and the
 Kotlin compile task for it does not get registered automatically by
-the version of `kotlin-android` shipped with KGP 2.2.21.
+the version of `kotlin-android` shipped with KGP 2.2.21
+**unless `android.experimental.enableTestFixturesKotlinSupport=true`
+is set in `gradle.properties`**.
 
-This is consistent with the empirical evidence (Java task exists,
-Kotlin task doesn't), the error message ("seen in source, no
-bytecode"), and the fact that a perfectly analogous setup works for
-`:domain` (which uses `kotlin("jvm")` — a different plugin path that
-handles `java-test-fixtures` natively).
+The hypothesis was right; what the offline investigation could not
+turn up was the existence of the gating flag. With the flag set, KGP
+registers `compileDebugTestFixturesKotlin` and the chain works.
 
-**It is not 100 % verified.** I did not have web access during the
-investigation to cross-check against the AGP/KGP issue tracker or the
-Kotlin community-supported integration matrix. The above is the
-strongest hypothesis given the symptom plus what each attempt did and
-didn't move.
+## Workarounds I considered and rejected (still relevant)
 
----
-
-## Workarounds I considered and rejected
+The list below is preserved as a reminder of what NOT to do if the
+flag-based fix ever stops working — the alternatives are still worse
+than just keeping the flag pinned to whatever it gets renamed to.
 
 | Workaround | Why rejected |
 |---|---|
@@ -237,53 +340,6 @@ didn't move.
 | Move `FakeDataStore` to `:data/src/main/` with `@VisibleForTesting` | Test-only code in production APK. Direct violation of the project's layering — the Brocken-C cleanup explicitly removed inverse leaks like this. Hard no. |
 | Move `FakeDataStore` to `:domain/src/testFixtures/` | `:domain` is `kotlin("jvm")` — it cannot consume the `androidx.datastore.preferences` AAR (the same blocker that pushed Brocken-C work to introduce `KolibriLog`). Hard no for the same reason. |
 
----
-
-## What stayed in `:app/src/test/`
-
-As a result, the following remained where they were:
-
-- `app/src/test/java/com/.../fakes/FakeDataStore.kt`
-- `app/src/test/java/com/.../data/*RepositoryImpl*Test.kt` — currently
-  ~12 files, including the 9-strong `BackupRepositoryImpl*Test` family
-  (Doomsday/Io/Isolation/Logic/Malformed/NamingConvention/Security/
-  Strict/Wallpaper). All of these reach the production
-  `XyzRepositoryImpl` from `:data` plus `FakeDataStore` and use
-  Robolectric.
-
-This is not architecturally wrong — these tests are Robolectric tests
-either way, so they wouldn't have been faster in `:data:test` than
-they are in `:app:test`. The Test-Time-Win that Brocken B promised
-was always concentrated in the **310 pure-JVM tests in `:domain:test`**,
-which did move successfully.
-
----
-
-## How to revisit this
-
-When AGP and / or KGP get bumped in the future, the smallest possible
-re-check is:
-
-1. Pull a working tree with this `:data/build.gradle.kts` already
-   producing tests-green on main.
-2. Apply the four-line change from "Reproducing it" §1+3 above.
-3. `./gradlew :data:tasks --all | grep -iE 'TestFixtures.*Kotlin'`
-4. If a `compileDebugTestFixturesKotlin` task now appears: the
-   integration gap has been fixed. Move `FakeDataStore` and continue
-   with the §13-Memo's "Was zukünftig passieren muss" steps in
-   `TODO.md`.
-5. If it still doesn't appear: this investigation log is still
-   current. Diff the AGP/KGP changelogs since the dates above to see
-   whether anything in their integration was touched, then check the
-   Android Studio + Kotlin issue trackers for `testFixtures + kotlin
-   + android-library`.
-
-If you find the actual upstream issue and ticket number, add the link
-under "References" below so the next visitor doesn't have to redo the
-search.
-
----
-
 ## Why this file lives in `:data`
 
 This is local to `:data`'s build configuration. It would be confusing
@@ -291,22 +347,10 @@ to put under `docs/` (we don't have a `docs/` tree, and it isn't
 project-wide architecture). It would also be misleading in
 `KNOWN_ISSUES.md`, which is reserved for runtime / Android-framework
 issues that cannot be fixed in app code (StrictMode, OneUI). This is
-neither: it is a build-tooling integration gap with a clear escape
-path the moment the upstream tooling supports it.
+neither: it is a build-tooling integration gap with a documented
+unblock that future maintainers should be able to recognize and
+re-apply if it ever regresses.
 
 `TODO.md` §13 contains the high-level status; this file is the deep
 dive a future maintainer needs to avoid redoing the investigation
 from scratch.
-
----
-
-## References
-
-- AGP testFixtures (general): the `android.testFixtures` block in the
-  AGP DSL reference.
-- KGP variant integration: the `kotlin-android` plugin's documented
-  integration with AGP variants — search "kotlin-android testFixtures"
-  in the Kotlin documentation and Android issue tracker.
-
-(No exact issue link available; the investigation was offline. Add
-one when you find it.)

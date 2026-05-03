@@ -10,6 +10,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 
+/**
+ * In-memory `DataStore<Preferences>` test double.
+ *
+ * Lives in `:data`'s testFixtures so it can be shared across
+ * `:app`'s and (future) `:data`'s test source sets without copying.
+ * Requires the `android.experimental.enableTestFixturesKotlinSupport=true`
+ * flag in `gradle.properties` — see `data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`.
+ */
 class FakeDataStore : DataStore<Preferences> {
 
     private val flow = MutableStateFlow(emptyPreferences())

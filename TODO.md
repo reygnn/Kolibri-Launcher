@@ -100,8 +100,15 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
   in `:domain` als Shared-Helper-Mechanismus etabliert (TimberRule,
   MainDispatcherRule, 14 Fake*Repositories, 14 abstract Contract-
   Klassen). Test-Time-Win, der ursprünglich §9.2 versprochen hatte,
-  ist jetzt real. `:data:test` bleibt durch AGP-Kotlin-Bug pending
-  (siehe §13-Memo).
+  ist jetzt real.
+- **§13 / `:data` testFixtures unblockiert 2026-05-03:** der vermutete
+  AGP/KGP-Bug ist tatsächlich ein undokumentierter Feature-Flag
+  (`android.experimental.enableTestFixturesKotlinSupport=true` in
+  `gradle.properties`, seit AGP 8.5). FakeDataStore lebt jetzt in
+  `:data/src/testFixtures/`, `:app`-Tests konsumieren es via
+  `testImplementation(testFixtures(project(":data")))`. JetBrains-Ticket
+  KT-50667. Resolution dokumentiert in
+  `data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`.
 - **Wert geliefert beim Refactor** (siehe §11-Memo): drei neue
   Domain-Modelle (`LauncherShortcut`, `DomainWallpaperColors`,
   `WallpaperBlendMode`), pure-Kotlin Color-Math (`core/ColorMath`),
@@ -126,10 +133,12 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
    Ersatz.
 
 3. **`:data:test` ist leer.** Repository-Impl-Tests stecken weiterhin
-   in `:app/src/test/` weil AGP's testFixtures-Kotlin-Compilation
-   für Android-Library-Module nicht funktioniert (siehe §13). Sobald
-   das aufgelöst ist, wandern ~12 Repository-Impl-Tests nach
-   `:data/src/test/`. Mittelschwer.
+   in `:app/src/test/`. Der AGP/KGP-Blocker ist seit 2026-05-03 weg
+   (siehe §13 und `data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`);
+   FakeDataStore ist schon umgezogen. Verbleibend: ~25 Impl-Test-Files
+   incrementell nach `:data/src/test/` schieben (~16 pure-JVM, ~9
+   Robolectric — Letztere brauchen `:data/src/test/resources/robolectric.properties`
+   plus Robolectric-Dep). Mittelschwer.
 
 ### Folge-Schritt zu §11 (erledigt durch §12)
 
@@ -1138,71 +1147,81 @@ zur Domain-Test-Infrastruktur).
   Vergleich: dieselben Tests im alten `:app/src/test/` brauchten
   ~90s wegen Robolectric-Bootstraps.
 
-**`:data:test` BLOCKIERT durch AGP-Bug:**
+**`:data` testFixtures-Plumbing entsperrt 2026-05-03:**
 
-Der Plan war, FakeDataStore + Repository-Impl-Tests nach `:data` zu
-verschieben. Vollständige Investigation in
-[`data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`](data/TESTFIXTURES_KOTLIN_INVESTIGATION.md)
-(Reproduktion, geprüfte Workarounds, Re-Check-Anleitung beim nächsten
-AGP/KGP-Bump). AGP unterstützt seit 8.0 testFixtures für Android-
-Library-Module via `android { testFixtures { enable = true } }`,
-ABER: für **Kotlin-Sourcen** in `src/testFixtures/` registriert AGP
-keine Compile-Task. `./gradlew :data:tasks --all | grep TestFixturesKotlin`
-liefert leer. Versuch mit `sourceSets.testFixtures.java.srcDir(
-"src/testFixtures/kotlin")` ändert nichts. Symptom in Konsumenten:
-"Cannot access 'class FakeDataStore': it is private in file" —
-Kotlin sieht die Klasse aber kann sie nicht resolven.
+Der `:data:test`-AGP-Bug aus dem ursprünglichen Memo ist **gelöst**:
+ein einzelner undokumentierter Flag in `gradle.properties`,
+`android.experimental.enableTestFixturesKotlinSupport=true`, registriert
+die fehlende `compileDebugTestFixturesKotlin`-Task für
+`com.android.library`-Module. Flag existiert seit AGP 8.5; im
+offiziellen Android-Doc nicht aufgeführt. Vollständige Resolution-Doku
+in [`data/TESTFIXTURES_KOTLIN_INVESTIGATION.md`](data/TESTFIXTURES_KOTLIN_INVESTIGATION.md)
+inklusive der historischen Investigation, die ohne Web-Zugriff nur die
+Hypothese, nicht den Flag finden konnte. JetBrains-Ticket: KT-50667.
 
-Bekanntes Problem im Android-Studio-Issue-Tracker. Workarounds, die
-NICHT funktionieren:
-- AGP-`testFixtures`-Block zusammen mit `java-test-fixtures`-Plugin —
-  Plugin-Konflikt.
-- `kotlin.sourceSets.testFixtures` direkt konfigurieren — die Source-
-  Set-Registry kennt den testFixtures-Variant nicht in kotlin-android.
+**FakeDataStore-Move erledigt 2026-05-03:**
 
-Bleibt offen, bis AGP/KGP einen Fix liefern. Bis dahin:
-- FakeDataStore stays in `:app/src/test/java/.../fakes/`
-- Repository-Impl-Tests stays in `:app/src/test/java/.../data/`
-  (~12 Files: `FavoritesRepositoryImpl*Test`, `WallpaperRepositoryImpl*Test`,
-  `BackupRepositoryImpl*Test` (9 Files!), `CustomNamesRepositoryImpl*Test`,
-  `AppUsageRepositoryImpl*Test` etc.)
+- `data/build.gradle.kts` hat jetzt `android.testFixtures.enable = true`
+  plus `testFixturesImplementation` für `androidx.datastore.preferences`
+  und `kotlinx.coroutines.core`.
+- `FakeDataStore.kt` ist von `app/src/test/java/.../fakes/` nach
+  `data/src/testFixtures/java/.../fakes/` umgezogen (Package
+  `com.github.reygnn.kolibri_launcher.fakes` unverändert — kein
+  Consumer-Test musste angepasst werden).
+- `app/build.gradle.kts` zieht jetzt zusätzlich
+  `testImplementation(testFixtures(project(":data")))`.
+- Full-Test-Suite grün nach dem Umzug.
 
-**Was zukünftig passieren muss, wenn der AGP-Fix kommt:**
+**Noch nicht erledigt (Folge-Schritte, jetzt unblockiert):**
 
-1. `:data/build.gradle.kts`: `android { testFixtures { enable = true } }`
-2. FakeDataStore von `:app/src/test/java/.../fakes/` nach
-   `:data/src/testFixtures/java/.../fakes/` (oder `kotlin/`)
-3. `:app/build.gradle.kts`: zusätzlich `testImplementation(testFixtures(project(":data")))`
-4. `app/src/test/resources/robolectric.properties` nach
-   `data/src/test/resources/` duplizieren (siehe §6-Memo zum
-   ANRWatchdog-Leak — ohne diesen Default lädt Robolectric
-   `KolibriLauncherApp` und der Process leakt einen ANRWatchdog-
-   Thread pro Test-Run).
-5. ~12 Repository-Impl-Tests von `app/src/test/java/.../data/` nach
-   `data/src/test/java/.../data/` schieben.
+Repository-Impl-Tests können jetzt nach `data/src/test/java/.../data/`
+verschoben werden, sind es aber noch nicht. ~25 Files insgesamt:
 
-Erwarteter zusätzlicher Test-Time-Win: ~30s (Robolectric-Bootstraps
-in :data:test isoliert von :app:test).
+- **Pure-JVM (FakeDataStore-only, kein Robolectric):** ~16 Files —
+  `FavoritesRepositoryImpl*Test` (3 inkl. ShareIn + Contract),
+  `SettingsRepositoryImpl*Test` (2), `HiddenAppsRepositoryImpl*Test` (2),
+  `CustomNamesRepositoryImpl*Test` (2),
+  `FavoritesOrderRepositoryImpl*Test` (2),
+  `SwipeActionsRepositoryImplContractTest`,
+  `AppUsageRepositoryImpl*Test` (2),
+  `UsageExportRepositoryImplFormatSpec` /
+  `UsageExportRepositoryImplTimeLordSpec` /
+  `UsageExportRepositoryImplXenomorphSpec` / `UsageExportRepositoryImplTest`.
+  Voraussetzung: `:data/build.gradle.kts` braucht die Test-Deps
+  (`junit`, `mockk`, `kotlinx-coroutines-test`, `turbine`, `truth`,
+  `kotlin-test-junit`, `testImplementation(testFixtures(project(":domain")))`).
+- **Robolectric (Uri/ContentResolver/InputStream):** ~9 Files —
+  `BackupRepositoryImpl*Test` (9: Doomsday/Io/Isolation/Logic/Malformed/
+  NamingConvention/Security/Strict/Wallpaper) + `BackupRepositoryImplTestFactory`,
+  `WallpaperRepositoryImpl*Test` (2 inkl. Contract),
+  `UsageExportRepositoryImplDoomsdaySpec`, `DataMigrationManagerTest`.
+  Voraussetzung: zusätzlich `testImplementation(libs.robolectric)`,
+  `data/src/test/resources/robolectric.properties` als Duplikat von
+  `app/src/test/resources/robolectric.properties` (siehe §6-Memo zum
+  ANRWatchdog-Leak — ohne diesen Default lädt Robolectric
+  `KolibriLauncherApp` und leakt einen ANRWatchdog-Thread pro Test-Run).
+- **Stays in `:app`:** Tests die `HiltTestApplication` /
+  `@TestInstallIn` / Activity-Tests benutzen — `hilt-android`-Plugin
+  ist in `:data` nicht aktiv.
 
-**Risiko-Punkte (relevant beim späteren :data-Move):**
+Erwarteter Test-Time-Win bei vollständigem Move: ~30s
+(Robolectric-Bootstraps in `:data:test` isoliert von `:app:test`,
+plus die ~16 pure-JVM Files laufen ohne Android-Test-Klassenpfad).
 
-- **Robolectric-Konfiguration:** robolectric.properties muss in
-  `data/src/test/resources/` dupliziert werden — keine Magie aus
-  `:app` greift dort.
-- **`@TestInstallIn`/Hilt-Test-Module:** einige `:app`-Tests benutzen
-  `HiltTestApplication` und Test-Module-Replacements. Bleiben
-  naturgemäß in `:app/src/test/`, weil das Hilt-Plugin (`hilt-android`)
-  in `:domain`/`:data` nicht aktiv ist.
-- **`AndroidEntryPoint`/Activity-Tests:** alle in `:app/src/test/`
-  (Activity-Lifecycle ist UI-Layer).
-- **Test-Isolation ist nicht 100% erreichbar.** Tests, die
-  Activity-Lifecycle, ContentResolver, oder System-API-Mocking
-  brauchen, bleiben naturgemäß in :app oder :data. Das ist by design.
+**Risiko-Punkte (relevant beim eigentlichen Datei-Move):**
+
+- **Robolectric.properties-Duplikat:** ohne den Default lädt Robolectric
+  `KolibriLauncherApp` und leakt ANRWatchdog-Threads. Siehe §6.
+- **`@TestInstallIn`/Hilt-Test-Module:** bleiben in `:app`.
+- **Activity/Fragment-Tests:** bleiben in `:app` (UI-Layer).
+- **Test-Isolation ist nicht 100% erreichbar.** Tests, die Hilt-
+  Test-Machinery oder Activity-Lifecycle brauchen, bleiben in `:app`.
+  Das ist by design.
 
 Memo bleibt damit (a) ein neuer Reviewer das testFixtures-Pattern und
-seine Begründung versteht, (b) der `:data:test`-AGP-Blocker bekannt
-ist und nicht versucht wird, ihn ad hoc zu reparieren, und (c) die
-Folge-Schritte beim AGP-Fix als bereits konkret skizziert vorliegen.
+seine Begründung versteht, (b) die Resolution für den (jetzt gelösten)
+AGP-Bug an einer Stelle dokumentiert ist, und (c) die
+Folge-Schritte beim eigentlichen Test-Move skizziert sind.
 
 ---
 

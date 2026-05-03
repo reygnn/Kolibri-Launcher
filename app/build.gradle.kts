@@ -199,13 +199,15 @@ dependencies {
     // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
     // Fake*Repository, Contract abstract classes). See `java-test-fixtures`
     // block in domain/build.gradle.kts. Brocken B.
-    //
-    // FakeDataStore stays in :app/src/test/java/.../fakes/ for now —
-    // moving it to :data/src/testFixtures/ would require the AGP-native
-    // testFixtures Kotlin compilation, which is currently broken for
-    // Android Library modules (no `compileDebugTestFixturesKotlin` task
-    // gets registered). See TODO §13 for status.
     testImplementation(testFixtures(project(":domain")))
+
+    // Shared test fixtures from :data (FakeDataStore). Unblocked
+    // 2026-05-03 by setting `android.experimental.enableTestFixturesKotlinSupport=true`
+    // in gradle.properties (an undocumented AGP flag, available since
+    // 8.5). See `data/TESTFIXTURES_KOTLIN_INVESTIGATION.md` for the
+    // history. The flag enables the otherwise-missing
+    // `compileDebugTestFixturesKotlin` task for android-library modules.
+    testImplementation(testFixtures(project(":data")))
 
     // UI & Material  (MUST be loaded first or use resolutionStrategy below!)
     implementation(libs.material)  // MUSS VOR androidx.appcompat:appcompat !!!
