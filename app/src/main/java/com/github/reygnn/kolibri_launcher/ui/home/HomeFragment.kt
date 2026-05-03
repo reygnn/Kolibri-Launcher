@@ -1107,8 +1107,13 @@ class HomeFragment : Fragment() {
 
                 val horizPaddingPx = try {
                     resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error getting padding dimension")
+                } catch (e: Resources.NotFoundException) {
+                    // Narrowed from Throwable — matches the same tight-around-
+                    // getDimensionPixelSize pattern used in applyTopMargin and
+                    // applyLayoutToExistingViews above. Silent fallback (no
+                    // silentError) because the outer per-item catch around
+                    // Button(...).apply already provides DEBUG-loud recovery
+                    // if construction fails wholesale.
                     AppConstants.FALLBACK_DIMEN_PX
                 }
                 setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)

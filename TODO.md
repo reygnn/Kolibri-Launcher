@@ -210,6 +210,17 @@ für die letzten 0.1, dann 9.0+.
   `applyLayoutToExistingViews` (tight-around-`getDimensionPixelSize` mit
   Fallback) und `renderFavorites`-Per-Item-Recovery-Loop. LOC stieg um
   4 wegen Erklärungs-Kommentaren — Audit-Klarheit ist der Win.
+- **Aktueller Stand 2026-05-03 (Region 4: Color/Button-Render, kleine Runde):**
+  2005 Zeilen, 52 catches (43 `Throwable`). Ein Throwable in
+  `createAppButton` (innerer `getDimensionPixelSize`-Catch) zu
+  `Resources.NotFoundException` narrowed; silentError rausgeworfen damit
+  der Pattern zu 723/819 matcht. Zwei outer-Per-Item-Recovery-Catches in
+  `createAppButton` (Button-Construction + Wrapper) als legit-pattern
+  verifiziert + erhalten — sind explizit als preserved-pattern in der
+  Funktions-KDoc dokumentiert. Sub-sweep-Findung: die Resources-Catches
+  in 723/819 catchen weiter `Exception` (nicht `Resources.NotFoundException`)
+  — kleine Inkonsistenz, bewusst aufgehoben für künftigen Consistency-
+  Sweep statt Region-Scope-Creep.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.
