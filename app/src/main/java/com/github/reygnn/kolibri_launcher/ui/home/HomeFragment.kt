@@ -1361,24 +1361,34 @@ class HomeFragment : Fragment() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupGestures() {
-        try {
-            gestureDetector = GestureDetector(requireContext(), createGestureListener())
+        // Outer try/catch removed per Rule 11. Body is GestureDetector
+        // construction (requireContext() throws only if Fragment detached
+        // — programmer error in onViewCreated) and a setOnTouchListener
+        // registration (pure setter).
+        gestureDetector = GestureDetector(requireContext(), createGestureListener())
 
-            // Root Layout: Only active when NOT in split mode
-            // Dient als Fallback-Ebene für Gesten im Full Mode.
-            binding.rootLayout.setOnTouchListener { _, event ->
-                try {
-                    if (_needsSplit.value) {
-                        return@setOnTouchListener false
-                    }
-                    gestureDetector?.onTouchEvent(event) ?: false
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error in root touch")
-                    false
+        // Root Layout: Only active when NOT in split mode.
+        // Dient als Fallback-Ebene für Gesten im Full Mode.
+        //
+        // The inner try/catch HERE is preserved: this is a system-callback
+        // boundary (Android's input dispatcher invokes us). Letting a
+        // programmer error propagate would crash the home screen — for
+        // a HOME launcher we deliberately trade ACRA visibility of bugs
+        // in this path for HOME-activity resilience. silentError still
+        // throws in DEBUG so developer sees it. The whole gesture-listener
+        // tree (onLongPress / onDoubleTap / onFling overrides) funnels
+        // its throws through this one catch — inner override-catches were
+        // removed in this sweep as redundant.
+        binding.rootLayout.setOnTouchListener { _, event ->
+            try {
+                if (_needsSplit.value) {
+                    return@setOnTouchListener false
                 }
+                gestureDetector?.onTouchEvent(event) ?: false
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in root touch")
+                false
             }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up gestures")
         }
     }
 
@@ -1393,27 +1403,23 @@ class HomeFragment : Fragment() {
                     }
                 }*/
 
+        // Inner try/catch around viewModel.* removed in all three overrides
+        // below. The viewModel calls are fire-and-forget (delegate.launchSafe),
+        // StateFlow.value reads cannot throw, swipeAnalyzer.analyze is pure
+        // Kotlin. Programmer errors propagate to setupGestures' onTouchListener
+        // catch (the system-callback boundary) — see the comment there.
         override fun onLongPress(e: MotionEvent) {
-            try {
-                if (viewModel.isWallpaperEditMode.value) {
-                    // Edit-Mode beenden
-                    viewModel.onSetWallpaperEditMode(false)
-                } else {
-                    viewModel.onLongPress()
-                }
-            } catch (ex: Throwable) {
-                TimberWrapper.silentError(ex, "Error in long press")
+            if (viewModel.isWallpaperEditMode.value) {
+                // Edit-Mode beenden
+                viewModel.onSetWallpaperEditMode(false)
+            } else {
+                viewModel.onLongPress()
             }
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            return try {
-                viewModel.onDoubleTapToLock()
-                true
-            } catch (ex: Throwable) {
-                TimberWrapper.silentError(ex, "Error in double tap")
-                false
-            }
+            viewModel.onDoubleTapToLock()
+            return true
         }
 
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vX: Float, vY: Float): Boolean {
@@ -1424,69 +1430,47 @@ class HomeFragment : Fragment() {
                 return true // Konsumiert = ignoriert
             }
 
-            return try {
-                val result = swipeAnalyzer.analyze(
-                    diffX = e2.x - e1.x,
-                    diffY = e2.y - e1.y,
-                    velocityX = vX,
-                    velocityY = vY
-                )
+            val result = swipeAnalyzer.analyze(
+                diffX = e2.x - e1.x,
+                diffY = e2.y - e1.y,
+                velocityX = vX,
+                velocityY = vY
+            )
 
-                when (result) {
-                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> { viewModel.onSwipeFromRightToLeft(); true }
-                    SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> { viewModel.onSwipeFromLeftToRight(); true }
-                    SwipeGestureAnalyzer.SwipeResult.UP -> { viewModel.onFlingUp(); true }
-                    SwipeGestureAnalyzer.SwipeResult.DOWN -> { viewModel.onFlingDown(); true }
-                    SwipeGestureAnalyzer.SwipeResult.IGNORED -> false
-                }
-            } catch (e: Throwable) {
-                false
+            return when (result) {
+                SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> { viewModel.onSwipeFromRightToLeft(); true }
+                SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> { viewModel.onSwipeFromLeftToRight(); true }
+                SwipeGestureAnalyzer.SwipeResult.UP -> { viewModel.onFlingUp(); true }
+                SwipeGestureAnalyzer.SwipeResult.DOWN -> { viewModel.onFlingDown(); true }
+                SwipeGestureAnalyzer.SwipeResult.IGNORED -> false
             }
         }
     }
 
     private fun setupDoubleTapActions() {
-        try {
-            binding.timeText.setOnClickListener(object : DoubleClickListener() {
-                override fun onDoubleClick() {
-                    try {
-                        viewModel.onTimeDoubleClick()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in time double click")
-                    }
-                }
-            })
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting time click")
-        }
+        // Three setOnClickListener registrations + per-listener
+        // onDoubleClick bodies that wrap a single viewModel fire-and-forget
+        // call. All six try/catch blocks (3 outer registrations + 3 inner
+        // bodies) removed per Rule 11 — programmer-error swallows. Any
+        // throw in onDoubleClick propagates to DoubleClickListener.onClick,
+        // where the kept system-callback-boundary catch handles it.
+        binding.timeText.setOnClickListener(object : DoubleClickListener() {
+            override fun onDoubleClick() {
+                viewModel.onTimeDoubleClick()
+            }
+        })
 
-        try {
-            binding.dateText.setOnClickListener(object : DoubleClickListener() {
-                override fun onDoubleClick() {
-                    try {
-                        viewModel.onDateDoubleClick()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in date double click")
-                    }
-                }
-            })
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting date click")
-        }
+        binding.dateText.setOnClickListener(object : DoubleClickListener() {
+            override fun onDoubleClick() {
+                viewModel.onDateDoubleClick()
+            }
+        })
 
-        try {
-            binding.batteryText.setOnClickListener(object : DoubleClickListener() {
-                override fun onDoubleClick() {
-                    try {
-                        viewModel.onBatteryDoubleClick()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in battery double click")
-                    }
-                }
-            })
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting battery click")
-        }
+        binding.batteryText.setOnClickListener(object : DoubleClickListener() {
+            override fun onDoubleClick() {
+                viewModel.onBatteryDoubleClick()
+            }
+        })
     }
 
     /**
@@ -1502,13 +1486,15 @@ class HomeFragment : Fragment() {
     ) : View.OnClickListener {
 
         override fun onClick(v: View?) {
+            // Outer catch preserved as the system-callback boundary
+            // (View.OnClickListener.onClick is invoked by Android's
+            // input dispatcher). Inner catch around onDoubleClick()
+            // removed — throws from concrete subclasses funnel through
+            // this one outer catch, same shape as the gesture-listener
+            // tree in setupGestures.
             try {
                 if (detector.registerClick()) {
-                    try {
-                        onDoubleClick()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in onDoubleClick")
-                    }
+                    onDoubleClick()
                 }
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in onClick")
@@ -1523,18 +1509,18 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     private fun setupBackPressHandler() {
-        try {
-            requireActivity().onBackPressedDispatcher.addCallback(
-                viewLifecycleOwner,
-                object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        Timber.d("Back pressed - ignoring (we're the launcher)")
-                    }
+        // try/catch removed per Rule 11. Body is a single addCallback
+        // registration + a Timber.d in the callback. requireActivity()
+        // throws only if Fragment is detached (programmer error in
+        // onViewCreated context).
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    Timber.d("Back pressed - ignoring (we're the launcher)")
                 }
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up back press handler")
-        }
+            }
+        )
     }
 
     // ============================================================================

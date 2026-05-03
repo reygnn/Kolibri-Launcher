@@ -232,6 +232,22 @@ für die letzten 0.1, dann 9.0+.
   unerreichbar war. Drei Catches als legit pattern erhalten:
   per-item-Recovery-Loop in `updateTimeBasedChips`, outer
   Chip-Construction-Catches in `createAlarmChip` / `createCalendarChip`.
+- **Aktueller Stand 2026-05-03 (Region 6: Gestures + Listeners):**
+  1993 Zeilen (-17), 39 catches (31 `Throwable`). Größter Single-Region-
+  Schnitt bisher: 11 Catches und 9 Throwable raus. `setupGestures` outer
+  entfernt (synchroner Init in `onViewCreated`), drei innere Catches in
+  `createGestureListener`-Overrides (`onLongPress` / `onDoubleTap` /
+  `onFling`) entfernt — Programmer-Error-Swallows um fire-and-forget
+  viewModel-Calls + pure-Kotlin `swipeAnalyzer.analyze`. Throws funnel
+  jetzt durch den **erhaltenen** outer-Catch in `setOnTouchListener`
+  (system-callback boundary; Android-Input-Dispatcher invoked us — HOME-
+  Activity-Resilience-Trade per Header-Frame). Alle 6 Catches in
+  `setupDoubleTapActions` entfernt (3 outer Registrations + 3 innere
+  onDoubleClick-Bodies); Throws funneln durch den **erhaltenen**
+  outer-Catch in `DoubleClickListener.onClick` (gleiche
+  system-callback-Boundary-Logik). `setupBackPressHandler`-Catch
+  entfernt — Body ist nur addCallback + Timber.d in handleOnBackPressed.
+  Backstop-Test grün, Full-Test-Suite grün.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.
