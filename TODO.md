@@ -29,6 +29,41 @@ Memo) und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
+## Wenn du als neue Session hier ankommst
+
+Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
+
+1. **`CLAUDE.md` (Projekt-Root)** — die 13 harten Regeln, der aktuelle
+   Modul-Layout-Snapshot (post-§9.2), und die Workflow-Konventionen.
+   Pflicht vor irgendeinem Code-Touch.
+2. **`app/src/test/CLAUDE.md`** — Test-Reference. Was existiert,
+   warum, was bewusst weggelassen ist, wo anzufangen.
+3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
+   technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
+4. **Diesen Audit-Snapshot unten** — aktueller Score 8.2, Baseline-
+   Vergleich, drei große Brocken zu 9+.
+
+### Ein kalter „leg los"-Auftrag braucht eine Richtungs-Entscheidung
+
+Der TODO.md-Status sagt „keine kleinen Open-Items mehr". Wenn der
+User trotzdem Arbeit will, ist das praktisch immer einer der drei
+Brocken aus dem Audit-Snapshot weiter unten — frag aber einmal nach,
+welcher. Sonst wählst du falsch.
+
+### Workflow-Defaults
+
+- **Branch vor non-trivialer Arbeit.** CLAUDE.md „Git workflow"-
+  Sektion. Solo-Workflow per User-Memory: Branch → commit → ff-merge
+  → push → branch löschen.
+- **Spike vor DI-/Build-riskanten Refactorings.** §9.2-Memo unten.
+  Throw-Away-Worktree, validiere die Risiko-Punkte, dann erst der
+  echte Branch. Hat 6-11h-Risiko in 4-6h-Plan verwandelt.
+- **Vor dem Refactor: lesen.** HomeFragment-Header-KDoc beschreibt
+  selbst, was der Pfad ist (siehe „Pfad zu 9+" → HomeFragment unten).
+  Den Header lesen, bevor du HomeFragment anfasst.
+
+---
+
 ## Audit-Snapshot 2026-05-03 (post-§9.2)
 
 Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot direkt nach §9.2-
@@ -98,18 +133,103 @@ Qualität schlagen Doku-Qualität bei der Note.
 
 ### Pfad zu 9+
 
-Brauchst genau **einen** der drei großen Brocken sauber, um über 9 zu
-kommen. Welcher davon ist nicht gleich:
+Brauchst genau **einen** der drei großen Brocken sauber, um über 9
+zu kommen. Drei davon halb wäre Score-neutral. Eins davon sauber
+bringt 0.8-1.0.
 
-- **HomeFragment-Lifecycle-Restructure** (größtes Risiko, größter
-  Win sichtbar im täglichen Code).
-- **Tests pro Modul redistribuieren** (mittleres Risiko, Test-Zeit-
-  Win + Architektur-Konsistenz mit §9.2).
-- **13 Pure-Kotlin-Domain-Refactorings** (kleinstes Risiko pro
-  Schritt, aber 13× — und schließt §9.2-Variante-1 nachträglich
-  zur ursprünglichen Vision).
+#### Brocken A — HomeFragment try/catch-Audit + Lifecycle-Restructure
 
-Drei davon halb wäre Score-neutral. Eins davon sauber bringt 0.8-1.0.
+- **Plan lebt bereits im Code.** `HomeFragment.kt` Datei-Header
+  (Zeilen ~72-233) beschreibt den Pfad selbst. **Lies den Header
+  zuerst** — er erklärt warum die Datei groß ist, was schon erledigt
+  wurde, und warum der try/catch-Audit der nächste Schritt ist
+  (~30-40% Zeilen-Reduktion).
+- **Erster konkreter Schritt:** den `try/catch(Throwable)`-Audit
+  laut der Vier-Kategorien-Frame im Header (Expected error,
+  Teardown race, Programmer error, Unrecoverable). Pro Catch
+  klassifizieren, dann die Programmer-Error-Catches entfernen, die
+  Teardown-Race-Catches durch `_binding?.let { }` +
+  `viewLifecycleOwner.lifecycleScope` ersetzen.
+- **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
+  größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
+  pro-Region statt Big Bang.
+- **Risiko:** mittel-hoch. Jeder Catch-Wegfall ist ein potentielles
+  Crash-Risiko in der HOME-Activity. Robolectric-Test-Backstop für
+  HomeFragment ist Pflicht vor dem Sweep — aktuell fehlt der noch.
+  **Spike-Vorlauf empfohlen:** ein Robolectric-Test für eine
+  HomeFragment-Region, um zu sehen ob der Setup überhaupt
+  praktikabel ist.
+- **Was nicht zu machen ist:** den im Header dokumentierten
+  „Fragment-delegate split" (FavoritesRenderer, TimeChipsRenderer
+  etc.). Das ist der Cargo-Cult-Move — der Header begründet bewusst
+  warum es deferred ist.
+
+#### Brocken B — Tests pro Modul redistribuieren
+
+- **Aktueller Zustand:** alle ~2200 Tests leben in `:app/src/test/`.
+  `:domain/test/` und `:data/test/` sind leer. §9.2 hat den
+  Compile-Cache-Win für Production-Code geliefert, aber nicht den
+  Test-Time-Win.
+- **Zwei nicht-triviale Sub-Probleme:**
+  - **Shared Test-Helpers:** `fakes/`, `rule/`, `TimberRule`,
+    `MainDispatcherRule`, `FakeDataStore` werden von Tests in allen
+    drei Modul-Domänen benutzt. Müssen in ein Shared-Modul
+    (`:test-fixtures` oder Gradle `testFixtures`-Feature) ODER
+    in `:domain/src/main/`-Test-Helper-Datein, ODER dupliziert
+    (schlechteste Option).
+  - **Robolectric-Konfiguration:** `app/src/test/resources/robolectric.properties`
+    setzt `application=android.app.Application` als Default
+    (siehe §6-Memo). Wenn Tests in `:data/test/` laufen, muss das
+    Setup mitwandern oder pro Modul dupliziert werden.
+- **Erster konkreter Schritt:** Shared-Test-Helpers-Strategie
+  entscheiden (testFixtures vs. eigenes Modul). Ohne diese
+  Entscheidung ist alles weitere Sand. Spike-Branch sinnvoll: ein
+  domain-Test allein nach `:domain/test/` schieben und sehen, was
+  ihm fehlt.
+- **Größenordnung:** 2-3 Tage, vergleichbar mit §9.2.
+- **Risiko:** mittel. Test-Konfiguration ist finicky, aber nicht
+  produktionsrelevant — Tests-grün bleibt der einzige Erfolgs-
+  Indikator.
+
+#### Brocken C — `:domain` als pure-Kotlin Modul (Variante-2 nachholen)
+
+§9.2 wurde als Variante 1 (Android-Library) umgesetzt, weil 16
+Domain-Files Android-SDK-Imports haben. Die ursprüngliche Vision
+(`:domain` ohne Android-SDK) wäre die saubere Architektur-Antwort,
+braucht aber alle 16 Files refactored.
+
+**Die 16 Pure-Kotlin-Blocker-Files (Stand 2026-05-03):**
+
+| File | Was leakt | Idee zur Auflösung |
+|---|---|---|
+| `core/AppConstants.kt` | `androidx.datastore.preferences.core.*` Keys | Keys nach `:data` ziehen, AppConstants behält nur reine Konstanten |
+| `core/TextColorCalculator.kt` | `Bitmap`/`Canvas`/`Color`/`Drawable` | Pure-Kotlin Color-Math extrahieren, Bitmap-Pfad in `:app` halten |
+| `domain/model/AppInfo.kt` | `Parcelable` (`@Parcelize`) | Plain data class; UI-Layer wrappt für Parcel-Bedarf |
+| `domain/model/MenuContext.kt` | `Parcelable` | dito |
+| `domain/model/BackupData.kt` | `androidx.core.net.toUri` | String-URIs im Modell, Konvertierung in Konsumenten |
+| `domain/model/UiColorsState.kt` | `android.graphics.Color` | Int-RGB statt Color-Klasse |
+| `domain/model/WallpaperState.kt` | `BlendMode` + `Uri` | Domain-Enum für BlendMode, String-URI |
+| `domain/model/AppContextMenuAction.kt` | `ShortcutInfo` + `@StringRes` | Eigene Domain-Shortcut-Repräsentation, Int statt @StringRes |
+| `domain/repository/GetDrawerAppsUseCaseRepository.kt` | `LiveData` | Flow-Return; UI konvertiert via `asLiveData()` |
+| `domain/repository/ShortcutRepository.kt` | `ShortcutInfo` | Domain-Shortcut-Modell, Mapper in `:data` |
+| `domain/service/ShortcutLauncherService.kt` | `ShortcutInfo` | dito |
+| `domain/usecase/GetDrawerAppsUseCase.kt` | `LiveData`/`asLiveData` | Flow-Return |
+| `domain/usecase/BuildAppContextMenuUseCase.kt` | `ShortcutInfo` | Domain-Shortcut-Modell |
+| `domain/usecase/LaunchShortcutUseCase.kt` | `ShortcutInfo` | dito |
+| `domain/usecase/ObserveUiColorsUseCase.kt` | `WallpaperColors`/`Color`/`ColorUtils` | Domain-Color-Modell, Color-Math in `:domain`-Pure-Kotlin |
+| `domain/usecase/SetWallpaperImageUseCase.kt` | `Uri` | String-URI, Konvertierung in Konsumenten |
+
+- **Erster konkreter Schritt:** mit dem einfachsten anfangen
+  (`AppInfo.kt` Parcelable → plain data class). Cycle-Elimination-
+  Branches als Vorbild — pro Datei ein Branch, ff-merge, weiter.
+- **Größenordnung:** ~5-7 Tage, einzeln aber jeder Schritt klein
+  und low-risk. Nach allen 16 kann `:domain` von Android-Library
+  auf pure-Kotlin umgeschaltet werden — eigener Branch, Test:
+  `./gradlew :domain:test` ohne Android-Anteil.
+- **Risiko:** niedrig pro Schritt, akkumuliert mittel. Gefahr ist
+  nicht Compile-Failure (sofort sichtbar) sondern Verhaltens-Drift
+  (z. B. wenn `Uri`-Validierung wegfällt und String-URI nicht
+  validiert wird).
 
 ---
 
