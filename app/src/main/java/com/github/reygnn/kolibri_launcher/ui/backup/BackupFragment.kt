@@ -11,6 +11,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
@@ -60,7 +61,7 @@ class BackupFragment : Fragment() {
             try {
                 viewModel.exportBackup(it.toString())
             } catch (e: Exception) {
-                Timber.e(e, "Export failed")
+                TimberWrapper.silentError(e, "Export failed")
                 showError(getString(R.string.backup_export_failed))
             }
         }
@@ -76,7 +77,7 @@ class BackupFragment : Fragment() {
                 viewModel.previewBackup(it.toString())
                 showImportOptionsDialog(it.toString())
             } catch (e: Exception) {
-                Timber.e(e, "Import preview failed")
+                TimberWrapper.silentError(e, "Import preview failed")
                 showError(getString(R.string.error_generic))
             }
         }
@@ -128,7 +129,7 @@ class BackupFragment : Fragment() {
 
                 // Wenn preview null ist (Timeout) oder Fragment weg ist -> Abbruch
                 if (preview == null) {
-                    Timber.e("Preview timeout or loading failed")
+                    TimberWrapper.silentError("Preview timeout or loading failed")
                     hideLoading()
                     showError(getString(R.string.error_generic))
                     return@launch
@@ -224,7 +225,7 @@ class BackupFragment : Fragment() {
                     .show()
 
             } catch (e: Exception) {
-                Timber.e(e, "Error loading backup preview")
+                TimberWrapper.silentError(e, "Error loading backup preview")
                 hideLoading()
                 showError(getString(R.string.error_generic))
             }
@@ -359,7 +360,7 @@ class BackupFragment : Fragment() {
     private fun showError(message: String) {
         _binding?.let {
             Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
-            Timber.e("Backup error: $message")
+            TimberWrapper.silentError("Backup error: $message")
         }
     }
 

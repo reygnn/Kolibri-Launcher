@@ -483,7 +483,7 @@ class BackupRepositoryImpl @Inject constructor(
 
         val jsonContent = jsonString
         if (jsonContent.isNullOrBlank()) {
-            Timber.e("ZIP backup does not contain backup.json")
+            TimberWrapper.silentError("ZIP backup does not contain backup.json")
             return ImportResult.InvalidFormat
         }
 
@@ -1224,20 +1224,20 @@ class BackupRepositoryImpl @Inject constructor(
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.e("Empty URI string provided")
+                TimberWrapper.silentError("Empty URI string provided")
                 throw BackupException("Invalid file location")
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.e(e, "Invalid URI format: $uriString")
+                TimberWrapper.silentError(e, "Invalid URI format: $uriString")
                 throw BackupException("Invalid file location format", e)
             }
 
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                Timber.e("Unsupported URI scheme: $scheme")
+                TimberWrapper.silentError("Unsupported URI scheme: $scheme")
                 throw BackupException("Unsupported file location type")
             }
 
@@ -1253,13 +1253,13 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: BackupException) {
             throw e
         } catch (e: SecurityException) {
-            Timber.e(e, "Permission denied for URI")
+            TimberWrapper.silentError(e, "Permission denied for URI")
             throw BackupException("No permission to write to this location", e)
         } catch (e: IOException) {
-            Timber.e(e, "I/O error while saving backup")
+            TimberWrapper.silentError(e, "I/O error while saving backup")
             throw BackupException("Failed to write file (storage full or unavailable?)", e)
         } catch (e: Exception) {
-            Timber.e(e, "Unexpected error saving backup")
+            TimberWrapper.silentError(e, "Unexpected error saving backup")
             throw BackupException("Failed to save backup: ${e.message}", e)
         }
     }
@@ -1289,7 +1289,7 @@ class BackupRepositoryImpl @Inject constructor(
             }
 
             if (fileSize > AppConstants.MAX_BACKUP_SIZE_BYTES) {
-                Timber.e("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
+                TimberWrapper.silentError("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
                 return@withContext ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
             }
 
@@ -1316,7 +1316,7 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Timber.e(e, "Error loading backup")
+            TimberWrapper.silentError(e, "Error loading backup")
             ImportResult.Error("Failed to load backup: ${e.message}")
         }
     }
@@ -1328,20 +1328,20 @@ class BackupRepositoryImpl @Inject constructor(
     override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.e("Empty URI string provided for preview")
+                TimberWrapper.silentError("Empty URI string provided for preview")
                 return@withContext null
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.e(e, "Invalid URI format for preview: $uriString")
+                TimberWrapper.silentError(e, "Invalid URI format for preview: $uriString")
                 return@withContext null
             }
 
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                Timber.e("Unsupported URI scheme for preview: $scheme")
+                TimberWrapper.silentError("Unsupported URI scheme for preview: $scheme")
                 return@withContext null
             }
 
@@ -1374,19 +1374,19 @@ class BackupRepositoryImpl @Inject constructor(
             }
 
             if (jsonString.isNullOrBlank()) {
-                Timber.e("Could not read backup content for preview")
+                TimberWrapper.silentError("Could not read backup content for preview")
                 return@withContext null
             }
 
             if (!jsonString.trim().startsWith("{")) {
-                Timber.e("File does not appear to be valid JSON")
+                TimberWrapper.silentError("File does not appear to be valid JSON")
                 return@withContext null
             }
 
             val backup = try {
                 json.decodeFromString<BackupData>(jsonString)
             } catch (e: SerializationException) {
-                Timber.e(e, "Failed to parse backup file for preview")
+                TimberWrapper.silentError(e, "Failed to parse backup file for preview")
                 return@withContext null
             }
 
@@ -1431,10 +1431,10 @@ class BackupRepositoryImpl @Inject constructor(
             return@withContext preview
 
         } catch (e: SecurityException) {
-            Timber.e(e, "Permission denied for preview")
+            TimberWrapper.silentError(e, "Permission denied for preview")
             null
         } catch (e: Exception) {
-            Timber.e(e, "Unexpected error while creating preview")
+            TimberWrapper.silentError(e, "Unexpected error while creating preview")
             null
         }
     }

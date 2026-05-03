@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -86,7 +87,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         processApps(rawApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
-        Timber.e(e, "Critical error in favoriteApps flow")
+        TimberWrapper.silentError(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }
 

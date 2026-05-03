@@ -385,14 +385,14 @@ class UsageExportRepositoryImpl @Inject constructor(
     override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
-                Timber.e("Empty URI string provided")
+                TimberWrapper.silentError("Empty URI string provided")
                 return@withContext false
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
-                Timber.e(e, "Invalid URI format: $uriString")
+                TimberWrapper.silentError(e, "Invalid URI format: $uriString")
                 return@withContext false
             }
 
@@ -403,7 +403,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                 Timber.i("Usage data saved to: $uri")
                 true
             } ?: run {
-                Timber.e("Failed to open output stream for URI: $uri")
+                TimberWrapper.silentError("Failed to open output stream for URI: $uri")
                 false
             }
 

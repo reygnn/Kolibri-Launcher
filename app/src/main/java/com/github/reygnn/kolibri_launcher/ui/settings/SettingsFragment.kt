@@ -588,7 +588,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 return typedValue.data
             }
         } catch (e: Throwable) {
-            Timber.e(e, "Failed to resolve theme color attribute: $attrRes")
+            TimberWrapper.silentError(e, "Failed to resolve theme color attribute: $attrRes")
         }
         // Fallback, wenn die Farbe nicht gefunden werden konnte
         return ContextCompat.getColor(context, android.R.color.black)
@@ -610,12 +610,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
             val customTabsIntent = builder.build()
             customTabsIntent.launchUrl(context, url.toUri())
         } catch (e: Throwable) {
-            Timber.e(e, "Could not open Custom Tab, falling back to standard browser.")
+            TimberWrapper.silentError(e, "Could not open Custom Tab, falling back to standard browser.")
             try {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 context.startActivity(intent)
             } catch (fallbackError: Throwable) {
-                Timber.e(fallbackError, "Even the fallback browser intent failed.")
+                TimberWrapper.silentError(fallbackError, "Even the fallback browser intent failed.")
             }
         }
     }
