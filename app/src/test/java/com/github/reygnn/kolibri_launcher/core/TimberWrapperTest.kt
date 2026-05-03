@@ -57,6 +57,13 @@ class TimberWrapperTest {
         // wrapper now reads its build type from a flag set by KolibriLauncherApp;
         // tests have to wire it themselves.
         TimberWrapper.isDebugBuild = true
+        // :domain's KolibriLog forwards through runtime-injected lambdas;
+        // KolibriLauncherApp wires them in production. Tests wire the same
+        // way so that silentError ends up on the captureTree as before.
+        KolibriLog.taggedErrorHandler = { tag, throwable, message ->
+            val tree = Timber.tag(tag)
+            if (throwable != null) tree.e(throwable, message) else tree.e(message)
+        }
     }
 
     @After
@@ -64,6 +71,8 @@ class TimberWrapperTest {
         Timber.uproot(captureTree)
         TimberWrapper.preventCrashForTesting.set(false)
         TimberWrapper.isDebugBuild = false
+        // Reset KolibriLog handlers to the safe no-op default for the next test.
+        KolibriLog.taggedErrorHandler = { _, _, _ -> }
     }
 
     // ------------------------------------------------------------------

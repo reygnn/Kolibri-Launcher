@@ -5,7 +5,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRe
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.first
-import timber.log.Timber
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
 
 class HandleSwipeActionUseCase @Inject constructor(
@@ -30,7 +30,7 @@ class HandleSwipeActionUseCase @Inject constructor(
         }
 
         if (componentName == null) {
-            Timber.d("No app assigned to swipe $slot")
+            KolibriLog.d("No app assigned to swipe $slot")
             return Result.NoAction
         }
 
@@ -43,7 +43,7 @@ class HandleSwipeActionUseCase @Inject constructor(
             refreshAppsUseCase()
             Result.LaunchApp(appToLaunch)
         } else {
-            Timber.w("App for swipe $slot not found: $componentName. Clearing setting.")
+            KolibriLog.w("App for swipe $slot not found: $componentName. Clearing setting.")
             swipeActionsRepository.setSwipeAction(slot, null)
             Result.NoAction
         }

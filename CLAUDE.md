@@ -48,16 +48,16 @@ split across `:domain`, `:data`, and `:app`; all tests live in `:app/src/test/`
 for now.
 
 ```
-:domain  (Android Library)
-  core/                   AppConstants, TextColorCalculator, TimberWrapper,
+:domain  (Pure-Kotlin JVM module — `kotlin("jvm")`, no Android SDK)
+  core/                   AppConstants, ColorMath, KolibriLog, TimberWrapper,
                           AppUpdateSignal, Qualifiers, CoerceExtensions
   domain/repository/      interfaces (FavoritesRepository, …) — 20 of them
   domain/usecase/         ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
   domain/model/           data classes (AppInfo, HomeSettings, UiState,
-                          AppContextMenuAction, WallpaperState, …)
+                          AppContextMenuAction + LauncherActionLabel,
+                          WallpaperState, LauncherShortcut, …) — pure
+                          Kotlin, no Parcelable / no Android imports.
   di/DispatcherModule     @Provides for Default/IO/Main + ApplicationScope
-  res/values/strings.xml  12 strings owned by use cases (favorites limit,
-                          rename app, etc.)
 
 :data    (Android Library, depends on :domain)
   data/                   repository implementations (FavoritesRepositoryImpl,
@@ -88,20 +88,29 @@ Key points to remember when adding code:
   `:data` or `:app`. The two cycles that existed before the split
   (`data → ui` via `SwipeSlot`/`AppUpdateSignal`/`CrashReportConsent`,
   `domain → di` via `@DefaultDispatcher`) are gone — don't reintroduce.
-- **`:domain` is an Android Library, not pure Kotlin.** It holds
-  `Parcelize`d models, `Bitmap`-using utilities (`TextColorCalculator`),
-  and DataStore preference keys (`AppConstants`). The compile-cache win
-  is the goal; strict purity was traded off — see TODO.md §9.2 memo.
-- **Each module has its own `BuildConfig`.** `:domain` and `:data` enable
-  `buildFeatures.buildConfig`. The app's `versionName` is *not* duplicated
-  as a `buildConfigField`; it flows from `:app/AppModule` via
+- **`:domain` is a pure-Kotlin JVM module.** No Android SDK on its
+  compile classpath, no `BuildConfig`, no `R` class. The §11/§12 sweeps
+  removed every Android dependency: Parcelable models became plain data
+  classes (UI wraps for Bundle transport), DataStore-key references in
+  `AppConstants` were dropped, `:domain/res/` strings moved to `:app/`,
+  and `core/KolibriLog` replaces direct `Timber.*` calls — its lambda
+  handlers are wired by `:app/KolibriLauncherApp.onCreate`. Same logic
+  for `TimberWrapper.isDebugBuild` (set from `BuildConfig.DEBUG` in
+  `:app`). The pure-Kotlin status is enforced by the build itself: the
+  module declares `kotlin("jvm")` and depends on `hilt-core` (JAR), not
+  `hilt-android` (AAR).
+- **`:data` is an Android Library** (it depends on Android SDK for
+  DataStore, ContentResolver, LauncherApps, etc.). The app's
+  `versionName` flows from `:app/AppModule` via
   `@Named("appVersionName") String` to `BackupDataAssembler` and
-  `UsageExportRepositoryImpl`. Single source of truth.
-- **`:domain` has its own `R` class** (12 use-case strings live in
-  `:domain/res/`). Use cases that need a string ID use
-  `com.github.reygnn.kolibri_launcher.domain.R`. UI consumers read
-  the resulting `Int` via `context.getString(messageResId)` — no
-  compile-time R reference needed cross-module.
+  `UsageExportRepositoryImpl` — not duplicated as a `buildConfigField`.
+  Single source of truth.
+- **Use-case messages are sealed identifiers, not `@StringRes Int`.**
+  `ToggleFavoriteUseCase.Result.Success.Added` etc. expose a sealed-
+  class identifier; UI maps to `R.string.*` via
+  `:app/ui/util/DomainMessageMappers.kt`. Same for `AppLoadResult.Failure`
+  and `AppContextMenuAction.LauncherAction.label`. Keeps the domain
+  free of `androidx.annotation` and Android resource ids.
 - **`internal` does not cross module boundaries.** When tests in `:app`
   need access to a test-only entry point in `:data`, the entry point
   drops `internal` and keeps `@VisibleForTesting` (so out-of-test

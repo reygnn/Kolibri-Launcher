@@ -16,6 +16,7 @@ import android.content.IntentFilter
 import android.os.Process
 import android.util.Log
 import com.github.anrwatchdog.ANRWatchDog
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
@@ -180,6 +181,19 @@ class KolibriLauncherApp : Application() {
         // BuildConfig of its own as a pure-Kotlin module). Must run before
         // any code path that may invoke silentError.
         TimberWrapper.isDebugBuild = BuildConfig.DEBUG
+
+        // Wire :domain's KolibriLog to Timber. :domain is a pure-Kotlin
+        // module without a Timber dependency on its compile classpath
+        // (Timber 5.x is .aar-only); KolibriLog forwards through these
+        // lambdas. Must run before any :domain code path can log.
+        KolibriLog.dHandler = { message -> Timber.d(message) }
+        KolibriLog.wHandler = { throwable, message ->
+            if (throwable != null) Timber.w(throwable, message) else Timber.w(message)
+        }
+        KolibriLog.taggedErrorHandler = { tag, throwable, message ->
+            val tree = Timber.tag(tag)
+            if (throwable != null) tree.e(throwable, message) else tree.e(message)
+        }
 
         // Initialize ACRA spam protection FIRST (before any crashes can occur)
         try {

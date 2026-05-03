@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import timber.log.Timber
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,15 +33,15 @@ class GetDrawerAppsUseCase @Inject constructor(
 
         // Non-critical Flows: Mit individuellen Fallbacks
         settingsRepository.sortOrderFlow.catch { e ->
-            Timber.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
+            KolibriLog.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
             emit(SortOrder.ALPHABETICAL)
         },
         hiddenAppsRepository.hiddenAppsFlow.catch { e ->
-            Timber.w(e, "hiddenAppsFlow error - showing all apps")
+            KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
     ) { rawApps, sortOrder, hiddenComponents ->
-        Timber.d(
+        KolibriLog.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
         )
@@ -75,7 +75,7 @@ class GetDrawerAppsUseCase @Inject constructor(
             }
         }
 
-        Timber.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
+        KolibriLog.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
         sortedApps
     }
         .catch { e ->

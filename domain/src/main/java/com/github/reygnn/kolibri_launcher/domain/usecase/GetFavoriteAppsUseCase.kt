@@ -13,7 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import timber.log.Timber
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,19 +66,19 @@ class GetFavoriteAppsUseCase @Inject constructor(
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
         installedAppsStateRepository.rawAppsFlow,
         favoritesRepository.favoriteComponentsFlow.catch { e ->
-            Timber.w(e, "favoriteComponentsFlow error - using empty set fallback")
+            KolibriLog.w(e, "favoriteComponentsFlow error - using empty set fallback")
             emit(emptySet())
         },
         hiddenAppsRepository.hiddenAppsFlow.catch { e ->
-            Timber.w(e, "hiddenAppsFlow error - showing all apps")
+            KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
         favoritesOrderRepository.favoriteComponentsOrderFlow.catch { e ->
-            Timber.w(e, "favoriteComponentsOrderFlow error - using empty order")
+            KolibriLog.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
         }
     ) { rawApps, favorites, hiddenApps, savedOrder ->
-        Timber.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
+        KolibriLog.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
         // Leere App-Liste → Loading state
         if (rawApps.isEmpty()) {
@@ -117,14 +117,14 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            Timber.w(e, "Sorting failed - using alphabetical fallback")
+            KolibriLog.w(e, "Sorting failed - using alphabetical fallback")
             favoriteApps.sortedBy { it.displayName.lowercase() }
         }
 
         val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
 
         return if (limitedOrderedFavorites.isNotEmpty()) {
-            Timber.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
+            KolibriLog.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
             UiState.Success(
                 FavoriteAppsResult(
                     apps = limitedOrderedFavorites,
@@ -134,7 +134,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         } else {
             // Fallback: Top N sichtbare Apps
             val fallbackApps = createFallbackApps(rawApps, hiddenApps)
-            Timber.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
+            KolibriLog.d("[DATAFLOW-FAV] No favorites - emitting ${fallbackApps.size} fallback apps")
             UiState.Success(
                 FavoriteAppsResult(
                     apps = fallbackApps,

@@ -3,62 +3,39 @@
  * :domain — domain layer (repositories, use cases, models, core utilities)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Android Library module hosting the layer that is conceptually free of UI
- * and data-source concerns. The Brocken-C sweeps removed every Android
- * import from `src/main/`, and the §11-Followup attempted to switch the
- * module type to pure-Kotlin (`kotlin("jvm")`). The switch is blocked by
- * Timber 5.x being distributed as `.aar` only — a JVM module cannot
- * consume that artifact, and TimberWrapper depends on Timber's static
- * API. Switching the module-type therefore requires a separate refactor
- * that abstracts TimberWrapper's logging backend behind a runtime-
- * injected delegate (so :domain can compile without the Timber AAR on
- * its classpath, and :app wires the Timber implementation at startup).
- * Left as a follow-up — see TODO.md §11.
+ * Pure-Kotlin JVM module. The §9.2 split landed this layer as an Android
+ * Library at first; the §11 sweeps removed every Android import from
+ * `src/main/`, and the §12 follow-up unblocked the type-switch by
+ * abstracting Timber behind `core/KolibriLog` (so `:domain` no longer
+ * needs Timber 5.x's `.aar` artefact on its compile classpath). All
+ * logging from domain code now goes through `KolibriLog`, whose
+ * lambda-backed handlers are wired by `:app/KolibriLauncherApp.onCreate`
+ * to the real Timber API.
  *
- * Source remains Android-free: `grep -rn "^import android\|^import androidx" src/main/`
- * yields nothing, which is the bigger architectural win regardless of
- * module-type.
- *
- * Hilt: this library declares modules (e.g. DispatcherModule). The
- * `kapt(libs.hilt.compiler)` invocation here generates the per-module
- * aggregating class that :app's @HiltAndroidApp picks up.
+ * Hilt: this layer declares @Module classes (e.g. DispatcherModule). The
+ * `hilt-android` Gradle plugin is NOT applied here because that plugin
+ * adds Android-specific entry-point processing (`@AndroidEntryPoint`,
+ * Application subclassing) which a pure-JVM module cannot host. What we
+ * still need — code generation for `@Module` / `@Provides` / `@Binds` —
+ * comes from the `kapt(libs.hilt.compiler)` invocation. The aggregating
+ * glue runs in `:app`, where the `hilt-android` plugin IS applied.
  */
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    kotlin("jvm")
     id("kotlin-kapt")
-    alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
 }
 
-android {
-    namespace = "com.github.reygnn.kolibri_launcher.domain"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 36
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
+}
 
-    buildFeatures {
-        buildConfig = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
-
-    java {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
+kotlin {
+    jvmToolchain(21)
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 
@@ -71,12 +48,15 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.timber)
 
-    implementation(libs.hilt.android)
+    // hilt-core is the JVM-only artefact (JAR). hilt-android (AAR) cannot
+    // be consumed by a kotlin("jvm") module; the @Module / @Provides /
+    // @Binds annotations and the runtime support live in hilt-core, which
+    // is enough for what :domain declares (DispatcherModule etc.). The
+    // aggregating glue runs in :app via the hilt-android plugin.
+    implementation(libs.hilt.core)
     kapt(libs.hilt.compiler)
 }
 

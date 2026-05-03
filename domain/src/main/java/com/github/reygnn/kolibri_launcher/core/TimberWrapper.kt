@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
 
@@ -41,17 +40,17 @@ object TimberWrapper {
      * In DEBUG-Builds wird zusätzlich eine Exception geworfen für sofortige Sichtbarkeit.
      */
     fun silentError(throwable: Throwable, message: String) {
-        Timber.tag(SILENT_LOG_TAG).e(throwable, message)
+        KolibriLog.taggedError(SILENT_LOG_TAG, throwable, message)
         crashInDebug(throwable, message)
     }
 
     fun silentError(message: String) {
-        Timber.tag(SILENT_LOG_TAG).e(message)
+        KolibriLog.taggedError(SILENT_LOG_TAG, null, message)
         crashInDebug(null, message)
     }
 
     fun silentError(throwable: Throwable) {
-        Timber.tag(SILENT_LOG_TAG).e(throwable)
+        KolibriLog.taggedError(SILENT_LOG_TAG, throwable, throwable.message ?: "Unknown error")
         crashInDebug(throwable, throwable.message ?: "Unknown error")
     }
 
@@ -113,15 +112,16 @@ object TimberWrapper {
         // failt, bringen weder ACRA-Flush noch exit den User-relevanten
         // Hinweis ins ACRA-Backend.
         try {
-            if (cause != null) {
-                Timber.tag(SILENT_LOG_TAG).e(cause, "FATAL: $message")
-            } else {
-                Timber.tag(SILENT_LOG_TAG).e("FATAL: $message")
-            }
+            KolibriLog.taggedError(SILENT_LOG_TAG, cause, "FATAL: $message")
         } catch (ignored: Throwable) {
-            // Last-resort Log via Android-Log; kein Throw nach oben.
+            // Last-resort log via System.err — JVM-only, can never depend on
+            // android.util.Log here because :domain is a pure-Kotlin module
+            // that cannot import Android types. Wrapped in a defensive catch:
+            // if even println throws (e.g. closed stderr), there is nothing
+            // left to salvage.
             try {
-                android.util.Log.e(SILENT_LOG_TAG, "FATAL: $message", cause)
+                System.err.println("[$SILENT_LOG_TAG] FATAL: $message")
+                cause?.printStackTrace(System.err)
             } catch (ignored2: Throwable) {
                 // Wenn auch das failt, gibt's nichts mehr zu retten.
             }

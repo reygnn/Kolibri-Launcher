@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retry
-import timber.log.Timber
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import java.io.IOException
 import javax.inject.Inject
 
@@ -44,7 +44,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     try {
                         if (cause is IOException) {
                             retryCount++
-                            Timber.w("App loading failed, retry $retryCount/${AppConstants.MAX_APP_LOAD_RETRIES}")
+                            KolibriLog.w("App loading failed, retry $retryCount/${AppConstants.MAX_APP_LOAD_RETRIES}")
                             delay(AppConstants.APP_LOAD_RETRY_BASE_DELAY_MS * retryCount)
                             true
                         } else {
@@ -62,7 +62,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     // Fallback-Logik
                     val cachedApps = installedAppsStateRepository.getCurrentApps()
                     if (cachedApps.isNotEmpty()) {
-                        Timber.w("Using cached apps as fallback (${cachedApps.size} apps)")
+                        KolibriLog.w("Using cached apps as fallback (${cachedApps.size} apps)")
                         installedAppsStateRepository.updateApps(cachedApps)
                         // Sende KEIN Fehler-Event, da wir einen Cache haben
                     } else {
@@ -75,7 +75,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     // Die gesamte Verarbeitungslogik
                     try {
                         if (realApps.isEmpty()) {
-                            Timber.w("Collected an empty app list. Skipping cleanup to prevent data loss.")
+                            KolibriLog.w("Collected an empty app list. Skipping cleanup to prevent data loss.")
                             installedAppsStateRepository.updateApps(emptyList())
                             return@collect
                         }

@@ -23,15 +23,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch versucht aber durch Timber-AAR blockiert — siehe §12 | — |
-| 12 | `:domain` Modul-Type-Switch (§11-Followup) | preparatorische Sub-Steps geliefert 2026-05-03 (Strings-Move, Sealed-Identifier, isDebugBuild), Plugin-Switch blockiert durch Timber-AAR — Memo unten | klein, gating refactor |
+| 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Zwei Brocken offen aus
 dem Audit-Snapshot (A: HomeFragment-Restructure, B: Test-Isolation
-pro Modul). Plus §12: der Modul-Type-Switch wartet auf einen
-TimberWrapper-Logger-Backend-Refactor (~1h), bevor `:domain` zu
-`kotlin("jvm")` werden kann. §10 ist als wiederkehrender Quartals-
-Termin etabliert und triggert sich von selbst — nächster Recheck
-2026-Q3.
+pro Modul). §10 ist als wiederkehrender Quartals-Termin etabliert
+und triggert sich von selbst — nächster Recheck 2026-Q3.
 
 ---
 
@@ -71,22 +68,28 @@ welcher. Sonst wählst du falsch.
 
 ---
 
-## Audit-Snapshot 2026-05-03 (post-Brocken-C)
+## Audit-Snapshot 2026-05-03 (post-§12)
 
-Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach Brocken-C-
+Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach dem §11/§12-
 Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 
-### Score: **8.6/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
+### Score: **8.7/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
 
-### Was die +0.4 ggü. 8.2 gebracht hat
+### Was die +0.5 ggü. 8.2 gebracht hat
 
-- **Brocken C abgehakt — `:domain/src/main/` ist Android-frei.**
-  Alle 16 Files aus der 9.2-Variante-1-Schuldenliste sind durch.
-  `grep -rn "^import android\|^import androidx" domain/src/main/`
-  liefert leer. Die ursprünglich „bewusst abgegebenen 0.5 Punkte"
-  sind zurückgewonnen — bis auf den letzten Schritt (Modul-Type-
-  Switch von Android Library auf pure-Kotlin), der noch ein
-  build.gradle.kts-Eingriff ist. Daher 0.4 statt der vollen 0.5.
+- **`:domain` ist pure-Kotlin JVM Modul.** Plugin `kotlin("jvm")`,
+  keine Android-/AndroidX-/Timber-Imports im Source, kein
+  `BuildConfig`, kein `R`. Die ursprünglich im §9.2-Audit „bewusst
+  abgegebenen 0.5 Punkte" sind komplett zurückgewonnen.
+- **§11 (Source-Sweep):** alle 16 Files aus der 9.2-Variante-1-
+  Schuldenliste sind Android-frei (siehe §11-Memo).
+- **§12 (Modul-Type-Switch):** TimberWrapper auf `KolibriLog`-
+  Indirektion umgestellt (lambda-backed handlers, wired by
+  `KolibriLauncherApp.onCreate`). Strings nach `:app/res/`,
+  Sealed-Identifier statt `@StringRes Int` in drei Use Cases. Plugin
+  von `com.android.library` auf `kotlin("jvm")`, `hilt-core` (JAR)
+  statt `hilt-android` (AAR), `kotlinx-coroutines-core` statt
+  `kotlinx-coroutines-android`.
 - **Wert geliefert beim Refactor** (siehe §11-Memo): drei neue
   Domain-Modelle (`LauncherShortcut`, `DomainWallpaperColors`,
   `WallpaperBlendMode`), pure-Kotlin Color-Math (`core/ColorMath`),
@@ -110,25 +113,11 @@ Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
    getestet. Robolectric ist guter Backstop, kein vollständiger
    Ersatz.
 
-### Folge-Schritt zu §11 (Modul-Type-Switch — durch Timber-AAR blockiert)
+### Folge-Schritt zu §11 (erledigt durch §12)
 
-- **Modul-Type-Switch `:domain` Android Library → pure-Kotlin.**
-  Versuch 2026-05-03 (siehe §12-Memo unten). Drei preparatorische
-  Sub-Steps geliefert und gemerged: Strings-Move nach `:app/res/`,
-  Sealed-Identifier statt `@StringRes Int` in drei Use Cases, plus
-  `TimberWrapper.isDebugBuild` statt `BuildConfig.DEBUG`. Der eigentliche
-  Plugin-Switch zu `kotlin("jvm")` ist am letzten Schritt durch
-  **Timber 5.0.1 als `.aar`-Distribution** blockiert — JVM-Module
-  können keine AARs auf den Compile-Classpath ziehen, und TimberWrapper
-  hängt direkt am `Timber.tag(...).e(...)`-Aufruf.
-  Vor dem Plugin-Switch muss TimberWrapper auf einen runtime-injected
-  Logger-Backend umgebaut werden (analog zum `isDebugBuild`-Pattern):
-  `:app` setzt beim Init eine Logger-Lambda, die Timber drinhängt;
-  `:domain` selbst hat keinen Timber-Import mehr.
-  Größenordnung: ~1h zusätzlicher Refactor + Plugin-Switch danach.
-  Bringt die letzten ~0.1 Punkte. Bis dahin bleibt `:domain` Android
-  Library — Source ist jedoch Android-frei, und die preparatorischen
-  Schritte sind eigenständig wertvoll.
+§12 hat den Modul-Type-Switch komplett geliefert. `:domain` ist jetzt
+`kotlin("jvm")` mit `hilt-core` und `kotlinx-coroutines-core` als
+JVM-only-Dependencies. Memo unten.
 
 ### Mittelschwere Deckler
 
@@ -904,91 +893,113 @@ Modul-Type-Switch klar als kleiner Folge-Schritt umrissen ist
 
 ---
 
-## 12. (Memo, prep-arbeitsschritt 2026-05-03 geliefert; Plugin-Switch blockiert) `:domain` Modul-Type-Switch
+## 12. (Memo, abgeschlossen 2026-05-03) `:domain` Modul-Type-Switch
 
 **Motivation:** §11 hat `:domain/src/main/` Android-frei gemacht,
-aber das Modul-Type bleibt `com.android.library`. Der Audit-Snapshot
-hat den eigentlichen Switch auf `kotlin("jvm")` als ~0.1-Punkte-
-Followup eingeplant. Versuch 2026-05-03.
+aber das Modul-Type blieb `com.android.library`. §12 bringt den
+eigentlichen Switch auf `kotlin("jvm")` durch und holt damit die
+verbleibenden ~0.1 Punkte aus dem Audit-Snapshot.
 
-**Geliefert (in `refactor/domain-jvm-module`-Branch, gemerged):**
+**Verlauf in zwei Branches:**
 
-- **Strings-Move:** alle 12 Use-Case-Strings aus `:domain/res/values/`
-  und `values-de/` nach `:app/res/values/strings.xml` und
-  `:app/res/values-de/strings.xml`. Beide Locales komplett.
-  `:domain/res/` ist gelöscht.
-- **Sealed-Identifier-Refactor in drei Use Cases**: statt
-  `@StringRes Int` exposen die Use Cases jetzt sealed-class-
-  Identifier; UI-Layer mappt zur `R.string.*`-Resource per
-  Extension-Funktion in `:app/ui/util/DomainMessageMappers.kt`.
-  - `ToggleFavoriteUseCase.Result` — `Success.Added` / `Success.Removed`
-    / `Error.LimitReached(maxFavorites: Int)`.
-  - `AppLoadResult.Error(failure: Failure)` mit `Failure.NotLoaded` als
-    einzigem Fall heute (sealed-class lässt Erweiterung zu).
-  - `AppContextMenuAction.LauncherAction(id, label: LauncherActionLabel)`
-    mit acht Subtypen für die acht möglichen Action-Labels.
-  Konsumenten in `AppManagementDelegate`, `AppContextMenuAdapter` und
-  `BaseActivity`-Toast lookup'en die Resource jetzt explizit am UI-
-  Boundary statt sie im Domain-Modell zu tragen.
-- **`TimberWrapper.isDebugBuild`-Flag** ersetzt den
-  `BuildConfig.DEBUG`-Lookup: pure-Kotlin-Module haben keinen eigenen
-  BuildConfig, der Flag wird vom `:app`-Modul beim Init in
-  `KolibriLauncherApp.onCreate` aus `BuildConfig.DEBUG` gesetzt.
-  Pattern-Vorbild: das schon existierende `preventCrashForTesting`-
-  AtomicBoolean. TimberWrapperTest setzt es im `@Before` auf `true`
-  für DEBUG-Semantik (und überschreibt es zu `false` für den einen
-  RELEASE-spezifischen Test, der die Negativ-Bedingung pinnt).
+1. **`refactor/domain-jvm-module`** (preparatorisch): Strings nach
+   `:app/res/`, Sealed-Identifier statt `@StringRes Int` in drei Use
+   Cases, `TimberWrapper.isDebugBuild`-Flag. Plugin-Switch versucht
+   und am **Timber 5.0.1 als `.aar`-Distribution** gescheitert —
+   JVM-Module können keine AARs auf den Compile-Classpath ziehen.
+   Build.gradle.kts zurückgedreht, Sub-Steps aber gemerged.
 
-**Blockiert beim eigentlichen Plugin-Switch:**
+2. **`refactor/domain-jvm-module-final`** (Folge): Timber-AAR-
+   Blocker durch `:domain/core/KolibriLog`-Indirektion aufgelöst.
 
-Der finale Schritt — `domain/build.gradle.kts` von `com.android.library`
-auf `kotlin("jvm")` umstellen — scheitert an **Timber 5.0.1 als
-`.aar`-Distribution**. JVM-Module können keine AARs auf den Compile-
-Classpath ziehen (Gradle-Variant-Matching schlägt fehl mit
-„declares 'aar' library elements ... consumer needed class files").
-Timber 5.x hat keine JVM-only Variante.
-
-`TimberWrapper` ruft direkt `Timber.tag(...).e(...)` und
-`Timber.e(...)` auf — die statische Timber-API. Damit `:domain` ohne
-das Timber-AAR kompiliert, muss `TimberWrapper` einen runtime-
-injected Logger-Backend bekommen (Lambda oder funktionales Interface),
-das `:app` beim Init wired:
+**`KolibriLog` als Domain-Logging-Façade:**
 
 ```kotlin
-// In :domain/TimberWrapper.kt
-object TimberWrapper {
-    @Volatile var logError: (tag: String, throwable: Throwable?, message: String) -> Unit = { _, _, _ -> }
-    @Volatile var logFatal: (tag: String, message: String) -> Unit = { _, _ -> }
-    // …silentError ruft logError(SILENT_LOG_TAG, throwable, message) statt Timber.tag().e()
-}
+object KolibriLog {
+    @Volatile var dHandler: (message: String) -> Unit = { _ -> }
+    @Volatile var wHandler: (throwable: Throwable?, message: String) -> Unit = { _, _ -> }
+    @Volatile var taggedErrorHandler: (tag: String, throwable: Throwable?, message: String) -> Unit = { _, _, _ -> }
 
-// In :app/KolibriLauncherApp.onCreate (vor allen anderen Init-Schritten)
-TimberWrapper.logError = { tag, t, msg -> Timber.tag(tag).e(t, msg) }
-TimberWrapper.logFatal = { tag, msg -> Timber.tag(tag).e(msg) }
+    fun d(message: String) = dHandler(message)
+    fun w(message: String) = wHandler(null, message)
+    fun w(throwable: Throwable, message: String) = wHandler(throwable, message)
+    fun taggedError(tag: String, throwable: Throwable?, message: String) = taggedErrorHandler(tag, throwable, message)
+}
 ```
 
-Risiko-Punkt: silentError-Aufrufe auf dem Bootstrap-Pfad (vor
-`KolibriLauncherApp.onCreate`, z.B. in `attachBaseContext` oder
-`CrashReportConsentStore`-Lookup) wären mit dem Default-Lambda
-no-op statt Logging. Akzeptabel, weil der Default sicher ist (kein
-Crash) und KolibriLauncherApp den Wire-up direkt nach dem
-`isDebugBuild`-Setzen machen würde — ähnlich wie schon der
-ACRA-Init-Flow heute.
+Domain-Code (vier Use Cases plus TimberWrapper) ruft jetzt
+`KolibriLog.d(...)` / `KolibriLog.w(...)` / `KolibriLog.taggedError(...)`
+statt `Timber.d/w/tag().e(...)`. Pattern-Vorbild: das schon
+etablierte `TimberWrapper.isDebugBuild`-Flag und
+`preventCrashForTesting`-AtomicBoolean.
 
-**Größenordnung:** ~1h. Inkrementell gut testbar, weil der Logger-
-Backend-Pattern bereits durch `isDebugBuild` etabliert ist.
+`KolibriLauncherApp.onCreate` wired die Handler beim App-Init zu
+Timber durch — direkt nach `isDebugBuild`, vor allen anderen Init-
+Schritten:
 
-**Was nicht zu machen ist:** Timber als JAR-only konsumieren via
-Gradle-Attribute-Hacks (`org.gradle.libraryelements = jar` o.ä.).
+```kotlin
+TimberWrapper.isDebugBuild = BuildConfig.DEBUG
+KolibriLog.dHandler = { message -> Timber.d(message) }
+KolibriLog.wHandler = { throwable, message ->
+    if (throwable != null) Timber.w(throwable, message) else Timber.w(message)
+}
+KolibriLog.taggedErrorHandler = { tag, throwable, message ->
+    val tree = Timber.tag(tag)
+    if (throwable != null) tree.e(throwable, message) else tree.e(message)
+}
+```
+
+Default-Handler sind no-op, sodass `silentError`-Aufrufe auf dem
+Bootstrap-Pfad (vor `KolibriLauncherApp.onCreate`) sicher landen —
+nichts geloggt, aber kein Crash. Akzeptabel weil das ACRA-Init-Flow
+schon dieselbe Reihenfolge folgt.
+
+**`TimberWrapper`-internal:** das Last-resort-Log in `silentDeath` (das
+früher direkt `android.util.Log.e` aufrief) nutzt jetzt
+`System.err.println` als JVM-portablen Fallback, falls KolibriLog-
+Backend selbst werfen sollte.
+
+**Build-Config (`domain/build.gradle.kts`):**
+
+- Plugin: `kotlin("jvm")` statt `com.android.library`. Plus
+  `kotlin-kapt` und `kotlin-serialization`. `hilt-android`-Plugin
+  raus (Android-only); `kotlin-parcelize`-Plugin auch raus
+  (kein @Parcelize-User mehr in `:domain`).
+- Dependencies: `hilt-core` (JAR) statt `hilt-android` (AAR).
+  `kotlinx-coroutines-core` statt `kotlinx-coroutines-android`.
+  Timber-Dependency komplett raus aus `:domain`.
+- `android { ... }` block weg, `namespace`/`compileSdk`/
+  `buildFeatures`/`compileOptions`/`kotlin`-Block neu strukturiert
+  als `java { toolchain }` und `kotlin { jvmToolchain }`.
+- `:domain/src/main/AndroidManifest.xml` gelöscht.
+
+**Tests:** `TimberWrapperTest` setzt im `@Before` zusätzlich
+`KolibriLog.taggedErrorHandler` auf einen Lambda der zur Capture-Tree
+forwardet (wie `KolibriLauncherApp` es zu Timber forwardet); im
+`@After` wird der Handler zurück auf no-op. Reset-Pattern parallel zu
+`isDebugBuild`/`preventCrashForTesting`.
+
+**Verifikation:**
+
+- `grep -rn "^import android\|^import androidx\|^import timber" domain/src/main/`
+  liefert leer.
+- `./gradlew :domain:compileKotlin` und `:domain:test` laufen ohne
+  Android-Anteil. (`:domain:test` ist heute `NO-SOURCE` weil Tests
+  noch in `:app/src/test/` leben — siehe Brocken B als Folge-Projekt.)
+- `./gradlew assembleDebug` und voller `test`-Run grün.
+
+**Was bewusst NICHT gemacht wurde:** Timber als JAR-only konsumieren
+via Gradle-Attribute-Hacks (`org.gradle.libraryelements = jar` o.ä.).
 AGP-AARs sind ZIP-Container mit `classes.jar` darin, kein direkter
 Klassenpfad. Hacks würden zur Laufzeit instabile Resourcen-Auflösung
 geben.
 
-Memo bleibt damit ein zukünftiger Reviewer (a) sieht, dass die
-preparatorischen Schritte landed sind und unabhängig vom Plugin-
-Switch wertvoll waren (Sealed-Identifier sind Type-Safety-Win),
-(b) den Timber-Blocker als bekannten Sub-Step kennt, und (c) den
-Logger-Backend-Pattern als nächste Schritt-Anweisung hat.
+Memo bleibt damit (a) ein neuer Reviewer das Logging-Façade-Pattern
+versteht, (b) der Wire-up-Punkt in `KolibriLauncherApp` als load-
+bearing markiert ist (Bootstrap-Reihenfolge), und (c) zukünftige
+domain-Files direkt `KolibriLog` benutzen statt versehentlich Timber
+zu importieren (was den Build sofort brechen würde — sicheres
+Self-Enforcement).
 
 ---
 
