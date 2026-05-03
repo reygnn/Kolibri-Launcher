@@ -197,6 +197,19 @@ für die letzten 0.1, dann 9.0+.
   Lifecycle-Init, fire-and-forget-launchSafe-Bodies, oder strukturell
   via `_binding == null`-Guard schon abgesichert). Backstop-Test bleibt
   grün.
+- **Aktueller Stand 2026-05-03 (Region 2: Observers — N/A):**
+  Bereits in §9.3-Sweep abgehakt. Inline-Kommentare in `observeViewModel`
+  / `observeLayoutChanges` dokumentieren das (Zeilen 522-527, 637-638,
+  665-667). Region übersprungen.
+- **Aktueller Stand 2026-05-03 (Region 3: Layout-Calc + Rendering):**
+  2000 Zeilen, 52 catches (44 `Throwable`). Zwei Throwable-Catches in
+  `adjustScrollViewWidth` entfernt (outer + inner um `scrollTo`); ein
+  Throwable in `recalculateLayoutCache` zu `Resources.NotFoundException`
+  narrowed (legitime ProGuard-Throw-Site, sinnvolle UX-Fallbacks). Drei
+  Catches in der Region als legit-pattern verifiziert: `applyTopMargin`/
+  `applyLayoutToExistingViews` (tight-around-`getDimensionPixelSize` mit
+  Fallback) und `renderFavorites`-Per-Item-Recovery-Loop. LOC stieg um
+  4 wegen Erklärungs-Kommentaren — Audit-Klarheit ist der Win.
 - **Größenordnung:** ~30-40% von 1997 Zeilen — das ist der einzelne
   größte Hebel im Repo. Nicht ein Tag, eher eine Woche, mit Sweep-
   pro-Region statt Big Bang.

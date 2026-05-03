@@ -7,6 +7,7 @@ import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -697,7 +698,13 @@ class HomeFragment : Fragment() {
             currentVerticalPaddingPx = cache.verticalPaddingPx
             isCurrentFontBold = cache.isBold
 
-        } catch (e: Throwable) {
+        } catch (e: Resources.NotFoundException) {
+            // Narrowed from Throwable: the only realistic throw site is
+            // the two getDimension calls (a renamed/missing dimen under
+            // ProGuard surfaces here). The fallback values are meaningful
+            // UX recovery — without them the launcher would render with
+            // garbage text size. Programmer errors in layoutCalculator
+            // (pure float math) propagate as intended.
             TimberWrapper.silentError(e, "Error calculating layout cache")
             currentTextSizePx = AppConstants.FALLBACK_TEXT_SIZE_PX
             currentVerticalPaddingPx = AppConstants.FALLBACK_VERTICAL_PADDING_PX
@@ -889,80 +896,77 @@ class HomeFragment : Fragment() {
      * Adjust ScrollView width based on split mode
      */
     private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
-        try {
-            val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-            val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
-            val customScrollView = binding.favoritesScrollView
+        // Outer + inner try/catch removed per Rule 11. Body is pure View-
+        // setter / property-write code plus splitWeightCalculator (pure
+        // math). The only conceivable throw was a ClassCastException on
+        // the layoutParams cast — that's a programmer error if the XML
+        // ever changes type, and should crash loudly in DEBUG, not get
+        // swallowed. scrollView.scrollTo is a setter that does not throw.
+        val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
+        val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
+        val customScrollView = binding.favoritesScrollView
 
-            val weights = splitWeightCalculator.calculate(
-                enableSplit = enableSplit,
-                orientation = resources.configuration.orientation,
-                portraitScrollWeight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT,
-                portraitGestureWeight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT,
-                landscapeScrollWeight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT,
-                landscapeGestureWeight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
-            )
+        val weights = splitWeightCalculator.calculate(
+            enableSplit = enableSplit,
+            orientation = resources.configuration.orientation,
+            portraitScrollWeight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT,
+            portraitGestureWeight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT,
+            landscapeScrollWeight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT,
+            landscapeGestureWeight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
+        )
 
-            scrollParams.weight = weights.scrollViewWeight
-            gestureParams.weight = weights.gestureZoneWeight
+        scrollParams.weight = weights.scrollViewWeight
+        gestureParams.weight = weights.gestureZoneWeight
 
-            if (enableSplit) {
-                wasInSplitMode = true
+        if (enableSplit) {
+            wasInSplitMode = true
 
-                Timber.d("Split mode: ${if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"} (${weights.scrollViewWeight}/${weights.gestureZoneWeight})")
+            Timber.d("Split mode: ${if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"} (${weights.scrollViewWeight}/${weights.gestureZoneWeight})")
 
-                binding.gestureZone.isVisible = true
+            binding.gestureZone.isVisible = true
 
-                // ScrollView darf Touches abfangen (zum Scrollen)
-                customScrollView.allowIntercept = true
-                customScrollView.isScrollContainer = true
-                customScrollView.isClickable = true
-                customScrollView.isFocusable = true
-                customScrollView.isFocusableInTouchMode = true
+            // ScrollView darf Touches abfangen (zum Scrollen)
+            customScrollView.allowIntercept = true
+            customScrollView.isScrollContainer = true
+            customScrollView.isClickable = true
+            customScrollView.isFocusable = true
+            customScrollView.isFocusableInTouchMode = true
 
-                // Touch Listener für Split Mode
-                binding.gestureZone.setOnTouchListener { view, event ->
-                    if (event.action == MotionEvent.ACTION_UP) {
-                        view.performClick()
-                    }
-                    gestureDetector?.onTouchEvent(event) ?: false
+            // Touch Listener für Split Mode
+            binding.gestureZone.setOnTouchListener { view, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    view.performClick()
                 }
-
-            } else {
-                // FULL MODE
-                binding.gestureZone.isVisible = false
-                borderDecorator.remove(binding.favoritesScrollView)
-
-                if (wasInSplitMode) {
-                    try {
-                        binding.favoritesScrollView.scrollTo(0, 0)
-                        Timber.d("Scroll position reset to top (split→full)")
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error resetting scroll position")
-                    }
-                }
-                wasInSplitMode = false
-
-                // ScrollView MUSS das Abfangen von Touches verhindern
-                customScrollView.allowIntercept = false
-                customScrollView.isScrollContainer = false
-                customScrollView.isClickable = false
-                customScrollView.isFocusable = false
-                customScrollView.isFocusableInTouchMode = false
-
-                // Listener auf NULL setzen
-                customScrollView.setOnTouchListener(null)
-                binding.gestureZone.setOnTouchListener(null)
-
-                Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
+                gestureDetector?.onTouchEvent(event) ?: false
             }
 
-            binding.favoritesScrollView.layoutParams = scrollParams
-            binding.gestureZone.layoutParams = gestureParams
+        } else {
+            // FULL MODE
+            binding.gestureZone.isVisible = false
+            borderDecorator.remove(binding.favoritesScrollView)
 
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error adjusting ScrollView width")
+            if (wasInSplitMode) {
+                binding.favoritesScrollView.scrollTo(0, 0)
+                Timber.d("Scroll position reset to top (split→full)")
+            }
+            wasInSplitMode = false
+
+            // ScrollView MUSS das Abfangen von Touches verhindern
+            customScrollView.allowIntercept = false
+            customScrollView.isScrollContainer = false
+            customScrollView.isClickable = false
+            customScrollView.isFocusable = false
+            customScrollView.isFocusableInTouchMode = false
+
+            // Listener auf NULL setzen
+            customScrollView.setOnTouchListener(null)
+            binding.gestureZone.setOnTouchListener(null)
+
+            Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
         }
+
+        binding.favoritesScrollView.layoutParams = scrollParams
+        binding.gestureZone.layoutParams = gestureParams
     }
 
     private fun clearAllViews() {
