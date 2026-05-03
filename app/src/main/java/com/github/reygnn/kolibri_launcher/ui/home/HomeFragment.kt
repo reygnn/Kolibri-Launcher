@@ -42,9 +42,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
@@ -346,7 +343,16 @@ class HomeFragment : Fragment() {
     private val wallpaperViewBinder = WallpaperViewBinder(
         bitmapLoader = { uri -> loadBitmapFromUri(uri) }
     )
-    private var isToolbarDockedTop = false
+
+    /**
+     * Owns the wallpaper-edit-mode click listeners, layer-buttons state,
+     * snap controls, toolbar dim/dock, and view-transform persistence
+     * during edit mode. Lifetime is tied to [_binding] — created in
+     * [onViewCreated], nulled in [onDestroyView]. The controller's
+     * methods don't repeat `_binding == null` guards because the
+     * controller cannot outlive the binding.
+     */
+    private var wallpaperEditController: WallpaperEditController? = null
 
     private var layerPickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
 
@@ -392,7 +398,17 @@ class HomeFragment : Fragment() {
             setupDoubleTapActions()
             setupFragmentResultListener()
             setupHomeWindowInsets()
-            setupWallpaperEditButtonsInsets()
+
+            wallpaperEditController = WallpaperEditController(
+                binding = binding,
+                viewModel = viewModel,
+                resources = resources,
+                launchLayerPicker = {
+                    layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
+                },
+                rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
+            )
+            wallpaperEditController?.setupInsets()
 
             registerLayerImagePicker()
             observeViewModel()
@@ -662,12 +678,9 @@ class HomeFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { isEditMode ->
             if (_binding == null) return@collectOnStarted
-
-            try {
-                updateWallpaperEditMode(isEditMode)
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
-            }
+            // Inner try/catch removed per Rule 11 — applyEditMode has its
+            // own outer catch as the orchestration boundary.
+            wallpaperEditController?.applyEditMode(isEditMode)
         }
 
     }
@@ -1761,33 +1774,6 @@ class HomeFragment : Fragment() {
     }
 
 
-    /**
-     * Wendet WindowInsets auf die Wallpaper Edit-Buttons an.
-     * Stellt sicher, dass die Buttons über der Navigation Bar sichtbar bleiben.
-     */
-    private fun setupWallpaperEditButtonsInsets() {
-        try {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.wallpaperEditButtons) { view, insets ->
-                val navBarInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-                val basePadding = try {
-                    resources.getDimensionPixelSize(R.dimen.layout_padding)
-                } catch (e: Throwable) {
-                    16 // Fallback 16dp in pixels (ungefähr)
-                }
-
-                view.setPadding(
-                    view.paddingLeft,
-                    view.paddingTop,
-                    view.paddingRight,
-                    basePadding + navBarInsets.bottom
-                )
-                insets
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up wallpaper edit buttons insets")
-        }
-    }
-
     // ============================================================================
     // HELPER
     // ==========================================================================
@@ -1960,14 +1946,14 @@ class HomeFragment : Fragment() {
                 target = state,
                 preferredActiveLayerId = focusHint,
                 onRebuildComplete = {
-                    // Layer-Toolbar aktualisieren wenn im Edit-Mode
+                    // Refresh the layer-toolbar after a rebuild while in
+                    // edit mode. Inner try/catch removed per Rule 11 —
+                    // the controller's methods touch only View
+                    // properties, and the outer catch in updateWallpaper
+                    // covers any escape.
                     if (wallpaperView.isEditMode) {
-                        try {
-                            applyLayerButtonsState()
-                            updateLayerIndicator()
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error refreshing layer toolbar")
-                        }
+                        wallpaperEditController?.applyLayerButtonsState()
+                        wallpaperEditController?.updateLayerIndicator()
                     }
                 }
             )
@@ -1988,558 +1974,6 @@ class HomeFragment : Fragment() {
         }
     }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// METHODE: updateWallpaperEditMode() – ERSETZT die bestehende komplett
-// Enthält: Layer-Buttons, Toolbar-Dimming, Image Picker, Layer Indicator
-// ═════════════════════════════════════════════════════════════════════════════
-
-    private fun updateWallpaperEditMode(isEditMode: Boolean) {
-        if (_binding == null) return
-
-        try {
-            val wallpaperView = binding.wallpaperView
-            val editOverlay = binding.wallpaperEditOverlay
-            val touchInterceptor = binding.wallpaperTouchInterceptor
-
-            applyWallpaperEditState(
-                WallpaperEditTransition.targetState(WallpaperEditTransition.forMode(isEditMode))
-            )
-
-            if (isEditMode) {
-                // Snapshot für Cancel wird jetzt im WallpaperDelegate gehalten —
-                // bereits bei onEnterWallpaperEditMode() aufgenommen.
-
-                // ── TOOLBAR DIMMING bei Gesten ──
-                // Toolbar wird gedimmt sobald der User draggt oder zoomt,
-                // und blendet wieder auf wenn losgelassen wird.
-                touchInterceptor.setOnTouchListener { _, event ->
-                    when (event.actionMasked) {
-                        MotionEvent.ACTION_DOWN -> {
-                            // Noch nicht dimmen – erst bei echtem Drag/Zoom
-                        }
-                        MotionEvent.ACTION_MOVE -> {
-                            // Toolbar sanft ausblenden
-                            dimToolbar(true)
-                        }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                            // Toolbar wieder einblenden
-                            dimToolbar(false)
-                        }
-                    }
-                    wallpaperView.onTouchEvent(event)
-                }
-
-                // ── SAVE BUTTON ──
-                binding.btnWallpaperSave.setOnClickListener {
-                    try {
-                        val currentWallpaperState = viewModel.wallpaperState.value
-
-                        // Save-button runs after a finished edit session, so we
-                        // trust the state's isMultiLayer value directly. No
-                        // race-guard against the view here — see the contrast
-                        // at saveCurrentViewTransforms below.
-                        val action = WallpaperSaveAction.decide(
-                            isMultiLayer = currentWallpaperState.isMultiLayer,
-                            hasWallpaper = currentWallpaperState.hasWallpaper,
-                            allLayerTransforms = readAllLayerTransforms(wallpaperView),
-                            singleTransform = readSingleTransform(wallpaperView),
-                        )
-                        dispatchSaveAction(action)
-
-                        viewModel.onCommitWallpaperEditMode()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error saving wallpaper")
-                    }
-                }
-
-                // ── CANCEL BUTTON ──
-                // Rolls back the entire edit session via the delegate:
-                // - state is restored to the snapshot taken on enter
-                //   (in-memory synchronously, persistence + file cleanup async)
-                // - files of removed layers are kept; files of added
-                //   layers are cleaned up
-                // After rolling back the state we re-run updateWallpaper()
-                // so pure transform drags (which never touched the state)
-                // also get reset on the view.
-                binding.btnWallpaperCancel.setOnClickListener {
-                    try {
-                        viewModel.onCancelWallpaperEditMode()
-                        updateWallpaper(viewModel.wallpaperState.value)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error canceling wallpaper edit")
-                    }
-                }
-
-                // ── SNAP BUTTONS (unverändert) ──
-
-                updateSnapButtonIcon(wallpaperView.isSnapEnabled)
-                binding.btnWallpaperSnap.setOnClickListener {
-                    try {
-                        wallpaperView.isSnapEnabled = !wallpaperView.isSnapEnabled
-                        updateSnapButtonIcon(wallpaperView.isSnapEnabled)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error toggling snap")
-                    }
-                }
-
-                updateSnapModeButtonIcon(wallpaperView.snapMode)
-                binding.btnWallpaperSnapMode.setOnClickListener {
-                    try {
-                        wallpaperView.snapMode = when (wallpaperView.snapMode) {
-                            ZoomableImageView.SnapMode.EDGE -> ZoomableImageView.SnapMode.CENTER
-                            ZoomableImageView.SnapMode.CENTER -> ZoomableImageView.SnapMode.EDGE
-                        }
-                        updateSnapModeButtonIcon(wallpaperView.snapMode)
-                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
-                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error toggling snap mode")
-                    }
-                }
-
-                updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
-                binding.btnWallpaperHSnap.setOnClickListener {
-                    try {
-                        wallpaperView.isHorizontalSnapEnabled = !wallpaperView.isHorizontalSnapEnabled
-                        updateHorizontalSnapButtonIcon(wallpaperView.isHorizontalSnapEnabled, wallpaperView.snapMode)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error toggling horizontal snap")
-                    }
-                }
-
-                updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
-                binding.btnWallpaperVSnap.setOnClickListener {
-                    try {
-                        wallpaperView.isVerticalSnapEnabled = !wallpaperView.isVerticalSnapEnabled
-                        updateVerticalSnapButtonIcon(wallpaperView.isVerticalSnapEnabled, wallpaperView.snapMode)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error toggling vertical snap")
-                    }
-                }
-
-                // 5. Original Size (1:1)
-                binding.btnWallpaperOneToOne.setOnClickListener {
-                    try {
-                        wallpaperView.showOriginalSize()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error showing original size")
-                    }
-                }
-
-                // 6. Fit to Width
-                binding.btnWallpaperFitWidth.setOnClickListener {
-                    try {
-                        wallpaperView.fitToWidth()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error fitting to width")
-                    }
-                }
-
-                // ── Dock Toggle (oben ↔ unten) ──
-                binding.btnToolbarDock.setOnClickListener {
-                    try {
-                        isToolbarDockedTop = !isToolbarDockedTop
-                        dockToolbar(isToolbarDockedTop)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error toggling toolbar dock")
-                    }
-                }
-
-                // ══════════════════════════════════════
-                // LAYER MANAGEMENT BUTTONS
-                // ══════════════════════════════════════
-
-                applyLayerButtonsState()
-                updateLayerIndicator()
-
-                // ── ADD LAYER (+) ──
-                binding.btnLayerAdd.setOnClickListener {
-                    try {
-                        // Transforms sichern BEVOR neuer Layer hinzugefügt wird
-                        saveCurrentViewTransforms()
-                        layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error launching layer picker")
-                    }
-                }
-
-                // ── DELETE LAYER (Trash) ──
-                binding.btnLayerDelete.setOnClickListener {
-                    try {
-                        val activeIndex = wallpaperView.activeLayerIndex
-                        if (activeIndex >= 0 && wallpaperView.layerCount > 0) {
-                            // Transforms der anderen Layer sichern
-                            saveCurrentViewTransforms()
-                            viewModel.onRemoveWallpaperLayer(activeIndex)
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error deleting layer")
-                    }
-                }
-
-                // ── LAYER UP (Z-Order hoch) ──
-                binding.btnLayerUp.setOnClickListener {
-                    try {
-                        val activeIndex = wallpaperView.activeLayerIndex
-                        if (activeIndex < wallpaperView.layerCount - 1) {
-                            // Transforms sichern BEVOR getauscht wird
-                            saveCurrentViewTransforms()
-                            wallpaperView.moveLayerUp(activeIndex)
-                            viewModel.onSwapWallpaperLayers(activeIndex, activeIndex + 1)
-                            updateLayerIndicator()
-                            applyLayerButtonsState()
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error moving layer up")
-                    }
-                }
-
-                // ── LAYER DOWN (Z-Order runter) ──
-                binding.btnLayerDown.setOnClickListener {
-                    try {
-                        val activeIndex = wallpaperView.activeLayerIndex
-                        if (activeIndex > 0) {
-                            // Transforms sichern BEVOR getauscht wird
-                            saveCurrentViewTransforms()
-                            wallpaperView.moveLayerDown(activeIndex)
-                            viewModel.onSwapWallpaperLayers(activeIndex, activeIndex - 1)
-                            updateLayerIndicator()
-                            applyLayerButtonsState()
-                        }
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error moving layer down")
-                    }
-                }
-
-                // ── Layer-Tap Callback: Aktualisiert Indikator ──
-                wallpaperView.onLayerTapped = { _, _ ->
-                    updateLayerIndicator()
-                    applyLayerButtonsState()
-                }
-
-                Timber.d("Wallpaper edit mode: ON (multiLayer=${viewModel.wallpaperState.value.isMultiLayer}, layers=${wallpaperView.layerCount})")
-
-            } else {
-                // ══════════════════════════════════════
-                // EDIT MODE BEENDET
-                // ══════════════════════════════════════
-
-                touchInterceptor.setOnTouchListener(null)
-
-                // Alle Listener aufräumen
-                binding.btnWallpaperSave.setOnClickListener(null)
-                binding.btnWallpaperCancel.setOnClickListener(null)
-                binding.btnWallpaperSnap.setOnClickListener(null)
-                binding.btnWallpaperSnapMode.setOnClickListener(null)
-                binding.btnWallpaperHSnap.setOnClickListener(null)
-                binding.btnWallpaperVSnap.setOnClickListener(null)
-                binding.btnWallpaperOneToOne.setOnClickListener(null)
-                binding.btnWallpaperFitWidth.setOnClickListener(null)
-                binding.btnToolbarDock.setOnClickListener(null)
-
-                // Layer-Buttons aufräumen
-                binding.btnLayerAdd.setOnClickListener(null)
-                binding.btnLayerDelete.setOnClickListener(null)
-                binding.btnLayerUp.setOnClickListener(null)
-                binding.btnLayerDown.setOnClickListener(null)
-
-                // Layer-Callbacks aufräumen
-                wallpaperView.onLayerTapped = null
-
-                Timber.d("Wallpaper edit mode: OFF")
-            }
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
-        }
-    }
-
-    /**
-     * Applies a [WallpaperEditState] target onto the views and the
-     * Fragment's own properties. Pure side-effect; the decision of *which*
-     * state to apply is made by [WallpaperEditTransition.targetState].
-     *
-     * Both Enter and Exit funnel through this method, so adding a new
-     * field to [WallpaperEditState] only requires one place here to apply
-     * it (plus the per-transition target values in
-     * [WallpaperEditTransition], which the compiler enforces).
-     */
-    private fun applyWallpaperEditState(state: WallpaperEditState) {
-        val wallpaperView = binding.wallpaperView
-        wallpaperView.isEditMode = state.isEditMode
-        wallpaperView.isSnapEnabled = state.snapEnabled
-        wallpaperView.isHorizontalSnapEnabled = state.horizontalSnapEnabled
-        wallpaperView.isVerticalSnapEnabled = state.verticalSnapEnabled
-        wallpaperView.snapMode = state.snapMode
-        binding.wallpaperEditOverlay.visibility =
-            if (state.overlayVisible) View.VISIBLE else View.GONE
-        binding.rootLayout.alpha = state.rootLayoutAlpha
-        binding.wallpaperEditButtons.alpha = state.toolbarAlpha
-        isToolbarDockedTop = state.toolbarDockedTop
-    }
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// HELPER: Toolbar Dimming
-// ═════════════════════════════════════════════════════════════════════════════
-
-    /** Animationsdauer für Toolbar-Dimming */
-    private companion object {
-        const val TOOLBAR_SHOW_DURATION_MS = 200L
-    }
-
-    /**
-     * Dimmt die Toolbar-Buttons während Drag/Zoom-Gesten.
-     * Damit der User das Bild besser sehen kann ohne dass die Buttons stören.
-     */
-    private fun dimToolbar(dim: Boolean) {
-        if (_binding == null) return
-
-        try {
-            if (dim) {
-                // Komplett unsichtbar – blockiert keine Touches mehr
-                binding.wallpaperEditButtons.visibility = View.INVISIBLE
-            } else {
-                // Wieder sichtbar mit kurzem Fade-In
-                binding.wallpaperEditButtons.alpha = 0f
-                binding.wallpaperEditButtons.visibility = View.VISIBLE
-                binding.wallpaperEditButtons.animate()
-                    .alpha(1.0f)
-                    .setDuration(TOOLBAR_SHOW_DURATION_MS)
-                    .start()
-            }
-        } catch (e: Throwable) {
-            try {
-                binding.wallpaperEditButtons.visibility = if (dim) View.INVISIBLE else View.VISIBLE
-                binding.wallpaperEditButtons.alpha = 1.0f
-            } catch (_: Throwable) {}
-        }
-    }
-
-    private fun dockToolbar(top: Boolean) {
-        if (_binding == null) return
-
-        try {
-            val toolbar = binding.wallpaperEditButtons
-            val params = toolbar.layoutParams as? android.widget.FrameLayout.LayoutParams ?: return
-
-            if (top) {
-                params.gravity = android.view.Gravity.TOP
-                // Padding umdrehen: oben braucht Platz für Status Bar
-                toolbar.setPadding(
-                    toolbar.paddingLeft,
-                    toolbar.paddingBottom,  // Was unten war, kommt nach oben
-                    toolbar.paddingRight,
-                    12  // Minimales Padding unten
-                )
-            } else {
-                params.gravity = android.view.Gravity.BOTTOM
-                // Original-Padding wiederherstellen (Insets werden von setupWallpaperEditButtonsInsets gehandhabt)
-                toolbar.setPadding(
-                    toolbar.paddingLeft,
-                    12,  // Minimales Padding oben
-                    toolbar.paddingRight,
-                    toolbar.paddingTop  // Was oben war, kommt nach unten
-                )
-            }
-
-            toolbar.layoutParams = params
-
-            // Icon wechseln: Zeigt immer die ANDERE Richtung
-            binding.btnToolbarDock.setIconResource(
-                if (top) R.drawable.ic_dock_bottom else R.drawable.ic_dock_top
-            )
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error docking toolbar")
-        }
-    }
-
-    /**
-     * Speichert die aktuellen View-Transforms in den State.
-     * MUSS vor jeder Layer-Operation aufgerufen werden (Add, Delete, Swap),
-     * damit die Live-Transforms nicht verloren gehen wenn updateWallpaper()
-     * die Layer neu aufbaut.
-     */
-    private fun saveCurrentViewTransforms() {
-        if (_binding == null) return
-
-        try {
-            val wallpaperView = binding.wallpaperView
-            val currentState = viewModel.wallpaperState.value
-
-            // Race-Guard: läuft vor Layer-Operationen, in denen WallpaperState
-            // und ZoomableImageView temporär divergieren können (State updated,
-            // View noch nicht rebuilt — oder umgekehrt). Wir gehen nur dann auf
-            // den Multi-Layer-Save-Pfad, wenn beide Seiten einig sind, sonst
-            // liest getLayer(i) aus einem nicht-rebuilt View und produziert
-            // Garbage oder crasht. Der Save-Button-Pfad oben hat diesen Guard
-            // bewusst nicht, weil er nach abgeschlossener Edit-Session läuft.
-            val isMultiLayerEffective =
-                currentState.isMultiLayer && wallpaperView.isMultiLayerMode
-
-            val action = WallpaperSaveAction.decide(
-                isMultiLayer = isMultiLayerEffective,
-                hasWallpaper = currentState.hasWallpaper,
-                allLayerTransforms = readAllLayerTransforms(wallpaperView),
-                singleTransform = readSingleTransform(wallpaperView),
-            )
-            dispatchSaveAction(action)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error saving current view transforms")
-        }
-    }
-
-    /**
-     * Reads all layer transforms from the view in index order. Cheap:
-     * `getLayer` is `List.getOrNull`, layer count is small. The caller
-     * passes the list to [WallpaperSaveAction.decide] which may discard
-     * it (when the chosen branch is single-layer or no-op).
-     */
-    private fun readAllLayerTransforms(
-        wallpaperView: ZoomableImageView,
-    ): List<Triple<Float, Float, Float>> =
-        (0 until wallpaperView.layerCount).map { i ->
-            val layer = wallpaperView.getLayer(i)
-            Triple(
-                layer?.scale ?: 1f,
-                layer?.translateX ?: 0f,
-                layer?.translateY ?: 0f,
-            )
-        }
-
-    /**
-     * Reads the single-layer transform from the view. The view's
-     * currentScale/Tx/Ty getters fall back to layer-active values in
-     * multi-layer mode; that's fine because the caller passes this
-     * triple to [WallpaperSaveAction.decide] which only uses it on the
-     * single-layer branch.
-     */
-    private fun readSingleTransform(
-        wallpaperView: ZoomableImageView,
-    ): Triple<Float, Float, Float> = Triple(
-        wallpaperView.currentScale,
-        wallpaperView.currentTranslateX,
-        wallpaperView.currentTranslateY,
-    )
-
-    /**
-     * Forwards a [WallpaperSaveAction] decision to the corresponding
-     * ViewModel call. The dispatch table is the only place where the
-     * decision branches translate into side effects; the decision
-     * itself is pure.
-     */
-    private fun dispatchSaveAction(action: WallpaperSaveAction) {
-        when (action) {
-            is WallpaperSaveAction.SaveAllLayers ->
-                viewModel.onSaveAllLayerTransforms(action.transforms)
-            is WallpaperSaveAction.SaveSingle ->
-                viewModel.onSaveWallpaperTransform(
-                    action.scale,
-                    action.translateX,
-                    action.translateY,
-                )
-            is WallpaperSaveAction.NoOp -> {
-                // Nothing to save. The caller decides whether a follow-up
-                // commit is still needed (save-button does, layer-op
-                // pre-flush does not).
-            }
-        }
-    }
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// HELPER: Layer UI Updates
-// ═════════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Aktualisiert den Layer-Indikator Text: "Layer 2/3"
-     */
-    private fun updateLayerIndicator() {
-        if (_binding == null) return
-
-        try {
-            val wallpaperView = binding.wallpaperView
-            val count = wallpaperView.layerCount
-            val active = wallpaperView.activeLayerIndex
-
-            if (count > 0) {
-                binding.txtLayerIndicator.text = "Layer ${active + 1}/$count"
-                binding.txtLayerIndicator.visibility = View.VISIBLE
-            } else {
-                binding.txtLayerIndicator.visibility = View.GONE
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error updating layer indicator")
-        }
-    }
-
-    /**
-     * Wendet den aus [LayerButtonsState] berechneten UI-Zustand auf die
-     * Layer-Buttons an (Visibility, Enabled, Alpha).
-     *
-     * Idempotent: mehrfacher Aufruf hintereinander ist unproblematisch.
-     */
-    private fun applyLayerButtonsState() {
-        if (_binding == null) return
-        try {
-            val wallpaperView = binding.wallpaperView
-            val state = LayerButtonsState.from(
-                isMultiLayerMode = wallpaperView.isMultiLayerMode,
-                layerCount = wallpaperView.layerCount,
-                activeLayerIndex = wallpaperView.activeLayerIndex,
-            )
-
-            binding.btnLayerAdd.visibility = if (state.addVisible) View.VISIBLE else View.GONE
-            binding.btnLayerDelete.visibility = if (state.deleteVisible) View.VISIBLE else View.GONE
-            binding.btnLayerUp.visibility = if (state.upVisible) View.VISIBLE else View.GONE
-            binding.btnLayerDown.visibility = if (state.downVisible) View.VISIBLE else View.GONE
-            binding.txtLayerIndicator.visibility = if (state.indicatorVisible) View.VISIBLE else View.GONE
-
-            binding.btnLayerUp.isEnabled = state.upEnabled
-            binding.btnLayerDown.isEnabled = state.downEnabled
-            binding.btnLayerDelete.isEnabled = state.deleteEnabled
-
-            // Visuelle Rückmeldung: Deaktivierte Buttons halbtransparent
-            binding.btnLayerUp.alpha = state.upAlpha
-            binding.btnLayerDown.alpha = state.downAlpha
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error applying layer buttons state")
-        }
-    }
-
-    private fun updateSnapButtonIcon(isEnabled: Boolean) {
-        if (_binding == null) return
-        binding.btnWallpaperSnap.setIconResource(SnapIconResolver.resolveMagnet(isEnabled))
-    }
-
-    private fun updateSnapModeButtonIcon(mode: ZoomableImageView.SnapMode) {
-        if (_binding == null) return
-        binding.btnWallpaperSnapMode.setIconResource(SnapIconResolver.resolveSnapMode(mode.toIconMode()))
-    }
-
-    private fun updateHorizontalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
-        if (_binding == null) return
-        binding.btnWallpaperHSnap.setIconResource(
-            SnapIconResolver.resolveHorizontal(isEnabled, mode.toIconMode())
-        )
-    }
-
-    private fun updateVerticalSnapButtonIcon(isEnabled: Boolean, mode: ZoomableImageView.SnapMode) {
-        if (_binding == null) return
-        binding.btnWallpaperVSnap.setIconResource(
-            SnapIconResolver.resolveVertical(isEnabled, mode.toIconMode())
-        )
-    }
-
-    /**
-     * Überbrückt das im View genestete [ZoomableImageView.SnapMode] zum
-     * android-freien [SnapMode]-Enum von [SnapIconResolver]. Langfristig
-     * sollte ZoomableImageView direkt auf das Top-Level-Enum migrieren.
-     */
-    private fun ZoomableImageView.SnapMode.toIconMode(): SnapMode = when (this) {
-        ZoomableImageView.SnapMode.EDGE -> SnapMode.EDGE
-        ZoomableImageView.SnapMode.CENTER -> SnapMode.CENTER
-    }
 
     // ============================================================================
     // LIFECYCLE
@@ -2645,7 +2079,14 @@ class HomeFragment : Fragment() {
                 // Ignore
             }
 
-            // 4. Binding nullen - Der "Golden Hammer"
+            // 4. Wallpaper-Edit-Controller nullen — bevor _binding weg ist,
+            // damit die Controller-Referenzen auf das Binding noch gültig
+            // sind falls der Controller im Tear-Down noch etwas aufräumen
+            // möchte. Aktuell hält er nur Closures auf das Binding;
+            // Reihenfolge ist defensiv, nicht funktional erzwungen.
+            wallpaperEditController = null
+
+            // 5. Binding nullen - Der "Golden Hammer"
             // Durchbricht den Fragment-View-Zyklus.
             _binding = null
 
