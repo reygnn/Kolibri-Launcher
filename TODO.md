@@ -26,13 +26,15 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | weitgehend erledigt 2026-05-03 — `:domain:test` hat 310 Tests in 45 Files (alle pure-JVM, ~5s gesamt), testFixtures in `:domain` etabliert (TimberRule, MainDispatcherRule, 14 Fake*Repositories, 14 abstract Contracts). `:data:test` blockiert durch AGP-android-library testFixtures-Kotlin-Bug — Memo unten | erledigt-für-:domain, blockiert-für-:data |
 
-**Empfohlene Reihenfolge bei freier Wahl:** Brocken A (HomeFragment-
-Restructure) als verbleibender großer Brocken aus dem Audit-Snapshot.
-§13: Brocken B ist für `:domain` weitgehend durch (310 Tests gewandert);
-für `:data` durch einen AGP-Kotlin-testFixtures-Bug blockiert — Move
-folgt sobald der Bug fixed ist oder eine Alternative gefunden wird.
-§10 ist als wiederkehrender Quartals-Termin etabliert und triggert
-sich von selbst — nächster Recheck 2026-Q3.
+**Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
+Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
+2026-05-03), B (Test-Isolation pro Modul, §13 vollständig inkl. `:data:test`-
+Move, 2026-05-03), C (`:domain` pure-Kotlin, §11/§12). §10 ist als
+wiederkehrender Quartals-Termin etabliert und triggert sich von selbst —
+nächster Recheck 2026-Q3. Verbleibende mittelschwere Deckler (siehe
+Audit-Snapshot „Was die 0.1 unter 9.0 deckelt"): leeres `androidTest/`,
+MainActivity-Größe (~1000 Zeilen / ~37 Catches als Symptom). Score ist
+nach Brocken-A-Abschluss revidiert (siehe Audit-Snapshot unten).
 
 ---
 
@@ -47,16 +49,20 @@ Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
    warum, was bewusst weggelassen ist, wo anzufangen.
 3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
    technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
-4. **Diesen Audit-Snapshot unten** — aktueller Score 8.9, Baseline-
-   Vergleich, ein verbleibender großer Brocken zu 9+.
+4. **Diesen Audit-Snapshot unten** — aktueller Score 9.3 (post-Brocken-A
+   2026-05-04), Baseline-Vergleich, alle drei großen Brocken erledigt;
+   verbleibend nur noch mittelschwere Deckler.
 
 ### Ein kalter „leg los"-Auftrag braucht eine Richtungs-Entscheidung
 
-Der TODO.md-Status sagt „keine kleinen Open-Items mehr". Wenn der
-User trotzdem Arbeit will, ist das praktisch immer Brocken A
-(HomeFragment-Restructure) — frag aber einmal nach. Brocken C ist
-durch (§11/§12), Brocken B für `:domain` durch (§13), für `:data`
-blockiert durch einen AGP-Bug.
+Der TODO.md-Status sagt „keine offenen Brocken mehr". Alle drei großen
+Brocken aus dem Audit-Snapshot sind durch (A: HomeFragment 2026-05-03,
+B: §13 inkl. `:data:test`-Move, C: §11/§12). Wenn der User trotzdem
+Arbeit will, gibt es keinen offensichtlichen Default mehr — frag was er
+will. Mögliche Anker: die mittelschweren Deckler aus dem Audit-Snapshot
+(`androidTest/` leer, MainActivity-Größe), der Quartals-Recheck §10
+(2026-Q3), oder ein neuer Audit-Pass für eine aktuelle Score-
+Bestandsaufnahme.
 
 ### Workflow-Defaults
 
@@ -72,12 +78,26 @@ blockiert durch einen AGP-Bug.
 
 ---
 
-## Audit-Snapshot 2026-05-03 (post-§13)
+## Audit-Snapshot 2026-05-03 (post-§13), aktualisiert 2026-05-04 (post-Brocken-A)
 
 Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach dem §11/§12/§13-
 Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
+Score-Bump 2026-05-04 nach Brocken-A-Abschluss eingetragen, basierend auf
+der ursprünglichen Audit-Formel „Eins davon sauber bringt 0.4-0.5".
 
-### Score: **8.9/10** (post-§9.2: 8.2/10, vor §9.2: 7.5/10)
+### Score: **9.3/10** (post-Brocken-A 2026-05-04: 9.3, post-§13: 8.9, post-§9.2: 8.2, vor §9.2: 7.5)
+
+### Was die +0.4 ggü. 8.9 gebracht hat (Brocken A, 2026-05-03)
+
+- **HomeFragment try/catch-Audit erledigt.** Sieben Region-Sweeps
+  mit Vier-Kategorien-Frame, Endstand 1972 Zeilen reiner Sweep
+  (1989 inkl. Header-Refresh-Commit `090a6d0`), 19 catches (-68%
+  ggü. 59 Baseline), 11 Throwable (-78% ggü. 51 Baseline).
+  HomeFragment war der größte einzelne Hebel im Repo und der #1-
+  Deckler im post-§13-Snapshot. Die verbleibenden Catches sind alle
+  echte Boundaries (I/O, system-callback, per-Item-Recovery) und in
+  der Funktions-KDoc als preserved-pattern dokumentiert. Backstop-
+  Test (`HomeFragmentRobolectricTest`) bleibt grün.
 
 ### Was die +0.7 ggü. 8.2 gebracht hat
 
@@ -180,14 +200,15 @@ Code- und Test-Qualität schlagen Doku-Qualität bei der Note. Die
 +0.4 von Brocken C sind explizit aus Code-Refactoring gekommen,
 nicht aus Doku-Pflege.
 
-### Pfad zu 9+
+### Pfad zu 9+ (historisch — alle Brocken erledigt 2026-05-03)
 
-Brauchst genau **einen** der zwei verbleibenden großen Brocken sauber,
-um über 9 zu kommen. Beide halb wäre Score-neutral. Eins davon sauber
-bringt 0.4-0.5 — plus der oben beschriebene §11-Modul-Type-Followup
-für die letzten 0.1, dann 9.0+.
+Stand zum Audit-Zeitpunkt war: einer der zwei verbleibenden großen
+Brocken (A oder B) sauber bringt 0.4-0.5, plus §11-Modul-Type-Followup
+die letzten 0.1, dann 9.0+. Inzwischen sind alle drei Brocken durch
+(A, B, C) — Score liegt bei 9.3 (siehe Score-Block oben). Die Sektionen
+unten bleiben als Audit-Trail erhalten.
 
-#### Brocken A — HomeFragment try/catch-Audit + Lifecycle-Restructure
+#### Brocken A — HomeFragment try/catch-Audit + Lifecycle-Restructure (erledigt 2026-05-03)
 
 - **Plan lebt bereits im Code.** `HomeFragment.kt` Datei-Header
   (Zeilen ~72-233) beschreibt den Pfad selbst. **Lies den Header

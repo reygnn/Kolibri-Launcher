@@ -5,6 +5,13 @@
 > Behauptungen wurden gegen das tatsächliche Repo verifiziert (mehrere initial
 > gemeldete „BLOCKER" haben sich als Fehlannahmen herausgestellt und wurden
 > entfernt).
+>
+> **Aktualisiert 2026-05-04:** HomeFragment-Zeilenzahlen auf den Stand
+> nach Brocken-A-Sweep (TODO „Pfad zu 9+") nachgezogen — das Original-
+> Audit hatte mit 2657 Zeilen (Pre-§9.3-Stand) gearbeitet, inzwischen
+> ist HomeFragment bei 1989 Zeilen / 19 Catches. Die Bewertungs-Logik
+> der einzelnen Befunde bleibt unverändert; nur die belegten Zahlen
+> wurden gesynced. Score-Update siehe TODO.md → Audit-Snapshot.
 
 **Skala:**
 - 🔴 **BLOCKER** — bricht Architektur-Regel oder Korrektheit
@@ -101,8 +108,8 @@ Sauber durch:
 - **Rule 7** — `KolibriLauncherApp` Mehrschicht-Paranoia ist intakt.
 - **Rule 8** — ACRA wird sofort nach Init deaktiviert; Reaktivierung nur bei Consent.
 - **Rule 9** — kein nacktes `Timber.e(` außerhalb `KolibriLauncherApp.kt` und `TimberWrapper.kt`.
-- **Rule 10** — keine Activity/Fragment/Receiver mit nennenswerter Business-Logik außerhalb Helpern. (`HomeFragment` 2657 Zeilen sind View-Glue + Wallpaper-Edit, dokumentiert.)
-- **Rule 11** — keine Catches um can't-throw-Operationen mehr; TODO §2 Sweep hat 229 entfernt, Reste sind legitim.
+- **Rule 10** — keine Activity/Fragment/Receiver mit nennenswerter Business-Logik außerhalb Helpern. (`HomeFragment` 1989 Zeilen sind View-Glue + Wallpaper-Edit, dokumentiert.)
+- **Rule 11** — keine Catches um can't-throw-Operationen mehr; TODO §2 Sweep hat 229 entfernt, Brocken-A-Audit weitere 40 Catches in HomeFragment (sieben Region-Sweeps, 59→19), Reste sind legitim.
 - **Rule 12** — keine `Timber.Forest.`-Aufrufe.
 
 ---
@@ -130,7 +137,7 @@ $ grep -rn "repeatOnLifecycle" app/src/main/java | wc -l
 
 | Datei | Zeilen | Bewertung |
 |---|---:|---|
-| `ui/home/HomeFragment.kt` | 2657 | Bewusst (CLAUDE.md erwähnt explizit) |
+| `ui/home/HomeFragment.kt` | 1989 | Bewusst (CLAUDE.md erwähnt explizit); post-Brocken-A 2026-05-03 von 2657 reduziert |
 | `ui/home/ZoomableImageView.kt` | 1468 | Custom-View für Multi-Layer-Wallpaper-Edit; vertretbar |
 | `data/BackupRepositoryImpl.kt` | 1444 | TODO.md §3 Split-Verwerfung dokumentiert |
 | `ui/settings/SettingsFragment.kt` | 1074 | Klassisches PreferenceFragment-Smell — Aufteilbar |
@@ -402,7 +409,7 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 | 2× SharedPreferences (`DataMigrationManager`, `CrashReportLimiter`) | Bootstrap-Henne-Ei + sync ACRA-Aufruf | Rule 5 |
 | `runBlocking` in `attachBaseContext` | Privacy-Race-Window vermeiden | KNOWN_ISSUES.md |
 | ProGuard `keep class …** { *; }` | Stack-Trace-Treue für Crash-Reports | Projekt-Philosophie (GPLv3) |
-| `HomeFragment` 2657 Zeilen | Pure Logik bereits extrahiert; UI-Glue bleibt | CLAUDE.md |
+| `HomeFragment` 1989 Zeilen (post-Brocken-A 2026-05-03) | Pure Logik bereits extrahiert; UI-Glue bleibt; verbleibende Catches sind echte Boundaries | CLAUDE.md, TODO „Pfad zu 9+" |
 | `BackupRepositoryImpl` 1444 Zeilen | Split würde 9 Repo-Deps duplizieren, nicht reduzieren | TODO.md §3 |
 | `SettingsFragment` 1074 Zeilen (§2.2) | PreferenceFragmentCompat-Pattern; weiteres Aufteilen wäre rein kosmetisch — keine echte Komplexität | akzeptiert 2026-05-03 |
 | `AppDrawerFragment` 607 Zeilen (§2.2) | KeyboardShowCoordinator + Adapter sind bereits extrahiert; weiteres Aufteilen wäre rein kosmetisch | akzeptiert 2026-05-03 |
