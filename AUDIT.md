@@ -119,20 +119,46 @@ Sauber durch:
 
 ## 2. Code-Smells, Duplikation, Komplexitäts-Hotspots
 
-### 2.1 🟡 MINOR — 34 rohe `repeatOnLifecycle`-Blöcke statt `collectOnStarted`-Extension
+### 2.1 (erledigt 2026-05-04) — Sweep `repeatOnLifecycle` → `collectOnStarted`
 
-`ui/flow/FlowCollection.kt` definiert die Extension `Fragment.collectOnStarted`,
-exakt um diese 8-Zeilen-Boilerplate zu kollabieren. Aktuell stehen
-**34 Vorkommen** roher `repeatOnLifecycle(Lifecycle.State.STARTED)` über das
-Repo verteilt.
+Audit-Ausgang: „34 Vorkommen" — bei genauerer Verifikation 12 echte
+Call-Sites (Rest waren Imports + Doc-Kommentare). Davon waren 8
+konvertierbar; die übrigen 4 sind multi-launch / nested-coroutine-Shapes,
+die per `FlowCollection.kt`-KDoc bewusst aus dem Extension-Scope
+ausgenommen sind.
 
-```bash
-$ grep -rn "repeatOnLifecycle" app/src/main/java | wc -l
-34
-```
+**Umgesetzt (commit nach 2026-05-04):**
 
-**Fix:** Mechanischer Sweep — `viewLifecycleOwner.lifecycleScope.launch { repeatOnLifecycle(STARTED) { … } }`
-→ `collectOnStarted { … }`. ~250–300 Zeilen Reduktion zu erwarten.
+- Neue `ComponentActivity.collectOnStarted`-Extension parallel zur
+  bestehenden Fragment-Variante in `ui/flow/FlowCollection.kt`
+  (Activities haben kein `viewLifecycleOwner`, brauchen daher eigenen
+  Receiver).
+- 8 Activity-Sites konvertiert: `CustomNamesActivity` (×2),
+  `HiddenAppsActivity` (×2), `OnboardingActivity` (×2 — bei einer fiel
+  ein unnötiger Inner-`launch` weg), `SwipeActionsActivity` (×2).
+
+**Bewusst NICHT konvertiert (4 Sites):**
+
+- `AppDrawerFragment:220` — Body enthält `searchJob = launch { delay; ... }`
+  (debounced search). KDoc-explicit „Not covered".
+- `BaseActivity:61` — multi-launch (Job 1 + Job 2 + …) inside
+  `repeatOnLifecycle`. KDoc-excluded.
+- `UsageExportFragment:105` — multi-launch.
+- `SettingsFragment:644` — multi-launch.
+
+Net-LOC: ~+30 (wegen der neuen ComponentActivity-Extension; reine
+Call-Sites etwa gleich groß). Audit-Schätzung „250–300 Zeilen
+Reduktion" beruhte auf dem unfilterten 34-er-Count und überschätzte
+die Pro-Site-Ersparnis — realer Win liegt nicht im LOC, sondern in:
+
+- zentralisierter Error-Handling-Schicht (Catch-Logik nur einmal in
+  FlowCollection.kt, nicht 8× kopiert)
+- drift-resistenter Konvention (wenn die Inner-Catch-Policy ändert,
+  ändert sie sich an einer Stelle)
+- symmetrischer Coverage von Fragment + Activity (Extension parallel
+  zur Fragment-Variante)
+- weniger kognitives Boilerplate-Geräusch — `collectOnStarted` ist
+  benannt für seinen Zweck.
 
 ---
 
@@ -393,7 +419,7 @@ vielen `DO NOT…`-Pinnings übersichtlicher machen.
 | 1 | 5 min | hoch | CLAUDE.md Rule 1 + Rule 2 von „XyzManager" auf „XyzRepositoryImpl" aktualisieren (§ 1.1) |
 | 2 | 2 min | mittel | `AppUsageRepositoryImpl.kt:171-173` Kommentar ins Englische (§ 1.2) |
 | 3 | 1 min | klein | `app/src/main/res/drawable/ic_center_focus.xml` löschen (§ 5.3) |
-| 4 | 30 min | mittel | Mechanischer Sweep `repeatOnLifecycle` → `collectOnStarted` (§ 2.1) |
+| 4 | ~~30 min~~ | mittel | ~~Mechanischer Sweep `repeatOnLifecycle` → `collectOnStarted`~~ — erledigt 2026-05-04 (§ 2.1) |
 | 5 | 1 h | hoch | Tests für `ContextMenuHelper` + `ScrollViewBorderDecorator` schreiben oder einbetten (§ 3.1) |
 | 6 | 1 h | mittel | ADR-KDoc in `ShortcutRepository`/`ResetRepository`/`UsageExportRepository` ODER Contract nachziehen (§ 1.3) |
 | 7 | 2–4 h | hoch | Top-10 `mockk(relaxed = true)`-Hotspots auf Fakes umstellen (§ 3.2) |

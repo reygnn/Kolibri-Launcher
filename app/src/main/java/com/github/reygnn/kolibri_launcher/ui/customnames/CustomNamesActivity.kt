@@ -12,9 +12,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.core.widget.doOnTextChanged
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -22,14 +20,15 @@ import com.github.reygnn.kolibri_launcher.databinding.ActivityCustomNamesBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * CRASH-SAFE VERSION
@@ -153,14 +152,12 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
             searchQueryFlow.value = text?.toString() ?: ""
         }
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                searchQueryFlow
-                    .debounce(SEARCH_DEBOUNCE_MS)
-                    .collect { query ->
-                        viewModel.onSearchQueryChanged(query)
-                    }
-            }
+        collectOnStarted(
+            flow = searchQueryFlow.debounce(SEARCH_DEBOUNCE_MS),
+            errorTag = "searchQuery",
+            coroutineContext = EmptyCoroutineContext,
+        ) { query ->
+            viewModel.onSearchQueryChanged(query)
         }
     }
 
@@ -169,10 +166,12 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     }
 
     private fun observeViewModelState() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state -> updateUi(state) }
-            }
+        collectOnStarted(
+            flow = viewModel.uiState,
+            errorTag = "uiState",
+            coroutineContext = EmptyCoroutineContext,
+        ) { state ->
+            updateUi(state)
         }
     }
 

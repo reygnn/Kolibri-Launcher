@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.flow
 
+import androidx.activity.ComponentActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -73,6 +74,46 @@ fun <T> Fragment.collectOnStarted(
     coroutineContext: CoroutineContext,
     collector: suspend (T) -> Unit,
 ): Job = viewLifecycleOwner.lifecycleScope.launch(coroutineContext) {
+    try {
+        repeatOnLifecycle(Lifecycle.State.STARTED) {
+            try {
+                flow.collect { value -> collector(value) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "$errorTag (collect)")
+            }
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        TimberWrapper.silentError(e, "$errorTag (lifecycle)")
+    }
+}
+
+/**
+ * Activity counterpart of the Fragment [collectOnStarted] extension above.
+ * Uses the Activity's own [lifecycleScope] (not a view-lifecycle scope —
+ * Activities don't have one). Same shape, same scope-limits: not for
+ * multi-sub-launch blocks or for collect bodies that nest their own
+ * coroutines.
+ *
+ * @param flow source flow to collect from while STARTED.
+ * @param errorTag identifier used for log messages on both catch layers.
+ * @param coroutineContext extra context for the outer launch. Most Activity
+ *   call sites in this project don't carry a per-Activity exception handler
+ *   (failures bubble to `lifecycleScope`'s default behavior), so passing
+ *   `EmptyCoroutineContext` is the common case. No default — explicit at
+ *   every call site, matching the Fragment extension's discipline.
+ * @param collector body invoked for each emitted value.
+ * @return the [Job] of the outer launch.
+ */
+fun <T> ComponentActivity.collectOnStarted(
+    flow: Flow<T>,
+    errorTag: String,
+    coroutineContext: CoroutineContext,
+    collector: suspend (T) -> Unit,
+): Job = lifecycleScope.launch(coroutineContext) {
     try {
         repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {

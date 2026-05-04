@@ -10,15 +10,13 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.core.widget.doOnTextChanged
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivityOnboardingBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
@@ -26,8 +24,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * ARCHITECTURE NOTE: Shared UI Components with HiddenAppsActivity
@@ -179,19 +177,17 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             searchQueryFlow.value = text?.toString() ?: ""
         }
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                searchQueryFlow
-                    .debounce(SEARCH_DEBOUNCE_MS)
-                    .collect { query ->
-                        try {
-                            viewModel.onSearchQueryChanged(query)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error in search query changed")
-                        }
-                    }
+        collectOnStarted(
+            flow = searchQueryFlow.debounce(SEARCH_DEBOUNCE_MS),
+            errorTag = "searchQuery",
+            coroutineContext = EmptyCoroutineContext,
+        ) { query ->
+            try {
+                viewModel.onSearchQueryChanged(query)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in search query changed")
             }
         }
     }
@@ -216,14 +212,12 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     }
 
     private fun observeViewModel() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    viewModel.uiState.collect { state ->
-                        updateUi(state)
-                    }
-                }
-            }
+        collectOnStarted(
+            flow = viewModel.uiState,
+            errorTag = "uiState",
+            coroutineContext = EmptyCoroutineContext,
+        ) { state ->
+            updateUi(state)
         }
     }
 
