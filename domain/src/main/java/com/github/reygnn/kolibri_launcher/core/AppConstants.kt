@@ -184,6 +184,14 @@ object AppConstants {
         const val SWIPE_ACTIONS = "swipe_actions"
         const val CRASH_REPORTS = "crash_reports"
         const val SECURE_WINDOW = "secure_window"
+
+        // Developer commands (Settings → Entwickler-Befehle): test/diagnostic
+        // shortcuts for ACRA crash-report verification. Visible in release
+        // builds because the maintainer needs them after every refactor that
+        // touches the crash pipeline (see TODO §14 for the libs.json/ACRA
+        // diagnosis arc that motivated these shortcuts).
+        const val RESET_ACRA_TIMER = "reset_acra_timer"
+        const val THROW_TEST_EXCEPTION = "throw_test_exception"
     }
 
     // Default Values für Settings

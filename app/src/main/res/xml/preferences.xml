@@ -193,4 +193,25 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
+    <!-- Entwickler-Befehle: ACRA-Verifikations-Shortcuts (Reset Limiter,
+         Throw Test Exception). Auch im Release sichtbar — siehe TODO §14
+         und die Strings im values/strings.xml. -->
+    <PreferenceCategory
+        android:key="category_developer_commands"
+        android:title="@string/developer_commands_category_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="reset_acra_timer"
+            android:title="@string/reset_acra_timer_title"
+            android:summary="@string/reset_acra_timer_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="throw_test_exception"
+            android:title="@string/throw_test_exception_title"
+            android:summary="@string/throw_test_exception_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

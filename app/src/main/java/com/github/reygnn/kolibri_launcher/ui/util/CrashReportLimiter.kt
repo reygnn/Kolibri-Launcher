@@ -206,8 +206,13 @@ object CrashReportLimiter {
     }
 
     /**
-     * Reset all limits (useful for testing or debugging).
-     * Should only be called from debug builds.
+     * Reset all crash-report cooldown timestamps stored by this limiter.
+     *
+     * Wired into Settings → Developer Commands → "Reset ACRA cooldown
+     * timer" so the maintainer can force the next crash to submit
+     * immediately, even when a same-class crash was already reported
+     * within the 24h dedup window. Safe to call in release builds — only
+     * the deduplication state is cleared, no user data is touched.
      */
     fun resetAllLimits() {
         try {

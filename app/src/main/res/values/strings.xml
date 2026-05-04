@@ -211,6 +211,17 @@
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
 
+    <!-- Developer commands: ACRA crash-report verification shortcuts. Visible
+         in release builds because the maintainer needs them after every refactor
+         that touches the crash pipeline. -->
+    <string name="developer_commands_category_title">Developer Commands</string>
+    <string name="reset_acra_timer_title">Reset ACRA cooldown timer</string>
+    <string name="reset_acra_timer_summary">Clears the 24-hour crash-report deduplication so the next crash submits immediately. Useful when verifying crash reporting end-to-end.</string>
+    <string name="throw_test_exception_title">Throw test exception</string>
+    <string name="throw_test_exception_summary">Deliberately crashes the app to verify ACRA submission end-to-end. Use only when you want to test crash reporting.</string>
+    <string name="toast_acra_timer_reset">ACRA cooldown timer cleared.</string>
+    <string name="toast_throwing_test_exception">Throwing test exception — app will crash now.</string>
+
     <string name="swipe_actions_title_screen">Swipe Actions</string>
     <string name="swipe_actions_subtitle_screen">Assign apps to left and right swipe</string>
     <string name="swipe_slot_empty">None</string>

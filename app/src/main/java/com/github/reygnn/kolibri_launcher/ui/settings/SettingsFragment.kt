@@ -45,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -579,6 +580,53 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 TimberWrapper.silentError(e, "Error in crash reports preference click")
                 false
             }
+        }
+
+        // Developer commands: ACRA-verification shortcuts. Click handlers are
+        // tiny and effectively can't throw, but we wrap defensively because
+        // a throw in a Preference click handler propagates straight to the
+        // global UncaughtExceptionHandler — which for the throw-test button
+        // is exactly what we WANT, but for the reset-timer button would be
+        // a regression. Two separate handlers keep the intent obvious.
+        findPreference<Preference>(AppConstants.PrefKeys.RESET_ACRA_TIMER)?.setOnPreferenceClickListener {
+            try {
+                CrashReportLimiter.resetAllLimits()
+                Toast.makeText(
+                    requireContext(),
+                    R.string.toast_acra_timer_reset,
+                    Toast.LENGTH_SHORT,
+                ).show()
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error resetting ACRA cooldown timer")
+                false
+            }
+        }
+
+        findPreference<Preference>(AppConstants.PrefKeys.THROW_TEST_EXCEPTION)?.setOnPreferenceClickListener {
+            // Toast first so the user sees the warning before the crash.
+            // The Thread + Thread.sleep(800) gives Android time to render
+            // the Toast (~300ms surface) before the throw lands. The throw
+            // runs on a non-Main thread with no CoroutineExceptionHandler
+            // attached, so it travels straight to ACRA's global
+            // UncaughtExceptionHandler — the exact path a real user crash
+            // takes.
+            Toast.makeText(
+                requireContext(),
+                R.string.toast_throwing_test_exception,
+                Toast.LENGTH_LONG,
+            ).show()
+            Thread {
+                try {
+                    Thread.sleep(800)
+                } catch (_: InterruptedException) {
+                    // ignore — the throw below is the point
+                }
+                throw RuntimeException(
+                    "ACRA developer-test crash from Settings (version ${BuildConfig.VERSION_NAME})",
+                )
+            }.start()
+            true
         }
     }
 
