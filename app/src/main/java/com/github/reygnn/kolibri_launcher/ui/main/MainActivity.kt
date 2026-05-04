@@ -53,17 +53,157 @@ import org.acra.ACRA
 import timber.log.Timber
 import javax.inject.Inject
 
-/**
- * ULTRA CRASH-SAFE & STABLE VERSION
+/*
+ * =============================================================================
+ *                    MainActivity — Catch-Sweep & Frame Notes
+ * =============================================================================
  *
- * Multi-layer exception handling:
- * - Throwable catch (handles Exception + Error types)
- * - CoroutineExceptionHandler for uncaught coroutine exceptions
- * - CancellationException properly re-thrown
- * - Idempotent initialization (runs only once)
- * - Safe state restoration after configuration changes
- * - Race condition prevention for wallpaper colors
- * - Proper cleanup in lifecycle methods
+ * Status: Post catch-sweep (2026-05-04). 24 try/catch blocks (20
+ * Throwable), 972 lines. Down from 48 / 40 / 797 on origin/main —
+ * catch reduction 50% / 50%. The line count grew because the audit-
+ * style header KDoc and the inline rationale comments on every kept
+ * catch are part of the deal: each remaining catch carries a one-
+ * paragraph reason that names its four-category frame slot, so a
+ * future reader knows why it is there before they ask.
+ *
+ *
+ * Pure-logic extraction in this sweep
+ * -----------------------------------
+ * `InitialSetupAction.decide` — sealed resolver for the first-run setup
+ * path (LaunchOnboarding vs InitializeImmediately, with the wipe+reinstall
+ * edge case). Pattern parallel to `AppLaunchAction.decide`; JVM-tested
+ * exhaustively in `InitialSetupActionTest`.
+ *
+ *
+ * The four-category frame for try/catch
+ * -------------------------------------
+ * Every remaining catch in this file falls into exactly one of these four
+ * named categories. Reviewers: please apply when adding a new catch, and
+ * please challenge any unannotated catch.
+ *
+ *   Expected errors (system API / external boundary) — caught with a
+ *     specific exception type, or with `Throwable` where several specific
+ *     types share the same recovery. User-facing recovery via Toast where
+ *     it matters. Examples: `launchApp`'s
+ *     ActivityNotFoundException + SecurityException + Throwable triple,
+ *     `startActivitySafely`'s Intent-resolution catch with fallback,
+ *     `OpenCalendar`'s Toast-recovery branch, `updateWallpaperColors`'
+ *     WallpaperManager-read catch with graceful fallback to default UI
+ *     colours.
+ *
+ *   Teardown races (Activity finishing / Window detached) — prevented
+ *     structurally with `if (isFinishing || isDestroyed) return` guards
+ *     before every Dialog.show() / DialogFragment.show() call site,
+ *     NOT masked with a post-hoc catch. The race
+ *     (WindowManager.BadTokenException / IllegalStateException
+ *     "Can not perform this action after onSaveInstanceState") becomes
+ *     impossible to hit, so no catch is needed.
+ *
+ *   Programmer errors (NPE, IllegalState, IndexOutOfBounds in pure
+ *     paths) — bugs, not conditions. Crash loudly in DEBUG via
+ *     silentError, RELEASE logs and ends the coroutine. Do not catch.
+ *     Removed wholesale in this sweep from `setupWindow`, `onStart`,
+ *     `onPause` (the `isReceiverRegistered` guard prevents the
+ *     IllegalArgumentException case), `onDestroy`, the inner branches
+ *     of `handleSpecificEvent` where the outer Catchall delivers
+ *     equivalent recovery, and the inner try/catch blocks in coroutine
+ *     bodies running under `mainActivityExceptionHandler` (the handler
+ *     is the safety net).
+ *
+ *   Unrecoverable / HOME-Activity-resilience boundaries — system
+ *     callbacks where letting the exception propagate would crash the
+ *     launcher (BroadcastReceiver.onReceive, the outer Catchall in
+ *     `handleSpecificEvent`), or paths where the Activity must not
+ *     continue with a half-initialised state (`setupMainContent`'s two
+ *     `silentDeath` paths — `finish()` would loop because Kolibri is
+ *     registered as HOME). The post-onboarding init catch in
+ *     `onboardingLauncher` is in the same family: on failure,
+ *     `finish()` hands off to the next default launcher rather than
+ *     leaving a half-initialised launcher in the foreground.
+ *
+ *
+ * What changed in this sweep
+ * --------------------------
+ *   1. Bug-fix in `mainActivityExceptionHandler` — the explicit DEBUG
+ *      re-throw was inside the outer try/catch(Throwable) and silently
+ *      swallowed silentError's Rule-9 RuntimeException, defeating
+ *      Rule 9 across every coroutine running under this handler. The
+ *      `try` is now tight around the logging call only; the DEBUG
+ *      re-throw lives outside. (Committed separately as the first
+ *      commit of the catch-sweep branch for bisect-friendliness.)
+ *
+ *   2. Doubled-defence catches in coroutine bodies — every
+ *      `lifecycleScope.launch(mainActivityExceptionHandler) { try ...
+ *      catch (Throwable) ... }` had the inner catch removed where it
+ *      only logged. The handler is the safety net. Affected:
+ *      `updateSecureFlag`, `updateRotationLock`, `initializeMainApp`,
+ *      `onStop`'s backup branch, `checkAndShowCrashReportConsent`'s
+ *      inner ACRA-toggle lambda. Inner CancellationException rethrows
+ *      went away with the catches they lived in. Where the Throwable
+ *      catch was kept (`onboardingLauncher`, `handleInitialSetup`), the
+ *      CancellationException rethrow stays to preserve cooperative
+ *      cancellation per canonical Kotlin coroutine guidance.
+ *
+ *   3. Programmer-error swallows in lifecycle overrides — outer catches
+ *      removed from `onCreate` (around installSplashScreen +
+ *      setupWindow), `onStart` (around the fire-and-forget
+ *      `viewModel.refreshAllData()`), `setupWindow` (three property
+ *      setters), `onPause` (guarded `unregisterReceiver`), and
+ *      `onDestroy` (plus its nested receiver-catch — same guard as
+ *      `onPause`). Per Rule 11: catches are for real failure modes,
+ *      not "just in case" wrappers around can't-throw operations.
+ *
+ *      Rule 7 (multi-layer paranoia for critical init) applies to
+ *      `KolibriLauncherApp.onCreate`, not to per-Activity init. A
+ *      programmer error during MainActivity init now propagates to the
+ *      application-level handler set up there, where it belongs.
+ *
+ *   4. `handleSpecificEvent` inner-catch surgery — the outer Catchall
+ *      stays (HOME-Activity-resilience boundary). Inner catches that
+ *      only logged the same way the outer Catchall would were removed
+ *      from `ShowAppDrawer`, `ShowSettings`, and `ShowColorPickerDialog`.
+ *      Inner catches that delivered Toast recovery (`OpenCalendar`,
+ *      `OpenWallpaperPicker`) or scoped diagnostic messages
+ *      (`LaunchApp`'s `popBackStack` branch) stay, with inline
+ *      rationale.
+ *
+ *   5. Standalone helper outer catches —
+ *      `showColorCustomizationDialog`, `showLayoutCustomizationDialog`,
+ *      `openSettingsActivity`, `showAccessibilityDialog` and `showDialog`
+ *      are all called from `handleSpecificEvent` whose Catchall already
+ *      covers them. Outer catches removed.
+ *
+ *   6. Dialog-show teardown-race guards — `showDialog`,
+ *      `showCustomizationOptionsDialog`, and the two
+ *      `DialogFragment.show()` call sites
+ *      (`ColorCustomizationDialogFragment`,
+ *      `LayoutCustomizationDialogFragment`) now guard with
+ *      `if (isFinishing || isDestroyed) return` before `.show()`. See
+ *      "Teardown races" above.
+ *
+ *
+ * DataStore-read fallback by inaction — explicit trade-off
+ * --------------------------------------------------------
+ * When DataStore reads in coroutine bodies (`updateSecureFlag`,
+ * `updateRotationLock`, `initializeMainApp`) fail, the exception handler
+ * logs and the coroutine ends. Window flags / init state remain in their
+ * previous values — graceful fallback by inaction. This is a deliberate
+ * trade-off; a per-call try/catch with a default would not produce
+ * different user-visible behaviour, so the extra surface is not worth it.
+ *
+ *
+ * Known pressure point: `handleSpecificEvent` size
+ * ------------------------------------------------
+ * The method is ~120 lines with ~15 `when`-branches. Each branch is
+ * Activity-bound (View setter, navigation, dialog show), so splitting
+ * into helper methods would relocate lines without reducing complexity
+ * — same argument as HomeFragment's Fragment-delegate-split deferral.
+ * If a single branch later accumulates non-trivial logic, lift that
+ * branch's logic into a sealed-resolver or pure helper (the
+ * `AppLaunchAction.decide` extract already inside this Activity is the
+ * template). Until then, accept the size.
+ *
+ * =============================================================================
  */
 @AndroidEntryPoint
 class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
@@ -122,6 +262,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     Intent.ACTION_BATTERY_CHANGED -> viewModel.updateBatteryLevelFromIntent(intent)
                 }
             } catch (e: Throwable) {
+                // Catch kept (HOME-Activity-resilience boundary, four-
+                // category frame): BroadcastReceiver.onReceive runs as a
+                // system callback. An unhandled throw here crashes the
+                // launcher process, so we keep the safety net even
+                // though updateBatteryLevelFromIntent has its own
+                // internal catch.
                 TimberWrapper.silentError(e, "Error in systemEventReceiver")
             }
         }
@@ -148,8 +294,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     }
                 }
             } catch (e: CancellationException) {
+                // Rethrow per canonical Kotlin coroutines guidance:
+                // catching Throwable in a coroutine body absorbs
+                // CancellationException too, which silently breaks
+                // cooperative cancellation. Letting it through here
+                // keeps the structured-concurrency contract intact.
                 throw e
             } catch (e: Throwable) {
+                // Catch kept (HOME-Activity-resilience boundary, four-
+                // category frame): this is the post-onboarding init
+                // path. If it fails, without finish() the user is left
+                // with a half-initialised launcher in the foreground —
+                // exactly the failure mode the frame calls out.
+                // finish() hands off to the next default launcher.
                 TimberWrapper.silentError(e, "Error handling onboarding result")
                 finish()
             }
@@ -164,18 +321,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 viewModel.onSetWallpaperImage(uri)
             }
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): the
+            // ActivityResult callback runs outside any outer Catchall,
+            // and onSetWallpaperImage delegates into a coroutine that
+            // touches ContentResolver. Toast gives the user a recovery
+            // signal; without the catch they would get nothing.
             TimberWrapper.silentError(e, "Error handling wallpaper picker result")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        try {
-            installSplashScreen()
-            setupWindow()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in pre-onCreate setup")
-        }
+        installSplashScreen()
+        setupWindow()
 
         super.onCreate(savedInstanceState)
 
@@ -257,17 +415,22 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
             }
         } catch (e: CancellationException) {
+            // Rethrow per canonical Kotlin coroutines guidance — see
+            // the matching comment in onboardingLauncher.
             throw e
         } catch (e: Throwable) {
+            // Catch kept (Expected error → Unrecoverable, four-category
+            // frame): DataStore IO failure on the first-run path. We
+            // attempt initializeMainApp anyway as a recovery; if THAT
+            // also fails we hand off to silentDeath rather than leaving
+            // the user with a half-initialised launcher.
             TimberWrapper.silentError(e, "Error in handleInitialSetup")
-            // Fallback: Initialize anyway to prevent broken state
             try {
                 initializeMainApp()
             } catch (fallbackError: Throwable) {
-                // Letzter Recovery-Pfad ist auch geplatzt. Die Activity
-                // weiterlaufen zu lassen würde dem User eine leere Hülle
-                // ohne ViewModel-Daten präsentieren — schlimmer als ein
-                // Restart, der beim zweiten Versuch funktionieren kann.
+                // Last recovery path also failed. Letting the Activity
+                // continue would leave a launcher with no ViewModel data
+                // — worse than a restart that may work the second time.
                 TimberWrapper.silentDeath(
                     fallbackError,
                     "Fallback initialization failed — no recovery path left"
@@ -281,8 +444,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             val intent = Intent(this, OnboardingActivity::class.java)
             onboardingLauncher.launch(intent)
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame):
+            // ActivityResultLauncher.launch can throw on lifecycle-state
+            // mismatches or activity-not-found. Fallback initialises
+            // without onboarding rather than blocking the user.
             TimberWrapper.silentError(e, "Error launching OnboardingActivity")
-            // Fallback: Initialize without onboarding
             lifecycleScope.launch(mainActivityExceptionHandler) {
                 initializeMainApp()
             }
@@ -300,112 +466,96 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             return
         }
 
-        try {
-            checkAndShowCrashReportConsent()
-            isInitialized = true
-            Timber.d("Main app initialization completed")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error during main app initialization")
-        }
-
-        // ACRA.errorReporter.handleSilentException(Exception("ACRA Manual Test Report"))
+        // No try/catch: this runs under mainActivityExceptionHandler.
+        // A throw from checkAndShowCrashReportConsent propagates to the
+        // handler (DEBUG: crashes loud per Rule 9; RELEASE: logs and
+        // ends the coroutine). isInitialized stays false in that case,
+        // so the next onCreate after a config change retries.
+        checkAndShowCrashReportConsent()
+        isInitialized = true
+        Timber.d("Main app initialization completed")
     }
 
     private fun setupWindow() {
-        try {
-            window.setWindowAnimations(0)
-            window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting up window")
-        }
+        window.setWindowAnimations(0)
+        window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
     }
 
     private suspend fun checkAndShowCrashReportConsent() {
         CrashReportConsent.showConsentDialog(this) { userGaveConsent ->
             lifecycleScope.launch(mainActivityExceptionHandler) {
-                try {
-                    ACRA.errorReporter.setEnabled(userGaveConsent)
-                    Timber.i("User consent for crash reports is set to: $userGaveConsent")
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error setting ACRA consent")
-                }
+                ACRA.errorReporter.setEnabled(userGaveConsent)
+                Timber.i("User consent for crash reports is set to: $userGaveConsent")
             }
         }
     }
 
     override fun onStart() {
         super.onStart()
-        try {
-            viewModel.refreshAllData()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onStart")
-        }
+        // No try/catch: refreshAllData forwards to clockDelegate.refreshAll
+        // (sync StateFlow updates with hardcoded SimpleDateFormat patterns;
+        // getInitialBatteryState has its own internal catch) and
+        // appDelegate.refreshInstalledApps (scope.launchSafe — fire-and-
+        // forget). No realistic sync-throw path remains.
+        viewModel.refreshAllData()
     }
 
     override fun onResume() {
         super.onResume()
+        val intentFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+        }
         try {
-            val intentFilter = IntentFilter().apply {
-                addAction(Intent.ACTION_BATTERY_CHANGED)
-            }
             registerReceiver(systemEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
-
-            updateWallpaperColors()
-            updateSecureFlag()
-            updateRotationLock()
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame):
+            // registerReceiver is a system-API call that can fail on
+            // permission issues or system races. Resetting the flag to
+            // false keeps onPause from later trying to unregister a
+            // receiver that was never actually registered.
             TimberWrapper.silentError(e, "Error registering system event receiver")
             isReceiverRegistered = false
         }
+
+        // updateWallpaperColors has its own catch with graceful fallback;
+        // updateSecureFlag / updateRotationLock launch under the handler.
+        updateWallpaperColors()
+        updateSecureFlag()
+        updateRotationLock()
     }
 
     private fun updateSecureFlag() {
         lifecycleScope.launch(mainActivityExceptionHandler) {
-            try {
-                val isSecure = settingsRepository.secureWindowFlow.first()
-                if (isSecure) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating FLAG_SECURE")
+            val isSecure = settingsRepository.secureWindowFlow.first()
+            if (isSecure) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
         }
     }
 
     private fun updateRotationLock() {
         lifecycleScope.launch(mainActivityExceptionHandler) {
-            try {
-                val locked = settingsRepository.rotationLockedFlow.first()
-                requestedOrientation = if (locked) {
-                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error updating rotation lock")
+            val locked = settingsRepository.rotationLockedFlow.first()
+            requestedOrientation = if (locked) {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
     }
 
     override fun onPause() {
         super.onPause()
-        try {
-            if (isReceiverRegistered) {
-                unregisterReceiver(systemEventReceiver)
-                isReceiverRegistered = false
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error unregistering receiver")
+        // No try/catch: the isReceiverRegistered guard structurally
+        // prevents the only realistic throw (IllegalArgumentException
+        // from unregistering a receiver that was never registered).
+        if (isReceiverRegistered) {
+            unregisterReceiver(systemEventReceiver)
+            isReceiverRegistered = false
         }
     }
 
@@ -414,13 +564,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
         if (BuildConfig.DEBUG) {
             lifecycleScope.launch(mainActivityExceptionHandler) {
-                try {
-                    dataStoreBackup.createBackup()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error creating backup")
-                }
+                dataStoreBackup.createBackup()
             }
         }
     }
@@ -461,24 +605,21 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     override fun onDestroy() {
-        try {
-            currentDialog?.dismiss()
-            currentDialog = null
+        // No try/catch: dialog dismiss is null-safe and self-protected
+        // against already-dismissed; unregisterReceiver is guarded by
+        // isReceiverRegistered (same structural prevention as onPause);
+        // property nullings cannot throw. super.onDestroy() runs
+        // unconditionally because there is no earlier return path.
+        currentDialog?.dismiss()
+        currentDialog = null
 
-            if (isReceiverRegistered) {
-                try {
-                    unregisterReceiver(systemEventReceiver)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error unregistering receiver in onDestroy")
-                }
-                isReceiverRegistered = false
-            }
-            navController = null
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error in onDestroy")
-        } finally {
-            super.onDestroy()
+        if (isReceiverRegistered) {
+            unregisterReceiver(systemEventReceiver)
+            isReceiverRegistered = false
         }
+        navController = null
+
+        super.onDestroy()
     }
 
     override fun handleSpecificEvent(event: UiEvent) {
@@ -490,13 +631,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             when (event) {
                 is UiEvent.ShowAppDrawer -> {
                     if (navController?.currentDestination?.id == R.id.homeFragment) {
-                        try {
-                            navController?.navigate(R.id.appDrawerFragment)
-                            if (BuildConfig.DEBUG) {
-                                Timber.d("[MAIN] Navigated to app drawer")
-                            }
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "[MAIN] Error navigating to app drawer")
+                        navController?.navigate(R.id.appDrawerFragment)
+                        if (BuildConfig.DEBUG) {
+                            Timber.d("[MAIN] Navigated to app drawer")
                         }
                     } else if (BuildConfig.DEBUG) {
                         Timber.d("[MAIN] Not navigating - wrong destination: ${navController?.currentDestination?.id}")
@@ -504,12 +641,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
 
                 is UiEvent.ShowSettings -> {
-                    try {
-                        val intent = Intent(this, SettingsActivity::class.java)
-                        startActivity(intent)
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "[MAIN] Error starting settings")
-                    }
+                    val intent = Intent(this, SettingsActivity::class.java)
+                    startActivity(intent)
                 }
 
                 is UiEvent.ShowCustomizationOptions -> {
@@ -517,11 +650,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
 
                 is UiEvent.ShowColorPickerDialog -> {
-                    try {
-                        ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "[MAIN] Error showing color picker")
-                    }
+                    if (isFinishing || isDestroyed) return
+                    ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
                 }
 
                 is UiEvent.OpenClock -> {
@@ -534,6 +664,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         ContentUris.appendId(builder, System.currentTimeMillis())
                         startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
                     } catch (e: Throwable) {
+                        // Inner catch kept (Expected error, four-category
+                        // frame): outer Catchall would log but not Toast,
+                        // so the user-visible "no calendar app" recovery
+                        // would be lost.
                         TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
                         Toast.makeText(this, getString(R.string.error_no_calendar_app), Toast.LENGTH_SHORT).show()
                     }
@@ -557,10 +691,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         )
                     }
 
-                    // popBackStack hat eigenen Catch, launchApp hat
-                    // dreifach-Catch (ActivityNotFoundException /
-                    // SecurityException / Throwable). Ein zusätzlicher
-                    // Outer-Catch wäre DEAD_REDUNDANT.
                     if (action is AppLaunchAction.PopThenLaunch) {
                         try {
                             navController?.popBackStack()
@@ -568,6 +698,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                                 Timber.d("[MAIN] Drawer closed")
                             }
                         } catch (e: Throwable) {
+                            // Inner catch kept (Expected error, four-
+                            // category frame): scoped log "Error popping
+                            // back stack" preserves diagnostic context
+                            // that the outer Catchall would flatten to
+                            // "Error in handleSpecificEvent". Even if
+                            // popBackStack fails, launchApp below still
+                            // runs (correct user-visible behaviour).
                             TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
                         }
                     }
@@ -583,6 +720,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     try {
                         WallpaperImagePicker.launch(wallpaperPickerLauncher)
                     } catch (e: Throwable) {
+                        // Inner catch kept (Expected error, four-category
+                        // frame): same shape as OpenCalendar — outer
+                        // Catchall would lose the user-visible Toast
+                        // recovery.
                         TimberWrapper.silentError(e, "Error launching wallpaper picker")
                         Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
                     }
@@ -610,6 +751,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
             }
         } catch (e: Throwable) {
+            // Outer Catchall kept (HOME-Activity-resilience boundary,
+            // four-category frame): event dispatch must not crash the
+            // launcher. Anything reaching this catch is a programmer
+            // error in one of the branches — silentError makes it loud
+            // in DEBUG (Rule 9), RELEASE logs and continues. The outer
+            // catch is also why several inner branches can drop their
+            // own catches: the recovery is identical here.
             TimberWrapper.silentError(e, "[MAIN] Error in handleSpecificEvent")
         }
     }
@@ -642,6 +790,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             }
 
         } catch (e: ActivityNotFoundException) {
+            // Triple-catch kept (Expected error, four-category frame):
+            // launching another package's main activity has three
+            // distinct expected failure modes — package gone since
+            // resolution (ActivityNotFoundException), permission denied
+            // (SecurityException), and a Throwable umbrella for the rest.
+            // Each Toast targets the right user-visible recovery.
             TimberWrapper.silentError(e, "[LAUNCH] ActivityNotFoundException: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_app_not_available), Toast.LENGTH_SHORT).show()
         } catch (e: SecurityException) {
@@ -654,68 +808,65 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private fun showDialog(builder: MaterialAlertDialogBuilder) {
-        try {
-            currentDialog?.dismiss()
-            currentDialog = builder.show()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing dialog")
-        }
+        // Structural teardown-race guard: prevents BadTokenException
+        // from showing a dialog on a finishing/destroyed Activity. With
+        // the guard, no post-hoc catch is needed.
+        if (isFinishing || isDestroyed) return
+        currentDialog?.dismiss()
+        currentDialog = builder.show()
     }
 
     private fun showAccessibilityDialog() {
-        try {
-            val builder = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
-                .setTitle(getString(R.string.accessibility_service_title))
-                .setMessage(getString(R.string.accessibility_service_explanation))
-                .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
-                    startActivitySafely(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }
-                .setNegativeButton(getString(R.string.cancel), null)
+        val builder = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            .setTitle(getString(R.string.accessibility_service_title))
+            .setMessage(getString(R.string.accessibility_service_explanation))
+            .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
+                startActivitySafely(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton(getString(R.string.cancel), null)
 
-            showDialog(builder)
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing accessibility dialog")
-        }
+        showDialog(builder)
     }
 
     private fun showCustomizationOptionsDialog() {
-        try {
-            currentDialog?.dismiss()
-            currentDialog = null
+        currentDialog?.dismiss()
+        currentDialog = null
 
-            val model = CustomizationDialogModel.build(
-                hasWallpaper = viewModel.wallpaperState.value.hasWallpaper,
-                isWallpaperEditMode = viewModel.isWallpaperEditMode.value,
-            )
+        val model = CustomizationDialogModel.build(
+            hasWallpaper = viewModel.wallpaperState.value.hasWallpaper,
+            isWallpaperEditMode = viewModel.isWallpaperEditMode.value,
+        )
 
-            // Dialog wird im Edit-Mode unterdrückt — die Inline-Buttons
-            // sind dann ohnehin sichtbar.
-            val visible = model as? CustomizationDialogModel.Visible ?: return
+        // Dialog wird im Edit-Mode unterdrückt — die Inline-Buttons
+        // sind dann ohnehin sichtbar.
+        val visible = model as? CustomizationDialogModel.Visible ?: return
 
-            val labels = visible.options.map { resolveCustomizationLabel(it) }
-            val actions = visible.options.map { resolveCustomizationAction(it) }
+        val labels = visible.options.map { resolveCustomizationLabel(it) }
+        val actions = visible.options.map { resolveCustomizationAction(it) }
 
-            currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
-                .setTitle(getString(R.string.customize_title))
-                .setItems(labels.toTypedArray()) { _, which ->
-                    try {
-                        actions.getOrNull(which)?.invoke()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error handling dialog selection")
-                    }
+        // Structural teardown-race guard before .show().
+        if (isFinishing || isDestroyed) return
+
+        currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            .setTitle(getString(R.string.customize_title))
+            .setItems(labels.toTypedArray()) { _, which ->
+                try {
+                    actions.getOrNull(which)?.invoke()
+                } catch (e: Throwable) {
+                    // Inner catch kept (HOME-Activity-resilience boundary,
+                    // four-category frame): system click-listener
+                    // callback runs outside any outer Catchall, so an
+                    // unhandled throw here would crash the launcher.
+                    TimberWrapper.silentError(e, "Error handling dialog selection")
                 }
-                .setNegativeButton(R.string.cancel, null)
-                .setOnDismissListener {
-                    if (currentDialog == it) {
-                        currentDialog = null
-                    }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener {
+                if (currentDialog == it) {
+                    currentDialog = null
                 }
-                .show()
-
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing customization options dialog")
-        }
+            }
+            .show()
     }
 
     private fun resolveCustomizationLabel(option: CustomizationOption): String =
@@ -749,6 +900,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private fun confirmRemoveWallpaper() {
+        // Structural teardown-race guard before .show().
+        if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
             .setTitle(getString(R.string.wallpaper_remove))
             .setMessage(getString(R.string.wallpaper_remove_confirm))
@@ -760,28 +913,25 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private fun showColorCustomizationDialog() {
-        try {
-            ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing color customization")
-        }
+        // Structural teardown-race guard. FragmentManager.show() throws
+        // IllegalStateException ("Can not perform this action after
+        // onSaveInstanceState") on a finishing/destroyed Activity.
+        if (isFinishing || isDestroyed) return
+        ColorCustomizationDialogFragment().show(supportFragmentManager, "ColorCustomizationDialog")
     }
 
     private fun showLayoutCustomizationDialog() {
-        try {
-            LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing layout customization")
-        }
+        if (isFinishing || isDestroyed) return
+        LayoutCustomizationDialogFragment().show(supportFragmentManager, "LayoutCustomizationDialog")
     }
 
     private fun openSettingsActivity() {
-        try {
-            val intent = Intent(this, SettingsActivity::class.java)
-            startActivity(intent)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "[MAIN] Error starting settings")
-        }
+        // No try/catch: this is only called from the customization-
+        // dialog click listener (system callback), which already has
+        // its own catch around the .invoke() call. Adding another here
+        // would be doubled defence.
+        val intent = Intent(this, SettingsActivity::class.java)
+        startActivity(intent)
     }
 
     private fun startActivitySafely(intent: Intent, fallbackIntent: Intent? = null) {
@@ -789,6 +939,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             startActivity(intent)
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame):
+            // startActivity throws ActivityNotFoundException for
+            // optional system intents (clock app, calendar, battery
+            // settings) that may not exist on every ROM. The fallback-
+            // intent branch + final Toast give the user a recovery
+            // signal instead of a silent no-op.
             TimberWrapper.silentError(e, getString(R.string.error_starting_intent, intent.toString()))
 
             if (fallbackIntent != null) {
@@ -811,6 +967,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
             viewModel.updateUiColors(colors)
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame):
+            // WallpaperManager.getWallpaperColors can fail on permission
+            // races and on some OEM ROMs. Fallback to default UI colours
+            // (updateUiColors with no args) keeps the screen rendering
+            // sensibly instead of stuck on stale tint.
             TimberWrapper.silentError(e, "Error updating wallpaper colors")
             viewModel.updateUiColors()
         }
