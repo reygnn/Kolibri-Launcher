@@ -354,13 +354,27 @@ class AppDrawerFragment : Fragment() {
         }
     }
 
+    /**
+     * Wires the app-drawer dismiss gesture: a decisive downward swipe
+     * anywhere in the drawer pops the navigation back to the home screen.
+     *
+     * The gesture detection itself lives in [SwipeDownDismissLayout]
+     * (the root view in `fragment_app_drawer.xml`). That class exists
+     * because RecyclerView's `requestDisallowInterceptTouchEvent` makes
+     * normal `OnTouchListener` / `onInterceptTouchEvent` approaches fail
+     * once the list starts scrolling — see the class KDoc for the full
+     * mechanism. Don't try to move the detection logic here; it has to
+     * live in the View hierarchy where `dispatchTouchEvent` is reachable.
+     *
+     * The `isAdded` guard handles the teardown race where the swipe
+     * gesture completes during fragment detachment (rotation, system
+     * kill): `popBackStack` on a detached fragment crashes. The keyboard
+     * is hidden automatically via `onPause` once the lifecycle transition
+     * triggered by `popBackStack` runs, so no explicit `hideKeyboard`
+     * call is needed here.
+     */
     private fun setupSwipeToDismiss() {
         binding.appDrawerRoot.onSwipeDown = {
-            // isAdded-Guard: bei einer Swipe-Geste, die exakt während
-            // einer Teardown-Race (Rotation, System-Kill) abschliesst,
-            // wäre popBackStack auf einem detached Fragment ein Crash.
-            // Keyboard-Hide passiert automatisch via onPause, sobald
-            // popBackStack die Lifecycle-Transition triggert.
             if (isAdded) {
                 findNavController().popBackStack()
             }

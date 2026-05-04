@@ -81,6 +81,42 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
     // TOUCH DISPATCH
     // ===========================================
 
+    /**
+     * Touch interception for the gesture this class exists to detect.
+     *
+     * Contract — three rules a future maintainer must keep:
+     *
+     *  1. **Read-only inspection until trigger.** ACTION_DOWN snapshots
+     *     start coordinates and time; ACTION_MOVE evaluates the gesture
+     *     against the three thresholds (distance, velocity, vertical
+     *     dominance) but does NOT consume the event yet. Children
+     *     (RecyclerView et al.) receive every event normally via
+     *     `super.dispatchTouchEvent` and can scroll, click, long-press as
+     *     usual. This is what makes "slow drag still scrolls the list"
+     *     work — the parent stays out of the way until the gesture is
+     *     unmistakable.
+     *
+     *  2. **One-shot trigger.** Once the three predicates align, we set
+     *     `triggered = true`, fire ACTION_CANCEL down to children
+     *     (so the RecyclerView stops mid-scroll instead of keeping its
+     *     fling), invoke the callback, and consume every remaining event
+     *     in the gesture. The flag resets only on the next ACTION_DOWN.
+     *     Without the one-shot guard, a held finger past the threshold
+     *     would re-fire the dismiss callback every frame.
+     *
+     *  3. **Never replace this with `onInterceptTouchEvent` or an
+     *     `OnTouchListener`.** RecyclerView calls
+     *     `requestDisallowInterceptTouchEvent(true)` on us as soon as
+     *     it claims the gesture (past touchSlop in the vertical axis),
+     *     which silently disables both. `dispatchTouchEvent` is the only
+     *     entry point that fires unconditionally on the parent — see the
+     *     class KDoc for the full backstory. The "obvious" simplification
+     *     is the bug.
+     *
+     * Returns `true` for every event after a trigger to keep ownership of
+     * the gesture (otherwise children would resume mid-fling). Returns
+     * whatever `super` returns otherwise — i.e. children decide.
+     */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
