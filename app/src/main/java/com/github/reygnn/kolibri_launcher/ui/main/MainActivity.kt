@@ -78,17 +78,33 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     private var isInitialized = false
     private var onboardingCheckCompleted = false
 
-    // Ultra Paranoia: Exception handler for MainActivity coroutines
+    // Coroutine exception handler for MainActivity scopes. Two responsibilities:
+    //
+    //   1. Log uncaught exceptions via silentError (RELEASE: logged; DEBUG:
+    //      silentError throws RuntimeException per Rule 9).
+    //   2. Re-throw the original throwable in DEBUG so programmer errors
+    //      surface instead of being silently absorbed by the handler.
+    //
+    // The previous shape wrapped both responsibilities in one
+    // try/catch(Throwable), which swallowed silentError's Rule-9
+    // RuntimeException AND the explicit `throw throwable` — defeating
+    // Rule 9 across every coroutine running under this handler. Layout
+    // now: `try` is tight around the logging call only; the DEBUG re-throw
+    // lives outside the catch. The catch's last-resort fallback is
+    // System.err so we don't lose the original error if Timber itself
+    // crashes (same shape as KolibriLog.silentDeath's stderr fallback).
     private val mainActivityExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in MainActivity")
+        } catch (loggingError: Throwable) {
+            System.err.println(
+                "MainActivity logging failed: ${loggingError.message}; " +
+                    "original error: ${throwable.message}"
+            )
+        }
 
-            // In Debug: make crashes loud!
-            if (BuildConfig.DEBUG) {
-                throw throwable
-            }
-        } catch (e: Throwable) {
-            // Even logging can fail
+        if (BuildConfig.DEBUG) {
+            throw throwable
         }
     }
 
