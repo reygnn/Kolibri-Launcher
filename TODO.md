@@ -29,12 +29,15 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
 2026-05-03), B (Test-Isolation pro Modul, §13 vollständig inkl. `:data:test`-
-Move, 2026-05-03), C (`:domain` pure-Kotlin, §11/§12). §10 ist als
-wiederkehrender Quartals-Termin etabliert und triggert sich von selbst —
-nächster Recheck 2026-Q3. Verbleibende mittelschwere Deckler (siehe
-Audit-Snapshot „Was die 0.1 unter 9.0 deckelt"): leeres `androidTest/`,
-MainActivity-Größe (~1000 Zeilen / ~37 Catches als Symptom). Score ist
-nach Brocken-A-Abschluss revidiert (siehe Audit-Snapshot unten).
+Move, 2026-05-03), C (`:domain` pure-Kotlin, §11/§12). MainActivity-Sweep
+ist 2026-05-03 ebenfalls gelandet (`d5c5ce3 → 0b7a21c → 986d478 → 78903ec`):
+Bug-Fix für die Rule-9-DEBUG-Throw-Semantik, `InitialSetupAction`-Pure-
+Logic-Extraktion, Catch-Sweep mit Vier-Kategorien-Frame-Annotation
+(37 → 21 Throwable). §10 ist als wiederkehrender Quartals-Termin etabliert
+und triggert sich von selbst — nächster Recheck 2026-Q3. Verbleibender
+mittelschwerer Deckler (siehe Audit-Snapshot „Was die 0.1 unter 9.0
+deckelt"): leeres `androidTest/`. Score ist nach Brocken-A-Abschluss
+revidiert (siehe Audit-Snapshot unten).
 
 ---
 
@@ -175,20 +178,26 @@ JVM-only-Dependencies. Memo unten.
 
 ### Mittelschwere Deckler
 
-- **MainActivity ~1000 Zeilen mit ~37 Catches.** 2026-05-02 als
-  „nichts mehr zu sweepen" geprüft (alle Catches sind echte
-  Boundaries). Catches sind Symptom, nicht Krankheit — die
-  1000-Zeilen-Activity ist die Krankheit.
+- **(erledigt 2026-05-03)** ~~MainActivity ~1000 Zeilen mit ~37 Catches.~~
+  MainActivity-Sweep gelandet 2026-05-03: 991 Zeilen (mit neuem KDoc-
+  Header-Block; reine Code-Größe gesunken), 25 catches / 21 Throwable
+  (-32%/-43% ggü. Baseline 37). Jeder verbleibende Catch hat eine
+  „// Catch kept (..., four-category frame)"-Annotation — System-API,
+  HOME-Activity-Resilience-Boundaries, Dialog-Lifecycle-Race etc.
+  Plus Pure-Logic-Extraktion `InitialSetupAction` (sealed Resolver +
+  JVM-Tests, commit `0b7a21c`).
 - **(erledigt 2026-05-03)** ~~Test-Isolation pro Modul nicht realisiert.~~
   Komplett: `:domain:test` (310 Tests, ~5s), `:data:test` (32 Tests,
   ~30s), `:app:test` (Rest, UI/Hilt). Gesamter Test-Time-Win der §9.2-
   Modul-Split-Story ist real.
-- **506 verbleibende `catch (Throwable)` im Main-Source.** Die
-  meisten sind verifiziert legitim, aber Volumen ist im Branchen-
+- **324 verbleibende `catch (Throwable)` im Main-Source** (Stand
+  2026-05-04, post-MainActivity-Sweep; war 506 zum Snapshot-Zeitpunkt).
+  Die meisten sind verifiziert legitim, aber Volumen bleibt im Branchen-
   vergleich hoch. Crash-Safety-Kultur gut; -Religion reduziert,
   nicht eliminiert.
-- **`MainActivity.mainActivityExceptionHandler` Bug-Hint** (siehe
-  §2-Reststand). Echter Defekt, dokumentiert aber nicht gefixt.
+- **(gefixt 2026-05-03)** ~~`MainActivity.mainActivityExceptionHandler`
+  Bug-Hint.~~ Repariert in commit `d5c5ce3`: die Rule-9-DEBUG-Throw-
+  Semantik wird nicht mehr lokal aufgehoben.
 
 ### Was *nicht* zählt für die Note
 
@@ -497,32 +506,36 @@ Lifecycle-/Per-Item-Recovery, kein CANT_THROW):
 - `DoubleClickDetector` (1 grep-Treffer) — Catch ist im Klassen-
   KDoc-Code-Beispiel, nicht im Code.
 
-`MainActivity` (~37 Catches): konservativ geprüft 2026-05-02. Nach
-dem früheren MainActivity-Mini-Sweep (-3) sind die verbleibenden
-Catches alle echte Boundaries — System-API (`registerReceiver`,
-`startActivity`, `LauncherApps`, `WallpaperManager`), View-Inflation
-(`setContentView`, `installSplashScreen`), DataStore-I/O,
-Dialog-Lifecycle-Race (`MaterialAlertDialogBuilder.show`,
-`DialogFragment.show`), BroadcastReceiver-Callback,
-`silentDeath`-Pfade als HOME-Activity-Recovery, plus UX-Toasts
-in `handleSpecificEvent`. Keine eindeutigen CANT_THROW-Catches.
-Hinweis: `mainActivityExceptionHandler` (L82-93) hat einen nested
-Catch um `silentError + if(DEBUG) throw`, der die Rule-9-DEBUG-
-throw-Semantik lokal aufhebt — das ist ein Bug-Hint, kein Sweep-
-Material; wenn er gefixt wird, dann als bewusste Verhaltens-
-änderung im DEBUG-Build.
+`MainActivity`: ursprünglich (~37 Catches) konservativ als „nichts
+mehr zu sweepen" geprüft 2026-05-02. Re-Audit 2026-05-03 hat das
+revidiert — Sweep gelandet (`d5c5ce3 → 0b7a21c → 986d478 → 78903ec`):
+Stand jetzt 25 catches (21 Throwable) bei 991 Zeilen (mit neuem
+KDoc-Header-Block). Jeder verbleibende Catch trägt eine
+„// Catch kept (..., four-category frame)"-Annotation und ist eine
+echte Boundary — System-API (`registerReceiver`, `startActivity`,
+`LauncherApps`, `WallpaperManager`), View-Inflation (`setContentView`,
+`installSplashScreen`), DataStore-I/O, Dialog-Lifecycle-Race
+(`MaterialAlertDialogBuilder.show`, `DialogFragment.show`),
+BroadcastReceiver-Callback, `silentDeath`-Pfade als HOME-Activity-
+Recovery, plus UX-Toasts in `handleSpecificEvent`. Plus Pure-Logic-
+Extraktion `InitialSetupAction` (sealed Resolver + JVM-Tests,
+commit `0b7a21c`). Der `mainActivityExceptionHandler`-Bug-Hint
+(Rule-9-DEBUG-Throw-Semantik lokal aufgehoben) ist im Sweep gefixt
+(`d5c5ce3`).
 
 In jeder bearbeiteten Klasse sind die behaltenen Catches per Inline-
 Kommentar als „echte EXTERNAL/Lifecycle"-Pfade markiert, damit ein
 Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
 
-### Reststand: 506 Catches (Stand 2026-05-02)
+### Reststand: 324 Catches (Stand 2026-05-04, post-MainActivity-Sweep; war 506 Stand 2026-05-02)
 
-- **HomeFragment (~104)** — eigenes Lifecycle-Restructure-Projekt,
-  KDoc im File-Header beschreibt den Pfad. NICHT als Sweep angehen,
-  wartet auf strukturelles Refactoring (`_binding?.let { }` +
-  `viewLifecycleOwner.lifecycleScope`).
-- **MainActivity (~37)** — geprüft 2026-05-02, nichts mehr zu sweepen.
+- **HomeFragment (~11 Throwable, post-Brocken-A 2026-05-03)** —
+  Floor reached, sieben Region-Sweeps mit Vier-Kategorien-Frame
+  durchgeführt. Verbleibende Catches sind echte Boundaries (siehe
+  „Brocken A" im Audit-Snapshot oben).
+- **MainActivity (~21 Throwable, post-Sweep 2026-05-03)** — Sweep
+  gelandet (`d5c5ce3 → 0b7a21c → 986d478 → 78903ec`); jeder Catch
+  hat „// Catch kept (..., four-category frame)"-Annotation.
 - **Repository-Files** — `BackupRepositoryImpl` (16),
   `ResetRepositoryImpl` (13), `UsageExportRepositoryImpl` (8),
   `InstalledAppsRepositoryImpl` (8), `FavoritesRepositoryImpl` (7) etc. —
@@ -580,10 +593,10 @@ Punkte strukturelle Projekte — keine Sweeps mehr im engeren Sinn:
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
 - [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
   Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
-- [ ] **`MainActivity.mainActivityExceptionHandler` Bug-Hint** — der
+- [x] ~~**`MainActivity.mainActivityExceptionHandler` Bug-Hint** — der
   nested Catch um `silentError + if(DEBUG) throw` hebt die Rule-9-
-  DEBUG-throw-Semantik lokal auf. Fix wäre eine bewusste DEBUG-
-  Verhaltensänderung, kein reiner Sweep.
+  DEBUG-throw-Semantik lokal auf.~~ Gefixt 2026-05-03 in commit
+  `d5c5ce3` als Teil des MainActivity-Sweeps.
 
 ### Default-Disposition
 

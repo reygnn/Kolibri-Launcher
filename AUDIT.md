@@ -6,12 +6,15 @@
 > gemeldete „BLOCKER" haben sich als Fehlannahmen herausgestellt und wurden
 > entfernt).
 >
-> **Aktualisiert 2026-05-04:** HomeFragment-Zeilenzahlen auf den Stand
-> nach Brocken-A-Sweep (TODO „Pfad zu 9+") nachgezogen — das Original-
-> Audit hatte mit 2657 Zeilen (Pre-§9.3-Stand) gearbeitet, inzwischen
-> ist HomeFragment bei 1989 Zeilen / 19 Catches. Die Bewertungs-Logik
-> der einzelnen Befunde bleibt unverändert; nur die belegten Zahlen
-> wurden gesynced. Score-Update siehe TODO.md → Audit-Snapshot.
+> **Aktualisiert 2026-05-04:** HomeFragment- und MainActivity-Zeilenzahlen
+> auf den Stand nach Brocken-A-Sweep (TODO „Pfad zu 9+") und MainActivity-
+> Sweep (commits `d5c5ce3 → 0b7a21c → 986d478 → 78903ec`) nachgezogen —
+> das Original-Audit hatte mit 2657 / 797 Zeilen gearbeitet, inzwischen
+> sind HomeFragment bei 1989 Zeilen / 19 Catches und MainActivity bei
+> 991 Zeilen / 25 Catches (21 Throwable). Plus Rule-9-DEBUG-Throw-Bug
+> in `mainActivityExceptionHandler` gefixt. Die Bewertungs-Logik der
+> einzelnen Befunde bleibt unverändert; nur die belegten Zahlen wurden
+> gesynced. Score-Update siehe TODO.md → Audit-Snapshot.
 
 **Skala:**
 - 🔴 **BLOCKER** — bricht Architektur-Regel oder Korrektheit
@@ -141,7 +144,7 @@ $ grep -rn "repeatOnLifecycle" app/src/main/java | wc -l
 | `ui/home/ZoomableImageView.kt` | 1468 | Custom-View für Multi-Layer-Wallpaper-Edit; vertretbar |
 | `data/BackupRepositoryImpl.kt` | 1444 | TODO.md §3 Split-Verwerfung dokumentiert |
 | `ui/settings/SettingsFragment.kt` | 1074 | Klassisches PreferenceFragment-Smell — Aufteilbar |
-| `ui/main/MainActivity.kt` | 797 | Launcher + HOME-Activity, Plattform-Glue |
+| `ui/main/MainActivity.kt` | 991 | Launcher + HOME-Activity, Plattform-Glue; post-Sweep 2026-05-03 (37 → 21 Throwable Catches), gewachsen durch neuen KDoc-Header-Block, reine Code-Größe gesunken |
 | `ui/main/delegate/WallpaperDelegate.kt` | 609 | Edit-Session-Protokoll, vertretbar |
 | `ui/appdrawer/AppDrawerFragment.kt` | 607 | Aufteilbar in Adapter/Coordinator-Helfer |
 
