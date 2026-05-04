@@ -138,20 +138,19 @@ fi
 #   (`SecurityException`, `ActivityNotFoundException`, `IOException`,
 #   etc.) already follow Rule 11 by being narrow — they are not flagged.
 #
-# Accepted markers (case as in source):
-#   - `[Cc]atch[a-z]* kept` — covers "Catch kept", "Inner catch kept",
-#     "Triple-catch kept", "Outer Catchall kept" (the convention's
-#     standard prefix forms)
-#   - `[Rr]ethrow per canonical` — the canonical CancellationException
-#     rethrow pattern
-#
-# Window: ±5 lines around the catch. Marker phrases stay on a single
-# line by convention, so per-line checking is enough — no concatenation
-# tricks needed.
+# The detection logic (regex + window) lives in
+# `tools/check-rule11-annotation.awk` so this script and the regression
+# test (`tools/check-conventions-test.sh`) share a single source.
 # ─────────────────────────────────────────────────────────────────────────────
 rule11_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
 )
+rule11_awk="$script_dir/check-rule11-annotation.awk"
+
+if [ ! -f "$rule11_awk" ]; then
+  echo "ERROR: Rule 11 awk script not found: $rule11_awk" >&2
+  exit 2
+fi
 
 rule11_hits=""
 for file in "${rule11_files[@]}"; do
@@ -159,23 +158,7 @@ for file in "${rule11_files[@]}"; do
     echo "ERROR: Rule 11 whitelist file not found: $file" >&2
     exit 2
   fi
-  hits=$(awk '
-    { lines[NR] = $0 }
-    END {
-      for (n = 1; n <= NR; n++) {
-        if (lines[n] ~ /catch \([a-zA-Z_]+: (Throwable|Exception)\)/ && lines[n] !~ /^[[:space:]]*[*\/]/) {
-          found = 0
-          for (i = n - 5; i <= n + 5; i++) {
-            if (i >= 1 && i <= NR) {
-              if (lines[i] ~ /[Cc]atch[a-z]* kept/) { found = 1; break }
-              if (lines[i] ~ /[Rr]ethrow per canonical/) { found = 1; break }
-            }
-          }
-          if (!found) print FILENAME ":" n ": " lines[n]
-        }
-      }
-    }
-  ' "$file")
+  hits=$(awk -f "$rule11_awk" "$file")
   if [ -n "$hits" ]; then
     rule11_hits="${rule11_hits}${hits}
 "

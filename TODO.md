@@ -766,13 +766,12 @@ in 9 Files. Linter wurde gebaut um diese Klasse dauerhaft zu beenden.
 - **Rule 12** — kein `Timber.Forest.*`.
 - **Naming** — `*Manager`-Klassen in `data/` außer `WallpaperFileManager`
   und `DataMigrationManager`.
-- **Rule 11 (annotation discipline, positive list)** — broad catches
-  (`Throwable`/`Exception`) in whitelisted Files müssen einen
-  Vier-Kategorien-Frame-Marker (`[Cc]atch[a-z]* kept` oder
-  `[Rr]ethrow per canonical`) innerhalb ±5 Zeilen tragen. Heute auf
-  der Whitelist: nur MainActivity. Hinzugefügt 2026-05-04 als
-  vierte Linter-Sektion. Erweiterung pro File: Catches reviewen +
-  annotieren, dann Pfad in `rule11_files`-Array eintragen.
+- **Rule 11 (annotation discipline, positive list)** — Spec/Konvention
+  in CLAUDE.md Rule 11 (kanonisch). Heute auf der Whitelist:
+  nur MainActivity. Hinzugefügt 2026-05-04 als vierte Linter-Sektion;
+  awk-Core in `tools/check-rule11-annotation.awk`, Regression-Test
+  via `tools/check-conventions-test.sh` (manuell rerunbar, nicht in
+  CI verdrahtet).
 
 **Bewusst nicht geprüft (jeweils mehr-als-Grep nötig):**
 

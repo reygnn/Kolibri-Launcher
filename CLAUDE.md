@@ -295,14 +295,17 @@ activities.
     (`Throwable` / `Exception`) in files that opted in to the
     convention. Today the whitelist is MainActivity only; HomeFragment
     will follow once its catches are reviewed under the same lens.
-    Accepted markers within ±5 lines of the catch:
+    Accepted markers within ±5 lines of the catch (symmetric window):
     `[Cc]atch[a-z]* kept` (covers "Catch kept", "Inner catch kept",
     "Triple-catch kept", "Outer Catchall kept") or
     `[Rr]ethrow per canonical` (CancellationException rethrow). To add
     a file to the whitelist: confirm every broad catch has an inline
     annotation, then append the path to the `rule11_files` array in
     `tools/check-conventions.sh`. Narrowed exception types are not
-    flagged — narrowing IS following Rule 11.
+    flagged — narrowing IS following Rule 11. The detection logic
+    itself lives in `tools/check-rule11-annotation.awk`; regression-
+    test any regex change via `tools/check-conventions-test.sh` (not
+    wired into CI, manual rerun).
 
 12. **Use the short Timber call form.** Write `Timber.d(...)`,
     `Timber.w(...)`, `Timber.tag(...).e(...)` etc. — not
