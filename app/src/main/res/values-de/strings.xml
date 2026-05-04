@@ -182,7 +182,6 @@
 
     <string name="category_privacy_title">Datenschutz</string>
     <string name="crash_report_setting_title">Crash-Berichte senden</string>
-    <string name="crash_report_setting_summary">Anonymisierte Fehlerberichte zur Verbesserung der App</string>
     <string name="crash_report_summary_enabled">Aktiviert. Vielen Dank, dass du hilfst, die App zu verbessern!</string>
     <string name="crash_report_summary_disabled">Deaktiviert. Tippe, um deine Auswahl zu ändern.</string>
 

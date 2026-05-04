@@ -205,7 +205,6 @@
 
     <string name="category_privacy_title">Privacy</string>
     <string name="crash_report_setting_title">Send crash reports</string>
-    <string name="crash_report_setting_summary">Anonymized error reports to improve the app</string>
     <string name="crash_report_summary_enabled">Enabled. Thank you for helping improve the app!</string>
     <string name="crash_report_summary_disabled">Disabled. Tap to change your choice.</string>
 

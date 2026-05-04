@@ -133,11 +133,17 @@ class DataMigrationManager @Inject constructor(
      * `acra_consent` SharedPreferences file into DataStore, then delete the
      * legacy file.
      *
-     * Idempotent: a missing legacy file is read as default false/false, which
-     * is the same as a no-op (DataStore stays at default since the keys also
-     * resolve to false on read). On the next launch the version is already 2,
-     * so this step does not run again — the legacy file deletion is the only
-     * side effect that matters across runs.
+     * Skips the DataStore write entirely when neither legacy key exists —
+     * which is the case on every install that started on V2-or-later code
+     * (no legacy file ever existed). Without this guard the migration would
+     * unconditionally write `false/false` to DataStore even on a fresh
+     * install, racing with [CrashReportConsentStore.saveConsent] if the
+     * user accepts the consent dialog before this coroutine completes
+     * (Application.onCreate launches this asynchronously). The race would
+     * silently clobber the user's freshly given consent. The
+     * `legacyPrefs.contains(...)` check makes the migration a true no-op
+     * for installs that never had legacy data — even a non-existent SP
+     * file returns `false` for `contains`, so the guard is safe.
      *
      * Failure handling: any exception is caught + logged. The version still
      * gets bumped (via [runMigration]'s `updateVersionInPreferences`), so we
@@ -150,6 +156,17 @@ class DataMigrationManager @Inject constructor(
             val legacyPrefs = context.getSharedPreferences(
                 LEGACY_ACRA_CONSENT_PREFS, Context.MODE_PRIVATE
             )
+
+            val hasLegacyData = legacyPrefs.contains(LEGACY_ACRA_KEY_CONSENT) ||
+                legacyPrefs.contains(LEGACY_ACRA_KEY_ASKED)
+
+            if (!hasLegacyData) {
+                Timber.i(
+                    "ACRA consent migration: no legacy SP data, skipping DataStore write"
+                )
+                return
+            }
+
             val hasConsent = legacyPrefs.getBoolean(LEGACY_ACRA_KEY_CONSENT, false)
             val hasAsked = legacyPrefs.getBoolean(LEGACY_ACRA_KEY_ASKED, false)
 

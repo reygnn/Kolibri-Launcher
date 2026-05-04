@@ -157,7 +157,7 @@
         <Preference
             android:key="crash_reports"
             android:title="@string/crash_report_setting_title"
-            android:summary="@string/crash_report_setting_summary"
+            android:summary="@string/crash_report_summary_disabled"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 

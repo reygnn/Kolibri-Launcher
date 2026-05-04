@@ -59,8 +59,13 @@ class DataMigrationManagerTest {
         every { sharedPreferencesEditor.putInt(any(), any()) } returns sharedPreferencesEditor
         every { sharedPreferencesEditor.commit() } returns true
 
-        // Legacy ACRA consent prefs (V1→V2 migration path)
+        // Legacy ACRA consent prefs (V1→V2 migration path).
+        // Default: legacy SP has no data — `contains` returns false. The
+        // migration's pre-check then short-circuits before reading values.
+        // Tests that exercise the actual migration (legacy data present)
+        // override the `contains` stub to return true.
         every { context.getSharedPreferences(eq(LEGACY_ACRA_CONSENT_PREFS), any()) } returns legacyAcraConsentPrefs
+        every { legacyAcraConsentPrefs.contains(any()) } returns false
         every { legacyAcraConsentPrefs.getBoolean(eq(LEGACY_ACRA_KEY_CONSENT), any()) } returns false
         every { legacyAcraConsentPrefs.getBoolean(eq(LEGACY_ACRA_KEY_ASKED), any()) } returns false
         every { context.deleteSharedPreferences(eq(LEGACY_ACRA_CONSENT_PREFS)) } returns true
@@ -144,6 +149,10 @@ class DataMigrationManagerTest {
     @Test
     fun `runMigrationIfNeeded - when CancellationException - propagates it`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns -1
+        // Force the migration to actually reach the DataStore write so the
+        // cancellable store can throw — the post-fix migration short-circuits
+        // before touching DataStore when no legacy data is present.
+        every { legacyAcraConsentPrefs.contains(any()) } returns true
         fakeDataStore.makeCancellable()
 
         assertFailsWith<CancellationException> {
@@ -233,9 +242,30 @@ class DataMigrationManagerTest {
     // ========== V1→V2 ACRA CONSENT MIGRATION TESTS ==========
 
     @Test
-    fun `migration V1 to V2 - with default-false legacy values - writes them to DataStore`() = runTest {
+    fun `migration V1 to V2 - no legacy SP data - skips DataStore write`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 1
-        // Legacy values default to false/false from setup()
+        // Default setup: legacyAcraConsentPrefs.contains(any()) returns false.
+
+        dataMigrationManager.runMigrationIfNeeded()
+
+        // No legacy data → DataStore must not be touched (regression guard
+        // for the consent-overwrite race documented in
+        // DataMigrationManager.migrateAcraConsentToDataStore KDoc).
+        val data = fakeDataStore.data.first()
+        Assert.assertNull(data[CrashReportConsentStore.HAS_CONSENT_KEY])
+        Assert.assertNull(data[CrashReportConsentStore.HAS_ASKED_KEY])
+        // Legacy SP also stays untouched — nothing to delete.
+        verify(exactly = 0) { context.deleteSharedPreferences(eq(LEGACY_ACRA_CONSENT_PREFS)) }
+        // Version still bumps so this step does not re-run forever.
+        verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
+    }
+
+    @Test
+    fun `migration V1 to V2 - legacy SP holds explicit false - writes them to DataStore`() = runTest {
+        every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 1
+        every { legacyAcraConsentPrefs.contains(eq(LEGACY_ACRA_KEY_CONSENT)) } returns true
+        every { legacyAcraConsentPrefs.contains(eq(LEGACY_ACRA_KEY_ASKED)) } returns true
+        // Values default to false/false from setup().
 
         dataMigrationManager.runMigrationIfNeeded()
 
@@ -248,6 +278,8 @@ class DataMigrationManagerTest {
     @Test
     fun `migration V1 to V2 - preserves true consent value from legacy SP`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 1
+        every { legacyAcraConsentPrefs.contains(eq(LEGACY_ACRA_KEY_CONSENT)) } returns true
+        every { legacyAcraConsentPrefs.contains(eq(LEGACY_ACRA_KEY_ASKED)) } returns true
         every { legacyAcraConsentPrefs.getBoolean(eq(LEGACY_ACRA_KEY_CONSENT), any()) } returns true
         every { legacyAcraConsentPrefs.getBoolean(eq(LEGACY_ACRA_KEY_ASKED), any()) } returns true
 
@@ -259,8 +291,9 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `migration V1 to V2 - deletes legacy SP file after successful DataStore write`() = runTest {
+    fun `migration V1 to V2 - with legacy data present - deletes legacy SP file after DataStore write`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 1
+        every { legacyAcraConsentPrefs.contains(any()) } returns true
 
         dataMigrationManager.runMigrationIfNeeded()
 
@@ -270,7 +303,7 @@ class DataMigrationManagerTest {
     @Test
     fun `migration V1 to V2 - when legacy SP read throws - bumps version and skips`() = runTest {
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 1
-        every { legacyAcraConsentPrefs.getBoolean(any(), any()) } throws RuntimeException("legacy SP read failed")
+        every { legacyAcraConsentPrefs.contains(any()) } throws RuntimeException("legacy SP read failed")
 
         dataMigrationManager.runMigrationIfNeeded()
 
@@ -281,16 +314,19 @@ class DataMigrationManagerTest {
     }
 
     @Test
-    fun `migration V1 to V2 - on first launch (V0) - also runs and writes default values`() = runTest {
-        // V0 → V2 traverses both V1 (no-op) and V2 steps. Migration is idempotent
-        // so even on first install it writes default false/false to DataStore.
+    fun `migration V1 to V2 - on first launch (V0) - skips DataStore write when no legacy data`() = runTest {
+        // V0 → V2 still runs the V2 migration step. With no legacy SP data
+        // present (the realistic fresh-install case), the step short-circuits
+        // and leaves DataStore untouched — preventing the race that would
+        // otherwise overwrite a freshly given consent before
+        // CrashReportConsentStore.saveConsent's coroutine completes.
         every { sharedPreferences.getInt(eq(KEY_DATA_VERSION), any()) } returns 0
 
         dataMigrationManager.runMigrationIfNeeded()
 
         val data = fakeDataStore.data.first()
-        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_CONSENT_KEY])
-        Assert.assertEquals(false, data[CrashReportConsentStore.HAS_ASKED_KEY])
+        Assert.assertNull(data[CrashReportConsentStore.HAS_CONSENT_KEY])
+        Assert.assertNull(data[CrashReportConsentStore.HAS_ASKED_KEY])
         verify { sharedPreferencesEditor.putInt(eq(KEY_DATA_VERSION), eq(TARGET_DATA_VERSION)) }
     }
 
