@@ -20,6 +20,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -175,6 +176,7 @@ class AppDrawerFragment : Fragment() {
         setupRecyclerView()
         setupSearch()
         setupSortFab()
+        setupSwipeToDismiss()
         observeViewModel()
         setupFragmentResultListener()
     }
@@ -349,6 +351,19 @@ class AppDrawerFragment : Fragment() {
         binding.fabSort.setOnClickListener {
             shouldScrollToTop = true
             viewModel.toggleSortOrder()
+        }
+    }
+
+    private fun setupSwipeToDismiss() {
+        binding.appDrawerRoot.onSwipeDown = {
+            // isAdded-Guard: bei einer Swipe-Geste, die exakt während
+            // einer Teardown-Race (Rotation, System-Kill) abschliesst,
+            // wäre popBackStack auf einem detached Fragment ein Crash.
+            // Keyboard-Hide passiert automatisch via onPause, sobald
+            // popBackStack die Lifecycle-Transition triggert.
+            if (isAdded) {
+                findNavController().popBackStack()
+            }
         }
     }
 
