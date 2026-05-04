@@ -99,8 +99,17 @@ class AppContextMenuAdapter(
         }
 
         override fun areContentsTheSame(oldItem: AppContextMenuAction, newItem: AppContextMenuAction): Boolean {
-            // Data classes und Objects haben eine korrekte equals()-Implementierung.
-            return oldItem == newItem
+            // Mirrors areItemsTheSame so Lint sees the concrete data-class / object types
+            // after smart-cast — DiffUtilEquals can't prove equals() on the sealed parent.
+            return when {
+                oldItem is AppContextMenuAction.Shortcut && newItem is AppContextMenuAction.Shortcut ->
+                    oldItem == newItem
+                oldItem is AppContextMenuAction.LauncherAction && newItem is AppContextMenuAction.LauncherAction ->
+                    oldItem == newItem
+                oldItem is AppContextMenuAction.Separator && newItem is AppContextMenuAction.Separator ->
+                    true
+                else -> false
+            }
         }
     }
 
