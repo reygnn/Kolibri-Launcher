@@ -14,7 +14,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
-import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
@@ -23,21 +22,25 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Why instrumented: this is the ONE test that validates the full first-run
- * path on real Android infrastructure. Robolectric covers the fragments and
- * ViewModel logic individually, but cannot honestly exercise:
+ * Why instrumented: validates the first-run path on real Android
+ * infrastructure. Robolectric covers the fragments and ViewModel logic
+ * individually, but cannot honestly exercise:
  *   - real RecyclerView measure + layout (OnboardingAppListAdapter is
  *     populated via DiffUtil and a real LinearLayoutManager — Robolectric
  *     fakes layout passes and can mask "ItemView never reaches measured
  *     state because parent was 0px" bugs)
  *   - real Espresso ChipGroup interactions
  *   - real Intent firing across activity boundaries
- *   - DataStore read AFTER an in-process "restart" (recreate())
  *
- * Scope: deliberately tight. We do NOT try to validate MainActivity's
- * full UI here — that's covered by MainActivityRobolectricTest. We only
- * verify that the onboarding produces the right outgoing intent and that
- * favorites survive an Activity recreate.
+ * COVERAGE LIMIT (read this before extending):
+ * The original test additionally called scenario.recreate() AFTER the
+ * done-click to assert that state survives a config change. That setup
+ * cannot work — OnboardingActivity.finish()'es itself when it launches
+ * MainActivity, so by the time recreate() is called the underlying
+ * Activity is already destroyed and ActivityScenario throws NPE.
+ * Persistence-across-recreate belongs in a Robolectric ViewModel /
+ * Activity test instead, where the lifecycle can be replayed without
+ * the cross-activity launch killing the subject. Don't add it back here.
  */
 @HiltAndroidTest
 class OnboardingToHomeSmokeTest {
@@ -54,22 +57,24 @@ class OnboardingToHomeSmokeTest {
     }
 
     @Test
-    fun firstRun_selectsFavorites_firesIntentToMainActivity_andPersistsAcrossRecreate() {
+    fun firstRun_selectsFavorites_firesIntentToMainActivity() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val launchIntent = Intent(ctx, OnboardingActivity::class.java).apply {
             putExtra(OnboardingActivity.EXTRA_LAUNCH_MODE, /*INITIAL_SETUP*/ "INITIAL_SETUP")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-        ActivityScenario.launch<OnboardingActivity>(launchIntent).use { scenario ->
+        ActivityScenario.launch<OnboardingActivity>(launchIntent).use {
             // ── ASSERT shell rendered ────────────────────────────────────────
             onView(withId(R.id.all_apps_recycler_view)).check(matches(isDisplayed()))
             onView(withId(R.id.done_button)).check(matches(isDisplayed()))
 
             // ── ACT: pick the first three items in the list ──────────────────
-            // We click the row, which toggles selection in the adapter.
             // Index-based selection is intentional: package-name-based would
             // depend on the exact device's installed apps and be flaky.
+            // Espresso's RecyclerViewActions throws a PerformException with
+            // a clear message if the position doesn't exist, which is the
+            // failure mode we want if the list isn't populated yet.
             repeat(3) { i ->
                 onView(withId(R.id.all_apps_recycler_view))
                     .perform(RecyclerViewActions.actionOnItemAtPosition<androidx.recyclerview.widget.RecyclerView.ViewHolder>(i, click()))
@@ -80,14 +85,6 @@ class OnboardingToHomeSmokeTest {
 
             // ── ASSERT: intent was fired to MainActivity ─────────────────────
             Intents.intended(hasComponent(MainActivity::class.java.name))
-
-            // ── ASSERT: state survived a recreate ────────────────────────────
-            // Note: recreate() re-runs Activity.onCreate but the process and
-            // DI graph survive. That's a weaker test than process death, but
-            // it's the strongest one that's reliable inside instrumentation.
-            // Real process-death testing belongs in CI smoke jobs, not here.
-            scenario.recreate()
-            onView(withId(R.id.all_apps_recycler_view)).check(matches(isDisplayed()))
         }
     }
 }

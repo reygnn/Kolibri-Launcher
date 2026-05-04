@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
+import android.content.Intent
 import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -8,14 +9,17 @@ import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -35,7 +39,16 @@ import javax.inject.Inject
  * the same ContentResolver code path as content:// for openInputStream/
  * openOutputStream, AND through openFileDescriptor for the size check, but
  * doesn't require SAF dialog interaction (which we don't want in a unit-
- * scoped test — see OnboardingToHomeSmokeTest for the SAF-dialog level).
+ * scoped test).
+ *
+ * Component selection: BackupDataAssembler.importBackup filters every
+ * component-string against the installed-apps set (BackupDataAssembler.kt
+ * lines 188-206 for favorites, 222-231 for hidden). Synthetic strings
+ * like "com.example.alpha" are silently dropped on import even though
+ * the export persists them — see TODO.md §15 for the missing input
+ * validation in FavoritesRepository.addFavoriteComponent. To make the
+ * round-trip assertion meaningful, we seed with REAL launcher components
+ * resolved at runtime against the device's PackageManager.
  */
 @HiltAndroidTest
 class BackupRoundTripSafTest {
@@ -47,39 +60,73 @@ class BackupRoundTripSafTest {
     @Inject lateinit var hidden: HiddenAppsRepository
     @Inject lateinit var customNames: CustomNamesRepository
     @Inject lateinit var settings: SettingsRepository
+    @Inject lateinit var installedApps: InstalledAppsRepository
     @Inject @ApplicationContext lateinit var context: Context
 
     private lateinit var backupFile: File
+    private lateinit var componentA: String
+    private lateinit var componentB: String
+    private lateinit var packageA: String
 
     @Before
     fun setUp() {
         hiltRule.inject()
         backupFile = File(context.cacheDir, "test-backup-${System.nanoTime()}.zip")
             .also { it.parentFile?.mkdirs(); it.delete() }
+
+        // Resolve two real launcher components from the device, in the
+        // exact "pkg/cls" format the import-side filter expects (matching
+        // installedComponentsSet membership). Stable across AOSP/Pixel/
+        // most OEM images — every launchable app shows up here.
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolved = context.packageManager.queryIntentActivities(launcherIntent, 0)
+        assumeTrue(
+            "Need at least 2 launcher apps on the test device; got ${resolved.size}",
+            resolved.size >= 2,
+        )
+        componentA = with(resolved[0].activityInfo) { "$packageName/$name" }
+        componentB = with(resolved[1].activityInfo) { "$packageName/$name" }
+        packageA = resolved[0].activityInfo.packageName
+
+        // Warm up InstalledAppsRepository: it exposes a WhileSubscribed(5000)
+        // StateFlow whose initialValue is emptyList(). BackupDataAssembler's
+        // import path calls .first() on it, and a `.first()` from a process
+        // with no prior subscriber sees the initialValue immediately and
+        // unsubscribes — every component in the backup is then filtered out
+        // as "not installed". Production doesn't see this because HomeViewModel
+        // & co. keep the StateFlow primed continuously. This is a real
+        // production fragility — see TODO.md §15 (we widened that item to
+        // cover the WhileSubscribed-unprimed-restore variant).
+        runBlocking {
+            withTimeout(10_000) {
+                installedApps.getInstalledApps().filter { it.isNotEmpty() }.first()
+            }
+        }
     }
 
     @Test
     fun saveAndLoad_throughRealContentResolver_restoresAllRepositories() = runBlocking {
-        // ── ARRANGE: seed each repository with a distinguishable value ───────
-        favorites.addFavoriteComponent("com.example.alpha")
-        favorites.addFavoriteComponent("com.example.beta")
-        hidden.hideComponent("com.example.hide.me")
-        customNames.setCustomNameForPackage("com.example.alpha", "α")
-        // Pick any settings flag whose getter returns a Flow<Boolean>; we
-        // intentionally flip from default (false) to make the assertion
-        // non-trivial. doubleTapToLock falls under importQualityOfLife,
+        // ── ARRANGE: seed each repository with a value tied to a real,
+        // installed component so the import-side cleanup filter can't
+        // legitimately throw it out. ─────────────────────────────────────
+        favorites.addFavoriteComponent(componentA)
+        favorites.addFavoriteComponent(componentB)
+        hidden.hideComponent(componentB) // app can be both favorite and hidden
+        customNames.setCustomNameForPackage(packageA, "α")
+        // Settings: any boolean flag whose default is the opposite of what
+        // we set here. doubleTapToLock falls under importQualityOfLife,
         // which defaults to true in ImportOptions().
         settings.setDoubleTapToLock(true)
 
         val uri = backupFile.toUri().toString()
 
-        // ── ACT 1: save through the real ContentResolver path ────────────────
+        // ── ACT 1: save through the real ContentResolver path ────────────
         val saved = withTimeout(10_000) { backup.saveBackupToFile(uri) }
         assertThat(saved).isTrue()
         assertThat(backupFile.exists()).isTrue()
         assertThat(backupFile.length()).isGreaterThan(0L)
 
-        // ── ARRANGE 2: wipe all live state to prove restore actually does work ─
+        // ── ARRANGE 2: wipe live state to prove restore actually works ──
         favorites.purgeRepository()
         hidden.purgeRepository()
         customNames.purgeRepository()
@@ -87,18 +134,16 @@ class BackupRoundTripSafTest {
 
         assertThat(favorites.favoriteComponentsFlow.first()).isEmpty()
 
-        // ── ACT 2: load through the real openFileDescriptor + openInputStream ─
+        // ── ACT 2: load through openFileDescriptor + openInputStream ────
         val result = withTimeout(10_000) {
             backup.loadBackupFromFile(uri, ImportOptions())
         }
 
-        // ── ASSERT ───────────────────────────────────────────────────────────
+        // ── ASSERT ──────────────────────────────────────────────────────
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        val restoredFavs = favorites.favoriteComponentsFlow.first()
-        assertThat(restoredFavs).containsExactly("com.example.alpha", "com.example.beta")
-        assertThat(hidden.hiddenAppsFlow.first()).contains("com.example.hide.me")
-        assertThat(customNames.getAllCustomNames()["com.example.alpha"]).isEqualTo("α")
+        assertThat(favorites.favoriteComponentsFlow.first()).containsExactly(componentA, componentB)
+        assertThat(hidden.hiddenAppsFlow.first()).contains(componentB)
+        assertThat(customNames.getAllCustomNames()[packageA]).isEqualTo("α")
         assertThat(settings.doubleTapToLockEnabledFlow.first()).isTrue()
     }
 

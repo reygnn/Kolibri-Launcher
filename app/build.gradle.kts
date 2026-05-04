@@ -300,8 +300,12 @@ dependencies {
     androidTestImplementation(libs.hilt.android.testing)
     kaptAndroidTest(libs.hilt.compiler)
 
-    // Mockito für instrumentierte Tests
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    // Turbine für SharedFlow-Subscriber-Race-Pattern in Receiver-Tests
+    // (siehe TESTING_CONVENTIONS „MUTABLESHAREDFLOW IN CONSTRUCTOR" — die
+    // Subscriber-vor-Trigger-Garantie funktioniert auf instrumentierter
+    // Hardware genauso wie unter JVM, nur ohne TestDispatcher).
+    androidTestImplementation(libs.turbine)
 }
 
 kapt {

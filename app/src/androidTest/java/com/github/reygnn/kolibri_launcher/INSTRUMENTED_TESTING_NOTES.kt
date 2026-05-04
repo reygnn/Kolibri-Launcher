@@ -48,9 +48,38 @@ package com.github.reygnn.kolibri_launcher
  * 5. Default-launcher state goes through DefaultHomeRoleHelper. Setting it
  *    via UI flow is fragile across OEM skins; the shell command is stable.
  *
- * 6. Test budget: keep this source set small. Five tests today, each
- *    targeting something that JVM + Robolectric structurally cannot reach
- *    (real ContentResolver descriptors, real RoleManager state, real
+ * 6. HiltAndroidTest swaps the production Application class for
+ *    HiltTestApplication (see app/src/androidTest/AndroidManifest.xml,
+ *    `tools:replace="android:name"`). This means KolibriLauncherApp.onCreate
+ *    DOES NOT RUN in instrumented tests, and any side effects of that
+ *    onCreate — most notably the dynamic registration of
+ *    PackageUpdateReceiver — are NOT reproduced. Tests that need to
+ *    exercise a dynamically registered Production receiver must register
+ *    their own instance of the production receiver class against
+ *    `context.registerReceiver(...)` in @Before, with a matching
+ *    @After teardown that swallows IllegalArgumentException (so a failure
+ *    in @Before before the registration call doesn't shadow the original
+ *    error). See PackageUpdateReceiverGoAsyncTest for the canonical
+ *    pattern. Trade-off: such tests cover the receiver class itself but
+ *    NOT the registration site in KolibriLauncherApp — flag that limit
+ *    in the test KDoc so future maintainers don't think the registration
+ *    is covered.
+ *
+ * 7. Cache-lag polling pattern. Some Android subsystems (notably
+ *    RoleManager's UID-side cache after a `cmd role` change) update with
+ *    a small delay relative to the ground truth. Don't `Thread.sleep` to
+ *    wait for them — use `support/awaitUntil(timeoutMs, describe) { ... }`
+ *    which polls the condition until satisfied OR raises an AssertionError
+ *    with the last-observed state. The returned elapsed-millis value can
+ *    itself be asserted against a budget, turning the polling into a
+ *    *measurement* — if a known cache lag exceeds its budget, that IS the
+ *    failure and the production code (the consumer of the cached value,
+ *    not the cache itself) needs the fix. See
+ *    DefaultLauncherRoleConsistencyTest for the pattern.
+ *
+ * 8. Test budget: keep this source set small. Each test must target
+ *    something that JVM + Robolectric structurally cannot reach (real
+ *    ContentResolver descriptors, real RoleManager state, real
  *    LauncherApps permission gate, real broadcast goAsync, real RecyclerView
  *    measure pass). If a test could pass as Robolectric, write it there
  *    instead — feedback loop is 50× faster.
@@ -58,9 +87,14 @@ package com.github.reygnn.kolibri_launcher
  * ANTI-PATTERNS:
  * X  @get:Rule val mainDispatcherRule = MainDispatcherRule()      // deadlocks Main
  * X  runTest { ... }                                              // clashes with real scheduler
- * X  Thread.sleep(...) for synchronization                        // flaky; use Espresso
+ * X  Thread.sleep(...) for synchronization                        // flaky; use Espresso or awaitUntil
  * X  Calling Dispatchers.setMain anywhere                         // ditto
  * X  Tests that depend on "previous test's data" — they MUST be independent
- *    (use ClearAppDataRule or seed in @Before).
+ *    (orchestrator clearPackageData=true handles cleanup; seed in @Before).
+ * X  In-test @get:Rule that runs `pm clear <ourPkg>` — kills the runner.
+ * X  scenario.recreate() AFTER the Activity has finish()'d itself (e.g.
+ *    after triggering an Intent that finishes the source activity); the
+ *    underlying Activity is destroyed and recreate() throws NPE. Move
+ *    such state-survival assertions into a Robolectric ViewModel test.
  */
 private object InstrumentedTestingNotes

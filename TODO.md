@@ -26,6 +26,9 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
 | 14 | `Invalid resource ID 0x00000000` Logcat-Noise | offen — Quelle lokalisieren, ~50 Errors pro App-Start aus dem Kolibri-Process (Tag `olibri_launcher`), keine Crashes aber Framework-Logs voll. Beobachtet 2026-05-04 nach ACRA-Verifikation. | klein-mittel, Investigation |
+| 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
+| 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
+| 17 | `SettingsFragment.updateDefaultLauncherStatus` ggf. RoleManager-UID-Cache-Lag | offen — Lag durch `DefaultLauncherRoleConsistencyTest` messbar; Wert wird beim ersten grünen Lauf hier eingetragen | klein-mittel, Investigation |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1334,6 +1337,103 @@ zumüllen. ACRA selbst funktioniert (separat verifiziert).
 vermutlich 1-2 Stellen mit Null-Check / Default-`R.string.empty`.
 Kein Score-Hebel, aber ein Logcat-Hygiene-Win und ein Indikator dass
 irgendwo eine `@StringRes Int = 0` Lücke schwelt.
+
+---
+
+## 15. (offen) `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht
+
+**Aufgedeckt 2026-05-04** beim Bring-up der instrumented Tests. Der Test
+`BackupRoundTripSafTest.saveAndLoad_throughRealContentResolver_…` hat
+synthetische Strings wie `"com.example.alpha"` als Favorit gesetzt; die
+gehen durch `addFavoriteComponent` ohne Beschwerde, werden persistiert,
+aber beim Backup-Restore von `BackupDataAssembler.kt:188-206` wieder
+weggeworfen, weil sie nicht in `installedComponentsSet` liegen — der
+Filter prüft auf gültige `pkg/cls`-Components.
+
+**Was fehlt:** keine Validierung, dass der String dem ComponentName-
+Format `pkg/cls` entspricht (oder über `ComponentName.unflattenFromString`
+parsbar ist). Heute akzeptiert das Repository jeden String stillschweigend.
+In Production unwahrscheinlich, aber: jede Stelle, die `addFavoriteComponent`
+aus User-Input oder externen Quellen aufruft (Migration-Pfade, Backup-
+Import, Custom-Backups Dritter) ist ein Risiko.
+
+**Mögliche Lösungen, in absteigender Härte:**
+
+1. `silentError`-Sanity-Check in `FavoritesRepositoryImpl.addFavoriteComponent`
+   bei `ComponentName.unflattenFromString(componentName) == null`. Ergibt
+   in DEBUG einen Throw (Rule 9), in Release einen Log + No-Op-Return.
+2. `addFavoriteComponent` rückgabe-typed: `Boolean` (existiert schon),
+   bei invalidem Format `false` zurückgeben statt silent stale-add.
+3. Alle `Set<String>`-basierten Component-Stores hinter einen Wrapper-Type
+   stellen, der nur über `ComponentName.flattenToString()` befüllt wird.
+   Größere Operation, aber strukturell wasserdicht.
+
+**Größenordnung:** Variante 1 ist klein (5 Zeilen + Test), Variante 3 ist
+mittel-groß. Empfehlung für jetzt: Variante 1, plus den Test in
+`BackupRoundTripSafTest` als Regressions-Anker.
+
+---
+
+## 16. (offen) `AppUpdateSignal.events`: `replay = 1` erwägen
+
+**Aufgedeckt 2026-05-04** beim Reparieren von `PackageUpdateReceiverGoAsyncTest`.
+`AppUpdateSignal._events = MutableSharedFlow<Unit>()` mit Default-Parametern
+(`replay = 0, extraBufferCapacity = 0`). Konsequenz: ein Subscriber, der
+nach dem `emit` ankommt, sieht das Event nicht — im Test musste deshalb
+Turbine eingesetzt werden (`events.test { ... }` parkt den Collector vor
+dem Trigger), und ein einfacher `delay(50)`-Workaround vor dem Trigger
+funktionierte nicht zuverlässig.
+
+**In Production** ist Loss eines `Update-Signals` ohnehin unproblematisch —
+es bedeutet höchstens, dass die App-Liste *eine Sekunde später* refreshed
+(beim nächsten Trigger oder Lifecycle-Event). Wenn ein `replay = 1` einen
+Subscriber einen veralteten Buffer-Wert sehen lässt: völlig unkritisch,
+weil der Wert sowieso `Unit` ist und nur als Trigger dient.
+
+**Vorteil von `replay = 1`:** sämtliche „Subscriber-vor-Trigger"-Race-
+Patterns in JVM-Tests UND in instrumented Tests werden trivial — kein
+Turbine, kein `UnconfinedTestDispatcher`, kein `delay`-Schätzen. Kostet
+einen `Unit`-Slot im Buffer.
+
+**Größenordnung:** trivial. Eine Konstante in `AppUpdateSignal.kt`
+ändern, vorhandene Tests laufen lassen. Ein `BufferOverflow.DROP_OLDEST`
+ergänzen, falls man den Buffer kontrolliert klein halten will (sonst
+default `BufferOverflow.SUSPEND`, was bei `replay = 1` und keinen
+weiteren Subscribern nicht greift). Wenn der Test in
+`PackageUpdateReceiverGoAsyncTest` nach der Änderung auch ohne Turbine
+grün läuft: Test entsprechend vereinfachen.
+
+---
+
+## 17. (offen) `SettingsFragment.updateDefaultLauncherStatus` ggf. RoleManager-UID-Cache-Lag
+
+**Aufgedeckt 2026-05-04** beim Reparieren von
+`DefaultLauncherRoleConsistencyTest`. Der Test exerciert die Transition
+*set → clear* der HOME-Rolle und misst, wie lange beide Erkennungspfade
+(`RoleManager.isRoleHeld(ROLE_HOME)` und
+`PackageManager.resolveActivity(CATEGORY_HOME)`) brauchen, bis sie
+übereinstimmend `false` melden.
+
+**Befürchtung:** der UID-lokale Cache des `RoleManager` aktualisiert
+nicht synchron mit dem Server-Side `cmd role remove-role-holder`-Call.
+Wenn die Konvergenz-Zeit >500 ms ist, sieht der User in
+`SettingsFragment` möglicherweise „du bist Default" obwohl er es nicht
+mehr ist (oder umgekehrt) — direkter UX-Bug. Der Test asserts
+`convergedMs <= 500ms`; >500ms ist *der* Production-Befund.
+
+**Was hier fehlt:**
+
+1. **Gemessener Lag-Wert** vom ersten grünen Test-Lauf: <NACHTRAGEN>
+2. **Wenn Lag >500ms**: `SettingsFragment.updateDefaultLauncherStatus`
+   so umbauen, dass es entweder beide Quellen gegenseitig validiert
+   (UI nur „du bist Default" zeigen, wenn beide übereinstimmen) oder
+   einen kurzen Polling-Pass macht beim onResume.
+3. **Wenn Lag <=500ms**: dieser Item geschlossen, das Polling-Budget
+   im Test bleibt als Regressions-Wächter.
+
+**Größenordnung:** Investigation klein (Test selbst liefert die Zahl);
+Fix mittel, falls erforderlich. Score-Hebel: Vertrauen-in-UI-Status,
+keine Crashes, keine Framework-Pflicht.
 
 ---
 
