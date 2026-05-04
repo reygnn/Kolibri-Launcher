@@ -241,16 +241,20 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
             onboardingCheckCompleted = true
 
-            if (!onboardingCompleted && !backupPresent) {
-                // 2. Wait for STARTED state, then launch ONCE
-                // This prevents BackgroundActivityLaunchViolation on Pixel/Android 14+
-                // Using withStarted is cleaner than repeatOnLifecycle + cancel
-                lifecycle.withStarted {
-                    launchOnboardingActivity()
+            when (InitialSetupAction.decide(onboardingCompleted, backupPresent)) {
+                InitialSetupAction.LaunchOnboarding -> {
+                    // 2. Wait for STARTED state, then launch ONCE
+                    // This prevents BackgroundActivityLaunchViolation on Pixel/Android 14+
+                    // Using withStarted is cleaner than repeatOnLifecycle + cancel
+                    lifecycle.withStarted {
+                        launchOnboardingActivity()
+                    }
                 }
-            } else {
-                // 3. Normal Start - Initialize immediately (no wait needed)
-                initializeMainApp()
+                InitialSetupAction.InitializeImmediately -> {
+                    // 3. Normal start (or wipe+reinstall with backup) —
+                    // initialize immediately, no wait needed.
+                    initializeMainApp()
+                }
             }
         } catch (e: CancellationException) {
             throw e
