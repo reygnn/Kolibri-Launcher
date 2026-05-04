@@ -4,7 +4,6 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.reygnn.kolibri_launcher.support.ClearAppDataRule
 import com.github.reygnn.kolibri_launcher.support.DefaultHomeRoleHelper
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -39,7 +38,6 @@ import org.junit.Test
 class DefaultLauncherRoleConsistencyTest {
 
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
-    @get:Rule(order = 1) val clearData = ClearAppDataRule()
 
     private lateinit var context: Context
     private lateinit var roleManager: RoleManager

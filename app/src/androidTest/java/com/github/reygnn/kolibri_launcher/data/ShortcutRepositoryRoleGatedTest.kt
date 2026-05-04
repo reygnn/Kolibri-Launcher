@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
-import com.github.reygnn.kolibri_launcher.support.ClearAppDataRule
 import com.github.reygnn.kolibri_launcher.support.DefaultHomeRoleHelper
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -33,7 +32,6 @@ import javax.inject.Inject
 class ShortcutRepositoryRoleGatedTest {
 
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
-    @get:Rule(order = 1) val clearData = ClearAppDataRule()
 
     @Inject lateinit var shortcuts: ShortcutRepository
 

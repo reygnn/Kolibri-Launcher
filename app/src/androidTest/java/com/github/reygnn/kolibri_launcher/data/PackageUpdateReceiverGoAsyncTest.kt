@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
-import com.github.reygnn.kolibri_launcher.support.ClearAppDataRule
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -50,7 +49,6 @@ import javax.inject.Inject
 class PackageUpdateReceiverGoAsyncTest {
 
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
-    @get:Rule(order = 1) val clearData = ClearAppDataRule()
 
     @Inject lateinit var appUpdateSignal: AppUpdateSignal
     @Inject @ApplicationContext lateinit var context: Context

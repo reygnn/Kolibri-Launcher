@@ -9,7 +9,6 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.support.ClearAppDataRule
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -42,7 +41,6 @@ import javax.inject.Inject
 class BackupRoundTripSafTest {
 
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
-    @get:Rule(order = 1) val clearData = ClearAppDataRule()
 
     @Inject lateinit var backup: BackupRepository
     @Inject lateinit var favorites: FavoritesRepository

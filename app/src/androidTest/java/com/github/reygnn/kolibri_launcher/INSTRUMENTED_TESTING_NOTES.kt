@@ -33,9 +33,17 @@ package com.github.reygnn.kolibri_launcher
  *    Order 0 is mandatory — Hilt must initialise before any other rule
  *    that touches @Inject fields.
  *
- * 4. App-data cleanup goes through ClearAppDataRule (uses `pm clear`).
- *    Do NOT delete DataStore files manually — race conditions with running
- *    coroutines from the previous test will corrupt state.
+ * 4. App-data cleanup is handled by androidx.test.orchestrator via the
+ *    `clearPackageData=true` instrumentation-runner argument (see
+ *    app/build.gradle.kts > defaultConfig > testInstrumentationRunnerArguments).
+ *    The orchestrator runs `pm clear` BETWEEN tests, AFTER the
+ *    instrumentation has finished and BEFORE the next one starts. Do NOT
+ *    add an in-test @get:Rule that calls `pm clear` on the target package
+ *    from inside the test process — instrumentation runs in the target
+ *    app's process, so a self-targeted `pm clear` SIGKILLs the runner.
+ *    Symptom: every test fails with "Test instrumentation process crashed"
+ *    and an empty stack trace. Same goes for manually deleting DataStore
+ *    files — coroutines from the previous test will race the deletion.
  *
  * 5. Default-launcher state goes through DefaultHomeRoleHelper. Setting it
  *    via UI flow is fragile across OEM skins; the shell command is stable.

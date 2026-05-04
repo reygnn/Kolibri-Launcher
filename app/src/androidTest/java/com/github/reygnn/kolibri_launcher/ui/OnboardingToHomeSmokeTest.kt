@@ -12,7 +12,6 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.support.ClearAppDataRule
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.google.common.truth.Truth.assertThat
@@ -44,7 +43,6 @@ import org.junit.Test
 class OnboardingToHomeSmokeTest {
 
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
-    @get:Rule(order = 1) val clearData = ClearAppDataRule()
 
     @Before fun setUp() {
         hiltRule.inject()

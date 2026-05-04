@@ -72,6 +72,14 @@ android {
 
         testInstrumentationRunner = "com.github.reygnn.kolibri_launcher.HiltTestRunner"
         testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "3"
+        // Wipes app data (DataStore, SharedPreferences, filesDir, runtime
+        // permissions) BETWEEN tests via androidx.test.orchestrator. The
+        // orchestrator runs `pm clear` AFTER the instrumentation has
+        // finished and BEFORE it starts the next test, so unlike a
+        // @get:Rule that calls `pm clear` from inside the test process
+        // (which SIGKILLs the runner itself), this is safe. Requires
+        // `execution = "ANDROIDX_TEST_ORCHESTRATOR"` in testOptions.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     sourceSets {
