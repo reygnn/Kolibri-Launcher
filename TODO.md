@@ -25,6 +25,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | erledigt 2026-05-03 (alle 16 Files Android-frei); Modul-Type-Switch in §12 nachgezogen | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
+| 14 | `Invalid resource ID 0x00000000` Logcat-Noise | offen — Quelle lokalisieren, ~50 Errors pro App-Start aus dem Kolibri-Process (Tag `olibri_launcher`), keine Crashes aber Framework-Logs voll. Beobachtet 2026-05-04 nach ACRA-Verifikation. | klein-mittel, Investigation |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1284,6 +1285,55 @@ Memo bleibt damit (a) ein neuer Reviewer das testFixtures-Pattern und
 seine Begründung versteht, (b) die Resolution für den (gelösten)
 AGP-Bug an einer Stelle dokumentiert ist, und (c) der Endstand des
 §13-Moves nachschlagbar ist.
+
+---
+
+## 14. (offen) `Invalid resource ID 0x00000000` Logcat-Noise
+
+**Beobachtet 2026-05-04** beim Re-Test nach der ACRA-Consent-Fix-Episode
+(`bundleRelease` 17:06, AAB installiert, App geöffnet). Logcat zeigt
+Schwallweise `Invalid resource ID 0x00000000`-Errors aus dem Kolibri-
+Process (Tag `olibri_launcher` — Android trunkiert das initiale `k`):
+
+```
+17:07:03.201 olibri_launcher  E  Invalid resource ID 0x00000000.   (×11 in 1s)
+17:07:05.395-08.845              ...                                (×14)
+17:08:00.347-04.854              ...                                (×17)
+```
+
+Häufung deckt sich mit MainActivity- und SettingsActivity-Open. Keine
+Crashes, keine ACRA-Reports — nur Framework-Errors die den Logcat
+zumüllen. ACRA selbst funktioniert (separat verifiziert).
+
+**Mögliche Ursachen** (nicht verifiziert, alle Resource-ID-0-Pfade):
+
+- `getString(0)` / `getText(0)` mit `@StringRes Int = 0` Default,
+  ungeprüft durchgereicht
+- `setText(@StringRes Int)` mit 0 statt null-Check oder
+  `setText(CharSequence)`-Variante
+- `findViewById(0)` oder `getResources().getXxx(0)` aus Reflection /
+  Library-Code
+- Eine View-Inflation, die ein `android:id="@null"` oder fehlendes
+  ID-Attribut auswertet
+
+**Strategie für die Investigation:**
+
+1. Stack-Trace einholen — `0x00000000`-Log kommt direkt aus Native
+   `ResourcesImpl.getValueForDensity`, ohne Java-Stack im Logcat.
+   Trick: in DEBUG einen StrictMode-Detector oder einen kurzen
+   Reflection-Hook auf `Resources.getString(int)` zwischenschalten,
+   der bei `id == 0` einen synthetischen Throwable wirft.
+2. Alternative: Compile-time-Suche nach `setText(0)` / `getString(0)` /
+   gefährlichen `@StringRes`-Properties ohne Null-Default.
+3. Pre-existing oder neu? Wenn der Schwall schon vor dem `:domain`-
+   Modul-Split (§11/§12) auftrat: alte Codebase. Wenn neu: Verdacht
+   auf einen Refactor (z.B. der Wallpaper-Color-Sealed-State, der
+   einen `@StringRes Int` Parameter hatte).
+
+**Größenordnung:** klein-mittel. Investigation 30-60 min, Fix
+vermutlich 1-2 Stellen mit Null-Check / Default-`R.string.empty`.
+Kein Score-Hebel, aber ein Logcat-Hygiene-Win und ein Indikator dass
+irgendwo eine `@StringRes Int = 0` Lücke schwelt.
 
 ---
 
