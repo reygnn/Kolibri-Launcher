@@ -18,13 +18,13 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 3 | `BackupRepositoryImpl` zerlegen | umgesetzt 2026-05-03 via §9.1 mit anderem Argument als ursprünglich angesetzt — Memo bleibt | — |
 | 5 | `MainDispatcherRule`-Audit über Tests | erledigt, Memo bleibt | — |
 | 6 | Robolectric-Test-Application-Leak | erledigt 2026-05-02, Memo bleibt | — |
-| 7 | Selbst-Linter für die 13 Rules | teilumgesetzt 2026-05-03 (3 von 6 Rules), Memo bleibt | — |
+| 7 | Selbst-Linter für die 13 Rules | teilumgesetzt (4 von 6 Rules: 9, 12, Naming seit 2026-05-03; Rule 11 annotation discipline seit 2026-05-04), Memo bleibt | — |
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
 | 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
-| 11 | Brocken C — `:domain` Source Pure-Kotlin | Source-Refactor erledigt 2026-05-03 (alle 16 Files), Modul-Type-Switch versucht aber durch Timber-AAR blockiert — siehe §12 | — |
+| 11 | Brocken C — `:domain` Source Pure-Kotlin | erledigt 2026-05-03 (alle 16 Files Android-frei); Modul-Type-Switch in §12 nachgezogen | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
-| 13 | Brocken B — Test-Isolation pro Modul | weitgehend erledigt 2026-05-03 — `:domain:test` hat 310 Tests in 45 Files (alle pure-JVM, ~5s gesamt), testFixtures in `:domain` etabliert (TimberRule, MainDispatcherRule, 14 Fake*Repositories, 14 abstract Contracts). `:data:test` blockiert durch AGP-android-library testFixtures-Kotlin-Bug — Memo unten | erledigt-für-:domain, blockiert-für-:data |
+| 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
