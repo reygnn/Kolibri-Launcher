@@ -75,35 +75,70 @@ import javax.inject.Inject
  *                    HomeFragment — Size & Refactoring Notes
  * =============================================================================
  *
- * This file is large — well over 2,000 lines. That size is a deliberate
- * trade-off, not an accident, and it is being reduced in planned stages.
- * If you are here to split it up, please read this first — the split is
- * NOT the next step.
+ * Status: Post-Brocken-A (2026-05-03). 1972 lines, 19 try/catch blocks
+ * (11 Throwable). Down from 2657 / 59 / 51 across two sweeps. The file
+ * is at its structural floor — see "Why the floor is here" below
+ * before proposing further size reduction.
  *
  *
- * Why the file is large
+ * Why the floor is here
  * ---------------------
- * The home screen carries the full UI responsibility of the launcher:
- * wallpaper rendering and live edit mode (enter / commit / cancel, save
- * button, layer add / delete / up / down, snap controls, toolbar dimming,
- * touch interception), multi-mode favorites rendering with per-button
- * colors, long-press menus and scroll-width adjustment, time-based chips
- * (alarm, calendar) with contrast-aware styling, clock display, status-bar
- * and navigation-bar insets, back-press handling across edit states,
- * orientation lock coordination, and lifecycle-scoped observation of
- * every relevant ViewModel flow.
+ * If you are reading this because a fresh review flagged the file size
+ * and you are tempted to split it, please read this section first. The
+ * floor argument has receipts.
  *
- * All of it touches View, binding, or LifecycleOwner. None of it can live
- * outside a Fragment on Android. The floor for this file, given the scope
- * of what the screen actually does, is not small — but it is well above
- * the current size.
+ * Account for what is actually in the file:
+ *
+ *   ~150 lines  this header KDoc — documentation, not code
+ *   ~60 lines   imports
+ *   ~80 lines   onDestroyView teardown — 14 setListener(null) calls
+ *               plus wallpaperView callback nulls plus _binding
+ *               nulling. Each listener must be released explicitly;
+ *               nothing here folds into a loop without losing type
+ *               information or making the teardown harder to audit.
+ *   ~120 lines  eight Android lifecycle overrides (onCreate,
+ *               onCreateView, onViewCreated, onConfigurationChanged,
+ *               onStart, onResume, onPause, onDestroyView). These are
+ *               Android Fragment contract — they cannot live anywhere
+ *               but in the Fragment subclass.
+ *   ~280 lines  eight collectOnStarted observer blocks, each tied to
+ *               a specific ViewModel flow with its own dispatch logic.
+ *               The Fragment.collectOnStarted helper (in ui.flow)
+ *               already collapsed nine repeatOnLifecycle blocks into
+ *               a single extension; the per-observer bodies are at
+ *               their minimum-information form.
+ *   ~150 lines  setup methods (setupGestures, setupDoubleTapActions,
+ *               setupBackPressHandler, setupHomeWindowInsets,
+ *               setupFragmentResultListener, registerLayerImagePicker).
+ *               Each requires binding, viewLifecycleOwner, or
+ *               childFragmentManager — Fragment-bound by definition.
+ *               Moving them to a sibling class adds construction and
+ *               wiring boilerplate without removing complexity.
+ *   ~1100 lines remaining — the actual rendering, layout, color, chip,
+ *               and wallpaper glue. Already heavily delegated: pure
+ *               logic lives in calculator / formatter / state classes
+ *               (see "Pure-logic extractions" below) covered by JVM
+ *               unit tests; wallpaper edit mode lives in
+ *               WallpaperEditController; wallpaper diff lives in
+ *               WallpaperViewBinder + WallpaperViewDiff. What remains
+ *               here is the View-side glue that cannot be tested
+ *               without Robolectric — and Robolectric is the wrong
+ *               tool for fast feedback on this kind of plumbing.
+ *
+ * The C-developer instinct ("just #include the setup methods") would
+ * relocate lines without reducing complexity. Same reasoning as the
+ * Fragment-delegate split below: lines move, total surface stays the
+ * same, plus extra import / construction / wiring boilerplate.
+ *
+ * Floor reached. Future size complaints in audits are budget-aware
+ * statements ("this is a big file") rather than action items.
  *
  *
  * Pure-logic extractions: what's done
  * -----------------------------------
  * Decision logic most prone to silent regression has been pulled into
- * pure Kotlin classes covered by fast JVM unit tests, independent of the
- * Android framework:
+ * pure Kotlin classes covered by fast JVM unit tests, independent of
+ * the Android framework:
  *
  *   LayerButtonsState       — layer-edit button visibility / enabled / alpha
  *   SnapIconResolver        — drawable selection for the four snap buttons
@@ -120,105 +155,64 @@ import javax.inject.Inject
  *                             Fragment)
  *   WallpaperSaveAction     — three-way decision (all layers / single /
  *                             none) shared by save-button and pre-layer-op
- *                             transform saver. Surfaced during walkthrough
- *                             after the original three; intentional
- *                             asymmetry between the two callers preserved
- *                             and now documented inline at the call site.
+ *                             transform saver
  *
- * Together they catch the classes of bugs that actually appear in
- * practice: new BackupPreview field added but the dialog forgets it; new
- * SnapMode value added but no icon mapping; off-by-one in layer button
- * enable / disable; locale-dependent date format slipping into a filename.
+ * Plus boilerplate reduction:
  *
- * Boilerplate reduction in the same direction:
- *
- *   Fragment.collectOnStarted (ui.flow) — replaced nine structurally
- *     identical repeatOnLifecycle(STARTED) blocks (eight in HomeFragment,
- *     one in AppDrawerFragment) with a single extension. Same behavior,
- *     ~100 lines smaller in HomeFragment, single point for the audit
- *     below to redesign the catch hierarchy. One Observer (split-mode
- *     threshold) was lifted from a single-catch to the resilient
- *     two-catch shape during migration; treated as fixing a copy-paste
- *     oversight, not a behavior change in spirit.
+ *   Fragment.collectOnStarted (ui.flow) — collapsed nine
+ *     repeatOnLifecycle(STARTED) blocks (eight here, one in
+ *     AppDrawerFragment) into a single extension.
  *
  *
- * Pure-logic extractions: phase complete
- * --------------------------------------
- * The three planned pure-logic extractions — Fragment.collectOnStarted
- * (collapsed eight repeatOnLifecycle blocks), ContextMenuResult (sealed
- * interface for setupFragmentResultListener), and WallpaperEditTransition
- * (state machine for updateWallpaperEditMode) — are all done and listed
- * under "what's done" above. The next priority is the try/catch audit
- * below, then the Fragment-delegate split.
+ * The four-category frame for try/catch
+ * -------------------------------------
+ * The Brocken-A sweep classified every catch in this file under one
+ * of four categories. The frame is preserved here because it is also
+ * the rule for any catch added in the future. Reviewers: please
+ * apply.
  *
- *
- * Next priority: try/catch(Throwable) audit
- * -----------------------------------------
- * With the pure-logic extractions done, the next item on the list is an
- * audit of the defensive try/catch(Throwable) pattern that wraps most
- * non-trivial calls in this file. This is roughly 30–40% of the current
- * line count — the single biggest lever, larger than the Fragment split
- * would be.
- *
- * The goal behind this pattern is correct: the launcher must not crash
- * in the user's face. A black screen on a home-screen launcher is worse
- * than on almost any other kind of app, because the user has no way to
- * navigate away. Stability matters.
- *
- * But try/catch(Throwable) + silentError is the wrong tool for that
- * goal. It doesn't achieve stability — it achieves *continuation*, which
- * is a different thing. When a render call throws and the wrapper
- * swallows it, the app keeps running, but in a half-broken state: a
- * layer didn't render, a color didn't apply, a binding is null further
- * down. The user sees a quietly broken screen and doesn't know anything
- * is wrong. Failures become invisible, and invisible failures don't
- * get fixed.
- *
- * The replacement is an escalation hierarchy matched to the failure
- * class, not a single catch(Throwable) for everything:
- *
- *   Expected errors (I/O, parse, missing package) — caught with specific
- *     exception types, surfaced to the user where they matter, otherwise
- *     logged at the appropriate level. Never silently swallowed.
+ *   Expected errors (I/O, parse, missing package) — caught with
+ *     specific exception types, surfaced where they matter, otherwise
+ *     logged at the appropriate level. Never swallowed. Examples in
+ *     this file: loadBitmapFromUri (FileNotFoundException +
+ *     SecurityException + OutOfMemoryError under the Throwable
+ *     umbrella), showAppInfo (ActivityNotFoundException),
+ *     getDimensionPixelSize sites (Resources.NotFoundException under
+ *     ProGuard).
  *
  *   Teardown races (fragment gone, coroutine still delivering) —
- *     prevented structurally via viewLifecycleOwner.lifecycleScope and
- *     `_binding?.let { }` checks, not masked with try/catch after the
- *     fact.
+ *     prevented structurally via viewLifecycleOwner.lifecycleScope
+ *     and local _binding snapshots, not masked with a post-hoc
+ *     catch. Examples: checkScrollStateAfterNextLayout, safePost,
+ *     updateWallpaper.
  *
- *   Programmer errors (NPE, IllegalState, IndexOutOfBounds) — these are
- *     bugs, not conditions. Crash loudly in debug, report via whatever
- *     crash-reporting channel exists in release, fix in source. Never
- *     swallow.
+ *   Programmer errors (NPE, IllegalState, IndexOutOfBounds) — bugs,
+ *     not conditions. Crash loudly in DEBUG via silentError;
+ *     swallowing them produces invisibly broken home screens, which
+ *     is the failure mode this file used to suffer from. Removed
+ *     wholesale in the sweep.
  *
- *   Unrecoverable failures (inflate failure → black screen, OOM on
- *     bitmap load) — controlled process termination with a brief
- *     user-facing notice, so the system restarts cleanly. This matches
- *     the direction the author already identified — for failures this
- *     severe, a controlled exit is better than continued execution in
- *     a broken state.
- *
- * Expected outcome of the audit: ~30–40% line reduction in HomeFragment,
- * a sharply smaller surface of latent bugs, and failures that are
- * actually observable when they happen. The work is design-level, not
- * mechanical — each existing wrapper needs to be classified and the
- * legitimate subset (teardown races, OOM) separated from the rest.
+ *   Unrecoverable / HOME-Activity-resilience boundaries —
+ *     system-callback paths where letting an exception propagate
+ *     would crash the launcher. Two preserved sites:
+ *     setupGestures' setOnTouchListener and
+ *     DoubleClickListener.onClick. Both are documented inline. The
+ *     same trade-off applies in per-item recovery loops
+ *     (renderFavorites, updateTimeBasedChips, createAppButton outer
+ *     catches): one bad item shouldn't break the whole list.
  *
  *
- * Fragment-delegate split: mostly cosmetic, deferred indefinitely
- * ----------------------------------------------------------------
- * After the try/catch audit lands, this file will be substantially
- * smaller and most of the bug-prone logic will already live behind
- * tests. At that point a Fragment-delegate split (mirroring the
- * ViewModel's `delegate/` siblings — WallpaperEditController,
- * FavoritesRenderer, TimeChipsRenderer) is largely cosmetic:
+ * Fragment-delegate split: deferred indefinitely
+ * ----------------------------------------------
+ * Splitting this file along the ViewModel's delegate/ pattern
+ * (FavoritesRenderer, TimeChipsRenderer, etc.) is largely cosmetic:
  *
  *   - Fragment-side delegates still depend on View, binding, and
  *     LifecycleOwner. They cannot be unit-tested with JUnit + MockK
- *     the way ViewModel delegates can — testing them needs Robolectric
- *     or instrumented tests, both of which this project deliberately
- *     avoids. A split improves readability and review surface, but
- *     does not directly improve unit-test coverage.
+ *     the way ViewModel delegates can — testing them needs
+ *     Robolectric or instrumented tests, both of which this project
+ *     deliberately avoids. A split improves readability and review
+ *     surface, but does not directly improve unit-test coverage.
  *   - The lines don't disappear; they move. Same total complexity,
  *     spread over more files plus extra import / construction /
  *     wiring boilerplate.
@@ -234,16 +228,39 @@ import javax.inject.Inject
  * None of these currently apply.
  *
  *
- * Priority order (operational summary)
- * ------------------------------------
- *   1. try/catch(Throwable) audit and replacement with the escalation
- *      hierarchy above. Largest single lever in the file — ~30–40%
- *      line reduction and a sharp drop in latent-bug surface.
- *      Design-level work, not mechanical.
+ * Would more Robolectric / androidTest coverage flip this?
+ * --------------------------------------------------------
+ * Reasonable question, asked here so the next audit doesn't have to
+ * re-derive the answer. No, it would not — for three reasons.
  *
- *   2. (no second item — Fragment-delegate split is deferred per
- *      "mostly cosmetic" above. Pure-logic extractions per Rule 10
- *      remain welcome whenever a new island surfaces.)
+ *   1. The bug-prone logic is already extracted. Every calculator,
+ *      formatter, state class, resolver, transition, and detector
+ *      listed above has JVM unit tests. What remains in the Fragment
+ *      is View-setter glue: "take calculator output, call setter
+ *      with it." A Robolectric test for that glue would assert
+ *      "setter was called with X" — a tautology against code that
+ *      literally calls setter with X. No new logical coverage.
+ *
+ *   2. A renderer split does not produce a testable API. A
+ *      hypothetical FavoritesRenderer would still need binding,
+ *      resources, and viewModel; its only output is View mutation.
+ *      Testing it requires inflating a binding (Robolectric or
+ *      instrumented), mocking a ViewModel, and asserting a View
+ *      tree — i.e. testing the Fragment with one extra indirection.
+ *      The "unit test" framing is misleading.
+ *
+ *   3. Robolectric and androidTests are strictly more expensive to
+ *      maintain than JVM tests. The KolibriLauncherApp test-app
+ *      leak (TODO §6) is a representative pain point: an
+ *      AGP-/Robolectric-version interaction silently sprung an OOM
+ *      across the suite. Each Robolectric test added is a new slot
+ *      for that class of failure. The current dose — one
+ *      HomeFragmentRobolectricTest as smoke-backstop — is the right
+ *      one. Multiplying by a sibling-renderer count would multiply
+ *      the maintenance surface without multiplying coverage.
+ *
+ * Rule 10 (empty androidTest/) is a deliberate, well-reasoned choice.
+ * The trade-offs do not change because a code split exists.
  *
  * =============================================================================
  */
