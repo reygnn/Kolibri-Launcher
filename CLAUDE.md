@@ -4,6 +4,13 @@ Project conventions for **Kolibri Launcher** (a minimalist Android launcher,
 GPLv3). Claude Code reads this file automatically at session start. Keep it
 short and actionable — not a marketing description (that's `README.md`'s job).
 
+> **Single-file by design.** Tooling auto-loads `CLAUDE.md` (root +
+> sub-paths). A separate `RULES.md` would either need a "read this first"
+> pointer (ignorable) or duplicate the rules (drift class). Stays
+> single-file until this file outgrows practical readability; if it does,
+> the natural next step is a deeper-path `CLAUDE.md` (e.g. `tools/CLAUDE.md`
+> for linter-specific conventions), not a sibling `RULES.md`.
+
 For deep test conventions, see `app/src/test/CLAUDE.md` and
 `app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
 This file is the **project-wide** entry point; the other CLAUDE.md is the
