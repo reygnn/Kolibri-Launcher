@@ -93,7 +93,20 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
-    implementation(libs.json)
+    // NOTE: org.json:json (libs.json) is intentionally NOT a runtime
+    // implementation dependency. Android's platform classpath already
+    // ships org.json.* (JSONObject, JSONArray, JSONStringer, …) — adding
+    // the Maven artifact bundles a duplicate `org.json.JSONStringer` into
+    // the APK that R8 minifies (renaming internal fields to `a`, `b`, …).
+    // At runtime ART loads the platform JSONStringer from the boot
+    // classpath, so any bytecode that R8 compiled against the bundled
+    // copy (notably ACRA's `StringFormat$JSON.toFormattedString`) hits
+    // NoSuchFieldError on `JSONStringer.a`. Symptom: `AcraTree: Failed
+    // to report exception to ACRA / NoSuchFieldError`. Diagnosed
+    // 2026-05-04 after the §9.2 module split silently brought this dep
+    // into runtime when the Repository-Impls moved here. The Maven
+    // artifact stays in `testImplementation` below where pure-JVM tests
+    // need it (no Android platform classes available there).
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
