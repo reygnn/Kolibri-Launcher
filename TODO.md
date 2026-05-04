@@ -766,12 +766,21 @@ in 9 Files. Linter wurde gebaut um diese Klasse dauerhaft zu beenden.
 - **Rule 12** — kein `Timber.Forest.*`.
 - **Naming** — `*Manager`-Klassen in `data/` außer `WallpaperFileManager`
   und `DataMigrationManager`.
+- **Rule 11 (annotation discipline, positive list)** — broad catches
+  (`Throwable`/`Exception`) in whitelisted Files müssen einen
+  Vier-Kategorien-Frame-Marker (`[Cc]atch[a-z]* kept` oder
+  `[Rr]ethrow per canonical`) innerhalb ±5 Zeilen tragen. Heute auf
+  der Whitelist: nur MainActivity. Hinzugefügt 2026-05-04 als
+  vierte Linter-Sektion. Erweiterung pro File: Catches reviewen +
+  annotieren, dann Pfad in `rule11_files`-Array eintragen.
 
 **Bewusst nicht geprüft (jeweils mehr-als-Grep nötig):**
 
-- **Rule 11** — try/catch um can't-throw-Operations. Bräuchte
-  semantische Analyse des catch-Body (welche Funktion wird gewrappt,
-  ist die pure?).
+- **Rule 11 (Sweep-Modus)** — try/catch um can't-throw-Operations
+  über alle Files. Bräuchte semantische Analyse des catch-Body
+  (welche Funktion wird gewrappt, ist die pure?). Die positive-list-
+  Variante oben ersetzt das nicht; sie verhindert nur Drift in
+  bereits geprüften Files.
 - **Rule 13** — deutsche Kommentar-Zeilen in neu hinzugefügten Lines.
   Bräuchte git-diff-Integration.
 - **Hardcoded UI-Strings** im Kotlin. Bräuchte String-Literal-

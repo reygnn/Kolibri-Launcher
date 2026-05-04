@@ -250,6 +250,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in MainActivity")
         } catch (loggingError: Throwable) {
+            // Catch kept (Expected error, four-category frame): the
+            // recursion-into-error-pipeline guard documented in the field
+            // KDoc above. If Timber itself crashes, fall back to stderr
+            // so the original error is not lost.
             System.err.println(
                 "MainActivity logging failed: ${loggingError.message}; " +
                     "original error: ${throwable.message}"
@@ -388,6 +392,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 TimberWrapper.silentDeath("NavHostFragment not found — main UI cannot start")
             }
         } catch (e: Throwable) {
+            // Catch kept (Unrecoverable, four-category frame): see the
+            // silentDeath rationale in the if/else branch above.
             // Gleicher Grund wie oben: setContentView/findFragment kann fatal
             // failen (View-Inflation, OOM, kaputte Resource), und ein finish()
             // wäre Zombie-Maker.
@@ -441,7 +447,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             try {
                 initializeMainApp()
             } catch (fallbackError: Throwable) {
-                // Last recovery path also failed. Letting the Activity
+                // Inner catch kept (Unrecoverable, four-category frame):
+                // last recovery path also failed. Letting the Activity
                 // continue would leave a launcher with no ViewModel data
                 // — worse than a restart that may work the second time.
                 TimberWrapper.silentDeath(
@@ -606,11 +613,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             try {
                 currentNav.navigate(destinationId)
             } catch (e: Throwable) {
+                // Catch kept (Expected error, four-category frame):
+                // NavController.navigate throws IllegalStateException when
+                // the saved destination ID is no longer in the graph
+                // (e.g. after an upgrade that renamed a fragment).
+                // Fallback to home keeps the launcher usable.
                 Timber.w(e, "Failed to restore navigation state")
-                // Fallback to home
                 try {
                     currentNav.popBackStack(R.id.homeFragment, false)
                 } catch (fallbackError: Throwable) {
+                    // Inner catch kept (Expected error, four-category
+                    // frame): even popBackStack can fail in degenerate
+                    // nav-graph states. silentError logs and continues;
+                    // the launcher recovers on the next user interaction.
                     TimberWrapper.silentError(fallbackError, "Failed to navigate to home fragment")
                 }
             }
@@ -815,6 +830,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             TimberWrapper.silentError(e, "[LAUNCH] SecurityException: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
         } catch (e: Throwable) {
+            // Throwable arm of the Triple-catch kept above (four-category
+            // frame): generic umbrella for unexpected launch failures.
             TimberWrapper.silentError(e, "[LAUNCH] Exception: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
         }
@@ -966,6 +983,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     startActivity(fallbackIntent)
                     return
                 } catch (fallbackError: Throwable) {
+                    // Inner catch kept (Expected error, four-category
+                    // frame): even the fallback intent can fail. The
+                    // outer Toast then handles the user-visible recovery.
                     TimberWrapper.silentError(fallbackError, getString(R.string.error_fallback_intent_failed))
                 }
             }

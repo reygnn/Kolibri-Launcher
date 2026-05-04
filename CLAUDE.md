@@ -241,9 +241,10 @@ activities.
    This rule is enforced by `./gradlew checkConventions` — the linter
    reports any bare `Timber.e(` outside the exception list, so a new
    crash-infra file added here also needs an entry in
-   `tools/check-conventions.sh`. Same task also catches Rule 12 and
-   the data/ Manager-naming drift; see TODO.md §7 for the full list
-   of automated checks.
+   `tools/check-conventions.sh`. Same task also catches Rule 12, the
+   data/ Manager-naming drift, and the Rule-11 annotation discipline
+   in whitelisted files (see Rule 11 below); see TODO.md §7 for the
+   full list of automated checks.
 
 10. **Testable logic lives outside Android-runtime classes.** Activities,
     Fragments, BroadcastReceivers, and Services are awkward to unit-test
@@ -288,6 +289,20 @@ activities.
     paranoia per Rule 7. The throwable-audit (TODO §2) removed 79
     such catches across nine files — don't re-add the pattern in
     new code.
+
+    **Annotation-discipline linter (positive list).** `./gradlew
+    checkConventions` enforces the marker phrase on broad catches
+    (`Throwable` / `Exception`) in files that opted in to the
+    convention. Today the whitelist is MainActivity only; HomeFragment
+    will follow once its catches are reviewed under the same lens.
+    Accepted markers within ±5 lines of the catch:
+    `[Cc]atch[a-z]* kept` (covers "Catch kept", "Inner catch kept",
+    "Triple-catch kept", "Outer Catchall kept") or
+    `[Rr]ethrow per canonical` (CancellationException rethrow). To add
+    a file to the whitelist: confirm every broad catch has an inline
+    annotation, then append the path to the `rule11_files` array in
+    `tools/check-conventions.sh`. Narrowed exception types are not
+    flagged — narrowing IS following Rule 11.
 
 12. **Use the short Timber call form.** Write `Timber.d(...)`,
     `Timber.w(...)`, `Timber.tag(...).e(...)` etc. — not

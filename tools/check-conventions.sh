@@ -23,13 +23,15 @@
 #      stay in sync.
 #
 # What the linter intentionally does NOT check yet:
-#   - Rule 11 (try/catch around can't-throw operations) — needs
-#     semantic analysis of the catch body, not pure grep.
+#   - Rule 11 in general (try/catch around can't-throw operations) —
+#     needs semantic analysis of the catch body, not pure grep. The
+#     section below covers a narrower aspect of Rule 11 (annotation
+#     discipline on broad catches in opted-in files).
 #   - Rule 13 (German comments in newly-added lines) — would need a
 #     git-diff integration; not added until the cost is needed.
 #   - Hardcoded UI strings — would need string-literal classification.
 #
-# Those three remain catch-by-review until the simpler grep checks
+# Those remain catch-by-review until the simpler grep checks
 # stop pulling their weight.
 # =============================================================================
 
@@ -118,6 +120,70 @@ naming_hits=$(
 
 if [ -n "$naming_hits" ]; then
   report "Naming — class ending in 'Manager' inside \`data/\` (use \`*RepositoryImpl\`)" "$naming_hits"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rule 11 (annotation discipline) — broad catches in whitelisted files
+# must carry a four-category-frame justification marker nearby.
+#
+# Scope (positive list, NOT all files):
+#   Only files that have explicitly adopted the four-category-frame
+#   annotation convention from the file header. Today: MainActivity only
+#   (the only file where every kept catch was reviewed and annotated as
+#   part of the post-§A audit trail). Add a path here when a new file's
+#   catches are reviewed and annotated under the same convention.
+#
+# What counts as "broad catch":
+#   `catch (e: Throwable)` or `catch (e: Exception)`. Narrowed types
+#   (`SecurityException`, `ActivityNotFoundException`, `IOException`,
+#   etc.) already follow Rule 11 by being narrow — they are not flagged.
+#
+# Accepted markers (case as in source):
+#   - `[Cc]atch[a-z]* kept` — covers "Catch kept", "Inner catch kept",
+#     "Triple-catch kept", "Outer Catchall kept" (the convention's
+#     standard prefix forms)
+#   - `[Rr]ethrow per canonical` — the canonical CancellationException
+#     rethrow pattern
+#
+# Window: ±5 lines around the catch. Marker phrases stay on a single
+# line by convention, so per-line checking is enough — no concatenation
+# tricks needed.
+# ─────────────────────────────────────────────────────────────────────────────
+rule11_files=(
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
+)
+
+rule11_hits=""
+for file in "${rule11_files[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: Rule 11 whitelist file not found: $file" >&2
+    exit 2
+  fi
+  hits=$(awk '
+    { lines[NR] = $0 }
+    END {
+      for (n = 1; n <= NR; n++) {
+        if (lines[n] ~ /catch \([a-zA-Z_]+: (Throwable|Exception)\)/ && lines[n] !~ /^[[:space:]]*[*\/]/) {
+          found = 0
+          for (i = n - 5; i <= n + 5; i++) {
+            if (i >= 1 && i <= NR) {
+              if (lines[i] ~ /[Cc]atch[a-z]* kept/) { found = 1; break }
+              if (lines[i] ~ /[Rr]ethrow per canonical/) { found = 1; break }
+            }
+          }
+          if (!found) print FILENAME ":" n ": " lines[n]
+        }
+      }
+    }
+  ' "$file")
+  if [ -n "$hits" ]; then
+    rule11_hits="${rule11_hits}${hits}
+"
+  fi
+done
+
+if [ -n "$rule11_hits" ]; then
+  report "Rule 11 — broad catch without four-category-frame annotation in whitelisted file" "${rule11_hits%$'\n'}"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
