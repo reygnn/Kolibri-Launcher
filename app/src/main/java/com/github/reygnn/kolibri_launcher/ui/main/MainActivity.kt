@@ -181,6 +181,19 @@ import javax.inject.Inject
  *      `if (isFinishing || isDestroyed) return` before `.show()`. See
  *      "Teardown races" above.
  *
+ *   7. `onResume` narrowed try-block (deliberate behaviour change) —
+ *      the previous catch wrapped both `registerReceiver` AND the
+ *      three `update*` calls (`updateWallpaperColors`,
+ *      `updateSecureFlag`, `updateRotationLock`). A registerReceiver
+ *      failure therefore skipped all three updates as a side effect.
+ *      The catch is now tight around `registerReceiver` only; the
+ *      three `update*` calls run unconditionally. Justification: the
+ *      three concerns (wallpaper colours, FLAG_SECURE, rotation-lock)
+ *      are independent of battery-receiver registration — losing the
+ *      receiver should not also leave the screen in stale tint or
+ *      with a stale FLAG_SECURE. Each `update*` has its own safety
+ *      net downstream (internal catch / coroutine handler).
+ *
  *
  * DataStore-read fallback by inaction — explicit trade-off
  * --------------------------------------------------------
