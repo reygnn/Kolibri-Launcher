@@ -28,7 +28,8 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 14 | `Invalid resource ID 0x00000000` Logcat-Noise | offen — Quelle lokalisieren, ~50 Errors pro App-Start aus dem Kolibri-Process (Tag `olibri_launcher`), keine Crashes aber Framework-Logs voll. Beobachtet 2026-05-04 nach ACRA-Verifikation. | klein-mittel, Investigation |
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
-| 17 | `SettingsFragment.updateDefaultLauncherStatus` ggf. RoleManager-UID-Cache-Lag | offen — Lag durch `DefaultLauncherRoleConsistencyTest` messbar; Wert wird beim ersten grünen Lauf hier eingetragen | klein-mittel, Investigation |
+| 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
+| 18 | `BackupDataAssembler.performImport` `.first()` auf `WhileSubscribed`-StateFlow ohne Primer | offen — restored-favorites werden silently leer, falls Restore vor erstem HomeViewModel-Mount läuft (aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04) | klein |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1405,35 +1406,85 @@ grün läuft: Test entsprechend vereinfachen.
 
 ---
 
-## 17. (offen) `SettingsFragment.updateDefaultLauncherStatus` ggf. RoleManager-UID-Cache-Lag
+## 17. (offen) `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent
 
-**Aufgedeckt 2026-05-04** beim Reparieren von
-`DefaultLauncherRoleConsistencyTest`. Der Test exerciert die Transition
-*set → clear* der HOME-Rolle und misst, wie lange beide Erkennungspfade
-(`RoleManager.isRoleHeld(ROLE_HOME)` und
-`PackageManager.resolveActivity(CATEGORY_HOME)`) brauchen, bis sie
-übereinstimmend `false` melden.
+**Aufgedeckt 2026-05-04** beim Bring-up von
+`DefaultLauncherRoleConsistencyTest`, **eingegrenzt 2026-05-05** beim
+zweiten Anlauf. Der ursprüngliche Verdacht — `RoleManager`-UID-Cache
+laggt nach `cmd role remove-role-holder` — ist **widerlegt**: der
+realistische Übergang „Self ist Default → User wählt anderen Launcher"
+konvergiert auf beiden Pfaden in **2 ms** (`Pixel 9a` AVD, Android 16).
+Production-Budget 500 ms, gemessen also weit drunter, kein
+SettingsFragment-Cache-UX-Bug.
 
-**Befürchtung:** der UID-lokale Cache des `RoleManager` aktualisiert
-nicht synchron mit dem Server-Side `cmd role remove-role-holder`-Call.
-Wenn die Konvergenz-Zeit >500 ms ist, sieht der User in
-`SettingsFragment` möglicherweise „du bist Default" obwohl er es nicht
-mehr ist (oder umgekehrt) — direkter UX-Bug. Der Test asserts
-`convergedMs <= 500ms`; >500ms ist *der* Production-Befund.
+**Was bleibt** ist eine *strukturelle* Asymmetrie zwischen beiden
+Pfaden:
 
-**Was hier fehlt:**
+- `RoleManager.isRoleHeld(ROLE_HOME)` returnt `false`, sobald *kein*
+  expliziter Holder gesetzt ist.
+- `PackageManager.resolveActivity(ACTION_MAIN + CATEGORY_HOME)` macht
+  in dem Fall best-match-Resolution unter allen `CATEGORY_HOME`-
+  Activities. Wenn unsere `MainActivity` als letztes Holder war (oder
+  einfach wegen Komponenten-Order am Anfang der Liste steht), sagt
+  `resolveActivity` weiter „wir". Folge: `ShortcutRepositoryImpl
+  .isDefaultLauncher()` returnt fälschlich `true` und das
+  `LauncherApps`-Permission-Gate wird angefragt → fängt
+  `SecurityException` korrekt ab, aber der Status-Indikator in
+  `SettingsFragment` wäre inkonsistent zur RoleManager-Wahrheit.
 
-1. **Gemessener Lag-Wert** vom ersten grünen Test-Lauf: <NACHTRAGEN>
-2. **Wenn Lag >500ms**: `SettingsFragment.updateDefaultLauncherStatus`
-   so umbauen, dass es entweder beide Quellen gegenseitig validiert
-   (UI nur „du bist Default" zeigen, wenn beide übereinstimmen) oder
-   einen kurzen Polling-Pass macht beim onResume.
-3. **Wenn Lag <=500ms**: dieser Item geschlossen, das Polling-Budget
-   im Test bleibt als Regressions-Wächter.
+**In Production tritt der Limbo nie auf** — der User wählt immer
+*irgendeinen* Launcher als Default, das HOME-Role-System hat dann
+einen expliziten Holder. Der Test simuliert das auch deshalb nicht
+mehr (`afterAnotherLauncherTakesRole_…` statt `afterClearingRole_…`),
+sondern den realistischen Übergang.
 
-**Größenordnung:** Investigation klein (Test selbst liefert die Zahl);
-Fix mittel, falls erforderlich. Score-Hebel: Vertrauen-in-UI-Status,
-keine Crashes, keine Framework-Pflicht.
+**Empfehlung, falls je relevant:**
+`SettingsFragment.updateDefaultLauncherStatus()` ausschließlich auf
+`RoleManager.isRoleHeld(ROLE_HOME)` stützen und den
+`resolveActivity`-Pfad fallen lassen. Aktuell weiß ich nicht, wo
+`resolveActivity` als Default-Indikator noch verwendet wird —
+`ShortcutRepositoryImpl.isDefaultLauncher()` hat einen anderen Zweck
+(Permission-Vorfilter, nicht UI-Status), und `SecurityException`-
+catch fängt sowieso ab.
+
+**Größenordnung:** klein, falls jemand den
+`resolveActivity`-Pfad als UI-Status verwendet finden sollte.
+Aktuell ist das §17 vermutlich abgeschlossen; ggf. zur
+Snapshot-Schließung mit „nicht reproducibel im Production-Pfad"
+markieren.
+
+---
+
+## 18. (offen) `BackupDataAssembler.performImport` `.first()` auf `WhileSubscribed`-StateFlow ohne Primer
+
+**Aufgedeckt 2026-05-04** beim Bring-up von `BackupRoundTripSafTest`.
+`BackupDataAssembler.performImport` (Line 175) ruft
+
+```kotlin
+val installedApps = installedAppsRepository.getInstalledApps().first()
+```
+
+`InstalledAppsRepository.getInstalledApps()` ist als `StateFlow` mit
+`SharingStarted.WhileSubscribed(5000)` und `initialValue = emptyList()`
+implementiert. **Ohne primären Subscriber sieht `.first()` sofort den
+`initialValue` (leere Liste) und unsubscribt wieder, bevor die Source-
+Funktion überhaupt anlaufen kann.** Beim Restore wird dann jeder
+Component-String aus dem Backup gegen die leere
+`installedComponentsSet` verglichen → alles wird stillschweigend
+weggeworfen.
+
+**Production tritt das nicht auf**, weil `HomeViewModel` und Co. den
+StateFlow ab Boot permanent subscribed halten. Aber: ein direkter
+Restore unmittelbar nach App-Install — bevor irgendein UI-Konsument
+gemountet hat — könnte die Race treffen. Theoretisch.
+
+**Fix:** statt `.first()` ein `.first { it.isNotEmpty() }` mit
+`withTimeout`. Im Test selbst ist das schon als `@Before`-Warmup
+gelöst; produktions-side wäre es auch sauber im
+`BackupDataAssembler` selbst.
+
+**Größenordnung:** trivial. Vier Zeilen + ein Test (der Test
+existiert bereits — `BackupRoundTripSafTest.saveAndLoad_…`).
 
 ---
 

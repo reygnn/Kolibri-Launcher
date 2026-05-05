@@ -96,5 +96,84 @@ package com.github.reygnn.kolibri_launcher
  *    after triggering an Intent that finishes the source activity); the
  *    underlying Activity is destroyed and recreate() throws NPE. Move
  *    such state-survival assertions into a Robolectric ViewModel test.
+ *
+ * ASSUMPTION TRAPS (the bring-up sessions hit each of these):
+ *
+ *  - `addFavoriteComponent("com.example.alpha")` does NOT validate the
+ *    string format — synthetic strings persist silently and only fall
+ *    out at the import-side filter. Tests that seed favorites through
+ *    real round-trip code paths must use REAL `pkg/cls` components
+ *    resolved at runtime via `queryIntentActivities(LAUNCHER)`.
+ *    See TODO.md §15.
+ *
+ *  - `setPackage(ourPkg)` does NOT bypass protected-broadcast SENDER
+ *    permission checks (PACKAGE_ADDED etc.). AMS gates on the sender's
+ *    UID, regardless of `setPackage`. Even `am broadcast -p ourPkg`
+ *    from the instrumentation shell only scopes Manifest-declared
+ *    receivers — it does not deliver to a dynamically registered
+ *    receiver. For receivers registered at runtime in production,
+ *    invoke `receiver.onReceive(context, intent)` directly in tests.
+ *    See PackageUpdateReceiverGoAsyncTest.
+ *
+ *  - `PackageManager.resolveActivity(ACTION_MAIN + CATEGORY_HOME)` is
+ *    NOT semantically equivalent to `RoleManager.isRoleHeld(ROLE_HOME)`.
+ *    With no explicit role-holder, resolveActivity falls back to
+ *    best-match resolution and may return us; RoleManager honestly
+ *    reports !isRoleHeld. Production never enters the no-holder limbo
+ *    (the user always picks *some* launcher), so default-launcher
+ *    consistency tests must simulate set→OTHER, not set→clear.
+ *    See DefaultLauncherRoleConsistencyTest, TODO.md §17.
+ *
+ *  - `WhileSubscribed(timeout)`-StateFlow + `.first()` from a process
+ *    with no prior subscriber returns the `initialValue` immediately
+ *    (often emptyList) and unsubscribes again, before the upstream can
+ *    even start producing. Production doesn't see this because the UI
+ *    keeps the flow primed continuously; tests where the SUT is the
+ *    first subscriber must warm up explicitly:
+ *      runBlocking { withTimeout(10_000) {
+ *          repo.someFlow().filter { it.isNotEmpty() }.first()
+ *      } }
+ *    See BackupRoundTripSafTest.@Before, TODO.md §18.
+ *
+ *  - Espresso's idle-resource model waits on View / Animation /
+ *    AsyncTask idle, NOT on Flow / StateFlow emission. A Recycler
+ *    populated through a StateFlow can be empty when
+ *    `RecyclerViewActions.actionOnItemAtPosition` fires →
+ *    "No view holder at position: 0". Wrap with
+ *    `support/awaitUntil { try { onView(...).check(matches(
+ *    hasMinimumChildCount(N))); true } catch { false } }`.
+ *    See OnboardingToHomeSmokeTest.
+ *
+ *  - The instrumentation runner runs in the target app's process, so
+ *    self-targeted `pm clear` is a SIGKILL of the runner itself.
+ *    Symptom: every test "Test instrumentation process crashed", empty
+ *    stack. App-data cleanup goes through the orchestrator
+ *    `clearPackageData=true` argument, not in-test rules.
+ *
+ * BUILD & RESULT-FILE LAYOUT (for future bring-up sessions):
+ *
+ *  - Headless emulator on a system with no X display:
+ *      ~/Android/Sdk/emulator/emulator -avd <name> \
+ *          -no-snapshot-save -no-boot-anim -no-window \
+ *          -gpu swiftshader_indirect &
+ *      adb wait-for-device
+ *      until [[ -n $(adb shell getprop sys.boot_completed | tr -d '\r') ]];
+ *          do sleep 2; done
+ *    Without -no-window, the Qt xcb plugin needs a display and the
+ *    emulator aborts with exit 134. Boot completes in ~30–60 s.
+ *
+ *  - Iteration cost: ~40 s for connectedDebugAndroidTest after a
+ *    warm build, ~15 s of which is emulator handshake. Plan
+ *    iterations sparingly.
+ *
+ *  - Test results live under
+ *    `app/build/outputs/androidTest-results/connected/debug/<DeviceName>/`:
+ *      * `test-result.textproto` — structured, every failure with
+ *        full stack trace inline. First place to look.
+ *      * `logcat-<TestClass>-<method>.txt` — full logcat for that one
+ *        method; useful for "silent crash" symptoms.
+ *      * `testlog/test-results.log` — gradle's own pass/fail list.
+ *    HTML report at `app/build/reports/androidTests/connected/debug/index.html`
+ *    is overview-only; the textproto has all the substance.
  */
 private object InstrumentedTestingNotes

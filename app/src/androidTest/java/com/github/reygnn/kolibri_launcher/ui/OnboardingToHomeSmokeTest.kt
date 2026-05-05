@@ -8,10 +8,12 @@ import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
+import androidx.test.espresso.matcher.ViewMatchers.hasMinimumChildCount
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -41,6 +43,15 @@ import org.junit.Test
  * Persistence-across-recreate belongs in a Robolectric ViewModel /
  * Activity test instead, where the lifecycle can be replayed without
  * the cross-activity launch killing the subject. Don't add it back here.
+ *
+ * Why an explicit awaitUntil before the first click: OnboardingViewModel
+ * loads the app list asynchronously from InstalledAppsRepository (a
+ * WhileSubscribed StateFlow). Espresso's idle-resource model waits on
+ * View / Animation / AsyncTask idle but NOT on StateFlow emission, so
+ * RecyclerViewActions.actionOnItemAtPosition can fire against a
+ * still-empty adapter and throw "No view holder at position: 0".
+ * awaitUntil with hasMinimumChildCount(3) closes that gap with a
+ * polling check that is bounded and gives a useful message on timeout.
  */
 @HiltAndroidTest
 class OnboardingToHomeSmokeTest {
@@ -68,6 +79,24 @@ class OnboardingToHomeSmokeTest {
             // ── ASSERT shell rendered ────────────────────────────────────────
             onView(withId(R.id.all_apps_recycler_view)).check(matches(isDisplayed()))
             onView(withId(R.id.done_button)).check(matches(isDisplayed()))
+
+            // ── WAIT: adapter populated. The ViewModel emits the app list
+            // through a StateFlow that Espresso's idle model does not
+            // observe, so we have to poll explicitly. 10s budget is well
+            // above the typical <1s population time on emulators but
+            // forgiving on cold-start.
+            awaitUntil(
+                timeoutMs = 10_000,
+                describe = { "RecyclerView did not reach >=3 children before timeout" },
+            ) {
+                try {
+                    onView(withId(R.id.all_apps_recycler_view))
+                        .check(matches(hasMinimumChildCount(3)))
+                    true
+                } catch (_: Throwable) {
+                    false
+                }
+            }
 
             // ── ACT: pick the first three items in the list ──────────────────
             // Index-based selection is intentional: package-name-based would

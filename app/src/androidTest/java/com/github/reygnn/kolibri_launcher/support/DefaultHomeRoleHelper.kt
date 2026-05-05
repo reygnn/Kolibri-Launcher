@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.support
 
 import android.app.role.RoleManager
+import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
 
 /**
@@ -21,13 +22,26 @@ object DefaultHomeRoleHelper {
     private const val USER = "--user 0"
 
     fun setSelfAsDefault() {
-        val pkg = pkg()
-        ShellCommand.run("cmd role add-role-holder $USER $ROLE $pkg")
+        setRoleHolderTo(pkg())
     }
 
     fun clearSelfAsDefault() {
         val pkg = pkg()
         ShellCommand.run("cmd role remove-role-holder $USER $ROLE $pkg")
+    }
+
+    /**
+     * Sets [packageName] as HOME role-holder. Because HOME is an exclusive
+     * role, this implicitly displaces whoever held it before — no need to
+     * clear first. Use this to simulate the realistic Production transition
+     * "user picks a different launcher" (set self → set other → both
+     * indicators must report the other), as opposed to the unrealistic
+     * "set self → clear" which leaves the system in a no-holder limbo
+     * that Production never enters (resolveActivity then falls back to
+     * any CATEGORY_HOME activity, including ours).
+     */
+    fun setRoleHolderTo(packageName: String) {
+        ShellCommand.run("cmd role add-role-holder $USER $ROLE $packageName")
     }
 
     /**
@@ -40,6 +54,23 @@ object DefaultHomeRoleHelper {
         val pkg = pkg()
         val out = ShellCommand.run("cmd role get-role-holders $USER $ROLE")
         return out.lines().any { it.trim() == pkg }
+    }
+
+    /**
+     * Returns the first installed package that exposes a CATEGORY_HOME
+     * activity and is NOT us. On Pixel emulators this is typically
+     * `com.google.android.apps.nexuslauncher`; on AOSP it's the bundled
+     * Launcher3. Returns null if no other HOME-capable app is on the
+     * device — tests that need this should `assumeTrue` on a non-null
+     * result, not fail.
+     */
+    fun findAnotherInstalledLauncher(): String? {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val ours = ctx.packageName
+        return ctx.packageManager.queryIntentActivities(intent, 0)
+            .map { it.activityInfo.packageName }
+            .firstOrNull { it != ours }
     }
 
     private fun pkg(): String =
