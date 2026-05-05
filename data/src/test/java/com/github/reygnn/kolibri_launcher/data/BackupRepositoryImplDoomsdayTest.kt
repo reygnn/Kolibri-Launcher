@@ -76,6 +76,17 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
 
+        // Seed: BackupDataAssembler.performImport waits for the InstalledApps
+        // StateFlow to deliver a non-empty emission (cold-path gate added in
+        // BACKUP_COLD_PATH_FIX). The fake never auto-populates, so without
+        // this seed every importFromJson call would time out and return
+        // ImportResult.Error. The sentinel is distinct from any test data
+        // (com.app1, com.whatsapp, …) so component-filter assertions still
+        // hold. Individual tests can override with their own component lists.
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("kolibri.test.sentinel", "kolibri.test.sentinel.Main")
+        )
+
         backupManager = BackupRepositoryImplTestFactory.create(
             fakeFavoritesRepo,
             fakeFavoritesOrderRepo,
@@ -104,7 +115,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only gesture settings - imports only gestures`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.doubleTap = false
         fakeSettingsRepo.swipeDown = false
         fakeSettingsRepo.color = Color.BLACK
@@ -138,7 +148,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only theme settings - imports only theme not gestures`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
@@ -352,7 +361,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - with importNothing option - returns error`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup()
         val jsonString = json.encodeToString(backup)
@@ -529,7 +537,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only theme settings - imports only theme`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
@@ -564,7 +571,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only power user settings - imports only threshold`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.splitModeThreshold = 0
         fakeSettingsRepo.color = Color.BLACK
 
@@ -633,7 +639,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - threshold validates to 0-512 range`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup(splitModeThreshold = 999)
         val jsonString = json.encodeToString(backup)
@@ -647,7 +652,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - threshold validates negative to zero`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup(splitModeThreshold = -50)
         val jsonString = json.encodeToString(backup)
@@ -713,7 +717,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - swipe actions - filters both non-installed apps`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val backup = createTestBackup(
             swipeLeft = "com.app1/com.app1.MainActivity",
@@ -918,7 +921,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - empty backup - succeeds`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         val backup = createTestBackup()
         val jsonString = json.encodeToString(backup)
 
@@ -933,7 +935,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - custom names with empty map - succeeds without trigger`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         val backup = createTestBackup(names = emptyMap())
         val jsonString = json.encodeToString(backup)
 
@@ -1097,7 +1098,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - threshold at preset values - imports correctly`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
 
         val presetValues = listOf(0, 42, 60, 100, 512)
 
@@ -1139,7 +1139,6 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only quality of life settings - imports only QoL`() = runTest {
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.autoShowKeyboard = false
         fakeSettingsRepo.color = Color.BLACK
 
@@ -1236,7 +1235,6 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - extended theme settings - imports layout and font settings`() = runTest {
         // Arrange
-        fakeInstalledAppsRepo.installedApps = emptyList()
         // Reset Fake values (Assuming defaults)
         fakeSettingsRepo.layoutScale = 1.0f
         fakeSettingsRepo.verticalPadding = 1.0f
@@ -1272,7 +1270,6 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - only time based events - imports only time settings`() = runTest {
         // Arrange
-        fakeInstalledAppsRepo.installedApps = emptyList()
         fakeSettingsRepo.showCalendar = false
         fakeSettingsRepo.showAlarm = false
         fakeSettingsRepo.color = Color.BLACK // Sollte nicht geändert werden

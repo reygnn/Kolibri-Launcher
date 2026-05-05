@@ -47,6 +47,12 @@ class BackupRepositoryImplNamingConventionTest {
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
 
+        // Seed: BackupDataAssembler.performImport waits for the InstalledApps
+        // StateFlow to deliver a non-empty emission (cold-path gate added in
+        // BACKUP_COLD_PATH_FIX). Without this seed, every importFromJson call
+        // would time out and return ImportResult.Error.
+        fakeInstalledAppsRepo.installedApps = listOf(createTestAppInfo("kolibri.test.sentinel"))
+
         val mockContext = mockk<Context>(relaxed = true)
         every { mockContext.contentResolver } returns mockk(relaxed = true)
 

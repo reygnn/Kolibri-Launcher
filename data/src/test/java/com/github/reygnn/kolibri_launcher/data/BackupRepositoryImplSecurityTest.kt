@@ -6,6 +6,7 @@ import io.mockk.mockk
 import android.content.ContentResolver
 import android.content.Context
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
@@ -67,6 +68,21 @@ class BackupRepositoryImplSecurityTest {
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
+
+        // Seed: BackupDataAssembler.performImport waits for the InstalledApps
+        // StateFlow to deliver a non-empty emission (cold-path gate added in
+        // BACKUP_COLD_PATH_FIX). Without this seed, every importFromJson call
+        // would time out and return ImportResult.Error. The sentinel is
+        // distinct from any test fixtures (com.fake.app$it, …) so the
+        // "is installed?" filter still rejects all malicious payloads.
+        fakeInstalledAppsRepo.installedApps = listOf(
+            AppInfo(
+                originalName = "Sentinel",
+                displayName = "Sentinel",
+                packageName = "kolibri.test.sentinel",
+                className = "kolibri.test.sentinel.Main",
+            )
+        )
 
         context = mockk<Context>(relaxed = true)
         val mockContentResolver = mockk<ContentResolver>(relaxed = true)

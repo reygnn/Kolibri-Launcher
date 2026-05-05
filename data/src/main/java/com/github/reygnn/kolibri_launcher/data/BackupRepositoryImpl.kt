@@ -344,7 +344,14 @@ class BackupRepositoryImpl @Inject constructor(
 
         // 4. Standard import
         Timber.i("ZIP import: ${extractedImages.size} images extracted, starting import")
-        return assembler.performImport(resolvedBackup, options, wallpaperRestorer)
+        return try {
+            assembler.performImport(resolvedBackup, options, wallpaperRestorer)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error importing ZIP backup")
+            ImportResult.Error(e.message ?: "Unknown error")
+        }
     }
 
     /**

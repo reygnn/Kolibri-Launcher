@@ -9,14 +9,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assume.assumeTrue
@@ -42,8 +39,9 @@ import javax.inject.Inject
  * scoped test).
  *
  * Component selection: BackupDataAssembler.importBackup filters every
- * component-string against the installed-apps set (BackupDataAssembler.kt
- * lines 188-206 for favorites, 222-231 for hidden). Synthetic strings
+ * component-string against the installed-apps set (`PHASE 1: Import
+ * Favorites` and `PHASE 3: Import Hidden Apps` in BackupDataAssembler.kt).
+ * Synthetic strings
  * like "com.example.alpha" are silently dropped on import even though
  * the export persists them — see TODO.md §15 for the missing input
  * validation in FavoritesRepository.addFavoriteComponent. To make the
@@ -60,7 +58,6 @@ class BackupRoundTripSafTest {
     @Inject lateinit var hidden: HiddenAppsRepository
     @Inject lateinit var customNames: CustomNamesRepository
     @Inject lateinit var settings: SettingsRepository
-    @Inject lateinit var installedApps: InstalledAppsRepository
     @Inject @ApplicationContext lateinit var context: Context
 
     private lateinit var backupFile: File
@@ -87,21 +84,6 @@ class BackupRoundTripSafTest {
         componentA = with(resolved[0].activityInfo) { "$packageName/$name" }
         componentB = with(resolved[1].activityInfo) { "$packageName/$name" }
         packageA = resolved[0].activityInfo.packageName
-
-        // Warm up InstalledAppsRepository: it exposes a WhileSubscribed(5000)
-        // StateFlow whose initialValue is emptyList(). BackupDataAssembler's
-        // import path calls .first() on it, and a `.first()` from a process
-        // with no prior subscriber sees the initialValue immediately and
-        // unsubscribes — every component in the backup is then filtered out
-        // as "not installed". Production doesn't see this because HomeViewModel
-        // & co. keep the StateFlow primed continuously. This is a real
-        // production fragility — see TODO.md §15 (we widened that item to
-        // cover the WhileSubscribed-unprimed-restore variant).
-        runBlocking {
-            withTimeout(10_000) {
-                installedApps.getInstalledApps().filter { it.isNotEmpty() }.first()
-            }
-        }
     }
 
     @Test

@@ -107,6 +107,18 @@ object AppConstants {
 
     // Backup & Restore Constants
     const val BACKUP_PREVIEW_TIMEOUT_MS = 2000L
+
+    /**
+     * Max time `BackupDataAssembler.performImport` waits for
+     * `InstalledAppsRepository` to deliver its first non-empty emission
+     * before failing the restore. The repository's StateFlow is
+     * `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)` with `initialValue =
+     * emptyList()`, so a cold restore (no UI subscriber yet) needs to
+     * wait for the upstream PackageManager query — including its
+     * built-in retry policy (`MAX_APP_LOAD_RETRIES * APP_LOAD_RETRY_BASE_DELAY_MS`
+     * cumulative ≈ 6 s worst case) — to actually run.
+     */
+    const val BACKUP_IMPORT_PRIME_TIMEOUT_MS = 10_000L
     const val MIME_TYPE_JSON = "application/json"
     const val MIME_TYPE_ZIP = "application/zip"
     const val BACKUP_FILE_PREFIX = "kolibri_backup_"

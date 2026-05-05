@@ -18,6 +18,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsReposito
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Named
@@ -172,7 +173,18 @@ class BackupDataAssembler @Inject constructor(
         options: ImportOptions,
         wallpaperRestorer: WallpaperRestorer,
     ): ImportResult {
-        val installedApps = installedAppsRepository.getInstalledApps().first()
+        // InstalledAppsRepository.getInstalledApps() is a StateFlow shared
+        // via WhileSubscribed(FLOW_SHARING_TIMEOUT_MS) with
+        // initialValue = emptyList(). A bare .first() from a cold subscriber
+        // sees the initialValue immediately and unsubscribes before the
+        // upstream PackageManager query runs — every restored component
+        // would then fail the "is installed?" filter below and the import
+        // would silently drop everything. Wait for the first non-empty
+        // emission, bounded by a timeout that accommodates the upstream's
+        // own retry budget.
+        val installedApps = withTimeoutOrNull(AppConstants.BACKUP_IMPORT_PRIME_TIMEOUT_MS) {
+            installedAppsRepository.getInstalledApps().first { it.isNotEmpty() }
+        } ?: error("Timed out waiting for InstalledAppsRepository to populate during backup import")
         val installedComponents = installedApps.map { it.componentName }.toSet()
 
         val installedComponentsSet = installedComponents.toHashSet()

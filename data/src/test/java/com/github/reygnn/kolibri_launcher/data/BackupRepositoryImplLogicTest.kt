@@ -64,6 +64,15 @@ class BackupRepositoryImplLogicTest {
         contentResolver = mockk<ContentResolver>(relaxed = true)
         every { context.contentResolver } returns contentResolver
 
+        // Seed: BackupDataAssembler.performImport waits for the InstalledApps
+        // StateFlow to deliver a non-empty emission (cold-path gate added in
+        // BACKUP_COLD_PATH_FIX). Tests that need specific apps in scope
+        // (com.exist, com.whatsapp, …) override this in their own arrange
+        // section. The sentinel never collides with those.
+        fakeInstalledAppsRepo.installedApps = listOf(
+            createAppInfo("kolibri.test.sentinel", ".Main")
+        )
+
         backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = fakeFavoritesRepo,
             favoritesOrderRepository = fakeFavoritesOrderRepo,

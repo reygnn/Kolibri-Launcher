@@ -127,13 +127,18 @@ package com.github.reygnn.kolibri_launcher
  *  - `WhileSubscribed(timeout)`-StateFlow + `.first()` from a process
  *    with no prior subscriber returns the `initialValue` immediately
  *    (often emptyList) and unsubscribes again, before the upstream can
- *    even start producing. Production doesn't see this because the UI
- *    keeps the flow primed continuously; tests where the SUT is the
- *    first subscriber must warm up explicitly:
- *      runBlocking { withTimeout(10_000) {
- *          repo.someFlow().filter { it.isNotEmpty() }.first()
- *      } }
- *    See BackupRoundTripSafTest.@Before, TODO.md §18.
+ *    even start producing. Production doesn't see this when the UI
+ *    keeps the flow primed continuously, but cold paths (e.g. an
+ *    import/restore that runs before any UI mounts a subscriber) hit
+ *    the race and silently get the initialValue. Preferred fix is in
+ *    the consumer itself: replace `.first()` with a predicate-bounded
+ *    wait, e.g.
+ *      withTimeoutOrNull(SOMETHING_MS) {
+ *          repo.someFlow().first { it.isNotEmpty() }
+ *      } ?: error("...")
+ *    See `BackupDataAssembler.performImport` for the canonical fix
+ *    pattern in this codebase, and `BackupDataAssemblerColdImportTest`
+ *    for the unit-test shape that pins it.
  *
  *  - Espresso's idle-resource model waits on View / Animation /
  *    AsyncTask idle, NOT on Flow / StateFlow emission. A Recycler

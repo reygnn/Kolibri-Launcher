@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -99,6 +100,19 @@ class BackupRepositoryImplWallpaperTest {
         fakeSwipeActionsRepo = FakeSwipeActionsRepository()
         fakeSettingsRepo = FakeSettingsRepository()
         fakeWallpaperRepo = FakeWallpaperRepository()
+
+        // Seed: BackupDataAssembler.performImport waits for the InstalledApps
+        // StateFlow to deliver a non-empty emission (cold-path gate added in
+        // BACKUP_COLD_PATH_FIX). Without this seed, every importFromJson call
+        // would time out and return ImportResult.Error.
+        fakeInstalledAppsRepo.installedApps = listOf(
+            AppInfo(
+                originalName = "Sentinel",
+                displayName = "Sentinel",
+                packageName = "kolibri.test.sentinel",
+                className = "kolibri.test.sentinel.Main",
+            )
+        )
 
         every { context.contentResolver } returns contentResolver
 

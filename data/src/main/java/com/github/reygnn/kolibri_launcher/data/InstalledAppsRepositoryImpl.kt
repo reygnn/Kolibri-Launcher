@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -101,7 +102,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
         }
         .stateIn(
             scope = scope,
-            started = SharingStarted.Companion.WhileSubscribed(5000),
+            started = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
             initialValue = emptyList()
         )
 
