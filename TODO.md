@@ -793,6 +793,13 @@ Memo bleibt damit ein neuer Reviewer beim Auftauchen ähnlicher
 zentralen Fix-Punkt findet (`robolectric.properties`) und nicht ad
 hoc per-Test `@Config`-Overrides streut.
 
+**Update 2026-05-06:** der konkret-namentlich genannte Auslöser
+(`com.github.anrwatchdog:1.4.0`) ist weg — durch
+[`AnrReporter`](app/src/main/java/com/github/reygnn/kolibri_launcher/ui/util/AnrReporter.kt)
+ersetzt. Der Fix selbst (Properties-Default auf `android.app.Application`)
+bleibt load-bearing, weil ACRA + Timber + Receiver + CoroutineScope
+auch ohne ANRWatchDog cross-test-bleed-through verursachen würden.
+
 ---
 
 ## 7. (Memo, teilumgesetzt 2026-05-03) Selbst-Linter für die 13 Rules
@@ -982,10 +989,12 @@ parat hat falls neue `:data`-Features die Version brauchen.
 
 ## 10. (Memo, Format etabliert 2026-05-03) Lib-Pinning regelmäßig revisit
 
-**Motivation:** ANRWatchdog `1.4.0` ist von 2018 ohne aktive Maintenance.
-Hilt `2.57.2` mit „DO NOT UPGRADE" — der ursprüngliche Grund (welche
-Major-Breaking-Änderung?) ist nicht festgehalten. Pins werden zu
-Tech-Debt, je länger sie ohne Re-Check stehen.
+**Motivation:** ANRWatchdog `1.4.0` ist von 2018 ohne aktive Maintenance
+(2026-05-06: rausgeflogen, durch eigenen `AnrReporter` auf
+`ApplicationExitInfo` ersetzt — Story für jeden Future-Pin der so
+endet). Hilt `2.57.2` mit „DO NOT UPGRADE" — der ursprüngliche Grund
+(welche Major-Breaking-Änderung?) ist nicht festgehalten. Pins werden
+zu Tech-Debt, je länger sie ohne Re-Check stehen.
 
 **Etabliert 2026-05-03 (Inaugural-Pass):** Im Header von
 `gradle/libs.versions.toml` lebt jetzt eine „QUARTERLY RECHECK
@@ -999,9 +1008,9 @@ Nächste-Recheck-Datum steht ebenfalls im Header — wer den Catalog
 **Inaugural-Pass-Scope:** Format-Etablierung only. Die einzelnen Pins
 wurden 2026-Q2 bewusst NICHT durchgegangen — der Recheck-Prozess
 braucht ein web-fähiges Tool für die Upstream-Recherche
-(Hilt-Changelog, ANRWatchdog-Alternativen, kotlinx-serialization 1.10
-Status), das im Inaugural-Pass nicht verfügbar war. Erste echte
-inhaltliche Durchlauf passiert 2026-Q3.
+(Hilt-Changelog, kotlinx-serialization 1.10 Status), das im
+Inaugural-Pass nicht verfügbar war. Erste echte inhaltliche Durchlauf
+passiert 2026-Q3.
 
 **Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
 Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,
@@ -1286,8 +1295,9 @@ Alle 32 Files aus `app/src/test/java/.../data/` sind nach
   MainDispatcherRule, alle Fake*Repositories und Contract-Abstracts.
 - **`data/src/test/resources/robolectric.properties`** als per-Modul-
   Duplikat (Application-Pin auf `android.app.Application`); Datei-
-  KDoc erklärt warum die :app-Begründung (ANRWatchDog-Leak) hier nicht
-  greift, die Pin-Disziplin aber trotzdem modul-weit gilt.
+  KDoc erklärt warum die :app-spezifische Begründung (cross-test
+  bleed-through aus ACRA + Timber + Receiver + CoroutineScope) hier
+  nicht greift, die Pin-Disziplin aber trotzdem modul-weit gilt.
 - **Migrations-Folge-Move:** `WallpaperRepositoryContract.kt` und
   `UsageExportRepositoryContract.kt` (beide abstract Contract-Doku-
   Klassen) zogen mit nach `:domain/src/testFixtures/` (das Standard-

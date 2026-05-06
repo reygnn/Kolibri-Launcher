@@ -36,8 +36,6 @@
 #   - Re-read the pin's stated reason. Is it still load-bearing?
 #   - Spot-check upstream (changelog of the lib, GitHub release notes) for
 #     a published fix that would make the pin lift safely.
-#   - For unmaintained libs (currently: anrwatchdog), check if a built-in
-#     Android API now covers the use case (ANR-Tracing seit API 30+).
 #   - If the reason still holds, just bump the date.
 #   - If the reason no longer holds, plan the lift as a separate change —
 #     not as part of the recheck itself.
@@ -82,7 +80,6 @@ coroutines = "1.10.2"  # OK to upgrade
 kotlinx-serialization = "1.9.0"  # 1.10.0 needs Kotlin 2.3.0 — bump together
 
 # Utilities
-anrwatchdog = "1.4.0"
 timber = "5.0.1"  # DO NOT UPGRADE — 6.x has breaking changes
 acra = "5.11.4"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync
 browser = "1.9.0"
@@ -140,7 +137,6 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 # Utilities
-anrwatchdog = { module = "com.github.anrwatchdog:anrwatchdog", version.ref = "anrwatchdog" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 acra-core = { module = "ch.acra:acra-core", version.ref = "acra" }
 acra-http = { module = "ch.acra:acra-http", version.ref = "acra" }

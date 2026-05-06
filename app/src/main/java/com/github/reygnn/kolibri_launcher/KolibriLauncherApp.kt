@@ -15,12 +15,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Process
 import android.util.Log
-import com.github.anrwatchdog.ANRWatchDog
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
+import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
@@ -64,6 +64,8 @@ class KolibriLauncherApp : Application() {
     lateinit var dataMigrationManager: DataMigrationManager
     @Inject
     lateinit var dataStoreBackup: DataStoreBackup
+    @Inject
+    lateinit var anrReporter: AnrReporter
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val packageUpdateReceiver = PackageUpdateReceiver()
@@ -244,7 +246,7 @@ class KolibriLauncherApp : Application() {
             }
         }
 
-        setupANRWatchDog()
+        reportPendingAnrsAsync()
 
         // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
         // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
@@ -408,19 +410,55 @@ class KolibriLauncherApp : Application() {
         }
     }
 
-    private fun setupANRWatchDog() {
-        // Der Watchdog läuft immer, auch im Release.
-        // Er ist extrem leichtgewichtig.
-
-        ANRWatchDog(5000) // 5000ms = 5 Sekunden (Standard Android ANR Zeit)
-            .setReportMainThreadOnly() // Wir wollen nur wissen, warum UI hängt
-            .setANRListener { error ->
-                // Hier übergeben wir den ANR an ACRA
-                Timber.e(error, "ANR detected!")
-                ACRA.errorReporter.handleException(error)
+    /**
+     * Walks `ApplicationExitInfo` for any ANRs the system recorded since
+     * the last app start, forwards each to ACRA via a synthetic exception
+     * that carries the system-supplied multi-thread dump as its message,
+     * and advances [AnrReporter]'s persisted watermark per successful
+     * forward.
+     *
+     * Replaces the previous `ANRWatchDog(5000)` live-sampling approach.
+     * See [AnrReporter] KDoc for the trade-off (soft-ANR loss accepted in
+     * exchange for richer system thread dumps + zero background overhead +
+     * no unmaintained dependency).
+     *
+     * The ACRA dedup limiter from [CrashReportLimiter] still applies —
+     * if a recurring ANR floods the same exception type, only the first
+     * within the 24h cooldown window actually leaves the device.
+     *
+     * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
+     * Application is on the crash-handling-infrastructure exception list.
+     */
+    private fun reportPendingAnrsAsync() {
+        applicationScope.launch(applicationExceptionHandler) {
+            try {
+                anrReporter.reportPendingAnrs { report ->
+                    val description = report.description.ifBlank { "ANR" }
+                    val synthetic = AnrException(
+                        message = "$description\n\n${report.threadDump.orEmpty()}",
+                    )
+                    Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
+                    try {
+                        ACRA.errorReporter.handleException(synthetic)
+                    } catch (e: Throwable) {
+                        Timber.e(e, "Failed to forward ANR to ACRA")
+                    }
+                }
+            } catch (e: Throwable) {
+                Timber.e(e, "Error walking pending ANRs")
             }
-            .start()
+        }
     }
+
+    /**
+     * Marker exception type used solely to carry a post-mortem ANR report
+     * into ACRA. Its stack trace is the *current* point in
+     * `reportPendingAnrsAsync` — not the ANR site, which lives in the
+     * `message` (system-supplied multi-thread dump). Distinct subclass so
+     * [CrashReportLimiter]'s per-type cooldown buckets ANRs separately
+     * from real exceptions.
+     */
+    private class AnrException(message: String) : RuntimeException(message)
 
     override fun onTerminate() {
         super.onTerminate()

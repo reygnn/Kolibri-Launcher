@@ -517,14 +517,22 @@ package com.github.reygnn.kolibri_launcher
  * --------------------------------------------
  * AndroidManifest.xml declares `android:name=".KolibriLauncherApp"`.
  * Without an override, Robolectric loads that production Application for
- * every test, and its `onCreate()` spins up an ANRWatchDog thread (non-
- * daemon, leaks for the JVM lifetime), installs ACRA's global
+ * every test, and its `onCreate()` installs ACRA's global
  * UncaughtExceptionHandler, plants Timber trees, registers a
- * BroadcastReceiver, and creates a CoroutineScope. None of that is torn
- * down between tests, so every Robolectric test class would leak one of
- * each. With ~10+ Robolectric test classes and the test executor at
- * -Xmx512m, accumulated ANRWatchDog threads sampling the main thread
- * every 5s pushed the heap over the edge — locally and in CI.
+ * BroadcastReceiver, creates a CoroutineScope, and (post-2026-05-06)
+ * launches the [com.github.reygnn.kolibri_launcher.ui.util.AnrReporter]
+ * coroutine which queries `ApplicationExitInfo` once. None of that is
+ * torn down between tests, so every Robolectric test class would leak
+ * one of each. With ~10+ Robolectric test classes and the test executor
+ * at -Xmx512m, the accumulated handlers / threads / receivers pushed the
+ * heap over the edge — locally and in CI.
+ *
+ * Historic note: pre-2026-05-06 the worst leaker in this list was
+ * `ANRWatchDog(5000)`, a non-daemon thread that sampled the main thread
+ * every 5 s for the JVM lifetime. The dependency is gone (replaced by
+ * AnrReporter); the two-layer strategy below was still load-bearing
+ * even without it (ACRA + Timber trees alone cause cross-test bleed-
+ * through), so the rules in this section did not change.
  *
  *
  * THE TWO-LAYER STRATEGY
@@ -564,8 +572,9 @@ package com.github.reygnn.kolibri_launcher
  *  - Don't need Hilt? Don't set `application=`. The properties-default
  *    gives you a no-op Application and KolibriLauncherApp stays out.
  *  - NEVER let a test load `KolibriLauncherApp` — even one such test in
- *    the run will spin up an ANRWatchDog thread that survives until the
- *    JVM ends. The properties-default exists to prevent that.
+ *    the run installs ACRA's global handler, plants Timber trees, and
+ *    creates a CoroutineScope that survives until the JVM ends. The
+ *    properties-default exists to prevent that.
  *
  *
  * REGRESSION HAZARDS
@@ -653,8 +662,8 @@ package com.github.reygnn.kolibri_launcher
  * - `HiltTestApplication` (from `dagger.hilt.android.testing`) is a
  *   minimal Hilt-managed Application. It is *not* the production
  *   `KolibriLauncherApp` — so production-only init code (ACRA, package
- *   receiver registration, ANRWatchDog) does NOT run in tests. That's
- *   intentional and what we want.
+ *   receiver registration, AnrReporter `ApplicationExitInfo` query) does
+ *   NOT run in tests. That's intentional and what we want.
  * - All production Hilt modules are in effect. The Activity's @Inject
  *   dependencies wire from the real graph; the real Repositories,
  *   UseCases etc. all initialise on Robolectric's in-memory filesystem.

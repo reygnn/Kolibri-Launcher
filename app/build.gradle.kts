@@ -243,7 +243,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Utilities
-    implementation(libs.anrwatchdog)
     implementation(libs.timber)
     implementation(libs.kotlinx.serialization.json)  // 1.10.0 benötigt Kotlin 2.3.0
     testImplementation(libs.robolectric)

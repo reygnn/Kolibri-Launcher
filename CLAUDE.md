@@ -85,7 +85,8 @@ for now.
                           @Named("appVersionName") from BuildConfig),
                           AppUpdateModule, ViewModelModule
   KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
-                          ANRWatchDog, migration bootstrap
+                          AnrReporter (post-mortem ApplicationExitInfo),
+                          migration bootstrap
 ```
 
 Key points to remember when adding code:
