@@ -1037,6 +1037,73 @@ hatte sich auch als latest bestätigt nach Gegenrecherche.
 Nächster Recheck: 2026-Q4. Format steht, Annotations sind aktuell —
 Folge-Pässe sollten in den dokumentierten 30 min/Quartal landen.
 
+**Folge-Branches 2026-05-06:**
+- `chore/lift-core-ktx-1.18` — gemerged (`87d8b3c`), trivial.
+- `chore/lift-activity-1.13` — gemerged (`0638ca0`), trivial; EdgeToEdge-
+  Reinvoke ohne Fund.
+- `spike/agp-9-bundle` — **abgebrochen nach 90 min** an sieben
+  kumulativen Blockern. Branch wurde nicht committed. Findings unten.
+
+### AGP-9-Bundle-Spike Postmortem (2026-05-06, ~90 min)
+
+Versuch: AGP 8.13.2 → 9.0.1 + Gradle 8.14.3 → 9.1.0 + Hilt 2.57.2 →
+2.59.2. Reihenfolge der Blocker:
+
+1. **Gradle Wrapper bump auf 9.1.0** — sauber
+2. **`kotlin.android` Plugin** verboten unter AGP 9 (built-in Kotlin)
+   → entfernen
+3. **`kotlin-kapt` inkompatibel** mit AGP 9 built-in Kotlin → AGP
+   schlägt explizit `android.builtInKotlin=false` als escape-hatch vor
+4. **`getDefaultProguardFile("proguard-android.txt")`** in AGP 9
+   entfernt (enthielt `-dontoptimize`) → muss `-android-optimize.txt`
+   sein
+5. **Hilt 2.59.2 mit kapt + escape-hatch** crashed bei
+   ComponentTreeDeps-Generierung (`Expected @HiltAndroidApp to have a
+   value`) — der dokumentierte 2.59.2-Fix für #5099 zieht offenbar nur
+   wenn AGP 9 newDsl=true ist
+6. **kapt → ksp Migration** als Lösung versucht: KSP-Plugin kollidiert
+   mit Hilt-Plugin Class-Loader (`KSP plugin was detected to be applied
+   but its task class could not be found`) → KSP muss im Root-Project
+   `apply false` deklariert werden (gleicher Scope wie Hilt)
+7. **KSP 2.2.21-2.0.4 (KSP1)** inkompatibel mit AGP 9 built-in Kotlin
+   → AGP empfiehlt erneut `android.builtInKotlin=false` plus zurück
+   zum `kotlin-android` Plugin. Plus dann auch `android.newDsl=false`
+   weil sonst class-cast-Exception zwischen `ApplicationExtensionImpl`
+   und `BaseExtension` (das `kotlin-android` Plugin braucht die alte
+   API)
+
+Trajektorie nach 90 min: Sub-Module bekommen den escape-hatch nicht
+zuverlässig appliziert (`KSP is not compatible with built-in Kotlin`
+in :data trotz gesetzter Flags in gradle.properties). Diminishing
+returns; selbst wenn dieser eine Block weiter lösbar ist, ist der
+gesamte Pfad ein Stack aus „bypass everything" der das Lift-Ziel
+(saubere AGP-9-Architektur) untergräbt.
+
+**Was wir aus dem Spike gelernt haben:**
+
+- Das AGP-9-Bundle ist NICHT „AGP + Hilt + Gradle" wie ursprünglich
+  gedacht. Realistisch ist es **AGP 9 + Hilt 2.59.2 + Gradle 9.1 +
+  KSP2 + Kotlin 2.3 + kotlinx-serialization 1.10**. KSP2-Wahl
+  kollabiert Bundle 1 und Bundle 2 ineinander.
+- Alternative: **AGP 9 + KSP1 + dauerhaft escape-hatch** — funktional
+  aber bedeutet `android.builtInKotlin=false` + `android.newDsl=false`
+  als load-bearing config. Zwei Deprecation-Warnungen die in AGP 10.0
+  eskalieren („will be removed in version 10.0"). Verschiebt das
+  Problem nur.
+- Hilt's KSP-Support ist seit 2.48 da, Migration ist real. Das ist die
+  Investition; nicht der AGP-Bump selbst.
+- AGP 9 ist nicht „grosser Refactor mit zwei Tagen Aufwand", sondern
+  „Migrationskette über 4-5 Pakete jeweils mit eigenen Folgekosten".
+  Realistisch eigene Spike-Session über mehrere Stunden, idealerweise
+  mit der Kotlin-2.3-Bundle-Lift gleichzeitig (dann KSP2 statt KSP1
+  und damit kein escape-hatch).
+
+**Empfehlung für die nächste Session:** lift komplettes Mega-Bundle
+(AGP 9 + Hilt 2.59.2 + Gradle 9.1 + KSP2 + Kotlin 2.3 +
+kotlinx-serialization 1.10 + kotlin-test) in einer sauberen Spike-
+Session. Wenn KSP2 + Kotlin 2.3 als Foundation steht, fallen die
+escape-hatch-Workarounds aus 2026-05-06 weg.
+
 **Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
 Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,
 Version bumpen) auf einen abgelaufenen Termin stößt, triggert den

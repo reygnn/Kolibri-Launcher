@@ -52,9 +52,14 @@
 # Next recheck:   2026-Q4.
 #
 # Cross-lib lift bundles to keep in mind (recheck 2026-Q3 surfaced these):
-#   1. AGP 9 + Hilt ≥2.59 + Gradle 9.1 — coupled. Lift one, lift all
-#      together. AGP 8.13.2 is the last of the 8.x line; the next stop
-#      is the bundle.
+#   1. AGP 9 + Hilt ≥2.59 + Gradle 9.1 + kapt→ksp + (likely) Kotlin 2.3
+#      — coupled. Lift one, lift all together. AGP 8.13.2 is the last
+#      of the 8.x line; the next stop is the bundle. SPIKE attempted
+#      2026-05-06, abandoned after 7 blockers — see TODO.md §10 for
+#      the chain (kapt incompatible with built-in Kotlin → KSP1
+#      incompatible with built-in Kotlin → escape-hatch needed →
+#      either accept the escape-hatch as load-bearing, or migrate
+#      to KSP2 which couples to bundle 2 below).
 #   2. Kotlin 2.3 + kotlinx-serialization 1.10 + kotlin-test (auto-
 #      matched) + KSP 2.3.x — coupled. Same logic.
 #   3. JUnit 5 — standalone migration effort, no triggers visible.
@@ -62,7 +67,7 @@
 
 [versions]
 # Build & Kotlin
-agp = "8.13.2"  # Recheck 2026-Q3: 8.13.2 is last of 8.x line; next stop is AGP 9.2.0 — see cross-lib bundle 1 in header (couples with Hilt 2.59 + Gradle 9.1). SPIKE_NEEDED before lift.
+agp = "8.13.2"  # Recheck 2026-Q3: 8.13.2 is last of 8.x line; next stop is AGP 9.x — see cross-lib bundle 1 in header. SPIKE attempted 2026-05-06 (branch spike/agp-9-bundle, abandoned after 7 cumulative blockers) — see TODO §10 for the dependency chain that surfaced; tl;dr the bundle expands beyond just AGP+Hilt+Gradle to include kapt→ksp migration which itself couples to Kotlin 2.3 unless KSP1+escape-hatch is accepted.
 kotlin = "2.2.21"  # 2.2.x — safe to update; kotlin-test must match exactly. Recheck 2026-Q3: 2.2.21 is current top of 2.2.x line. 2.3.0 would pull cross-lib bundle 2 (kotlinx-serialization 1.10, KSP 2.3) — coupled lift.
 ksp = "2.2.21-2.0.4"  # not currently used; kept for the eventual KSP migration. Recheck 2026-Q3: matched to kotlin pin; KSP1 is deprecated, KSP2 line is 2.3.x — coupled to Kotlin 2.3 lift.
 
