@@ -109,16 +109,32 @@ object AppConstants {
     const val BACKUP_PREVIEW_TIMEOUT_MS = 2000L
 
     /**
-     * Max time `BackupDataAssembler.performImport` waits for
-     * `InstalledAppsRepository` to deliver its first non-empty emission
-     * before failing the restore. The repository's StateFlow is
-     * `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)` with `initialValue =
-     * emptyList()`, so a cold restore (no UI subscriber yet) needs to
-     * wait for the upstream PackageManager query — including its
-     * built-in retry policy (`MAX_APP_LOAD_RETRIES * APP_LOAD_RETRY_BASE_DELAY_MS`
-     * cumulative ≈ 6 s worst case) — to actually run.
+     * Max time a cold consumer waits for `InstalledAppsRepository` to
+     * deliver its first non-empty emission before giving up.
+     *
+     * The repository's StateFlow is `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)`
+     * with `initialValue = emptyList()`. From a cold subscriber (no UI
+     * has primed it yet — backup restore from onboarding, Hidden-Apps or
+     * Swipe-Actions activity opened directly after a process death)
+     * `.first()` returns the initial empty list and unsubscribes before
+     * the upstream PackageManager query runs.
+     *
+     * The fix pattern at every consumer site is:
+     *   ```
+     *   withTimeoutOrNull(INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+     *       repo.getInstalledApps().first { it.isNotEmpty() }
+     *   } ?: error("...")
+     *   ```
+     *
+     * 10 s accommodates the upstream's own retry policy
+     * (`MAX_APP_LOAD_RETRIES * APP_LOAD_RETRY_BASE_DELAY_MS`
+     * cumulative ≈ 6 s worst case) plus PackageManager latency on slow
+     * devices. If those retry constants change, this value should follow.
+     *
+     * Used by: `BackupDataAssembler.performImport`,
+     * `HiddenAppsViewModel.initialize`, `SwipeActionsViewModel.initialize`.
      */
-    const val BACKUP_IMPORT_PRIME_TIMEOUT_MS = 10_000L
+    const val INSTALLED_APPS_PRIME_TIMEOUT_MS = 10_000L
     const val MIME_TYPE_JSON = "application/json"
     const val MIME_TYPE_ZIP = "application/zip"
     const val BACKUP_FILE_PREFIX = "kolibri_backup_"

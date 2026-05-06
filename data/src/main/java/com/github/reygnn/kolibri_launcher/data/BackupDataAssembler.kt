@@ -182,7 +182,7 @@ class BackupDataAssembler @Inject constructor(
         // would silently drop everything. Wait for the first non-empty
         // emission, bounded by a timeout that accommodates the upstream's
         // own retry budget.
-        val installedApps = withTimeoutOrNull(AppConstants.BACKUP_IMPORT_PRIME_TIMEOUT_MS) {
+        val installedApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
             installedAppsRepository.getInstalledApps().first { it.isNotEmpty() }
         } ?: error("Timed out waiting for InstalledAppsRepository to populate during backup import")
         val installedComponents = installedApps.map { it.componentName }.toSet()

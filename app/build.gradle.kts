@@ -321,6 +321,19 @@ configurations.all {
 
         force("androidx.test:runner:${libs.versions.androidxTest.get()}")
         force("androidx.test:monitor:${libs.versions.androidxTest.get()}")
+        // Espresso 3.7.0's RootViewPicker / InstrumentationActivityInvoker
+        // calls into desugared ActivityInvoker default methods
+        // (`androidx.test.internal.platform.app.ActivityInvoker$-CC`) which
+        // only exist in androidx.test:core ≥ 1.6. Without this force,
+        // Gradle's consistent-resolution between debugRuntimeClasspath and
+        // debugAndroidTestRuntimeClasspath downgrades core to {strictly
+        // 1.5.0} (because production runtime doesn't pull a higher version
+        // transitively), so any androidTest call into `inRoot(isDialog())`,
+        // `scenario.onActivity { }`, or `withText(...)` matchers fails with
+        // NoClassDefFoundError before the matcher runs. Symptom found
+        // 2026-05-06 while bringing up CustomNamesActivityRenameTest +
+        // AppDrawerFragmentSearchTest.
+        force("androidx.test:core:${libs.versions.androidxTest.get()}")
     }
 }
 

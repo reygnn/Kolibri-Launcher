@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.swipeactions
 
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -96,9 +98,17 @@ class SwipeActionsViewModel @Inject constructor(
     internal fun initialize() {
         launchSafe {
             try {
-                // Lade alle installierten Apps via UseCase
-                val allApps = getInstalledAppsUseCase().first()
-                    .sortedBy { it.displayName.lowercase() }
+                // Cold-path race: GetInstalledAppsUseCase emits a
+                // WhileSubscribed StateFlow with initialValue=emptyList(),
+                // so a bare .first() from a cold Swipe-Actions entry (no
+                // HomeFragment subscriber yet) returns the empty list and
+                // unsubscribes. Wait for a real emission with a bounded
+                // timeout — same pattern as BackupDataAssembler and
+                // HiddenAppsViewModel.
+                val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+                    getInstalledAppsUseCase().first { it.isNotEmpty() }
+                }?.sortedBy { it.displayName.lowercase() }
+                    ?: error("Timed out waiting for InstalledAppsRepository to populate in SwipeActionsViewModel")
                 allAppsMasterList.value = allApps
 
                 // Lade die aktuell gespeicherten Zuweisungen via UseCases

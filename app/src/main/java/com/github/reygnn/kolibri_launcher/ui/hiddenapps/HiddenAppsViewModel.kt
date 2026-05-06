@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.hiddenapps
 
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -79,8 +81,17 @@ class HiddenAppsViewModel @Inject constructor(
     fun initialize() {
         launchSafe {
             try {
-                val allApps = getInstalledAppsUseCase().first()
-                    .sortedBy { it.displayName.lowercase() }
+                // GetInstalledAppsUseCase exposes a WhileSubscribed StateFlow
+                // with initialValue=emptyList(). A bare .first() from a cold
+                // entry (process launched directly into Hidden-Apps after a
+                // process death, before HomeFragment ever subscribes) sees
+                // the initial empty list and unsubscribes, leaving the
+                // screen permanently empty. Wait for a real emission with a
+                // bounded timeout — same pattern as BackupDataAssembler.
+                val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+                    getInstalledAppsUseCase().first { it.isNotEmpty() }
+                }?.sortedBy { it.displayName.lowercase() }
+                    ?: error("Timed out waiting for InstalledAppsRepository to populate in HiddenAppsViewModel")
                 allAppsMasterList.value = allApps
 
                 initialHiddenComponents = getHiddenAppsUseCase().first()
