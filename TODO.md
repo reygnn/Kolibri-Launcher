@@ -29,7 +29,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
-| 18 | `BackupDataAssembler.performImport` `.first()` auf `WhileSubscribed`-StateFlow ohne Primer | offen — restored-favorites werden silently leer, falls Restore vor erstem HomeViewModel-Mount läuft (aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04) | klein |
+| 19 | `LayoutDelegate.splitModeThreshold` cold-`.value`-read auf `WhileSubscribed`-StateFlow | bekannt + bewusst gelassen — gleiche Bug-Klasse wie das ehemalige §18, aber self-correcting (cold-read liefert 0 = "Auto Mode", nächster Subscribe liefert echten Wert). Spike-Test vor Fix nötig | klein, niedrige Priorität |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -39,10 +39,11 @@ ist 2026-05-03 ebenfalls gelandet (`d5c5ce3 → 0b7a21c → 986d478 → 78903ec`
 Bug-Fix für die Rule-9-DEBUG-Throw-Semantik, `InitialSetupAction`-Pure-
 Logic-Extraktion, Catch-Sweep mit Vier-Kategorien-Frame-Annotation
 (37 → 21 Throwable). §10 ist als wiederkehrender Quartals-Termin etabliert
-und triggert sich von selbst — nächster Recheck 2026-Q3. Verbleibender
-mittelschwerer Deckler (siehe Audit-Snapshot „Was die 0.1 unter 9.0
-deckelt"): leeres `androidTest/`. Score ist nach Brocken-A-Abschluss
-revidiert (siehe Audit-Snapshot unten).
+und triggert sich von selbst — nächster Recheck 2026-Q3.
+`androidTest/` ist seit Mai gefüllt (Stand 2026-05-06: 16 Tests, siehe
+„Audit-Snapshot 2026-05-06"-Eintrag unten); der ehemalige
+„leeres `androidTest/`"-Deckler ist weg. Score ist auf 9.5 hochgesetzt
+(siehe Audit-Snapshot unten).
 
 ---
 
@@ -57,20 +58,22 @@ Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
    warum, was bewusst weggelassen ist, wo anzufangen.
 3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
    technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
-4. **Diesen Audit-Snapshot unten** — aktueller Score 9.3 (post-Brocken-A
-   2026-05-04), Baseline-Vergleich, alle drei großen Brocken erledigt;
-   verbleibend nur noch mittelschwere Deckler.
+4. **Diesen Audit-Snapshot unten** — aktueller Score 9.5 (post-androidTest-
+   Bring-up 2026-05-06), Baseline-Vergleich, alle drei großen Brocken
+   erledigt; der ehemalige `androidTest/`-leer-Deckler ist jetzt auch
+   weg.
 
 ### Ein kalter „leg los"-Auftrag braucht eine Richtungs-Entscheidung
 
 Der TODO.md-Status sagt „keine offenen Brocken mehr". Alle drei großen
 Brocken aus dem Audit-Snapshot sind durch (A: HomeFragment 2026-05-03,
-B: §13 inkl. `:data:test`-Move, C: §11/§12). Wenn der User trotzdem
-Arbeit will, gibt es keinen offensichtlichen Default mehr — frag was er
-will. Mögliche Anker: die mittelschweren Deckler aus dem Audit-Snapshot
-(`androidTest/` leer, MainActivity-Größe), der Quartals-Recheck §10
-(2026-Q3), oder ein neuer Audit-Pass für eine aktuelle Score-
-Bestandsaufnahme.
+B: §13 inkl. `:data:test`-Move, C: §11/§12). Der ehemalige
+„`androidTest/` leer"-Deckler ist seit Mai auch erledigt (16 Tests
+Stand 2026-05-06). Wenn der User trotzdem Arbeit will, gibt es keinen
+offensichtlichen Default mehr — frag was er will. Mögliche Anker: die
+verbleibenden kleinen Einträge in der Tabelle (§14-§17, §19), der
+Quartals-Recheck §10 (2026-Q3), oder ein neuer Audit-Pass für eine
+aktuelle Score-Bestandsaufnahme.
 
 ### Workflow-Defaults
 
@@ -86,14 +89,52 @@ Bestandsaufnahme.
 
 ---
 
-## Audit-Snapshot 2026-05-03 (post-§13), aktualisiert 2026-05-04 (post-Brocken-A)
+## Audit-Snapshot 2026-05-03 (post-§13), aktualisiert 2026-05-04 (post-Brocken-A) und 2026-05-06 (post-androidTest-Bring-up)
 
 Brutaler-ehrlicher-Auditor-Hut, ungeschönt. Snapshot nach dem §11/§12/§13-
 Sweep gemacht, damit beim nächsten Audit ein Vergleichspunkt da ist.
 Score-Bump 2026-05-04 nach Brocken-A-Abschluss eingetragen, basierend auf
 der ursprünglichen Audit-Formel „Eins davon sauber bringt 0.4-0.5".
+Score-Bump 2026-05-06 nach androidTest-Bring-up: der ehemalige
+„`androidTest/` leer"-Deckler ist weg (16 Tests).
 
-### Score: **9.3/10** (post-Brocken-A 2026-05-04: 9.3, post-§13: 8.9, post-§9.2: 8.2, vor §9.2: 7.5)
+### Score: **9.5/10** (post-androidTest 2026-05-06: 9.5, post-Brocken-A 2026-05-04: 9.3, post-§13: 8.9, post-§9.2: 8.2, vor §9.2: 7.5)
+
+### Was die +0.2 ggü. 9.3 gebracht hat (androidTest-Bring-up, 2026-05-04 → 2026-05-06)
+
+- **`androidTest/` ist nicht mehr leer.** Stand 2026-05-06: 16 Tests
+  in 12 Klassen. Coverage:
+  - Backup-Save/Load roundtrip durch echte SAF (`BackupRoundTripSafTest`)
+  - Wallpaper-Bytes roundtrip durch ZIP + WallpaperFileManager
+    (`BackupRoundTripWallpaperTest`)
+  - RoleManager + LauncherApps permission gates (`ShortcutRepository*`,
+    `DefaultLauncherRoleConsistencyTest`)
+  - BroadcastReceiver `goAsync` (`PackageUpdateReceiverGoAsyncTest`)
+  - Onboarding → Home Smoke (`OnboardingToHomeSmokeTest`)
+  - HiddenApps Toggle (`HiddenAppsActivityToggleTest`)
+  - CustomNames Rename (`CustomNamesActivityRenameTest`)
+  - AppDrawer Search + Swipe-Dismiss (`AppDrawerFragmentSearchTest`,
+    `AppDrawerSwipeDismissTest`)
+  - MainActivity singleTask HOME-Intent (`MainActivityHomeIntentTest`)
+  - BackupFragment SAF UI flow (`BackupFragmentSafImportTest`)
+- **Cold-path bug class fixed across three sites** während des
+  Espresso-Companion-Bring-ups (`bd0d236`, `21267ad`):
+  `BackupDataAssembler.performImport`,
+  `HiddenAppsViewModel.initialize`,
+  `SwipeActionsViewModel.initialize`. Die
+  `withTimeoutOrNull { first { isNotEmpty() } } ?: error(...)`
+  Pattern lebt jetzt zentral in `INSTALLED_APPS_PRIME_TIMEOUT_MS`
+  (KDoc nennt alle drei Sites). F3 (`LayoutDelegate.splitModeThreshold`,
+  niedrigere Severity, self-correcting) bleibt als §19 in der
+  TODO-Tabelle bewusst offen.
+- **Test-Infrastruktur hardening** (siehe `INSTRUMENTED_TESTING_NOTES.kt`
+  Punkte 9-11): `androidx.test:core` muss explizit auf
+  `${libs.versions.androidxTest.get()}` ge-`force`-d werden gegen
+  Gradle's consistent-resolution-Downgrade auf `{strictly 1.5.0}`;
+  `HiltTestRunner.onStart` kollabiert die NotificationShade vor jedem
+  Test-Prozess; Espresso-Swipes auf Launcher-Windows brauchen
+  `VISIBLE_CENTER` statt `TOP_CENTER` weil y=0 ins System-Status-Bar-
+  Window dispatched.
 
 ### Was die +0.4 ggü. 8.9 gebracht hat (Brocken A, 2026-05-03)
 
@@ -161,11 +202,16 @@ der ursprünglichen Audit-Formel „Eins davon sauber bringt 0.4-0.5".
    `createAlarmChip` / `createCalendarChip`). Backstop-Test
    (`HomeFragmentRobolectricTest`) bleibt grün.
 
-2. **`androidTest/` ist leer.** Aus historischen Gründen (Rule 10),
-   gut begründet. Aber: Activity-Lifecycle, AccessibilityService,
-   IPC mit System-Diensten sind End-to-End nie auf einem Gerät
-   getestet. Robolectric ist guter Backstop, kein vollständiger
-   Ersatz.
+2. **(erledigt 2026-05-04 → 2026-05-06)** ~~`androidTest/` ist leer.~~
+   Bring-up gestartet 2026-05-04 (5 Tests gegen reale ContentResolver-,
+   RoleManager-, LauncherApps-, BroadcastReceiver-, RecyclerView-Pfade),
+   ausgebaut 2026-05-06 auf 16 Tests (Espresso-Companions für AppDrawer,
+   HiddenApps, CustomNames, MainActivity-singleTask, BackupFragment-SAF,
+   Wallpaper-ZIP-Roundtrip; Test-Runner-Hardening für NotificationShade-
+   Focus + androidx.test:core Force). Activity-Lifecycle und IPC mit
+   System-Diensten haben jetzt End-to-End-Backstop. Cold-path bugs in
+   drei Production-ViewModels durch den Bring-up aufgedeckt und gefixt
+   (siehe Score-Block oben).
 
 3. **(erledigt 2026-05-03)** ~~`:data:test` ist leer.~~ Brocken-B-Move
    für `:data` durchgezogen: 32 Repository-Impl-Test-Files sind aus
@@ -1455,36 +1501,44 @@ markieren.
 
 ---
 
-## 18. (offen) `BackupDataAssembler.performImport` `.first()` auf `WhileSubscribed`-StateFlow ohne Primer
+## 19. (bekannt + bewusst gelassen) `LayoutDelegate.splitModeThreshold` cold-`.value`-read
 
-**Aufgedeckt 2026-05-04** beim Bring-up von `BackupRoundTripSafTest`.
-`BackupDataAssembler.performImport` (Line 175) ruft
+**Aufgedeckt 2026-05-06** beim systematischen Audit aller
+`.first()`/`.value`-Reads auf `WhileSubscribed`-StateFlows nach dem
+Schwester-Bug-Fix in `BackupDataAssembler` + `HiddenAppsViewModel` +
+`SwipeActionsViewModel` (siehe `INSTALLED_APPS_PRIME_TIMEOUT_MS`-KDoc).
 
-```kotlin
-val installedApps = installedAppsRepository.getInstalledApps().first()
-```
+`LayoutDelegate.splitModeThreshold` ist ein
+`stateIn(WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), initialValue = 0)`
+auf `getSplitModeThresholdUseCase()`. Konsumiert nur an einer Stelle:
+`HomeFragment.kt:503` liest `viewModel.splitModeThreshold.value`
+während eines Scroll-Checks.
 
-`InstalledAppsRepository.getInstalledApps()` ist als `StateFlow` mit
-`SharingStarted.WhileSubscribed(5000)` und `initialValue = emptyList()`
-implementiert. **Ohne primären Subscriber sieht `.first()` sofort den
-`initialValue` (leere Liste) und unsubscribt wieder, bevor die Source-
-Funktion überhaupt anlaufen kann.** Beim Restore wird dann jeder
-Component-String aus dem Backup gegen die leere
-`installedComponentsSet` verglichen → alles wird stillschweigend
-weggeworfen.
+**Strukturell:** wenn der Read aus einem cold subscriber-Zustand
+kommt (kein anderer UI-Konsument hat den StateFlow vorher primed),
+liefert `.value` den `initialValue = 0`. In `splitModeCalculator`
+wird `0` als „Auto Mode" interpretiert (per Doc-Kommentar in
+`LayoutDelegate.kt:87`).
 
-**Production tritt das nicht auf**, weil `HomeViewModel` und Co. den
-StateFlow ab Boot permanent subscribed halten. Aber: ein direkter
-Restore unmittelbar nach App-Install — bevor irgendein UI-Konsument
-gemountet hat — könnte die Race treffen. Theoretisch.
+**Praktische Severity: niedrig — self-correcting.** Cold-read liefert
+0 = „Auto Mode". Nächster Subscribe (innerhalb des selben Frames,
+weil HomeFragment der Subscriber ist) liefert den echten User-Wert.
+Der eine kompromittierte Scroll-Check produziert höchstens eine
+Frame-späte Layout-Entscheidung, die die nächste Iteration korrigiert.
 
-**Fix:** statt `.first()` ein `.first { it.isNotEmpty() }` mit
-`withTimeout`. Im Test selbst ist das schon als `@Before`-Warmup
-gelöst; produktions-side wäre es auch sauber im
-`BackupDataAssembler` selbst.
+**Vor einem Fix: Spike-Test.** Das self-correcting-Verhalten heißt
+auch, dass ein klassischer Vorher/Nachher-Vergleich schwer
+beobachtbar ist. Ein Test bräuchte präzises Race-Window-Setup
+(persistierter User-Wert ≠ 0, dann cold-Process simulieren, dann auf
+genau den `.value`-Read warten bevor der Subscribe-Path den
+Cache-Slot füllt). Lohnt sich nur, wenn der Bug irgendwann
+observable wird.
 
-**Größenordnung:** trivial. Vier Zeilen + ein Test (der Test
-existiert bereits — `BackupRoundTripSafTest.saveAndLoad_…`).
+**Empfehlung:** offen lassen. Wenn jemand den Fix einbaut, gleiche
+Pattern wie die anderen drei Sites (`withTimeoutOrNull { first {
+it != 0 } }`), aber das `0`-Predicate kollidiert mit dem User-
+Wert „Auto Mode" — braucht ein anderes Sentinel (`null` als
+`initialValue`?), was wieder Konsumenten ändert.
 
 ---
 

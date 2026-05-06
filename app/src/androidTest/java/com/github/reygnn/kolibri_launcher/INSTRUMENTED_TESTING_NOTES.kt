@@ -84,6 +84,48 @@ package com.github.reygnn.kolibri_launcher
  *    measure pass). If a test could pass as Robolectric, write it there
  *    instead — feedback loop is 50× faster.
  *
+ * 9. `androidx.test:core` must be force-pinned in app/build.gradle.kts
+ *    to the same version as `runner` and `monitor`:
+ *      configurations.all {
+ *          resolutionStrategy {
+ *              force("androidx.test:core:${libs.versions.androidxTest.get()}")
+ *              ...
+ *          }
+ *      }
+ *    Gradle's consistent-resolution between debugRuntimeClasspath and
+ *    debugAndroidTestRuntimeClasspath otherwise downgrades core to
+ *    {strictly 1.5.0} (because production runtime doesn't pull a higher
+ *    version transitively). Espresso 3.7.0's RootViewPicker /
+ *    InstrumentationActivityInvoker call into desugared
+ *    `androidx.test.internal.platform.app.ActivityInvoker$-CC` companion
+ *    default methods that only exist in core ≥ 1.6 → without the force,
+ *    every androidTest path through `inRoot(isDialog())`,
+ *    `scenario.onActivity { }`, or `withText(...)` matchers fails with
+ *    NoClassDefFoundError before the matcher runs. Symptom diagnosed
+ *    2026-05-06 while bringing up CustomNamesActivityRenameTest +
+ *    AppDrawerFragmentSearchTest.
+ *
+ * 10. HiltTestRunner.onStart calls `cmd statusbar collapse` before every
+ *     test process. Long-running headless emulators end up with the
+ *     NotificationShade as the focused window between tests — with no
+ *     real user activity to push it back, the system chrome creeps to
+ *     the front. With NotificationShade focused, Espresso's RootViewPicker
+ *     reports `has-window-focus=false` on every test Activity's window
+ *     and times out with `RootViewWithoutFocusException` after 10 s.
+ *     The collapse-before-each-test workaround keeps the suite stable
+ *     across multiple consecutive runs on a single AVD instance.
+ *     `cmd statusbar collapse` is harmless when no shade is open.
+ *
+ * 11. Espresso swipe gestures on launcher-style windows (FLAG_SHOW_WALLPAPER,
+ *     full-screen) must use VISIBLE_CENTER as the start point, not
+ *     TOP_CENTER. TOP_CENTER lands at y=0 — the system status-bar window
+ *     occupies that area; the touch events go to the status bar and
+ *     never reach the matched view's dispatchTouchEvent. VISIBLE_CENTER
+ *     is guaranteed to be inside the matched view's hit-test region.
+ *     See AppDrawerSwipeDismissTest for the canonical pattern; required
+ *     because SwipeDownDismissLayout's `dispatchTouchEvent` override
+ *     can't observe events the system never delivers.
+ *
  * ANTI-PATTERNS:
  * X  @get:Rule val mainDispatcherRule = MainDispatcherRule()      // deadlocks Main
  * X  runTest { ... }                                              // clashes with real scheduler
