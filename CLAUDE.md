@@ -40,10 +40,13 @@ testing reference.
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
 
-Gradle is bundled via wrapper. `androidTest/` is currently empty — see
-Rule 10 below for the historical reason and the conditions under which
-new instrumented or Robolectric-based tests would be welcome. Robolectric
-is already in use in the JVM `test/` set for `android.net.Uri`-touching
+Gradle is bundled via wrapper. `androidTest/` was empty for ~6 months
+after a flakiness-driven deletion event (~500 tests removed — see
+Rule 10 below and `HISTORY.md`). Since late April 2026 it is being
+reintroduced selectively, under a stricter bar: only genuinely
+important paths that either deliver value JVM tests can't reach or
+can't be covered reliably by Robolectric. Robolectric itself is
+already in use in the JVM `test/` set for `android.net.Uri`-touching
 code (e.g. `WallpaperRepositoryImplTest`).
 
 ---
@@ -264,14 +267,17 @@ activities.
     value to extract.
 
     JVM is the default test target — fast, deterministic, and covers
-    everything the rule above puts there. `androidTest/` is currently
-    empty for *historical* reasons: a past round of unreliable
-    instrumented tests was abandoned (constant flakiness, debug sessions
-    that ate days). The directory is empty by accident of history, not
-    by principle. Clean instrumented tests or Robolectric-based tests
-    (Robolectric is already used in `test/` for `android.net.Uri`-
-    touching code) are welcome when a real need arises and the patterns
-    prove demonstrably stable.
+    everything the rule above puts there. `androidTest/` was abandoned
+    for ~6 months after a deletion event of ~500 instrumented tests
+    (constant flakiness, debug sessions that ate days; full account in
+    `HISTORY.md`). Since late April 2026 it is being reintroduced under
+    a stricter bar: a path earns a place in `androidTest/` only if it
+    is genuinely important AND either (a) delivers value that JVM tests
+    can't reach, or (b) cannot be covered reliably by Robolectric. The
+    previous "anything worth testing on a device" mode is over —
+    instrumented tests are now the exception, not a parallel default.
+    Robolectric (already used in `test/` for `android.net.Uri`-touching
+    code) remains the first stop when leaving the JVM.
 
     Applies to both new code and existing classes; if you spot a
     violation, lift the logic out.
