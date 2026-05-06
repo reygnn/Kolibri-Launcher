@@ -13,6 +13,8 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
@@ -22,6 +24,7 @@ import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
+import com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -247,6 +250,7 @@ class KolibriLauncherApp : Application() {
         }
 
         reportPendingAnrsAsync()
+        startRecoveryWatchdogAfterBootstrap()
 
         // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
         // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
@@ -459,6 +463,41 @@ class KolibriLauncherApp : Application() {
      * from real exceptions.
      */
     private class AnrException(message: String) : RuntimeException(message)
+
+    /**
+     * Self-defense companion to [AnrReporter]: starts the
+     * [RecoveryWatchdog] daemon thread that kills the process if the
+     * main looper stops dispatching for 8 s.
+     *
+     * Started via `Handler.post { … }` rather than directly so the
+     * first watchdog tick lands *after* `onCreate` returns and the
+     * main thread re-enters its dispatch loop. Otherwise the heavy
+     * cold-start work in this method (DataStore reads, migrations,
+     * receiver registration) could legitimately block past 8 s and
+     * trigger a kill-restart-loop on a HOME process that the OS
+     * eagerly relaunches. See [RecoveryWatchdog] KDoc for the full
+     * "why a Thread, not a coroutine" + "why 8 s" + AEI-categorization
+     * caveat.
+     *
+     * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
+     * Application is on the crash-handling-infrastructure exception
+     * list. The catch is defensive — `Handler.post` to the main
+     * Looper is structurally safe, but an OOM during post-allocation
+     * is the kind of edge that we don't want to crash startup over.
+     */
+    private fun startRecoveryWatchdogAfterBootstrap() {
+        try {
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    RecoveryWatchdog().start()
+                } catch (e: Throwable) {
+                    Timber.e(e, "Failed to start RecoveryWatchdog")
+                }
+            }
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to schedule RecoveryWatchdog start")
+        }
+    }
 
     override fun onTerminate() {
         super.onTerminate()

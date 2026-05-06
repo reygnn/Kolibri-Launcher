@@ -519,20 +519,27 @@ package com.github.reygnn.kolibri_launcher
  * Without an override, Robolectric loads that production Application for
  * every test, and its `onCreate()` installs ACRA's global
  * UncaughtExceptionHandler, plants Timber trees, registers a
- * BroadcastReceiver, creates a CoroutineScope, and (post-2026-05-06)
- * launches the [com.github.reygnn.kolibri_launcher.ui.util.AnrReporter]
- * coroutine which queries `ApplicationExitInfo` once. None of that is
- * torn down between tests, so every Robolectric test class would leak
- * one of each. With ~10+ Robolectric test classes and the test executor
- * at -Xmx512m, the accumulated handlers / threads / receivers pushed the
- * heap over the edge — locally and in CI.
+ * BroadcastReceiver, creates a CoroutineScope, launches the
+ * [com.github.reygnn.kolibri_launcher.ui.util.AnrReporter] coroutine,
+ * and starts a [com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog]
+ * daemon thread. None of that is torn down between tests, so every
+ * Robolectric test class would leak one of each. With ~10+ Robolectric
+ * test classes and the test executor at -Xmx512m, the accumulated
+ * handlers / threads / receivers pushed the heap over the edge —
+ * locally and in CI.
  *
  * Historic note: pre-2026-05-06 the worst leaker in this list was
  * `ANRWatchDog(5000)`, a non-daemon thread that sampled the main thread
  * every 5 s for the JVM lifetime. The dependency is gone (replaced by
- * AnrReporter); the two-layer strategy below was still load-bearing
- * even without it (ACRA + Timber trees alone cause cross-test bleed-
- * through), so the rules in this section did not change.
+ * AnrReporter for reporting + RecoveryWatchdog for self-defense); the
+ * two-layer strategy below was still load-bearing even without it
+ * (ACRA + Timber trees alone cause cross-test bleed-through), so the
+ * rules in this section did not change.
+ *
+ * Aside on RecoveryWatchdog specifically: it's a deliberate convention
+ * break — raw [Thread], no coroutines. The class KDoc explains why
+ * (the watchdog has to function when the kotlinx scheduler is the thing
+ * that's hung). Don't "fix" it by routing through a dispatcher later.
  *
  *
  * THE TWO-LAYER STRATEGY
