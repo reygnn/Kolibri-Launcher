@@ -126,6 +126,87 @@ canonical original.
 
 ---
 
+## The working method — three sessions and cold-eye reviews
+
+For most of the project's nine months, the user has worked with three
+Claude sessions in parallel, each playing a distinct role:
+
+- **Dev** — implements changes.
+- **Revisor (reviewer)** — reviews each change against the rules and
+  conventions.
+- **Auditor** — assesses the result against an external-reviewer
+  standard, scoring it against the codebase's own rubric.
+
+The same proposal has to clear three independent perspectives before
+it lands. Visible artifacts of this methodology in the repository:
+[AUDIT.md](AUDIT.md) is direct Auditor-session output (an external
+Senior Android Engineer perspective with a BLOCKER/MAJOR/MINOR/NIT
+scale, refreshed 2026-05-04). The "Auditor Snapshot" section in
+[TODO.md](TODO.md) and the documented score formula come from the
+same lineage. The catch-frame annotation discipline visible in
+`MainActivity.kt` ("Catch kept", "Rethrow per canonical", etc.) and
+the Rule-11 annotation linter at `tools/check-rule11-annotation.awk`
+carry the Revisor session's handwriting, institutionalized in code.
+
+This is also the explanation for how a solo project reaches
+committee-quality engineering. Discipline that looks excessive when
+read in isolation is the residue of multiple competing perspectives
+reaching equilibrium over many iterations.
+
+A periodic complement to the three-session approach: the user took
+the full source code, gave it to a *completely fresh* Claude session
+with no prior context, and asked it to find bugs and logic holes. The
+findings were folded back into the next iteration. Repeated many
+times.
+
+This works because an existing session — even an Auditor session
+loaded with all 13 rules — accumulates unconscious rationalizations
+over time ("I accepted this earlier, so it must be fine"). A fresh
+session reads code with the question "does this make sense?" rather
+than "is this consistent with what I have already signed off on?"
+That difference catches the holes that accumulated sessions have
+grown blind to. Visible traces:
+`UsageExportRepositoryImplXenomorphSpec.kt` (an adversarial-input
+spec deliberately named after Ash's review of the Alien xenomorph),
+and the Doomsday / Strict / Malformed / Security / Adversarial test
+suites against `BackupRepositoryImpl` — together about 6,000 test
+lines for roughly 650 implementation lines.
+
+The architectural arc — ViewModels → use cases → repositories → unit
+tests → Hilt → MockK → three-module split (`:app → :data → :domain`)
+— is the standard Clean-Architecture progression for Android. Each
+step here was triangulated through the three roles and
+pressure-tested by fresh sessions, not adopted from a book. The
+three-module split was the endpoint, not a starting design — only
+reachable once the layers had been cleanly separated through prior
+iteration.
+
+---
+
+## Coda — Ash's review as the unconscious target
+
+The fictional Ash review at the top of [REVIEWS.md](REVIEWS.md) was
+added almost on day one. It was not a programmatic spec the project
+worked toward; it was an early articulation of a craft intuition the
+user kept reaching for at each decision point. Conscious planning, as
+the user describes it, has been mostly after-the-fact
+rationalization. The actual driver was a feel for what felt right,
+captured in writing before he knew that *was* what he was after.
+
+That makes the entire arc — the multi-layer crash safety, the sixteen
+repositories with their contract tests, the recovery watchdog, the
+post-mortem ANR reporter, the convention linter, the
+abandoned-and-revived instrumented test set — legible as one thing:
+stages of metamorphosis pulled forward by an undeclared aesthetic,
+not feature scope creep.
+
+> "I admire its purity. A launcher unclouded by widgets, legacy code,
+> or delusions of necessity. A structural perfection matched only by
+> its efficiency."
+> — Ash, Android Science Officer, [REVIEWS.md](REVIEWS.md)
+
+---
+
 *Architecture rules live in [CLAUDE.md](CLAUDE.md), current
 work-in-progress in [TODO.md](TODO.md), known unfixable issues in
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md), and fictional reviews in
