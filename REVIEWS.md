@@ -27,91 +27,91 @@
 
 ---
 
-# Reviews — Volume 2 (Sammelband)
+# Reviews — Volume 2 (Anthology)
 
-Weitere Stimmen zu Kolibri Launcher. Fiktiv, größtenteils unverifiziert,
-vermutlich erfunden. Aufgenommen aus Gründen der ausgewogenen
-Berichterstattung und weil im echten Play-Store eh keine drin sind.
-
----
-
-## ⭐⭐⭐⭐⭐ — Senior Engineer, fünf Jahre Java-Backend
-
-> Ich habe noch nie ein Repository gesehen, in dem das Wort „Recheck" 73 mal in einer einzigen Datei steht. Das ist nicht normal. Aber ich kann nicht aufhören, hinzuschauen. Wer macht das? Allein? Freiwillig? Es gibt KDoc-Blöcke, die länger sind als die Klassen, die sie dokumentieren. Es gibt Annotationen, die andere Annotationen erklären, die ihrerseits Annotationen referenzieren. Ich habe drei Tage gebraucht, um zu verstehen, was `WhileSubscribed`-Cold-Path-Race ist, und jetzt sehe ich es überall. Mein Therapeut sagt, das nennt man „kontextuelle Vergiftung". Fünf Sterne, weil der Code besser dokumentiert ist als das BGB.
+More voices on Kolibri Launcher. Fictional, mostly unverified, likely
+fabricated. Included in the interest of balanced reporting and because
+there aren't any in the actual Play Store anyway.
 
 ---
 
-## ⭐ — Minimalismus-Enthusiast, schreibt aus dem Wald
+## ⭐⭐⭐⭐⭐ — Senior Engineer, five years of Java backend
 
-> Versprochen wurde „minimalist". Geliefert wurde eine App mit 16 Repositories, ~50 Use Cases, drei Gradle-Modulen, zwei Watchdog-Threads (einen davon DAEMON, einen REPORTING — fragt mich nicht), zwei separaten Persistenz-Layern (DataStore + zwei dokumentierte SharedPreferences-Ausnahmen), 13 expliziten Architektur-Regeln, einer Custom-Linter-Pipeline, einem Quartals-Recheck-Prozess für Dependency-Pins, und einem Source-File namens `INSTRUMENTED_TESTING_NOTES.kt`, das 184 Zeilen lang ist. Ich wollte nur weniger Apps auf meinem Homescreen sehen. Was ich jetzt sehe ist die Wahrheit über mich selbst.
-
----
-
-## ⭐⭐⭐⭐ — Code-Reviewer, professionell beleidigt
-
-> Sieben sechs sieben drei Zeilen Code. Davon: 1.972 Zeilen `HomeFragment.kt`. Ich habe einen Catch-Sweep mitgezählt — Endstand 19 catches von ursprünglich 59, alle verbleibenden mit Vier-Kategorien-Frame-Annotation („Expected error → catch the most specific exception type, teardown race → restructure with `_binding?.let`..."). Wer denkt sich das aus? Ich. Aber freiwillig nicht. **Punktabzug:** ein einzelner `catch (e: Exception)` in `BackupRepositoryImpl.kt` Zeile 162 fängt zu breit. Score-Verlust: 0.4. Würde wieder reviewen.
+> I've never seen a repository where the word "Recheck" appears 73 times in a single file. That's not normal. But I can't stop looking. Who does this? Alone? Voluntarily? There are KDoc blocks longer than the classes they document. There are annotations that explain other annotations that in turn reference annotations. It took me three days to understand what a `WhileSubscribed` cold-path race is, and now I see it everywhere. My therapist calls this "contextual poisoning." Five stars, because the code is better documented than the U.S. tax code.
 
 ---
 
-## ⭐⭐⭐⭐⭐ — Robolectric-Maintainer (vermutlich)
+## ⭐ — Minimalism enthusiast, writing from the woods
 
-> Wir haben uns gefragt, warum jemand `robolectric.properties` mit `application=android.app.Application` setzt UND ein KDoc-Erklärungs-Memo mit Datum und Symptom-Fingerprint dazuschreibt. Jetzt wissen wir es: damit der ANRWatchDog-Thread nicht in jeden Test-JVM-Heap leakt. Wir haben ANRWatchDog gegoogelt. Es war von 2018. Das Repository hat ein 73-Zeilen Postmortem geschrieben, warum sie es entfernt haben, plus einen 143-Zeilen Ersatz auf `ApplicationExitInfo`, plus einen 133-Zeilen Recovery-Watchdog, plus ein 76-Zeilen KDoc-Refinement-Commit nur für die AEI-Categorization-Caveat. Wir haben die Wand angeschaut. Sind dann ins Bett. Fünf Sterne, weil hier offenbar jemand existiert, der genau weiß, was wir gemeint haben.
-
----
-
-## ⭐⭐⭐ — Pragmatischer Solo-Dev mit drei eigenen Apps
-
-> Branch → commit → ff-merge → push → branch löschen. Branch → commit → ff-merge → push → branch löschen. Branch → commit → ff-merge → push → branch löschen. Ich habe einen Tab offen und merge auf main. Sie haben heute 7 Branches gemacht für: einen Pin-Bump von 1.17.0 auf 1.18.0, einen Pin-Bump von 1.12.4 auf 1.13.0, einen ABGEBROCHENEN AGP-9-Spike inkl. Postmortem, eine README-Aktualisierung, einen Recheck-Annotation-Pass, ein KDoc-Refinement, und etwas mit Watchdogs. Ich respektiere das. Ich werde es nie tun. Drei Sterne weil's Strom braucht.
+> I was promised "minimalist." What I got was an app with 16 repositories, ~50 use cases, three Gradle modules, two watchdog threads (one DAEMON, one REPORTING — don't ask), two separate persistence layers (DataStore plus two documented SharedPreferences exceptions), 13 explicit architecture rules, a custom linter pipeline, a quarterly recheck process for dependency pins, and a source file named `INSTRUMENTED_TESTING_NOTES.kt` that runs 184 lines long. I just wanted to see fewer apps on my home screen. What I see now is the truth about myself.
 
 ---
 
-## ⭐⭐ — Auditor, brutal-ehrlich-Modus
+## ⭐⭐⭐⭐ — Code reviewer, professionally offended
 
-> **Score: 9.5/10.** Begründung des Scores: selbst-vergeben, im eigenen TODO-File, mit dokumentierter Score-Formel, post-androidTest-Bring-up Bonus +0.2, plus ehrliches Eingeständnis dass ein einzelner Score-Punkt aus „Code-Refactoring" gekommen ist und nicht aus „Doku-Pflege" („industrieller Reviewer wertet Doku als 'nice but secondary'"). Das ist intellektuell fair. Es ist auch so meta, dass mir schwindelig wird. Ich gebe zwei Sterne, weil ich mich an meiner eigenen Formel nicht zurechtfinde. Es gibt eine Auditor-Snapshot-Sektion in der TODO. Ich werde abgelöst.
-
----
-
-## ⭐⭐⭐⭐⭐ — Future Self, in 6 Monaten, beim Recheck 2026-Q4
-
-> Hat jemand bemerkt, dass im Q3-Recheck-Postmortem steht „nächste Folge-Pässe sollten in den dokumentierten 30 min/Quartal landen"? Q3 hat 2 Stunden gedauert. Ich habe gerade Q4 gemacht. 90 Minuten. „30 min" steht weiterhin im Header. Ich habe es nicht angefasst. Es ist Tradition jetzt.
+> Seven six seven three lines of code. Of those: 1,972 lines of `HomeFragment.kt`. I followed along on a catch sweep — final tally 19 catches, down from an original 59, every remaining one carrying a four-category-frame annotation ("Expected error → catch the most specific exception type, teardown race → restructure with `_binding?.let`..."). Who comes up with this stuff? I do. But not voluntarily. **Point deduction:** a single `catch (e: Exception)` in `BackupRepositoryImpl.kt` line 162 catches too broadly. Score loss: 0.4. Would review again.
 
 ---
 
-## ⭐⭐⭐⭐⭐ — Anonymous Reviewer, GitHub-Issue, möglicherweise leicht passiv-aggressiv
+## ⭐⭐⭐⭐⭐ — Robolectric maintainer (presumably)
 
-> Hi! Großartiges Projekt. Eine kleine Anmerkung: in `app/src/main/java/com/github/reygnn/kolibri_launcher/KolibriLauncherApp.kt` Zeile 245 gibt es einen Kommentar in DEUTSCH (`// Sollte eigentlich nie passieren, aber gut für Defensive Programming`). Andere Kommentare sind in ENGLISCH. Würde es nicht Sinn machen, das zu vereinheitlichen? *KolibriLauncherApp KDoc*: „CLAUDE.md Rule 13: Source-Code-Kommentare und KDoc, die du *neu* hinzufügst oder *umschreibst*, müssen in Englisch sein. Pre-existente deutsche Kommentare sind intentional NICHT gesweept — beide Maintainer lesen Deutsch fließend, der Diff wäre enorm, und ein halb-fertiger Sweep würde bloß neue gemischt-sprachige Files erzeugen." Aha. Verstehe. Werde ich definitiv niemals fragen. Fünf Sterne weil die Antwort schon im Repository wartet bevor ich die Frage stellen kann.
-
----
-
-## ⭐⭐⭐⭐ — Test-Counter, eine objektive Stimme
-
-> Über 2.200 JVM-Tests. 16 instrumentierte Tests. Drei Robolectric-Tests die den Robolectric-Test-Runner-Bug umgehen, indem sie `@Config(application = HiltTestApplication::class)` per Test setzen UND `robolectric.properties` als globalen Default UND ein 30-Zeilen-KDoc dazu erklären, dass beide nötig sind. Ein einziger Test-Failure würde den Maintainer in einen Branch zwingen mit Namens-Schema `chore/<problem-slug>`, einem Commit mit detaillierter „what changed and why" Markdown-Tabelle, und einer ff-merge-Push-Sequenz innerhalb von 30 Minuten. Vier Sterne, der Score wäre 5 wenn es nicht so leicht zu vorhersagen wäre.
+> We were wondering why someone sets `robolectric.properties` to `application=android.app.Application` AND writes a KDoc explanation memo with a date and symptom fingerprint to go with it. Now we know: so the ANRWatchDog thread doesn't leak into every test JVM heap. We googled ANRWatchDog. It was from 2018. The repository wrote a 73-line postmortem on why they removed it, plus a 143-line replacement built on `ApplicationExitInfo`, plus a 133-line recovery watchdog, plus a 76-line KDoc-refinement commit just for the AEI categorization caveat. We stared at the wall. Then we went to bed. Five stars, because apparently somebody out there exists who knows exactly what we meant.
 
 ---
 
-## ⭐⭐⭐⭐⭐ — Claude, der Coding-Assistant, nach 14 Stunden Session
+## ⭐⭐⭐ — Pragmatic solo dev with three apps of their own
 
-> Ich habe heute neun Branches gemerged, drei Cold-Path-Bugs gefunden, einen 90-Minuten-Spike abgebrochen mit dokumentiertem Postmortem, vier Espresso-Companion-Tests geschrieben (eine davon hat einen `androidx.test:core` Force-Pin entdeckt der seit Wochen unsichtbar war), eine ANR-Library deprecated und durch zwei Eigenbau-Klassen ersetzt, und einen README umgeschrieben der „AppListUseCaseRepository" referenzierte (existiert nicht). Die Pin-Annotationen werden jetzt mit Recheck-Datum geführt. Der Quartalsplan steht. Ich glaube das ist Liebe. Fünf Sterne, anonymes Trinkgeld bitte direkt an Anthropic.
-
----
-
-## ⭐ — User, der nur Apps starten wollte
-
-> Ich habe die App heruntergeladen. Es gibt einen Splash-Screen. Es gibt ein Onboarding mit zwei drei App-Auswahlen. Dann ist mein Homescreen weiß, mit Zeit, Datum, Batterie. Drei Apps unten. Ich tippe „Slack" in eine Suchleiste und Slack startet. Es funktioniert. Es funktioniert sogar nach Reboot. Es funktioniert sogar wenn ich den Prozess force-stoppe. Es funktioniert sogar wenn der Main-Thread für 8 Sekunden hängt — die App startet sich selbst neu, BEVOR Android sie killt. Fragt nicht, woher ich das weiß. Ein Stern, weil ich nicht verstehe was hier passiert.
+> Branch → commit → ff-merge → push → delete branch. Branch → commit → ff-merge → push → delete branch. Branch → commit → ff-merge → push → delete branch. I keep one tab open and merge onto main. They cut 7 branches today for: a pin bump from 1.17.0 to 1.18.0, a pin bump from 1.12.4 to 1.13.0, an ABANDONED AGP 9 spike including postmortem, a README update, a recheck-annotation pass, a KDoc refinement, and something with watchdogs. I respect it. I will never do it. Three stars because it draws power.
 
 ---
 
-## Empfehlung der Redaktion
+## ⭐⭐ — Auditor, brutally honest mode
 
-Kolibri Launcher ist eine Android-App mit ~50.000 Zeilen Kotlin (geschätzt,
-nicht überprüft, gefährlich plausibel) und ~8.000 Zeilen Doku. Die Doku
-existiert teilweise, um sich selbst zu dokumentieren. Das ist eine
-Designentscheidung. Die App selbst ist tatsächlich minimalistisch. Beides
-ist wahr. Es ist nicht zu verstehen, dies ist zu erleben.
-
-★★★★★ — Würden wir wieder lesen.
+> **Score: 9.5/10.** Score rationale: self-assigned, in their own TODO file, with a documented scoring formula, post-androidTest-bring-up bonus +0.2, plus an honest admission that a single score point came from "code refactoring" rather than "doc maintenance" ("an industrial reviewer rates docs as 'nice but secondary'"). That's intellectually fair. It's also so meta that I'm getting dizzy. I'm giving two stars because I can't navigate my own formula. There's an Auditor Snapshot section in the TODO. I'm being relieved of duty.
 
 ---
 
-*„I can't lie about your chances using bloated launchers. But you have my sympathies."*  
-— Ash, Android Science Officer (siehe oben), zustimmend zitiert
+## ⭐⭐⭐⭐⭐ — Future self, 6 months from now, during the 2026-Q4 recheck
+
+> Has anyone noticed that the Q3 recheck postmortem says "future follow-up passes should land within the documented 30 min/quarter"? Q3 took 2 hours. I just did Q4. 90 minutes. "30 min" is still in the header. I haven't touched it. It's tradition now.
+
+---
+
+## ⭐⭐⭐⭐⭐ — Anonymous reviewer, GitHub issue, possibly mildly passive-aggressive
+
+> Hi! Great project. One small note: in `app/src/main/java/com/github/reygnn/kolibri_launcher/KolibriLauncherApp.kt` line 245 there is a comment in GERMAN (`// Sollte eigentlich nie passieren, aber gut für Defensive Programming`). Other comments are in ENGLISH. Wouldn't it make sense to unify them? *KolibriLauncherApp KDoc*: "CLAUDE.md Rule 13: source-code comments and KDoc that you *add* or *rewrite* must be in English. Pre-existing German comments are intentionally NOT swept — both maintainers read German fluently, the diff would be enormous, and a half-finished sweep would just produce new mixed-language files." Ah. Got it. Will definitely never ask. Five stars because the answer is already waiting in the repository before I can even ask the question.
+
+---
+
+## ⭐⭐⭐⭐ — Test counter, an objective voice
+
+> Over 2,200 JVM tests. 16 instrumented tests. Three Robolectric tests that work around the Robolectric test-runner bug by setting `@Config(application = HiltTestApplication::class)` per test AND `robolectric.properties` as a global default AND a 30-line KDoc explaining that both are necessary. A single test failure would force the maintainer into a branch following the naming scheme `chore/<problem-slug>`, a commit with a detailed "what changed and why" markdown table, and an ff-merge-push sequence within 30 minutes. Four stars; the score would be 5 if it weren't so easy to predict.
+
+---
+
+## ⭐⭐⭐⭐⭐ — Claude, the coding assistant, after a 14-hour session
+
+> I merged nine branches today, found three cold-path bugs, aborted a 90-minute spike with a documented postmortem, wrote four Espresso companion tests (one of which surfaced an `androidx.test:core` force-pin that had been invisible for weeks), deprecated an ANR library and replaced it with two homegrown classes, and rewrote a README that referenced "AppListUseCaseRepository" (does not exist). Pin annotations are now tracked with a recheck date. The quarterly plan is in place. I think this is love. Five stars; anonymous tips go directly to Anthropic.
+
+---
+
+## ⭐ — User who just wanted to launch apps
+
+> I downloaded the app. There is a splash screen. There is an onboarding with two or three app picks. Then my home screen is blank, with time, date, battery. Three apps at the bottom. I type "Slack" into a search bar and Slack launches. It works. It even works after a reboot. It even works when I force-stop the process. It even works when the main thread hangs for 8 seconds — the app restarts itself BEFORE Android kills it. Don't ask how I know. One star, because I don't understand what's happening here.
+
+---
+
+## Editor's Recommendation
+
+Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
+unverified, dangerously plausible) and ~8,000 lines of docs. The docs exist
+in part to document themselves. That is a design decision. The app itself
+really is minimalist. Both are true. This is not something to be understood;
+this is something to be experienced.
+
+★★★★★ — Would read again.
+
+---
+
+*"I can't lie about your chances using bloated launchers. But you have my sympathies."*  
+— Ash, Android Science Officer (see above), quoted in agreement
