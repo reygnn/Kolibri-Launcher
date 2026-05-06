@@ -47,63 +47,72 @@
 #   - Not exhaustive. ~30 min per quarter is the budget; if a single pin
 #     needs deep investigation, capture it as a separate TODO item.
 #
-# Latest recheck: 2026-Q2 (2026-05-03) — inaugural pass, format established.
-# Next recheck:   2026-Q3.
+# Latest recheck: 2026-Q3 (2026-05-06, vorgezogen) — first pass with web
+#                 access; per-pin annotations below carry the findings.
+# Next recheck:   2026-Q4.
+#
+# Cross-lib lift bundles to keep in mind (recheck 2026-Q3 surfaced these):
+#   1. AGP 9 + Hilt ≥2.59 + Gradle 9.1 — coupled. Lift one, lift all
+#      together. AGP 8.13.2 is the last of the 8.x line; the next stop
+#      is the bundle.
+#   2. Kotlin 2.3 + kotlinx-serialization 1.10 + kotlin-test (auto-
+#      matched) + KSP 2.3.x — coupled. Same logic.
+#   3. JUnit 5 — standalone migration effort, no triggers visible.
 # =============================================================================
 
 [versions]
 # Build & Kotlin
-agp = "8.13.2"
-kotlin = "2.2.21"  # 2.2.x — safe to update; kotlin-test must match exactly
-ksp = "2.2.21-2.0.4"  # not currently used; kept for the eventual KSP migration
+agp = "8.13.2"  # Recheck 2026-Q3: 8.13.2 is last of 8.x line; next stop is AGP 9.2.0 — see cross-lib bundle 1 in header (couples with Hilt 2.59 + Gradle 9.1). SPIKE_NEEDED before lift.
+kotlin = "2.2.21"  # 2.2.x — safe to update; kotlin-test must match exactly. Recheck 2026-Q3: 2.2.21 is current top of 2.2.x line. 2.3.0 would pull cross-lib bundle 2 (kotlinx-serialization 1.10, KSP 2.3) — coupled lift.
+ksp = "2.2.21-2.0.4"  # not currently used; kept for the eventual KSP migration. Recheck 2026-Q3: matched to kotlin pin; KSP1 is deprecated, KSP2 line is 2.3.x — coupled to Kotlin 2.3 lift.
 
 # Hilt
-hilt = "2.57.2"  # DO NOT UPGRADE — keep proguard-rules.pro in sync if forced to bump
+hilt = "2.57.2"  # DO NOT UPGRADE — keep proguard-rules.pro in sync if forced to bump. Recheck 2026-Q3: 2.58 turned `useBindingGraphFix` on by default (potentially breaking) and is incompatible with AGP 9; 2.59 requires AGP 9. Lift coupled to AGP 9 spike (header bundle 1).
 
 # UI / Material
-material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts)
-appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang
-core-ktx = "1.17.0"
-core-splashscreen = "1.2.0"
-activity = "1.12.4"
-fragment = "1.8.9"  # DO NOT UPGRADE — fragment-ktx and fragment-testing share this
-recyclerview = "1.4.0"
+material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
+appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang. Recheck 2026-Q3: current = latest stable (no 1.8.x stable in sight).
+core-ktx = "1.17.0"  # Recheck 2026-Q3: LIFT_SAFE → 1.18.0 (2026-03-11, additive minor). Lift on follow-up branch.
+core-splashscreen = "1.2.0"  # Recheck 2026-Q3: current = latest stable.
+activity = "1.12.4"  # Recheck 2026-Q3: LIFT_SAFE → 1.13.0 (2026-03-11) BUT introduces EdgeToEdge re-invoke on config-change — small UX delta. Lift on follow-up branch with smoke-test on rotation.
+fragment = "1.8.9"  # DO NOT UPGRADE — fragment-ktx and fragment-testing share this. Recheck 2026-Q3: current = latest stable in 1.8.x; 1.9.x not stable yet.
+recyclerview = "1.4.0"  # Recheck 2026-Q3: current = latest stable.
 
 # Lifecycle & Navigation
-lifecycle = "2.10.0"  # OK to upgrade
-navigation = "2.9.7"  # OK to upgrade
+lifecycle = "2.10.0"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (2.11.x is alpha).
+navigation = "2.9.7"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (2.10.x is alpha).
 
 # Data & Async
-datastore = "1.2.1"
-preference = "1.2.1"
-coroutines = "1.10.2"  # OK to upgrade
-kotlinx-serialization = "1.9.0"  # 1.10.0 needs Kotlin 2.3.0 — bump together
+datastore = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
+preference = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
+coroutines = "1.10.2"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (1.11 is RC). Lift when 1.11 ships stable.
+kotlinx-serialization = "1.9.0"  # 1.10.0 needs Kotlin 2.3.0 — bump together. Recheck 2026-Q3: pin reason still applies; coupled to header bundle 2.
 
 # Utilities
-timber = "5.0.1"  # DO NOT UPGRADE — 6.x has breaking changes
-acra = "5.11.4"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync
-browser = "1.9.0"
-leakcanary = "2.14"
-json = "20251224"
+timber = "5.0.1"  # DO NOT UPGRADE — 6.x has breaking changes. Recheck 2026-Q3: 6.x doesn't exist yet (only 5.1.0-SNAPSHOT in trunk); 5.0.1 has been latest stable for years. Pin marker is forward-looking, current state is "current = latest".
+acra = "5.11.4"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-Q3: current = latest stable (2024-09-13). Pin reason still applies.
+browser = "1.9.0"  # Recheck 2026-Q3: 1.9.0 resolves and runs; developer.android.com release notes lag behind Maven publish (only 1.8.0 + 1.9.0-alpha04 listed there, but Google Maven serves 1.9.0 stable). Verify next pass.
+leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
+json = "20251224"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
 
 # Test (JVM)
-junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration
-core-testing = "2.2.0"  # DO NOT CHANGE
-kotlin-test = "2.2.21"  # DO NOT DOWNGRADE — 1.9.23 causes compiler errors; must match `kotlin`
-turbine = "1.2.1"  # OK to upgrade
-truth = "1.4.5"  # OK to upgrade
-robolectric = "4.16.1"  # OK to upgrade
-mockk = "1.14.9"
+junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration. Recheck 2026-Q3: current = latest 4.x stable. JUnit 5 lift is its own migration effort, no triggers visible.
+core-testing = "2.2.0"  # DO NOT CHANGE. Recheck 2026-Q3: current = latest stable; pin marker stays.
+kotlin-test = "2.2.21"  # DO NOT DOWNGRADE — 1.9.23 causes compiler errors; must match `kotlin`. Recheck 2026-Q3: matched to kotlin pin; couples to Kotlin 2.3 lift.
+turbine = "1.2.1"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (1.3.0-SNAPSHOT in trunk).
+truth = "1.4.5"  # OK to upgrade. Recheck 2026-Q3: current = latest stable.
+robolectric = "4.16.1"  # OK to upgrade. Recheck 2026-Q3: current = latest stable; supports SDK 36 + JDK 21 — fits the project.
+mockk = "1.14.9"  # Recheck 2026-Q3: current = latest stable (2026-01-26; clearAllStubsFromMemory + any()-fix shipped here).
 
 # AndroidX Test (keep ALL in sync — runner/rules/core/junit-ktx)
 # `androidxTest` is camelCase to avoid an accessor-namespace clash with
 # `androidx-test-core` / `androidx-test-junit`: hyphen-keys are mapped to
 # dot-paths, so a leaf `androidx-test` would collide with the prefix.
-androidxTest = "1.7.0"
-androidx-test-core = "1.7.0"
-androidx-test-junit = "1.3.0"
-espresso = "3.7.0"
-orchestrator = "1.6.1"
+androidxTest = "1.7.0"  # Recheck 2026-Q3: current = latest stable.
+androidx-test-core = "1.7.0"  # Recheck 2026-Q3: current = latest stable; force-pinned in app/build.gradle.kts to dodge consistent-resolution downgrade — see commit bd0d236 for the ActivityInvoker$-CC story.
+androidx-test-junit = "1.3.0"  # Recheck 2026-Q3: current = latest stable.
+espresso = "3.7.0"  # Recheck 2026-Q3: current = latest stable.
+orchestrator = "1.6.1"  # Recheck 2026-Q3: current = latest stable.
 
 
 [libraries]

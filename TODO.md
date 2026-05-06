@@ -1009,8 +1009,33 @@ Nächste-Recheck-Datum steht ebenfalls im Header — wer den Catalog
 wurden 2026-Q2 bewusst NICHT durchgegangen — der Recheck-Prozess
 braucht ein web-fähiges Tool für die Upstream-Recherche
 (Hilt-Changelog, kotlinx-serialization 1.10 Status), das im
-Inaugural-Pass nicht verfügbar war. Erste echte inhaltliche Durchlauf
-passiert 2026-Q3.
+Inaugural-Pass nicht verfügbar war.
+
+**Erster inhaltlicher Pass: 2026-Q3 (vorgezogen 2026-05-06).** Web-
+Tooling war jetzt verfügbar; alle 33 Pins durchgegangen, Annotations
+im Catalog gesetzt. Ergebnis-Zusammenfassung:
+
+- **30 KEEP** — Pin-Begründung gilt weiter ODER current = latest stable.
+- **2 LIFT_SAFE** für Folge-Branches: `core-ktx 1.17.0 → 1.18.0`,
+  `activity 1.12.4 → 1.13.0` (letzteres mit kleiner UX-Delta wegen
+  EdgeToEdge-Reinvoke bei Config-Change — Smoke-Test auf Rotation
+  empfohlen).
+- **1 SPIKE_NEEDED**: `agp 8.13.2` ist last 8.x; Lift auf 9.x koppelt
+  mit Hilt 2.59 + Gradle 9.1 als Bundle. Eigene Spike-Branch.
+
+Drei Cross-Lib-Bündel im Catalog-Header dokumentiert:
+1. AGP 9 + Hilt ≥2.59 + Gradle 9.1 (gemeinsam liften)
+2. Kotlin 2.3 + kotlinx-serialization 1.10 + KSP 2.3 + kotlin-test
+   (gemeinsam liften)
+3. JUnit 5 (eigene Migration, keine Trigger sichtbar)
+
+Zwei Punkte mit Datenlücke (konservativ KEEP, in Q4 verifizieren):
+`browser 1.9.0` (developer.android.com release notes lagen, Maven
+serviert 1.9.0 stable — Build läuft, deshalb KEEP), und `mockk 1.14.9`
+hatte sich auch als latest bestätigt nach Gegenrecherche.
+
+Nächster Recheck: 2026-Q4. Format steht, Annotations sind aktuell —
+Folge-Pässe sollten in den dokumentierten 30 min/Quartal landen.
 
 **Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
 Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,
