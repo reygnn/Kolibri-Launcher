@@ -42,18 +42,30 @@ import kotlin.system.exitProcess
  * code path that's already proven to be hung — a recipe for more hangs.
  *
  * **Caveat — AEI reason classification under self-kill:** when *we* send
- * `SIGKILL` via [Process.killProcess] at [timeoutMs], the system may
- * record the resulting `ApplicationExitInfo` as `REASON_SIGNALED` rather
- * than `REASON_ANR` — depends on whether the system's own ANR-handling
- * machinery (kicked off at its 5 s threshold) has already tagged the
- * process before our `SIGKILL` lands. If it tags us as SIGNALED,
- * AnrReporter's `REASON_ANR` filter skips that exit and we lose the
- * report. Trade-off accepted in the original handoff — the recovery
- * win (process up again in seconds, not a half-minute of frozen
- * launcher) is the load-bearing benefit; reporting was *never* the
- * busy path here (single-digit ANRs in the project's history). Real
- * system-driven kills (we don't fire, system kills at ~10 s) keep
- * REASON_ANR and are the common case anyway.
+ * `SIGKILL` via [Process.killProcess] at [timeoutMs], the resulting
+ * `ApplicationExitInfo` record is classified as `REASON_SIGNALED`, NOT
+ * `REASON_ANR`. Per the Android docs on
+ * `ApplicationExitInfo.getTraceInputStream`, the system *does* still
+ * attach the ANR trace to such records when it had detected the ANR
+ * before the kill ("ANR trace data may be associated with an
+ * ApplicationExitInfo instance even though that instance's exit reason
+ * is not 'ANR'") — but [AnrReporter]'s filter (`reason == REASON_ANR`)
+ * skips them, so the report goes uncollected.
+ *
+ * Trade-off accepted: self-defense is the load-bearing job here. Real
+ * system-driven kills (we don't fire, system times out at ~10 s) keep
+ * `REASON_ANR` and remain the common case anyway. Reporting was *never*
+ * the busy path in this project — single-digit ANRs in the project's
+ * history.
+ *
+ * Future-self note: if self-kill ANRs ever show up often enough that
+ * we want them in our reports, the fix is in [AnrReporter], not here —
+ * extend the filter to also include `REASON_SIGNALED` records that
+ * carry a non-null `traceInputStream`. Watch out: `traceInputStream`
+ * is single-read, so the materialisation has to happen inside
+ * `AnrReporter.toReport` (or be cached on the same iteration —
+ * filtering on it directly invalidates it for the consumer). Out of
+ * scope for this PR.
  *
  * ## Why 8 s default
  *
