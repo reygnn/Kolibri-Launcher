@@ -32,6 +32,7 @@ class HiltTestRunner : AndroidJUnitRunner() {
 
     override fun onStart() {
         disableSystemAnimations()
+        collapseNotificationShade()
         super.onStart()
     }
 
@@ -44,5 +45,22 @@ class HiltTestRunner : AndroidJUnitRunner() {
         ).forEach { cmd ->
             automation.executeShellCommand(cmd).close()
         }
+    }
+
+    /**
+     * Headless emulators left running for a while end up with the
+     * NotificationShade as the focused window — between tests there's no
+     * real user activity to push it back, and the system chrome creeps to
+     * the front. With NotificationShade focused, Espresso's RootViewPicker
+     * sees `has-window-focus=false` on every test Activity's window and
+     * times out with `RootViewWithoutFocusException` after 10 s.
+     *
+     * `cmd statusbar collapse` is the canonical shell-side dismiss; harmless
+     * when no shade is open. Run before every test process via the runner
+     * because per-test @Before would be 12+ duplicated copies.
+     */
+    private fun collapseNotificationShade() {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.executeShellCommand("cmd statusbar collapse").close()
     }
 }
