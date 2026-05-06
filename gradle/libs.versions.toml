@@ -74,7 +74,7 @@ material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() 
 appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang. Recheck 2026-Q3: current = latest stable (no 1.8.x stable in sight).
 core-ktx = "1.18.0"  # Recheck 2026-Q3: lifted from 1.17.0 (2026-05-06); additive minor, no breaking changes.
 core-splashscreen = "1.2.0"  # Recheck 2026-Q3: current = latest stable.
-activity = "1.12.4"  # Recheck 2026-Q3: LIFT_SAFE → 1.13.0 (2026-03-11) BUT introduces EdgeToEdge re-invoke on config-change — small UX delta. Lift on follow-up branch with smoke-test on rotation.
+activity = "1.13.0"  # Recheck 2026-Q3: lifted from 1.12.4 (2026-05-06). Note: 1.13.0 re-invokes EdgeToEdge on config-changes (rotation, theme switch) — verified harmless in this codebase via the existing instrumented suite.
 fragment = "1.8.9"  # DO NOT UPGRADE — fragment-ktx and fragment-testing share this. Recheck 2026-Q3: current = latest stable in 1.8.x; 1.9.x not stable yet.
 recyclerview = "1.4.0"  # Recheck 2026-Q3: current = latest stable.
 
