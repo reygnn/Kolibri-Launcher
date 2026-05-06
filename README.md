@@ -1,105 +1,226 @@
 # Kolibri Launcher
 
-[![Android CI](https://github.com/reygnn/kolibri-launcher/actions/workflows/android.yml/badge.svg)](https://github.com/reygnn/kolibri-launcher/actions/workflows/android.yml)
-[![Coverage](https://codecov.io/gh/reygnn/kolibri-launcher/branch/main/graph/badge.svg)](https://codecov.io/gh/reygnn/kolibri-launcher)
+[![Android CI](https://github.com/reygnn/Kolibri-Launcher/actions/workflows/android.yml/badge.svg)](https://github.com/reygnn/Kolibri-Launcher/actions/workflows/android.yml)
+[![Coverage](https://codecov.io/gh/reygnn/Kolibri-Launcher/branch/main/graph/badge.svg)](https://codecov.io/gh/reygnn/Kolibri-Launcher)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![API](https://img.shields.io/badge/API-36%2B-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers#platform-code-names-versions-api-levels-and-ndk-releases)
+[![API](https://img.shields.io/badge/API-36-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers)
 
-A minimalist, open-source Android launcher designed for focus and speed, built with a state-of-the-art, reactive, and highly decoupled architecture.
+A minimalist Android home-screen launcher. Opinionated, single-platform, no clutter.
 
-## About The Project
+## What it is
 
-In a world of distracting, cluttered home screens, Kolibri Launcher offers a breath of fresh air. It provides a clean, beautiful, and distraction-free environment that puts your essential apps front and center, keeping everything else neatly tucked away.
+Kolibri replaces your home screen with a stripped-down view: time, date,
+battery, and a hand-picked list of favourite apps. Everything else lives
+in a swipe-up app drawer with instant search. No widgets. No icon grid.
+No "discover" tabs.
 
-More than just a functional app, this project is a showcase of modern Android architecture best practices. It serves as a practical, real-world example of building a reactive, testable, and maintainable application from the ground up, following Google's latest recommendations.
+It's also a private playground for trying current Android architecture
+ideas — Hilt, Coroutines/Flow, Jetpack Navigation, Clean-Architecture
+module split, Robolectric + Espresso, the works. The codebase is
+deliberately over-engineered relative to its size; if you're poking
+around for examples of how a given pattern looks in 2026, you'll
+probably find one.
 
 ## Requirements
 
-*   **Android 16+** (API Level 36)
-*   No backward compatibility for older Android versions
+- **Android 16** (API 36). `minSdk = compileSdk = targetSdk = 36`.
+  No backwards-compat shims. If your device is older, this launcher
+  won't install.
+- **JDK 21** to build. Lower JDKs fail at the Robolectric / SDK-36
+  test layer.
 
 ## Privacy & Crash Reporting
 
-*   **ACRA (Application Crash Reports for Android):** The app uses ACRA to collect anonymous crash reports, helping improve stability and fix bugs.
-*   **Fully Anonymous:** No personal data is collected. Reports contain only technical information about crashes (Android version, device model, stack trace).
-*   **Opt-In:** Crash reporting is disabled by default. Users are asked for consent on first launch.
-*   **User Control:** Can be enabled/disabled anytime in the app settings.
-*   **Self-Hosted:** Reports are sent to a private server, not third-party services.
+- **ACRA**, opt-in. Disabled by default; the consent dialog appears
+  on first launch and the choice is remembered.
+- **Self-hosted backend.** Reports go to a private server. No third-
+  party telemetry, no analytics SDKs, no ads.
+- **Anonymous payload.** Stack trace + device model + Android version.
+  No user identifiers, no app contents.
+- **Per-type rate-limited.** Same exception class within a 24 h window
+  fires once. Stops a recurring crash from flooding the backend.
+- **Toggle anytime** in Settings → Crash Reports.
+- **Post-mortem ANR detection** uses Android's
+  `ApplicationExitInfo` API (introduced in API 30, available natively
+  here because of the `minSdk = 36` floor) plus a self-defense
+  `RecoveryWatchdog` that kills the process if the main looper hangs
+  for 8 s. No third-party ANR library.
 
 ## Screenshots
 
 <p align="center">
-  <img src="metadata/en-US/images/phoneScreenshots/1.png" width="250" alt="Home Screen" />
-  <img src="metadata/en-US/images/phoneScreenshots/2.png" width="250" alt="App Drawer" />
+  <img src="metadata/en-US/images/phoneScreenshots/1.png" width="250" alt="Home screen" />
+  <img src="metadata/en-US/images/phoneScreenshots/2.png" width="250" alt="App drawer" />
   <img src="metadata/en-US/images/phoneScreenshots/3.png" width="250" alt="Settings" />
 </p>
 
 ## Features
 
-*   **Minimalist Home Screen:** Displays only the time, date, battery, and your hand-picked favorite apps.
-*   **Gesture Navigation:** A simple swipe up opens the full app drawer.
-*   **App Drawer with Search:** Quickly find any app you need.
-*   **Smart Sorting:** Sort apps alphabetically or by usage count.
-*   **Dynamic Theming:** Text colors automatically adapt to your wallpaper for perfect readability.
-*   **App Management:** Hide apps you want to see less often and manage favorites with ease.
-*   **App Shortcuts:** Long-press an app to access its system shortcuts.
-*   **Lightweight & Fast:** Built for performance and a smooth experience.
+### Home & navigation
 
-## Architectural Overview & Tech Stack
+- Minimalist home: time, date, battery, calendar event, alarm — all
+  optional via Settings.
+- Swipe-up to the app drawer; swipe-down inside the drawer to dismiss.
+- Long-press any app for system shortcuts (LauncherApps API).
+- Double-tap to lock screen (optional, requires accessibility service).
+- Two configurable swipe-from-edge actions (left / right).
 
-This launcher is built with a strong emphasis on clean architecture, SOLID principles, and a fully reactive design.
+### App drawer
 
-*   **100% Kotlin**
-*   **MVVM Architecture:** A strict separation of concerns between the UI (`Fragments`), state-holding (`ViewModel`), and business logic.
-*   **Clean Architecture & SOLID Principles:**
-    *   **Dependency Inversion Principle (SOLID):** The entire application is decoupled through the use of interfaces (`...Repository`). High-level components like `ViewModel` and `UseCase` depend on abstract contracts, not concrete implementations.
-    *   **UseCase Layer:** Business logic lives in fine-grained use cases under `domain/usecase/` (e.g. `GetDrawerAppsUseCase`, `ToggleFavoriteUseCase`), each orchestrating exactly the repositories it needs.
-    *   **Repository Pattern:** Each data source is managed by a dedicated repository (e.g., `FavoritesRepository`, `SettingsRepository`).
-*   **Reactive UI & State Management:**
-    *   **Kotlin Coroutines & Flows:** Used for the entire asynchronous pipeline, from the data layer (`DataStore`) to the UI.
-    *   **Single Source of Truth:** The `HomeViewModel` exposes a single `UiState` data class via **StateFlow**, ensuring an atomic, predictable, and easily debuggable UI state.
-    *   **Events vs. State:** A clear separation between state (`StateFlow`) and one-time UI events (`SharedFlow`) is maintained for robust UI logic.
-*   **Dependency Injection:** With **Hilt** to manage all dependencies and bind interfaces to their implementations.
-*   **Data Persistence:** With **Jetpack DataStore** for storing all user settings and preferences, ensuring safe, asynchronous data operations.
-*   **Android Jetpack:**
-    *   **Navigation Component** for managing fragment transactions.
-    *   **ViewModel** for lifecycle-aware state management.
-    *   **AndroidX Libraries** throughout.
+- Real-time search with debounced filter.
+- Sort alphabetically or by time-weighted usage (decay constant
+  configurable via the `USAGE_DECAY_LAMBDA`).
+- Optional auto-launch when the search filter narrows to a single
+  result.
+- Hide apps you never want to see.
+- Custom display names per app (rename "Slack" to "🐛", etc.).
 
-### Comprehensive Testing Strategy
+### Wallpaper
 
-The project is built with testability as a first-class citizen, ensuring reliability and maintainability through a multi-layered testing approach. Every layer of the architecture is covered by the appropriate type of test.
+- Single image or multi-layer composition with per-layer scale,
+  translation, and blend modes.
+- Dynamic text colours: foreground text adapts to wallpaper luminance
+  (`smart_contrast` mode) so dark text never lands on a dark
+  wallpaper region.
 
-*   **Unit Tests (JVM):**
-    *   **Purpose:** Fast, local tests for the data, business, and presentation logic layers, running on the JVM without an emulator.
-    *   **Coverage:** Covers `ViewModel` logic, the `AppListUseCaseRepository`, and all `Repository` interactions.
-    *   **Tech Stack:** **JUnit**, **MockK** for idiomatic Kotlin mocking (the test suite was previously on Mockito and has been fully migrated), **Turbine** for robust testing of Kotlin Flows, and **kotlinx-coroutines-test** for deterministic coroutine scheduling.
+### Backup & Restore
 
-*   **UI / Instrumented Tests (On-Device):**
-    *   **Purpose:** To verify the correctness of the UI layer, user interactions, and the integration between Fragments and the `ViewModel`. These tests run on an Android emulator or a physical device.
-    *   **Coverage:** Covers UI state rendering (`HomeFragment`), navigation gestures (`swipe up`), `RecyclerView` display and filtering (`AppDrawerFragment`), and dialog interactions (`AppContextMenuDialogFragment`).
-    *   **Tech Stack:** **Espresso** for UI interactions, **Hilt Android Testing** for robust dependency injection in tests, and `ActivityScenarioRule` for launching UI components in a controlled environment.
-    *   **Stability:** Includes custom JUnit Rules (`DisableAnimationsRule`) to ensure test stability and eliminate flakiness by programmatically disabling system animations during test runs.
+- Full settings export / import via SAF (file picker).
+- ZIP format with embedded wallpaper images; legacy JSON-only format
+  still loads on import.
+- Per-section import options: import only favourites, or only
+  themes, etc.
 
-## Building The Project
+### Reliability
 
-1.  Clone the repository: `git clone https://github.com/reygnn/kolibri-launcher.git`
-2.  Open the project in the latest stable version of Android Studio.
-3.  Let Gradle sync the dependencies.
-4.  Build and run the project.
+- Crash-safety pattern across the codebase — every async boundary
+  has its own coroutine exception handler, every external API call
+  is in a `try/catch` that classifies the failure (see the
+  four-category frame in `CLAUDE.md` Rule 11).
+- Multi-layer global crash handler — OOM recovery, ACRA spam guard,
+  process-restart paths.
+
+## Architecture & Tech Stack
+
+Three Gradle modules since the 2026-05 split:
+
+```
+:app     Android Application — UI (Activities, Fragments), main
+          (Hilt entry, ACRA init, AnrReporter, RecoveryWatchdog),
+          and per-feature packages under `ui/`.
+:data    Android Library — repository implementations, DataStore,
+          ContentResolver-touching code, package-update receiver.
+          Depends on :domain.
+:domain  Pure-Kotlin JVM module (no Android SDK). Repository
+          interfaces, ~50 fine-grained use cases, pure-Kotlin
+          domain models, dispatcher qualifiers, KolibriLog
+          indirection (so :domain doesn't import Timber directly).
+```
+
+Module dependency direction is one-way: `:app → :data → :domain`.
+Cycles eliminated in the cycle-elimination branches (see TODO.md
+§9.2).
+
+### Stack
+
+- **100 % Kotlin 2.2.x**, no Java sources.
+- **MVVM + Clean Architecture.** Activities/Fragments hold no
+  business logic — every state path goes through a `ViewModel` which
+  composes use cases.
+- **Coroutines + Flow.** UI state is `StateFlow`, one-time events
+  are `SharedFlow`. The `WhileSubscribed` cold-path bug class is
+  audited and fixed (see `BackupDataAssembler.performImport` for the
+  canonical pattern).
+- **Hilt** for DI. Test variants use `HiltTestApplication` so the
+  production `KolibriLauncherApp` doesn't leak into Robolectric runs.
+- **Jetpack DataStore Preferences** is the *only* persistent store
+  (two documented exceptions for crash-handler bootstrap state, see
+  `CLAUDE.md` Rule 5).
+- **Material 3** + AndroidX. View Binding, no Compose.
+- **Navigation Component** for fragment transitions inside the
+  HOME activity.
+- **ACRA 5.11.4** for crash reporting (self-hosted, opt-in).
+
+### Testing
+
+The project is *aggressively* tested by personal-project standards.
+Three layers:
+
+- **JVM unit tests** (~2200 in total across `:domain`, `:data`,
+  `:app`) — JUnit 4, MockK, Turbine, kotlinx-coroutines-test.
+  No Mockito (fully migrated). The `:domain` module is pure-Kotlin
+  so its 310 tests run in ~5 s without Robolectric bootstrap.
+- **Robolectric tests** — only for code that legitimately touches
+  Android types (`android.net.Uri`, real `ParcelFileDescriptor`,
+  Activity-host fragment smoke tests). Project default `Application`
+  is `android.app.Application`, NOT `KolibriLauncherApp`, to keep
+  background services out of test runs (see TODO.md §6 for the
+  OOM-incident memo).
+- **Instrumented tests** (16 on a real AVD / device) — limited to
+  things JVM and Robolectric structurally cannot reach: real
+  ContentResolver descriptors, real RoleManager state,
+  LauncherApps permission gates, real BroadcastReceiver `goAsync`,
+  real RecyclerView measure pass, swipe-down gesture
+  dispatch chains. AndroidX Test Orchestrator (`clearPackageData`)
+  resets state between tests.
+
+Per-repository contract-test pattern: each repository interface has
+an abstract `XyzRepositoryContract` plus a `FakeXyzRepositoryContractTest`
++ `XyzRepositoryImplContractTest` — if fake and impl drift, the
+contract catches it at JVM speed. Three real fake-vs-impl bugs were
+caught this way.
+
+Detailed conventions live in
+[`app/src/test/CLAUDE.md`](app/src/test/CLAUDE.md) and
+[`TESTING_CONVENTIONS.kt`](app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt);
+instrumented-test specifics in
+[`INSTRUMENTED_TESTING_NOTES.kt`](app/src/androidTest/java/com/github/reygnn/kolibri_launcher/INSTRUMENTED_TESTING_NOTES.kt).
+
+## Building
+
+```bash
+git clone https://github.com/reygnn/Kolibri-Launcher.git
+cd Kolibri-Launcher
+./gradlew assembleDebug         # debug APK
+./gradlew testDebugUnitTest     # JVM unit tests
+./gradlew connectedDebugAndroidTest   # instrumented tests (needs AVD/device)
+./gradlew jacocoTestReport      # coverage
+./gradlew assembleRelease       # release APK + ProGuard mapping upload to ACRA
+```
+
+Gradle is bundled via the wrapper. JDK 21 is required (Robolectric +
+SDK 36 dependency).
+
+For ACRA's release-build pipeline, two property files are expected at
+the repo root and intentionally git-ignored:
+
+- `keystore.properties` — release signing config (skipped if absent;
+  CI uses a debug-signed APK).
+- `secrets.properties` — ACRA backend URL + basic-auth credentials
+  (skipped if absent; reports just won't be uploaded).
+
+## Project documentation
+
+- [`CLAUDE.md`](CLAUDE.md) — project conventions and the 13 hard
+  architectural rules. Read this first before any code change.
+- [`TODO.md`](TODO.md) — living roadmap, audit snapshot, and the
+  quarterly-recheck process for pinned dependencies.
+- [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) — StrictMode violations
+  caused by the Android framework or OEM modifications that cannot
+  be fixed in app code.
 
 ## Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Solo-maintained, but issues and pull requests are welcome. If you're
+fixing a bug, please include a failing test first (the project
+treats tests as the source of truth for behaviour). Architectural
+changes that contradict `CLAUDE.md` need an issue first to discuss
+the rule trade-off.
 
 ## License
 
-This project is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License v3.0** as published by the Free Software Foundation.
+GNU General Public License v3.0 — see [`LICENSE`](LICENSE).
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-See `LICENSE` for the full license text.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
