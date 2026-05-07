@@ -44,12 +44,19 @@ class GestureDelegate(
     private var enableSwipeDownToastShown = false
 
     // --- Fling ---
+    //
+    // Each directional handler short-circuits while a lock animation
+    // is in progress. Moved here from `HomeFragment.createGestureListener`
+    // (homescroll.md §8 decision 6) so the gate is JVM-testable and
+    // applies regardless of which UI surface invoked the action.
 
     fun onFlingUp() = scope.launchSafe("Error on fling up") {
+        if (_isLockingInProgress.value) return@launchSafe
         scope.sendEvent(UiEvent.ShowAppDrawer)
     }
 
     fun onFlingDown() = scope.launchSafe("Error on fling down") {
+        if (_isLockingInProgress.value) return@launchSafe
         when (requestNotificationsUseCase()) {
             is RequestNotificationsUseCase.Result.Success -> {
             }
@@ -74,6 +81,7 @@ class GestureDelegate(
     // --- Swipe ---
 
     fun onSwipeFromRightToLeft() = scope.launchSafe("Error in onSwipeFromRightToLeft") {
+        if (_isLockingInProgress.value) return@launchSafe
         when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)) {
             is HandleSwipeActionUseCase.Result.LaunchApp -> {
                 scope.sendEvent(UiEvent.LaunchApp(result.app))
@@ -84,6 +92,7 @@ class GestureDelegate(
     }
 
     fun onSwipeFromLeftToRight() = scope.launchSafe("Error in onSwipeFromLeftToRight") {
+        if (_isLockingInProgress.value) return@launchSafe
         when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)) {
             is HandleSwipeActionUseCase.Result.LaunchApp -> {
                 scope.sendEvent(UiEvent.LaunchApp(result.app))

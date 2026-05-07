@@ -460,7 +460,7 @@ integration + sealed-class trigger state).
   already cover the realistic failure modes.
 - **Final size: ~210 lines** (the estimate of 200–250 held).
 
-### Step 2 — Update layout XML
+### Step 2 — Update layout XML [DONE 2026-05-07]
 
 File: `app/src/main/res/layout/fragment_home.xml`.
 
@@ -476,7 +476,31 @@ File: `app/src/main/res/layout/fragment_home.xml`.
 - Add an explicit `android:id="@+id/home_gesture_root"` (or similar)
   on the new layout so Espresso tests can target it.
 
-### Step 3 — Wire up in HomeFragment
+**Implementation notes (2026-05-07):**
+
+- **Wrapping strategy diverged from the original Step 2 plan**
+  because the §8 decision 4 update (split-mode code stays
+  physically in place during this migration) made it impossible to
+  drop `favoritesContainer` / `gestureZone`. Instead of replacing
+  `favoritesContainer` with `HomeGestureLayout`, the wrapper sits
+  one level higher: it wraps `rootLayout` (the entire content
+  layer between Layer 0 wallpaper and Layer 2 edit overlay).
+  `favoritesContainer` and `gestureZone` are kept exactly as they
+  were so the dead split-mode setup block remains compilable and
+  reachable on paper. The cleanup branch (§6 step 6) removes them
+  in one go.
+- **`rootLayout` changed from `match_parent` to `0dp + constraints`**
+  because `HomeGestureLayout` extends `ConstraintLayout` and its
+  child uses the idiomatic constraint-based positioning (mirrors
+  `fragment_app_drawer.xml` which wraps its children in
+  `SwipeDownDismissLayout`). Visual layout result is identical
+  (rootLayout still fills the wrapper); the change is XML-mechanical.
+- **Wrapper id is `homeGestureRoot`, not `home_gesture_root`.**
+  Camel-case matches the rest of the project's id naming
+  (`favoritesScrollView`, `wallpaperEditOverlay`, etc.). The doc
+  said "or similar"; this is the local convention.
+
+### Step 3 — Wire up in HomeFragment [DONE 2026-05-07]
 
 - Delete `setupGestures()` (lines 1380–1410), `createGestureListener()`
   (lines 1412–1465), and the `gestureDetector` field (line 322).
@@ -502,6 +526,71 @@ File: `app/src/main/res/layout/fragment_home.xml`.
   Rule 10 — JVM-testable, centralizes the gate, future call sites
   (e.g. hardware button) inherit it. Verify the actual flag name
   (`isLockingInProgress` or whichever) when implementing.
+
+**Implementation notes (2026-05-07):**
+
+- **Locking-in-progress gate landed in `GestureDelegate`, not
+  `LauncherViewModel`.** The ViewModel methods (`onFlingUp` /
+  `onFlingDown` / `onSwipeFromRightToLeft` /
+  `onSwipeFromLeftToRight`) are pure pass-through one-liners
+  delegating to `GestureDelegate`. Adding the gate at the
+  pass-through layer would have meant 4 redundant ViewModel-side
+  reads of a flag that already lives on the delegate.
+  `GestureDelegate` already exposes `_isLockingInProgress`
+  internally (it's where the lock animation is awaited via
+  `delay(LOCK_GESTURE_BLOCK_DURATION_MS)`), so the gate sits next
+  to its source of truth: `if (_isLockingInProgress.value)
+  return@launchSafe` as the first line of each of the four
+  directional handlers. Honors the spirit of decision 6 (Rule 10
+  — JVM-testable, centralized) without the extra plumbing.
+  Long-press and double-tap stay unguarded, mirroring the original
+  `createGestureListener.onFling`-only check.
+- **Step-2-and-Step-3 collapsed into one commit.** The original
+  Step 7 plan in §6 already grouped XML and HomeFragment wiring
+  together. Doing them sequentially would have created an
+  incoherent intermediate state where two gesture detectors
+  (the old `binding.rootLayout.setOnTouchListener` + the new
+  `HomeGestureLayout.dispatchTouchEvent`) both fired on every
+  touch. Combined commit avoids the conflict entirely.
+- **Wallpaper-edit-mode gating uses null-toggling via Observer 8.**
+  The doc's §3 decision was "nullable per-gesture callbacks; edit
+  mode toggles non-long-press to null". Concrete shape:
+  `setupHomeGestures()` wires all six callbacks at Fragment-create
+  time (the long-press one with the dual-behavior body internally).
+  A new helper `applyWallpaperEditModeToGestures(isEditMode)` is
+  invoked from Observer 8 (the existing wallpaper-edit-mode
+  observer). On entry to edit mode it nulls the four swipes plus
+  double-tap; on exit it re-wires them via
+  `wireDirectionalGestureCallbacks()`. Long-press stays wired
+  always; its body branches internally based on
+  `viewModel.isWallpaperEditMode.value`.
+- **`gestureDetector` field stayed as vestigial `var ... = null`**
+  even though no code path writes to it any more. Removing it
+  entirely would have required a small surgery on the dead
+  split-mode setup block (lines 953–958, which references
+  `gestureDetector?.onTouchEvent`) — and §8 decision 4 says split
+  code stays physically in place. Keeping the field as a
+  vestigial null is the minimum-surgery option; the cleanup
+  branch removes both the field and the dead block in one go.
+  Same reasoning for the `gestureDetector = null` line in the
+  teardown block (line 1954).
+- **`swipeAnalyzer` field deleted.** Unlike `gestureDetector`,
+  it was only referenced by `setupGestures` /
+  `createGestureListener` themselves (now deleted), so removing
+  it is clean. `HomeGestureLayout` has its own internal
+  `SwipeGestureAnalyzer` instance with stricter calibration —
+  the AppConstants-tuned analyzer field has no remaining caller.
+- **Split mode is deactivated by hardcoding the StateFlow assignment**
+  in `checkAndEmitScrollState()` to `_needsSplit.value = false`
+  (instead of `= shouldSplit`). The `shouldSplit` computation
+  itself stays alive (still calls `splitModeCalculator.shouldSplit`
+  with all the threshold logic), but the result is dropped. This
+  is the minimum-surgery deactivation per §8 decision 4 —
+  cleanup branch removes the `splitModeCalculator` call and the
+  whole `LayoutDelegate` split-mode plumbing. All the code that
+  reads `_needsSplit.value` (lines 1042 border decorator, 1762
+  scroll-state verifier, observer 2 layout adjustment) just sees
+  permanent `false` and short-circuits to the no-split branch.
 
 ### Step 4 — Tests
 

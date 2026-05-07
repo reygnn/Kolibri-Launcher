@@ -353,10 +353,6 @@ class HomeFragment : Fragment() {
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
     private val borderDecorator = ScrollViewBorderDecorator()
-    private val swipeAnalyzer = SwipeGestureAnalyzer(
-        distanceThreshold = AppConstants.SWIPE_THRESHOLD.toFloat(),
-        velocityThreshold = AppConstants.SWIPE_VELOCITY_THRESHOLD.toFloat(),
-    )
     private val timeFormatter = TimeEventFormatter()
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }
@@ -423,7 +419,7 @@ class HomeFragment : Fragment() {
 
         hideStatusBar()
         setupBackPressHandler()
-        setupGestures()
+        setupHomeGestures()
         setupDoubleTapActions()
         setupFragmentResultListener()
         setupHomeWindowInsets()
@@ -526,7 +522,12 @@ class HomeFragment : Fragment() {
                 Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
             }
 
-            _needsSplit.value = shouldSplit
+            // Split mode is deactivated as of 2026-05-07 (homescroll.md
+            // §8 decision 4). The `shouldSplit` computation is preserved
+            // so a future cleanup branch removes everything in one go,
+            // but the StateFlow is forced to `false` here so the
+            // downstream split-mode setup block never runs.
+            _needsSplit.value = false
 
             // Reset scroll position wenn kein Split Mode
             if (!shouldSplit) {
@@ -658,6 +659,7 @@ class HomeFragment : Fragment() {
             // Inner try/catch removed per Rule 11 — applyEditMode has its
             // own outer catch as the orchestration boundary.
             wallpaperEditController?.applyEditMode(isEditMode)
+            applyWallpaperEditModeToGestures(isEditMode)
         }
 
     }
@@ -1379,91 +1381,70 @@ class HomeFragment : Fragment() {
     // GESTURES - SIMPLIFIED ROUTING
     // ============================================================================
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupGestures() {
-        // Outer try/catch removed per Rule 11. Body is GestureDetector
-        // construction (requireContext() throws only if Fragment detached
-        // — programmer error in onViewCreated) and a setOnTouchListener
-        // registration (pure setter).
-        gestureDetector = GestureDetector(requireContext(), createGestureListener())
-
-        // Root Layout: Only active when NOT in split mode.
-        // Dient als Fallback-Ebene für Gesten im Full Mode.
-        //
-        // The inner try/catch HERE is preserved: this is a system-callback
-        // boundary (Android's input dispatcher invokes us). Letting a
-        // programmer error propagate would crash the home screen — for
-        // a HOME launcher we deliberately trade ACRA visibility of bugs
-        // in this path for HOME-activity resilience. silentError still
-        // throws in DEBUG so developer sees it. The whole gesture-listener
-        // tree (onLongPress / onDoubleTap / onFling overrides) funnels
-        // its throws through this one catch — inner override-catches were
-        // removed in this sweep as redundant.
-        binding.rootLayout.setOnTouchListener { _, event ->
-            try {
-                if (_needsSplit.value) {
-                    return@setOnTouchListener false
-                }
-                gestureDetector?.onTouchEvent(event) ?: false
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in root touch")
-                false
-            }
-        }
-    }
-
-    private fun createGestureListener() = object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent): Boolean = true
-
-        /*        override fun onLongPress(e: MotionEvent) {
-                    try {
-                        viewModel.onLongPress()
-                    } catch (ex: Throwable) {
-                        TimberWrapper.silentError(ex, "Error in long press")
-                    }
-                }*/
-
-        // Inner try/catch around viewModel.* removed in all three overrides
-        // below. The viewModel calls are fire-and-forget (delegate.launchSafe),
-        // StateFlow.value reads cannot throw, swipeAnalyzer.analyze is pure
-        // Kotlin. Programmer errors propagate to setupGestures' onTouchListener
-        // catch (the system-callback boundary) — see the comment there.
-        override fun onLongPress(e: MotionEvent) {
+    /**
+     * Wires the [HomeGestureLayout] callbacks. The wrapper detects all
+     * five home-screen gestures (four directional swipes + double-tap
+     * + long-press) anywhere on the home content via
+     * `dispatchTouchEvent` and forwards each to its own per-gesture
+     * callback. The locking-in-progress short-circuit lives in
+     * [com.github.reygnn.kolibri_launcher.ui.main.delegate.GestureDelegate]
+     * — each `onFling*` and `onSwipeFrom*` method early-returns while
+     * a lock animation is playing.
+     *
+     * The four directional swipes plus the double-tap are gated on
+     * wallpaper-edit mode via a separate observer (see [observeViewModel]
+     * / [applyWallpaperEditModeToGestures]) — when the user enters
+     * edit mode those callbacks are nulled so accidental swipes don't
+     * leave the mode through a side gesture. The long-press callback
+     * stays wired in both modes; its body branches internally to
+     * either exit edit mode or open the customization options dialog.
+     */
+    private fun setupHomeGestures() {
+        wireDirectionalGestureCallbacks()
+        binding.homeGestureRoot.onLongPress = {
             if (viewModel.isWallpaperEditMode.value) {
-                // Edit-Mode beenden
                 viewModel.onSetWallpaperEditMode(false)
             } else {
                 viewModel.onLongPress()
             }
         }
+    }
 
-        override fun onDoubleTap(e: MotionEvent): Boolean {
-            viewModel.onDoubleTapToLock()
-            return true
-        }
+    /**
+     * Sets the four swipe callbacks plus the double-tap callback on
+     * [HomeGestureLayout]. Called once during initial wiring and again
+     * each time the user leaves wallpaper-edit mode (see
+     * [applyWallpaperEditModeToGestures]).
+     */
+    private fun wireDirectionalGestureCallbacks() {
+        if (_binding == null) return
+        val gestures = binding.homeGestureRoot
+        gestures.onSwipeUp = { viewModel.onFlingUp() }
+        gestures.onSwipeDown = { viewModel.onFlingDown() }
+        gestures.onSwipeLeft = { viewModel.onSwipeFromRightToLeft() }
+        gestures.onSwipeRight = { viewModel.onSwipeFromLeftToRight() }
+        gestures.onDoubleTap = { viewModel.onDoubleTapToLock() }
+    }
 
-        override fun onFling(e1: MotionEvent?, e2: MotionEvent, vX: Float, vY: Float): Boolean {
-            if (e1 == null) return false
-
-            if (viewModel.isLockingInProgress.value) {
-                Timber.d("🚫 Ignoring swipe during lock animation")
-                return true // Konsumiert = ignoriert
-            }
-
-            val result = swipeAnalyzer.analyze(
-                diffX = e2.x - e1.x,
-                diffY = e2.y - e1.y,
-                velocityX = vX,
-                velocityY = vY
-            )
-
-            return when (result) {
-                SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> { viewModel.onSwipeFromRightToLeft(); true }
-                SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> { viewModel.onSwipeFromLeftToRight(); true }
-                SwipeGestureAnalyzer.SwipeResult.UP -> { viewModel.onFlingUp(); true }
-                SwipeGestureAnalyzer.SwipeResult.DOWN -> { viewModel.onFlingDown(); true }
-                SwipeGestureAnalyzer.SwipeResult.IGNORED -> false
-            }
+    /**
+     * Toggles the directional gesture callbacks based on wallpaper-edit
+     * mode. In edit mode the four swipes plus double-tap are nulled
+     * out so the user can drag wallpaper layers around without
+     * accidentally launching apps or locking the screen. The
+     * long-press callback stays untouched — that's the gesture used
+     * to leave the mode.
+     */
+    private fun applyWallpaperEditModeToGestures(isEditMode: Boolean) {
+        if (_binding == null) return
+        val gestures = binding.homeGestureRoot
+        if (isEditMode) {
+            gestures.onSwipeUp = null
+            gestures.onSwipeDown = null
+            gestures.onSwipeLeft = null
+            gestures.onSwipeRight = null
+            gestures.onDoubleTap = null
+        } else {
+            wireDirectionalGestureCallbacks()
         }
     }
 
