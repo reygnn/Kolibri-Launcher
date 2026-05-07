@@ -793,8 +793,46 @@ rather than the navigation system internals.
   resolvable favorites at install time) is acceptable but the gap
   exists.
 
-  **Status:** new APK pushed to the
-  `wrapper-test-2026-05-07` GitHub pre-release; awaiting
+  **Status of round 2:** new APK pushed; user found two more bugs
+  in real-device validation.
+
+- **Round-2 bug A: ScrollStateVerifier kept undoing the scroll
+  fix.** The `allowIntercept = true` in `adjustScrollViewWidth`'s
+  else-branch was correct, but `verifyAndFixScrollState` runs
+  periodically (called from six `safePost { scheduleScrollVerification() }`
+  sites — onResume, layout listeners, render-end, etc.) and uses
+  `ScrollStateVerifier.verify` which says: `!currentSplitState &&
+  allowIntercept` → `FixFullMode` → forces `customScrollView.allowIntercept = false`.
+  In the new wrapper world that expectation is INVERTED: split
+  mode permanently off, allowIntercept must stay true. So every
+  periodic verification silently undid the scroll fix within
+  milliseconds. Fix: the `FixFullMode` branch is now a no-op
+  (logs a debug line, doesn't write the flag); the verifier still
+  runs but its only writer for the post-deactivation case is
+  defanged. The whole verifier path is removed by the cleanup
+  branch.
+
+- **Round-2 bug B: long-press on a favorite triggered both the
+  app-context-menu and the customization dialog.** The wrapper's
+  embedded `tapDetector` was being fed every event unconditionally,
+  so it scheduled its own long-press timer in parallel with the
+  favorite button's own long-click pipeline. Both ~500ms timers
+  fired, both dialogs opened. Long-press on empty space (no
+  clickable descendant) produced only the wrapper's customization
+  dialog — correct. Fix: track whether `super.dispatchTouchEvent`
+  on ACTION_DOWN returned true (a descendant claimed the gesture).
+  If yes, skip feeding `tapDetector` for the rest of the gesture.
+  If no (empty-space touch), the wrapper's tap detector stays the
+  sole long-press / double-tap surface, preserving the
+  Customize-on-empty-space and double-tap-to-lock behaviors. The
+  swipe analyzer in the MOVE branch is unaffected — it always
+  runs regardless of who claimed DOWN, so a fast swipe that
+  starts on a favorite still triggers the wrapper's
+  directional callbacks (and the favorite's own click is
+  cancelled by the synthesized ACTION_CANCEL in
+  `cancelChildGesture`).
+
+  **Status:** v3 APK pushed to the same release; awaiting
   re-validation.
 
 ### Step 6 — Deactivate split mode (cleanup deferred)

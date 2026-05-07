@@ -105,6 +105,18 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var downTime = 0L
     private var triggered = false
 
+    /**
+     * Whether a descendant view returned `true` from its
+     * `onTouchEvent` for the current gesture's ACTION_DOWN. Used to
+     * suppress the wrapper's own [tapDetector] when a clickable
+     * child (e.g. a favorite button) has its own long-press / click
+     * pipeline — otherwise both detectors fire in parallel and the
+     * user sees TWO dialogs (the favorite's app-context-menu plus
+     * the wrapper's customization-options dialog) on a single
+     * long-press.
+     */
+    private var childClaimedDown = false
+
     // ===========================================
     // EMBEDDED TAP DETECTOR (double-tap + long-press)
     // ===========================================
@@ -175,8 +187,6 @@ class HomeGestureLayout @JvmOverloads constructor(
      * never produces enough velocity to trip the swipe analyzer.
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        tapDetector.onTouchEvent(ev)
-
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = ev.x
@@ -217,6 +227,23 @@ class HomeGestureLayout @JvmOverloads constructor(
         // result is irrelevant to dispatch routing.
         val consumedBySuper = super.dispatchTouchEvent(ev)
 
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            childClaimedDown = consumedBySuper
+        }
+
+        // The tap detector only sees events that no descendant has
+        // claimed. A clickable child (favorite button) has its own
+        // long-press / click pipeline — running ours in parallel
+        // would double-fire (the favorite's app-context-menu plus the
+        // wrapper's customization-options dialog on a single
+        // long-press). For touches in regions with no clickable
+        // descendant (empty space below the favorites list), the
+        // wrapper's tap detector remains the sole long-press /
+        // double-tap surface.
+        if (!childClaimedDown) {
+            tapDetector.onTouchEvent(ev)
+        }
+
         // ACTION_DOWN claim — even if no descendant returned true,
         // we MUST tell the grandparent "yes, this branch wants the
         // gesture". Without that claim, the FrameLayout treats this
@@ -224,12 +251,9 @@ class HomeGestureLayout @JvmOverloads constructor(
         // ACTION_MOVE / ACTION_UP to a different child or swallows
         // them — `dispatchTouchEvent` then never fires again for
         // the rest of the gesture and our analyzer cannot decide.
-        // The descendant tree under this layout is intentionally
-        // touch-passive in the migration-commit state: the
-        // `NonInterceptingScrollView` inside is hardcoded
-        // `allowIntercept = false` per §6 step 6 (homescroll.md), so
-        // it deliberately rejects DOWN. Without this claim, the
-        // wrapper would only ever see one event per gesture.
+        // The empty space below a short favorites list has no
+        // clickable descendant — without this claim, the wrapper
+        // would only ever see one event per gesture there.
         // SwipeDownDismissLayout in the AppDrawer does NOT need the
         // same workaround because its child is a RecyclerView that
         // claims DOWN unconditionally; that's an accident of its

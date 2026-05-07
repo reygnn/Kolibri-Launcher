@@ -1764,9 +1764,16 @@ class HomeFragment : Fragment() {
                 // Alles gut, nichts tun
             }
             VerifyResult.FixFullMode -> {
-                Timber.w("Scroll state mismatch detected - fixing...")
-                customScrollView.allowIntercept = false
-                customScrollView.scrollTo(0, 0)
+                // No-op since the 2026-05-07 deactivation. The verifier's
+                // "Full Mode = allowIntercept off" expectation is inverted
+                // in the new wrapper world: with split mode permanently
+                // off (homescroll.md §8 decision 4), the ScrollView MUST
+                // keep `allowIntercept = true` so it can claim touches
+                // and scroll. Letting this branch run would silently
+                // undo the scroll fix on every periodic verification.
+                // The whole ScrollStateVerifier path is removed by the
+                // cleanup branch (§6 step 6).
+                Timber.d("Skipping FixFullMode (split mode permanently off)")
             }
             VerifyResult.FixSplitMode -> {
                 Timber.w("Split mode but intercept disabled - fixing...")
