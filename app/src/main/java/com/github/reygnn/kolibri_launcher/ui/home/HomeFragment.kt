@@ -376,7 +376,6 @@ class HomeFragment : Fragment() {
         setupBackPressHandler()
         setupHomeGestures()
         setupDoubleTapActions()
-        setupTopAreaLongPressForSettings()
         setupFragmentResultListener()
         setupHomeWindowInsets()
 
@@ -1167,44 +1166,25 @@ class HomeFragment : Fragment() {
      * edit mode those callbacks are nulled so accidental swipes don't
      * leave the mode through a side gesture. The long-press callback
      * stays wired in both modes; its body branches internally to
-     * either exit edit mode or open the customization options dialog.
+     * either exit edit mode or open the customization-options dialog.
+     *
+     * Long-press priority on a favorite goes to the button itself,
+     * not to this wrapper callback: the wrapper's tap detector is
+     * suppressed for any DOWN that lands on an `isLongClickable`
+     * descendant (the favorite button has `setOnLongClickListener`
+     * set in `renderFavorites`), so the button's
+     * app-context-menu wins and the customization-options dialog
+     * does not double-fire.
      */
     private fun setupHomeGestures() {
         wireDirectionalGestureCallbacks()
-        // The wrapper's `onLongPress` stays unset in normal mode —
-        // settings is wired to the timeContainer / timeText / dateText /
-        // batteryText long-click listeners (see
-        // [setupTopAreaLongPressForSettings]). On wallpaper-edit-mode
-        // entry, [applyWallpaperEditModeToGestures] sets `onLongPress`
-        // to "exit edit mode" so the user can leave the overlay by
-        // holding their finger somewhere on the wallpaper area.
-    }
-
-    /**
-     * Long-press anywhere in the top status area (clock + date +
-     * battery + the empty horizontal space at that level) opens the
-     * Customize options dialog. Listeners are set on the inner
-     * TextViews AND on `timeContainer` (which is `match_parent` width
-     * since 2026-05-07) so that:
-     *   - Long-press directly on the time / date / battery text fires
-     *     the corresponding TextView's listener (children consume DOWN
-     *     because they're clickable for the existing
-     *     OpenClock / OpenCalendar / OpenBatterySettings double-tap).
-     *   - Long-press in the empty space right of those TextViews falls
-     *     through to `timeContainer`'s listener.
-     * The HomeGestureLayout wrapper's hit-test (`isLongClickable`)
-     * picks up either one and suppresses its own customization
-     * long-press, so there is no double-fire on this zone.
-     */
-    private fun setupTopAreaLongPressForSettings() {
-        val openSettings = View.OnLongClickListener {
-            viewModel.onLongPress()
-            true
+        binding.homeGestureRoot.onLongPress = {
+            if (viewModel.isWallpaperEditMode.value) {
+                viewModel.onSetWallpaperEditMode(false)
+            } else {
+                viewModel.onLongPress()
+            }
         }
-        binding.timeContainer.setOnLongClickListener(openSettings)
-        binding.timeText.setOnLongClickListener(openSettings)
-        binding.dateText.setOnLongClickListener(openSettings)
-        binding.batteryText.setOnLongClickListener(openSettings)
     }
 
     /**
@@ -1224,16 +1204,14 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Toggles the wrapper's gesture callbacks based on wallpaper-edit
-     * mode. In edit mode the four swipes plus double-tap are nulled
-     * out so the user can drag wallpaper layers around without
-     * accidentally launching apps or locking the screen.
-     * `onLongPress` is the inverse: outside edit mode it stays null
-     * (settings is on the top-area TextView listeners, not on the
-     * wrapper), but in edit mode it's wired to "exit edit mode" so
-     * the user can leave the overlay by long-pressing anywhere the
-     * wallpaperEditOverlay's touch interceptor doesn't already
-     * handle.
+     * Toggles the wrapper's directional gesture callbacks based on
+     * wallpaper-edit mode. In edit mode the four swipes plus
+     * double-tap are nulled out so the user can drag wallpaper
+     * layers around without accidentally launching apps or locking
+     * the screen. The long-press callback is left untouched — its
+     * body branches internally on `isWallpaperEditMode.value`, so
+     * the same wired callback handles both "exit edit mode" and
+     * "open customization-options dialog".
      */
     private fun applyWallpaperEditModeToGestures(isEditMode: Boolean) {
         if (_binding == null) return
@@ -1244,10 +1222,8 @@ class HomeFragment : Fragment() {
             gestures.onSwipeLeft = null
             gestures.onSwipeRight = null
             gestures.onDoubleTap = null
-            gestures.onLongPress = { viewModel.onSetWallpaperEditMode(false) }
         } else {
             wireDirectionalGestureCallbacks()
-            gestures.onLongPress = null
         }
     }
 
