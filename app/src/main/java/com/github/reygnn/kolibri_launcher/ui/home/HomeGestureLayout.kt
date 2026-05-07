@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 
 /**
@@ -106,14 +108,22 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var triggered = false
 
     /**
-     * Whether a descendant view returned `true` from its
-     * `onTouchEvent` for the current gesture's ACTION_DOWN. Used to
-     * suppress the wrapper's own [tapDetector] when a clickable
-     * child (e.g. a favorite button) has its own long-press / click
-     * pipeline — otherwise both detectors fire in parallel and the
-     * user sees TWO dialogs (the favorite's app-context-menu plus
-     * the wrapper's customization-options dialog) on a single
-     * long-press.
+     * Whether the touch at the current gesture's ACTION_DOWN landed
+     * on (or under) a descendant view with `isLongClickable = true`.
+     * Used to suppress the wrapper's own [tapDetector] when a
+     * long-clickable child (e.g. a favorite button) has its own
+     * long-press pipeline — otherwise both detectors fire in
+     * parallel and the user sees TWO dialogs on a single long-press
+     * (the favorite's app-context-menu plus the wrapper's
+     * customization-options dialog).
+     *
+     * Computed via a manual hit-test in [hasLongClickableDescendantAt],
+     * NOT from `super.dispatchTouchEvent`'s consumed signal: the
+     * latter is true even when the ScrollView claims DOWN itself
+     * (its `onTouchEvent` always returns true when it has children),
+     * which would suppress the wrapper's tap detector for empty-space
+     * touches inside the favorites scroll area too — exactly where
+     * the user expects the wrapper's long-press to fire.
      */
     private var childClaimedDown = false
 
@@ -193,6 +203,7 @@ class HomeGestureLayout @JvmOverloads constructor(
                 downY = ev.y
                 downTime = ev.eventTime
                 triggered = false
+                childClaimedDown = hasLongClickableDescendantAt(ev.x, ev.y)
             }
 
             MotionEvent.ACTION_MOVE -> if (!triggered) {
@@ -227,19 +238,17 @@ class HomeGestureLayout @JvmOverloads constructor(
         // result is irrelevant to dispatch routing.
         val consumedBySuper = super.dispatchTouchEvent(ev)
 
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-            childClaimedDown = consumedBySuper
-        }
-
-        // The tap detector only sees events that no descendant has
-        // claimed. A clickable child (favorite button) has its own
-        // long-press / click pipeline — running ours in parallel
-        // would double-fire (the favorite's app-context-menu plus the
-        // wrapper's customization-options dialog on a single
-        // long-press). For touches in regions with no clickable
-        // descendant (empty space below the favorites list), the
-        // wrapper's tap detector remains the sole long-press /
-        // double-tap surface.
+        // The tap detector only sees events when no long-clickable
+        // descendant lives at the touch position. A favorite button
+        // has its own long-press pipeline (`setOnLongClickListener`
+        // → app-context-menu); running the wrapper's tapDetector in
+        // parallel would double-fire (button menu plus wrapper's
+        // customization-options dialog) on a single long-press. For
+        // every other surface — the empty space beside a short
+        // favorite, the empty area below the favorites list, the
+        // padding around the clock — there is no long-clickable
+        // descendant at the touch point and the wrapper's tap
+        // detector is the sole long-press / double-tap source.
         if (!childClaimedDown) {
             tapDetector.onTouchEvent(ev)
         }
@@ -263,6 +272,59 @@ class HomeGestureLayout @JvmOverloads constructor(
             ev.actionMasked == MotionEvent.ACTION_DOWN -> true
             else -> consumedBySuper
         }
+    }
+
+    /**
+     * Walks the visible view tree from this layout downward, mirroring
+     * `ViewGroup.dispatchTouchEvent`'s hit-testing for axis-aligned,
+     * untransformed children, and returns `true` if any view on the
+     * path to the deepest descendant at (`rootX`, `rootY`) has
+     * `isLongClickable = true`.
+     *
+     * Why a manual walk and not `super.dispatchTouchEvent`'s consumed
+     * signal: ScrollView's `onTouchEvent` always returns true on
+     * ACTION_DOWN when it has children (its custom logic claims the
+     * gesture for scroll-handling), so the consumed signal is true
+     * even when the touch landed in empty scroll-space with no
+     * long-clickable descendant. We need the finer-grained answer:
+     * "is there a view here that will fire its OWN long-press?". If
+     * yes, suppress ours; if no, fire ours.
+     *
+     * Accuracy gap: this hit-test does NOT account for runtime
+     * matrix transforms (rotation, scale, translation via
+     * `View.setRotation` / `setScale*` / `setTranslation*`). The
+     * descendants of `HomeGestureLayout` in this app are
+     * untransformed — if you add an animated/rotated view inside,
+     * audit this method.
+     */
+    private fun hasLongClickableDescendantAt(rootX: Float, rootY: Float): Boolean {
+        var view: View = this
+        var x = rootX
+        var y = rootY
+        while (view is ViewGroup) {
+            if (view !== this && view.isLongClickable) return true
+            var hitChild: View? = null
+            var hitX = 0f
+            var hitY = 0f
+            for (i in view.childCount - 1 downTo 0) {
+                val child = view.getChildAt(i)
+                if (child.visibility != View.VISIBLE) continue
+                val cx = x - child.left + view.scrollX
+                val cy = y - child.top + view.scrollY
+                if (cx >= 0f && cx < child.width.toFloat() &&
+                    cy >= 0f && cy < child.height.toFloat()) {
+                    hitChild = child
+                    hitX = cx
+                    hitY = cy
+                    break
+                }
+            }
+            if (hitChild == null) return false
+            view = hitChild
+            x = hitX
+            y = hitY
+        }
+        return view.isLongClickable
     }
 
     /**

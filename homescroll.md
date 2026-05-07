@@ -832,8 +832,105 @@ rather than the navigation system internals.
   cancelled by the synthesized ACTION_CANCEL in
   `cancelChildGesture`).
 
-  **Status:** v3 APK pushed to the same release; awaiting
-  re-validation.
+  **Status of round 3:** v3 APK pushed; user found a finer
+  refinement issue — the favorite buttons were full-width
+  (`MATCH_PARENT`), so any touch in the row claimed by the button
+  even outside the visible text. After discussion the design also
+  changed: the user no longer wants long-press on home to
+  double-mean "context menu (on favorite) vs. settings (in void)".
+  Long-press now has *one* meaning per zone — never a global
+  customization gesture in normal mode. Round-4 fix below.
+
+- **Round-4 fix: text-only button hit area + true-isLongClickable
+  hit test.** Two changes together:
+  1. Favorite-button `layoutParams.width` flipped from
+     `MATCH_PARENT` to `WRAP_CONTENT`. The `gravity = START |
+     CENTER_VERTICAL` already aligned the text to the row's
+     leading edge; now the button's hit-test region only covers
+     the actual text. `maxLines = 1` + `ellipsize = END` continue
+     to handle long names by stretching to the available row
+     width as needed.
+  2. The wrapper's `childClaimedDown` was sourced from
+     `super.dispatchTouchEvent`'s consumed signal. That signal is
+     `true` whenever the ScrollView claims DOWN itself — and
+     ScrollView's `onTouchEvent` always returns `true` on DOWN
+     when it has children, regardless of whether any child
+     claimed. Result: the wrapper's tap detector was suppressed
+     in the empty space inside the scroll viewport too, exactly
+     where the user expects long-press to fire the wrapper's
+     customization dialog. Replaced with a manual hit-test
+     `hasLongClickableDescendantAt(x, y)` that walks the visible
+     view tree from the wrapper downward, mirroring
+     `ViewGroup.dispatchTouchEvent`'s axis-aligned hit-test, and
+     returns true only when a view on the path has
+     `isLongClickable = true`. Setting `setOnLongClickListener`
+     toggles `isLongClickable` to true, so favorite buttons
+     register as suppressors; the ScrollView, the LinearLayouts,
+     the (clickable-but-not-long-clickable) clock/date/battery
+     TextViews, and the empty appList areas all register as
+     non-suppressors and let the wrapper's tap detector run.
+
+  **Status of round 4:** the v4 build was prepared but never
+  shipped — during the pre-push review the user pushed back on
+  using long-press for two semantically different actions
+  (favorite app-context-menu and global customization-options
+  dialog). The settings gesture moved instead.
+
+- **Round-5 redesign: long-press settings moves to the
+  top-status-area zone.** The earlier dual-meaning long-press
+  ("on favorite = app menu, elsewhere = customize") was
+  re-evaluated after the user installed v4-prep on a real device
+  and found it unintuitive. New rule: long-press never means
+  customize as a *global* home gesture. Customize fires only when
+  the long-press lands inside the top status row (clock + date +
+  battery + the empty horizontal space at that level). On a
+  favorite, long-press means app-context-menu (Android-list
+  standard, kept). Anywhere else on home (between the status row
+  and the favorites list, beside a short favorite, in empty
+  scroll space below the favorites), long-press is a no-op.
+
+  Implementation (cumulative; the v4 changes from round 4 stay
+  in place — text-only favorite buttons + the manual hit-test
+  `hasLongClickableDescendantAt` in `HomeGestureLayout`):
+
+  1. `fragment_home.xml`: `timeContainer` width flipped from
+     `wrap_content` to `match_parent`. The contained TextViews
+     remain `wrap_content` with start gravity, so the visible
+     layout is unchanged — but the LinearLayout's hit-test region
+     now spans the full row width, picking up the empty horizontal
+     space to the right of the text. (`gravity = start` already in
+     place; redundant for `wrap_content` children but harmless.)
+  2. `HomeFragment.setupTopAreaLongPressForSettings`: new method,
+     called from `onViewCreated` after `setupDoubleTapActions`. It
+     wires `setOnLongClickListener { viewModel.onLongPress(); true }`
+     on `timeContainer`, `timeText`, `dateText`, and `batteryText` —
+     all four because each TextView is `clickable = true` (from the
+     existing DoubleClickListener for OpenClock / OpenCalendar /
+     OpenBatterySettings) and consumes ACTION_DOWN itself, so a
+     long-click set on the parent alone wouldn't fire when the
+     touch lands directly on a TextView. The four-listener fan-out
+     covers every settings hit zone uniformly.
+  3. `HomeFragment.setupHomeGestures`: the wrapper's `onLongPress`
+     wiring is removed. In normal mode the wrapper's tap detector
+     never has a long-press callback to invoke (its 500 ms timer
+     still ticks but produces no UI side effect).
+  4. `HomeFragment.applyWallpaperEditModeToGestures`: in edit
+     mode, `onLongPress` is set to `{ viewModel.onSetWallpaperEditMode(false) }`
+     so the user can still leave the overlay by holding their
+     finger somewhere the `wallpaperTouchInterceptor` doesn't
+     consume. On exit-edit-mode the callback is set back to null.
+     This carve-out is the only place where the wrapper's
+     long-press fires in normal usage.
+
+  The wrapper's hit-test still suppresses double-fire: the
+  `timeContainer` and the four TextViews now have
+  `isLongClickable = true` (from `setOnLongClickListener`), so
+  `hasLongClickableDescendantAt` returns true at any touch in the
+  status row, the wrapper's tap detector is skipped, only the
+  TextView's / timeContainer's own long-click listener fires.
+
+  **Status of round 5:** APK (`0.99.63-wrapper.2` / 83) prepared;
+  awaiting re-validation.
 
 ### Step 6 — Deactivate split mode (cleanup deferred)
 
