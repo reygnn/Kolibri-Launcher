@@ -29,7 +29,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
-| 20 | Gesture/Scroll Tuning UI mit Schiebereglern | offen — entstanden aus der HomeGesture-Wrapper-Migration 2026-05-07 (Step 5 Round-6); User soll Velocity / Distanz / Dominance pro Richtung in Echtzeit einstellen können statt für „den Durchschnitt" zu hardcoden | mittel |
+| 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1603,7 +1603,7 @@ markieren.
 
 ---
 
-## 20. (offen) Gesture/Scroll Tuning UI mit Schiebereglern
+## 20. (verschoben bis auf weiteres) Gesture/Scroll Tuning UI mit Schiebereglern
 
 Aufgekommen während der Real-Device-Validierung der HomeGesture-
 Wrapper-Migration (homescroll.md Step 5, Round 6, 2026-05-07). Die
@@ -1653,10 +1653,14 @@ ist die interessante Stelle (synthetischer Touch-Pipeline-Spy?).
 Risiko: Nutzer dreht sich in unbenutzbare Werte; Reset-Button +
 sane Defaults sind Pflicht.
 
-**Wann:** nicht vor anderem Backlog. Aktuelle Defaults sind „gut
-genug" laut Step-5-Validation. Erste Indikatoren für „echt nötig":
-mehrere User berichten dass das Wischen sich nicht richtig anfühlt
-und sie pro Gerät unterschiedlich kalibrieren wollen.
+**Wann:** **verschoben bis auf weiteres** (Stand 2026-05-07). Die
+Defaults (`scaledTouchSlop * 4`, `1.2 px/ms`, `1.5x` Dominance,
+plus die RecyclerView-Engine-Parität nach commit 501c8ab) haben
+sich nach realer Nutzung der Pre-Releases v0.99.65 / v0.99.66 als
+„perfekt" empfunden — kein User-Druck zur Customization. Erste
+Indikatoren für „dann doch nötig": mehrere User berichten dass das
+Wischen sich nicht richtig anfühlt und sie pro Gerät
+unterschiedlich kalibrieren wollen.
 
 ---
 
