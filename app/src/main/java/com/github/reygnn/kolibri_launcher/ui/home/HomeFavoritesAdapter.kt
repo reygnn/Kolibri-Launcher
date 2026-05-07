@@ -8,12 +8,12 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.core.graphics.ColorUtils
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
 
 /**
  * RecyclerView adapter for the home favorites list.
@@ -41,10 +41,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * flow through `submitList` (inherited from [ListAdapter]) with the
  * standard [DiffUtil] callback.
  */
-class FavoritesAdapter(
+class HomeFavoritesAdapter(
     private val onAppClick: (AppInfo) -> Unit,
     private val onAppLongClick: (AppInfo) -> Unit,
-) : ListAdapter<AppInfo, FavoritesAdapter.ViewHolder>(DIFF_CALLBACK) {
+) : ListAdapter<AppInfo, HomeFavoritesAdapter.ViewHolder>(AppInfoDiffCallback()) {
 
     /**
      * Snapshot of the styling state that varies with theme + layout
@@ -131,14 +131,6 @@ class FavoritesAdapter(
             textColor = AppConstants.DEFAULT_TEXT_COLOR,
             shadowColor = AppConstants.DEFAULT_TEXT_COLOR,
         )
-
-        val DIFF_CALLBACK = object : DiffUtil.ItemCallback<AppInfo>() {
-            override fun areItemsTheSame(oldItem: AppInfo, newItem: AppInfo): Boolean =
-                oldItem.componentName == newItem.componentName
-
-            override fun areContentsTheSame(oldItem: AppInfo, newItem: AppInfo): Boolean =
-                oldItem == newItem
-        }
 
         fun createSubtlePressColor(normalColor: Int): ColorStateList {
             val pressedColor = ColorUtils.setAlphaComponent(

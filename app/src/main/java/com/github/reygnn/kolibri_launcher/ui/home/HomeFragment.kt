@@ -283,7 +283,7 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val favoritesAdapter by lazy {
-        FavoritesAdapter(
+        HomeFavoritesAdapter(
             onAppClick = { app -> viewModel.onAppClicked(app) },
             onAppLongClick = { app -> showAppContextMenu(app) },
         )
@@ -710,7 +710,7 @@ class HomeFragment : Fragment() {
 
     /**
      * Hands the favorites list and the current styling snapshot to
-     * the [FavoritesAdapter]. The adapter handles all item creation /
+     * the [HomeFavoritesAdapter]. The adapter handles all item creation /
      * binding internally (see its KDoc); the host fragment is no
      * longer in the per-item construction business.
      */
@@ -731,19 +731,19 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Builds the styling snapshot for [FavoritesAdapter] from the
+     * Builds the styling snapshot for [HomeFavoritesAdapter] from the
      * fragment's currently-cached layout values and the given color
      * state. Called from [renderFavorites], [updateFavoriteButtonColors]
      * (after a theme change), and [applyLayoutToExistingViews] (after
      * a layout/scale/font change).
      */
-    private fun buildFavoritesStyling(colors: UiColorsState): FavoritesAdapter.Styling {
+    private fun buildFavoritesStyling(colors: UiColorsState): HomeFavoritesAdapter.Styling {
         val horizPaddingPx = try {
             resources.getDimensionPixelSize(R.dimen.touch_target_padding)
         } catch (e: Resources.NotFoundException) {
             AppConstants.FALLBACK_DIMEN_PX
         }
-        return FavoritesAdapter.Styling(
+        return HomeFavoritesAdapter.Styling(
             textSizePx = currentTextSizePx,
             verticalPaddingPx = currentVerticalPaddingPx,
             horizPaddingPx = horizPaddingPx,
