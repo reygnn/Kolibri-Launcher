@@ -752,6 +752,51 @@ rather than the navigation system internals.
   acceptable — natural thumb motion is asymmetric (down is easier
   than up).
 
+**In-progress notes (2026-05-07):**
+
+- **First real-device round found a second bug: ScrollView never
+  scrolls when favorites overflow.** Fast swipes worked, all four
+  directions detected, gestures wired correctly — but slow vertical
+  drag with an overflowing favorites list did nothing. Root cause:
+  the original full-mode setup in
+  `HomeFragment.adjustScrollViewWidth` deliberately set
+  `customScrollView.allowIntercept = false` (plus `isScrollContainer
+  / isClickable / isFocusable / isFocusableInTouchMode = false`)
+  because the OLD design required touches to bubble up past the
+  ScrollView so `rootLayout`'s `OnTouchListener` (the gesture
+  detector) could see them. With the new `HomeGestureLayout`
+  intercepting at parent level via `dispatchTouchEvent`, that
+  bypass route is gone — but the migration commit left those flags
+  at their full-mode `false` defaults. The ScrollView consequently
+  refused to claim ACTION_DOWN, and Android's normal scroll
+  pipeline never engaged. The instrumented `slowDragUpOnHome…`
+  test missed it because the AVD launched with an empty favorites
+  list (no overflow → nothing to scroll → nothing to detect).
+
+  **Fix:** in the post-deactivation `else` branch (the only one that
+  ever runs now that `_needsSplit` is forced false), all five flags
+  are flipped to `true`, matching what split mode used to set on
+  its scrollable side. `setOnTouchListener(null)` stays — the
+  ScrollView uses its own `onTouchEvent` for scroll handling. The
+  `_needsSplit` deactivation in §8 decision 4 still holds; only
+  the hardcoded `false` ScrollView flags were wrong.
+
+  **Lesson for the test budget rationale in Step 4:** dropping the
+  positive scroll-pass-through test (`swipeUpSlow_scrollsFavorites…`
+  in the original 12-test plan) was a mistake. The negative test
+  I kept (`slowDragUpOnHome_doesNotOpenAppDrawer`) only verifies
+  that the wrapper does not misfire on slow drags — it doesn't
+  verify the ScrollView still scrolls. A "favorites scroll on slow
+  drag with overflowing content" test belongs in `androidTest/`,
+  not just real-device validation; deferring it to the cleanup
+  branch (because of the test-fixture cost of populating real
+  resolvable favorites at install time) is acceptable but the gap
+  exists.
+
+  **Status:** new APK pushed to the
+  `wrapper-test-2026-05-07` GitHub pre-release; awaiting
+  re-validation.
+
 ### Step 6 — Deactivate split mode (cleanup deferred)
 
 Decision (see §8): split-mode code stays physically in place during
@@ -765,8 +810,11 @@ In the migration commit:
   no-split branch).
 - The split-mode setup block becomes unreachable but stays in the
   source.
-- `NonInterceptingScrollView.allowIntercept = false` permanently;
-  the dual-mode field stays.
+- `NonInterceptingScrollView.allowIntercept = true` permanently
+  (the migration commit initially set this to `false` mirroring the
+  legacy full-mode setup, but that broke scroll-on-overflow — see
+  Step 5 in-progress notes for the diagnosis); the dual-mode field
+  stays until cleanup.
 - The `gestureZone` view stays in `fragment_home.xml` with
   `isVisible = false` permanently.
 - `LayoutDelegate`'s split-mode computation stays.

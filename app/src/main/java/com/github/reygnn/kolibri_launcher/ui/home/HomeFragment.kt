@@ -963,7 +963,23 @@ class HomeFragment : Fragment() {
             }
 
         } else {
-            // FULL MODE
+            // GESTURE-WRAPPER MODE (post-2026-05-07 migration).
+            //
+            // The HomeGestureLayout above intercepts directional swipes
+            // via dispatchTouchEvent regardless of what the ScrollView
+            // does, so the ScrollView is now configured to handle
+            // touches normally — it must claim ACTION_DOWN and scroll
+            // on slow drags. The previous "touch-transparent" config
+            // here was a relic of the split-mode design where
+            // gestures had to bubble up to the rootLayout's
+            // OnTouchListener; with the wrapper that bypass route is
+            // gone, but if `allowIntercept` is left at `false` the
+            // ScrollView never claims DOWN, never scrolls, and a long
+            // overflowing favorites list becomes unscrollable. This
+            // whole if/else block is removed by the cleanup branch
+            // (homescroll.md §6 step 6); until then the configuration
+            // here matches what split-mode used to set on the
+            // scrollable side.
             binding.gestureZone.isVisible = false
             borderDecorator.remove(binding.favoritesScrollView)
 
@@ -973,18 +989,16 @@ class HomeFragment : Fragment() {
             }
             wasInSplitMode = false
 
-            // ScrollView MUSS das Abfangen von Touches verhindern
-            customScrollView.allowIntercept = false
-            customScrollView.isScrollContainer = false
-            customScrollView.isClickable = false
-            customScrollView.isFocusable = false
-            customScrollView.isFocusableInTouchMode = false
+            customScrollView.allowIntercept = true
+            customScrollView.isScrollContainer = true
+            customScrollView.isClickable = true
+            customScrollView.isFocusable = true
+            customScrollView.isFocusableInTouchMode = true
 
-            // Listener auf NULL setzen
             customScrollView.setOnTouchListener(null)
             binding.gestureZone.setOnTouchListener(null)
 
-            Timber.d("Full mode: 100%% (ScrollView touch-transparent)")
+            Timber.d("Gesture-wrapper mode: ScrollView intercepts for scrolling")
         }
 
         binding.favoritesScrollView.layoutParams = scrollParams
