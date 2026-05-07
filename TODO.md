@@ -30,6 +30,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
 | 19 | `LayoutDelegate.splitModeThreshold` cold-`.value`-read auf `WhileSubscribed`-StateFlow | bekannt + bewusst gelassen — gleiche Bug-Klasse wie das ehemalige §18, aber self-correcting (cold-read liefert 0 = "Auto Mode", nächster Subscribe liefert echten Wert). Spike-Test vor Fix nötig | klein, niedrige Priorität |
+| 20 | Gesture/Scroll Tuning UI mit Schiebereglern | offen — entstanden aus der HomeGesture-Wrapper-Migration 2026-05-07 (Step 5 Round-6); User soll Velocity / Distanz / Dominance pro Richtung in Echtzeit einstellen können statt für „den Durchschnitt" zu hardcoden | mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1641,6 +1642,63 @@ Pattern wie die anderen drei Sites (`withTimeoutOrNull { first {
 it != 0 } }`), aber das `0`-Predicate kollidiert mit dem User-
 Wert „Auto Mode" — braucht ein anderes Sentinel (`null` als
 `initialValue`?), was wieder Konsumenten ändert.
+
+---
+
+## 20. (offen) Gesture/Scroll Tuning UI mit Schiebereglern
+
+Aufgekommen während der Real-Device-Validierung der HomeGesture-
+Wrapper-Migration (homescroll.md Step 5, Round 6, 2026-05-07). Die
+drei Wrapper-Konstanten (`minSwipeDistancePx`, `minVelocityPxPerMs`,
+`dominanceFactor`) sind in `HomeGestureLayout` und
+`SwipeDownDismissLayout` jeweils auf empirisch ermittelte Werte
+hardcodiert (`scaledTouchSlop * 4`, `1.2 px/ms`, `1.5x`). Während
+der Migration wurde sichtbar, dass „der richtige Wert" pro User und
+pro Richtung unterschiedlich ist:
+
+- Daumen-Streckung (Up) ist anatomisch schwerer als Daumen-Beugung
+  (Down), die `homescroll.md` §6 Step 5 weist explizit darauf hin
+  („natural thumb motion is asymmetric").
+- Die konkurrierende Scroll-Komponente (RecyclerView im AppDrawer
+  vs. ScrollView im Home, Liste-Länge etc.) verschiebt das
+  Schwellengefühl zwischen Wischen und Scrollen.
+
+Statt für „den durchschnittlichen User" zu raten oder pro Richtung
+hardzucoden, gehört das Tuning in eine eigene Settings-UI mit
+Schiebereglern und Live-Preview. Der User stellt selbst ein, was
+sich für ihn gut anfühlt.
+
+**Skizze:**
+
+- Pro Richtung (Up / Down / Left / Right) ein Slider-Set für die
+  drei Konstanten — oder ein gemeinsames Set + per-Richtung-
+  Multiplikator.
+- Live-Preview-Bereich, in dem der User wischt und sieht ob
+  getriggert hätte (visueller Marker).
+- Persistenz in DataStore (`PrefKeys.GESTURE_*`-Schema).
+- Reset-auf-Defaults-Button.
+
+**Architektur-Anker:**
+
+- `SwipeGestureAnalyzer` ist seit der Migration (2026-05-07) bereits
+  parametrisiert (`distanceThreshold`, `velocityThreshold`,
+  `dominanceFactor` als Constructor-Args). Per-Richtung wäre der
+  nächste Schritt — entweder vier Sets statt einem, oder ein
+  Analyzer pro Richtung.
+- Beide Wrapper (`HomeGestureLayout` + `SwipeDownDismissLayout`)
+  müssten die Konstanten aus DataStore beziehen statt aus eigenen
+  Felddefaults — vermutlich via Hilt-injiziertes
+  `GestureSettings`-Object.
+
+**Aufwand:** mittel. Settings-UI an sich ist Standard. Live-Preview
+ist die interessante Stelle (synthetischer Touch-Pipeline-Spy?).
+Risiko: Nutzer dreht sich in unbenutzbare Werte; Reset-Button +
+sane Defaults sind Pflicht.
+
+**Wann:** nicht vor anderem Backlog. Aktuelle Defaults sind „gut
+genug" laut Step-5-Validation. Erste Indikatoren für „echt nötig":
+mehrere User berichten dass das Wischen sich nicht richtig anfühlt
+und sie pro Gerät unterschiedlich kalibrieren wollen.
 
 ---
 

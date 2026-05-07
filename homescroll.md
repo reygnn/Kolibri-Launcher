@@ -734,7 +734,7 @@ rather than the navigation system internals.
 - **Test results on Pixel 9a AVD: both pass.** Run via
   `./gradlew :app:connectedDebugAndroidTest`.
 
-### Step 5 — Real-device validation
+### Step 5 — Real-device validation [DONE 2026-05-07]
 
 - Build a debug APK and install on a real device.
 - Walk through each gesture in both states (favorites fit on screen,
@@ -931,6 +931,28 @@ rather than the navigation system internals.
 
   **Status of round 5:** APK (`0.99.63-wrapper.2` / 83) prepared;
   awaiting re-validation.
+
+- **Round-6: long-press in clock-area + on favorite text confirmed
+  working; swipe-up triggers reliably; scroll works on overflow.**
+  User signed off on Step 5 in principle: long-press semantics are
+  unambiguous per zone, the wrapper's directional analyzer fires
+  correctly on swipe-up, the favorites ScrollView scrolls on slow
+  drags. Double-tap and swipe-down were not validated in this
+  round because the accessibility service couldn't be enabled
+  (Android refuses for debug-signed installs after a re-install
+  arc); they'll be exercised after the migration ships through
+  the regular release-signed build path.
+
+  The boundary feel between swipe-up and scroll is described as
+  "optimization-worthy" — see TODO §20 (Gesture/Scroll Tuning UI).
+  Hardcoding per-direction values for "the average user" was
+  rejected as the wrong direction; instead, the three wrapper
+  constants (`minSwipeDistancePx`, `minVelocityPxPerMs`,
+  `dominanceFactor`) will eventually become user-tunable in a
+  dedicated settings UI with live-preview sliders. The migration
+  ships with the SwipeDownDismissLayout-validated defaults
+  (`scaledTouchSlop * 4`, `1.2 px/ms`, `1.5x`); the tuning UI is
+  a separate follow-up branch, not part of this work.
 
 ### Step 6 — Deactivate split mode (cleanup deferred)
 
