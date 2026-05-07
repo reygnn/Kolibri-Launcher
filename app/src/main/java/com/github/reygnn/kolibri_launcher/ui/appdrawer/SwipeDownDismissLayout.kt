@@ -5,8 +5,8 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import androidx.constraintlayout.widget.ConstraintLayout
-import com.github.reygnn.kolibri_launcher.ui.home.SwipeGestureAnalyzer
 import com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds
+import com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer
 
 /**
  * Container that detects a decisive downward swipe anywhere within its

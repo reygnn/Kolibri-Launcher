@@ -44,8 +44,8 @@ import javax.inject.Inject
  * configured swipe-app launch) that are not structurally observable
  * from inside the app's view tree without polluting the production
  * API with a test-only callback hook. Direction-discrimination of the
- * underlying [SwipeGestureAnalyzer] is JVM-tested in
- * `SwipeGestureAnalyzerTest`; what only the real touch pipeline can
+ * underlying [com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer]
+ * is JVM-tested in `SwipeGestureAnalyzerTest`; what only the real touch pipeline can
  * prove is that fast swipes trigger and slow drags don't, which one
  * direction demonstrates structurally. Real-device validation
  * (homescroll.md §6 Step 5) covers per-direction feel.

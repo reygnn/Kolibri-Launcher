@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home
+package com.github.reygnn.kolibri_launcher.ui.util
 
 import kotlin.math.abs
 
