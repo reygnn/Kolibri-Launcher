@@ -15,6 +15,12 @@
 > in `mainActivityExceptionHandler` gefixt. Die Bewertungs-Logik der
 > einzelnen Befunde bleibt unverändert; nur die belegten Zahlen wurden
 > gesynced. Score-Update siehe TODO.md → Audit-Snapshot.
+>
+> **Ergänzt 2026-05-07:** Zweiter Audit-Pass aus frischer Session, fokussiert
+> auf Polish-Opportunitäten (Code-Duplikation, Konvention-Drift, tote
+> Scaffolding). Neue Befunde stehen in §8; zwei stale Stellen im Original
+> (§3.4 `advanceUntilIdle`-Claim, §5.8 String-Parität-Zahlen) und ein
+> bereits behobenes Issue (§4.1 PackageName-Log) in §8.11 korrigiert.
 
 **Skala:**
 - 🔴 **BLOCKER** — bricht Architektur-Regel oder Korrektheit
@@ -450,7 +456,269 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 
 ---
 
+## 8. Nachtrag-Audit 2026-05-07 — Fresh-Eyes-Polish-Sweep
+
+> Zweiter Audit-Pass aus frischer Session. Fokus: Polish-Opportunitäten mit
+> struktureller Substanz, die nicht in TODO.md oder oben stehendem Audit
+> aufgeführt sind. Befunde wurden cross-checked gegen TODO.md / Original-
+> Audit; alle hier gelisteten Sites sind durch direkten Datei-Read
+> verifiziert. Stichproben-Verifikation der konkreten Site-Zahlen ist im
+> Konversations-Log dokumentiert.
+
+### 8.1 🟠 MAJOR — Delegate Double-Wrap-Error-Handling
+
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (8 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden); analoger Befund in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
+
+`DelegateScope.launchSafe` (`DelegateScope.kt:41-54`) kapselt bereits
+```kotlin
+try { block() }
+catch (e: CancellationException) { throw e }
+catch (e: Throwable) { TimberWrapper.silentError(e, errorMessage) }
+```
+Jede Delegate-Methode wickelt ihren Body in **exakt dasselbe** try/catch und
+sendet zusätzlich einen Toast-Event. Resultat: jedes Throwable löst zwei
+`silentError`-Aufrufe aus (innerer wie äußerer Catch protokollieren die
+gleiche Exception); in DEBUG zwei Throws (innerer `silentError` wirft, äußerer
+`launchSafe`-Catch fängt und `silentError` wirft erneut).
+
+**Fix:** `launchSafe`-Overload mit `errorToastResId: Int? = null`, der den
+Toast in der eigenen Catch-Branch sendet. Eliminiert ~40 Zeilen identischer
+Boilerplate, behebt das Double-Log/Double-Throw-Smell.
+
+---
+
+### 8.2 🟠 MAJOR — `MutableSharedFlow()` ohne Buffer in 6 Tests
+
+Der dokumentierte Anti-Pattern aus `app/src/test/CLAUDE.md` §2 (Erste
+Emission ohne Subscriber suspendiert) ist in 6 Setup-Blöcken aktiv:
+
+- `app/src/test/.../ui/main/MonolithicLauncherViewModelTest.kt:208`
+- `app/src/test/.../ui/main/LauncherViewModelTest.kt:193`
+- `app/src/test/.../ui/main/LauncherViewModelSecurityTest.kt:140`
+- `app/src/test/.../ui/main/LauncherViewModelDoomsdayTest.kt:122`
+- `app/src/test/.../ui/main/LauncherViewModelContractTest.kt:210`
+- `app/src/test/.../ui/main/delegate/AppManagementDelegateTest.kt:129`
+
+Production wired das in `di/AppUpdateModule.kt:18` als
+`MutableSharedFlow(replay = 0, extraBufferCapacity = 1)`. Tests stubben
+mit bare `MutableSharedFlow()`. Latente Flake-Quelle bei Race zwischen
+Test-Subscribe-Timing und ersten Emits.
+
+**Fix:** Production-Wiring nachbauen (`extraBufferCapacity = 1`) oder
+`onBufferOverflow = BufferOverflow.DROP_OLDEST`. Keine separate Test-
+Helper-Funktion nötig, ein Konstruktor-Argument reicht.
+
+---
+
+### 8.3 🟠 MAJOR — Rule 11 in `BaseViewModel.showErrorToastIfSupported`
+
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt:152-166`
+
+```kotlin
+protected open fun showErrorToastIfSupported() {
+    viewModelScope.launch(coroutineExceptionHandler) {
+        try {
+            @Suppress("UNCHECKED_CAST")
+            sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
+        } catch (e: CancellationException) { throw e }
+        catch (e: ClassCastException) {
+            Timber.d("This ViewModel does not support UiEvent error toasts")
+        }
+    }
+}
+```
+
+`try/catch ClassCastException` als Runtime-Type-Check ist genau der
+Anti-Pattern aus Rule 11 — Catch um eine Operation, deren einzige Failure-
+Mode Programmer-Error ist. Fire-Pfad: jeder ViewModel mit `E != UiEvent`
+landet bei jedem Error in dieser Catch-Branch.
+
+**Fix:** Strukturell — `protected open val errorEvent: E? = null` (oder
+Factory-Lambda im Constructor) und `errorEvent?.let { sendEvent(it) }`.
+Der Type-Test wird zu einem Null-Check, kein Catch nötig.
+
+---
+
+### 8.4 🟠 MAJOR — Rule 13 verletzt: weitere net-new deutsche Kommentare
+
+Zwei zusätzliche Sites zur Existing-Finding §1.2:
+
+- `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt:388-400` (Commit `014d9f5c`, 2026-04-30) — kompletter Erklär-Block in Deutsch zu `silentDeath`-Strategie und HOME-Activity-Restart-Loop.
+- `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerAdapter.kt:102-104` (Commit `5033e123`, 2026-04-30) — „when auf String-Payloads + holder.updateX-Aufrufe sind reine TextView-Setter…".
+
+Beide stammen aus Rule-11-Sweep-Commits, also nach Einführung von Rule 13.
+`tools/check-conventions.sh` fängt Rule 13 nicht (per TODO §7 wäre git-diff-
+Integration nötig), daher silent drift. Weitere Sites wahrscheinlich.
+
+**Fix:** Komment-Sweep über alle 2026er Sweep-Commits, oder TODO §7 vorziehen
+(git-diff-aware Lint). Sweep-only-Lösung ist Sisyphos ohne den Lint.
+
+---
+
+### 8.5 🟡 MINOR — `PackageUpdateReceiver`-Catch-Verschachtelung
+
+`data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt:30-52`
+
+`onReceive`-Body: outer try um `goAsync()` (Z. 30-35) + outer try um
+`handleReceive`-Aufruf (Z. 37-52) + nested try um `pendingResult?.finish()`
+im Lambda-Argument (Z. 39-43) + ein **zweiter** nested try um denselben
+`pendingResult?.finish()`-Aufruf in der Catch-Branch (Z. 47-51). Plus
+`safeOnFinish` in Z. 145-151 als drittes Wrapper.
+
+`PendingResult.finish()` dokumentierte Throws: `IllegalStateException` bei
+Double-Finish. Zwei Catches an Boundary-Punkten würden dieselbe Coverage
+liefern. TODO §2 listet den Receiver als „swept", aber die Verschachtelung
+lebt.
+
+---
+
+### 8.6 🟡 MINOR — `domain/model/UsageExport.kt` ist tot
+
+`/home/user/AndroidStudio_Projects/Kolibri_Launcher/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/model/UsageExport.kt`
+
+Datei mit 22 Zeilen, davon Z. 3-20 alle `//`-prefixed (data-class
+`UsageExportData` mit `kotlinx.serialization`-Annotationen). Nur das
+`package`-Statement ist live; die Datei produziert keine Symbole.
+`UsageExportRepositoryImpl.kt:130` referenziert den toten Typ noch in
+einem Kommentar („…da UsageExportData jetzt List<String> statt List<Long>
+hat"). Half-state aus dem JSON-Serialization-Refactor.
+
+**Fix:** Datei löschen oder reanimieren. Mittelweg ist die schlechteste
+aller Welten.
+
+---
+
+### 8.7 🟡 MINOR — `purgeRepository`-Duplikation in `:data`
+
+13 Repository-Impls in `:data` haben `purgeRepository`-Methoden mit
+identischem Body-Schema:
+
+```kotlin
+override suspend fun purgeRepository() {
+    try {
+        dataStore.edit { preferences -> /* remove keys */ }
+    } catch (e: CancellationException) { throw e }
+    catch (e: Throwable) {
+        TimberWrapper.silentError(e, "Failed to purge X repository")
+    }
+}
+```
+
+Alle 13 Files: `AppUsageRepositoryImpl`, `CustomNamesRepositoryImpl`,
+`FavoritesRepositoryImpl`, `FavoritesOrderRepositoryImpl`, `HiddenAppsRepositoryImpl`,
+`InstalledAppsRepositoryImpl`, `InstalledAppsStateRepositoryImpl`,
+`ScreenLockRepositoryImpl`, `SettingsRepositoryImpl`, `ShortcutRepositoryImpl`,
+`SwipeActionsRepositoryImpl`, `TimeBasedEventsRepositoryImpl`, `WallpaperRepositoryImpl`.
+
+`SettingsRepositoryImpl` hat schon eine `safeEdit`-Helper-Methode, die
+nirgends sonst genutzt wird.
+
+**Fix:** Module-Helper `suspend fun DataStore<Preferences>.safePurge(repoName: String, edit: MutablePreferences.() -> Unit)`. Schätzung ~70 Zeilen Reduktion.
+Caveat: Einige `purgeRepository`-Bodies sind absichtlich No-Op
+(`InstalledAppsStateRepository` ist in der Drift-Doku) — die müssen
+dokumentiert No-Op bleiben, nicht in den Helper hineinrefactort.
+
+---
+
+### 8.8 🟡 MINOR — `:data` hält `buildConfig = true` für eine einzige Zeile
+
+`data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesRepositoryImpl.kt:289` ist die **einzige** `BuildConfig.DEBUG`-Referenz im gesamten `:data`-Modul (verifiziert via grep).
+
+Die ganze BuildConfig-Generation existiert für eine `Timber.d`-Branch.
+`TimberWrapper.isDebugBuild` ist bereits aus `:app`/`KolibriLauncherApp.onCreate`
+durchgereicht (per §11/§12-Migration). `:data` könnte `buildConfig = true`
+aus seiner `build.gradle.kts` entfernen — kleineres AAR, eine Indirektion
+weniger.
+
+---
+
+### 8.9 🟢 NIT — `BaseViewModel.handleError` mit unreachable Cancellation-Branches
+
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt:122` (`is CancellationException -> Timber.d("...cancelled (normal)")`) und Z. 141 (`is CancellationException -> true` in `shouldSuppressErrorToast`).
+
+`handleError` wird aus drei Pfaden aufgerufen:
+- `launchSafe` (Z. 66-77): rethrowt CancellationException auf Z. 71, **bevor** `handleError` (Z. 74) erreicht wird.
+- `executeSafe` (Z. 87-105): rethrowt CancellationException auf Z. 94, **bevor** `handleError` (Z. 97) erreicht wird.
+- `coroutineExceptionHandler` (Z. 56): bekommt CancellationException in `viewModelScope` per Coroutine-Semantik gar nicht erst zugestellt.
+
+Beide CancellationException-Branches in `handleError`/`shouldSuppressErrorToast` sind dead code.
+
+---
+
+### 8.10 🟢 NIT — Auskommentierte Klassen-Deklaration in `AppDrawerFragment`
+
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerFragment.kt:69`
+
+```kotlin
+@AndroidEntryPoint
+//class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
+class AppDrawerFragment : Fragment() {
+```
+
+Leftover aus dem Zeitpunkt, als der Fragment via Layout-ID-Konstruktor
+aufgesetzt wurde. Die lebende Klasse inflated jetzt manuell in
+`onCreateView`. Entweder Comment löschen oder zur Layout-ID-Form
+zurückkehren (kürzer).
+
+---
+
+### 8.11 Korrekturen am bestehenden Audit
+
+Bei der Verifikation der eigenen Findings sind drei Drifts im Original-
+Audit aufgefallen:
+
+**§3.4 „Null `advanceUntilIdle()`":** Faktisch falsch. Aktueller Stand:
+**661 Vorkommen über 21 Files** in `app/src/test/` allein
+(`MonolithicLauncherViewModelTest`: 154, `OnboardingViewModelTest`: 83,
+`HiddenAppsViewModelTest`: 38, `LauncherViewModelTest`: 57). Wahrscheinlich
+gemeint: „Null `advanceUntilIdle` gegen `WhileSubscribed`-Flows" (das wäre
+die Konvention aus `app/src/test/CLAUDE.md` §1). Sollte präzisiert oder
+gestrichen werden.
+
+**§5.8 String-Parität:** Faktisch falsch. Behauptet „237/236 Keys, einziger
+Unterschied `time_placeholder`". Aktuell (verifiziert via `grep -c '<string '`):
+**246 EN / 232 DE = 14 Differenzen**. Alle 14 sind `translatable="false"`
+(`battery_placeholder` + 13 `blend_mode_*`), Verhalten korrekt — aber
+das Framing „einzige Differenz" ist veraltet.
+
+**§4.1 „PII-Log: Paketnamen in Debug":** Bereits behoben. `PackageUpdateReceiver.kt:66-67` hasht den Paketnamen über `packageName.hashCode().toString(16)` und dokumentiert die Begründung im Kommentar darüber. Der Befund kann gestrichen werden.
+
+---
+
+### 8.12 Empfohlene Reihenfolge
+
+| # | Schritt | Aufwand | Begründung |
+|---|---|---|---|
+| 1 | §8.2 Test-Fix `MutableSharedFlow` | ~15 min | Latente Flake-Quelle, isoliert, eine Konstruktor-Argument-Änderung pro Site |
+| 2 | §8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1) | ~5 min | Doku-Refresh ohne Code-Änderung; verhindert dass folgende Audits die alten Behauptungen erben |
+| 3 | §8.1 Delegate `launchSafe`-Overload | ~1 h | Eigener Refactor-Branch; eliminiert ~40 Zeilen Boilerplate, behebt Double-Log/Double-Throw-Smell |
+| 4 | §8.6 + §8.10 Cleanup-Sammel-Branch | ~5 min | Tote `UsageExport.kt`-Datei + auskommentierte Klassendeklaration; trivial |
+| 5 | §8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported` | ~30 min | Strukturelle Änderung (`errorEvent: E?` statt Cast-Catch); Touch auf alle Subklassen |
+| 6 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
+| 7 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
+| 8 | §8.8 `:data` `buildConfig = false` | ~10 min | Build-Konfig + `Timber.d`-Branch über `TimberWrapper.isDebugBuild` ersetzen |
+| 9 | §8.5 `PackageUpdateReceiver` flachklopfen | ~30 min | Heikel — Receiver auf Cold-Start-Path; Test-Pinning vorab empfohlen |
+| 10 | §8.9 Dead Cancellation-Branches in `BaseViewModel.handleError` | ~5 min | Reine Code-Reduktion |
+
+Reihenfolge optimiert für Risiko-Profil (klein/isoliert zuerst), nicht
+strikt nach Schweregrad. §8.4 bleibt blockiert auf TODO §7.
+
+---
+
+### 8.13 Bewusst nicht ergänzt
+
+- **Falscher Rule-13-Treffer in der initialen Pass-Liste:**
+  `data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesRepositoryImpl.kt:300`
+  („// Nicht crashen, einfach den aktuellen Zustand behalten") — git blame
+  zeigt 2025-11-03 (Commit `aca08435`), also **vor** Einführung von Rule 13.
+  Legacy, exempt. Hier dokumentiert, damit künftige Audits nicht denselben
+  False-Positive ziehen.
+
+---
+
 ## Zusammenfassung
+
+Original-Audit (2026-05-03/04):
 
 | Kategorie | Anzahl |
 |---|---|
@@ -459,7 +727,25 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 | 🟡 MINOR | **9** (2.1, 2.2, 4.1, 5.1, 5.2, 5.3, 5.4, 5.5, plus 3.3) |
 | 🟢 NIT | **6** (2.3, 2.4, 4.2, 4.3, 5.6, 5.7) |
 
+Nachtrag (2026-05-07):
+
+| Kategorie | Anzahl |
+|---|---|
+| 🔴 BLOCKER | **0** |
+| 🟠 MAJOR | **4** (8.1, 8.2, 8.3, 8.4) |
+| 🟡 MINOR | **4** (8.5, 8.6, 8.7, 8.8) |
+| 🟢 NIT | **2** (8.9, 8.10) |
+| Korrekturen am Original | **3** (3.4, 5.8, 4.1) |
+
 **Reifegrad:** Hoch. Die Architektur-Disziplin ist außergewöhnlich, und die
 größte Schwachstelle ist nicht der Code, sondern die **Doku-zu-Code-Drift**
 in CLAUDE.md (`Manager` → `RepositoryImpl`-Rename nicht nachgezogen). Das
 ist ein 5-Minuten-Fix mit hohem Wert für Onboarding und LLM-Sessions.
+
+**Reifegrad-Update 2026-05-07:** Der Nachtrag-Pass hat keine BLOCKER und
+keine architekturkritischen MAJORs gefunden — die vier MAJORs sind alle
+Konsistenz-/Boilerplate-Probleme, kein Korrektheits-Risiko. Die größte
+strukturelle Bedrohung bleibt die Drift zwischen Lint-Coverage
+(`checkConventions`) und Konvention-Spread (Rule 13, §8.4) — wenn die
+Lint-Lücke nicht geschlossen wird, sammelt sich das Problem selbst-
+verstärkend an.
