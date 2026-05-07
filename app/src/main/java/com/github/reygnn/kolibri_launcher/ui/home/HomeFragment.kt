@@ -16,17 +16,11 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.text.format.DateFormat
 import android.util.TypedValue
-import android.view.GestureDetector
-import android.view.Gravity
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
-import android.widget.Button
-import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
-import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -34,6 +28,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -286,7 +281,13 @@ class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
-    private val favoritesScrollView get() = binding.favoritesScrollView
+
+    private val favoritesAdapter by lazy {
+        FavoritesAdapter(
+            onAppClick = { app -> viewModel.onAppClicked(app) },
+            onAppLongClick = { app -> showAppContextMenu(app) },
+        )
+    }
 
     // ===========================================
     // LAYOUT CACHE - COMPUTED VALUES
@@ -374,6 +375,7 @@ class HomeFragment : Fragment() {
 
         hideStatusBar()
         setupBackPressHandler()
+        setupFavoritesRecyclerView()
         setupHomeGestures()
         setupDoubleTapActions()
         setupFragmentResultListener()
@@ -696,34 +698,10 @@ class HomeFragment : Fragment() {
      * (real Resources.NotFoundException under ProGuard).
      */
     private fun applyLayoutToExistingViews() {
-        val horizPadding = try {
-            resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-        } catch (e: Exception) {
-            AppConstants.FALLBACK_DIMEN_PX
-        }
-
-        val targetTypeface = if (isCurrentFontBold) {
-            android.graphics.Typeface.DEFAULT_BOLD
-        } else {
-            android.graphics.Typeface.DEFAULT
-        }
-
-        for (i in 0 until binding.appList.childCount) {
-            val wrapper = binding.appList.getChildAt(i) as? LinearLayout
-            val button = wrapper?.getChildAt(0) as? Button
-
-            if (button != null) {
-                button.setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
-
-                button.minHeight = 0
-                button.minimumHeight = 0
-                button.includeFontPadding = false
-
-                button.setPadding(horizPadding, currentVerticalPaddingPx, horizPadding, currentVerticalPaddingPx)
-
-                button.typeface = targetTypeface
-            }
-        }
+        if (_binding == null) return
+        favoritesAdapter.setStyling(
+            buildFavoritesStyling(viewModel.uiColorsState.value)
+        )
     }
 
     // ============================================================================
@@ -731,42 +709,57 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     /**
-     * SIMPLIFIED: No capacity calculation!
-     * Just render, then check scroll capability
+     * Hands the favorites list and the current styling snapshot to
+     * the [FavoritesAdapter]. The adapter handles all item creation /
+     * binding internally (see its KDoc); the host fragment is no
+     * longer in the per-item construction business.
      */
     private fun renderFavorites(
         apps: List<AppInfo>,
         colors: UiColorsState
     ) {
         if (_binding == null) return
-        val ctx = context ?: return
-
-        // Outer try/catch removed per Rule 11 — body is removeAllViews +
-        // a per-item createAppButton loop with its own catch + scroll-
-        // state callbacks (themselves with internal handling). Per-item
-        // recovery is preserved.
         Timber.d("Rendering ${apps.size} favorites")
-        binding.appList.removeAllViews()
-
-        for (app in apps) {
-            try {
-                val button = createAppButton(ctx, app, colors.textColor, colors.shadowColor)
-                if (button != null) {
-                    binding.appList.addView(button)
-                }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
-            }
-        }
+        favoritesAdapter.setStyling(buildFavoritesStyling(colors))
+        favoritesAdapter.submitList(apps)
     }
 
     private fun clearAllViews() {
-        // try/catch removed per Rule 11 — removeAllViews is a pure View
-        // method and the lifecycle guards (_binding != null && isAdded
-        // && !isDetached) already preclude the only realistic failure
-        // mode (call after teardown).
         if (_binding != null && isAdded && !isDetached) {
-            binding.appList.removeAllViews()
+            favoritesAdapter.submitList(emptyList())
+        }
+    }
+
+    /**
+     * Builds the styling snapshot for [FavoritesAdapter] from the
+     * fragment's currently-cached layout values and the given color
+     * state. Called from [renderFavorites], [updateFavoriteButtonColors]
+     * (after a theme change), and [applyLayoutToExistingViews] (after
+     * a layout/scale/font change).
+     */
+    private fun buildFavoritesStyling(colors: UiColorsState): FavoritesAdapter.Styling {
+        val horizPaddingPx = try {
+            resources.getDimensionPixelSize(R.dimen.touch_target_padding)
+        } catch (e: Resources.NotFoundException) {
+            AppConstants.FALLBACK_DIMEN_PX
+        }
+        return FavoritesAdapter.Styling(
+            textSizePx = currentTextSizePx,
+            verticalPaddingPx = currentVerticalPaddingPx,
+            horizPaddingPx = horizPaddingPx,
+            isBold = isCurrentFontBold,
+            textColor = colors.textColor,
+            shadowColor = colors.shadowColor,
+        )
+    }
+
+    private fun setupFavoritesRecyclerView() {
+        binding.favoritesRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = favoritesAdapter
+            // Items are programmatically constructed Buttons whose width
+            // changes per text — fixed-size optimization would not apply.
+            setHasFixedSize(false)
         }
     }
 
@@ -808,7 +801,7 @@ class HomeFragment : Fragment() {
         )
 
         updateCalendarChipsColors(colors)
-        updateFavoriteButtonColors(textColor, shadowColor)
+        updateFavoriteButtonColors(colors)
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -826,168 +819,13 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Aktualisiert die Farben aller existierenden Buttons.
-     * Wird aufgerufen, wenn sich das Theme ändert ODER wenn das Fragment
-     * neu sichtbar wird (z.B. Rückkehr vom App Drawer), da der Flow neu emittiert.
-     * WICHTIG: Muss createSubtlePressColor() nutzen, um den Klick-Effekt nicht zu zerstören!
+     * Pushes the current color state through to the favorites adapter.
+     * Called from `updateAllColors` whenever the theme flow emits.
+     * The adapter rebinds visible items so the new color is applied.
      */
-    private fun updateFavoriteButtonColors(textColor: Int, shadowColor: Int) {
+    private fun updateFavoriteButtonColors(colors: UiColorsState) {
         if (_binding == null) return
-
-        // Both inner and outer try/catch blocks removed per Rule 11 —
-        // childCount + getChildAt + safe-casts + property writes are
-        // pure code paths.
-        for (i in 0 until binding.appList.childCount) {
-            // Wrapper (LinearLayout) holen, dann Button (Index 0).
-            val wrapper = binding.appList.getChildAt(i) as? LinearLayout
-            val button = wrapper?.getChildAt(0) as? Button
-
-            if (button != null) {
-                button.setTextColor(createSubtlePressColor(textColor))
-                button.setShadowLayer(
-                    AppConstants.SHADOW_RADIUS_APPS,
-                    AppConstants.SHADOW_DX,
-                    AppConstants.SHADOW_DY,
-                    shadowColor,
-                )
-            }
-        }
-    }
-
-    // ============================================================================
-    // BUTTON CREATION
-    // ============================================================================
-
-    private fun createAppButton(
-        context: Context,
-        app: AppInfo,
-        textColor: Int,
-        shadowColor: Int
-    ): View? {
-        // The two outer try/catches are per-item recovery boundaries
-        // (the audit's preserved pattern for per-item subscription
-        // resilience): if a single button or its wrapper fails to
-        // construct, the rest of the favorites list still renders.
-        //
-        // The inner try/catches that used to wrap pure View property
-        // writes / single-method click handlers / wrapper config were
-        // removed per Rule 11 — those bodies are programmer-error-only
-        // paths and are covered by the outer per-item catch.
-
-        // 1. Button-Instanz erstellen
-        val button: Button = try {
-            Button(context).apply {
-                // --- UI Konfiguration ---
-                text = app.displayName
-                background = null
-
-                // WICHTIG: Mindestgrössen entfernen, damit Padding < 48dp funktioniert
-                minHeight = 0
-                minimumHeight = 0
-                minWidth = 0
-                minimumWidth = 0
-
-                // WICHTIG: Font Padding entfernen für exakte Abstände
-                includeFontPadding = false
-
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
-
-                val horizPaddingPx = try {
-                    resources.getDimensionPixelSize(R.dimen.touch_target_padding)
-                } catch (e: Resources.NotFoundException) {
-                    // Narrowed from Throwable — matches the same tight-around-
-                    // getDimensionPixelSize pattern used in applyTopMargin and
-                    // applyLayoutToExistingViews above. Silent fallback (no
-                    // silentError) because the outer per-item catch around
-                    // Button(...).apply already provides DEBUG-loud recovery
-                    // if construction fails wholesale.
-                    AppConstants.FALLBACK_DIMEN_PX
-                }
-                setPadding(horizPaddingPx, currentVerticalPaddingPx, horizPaddingPx, currentVerticalPaddingPx)
-
-                typeface = if (isCurrentFontBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-
-                setTextColor(createSubtlePressColor(textColor))
-
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-
-                setShadowLayer(
-                    AppConstants.SHADOW_RADIUS_APPS,
-                    AppConstants.SHADOW_DX,
-                    AppConstants.SHADOW_DY,
-                    shadowColor,
-                )
-
-                // Button width is WRAP_CONTENT so its hit-test region only
-                // covers the actual text area. Touches in the row beside
-                // the (left-gravity-aligned) text fall through to the
-                // wrapper's HomeGestureLayout, where a hit-test for
-                // `isLongClickable` descendants determines whether to
-                // fire the wrapper's own customization long-press
-                // (homescroll.md Step 5 round-3 finding). Long names
-                // get ellipsized to the parent width via the
-                // `maxLines = 1` + `ellipsize = END` combo set above.
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
-
-                // --- Click Handler ---
-                setOnClickListener { viewModel.onAppClicked(app) }
-                setOnLongClickListener {
-                    showAppContextMenu(app)
-                    true
-                }
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating button instance for ${app.packageName}")
-            return null
-        }
-
-        // 2. Wrapper AUCH absichern (per-item recovery)
-        return try {
-            LinearLayout(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    setMargins(0, 0, 0, 0)
-                }
-
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.START
-
-                addView(button)
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error creating wrapper for ${app.packageName}")
-            null
-        }
-    }
-
-    /**
-     * Generates a ColorStateList that slightly reduces text opacity when pressed.
-     * This provides immediate visual feedback to the user without the visual clutter
-     * of a traditional ripple effect or background change.
-     */
-    private fun createSubtlePressColor(normalColor: Int): ColorStateList {
-        // 255 = Komplett sichtbar
-        // 180 = Leicht transparent (ca. 70%) -> Wirkt sehr hochwertig und ruhig
-        val pressedColor = ColorUtils.setAlphaComponent(normalColor, AppConstants.PRESSED_STATE_ALPHA)
-
-        return ColorStateList(
-            arrayOf(
-                intArrayOf(android.R.attr.state_pressed), // Wenn gedrückt...
-                intArrayOf()                              // Sonst...
-            ),
-            intArrayOf(
-                pressedColor, // ... nimm die leicht transparente Farbe
-                normalColor   // ... nimm die normale Farbe
-            )
-        )
+        favoritesAdapter.setStyling(buildFavoritesStyling(colors))
     }
 
     // ============================================================================

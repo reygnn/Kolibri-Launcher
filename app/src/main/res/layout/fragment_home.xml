@@ -18,9 +18,9 @@
       Wrapped in HomeGestureLayout (since 2026-05-07) so that the
       five home-screen gestures (4 directional swipes + double-tap +
       long-press) are detected via dispatchTouchEvent at the parent
-      level, while the favoritesScrollView inside still receives slow
-      drags normally for scrolling. See homescroll.md and the class
-      KDoc on HomeGestureLayout for the full rationale.
+      level, while the favoritesRecyclerView inside still receives
+      slow drags normally for scrolling. See homescroll.md and the
+      class KDoc on HomeGestureLayout for the full rationale.
     -->
     <com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout
         android:id="@+id/homeGestureRoot"
@@ -109,19 +109,12 @@
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <ScrollView
-                android:id="@+id/favoritesScrollView"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/favoritesRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:fillViewport="true"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:id="@+id/appList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
+                android:scrollbars="none"
+                android:overScrollMode="ifContentScrolls" />
         </LinearLayout>
 
     </LinearLayout>
