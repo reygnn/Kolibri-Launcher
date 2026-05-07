@@ -465,9 +465,9 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 > verifiziert. Stichproben-Verifikation der konkreten Site-Zahlen ist im
 > Konversations-Log dokumentiert.
 
-### 8.1 🟠 MAJOR — Delegate Double-Wrap-Error-Handling
+### 8.1 🟡 MINOR — Delegate-Wrap und `launchSafe`-Doppel-Sicherung
 
-`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (8 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden); analoger Befund in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (5 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden), analog in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
 
 `DelegateScope.launchSafe` (`DelegateScope.kt:41-54`) kapselt bereits
 ```kotlin
@@ -476,14 +476,27 @@ catch (e: CancellationException) { throw e }
 catch (e: Throwable) { TimberWrapper.silentError(e, errorMessage) }
 ```
 Jede Delegate-Methode wickelt ihren Body in **exakt dasselbe** try/catch und
-sendet zusätzlich einen Toast-Event. Resultat: jedes Throwable löst zwei
-`silentError`-Aufrufe aus (innerer wie äußerer Catch protokollieren die
-gleiche Exception); in DEBUG zwei Throws (innerer `silentError` wirft, äußerer
-`launchSafe`-Catch fängt und `silentError` wirft erneut).
+sendet zusätzlich einen Toast-Event. Tatsächliches Verhalten:
 
-**Fix:** `launchSafe`-Overload mit `errorToastResId: Int? = null`, der den
-Toast in der eigenen Catch-Branch sendet. Eliminiert ~40 Zeilen identischer
-Boilerplate, behebt das Double-Log/Double-Throw-Smell.
+- **Production:** Innerer `Throwable`-Catch swallowed alles; der äußere
+  `launchSafe`-Catch sieht nichts, ein einziger `silentError` pro Error.
+  Der `launchSafe`-Catch ist hier reine ungenutzte Sicherheits-Schicht.
+- **DEBUG:** Innerer `silentError` wirft → äußerer `launchSafe`-Catch
+  fängt → zweiter `silentError` wirft erneut. Doppel-Throw-Kaskade.
+
+Der ursprüngliche Befund („zwei `silentError`-Aufrufe in Production") war
+falsch und ist hier korrigiert.
+
+**Reduktions-Potenzial:** Methoden mit `R.string.error_generic` als
+Toast (4 von 5 in `AppManagementDelegate`, alle 3 in `ThemingDelegate`)
+könnten auf eine `launchSafe(errorMessage, defaultToast = R.string.error_generic)`-Variante
+kondensieren. Methoden mit feature-spezifischem Toast (`onAppClicked` →
+`error_launching_app`) bleiben inline. Realistische Schätzung: ~20 Zeilen
+Reduktion, nicht die initial behaupteten 40.
+
+**Bewertung MINOR statt MAJOR:** kein Korrektheits-Bug (das Verhalten ist
+in Production identisch zur idealen Form), nur Boilerplate-Konsolidierung
+plus DEBUG-Doppel-Throw vermeiden.
 
 ---
 
@@ -555,20 +568,27 @@ Integration nötig), daher silent drift. Weitere Sites wahrscheinlich.
 
 ---
 
-### 8.5 🟡 MINOR — `PackageUpdateReceiver`-Catch-Verschachtelung
+### 8.5 ✗ Zurückgezogen — `PackageUpdateReceiver`-Catch-Verschachtelung
 
 `data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt:30-52`
 
-`onReceive`-Body: outer try um `goAsync()` (Z. 30-35) + outer try um
-`handleReceive`-Aufruf (Z. 37-52) + nested try um `pendingResult?.finish()`
-im Lambda-Argument (Z. 39-43) + ein **zweiter** nested try um denselben
-`pendingResult?.finish()`-Aufruf in der Catch-Branch (Z. 47-51). Plus
-`safeOnFinish` in Z. 145-151 als drittes Wrapper.
+Initialer Befund: 4 verschachtelte Catches in `onReceive` (`goAsync`,
+`handleReceive`, zwei `pendingResult.finish()`-Wrapper) plus
+`safeOnFinish` als drittes Wrapper.
 
-`PendingResult.finish()` dokumentierte Throws: `IllegalStateException` bei
-Double-Finish. Zwei Catches an Boundary-Punkten würden dieselbe Coverage
-liefern. TODO §2 listet den Receiver als „swept", aber die Verschachtelung
-lebt.
+**Zurückgezogen:** Die TODO §2-Sweep-Kampagne hat diesen Receiver explizit
+geprüft und das Layering bewusst akzeptiert. Begründung steht im Code-
+Kontext: `BroadcastReceiver.onReceive` darf nicht werfen lassen
+(System-API-Kontrakt), `PendingResult.finish()` muss garantiert laufen
+(sonst lebt der Receiver weiter und blockiert den Process), Hilt-Cold-
+Start-Race ist real auf dem Package-Broadcast-Pfad. Die einzelnen Catches
+adressieren unterschiedliche Failure-Modes — Konsolidierung würde Coverage
+reduzieren.
+
+Hier nur dokumentiert, damit künftige fresh-eyes-Audits diesen Befund
+nicht erneut ziehen. Der korrekte Ort für die Begründung wäre §7
+(„Bewusst akzeptierte Schulden"); bislang dort nicht eingetragen, weil
+die Sweep-Akzeptanz nur im Commit-Verlauf sitzt.
 
 ---
 
@@ -691,17 +711,16 @@ das Framing „einzige Differenz" ist veraltet.
 |---|---|---|---|
 | 1 | §8.2 Test-Fix `MutableSharedFlow` | ~15 min | Latente Flake-Quelle, isoliert, eine Konstruktor-Argument-Änderung pro Site |
 | 2 | §8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1) | ~5 min | Doku-Refresh ohne Code-Änderung; verhindert dass folgende Audits die alten Behauptungen erben |
-| 3 | §8.1 Delegate `launchSafe`-Overload | ~1 h | Eigener Refactor-Branch; eliminiert ~40 Zeilen Boilerplate, behebt Double-Log/Double-Throw-Smell |
-| 4 | §8.6 + §8.10 Cleanup-Sammel-Branch | ~5 min | Tote `UsageExport.kt`-Datei + auskommentierte Klassendeklaration; trivial |
+| 3 | §8.6 + §8.10 + §8.9 Cleanup-Sammel-Branch | ~10 min | Tote `UsageExport.kt`-Datei, auskommentierte Klassendeklaration in `AppDrawerFragment`, dead Cancellation-Branches in `BaseViewModel.handleError`. Alle drei trivial und punktuell. |
+| 4 | §8.1 Delegate `launchSafe`-Overload | ~30 min | Boilerplate-Konsolidierung ~20 Zeilen; nur die `error_generic`-Sites fold-bar, feature-spezifische Toasts bleiben inline |
 | 5 | §8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported` | ~30 min | Strukturelle Änderung (`errorEvent: E?` statt Cast-Catch); Touch auf alle Subklassen |
-| 6 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
-| 7 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
-| 8 | §8.8 `:data` `buildConfig = false` | ~10 min | Build-Konfig + `Timber.d`-Branch über `TimberWrapper.isDebugBuild` ersetzen |
-| 9 | §8.5 `PackageUpdateReceiver` flachklopfen | ~30 min | Heikel — Receiver auf Cold-Start-Path; Test-Pinning vorab empfohlen |
-| 10 | §8.9 Dead Cancellation-Branches in `BaseViewModel.handleError` | ~5 min | Reine Code-Reduktion |
+| 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
+| 7 | §8.8 `:data` `buildConfig = false` | ~10 min | Build-Konfig + `Timber.d`-Branch über `TimberWrapper.isDebugBuild` ersetzen |
+| 8 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
 
-Reihenfolge optimiert für Risiko-Profil (klein/isoliert zuerst), nicht
-strikt nach Schweregrad. §8.4 bleibt blockiert auf TODO §7.
+§8.5 zurückgezogen (siehe Sektion). Reihenfolge optimiert für Risiko-Profil
+(klein/isoliert zuerst), nicht strikt nach Schweregrad. §8.4 bleibt
+blockiert auf TODO §7.
 
 ---
 
@@ -732,9 +751,10 @@ Nachtrag (2026-05-07):
 | Kategorie | Anzahl |
 |---|---|
 | 🔴 BLOCKER | **0** |
-| 🟠 MAJOR | **4** (8.1, 8.2, 8.3, 8.4) |
-| 🟡 MINOR | **4** (8.5, 8.6, 8.7, 8.8) |
+| 🟠 MAJOR | **3** (8.2, 8.3, 8.4) |
+| 🟡 MINOR | **4** (8.1 [von MAJOR herabgestuft], 8.6, 8.7, 8.8) |
 | 🟢 NIT | **2** (8.9, 8.10) |
+| Zurückgezogen | **1** (8.5 — bereits in TODO §2-Sweep akzeptiert) |
 | Korrekturen am Original | **3** (3.4, 5.8, 4.1) |
 
 **Reifegrad:** Hoch. Die Architektur-Disziplin ist außergewöhnlich, und die
