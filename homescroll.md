@@ -984,13 +984,32 @@ The cleanup branch later removes: `_needsSplit`, the
 in `NonInterceptingScrollView` (replaced with plain `ScrollView`),
 and `ScrollViewBorderDecorator`.
 
-### Step 7 — Branch + commit + ff-merge + push
+### Step 7 — Branch + commit + ff-merge + push [DONE 2026-05-07]
 
 Per the user's solo workflow: branch (suggested name
 `refactor/home-gesture-wrapper`), commit per step where it makes
 sense as a unit (probably one commit for the new layout class +
 test, one for the HomeFragment wiring + XML, one for the cleanup),
 ff-merge to main, push, ask the user before deleting the branch.
+
+**Implementation notes (2026-05-07):**
+
+- **ff-merge landed cleanly into `main`** at commit `f9c0b48`.
+  Branch `refactor/home-gesture-wrapper` had 13 commits between
+  `5ee9f6c` (the original handover doc) and `f9c0b48` (the final
+  version bump): the design-and-decisions doc, the wrapper class
+  + analyzer parameterization (Step 1), the XML + HomeFragment
+  wiring + GestureDelegate gate (Step 2+3), the instrumented test
+  (Step 4), the ACTION_DOWN-claim fix (round 1), the verifier
+  defang + first long-press double-fire fix (round 2), the
+  text-only-buttons + hit-test (round 3), the long-press-redesign
+  to clock-area (round 5), and the docs/release-version finalize
+  pair (Step 5 done + version bump to 0.99.64 / 84). Cleanup
+  starts in a separate branch (Step 6).
+- **Wrapper-test pre-release deleted** with `gh release delete
+  wrapper-test-2026-05-07 --cleanup-tag --yes` after the merge
+  landed. The five APK iterations served their purpose during the
+  real-device validation arc; production users won't see the tag.
 
 ---
 
