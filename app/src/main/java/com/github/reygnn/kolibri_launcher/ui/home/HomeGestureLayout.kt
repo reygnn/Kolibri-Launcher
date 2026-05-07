@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds
 
 /**
  * Container that detects the five home-screen gestures (four
@@ -61,26 +62,6 @@ class HomeGestureLayout @JvmOverloads constructor(
     var onLongPress: (() -> Unit)? = null
 
     // ===========================================
-    // TUNING CONSTANTS
-    // ===========================================
-    //
-    // Mirroring SwipeDownDismissLayout's empirically validated set —
-    // those values are the only ones proven to discriminate fast
-    // swipes from slow drags on a ScrollView axis without the user
-    // perceiving lag or false triggers. Per-direction tuning is a
-    // possible follow-up if real-device feel is uneven; start shared.
-
-    /** Higher → user must drag further before a swipe counts. */
-    private val minSwipeDistancePx: Float =
-        (ViewConfiguration.get(context).scaledTouchSlop * 4).toFloat()
-
-    /** Higher → only fast flicks fire; slow drags can never trigger. */
-    private val minVelocityPxPerMs = 1.2f
-
-    /** Higher → gesture must be more strictly axis-aligned. */
-    private val dominanceFactor = 1.5f
-
-    // ===========================================
     // INTERNAL ANALYZER
     // ===========================================
 
@@ -90,12 +71,20 @@ class HomeGestureLayout @JvmOverloads constructor(
      * fed in **px/ms** — the unit naturally produced by `MotionEvent`
      * delta-over-elapsed-time computation. The analyzer is
      * unit-agnostic; the only requirement is that the velocity input
-     * and [minVelocityPxPerMs] use the same unit.
+     * and [GestureThresholds.VELOCITY_PX_PER_MS] use the same unit.
+     *
+     * Calibration comes from [GestureThresholds] — see that object's
+     * KDoc for the rationale; both this wrapper and
+     * [com.github.reygnn.kolibri_launcher.ui.appdrawer.SwipeDownDismissLayout]
+     * read from there.
      */
     private val analyzer = SwipeGestureAnalyzer(
-        distanceThreshold = minSwipeDistancePx,
-        velocityThreshold = minVelocityPxPerMs,
-        dominanceFactor = dominanceFactor,
+        distanceThreshold = (
+            ViewConfiguration.get(context).scaledTouchSlop *
+                GestureThresholds.TOUCH_SLOP_DISTANCE_MULTIPLIER
+            ).toFloat(),
+        velocityThreshold = GestureThresholds.VELOCITY_PX_PER_MS,
+        dominanceFactor = GestureThresholds.DOMINANCE_FACTOR,
     )
 
     // ===========================================

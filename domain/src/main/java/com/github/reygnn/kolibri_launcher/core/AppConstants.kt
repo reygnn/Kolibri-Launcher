@@ -9,8 +9,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 object AppConstants {
 
     // UI Constants
-    const val SWIPE_THRESHOLD = 50
-    const val SWIPE_VELOCITY_THRESHOLD = 50
     const val DOUBLE_CLICK_THRESHOLD = 300L
     const val LOCK_GESTURE_BLOCK_DURATION_MS = 1000L
 

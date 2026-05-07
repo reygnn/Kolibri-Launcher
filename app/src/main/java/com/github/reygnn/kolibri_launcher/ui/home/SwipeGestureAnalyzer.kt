@@ -15,21 +15,17 @@ import kotlin.math.abs
  *
  * Thresholds and dominance factor are passed as constructor parameters
  * so multiple call sites can share the algorithm with their own
- * calibration. Two consumers exist today:
+ * calibration. Two consumers in production:
  *
- *  - `HomeFragment.createGestureListener.onFling` feeds smoothed
- *    velocities (px/sec) from `GestureDetector.onFling` and uses the
- *    permissive `AppConstants.SWIPE_*_THRESHOLD` values plus the
- *    default `dominanceFactor = 1f` (binary axis check). This call
- *    site is scheduled for removal once `HomeGestureLayout` replaces
- *    the split-mode gesture wiring.
+ *  - [com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout]
+ *  - [com.github.reygnn.kolibri_launcher.ui.appdrawer.SwipeDownDismissLayout]
  *
- *  - `HomeGestureLayout.dispatchTouchEvent` feeds raw deltas-derived
- *    velocities (px/ms) from `MotionEvent` and uses the stricter
- *    `SwipeDownDismissLayout`-style values
- *    (`scaledTouchSlop * 4`, `1.2f` px/ms, `1.5f` dominance).
+ * Both feed raw deltas-derived velocities (px/ms) from `MotionEvent`
+ * and read the same calibration from
+ * [com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds]
+ * (`scaledTouchSlop * 4`, `1.2f` px/ms, `1.5f` dominance).
  *
- * The analyzer is unit-agnostic: caller's units must be consistent
+ * The analyzer is unit-agnostic: the caller's units must be consistent
  * between input velocities and the `velocityThreshold` parameter.
  */
 class SwipeGestureAnalyzer(

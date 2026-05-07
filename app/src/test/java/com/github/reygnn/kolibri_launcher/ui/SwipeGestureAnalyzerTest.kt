@@ -12,9 +12,12 @@ class SwipeGestureAnalyzerTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    // Test reproduces the legacy `AppConstants.SWIPE_*_THRESHOLD = 50`
-    // calibration explicitly. Default `dominanceFactor = 1f` preserves
-    // the original binary axis check.
+    // Round-number thresholds (50f / 50f) chosen for legible boundary
+    // assertions; the analyzer is unit-agnostic, so the actual
+    // production calibration (in `ui/util/GestureThresholds.kt`) is
+    // irrelevant here. Default `dominanceFactor = 1f` exercises the
+    // binary axis check; the parameterized 1.5f path is covered by
+    // the instrumented HomeGestureLayoutTest / AppDrawer tests.
     private val analyzer = SwipeGestureAnalyzer(
         distanceThreshold = 50f,
         velocityThreshold = 50f,

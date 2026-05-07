@@ -5,7 +5,8 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import androidx.constraintlayout.widget.ConstraintLayout
-import kotlin.math.abs
+import com.github.reygnn.kolibri_launcher.ui.home.SwipeGestureAnalyzer
+import com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds
 
 /**
  * Container that detects a decisive downward swipe anywhere within its
@@ -56,17 +57,28 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
     var onSwipeDown: (() -> Unit)? = null
 
     // ===========================================
-    // TUNING CONSTANTS
+    // INTERNAL ANALYZER
     // ===========================================
 
-    /** Higher → user must drag further before a swipe counts. */
-    private val minSwipeDistancePx = ViewConfiguration.get(context).scaledTouchSlop * 4
-
-    /** Higher → only fast flicks dismiss; slow drags can never trigger. */
-    private val minVerticalVelocityPxPerMs = 1.2f
-
-    /** Higher → gesture must be more strictly vertical (less diagonal tolerance). */
-    private val verticalDominanceFactor = 1.5f
+    /**
+     * Shares [SwipeGestureAnalyzer] with
+     * [com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout] so
+     * the three-predicate "decisive flick" decision (distance + velocity
+     * + axis-dominance) is one source of truth. Calibration comes from
+     * [GestureThresholds] — same rationale as the home wrapper. We only
+     * react to the [SwipeGestureAnalyzer.SwipeResult.DOWN] result here
+     * (the layout exists for one direction); the other results are
+     * structurally impossible after a UP/LEFT/RIGHT gesture in an
+     * AppDrawer context but treated as no-ops anyway.
+     */
+    private val analyzer = SwipeGestureAnalyzer(
+        distanceThreshold = (
+            ViewConfiguration.get(context).scaledTouchSlop *
+                GestureThresholds.TOUCH_SLOP_DISTANCE_MULTIPLIER
+            ).toFloat(),
+        velocityThreshold = GestureThresholds.VELOCITY_PX_PER_MS,
+        dominanceFactor = GestureThresholds.DOMINANCE_FACTOR,
+    )
 
     // ===========================================
     // GESTURE STATE (per-touch)
@@ -127,16 +139,15 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> if (!triggered) {
-                val dy = ev.y - downY
                 val dx = ev.x - downX
+                val dy = ev.y - downY
                 val dt = (ev.eventTime - downTime).coerceAtLeast(1L)
-                val velocityY = dy / dt
+                val vx = dx / dt
+                val vy = dy / dt
 
-                val isFarEnoughDown = dy > minSwipeDistancePx
-                val isMostlyVertical = abs(dy) > abs(dx) * verticalDominanceFactor
-                val isFastEnough = velocityY > minVerticalVelocityPxPerMs
-
-                if (isFarEnoughDown && isMostlyVertical && isFastEnough) {
+                if (analyzer.analyze(dx, dy, vx, vy) ==
+                    SwipeGestureAnalyzer.SwipeResult.DOWN
+                ) {
                     triggered = true
                     cancelChildGesture(ev)
                     onSwipeDown?.invoke()
