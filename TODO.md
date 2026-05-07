@@ -30,6 +30,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | offen — entstanden aus der HomeGesture-Wrapper-Migration 2026-05-07 (Step 5 Round-6); User soll Velocity / Distanz / Dominance pro Richtung in Echtzeit einstellen können statt für „den Durchschnitt" zu hardcoden | mittel |
+| 21 | Customize-Long-Press wieder global statt nur Uhrenbereich | offen — Regression aus Step 5 Round-5 der HomeGesture-Wrapper-Migration; Long-Press anywhere on Home (außer auf Favoriten) soll Settings öffnen, nicht nur im Header-Streifen | klein-mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1657,6 +1658,62 @@ sane Defaults sind Pflicht.
 genug" laut Step-5-Validation. Erste Indikatoren für „echt nötig":
 mehrere User berichten dass das Wischen sich nicht richtig anfühlt
 und sie pro Gerät unterschiedlich kalibrieren wollen.
+
+---
+
+## 21. (offen) Customize-Long-Press wieder global, mit Buttons als Priorität
+
+Aufgekommen 2026-05-07 nach kurzem realen Einsatz der Pre-Release
+v0.99.64. Der Round-5-Redesign der HomeGesture-Wrapper-Migration
+(homescroll.md Step 5) hat den Customize-Dialog von „Long-Press
+irgendwo auf Home" auf „Long-Press nur im timeContainer-Bereich"
+eingeengt — als Antwort darauf, dass der User das
+Long-Press-Doppel-Verhalten („auf Favorit = Context-Menu, in void
+= Settings") als überladen empfunden hat. In der Praxis ist das zu
+restriktiv: der Reflex ist Long-Press auf der freien Fläche, das
+passiert oft nicht im Header.
+
+**Diagnose im Rückblick:** das Round-5-Redesign war eine
+Über-Korrektur. Das eigentliche Problem damals war das
+Round-2-Doppel-Feuer auf einem Favoriten (sowohl der Wrapper als
+auch der Button feuerten Long-Press parallel → zwei Dialoge auf
+einer Geste). Das wurde in Round-4 durch den
+`hasLongClickableDescendantAt`-Hit-Test im Wrapper gelöst. Der
+Round-5-Schritt — Settings nur noch via timeContainer — war
+zusätzlich zu Round-4 und damit redundant: der Hit-Test allein
+hätte schon gereicht.
+
+**Sollverhalten** (rückbau auf Round-4-Stand):
+
+- Long-Press auf einem Favoriten-Text → App-Context-Menu (über
+  Button.onLongClickListener; der Wrapper-tapDetector wird via
+  Hit-Test übersprungen).
+- Long-Press irgendwo sonst auf Home (Header-Bereich, Raum
+  zwischen Header und Favoriten, Raum rechts neben kurzen
+  Favoriten, Raum unter Favoriten) → Customize-Dialog (über
+  Wrapper-tapDetector, weil kein long-clickable Descendant unter
+  dem Touch).
+
+**Konkrete Änderungen:**
+
+1. `HomeFragment.setupTopAreaLongPressForSettings` löschen
+   (inkl. dem Aufruf aus `onViewCreated`).
+2. `HomeFragment.setupHomeGestures`: wieder
+   `binding.homeGestureRoot.onLongPress = { viewModel.onLongPress() }`
+   wiren.
+3. `applyWallpaperEditModeToGestures`: in Edit-Mode auf
+   Exit-Mode-Callback toggeln, sonst zurück auf Customize-Callback
+   (statt null).
+4. `fragment_home.xml`: `timeContainer` width zurück auf
+   `wrap_content` (oder belassen — der Hit-Test greift auch bei
+   `match_parent`, schadet visuell nichts).
+5. Round-3/4-Mechanik (text-only Favoriten-Buttons + Hit-Test)
+   bleibt — sie ist die Voraussetzung dass Buttons Priorität
+   kriegen und das Doppel-Fire vermieden wird.
+
+**Aufwand:** klein-mittel. ~30-40 Zeilen. Tests müssen nicht
+angepasst werden (instrumented tests testen nur swipe-up, nicht
+long-press).
 
 ---
 
