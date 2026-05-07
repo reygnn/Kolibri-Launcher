@@ -22,6 +22,7 @@ import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.google.android.material.chip.Chip
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -223,7 +224,7 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             }
 
-            currentDialog = AlertDialog.Builder(this)
+            currentDialog = MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.rename_dialog_title, app.originalName))
                 .setView(editText)
                 .setPositiveButton(R.string.save) { _, _ ->

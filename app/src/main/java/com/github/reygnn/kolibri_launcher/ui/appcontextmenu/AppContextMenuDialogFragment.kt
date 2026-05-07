@@ -23,6 +23,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseC
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -258,7 +259,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 setHint(R.string.new_app_name_hint)
             }
 
-            currentDialog = AlertDialog.Builder(ctx)
+            currentDialog = MaterialAlertDialogBuilder(ctx)
                 .setTitle(getString(R.string.rename_app_title, appInfo.displayName))
                 .setView(editText)
                 .setPositiveButton(R.string.rename) { _, _ ->
