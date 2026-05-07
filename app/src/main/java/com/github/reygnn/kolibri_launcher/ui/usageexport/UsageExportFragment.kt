@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentUsageExportBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -30,7 +31,7 @@ class UsageExportFragment : Fragment() {
     private val viewModel: UsageExportViewModel by viewModels()
 
     private val exportLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_JSON)
     ) { uri ->
         uri?.let { viewModel.exportToFile(it.toString()) }
     }
@@ -72,7 +73,7 @@ class UsageExportFragment : Fragment() {
 
         binding.buttonImport.setOnClickListener {
             try {
-                importLauncher.launch(arrayOf("application/json"))
+                importLauncher.launch(arrayOf(AppConstants.MIME_TYPE_JSON))
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching import picker")
                 Toast.makeText(requireContext(), R.string.usage_import_error, Toast.LENGTH_SHORT).show()
