@@ -95,7 +95,6 @@ class BackupDataAssembler @Inject constructor(
         val swipeDownToNotificationsEnabled = settingsRepository.swipeDownToNotificationsEnabledFlow.first()
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
-        val splitModeThreshold = settingsRepository.splitModeThresholdFlow.first()
         val secureWindow = settingsRepository.secureWindowFlow.first()
         val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
@@ -146,7 +145,6 @@ class BackupDataAssembler @Inject constructor(
             swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
-            splitModeThreshold = splitModeThreshold,
             secureWindow = secureWindow,
             rotationLocked = rotationLocked,
         )
@@ -325,9 +323,6 @@ class BackupDataAssembler @Inject constructor(
 
         // ===== PHASE 10: Import Power-User Settings =====
         if (options.importPowerUserSettings) {
-            backup.settings.splitModeThreshold?.let { threshold ->
-                settingsRepository.setSplitModeThreshold(threshold.coerceInSafe(AppConstants.SPLIT_MODE_THRESHOLD_MIN, AppConstants.SPLIT_MODE_THRESHOLD_MAX))
-            }
             backup.settings.secureWindow?.let { settingsRepository.setSecureWindow(it) }
             backup.settings.rotationLocked?.let { settingsRepository.setRotationLocked(it) }
         }

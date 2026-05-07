@@ -183,7 +183,6 @@ class BackupRepositoryImplStrictTest {
               "version": "1.0.0",
               "timestamp": 123456789,
               "settings": {
-                "split_mode_threshold": 120,
                 "is_font_bold": true,
                 "favoriteComponents": []
               }
@@ -200,10 +199,6 @@ class BackupRepositoryImplStrictTest {
 
         // THEN
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // Check if split_mode_threshold (snake_case in JSON -> camelCase in Repo) arrived
-        val threshold = settingsRepo.splitModeThresholdFlow.first()
-        assertThat(threshold).isEqualTo(120)
 
         // Check Boolean
         val isBold = settingsRepo.isFontBoldStateFlow.first()

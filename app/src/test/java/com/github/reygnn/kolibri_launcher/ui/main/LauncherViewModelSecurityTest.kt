@@ -12,7 +12,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
@@ -130,9 +129,6 @@ class LauncherViewModelSecurityTest {
         val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
 
-        val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase = mockk(relaxed = true)
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
-
         val getLayoutSettingsUseCase: GetLayoutSettingsUseCase = mockk {
             every { layoutScale } returns flowOf(1.0f)
             every { verticalPadding } returns flowOf(1.0f)
@@ -168,7 +164,6 @@ class LauncherViewModelSecurityTest {
             checkAppUsageUseCase = mockk(relaxed = true),
             getAutoShowKeyboardSettingUseCase = mockk(relaxed = true),
             getTextShadowEnabledUseCase = mockk(relaxed = true),
-            getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
             getLayoutSettingsUseCase = getLayoutSettingsUseCase,
             setLayoutScaleUseCase = setLayoutScaleUseCase,
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,

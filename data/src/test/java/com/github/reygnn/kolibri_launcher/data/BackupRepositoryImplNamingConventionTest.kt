@@ -80,7 +80,6 @@ class BackupRepositoryImplNamingConventionTest {
         fakeSettingsRepo.setChipBackgroundColor(-654321)
         fakeSettingsRepo.setTextShadowEnabled(true)
         fakeSettingsRepo.setLayoutScale(1.5f)
-        fakeSettingsRepo.setSplitModeThreshold(42)
         fakeSettingsRepo.setDoubleTapToLockEnabled(true)
         fakeSettingsRepo.setSwipeDownToNotificationsEnabled(false)
 
@@ -91,7 +90,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(json).contains("\"chipBackgroundColor\":")
         assertThat(json).contains("\"textShadowEnabled\":")
         assertThat(json).contains("\"layoutScale\":")
-        assertThat(json).contains("\"splitModeThreshold\":")
         assertThat(json).contains("\"doubleTapToLockEnabled\":")
         assertThat(json).contains("\"swipeDownToNotificationsEnabled\":")
 
@@ -100,7 +98,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(json).doesNotContain("\"chip_bg_color\":")
         assertThat(json).doesNotContain("\"text_shadow_enabled\":")
         assertThat(json).doesNotContain("\"layout_scale\":")
-        assertThat(json).doesNotContain("\"split_mode_threshold\":")
         assertThat(json).doesNotContain("\"double_tap_to_lock_enabled\":")
         assertThat(json).doesNotContain("\"swipe_down_to_notifications_enabled\":")
     }
@@ -134,7 +131,6 @@ class BackupRepositoryImplNamingConventionTest {
                 "settings": {
                     "textColor": -111111,
                     "chipBackgroundColor": -222222,
-                    "splitModeThreshold": 55,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -150,7 +146,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111111)
         assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-222222)
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(55)
     }
 
     // ========================================================================
@@ -165,7 +160,6 @@ class BackupRepositoryImplNamingConventionTest {
                 "settings": {
                     "text_color": -333333,
                     "chip_bg_color": -444444,
-                    "split_mode_threshold": 77,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -181,7 +175,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-333333)
         assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-444444)
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(77)
     }
 
     @Test
@@ -233,7 +226,6 @@ class BackupRepositoryImplNamingConventionTest {
                 "version": "1.0.0",
                 "settings": {
                     "textColor": -555555,
-                    "split_mode_threshold": 88,
                     "favoriteComponents": ["com.test/com.test.Main"],
                     "hidden_components": []
                 }
@@ -252,7 +244,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-555555)
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(88)
         assertThat(fakeFavoritesRepo.favoriteComponentsFlow.first())
             .contains("com.test/com.test.Main")
     }
@@ -267,7 +258,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         // Setup initial data
         fakeSettingsRepo.setTextColor(-999999)
-        fakeSettingsRepo.setSplitModeThreshold(123)
         fakeFavoritesRepo.saveFavoriteComponents(listOf(componentName))
         fakeInstalledAppsRepo.installedApps = listOf(
             createTestAppInfo("com.roundtrip")
@@ -278,7 +268,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         // Reset repos
         fakeSettingsRepo.setTextColor(0)
-        fakeSettingsRepo.setSplitModeThreshold(0)
         fakeFavoritesRepo.saveFavoriteComponents(emptyList())
 
         // Re-import
@@ -294,7 +283,6 @@ class BackupRepositoryImplNamingConventionTest {
         // Verify
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-999999)
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(123)
         assertThat(fakeFavoritesRepo.favoriteComponentsFlow.first())
             .contains(componentName)
     }
@@ -322,7 +310,6 @@ class BackupRepositoryImplNamingConventionTest {
     @Test
     fun `importFromJson ignores malformed mixed case keys`() = runTest {
         // Initiale Werte setzen
-        fakeSettingsRepo.setSplitModeThreshold(42)
         fakeSettingsRepo.setTextColor(-111)
         fakeSettingsRepo.setChipBackgroundColor(-222)
 
@@ -330,7 +317,6 @@ class BackupRepositoryImplNamingConventionTest {
         {
           "version": "1.0.0",
           "settings": {
-            "split_modeThreshold": 99,
             "text_Color": -123456,
             "chipBackground_color": -654321,
             "favoriteComponents": [],
@@ -347,7 +333,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         // Werte sollten UNVERÄNDERT sein (malformed keys ignoriert)
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(42)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111)
         assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-222)
     }

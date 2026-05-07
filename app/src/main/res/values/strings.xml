@@ -301,21 +301,6 @@
     <!-- Advanced Settings Category -->
     <string name="category_advanced_title">Advanced Settings</string>
     
-    <!-- Split-Mode Threshold Setting -->
-    <string name="split_mode_threshold_title">Split-Mode Threshold</string>
-    <string name="split_mode_threshold_summary">Current: %1$s\n%2$s</string>
-    <string name="split_mode_threshold_dialog_title">Split-Mode Threshold (0–512 Pixel)</string>
-<string name="split_mode_threshold_dialog_message">Controls when split-mode activates on the home screen:\n\n• 0 px = Auto (Android default)\n• 120 px = Good start value for tinkering\n• 512 px = Max value</string>
-    
-    <!-- Threshold Descriptions -->
-    <string name="split_mode_threshold_desc_auto">Auto (Android default)</string>
-    <string name="split_mode_threshold_desc_tinkering">Good start value for tinkering</string>
-    <string name="split_mode_threshold_desc_max">Max value</string>
-    <string name="split_mode_threshold_desc_custom">Custom threshold: %d pixels</string>
-    
-    <!-- Toast Messages -->
-    <string name="split_mode_threshold_invalid">Please enter a value between 0 and 512</string>
-    <string name="split_mode_threshold_saved">Split-mode threshold saved: %d px</string>
     <string name="import_option_power_user">Power User Settings</string>
     
     <string name="customize_layout_title">Layout &amp; Size</string>

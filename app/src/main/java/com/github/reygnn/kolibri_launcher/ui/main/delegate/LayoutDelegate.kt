@@ -13,7 +13,6 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -26,11 +25,10 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * Delegate responsible for layout settings:
  * scale, vertical padding, font bold, content top margin,
- * split mode threshold, and reset to defaults.
+ * and reset to defaults.
  */
 class LayoutDelegate(
     getLayoutSettingsUseCase: GetLayoutSettingsUseCase,
-    getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase,
     private val setLayoutScaleUseCase: SetLayoutScaleUseCase,
     private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     private val setFontBoldUseCase: SetFontBoldUseCase,
@@ -82,18 +80,6 @@ class LayoutDelegate(
             scope = scope.coroutineScope,
             started = SharingStarted.Eagerly,
             initialValue = 0f
-        )
-
-    /** 0 = Automatik (Android entscheidet) */
-    val splitModeThreshold: StateFlow<Int> = getSplitModeThresholdUseCase()
-        .catch { e ->
-            TimberWrapper.silentError(e, "Error observing split mode threshold")
-            emit(0)
-        }
-        .stateIn(
-            scope = scope.coroutineScope,
-            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-            initialValue = 0
         )
 
     // --- Public API: Setters ---

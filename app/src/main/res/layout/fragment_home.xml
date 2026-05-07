@@ -109,11 +109,10 @@
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView
+            <ScrollView
                 android:id="@+id/favoritesScrollView"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
                 android:fillViewport="true"
                 android:scrollbars="none">
 
@@ -122,16 +121,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
-            </com.github.reygnn.kolibri_launcher.ui.home.NonInterceptingScrollView>
-
-            <View
-                android:id="@+id/gestureZone"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="0"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone" />
+            </ScrollView>
         </LinearLayout>
 
     </LinearLayout>

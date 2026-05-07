@@ -392,43 +392,6 @@ class BackupRepositoryImplSecurityTest {
     // ========================================================================
 
     @Test
-    fun `attack - Long MAX_VALUE for splitModeThreshold - should coerce to valid range`() = runTest {
-        val maliciousJson = validBackupJson(extras = "\"splitModeThreshold\": 9223372036854775807")
-
-        val result = backupManager.importFromJson(
-            maliciousJson,
-            ImportOptions(importPowerUserSettings = true)
-        )
-
-        // Sollte nicht crashen - der Wert wird via coerceIn begrenzt
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-    }
-
-    @Test
-    fun `attack - Long MIN_VALUE for splitModeThreshold - should coerce to valid range`() = runTest {
-        val maliciousJson = validBackupJson(extras = "\"splitModeThreshold\": -9223372036854775808")
-
-        val result = backupManager.importFromJson(
-            maliciousJson,
-            ImportOptions(importPowerUserSettings = true)
-        )
-
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-    }
-
-    @Test
-    fun `attack - negative splitModeThreshold - should coerce to valid range`() = runTest {
-        val maliciousJson = validBackupJson(extras = "\"splitModeThreshold\": -999999")
-
-        val result = backupManager.importFromJson(
-            maliciousJson,
-            ImportOptions(importPowerUserSettings = true)
-        )
-
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-    }
-
-    @Test
     fun `attack - ARGB color as unsigned int greater than Int MAX - should handle correctly`() = runTest {
         // 0xFFFF0000 (rot mit voller Opazität) = 4294901760 als unsigned
         val maliciousJson = validBackupJson(extras = "\"textColor\": 4294901760")
@@ -1094,7 +1057,6 @@ class BackupRepositoryImplSecurityTest {
                     "swipeRightApp": null,
                     "textColor": null,
                     "chipBackgroundColor": null,
-                    "splitModeThreshold": null,
                     "layoutScale": null,
                     "verticalPaddingScale": null,
                     "contentTopMarginScale": null,

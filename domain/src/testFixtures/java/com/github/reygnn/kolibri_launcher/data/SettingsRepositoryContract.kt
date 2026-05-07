@@ -28,8 +28,6 @@ import org.junit.Test
  * repräsentatives Sample je Datentyp (Boolean, Int, Float, String, Enum) plus
  * die Stellen mit nicht-trivialer Logik ab:
  *
- *   - `splitModeThreshold`: Clamping auf [SPLIT_MODE_THRESHOLD_MIN,
- *                            SPLIT_MODE_THRESHOLD_MAX]
  *   - `onboardingCompleted`: einseitiger Setter (nur true), überlebt `purge`
  *   - `purgeRepository`: setzt alles auf Default ZURÜCK, außer Onboarding
  *
@@ -96,15 +94,6 @@ abstract class SettingsRepositoryContract {
     fun `fresh repository emits default readabilityMode`() = runTest {
         val repo = createRepository()
         assertEquals(AppConstants.DEFAULT_READABILITY_MODE, repo.readabilityModeFlow.first())
-    }
-
-    @Test
-    fun `fresh repository emits default splitModeThreshold`() = runTest {
-        val repo = createRepository()
-        assertEquals(
-            AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD,
-            repo.splitModeThresholdFlow.first()
-        )
     }
 
     @Test
@@ -180,58 +169,6 @@ abstract class SettingsRepositoryContract {
         assertEquals(0x22222222.toInt(), repo.textColorFlow.first())
     }
 
-    // ---------- splitModeThreshold: Clamping ----------
-
-    @Test
-    fun `setSplitModeThreshold below min clamps to min`() = runTest {
-        val repo = createRepository()
-        repo.setSplitModeThreshold(AppConstants.SPLIT_MODE_THRESHOLD_MIN - 100)
-        assertEquals(
-            AppConstants.SPLIT_MODE_THRESHOLD_MIN,
-            repo.splitModeThresholdFlow.first()
-        )
-    }
-
-    @Test
-    fun `setSplitModeThreshold above max clamps to max`() = runTest {
-        val repo = createRepository()
-        repo.setSplitModeThreshold(AppConstants.SPLIT_MODE_THRESHOLD_MAX + 1000)
-        assertEquals(
-            AppConstants.SPLIT_MODE_THRESHOLD_MAX,
-            repo.splitModeThresholdFlow.first()
-        )
-    }
-
-    @Test
-    fun `setSplitModeThreshold within range is stored as-is`() = runTest {
-        val repo = createRepository()
-        val midpoint = (AppConstants.SPLIT_MODE_THRESHOLD_MIN +
-                AppConstants.SPLIT_MODE_THRESHOLD_MAX) / 2
-        repo.setSplitModeThreshold(midpoint)
-        assertEquals(midpoint, repo.splitModeThresholdFlow.first())
-    }
-
-    @Test
-    fun `setSplitModeThreshold at Int MAX_VALUE clamps to max`() = runTest {
-        // Wichtig: Testet die Hardening-Absicht hinter `coerceInSafe`.
-        val repo = createRepository()
-        repo.setSplitModeThreshold(Int.MAX_VALUE)
-        assertEquals(
-            AppConstants.SPLIT_MODE_THRESHOLD_MAX,
-            repo.splitModeThresholdFlow.first()
-        )
-    }
-
-    @Test
-    fun `setSplitModeThreshold at Int MIN_VALUE clamps to min`() = runTest {
-        val repo = createRepository()
-        repo.setSplitModeThreshold(Int.MIN_VALUE)
-        assertEquals(
-            AppConstants.SPLIT_MODE_THRESHOLD_MIN,
-            repo.splitModeThresholdFlow.first()
-        )
-    }
-
     // ---------- onboardingCompleted: einseitig ----------
 
     @Test
@@ -274,7 +211,6 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         repo.setDoubleTapToLock(!AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
         repo.setAutoShowKeyboard(!AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
-        repo.setSplitModeThreshold(123)
 
         repo.purgeRepository()
 
@@ -285,10 +221,6 @@ abstract class SettingsRepositoryContract {
         assertEquals(
             AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD,
             repo.autoShowKeyboardFlow.first()
-        )
-        assertEquals(
-            AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD,
-            repo.splitModeThresholdFlow.first()
         )
     }
 

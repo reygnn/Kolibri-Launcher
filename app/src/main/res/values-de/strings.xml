@@ -275,18 +275,6 @@
 <string name="auto_launch_app_summary">Startet die App sofort, wenn sie das einzige Suchergebnis ist</string>
 
     <string name="category_advanced_title">Erweiterte Einstellungen</string>
-    <string name="split_mode_threshold_title">Split-Mode Schwellwert</string>
-    <string name="split_mode_threshold_summary">Aktuell: %1$s\n%2$s</string>
-    <string name="split_mode_threshold_dialog_title">Split-Mode Schwellwert (0–512 Pixel)</string>
-<string name="split_mode_threshold_dialog_message">Steuert, wann der Split-Mode auf dem Homescreen aktiviert wird:\n\n• 0 px = Auto (Android Standard)\n• 120 px = Guter Startwert zum Experimentieren\n• 512 px = Maximalwert</string>
-    
-    <string name="split_mode_threshold_desc_auto">Auto (Android Standard)</string>
-    <string name="split_mode_threshold_desc_tinkering">Guter Startwert zum Experimentieren</string>
-    <string name="split_mode_threshold_desc_max">Maximalwert</string>
-    <string name="split_mode_threshold_desc_custom">Benutzerdefiniert: %d Pixel</string>
-    
-    <string name="split_mode_threshold_invalid">Bitte einen Wert zwischen 0 und 512 eingeben</string>
-    <string name="split_mode_threshold_saved">Split-Mode Schwellwert gespeichert: %d px</string>
     <string name="import_option_power_user">Power-User-Einstellungen</string>
     
     <string name="customize_layout_title">Layout &amp; Größe</string>

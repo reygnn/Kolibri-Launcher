@@ -53,7 +53,7 @@ package com.github.reygnn.kolibri_launcher
  *    Otherwise the collector starts too late and misses events.
  *
  * 6. WhileSubscribed flows need active subscribers:
- *    `launch(UnconfinedTestDispatcher()) { vm.splitModeThreshold.collect {} }`
+ *    `launch(UnconfinedTestDispatcher()) { vm.someState.collect {} }`
  *    Without a subscriber, the upstream never starts and values stay at default.
  *
  * ANTI-PATTERNS (will break tests silently):

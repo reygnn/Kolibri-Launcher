@@ -95,7 +95,6 @@ class BackupRepositoryImplLogicTest {
     fun `exportToJson - collects data from repositories correctly`() = runTest {
         // ARRANGE: Wir füllen die Fakes mit Testdaten
         fakeSettingsRepo.setTextColor(-123456)
-        fakeSettingsRepo.setSplitModeThreshold(42)
 
         // Simuliere eine existierende Custom App Bezeichnung
         // (Für Export ist installedApps egal, er nimmt einfach was im Repo steht)
@@ -110,7 +109,6 @@ class BackupRepositoryImplLogicTest {
         // ASSERT: Prüfen, ob das JSON die Werte enthält
         // 2025-11-29: Standard ist neu camelCase.
         assertThat(jsonString).contains("\"textColor\": -123456")
-        assertThat(jsonString).contains("\"splitModeThreshold\": 42")
         assertThat(jsonString).contains("\"com.test.app\": \"My Cool App\"")
         assertThat(jsonString).contains("com.test.app/.MainActivity")
         assertThat(jsonString).contains("\"version\": \"1.0.0\"")
@@ -128,7 +126,6 @@ class BackupRepositoryImplLogicTest {
                 "version": "1.0.0",
                 "settings": {
                     "text_color": -65536,
-                    "split_mode_threshold": 99,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -148,9 +145,6 @@ class BackupRepositoryImplLogicTest {
         // Prüfen, ob die Daten im Fake angekommen sind
         val newColor = fakeSettingsRepo.textColorFlow.first()
         assertThat(newColor).isEqualTo(-65536)
-
-        val newThreshold = fakeSettingsRepo.splitModeThresholdFlow.first()
-        assertThat(newThreshold).isEqualTo(99)
     }
 
     @Test
@@ -245,13 +239,12 @@ class BackupRepositoryImplLogicTest {
 
     @Test
     fun `importFromJson - respects partial import options`() = runTest {
-        // ARRANGE: JSON hat Theme und PowerUser Werte
+        // ARRANGE: JSON hat Theme Werte
         val json = """
             {
                 "version": "1.0.0",
                 "settings": {
                     "text_color": -1,
-                    "split_mode_threshold": 50,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -261,9 +254,8 @@ class BackupRepositoryImplLogicTest {
 
         // Initiale Werte im Repo auf 0 setzen
         fakeSettingsRepo.setTextColor(0)
-        fakeSettingsRepo.setSplitModeThreshold(0)
 
-        // ACT: Wir importieren NUR Theme (importPowerUserSettings = false)
+        // ACT: Wir importieren NUR Theme
         val result = backupManager.importFromJson(
             json,
             ImportOptions(importThemeSettings = true, importPowerUserSettings = false)
@@ -274,9 +266,6 @@ class BackupRepositoryImplLogicTest {
 
         // Theme sollte aktualisiert sein (-1)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-1)
-
-        // PowerUser Setting sollte UNVERÄNDERT bleiben (0), da Option false war
-        assertThat(fakeSettingsRepo.splitModeThresholdFlow.first()).isEqualTo(0)
     }
 
     // --- Helper ---

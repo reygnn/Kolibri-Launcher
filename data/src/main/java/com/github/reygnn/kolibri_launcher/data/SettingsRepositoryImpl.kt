@@ -56,7 +56,6 @@ class SettingsRepositoryImpl @Inject constructor(
         // Int Keys
         val TEXT_COLOR = intPreferencesKey(AppConstants.PrefKeys.TEXT_COLOR)
         val CHIP_BACKGROUND_COLOR = intPreferencesKey(AppConstants.PrefKeys.CHIP_BACKGROUND_COLOR)
-        val SPLIT_MODE_THRESHOLD = intPreferencesKey(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
 
         // Float Keys
         val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
@@ -229,26 +228,6 @@ class SettingsRepositoryImpl @Inject constructor(
         safeEdit { it[PreferenceKeys.AUTO_LAUNCH_APP] = isEnabled }
     }
 
-    override val splitModeThresholdFlow: Flow<Int> = dataStore.data.safeData
-        .map { preferences ->
-            val threshold = preferences[PreferenceKeys.SPLIT_MODE_THRESHOLD]
-                ?: AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD
-
-            // Validierung auch beim Lesen, falls manipulierte Daten vorliegen
-            threshold.coerceInSafe(
-                AppConstants.SPLIT_MODE_THRESHOLD_MIN,
-                AppConstants.SPLIT_MODE_THRESHOLD_MAX
-            )
-        }
-
-    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
-        val validThreshold = thresholdPixels.coerceInSafe(
-            AppConstants.SPLIT_MODE_THRESHOLD_MIN,
-            AppConstants.SPLIT_MODE_THRESHOLD_MAX
-        )
-        safeEdit { it[PreferenceKeys.SPLIT_MODE_THRESHOLD] = validThreshold }
-    }
-
     override val layoutScaleStateFlow: Flow<Float> = dataStore.data.safeData
         .map { preferences ->
             preferences[PreferenceKeys.LAYOUT_SCALE]
@@ -333,7 +312,6 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.SHOW_ALARM)
             preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
             preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
-            preferences.remove(PreferenceKeys.SPLIT_MODE_THRESHOLD)
             preferences.remove(PreferenceKeys.SECURE_WINDOW)
             preferences.remove(PreferenceKeys.ROTATION_LOCKED)
 

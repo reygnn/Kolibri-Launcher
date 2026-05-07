@@ -17,7 +17,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSett
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -106,7 +105,6 @@ class LauncherViewModelTest {
     private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
     private lateinit var getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
-    private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
     private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
     private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
@@ -171,9 +169,6 @@ class LauncherViewModelTest {
         getAutoShowKeyboardSettingUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
 
-        getSplitModeThresholdUseCase = mockk(relaxed = true)
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
-
         getLayoutSettingsUseCase = mockk {
             every { layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
@@ -227,7 +222,6 @@ class LauncherViewModelTest {
         checkAppUsageUseCase = checkAppUsageUseCase,
         getAutoShowKeyboardSettingUseCase = getAutoShowKeyboardSettingUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
-        getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
         setLayoutScaleUseCase = setLayoutScaleUseCase,
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
@@ -608,14 +602,6 @@ class LauncherViewModelTest {
         coVerify { setContentTopMarginUseCase.invoke(AppConstants.DEFAULT_TOP_MARGIN) }
     }
 
-    @Test
-    fun `splitModeThreshold starts with zero`() = runTest {
-        val vm = createViewModel()
-        advanceUntilIdle()
-
-        assertEquals(0, vm.splitModeThreshold.value)
-    }
-
     // ===========================================
     // DELEGATION: WALLPAPER
     // ===========================================
@@ -732,7 +718,6 @@ class LauncherViewModelTest {
         vm.verticalPaddingState.value
         vm.isFontBoldState.value
         vm.contentTopMarginState.value
-        vm.splitModeThreshold.value
         vm.wallpaperState.value
         vm.isWallpaperEditMode.value
         vm.isLockingInProgress.value

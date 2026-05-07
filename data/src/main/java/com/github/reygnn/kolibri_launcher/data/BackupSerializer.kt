@@ -171,8 +171,7 @@ class BackupSerializer @Inject constructor() {
                 backup.settings.swipeDownToNotificationsEnabled != null,
             hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
                 backup.settings.autoLaunchApp != null,
-            hasPowerUserSettings = backup.settings.splitModeThreshold != null ||
-                backup.settings.secureWindow != null ||
+            hasPowerUserSettings = backup.settings.secureWindow != null ||
                 backup.settings.rotationLocked != null,
         )
     }
@@ -206,7 +205,6 @@ class BackupSerializer @Inject constructor() {
                 swipeRightApp = settings.getStrictString("swipe_right_app") ?: backup.settings.swipeRightApp,
                 textColor = settings.getStrictInt("text_color") ?: backup.settings.textColor,
                 chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: backup.settings.chipBackgroundColor,
-                splitModeThreshold = settings.getStrictInt("split_mode_threshold") ?: backup.settings.splitModeThreshold,
                 layoutScale = settings.getStrictFloat("layout_scale") ?: backup.settings.layoutScale,
                 verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
                 contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
@@ -318,7 +316,6 @@ class BackupSerializer @Inject constructor() {
             swipeRightApp = settingsJson.getStrictString("swipe_right_app"),
             textColor = settingsJson.getStrictInt("text_color"),
             chipBackgroundColor = settingsJson.getStrictInt("chip_bg_color"),
-            splitModeThreshold = settingsJson.getStrictInt("split_mode_threshold"),
             layoutScale = settingsJson.getStrictFloat("layout_scale"),
             verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
             contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),

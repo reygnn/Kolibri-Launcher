@@ -29,7 +29,6 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
-| 19 | `LayoutDelegate.splitModeThreshold` cold-`.value`-read auf `WhileSubscribed`-StateFlow | bekannt + bewusst gelassen — gleiche Bug-Klasse wie das ehemalige §18, aber self-correcting (cold-read liefert 0 = "Auto Mode", nächster Subscribe liefert echten Wert). Spike-Test vor Fix nötig | klein, niedrige Priorität |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | offen — entstanden aus der HomeGesture-Wrapper-Migration 2026-05-07 (Step 5 Round-6); User soll Velocity / Distanz / Dominance pro Richtung in Echtzeit einstellen können statt für „den Durchschnitt" zu hardcoden | mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
@@ -1601,47 +1600,6 @@ catch fängt sowieso ab.
 Aktuell ist das §17 vermutlich abgeschlossen; ggf. zur
 Snapshot-Schließung mit „nicht reproducibel im Production-Pfad"
 markieren.
-
----
-
-## 19. (bekannt + bewusst gelassen) `LayoutDelegate.splitModeThreshold` cold-`.value`-read
-
-**Aufgedeckt 2026-05-06** beim systematischen Audit aller
-`.first()`/`.value`-Reads auf `WhileSubscribed`-StateFlows nach dem
-Schwester-Bug-Fix in `BackupDataAssembler` + `HiddenAppsViewModel` +
-`SwipeActionsViewModel` (siehe `INSTALLED_APPS_PRIME_TIMEOUT_MS`-KDoc).
-
-`LayoutDelegate.splitModeThreshold` ist ein
-`stateIn(WhileSubscribed(FLOW_SHARING_TIMEOUT_MS), initialValue = 0)`
-auf `getSplitModeThresholdUseCase()`. Konsumiert nur an einer Stelle:
-`HomeFragment.kt:503` liest `viewModel.splitModeThreshold.value`
-während eines Scroll-Checks.
-
-**Strukturell:** wenn der Read aus einem cold subscriber-Zustand
-kommt (kein anderer UI-Konsument hat den StateFlow vorher primed),
-liefert `.value` den `initialValue = 0`. In `splitModeCalculator`
-wird `0` als „Auto Mode" interpretiert (per Doc-Kommentar in
-`LayoutDelegate.kt:87`).
-
-**Praktische Severity: niedrig — self-correcting.** Cold-read liefert
-0 = „Auto Mode". Nächster Subscribe (innerhalb des selben Frames,
-weil HomeFragment der Subscriber ist) liefert den echten User-Wert.
-Der eine kompromittierte Scroll-Check produziert höchstens eine
-Frame-späte Layout-Entscheidung, die die nächste Iteration korrigiert.
-
-**Vor einem Fix: Spike-Test.** Das self-correcting-Verhalten heißt
-auch, dass ein klassischer Vorher/Nachher-Vergleich schwer
-beobachtbar ist. Ein Test bräuchte präzises Race-Window-Setup
-(persistierter User-Wert ≠ 0, dann cold-Process simulieren, dann auf
-genau den `.value`-Read warten bevor der Subscribe-Path den
-Cache-Slot füllt). Lohnt sich nur, wenn der Bug irgendwann
-observable wird.
-
-**Empfehlung:** offen lassen. Wenn jemand den Fix einbaut, gleiche
-Pattern wie die anderen drei Sites (`withTimeoutOrNull { first {
-it != 0 } }`), aber das `0`-Predicate kollidiert mit dem User-
-Wert „Auto Mode" — braucht ein anderes Sentinel (`null` als
-`initialValue`?), was wieder Konsumenten ändert.
 
 ---
 

@@ -23,7 +23,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSett
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -106,7 +105,6 @@ class LauncherViewModelContractTest {
     private val homeSettingsFlow = MutableStateFlow(HomeSettings())
     private val wallpaperStateFlow = MutableStateFlow(WallpaperState.NONE)
     private val uiColorsFlow = MutableStateFlow(UiColorsState())
-    private val splitThresholdFlow = MutableStateFlow(0)
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     private val fontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
@@ -201,9 +199,6 @@ class LauncherViewModelContractTest {
         val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns wallpaperStateFlow
 
-        val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase = mockk(relaxed = true)
-        every { getSplitModeThresholdUseCase.invoke() } returns splitThresholdFlow
-
         val getLayoutSettingsUseCase: GetLayoutSettingsUseCase = mockk {
             every { layoutScale } returns layoutScaleFlow
             every { verticalPadding } returns verticalPaddingFlow
@@ -243,7 +238,6 @@ class LauncherViewModelContractTest {
             checkAppUsageUseCase = checkAppUsageUseCase,
             getAutoShowKeyboardSettingUseCase = getAutoShowKeyboardSettingUseCase,
             getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
-            getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
             getLayoutSettingsUseCase = getLayoutSettingsUseCase,
             setLayoutScaleUseCase = setLayoutScaleUseCase,
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
@@ -560,17 +554,12 @@ class LauncherViewModelContractTest {
         assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, vm.verticalPaddingState.value)
         assertEquals(AppConstants.DEFAULT_FONT_BOLD, vm.isFontBoldState.value)
         assertEquals(0f, vm.contentTopMarginState.value)
-        assertEquals(0, vm.splitModeThreshold.value)
-
-        // Subscribe to WhileSubscribed flows (like a Fragment would)
-        val thresholdJob = launch(UnconfinedTestDispatcher()) { vm.splitModeThreshold.collect {} }
 
         // Simulate settings change from data layer
         layoutScaleFlow.value = 0.8f
         verticalPaddingFlow.value = 0.5f
         fontBoldFlow.value = !AppConstants.DEFAULT_FONT_BOLD
         contentTopMarginFlow.value = 0.3f
-        splitThresholdFlow.value = 100
         advanceUntilIdle()
 
         // Fragment would see these updates
@@ -578,9 +567,6 @@ class LauncherViewModelContractTest {
         assertEquals(0.5f, vm.verticalPaddingState.value)
         assertEquals(!AppConstants.DEFAULT_FONT_BOLD, vm.isFontBoldState.value)
         assertEquals(0.3f, vm.contentTopMarginState.value)
-        assertEquals(100, vm.splitModeThreshold.value)
-
-        thresholdJob.cancel()
     }
 
 
@@ -793,15 +779,11 @@ class LauncherViewModelContractTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        // Subscribe to WhileSubscribed flows (like a Fragment would)
-        val thresholdJob = launch(UnconfinedTestDispatcher()) { vm.splitModeThreshold.collect {} }
-
         // Simulate data layer changes across all domains
         favoriteAppsFlow.value = UiState.Success(
             FavoriteAppsResult(listOf(testApp), isFallback = false)
         )
         layoutScaleFlow.value = 0.6f
-        splitThresholdFlow.value = 42
         uiColorsFlow.value = UiColorsState(textColor = 0xFFFF00)
         wallpaperStateFlow.value = WallpaperState(imageUri = "file:///test.jpg")
         timeBasedEventsFlow.value = listOf(
@@ -814,12 +796,9 @@ class LauncherViewModelContractTest {
         // Fragment would see all of these
         assertTrue(vm.favoriteAppsState.value is UiState.Success)
         assertEquals(0.6f, vm.layoutScaleState.value)
-        assertEquals(42, vm.splitModeThreshold.value)
         assertEquals(0xFFFF00, vm.uiColorsState.value.textColor)
         assertTrue(vm.wallpaperState.value.hasWallpaper)
         assertEquals(1, vm.uiState.value.timeBasedEvents.size)
         assertEquals("77%", vm.uiState.value.batteryString)
-
-        thresholdJob.cancel()
     }
 }

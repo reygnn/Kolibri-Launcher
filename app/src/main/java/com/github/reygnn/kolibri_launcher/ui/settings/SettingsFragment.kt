@@ -104,7 +104,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
-    private var splitModeThresholdPreference: EditTextPreference? = null
     private var secureWindowSwitchPreference: SwitchPreferenceCompat? = null
     private var rotationLockedSwitchPreference: SwitchPreferenceCompat? = null
 
@@ -233,50 +232,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 true
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
-                false
-            }
-        }
-
-        splitModeThresholdPreference =
-            findPreference(AppConstants.PrefKeys.SPLIT_MODE_THRESHOLD)
-        splitModeThresholdPreference?.setOnPreferenceChangeListener { _, newValue ->
-            try {
-                val thresholdString =
-                    newValue as? String ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN.toString()
-                val threshold =
-                    thresholdString.toIntOrNull() ?: AppConstants.SPLIT_MODE_THRESHOLD_MIN
-
-                if (threshold !in AppConstants.SPLIT_MODE_THRESHOLD_MIN..AppConstants.SPLIT_MODE_THRESHOLD_MAX) {
-                    Toast.makeText(
-                        requireContext(),
-                        R.string.split_mode_threshold_invalid,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    false // Verhindere das Update
-                } else {
-                    // Speichere den validen Wert
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        settingsRepository.setSplitModeThreshold(threshold)
-
-                        // Zeige Bestätigung
-                        Toast.makeText(
-                            requireContext(),
-                            getString(R.string.split_mode_threshold_saved, threshold),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                    true // Erlaube das Update
-                }
-            } catch (e: NumberFormatException) {
-                TimberWrapper.silentError(e, "Invalid number format for split-mode threshold")
-                Toast.makeText(
-                    requireContext(),
-                    R.string.split_mode_threshold_invalid,
-                    Toast.LENGTH_SHORT
-                ).show()
-                false
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in split-mode threshold change listener")
                 false
             }
         }
@@ -806,46 +761,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
-                // Observer für Split-Mode Threshold
-                launch {
-                    try {
-                        settingsRepository.splitModeThresholdFlow.collect { threshold ->
-                            if (!isAdded || isDetached) return@collect
-                            splitModeThresholdPreference?.apply {
-                                text = threshold.toString()
-
-                                val description = when {
-                                    threshold == AppConstants.SPLIT_MODE_THRESHOLD_MIN -> getString(
-                                        R.string.split_mode_threshold_desc_auto
-                                    )
-
-                                    threshold == AppConstants.SPLIT_MODE_THRESHOLD_MAX -> getString(
-                                        R.string.split_mode_threshold_desc_max
-                                    )
-
-                                    threshold in (AppConstants.SPLIT_MODE_THRESHOLD_MIN + 1)..AppConstants.SPLIT_MODE_TINKERING_LIMIT ->
-                                        getString(R.string.split_mode_threshold_desc_tinkering)
-
-                                    else ->
-                                        getString(
-                                            R.string.split_mode_threshold_desc_custom,
-                                            threshold
-                                        )
-                                }
-
-                                summary = getString(
-                                    R.string.split_mode_threshold_summary,
-                                    "$threshold px",
-                                    description
-                                )
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in splitModeThreshold flow collection")
-                    }
-                }
 
                 // Observer für Secure Window Setting
                 launch {
@@ -1106,7 +1021,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         alarmSwitchPreference?.onPreferenceChangeListener = null
         autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
         autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
-        splitModeThresholdPreference?.onPreferenceChangeListener = null
         secureWindowSwitchPreference?.onPreferenceChangeListener = null
         rotationLockedSwitchPreference?.onPreferenceChangeListener = null
 
@@ -1114,7 +1028,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         alarmSwitchPreference = null
         autoKeyboardSwitchPreference = null
         autoLaunchAppSwitchPreference = null
-        splitModeThresholdPreference = null
         secureWindowSwitchPreference = null
         rotationLockedSwitchPreference = null
 

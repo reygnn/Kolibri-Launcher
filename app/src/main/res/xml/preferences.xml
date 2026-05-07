@@ -166,17 +166,6 @@
         android:title="@string/category_advanced_title"
         app:iconSpaceReserved="false">
 
-        <EditTextPreference
-            android:key="split_mode_threshold"
-            android:title="@string/split_mode_threshold_title"
-            android:summary="@string/split_mode_threshold_summary"
-            android:defaultValue="0"
-            android:inputType="number"
-            android:dialogTitle="@string/split_mode_threshold_dialog_title"
-            android:dialogMessage="@string/split_mode_threshold_dialog_message"
-            app:iconSpaceReserved="false"
-            app:useSimpleSummaryProvider="false" />
-            
         <SwitchPreferenceCompat
             android:key="secure_window"
             android:title="@string/secure_window_title"

@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -39,7 +38,6 @@ class LayoutDelegateTest {
     private val sentEvents = mutableListOf<UiEvent>()
 
     private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
-    private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
     private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
@@ -56,9 +54,6 @@ class LayoutDelegateTest {
             every { contentTopMargin } returns flowOf(0f)
         }
 
-        getSplitModeThresholdUseCase = mockk(relaxed = true)
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
-
         setLayoutScaleUseCase = mockk(relaxed = true)
         setVerticalPaddingUseCase = mockk(relaxed = true)
         setFontBoldUseCase = mockk(relaxed = true)
@@ -72,11 +67,9 @@ class LayoutDelegateTest {
     )
 
     private fun createDelegate(
-        getLayoutSettingsUseCase: GetLayoutSettingsUseCase = this.getLayoutSettingsUseCase,
-        getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase = this.getSplitModeThresholdUseCase
+        getLayoutSettingsUseCase: GetLayoutSettingsUseCase = this.getLayoutSettingsUseCase
     ) = LayoutDelegate(
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
-        getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
         setLayoutScaleUseCase = setLayoutScaleUseCase,
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
@@ -118,14 +111,6 @@ class LayoutDelegateTest {
         advanceUntilIdle()
 
         assertEquals(0f, delegate.contentTopMarginState.value)
-    }
-
-    @Test
-    fun `splitModeThreshold starts with zero`() = runTest {
-        val delegate = createDelegate()
-        advanceUntilIdle()
-
-        assertEquals(0, delegate.splitModeThreshold.value)
     }
 
     // ===========================================

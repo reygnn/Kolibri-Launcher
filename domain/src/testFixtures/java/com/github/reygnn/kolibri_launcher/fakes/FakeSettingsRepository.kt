@@ -64,7 +64,6 @@ class FakeSettingsRepository : SettingsRepository {
     private val swipeDownFlow = MutableStateFlow(AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
     private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
-    private val splitModeThresholdFlowState = MutableStateFlow(AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD)
     private val secureWindowFlowState = MutableStateFlow(AppConstants.DEFAULT_SECURE_WINDOW)
 
     // Mode Defaults
@@ -132,16 +131,6 @@ class FakeSettingsRepository : SettingsRepository {
         get() = autoLaunchAppFlowState.value
         set(value) { autoLaunchAppFlowState.value = value }
 
-    var splitModeThreshold: Int
-        get() = splitModeThresholdFlowState.value
-        set(value) {
-            // FIX: Magic Numbers 0 und 512 ersetzt
-            splitModeThresholdFlowState.value = value.coerceInSafe(
-                AppConstants.SPLIT_MODE_THRESHOLD_MIN,
-                AppConstants.SPLIT_MODE_THRESHOLD_MAX
-            )
-        }
-
     var currentSortOrder: SortOrder
         get() = sortOrderState.value
         private set(value) { sortOrderState.value = value }
@@ -169,7 +158,6 @@ class FakeSettingsRepository : SettingsRepository {
     override val showAlarmFlow: Flow<Boolean> = alarmFlow
     override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
     override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
-    override val splitModeThresholdFlow: Flow<Int> = splitModeThresholdFlowState
     override val secureWindowFlow: Flow<Boolean> = secureWindowFlowState
 
 
@@ -235,10 +223,6 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = isEnabled
     }
 
-    override suspend fun setSplitModeThreshold(thresholdPixels: Int) {
-        splitModeThreshold = thresholdPixels
-    }
-
     override suspend fun setSortOrder(sortOrder: SortOrder) {
         sortOrderState.value = sortOrder
     }
@@ -272,7 +256,6 @@ class FakeSettingsRepository : SettingsRepository {
         swipeDown = AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS
         autoShowKeyboard = AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
-        splitModeThreshold = AppConstants.DEFAULT_SPLIT_MODE_THRESHOLD
 
         readabilityModeState.value = AppConstants.DEFAULT_READABILITY_MODE
         sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER

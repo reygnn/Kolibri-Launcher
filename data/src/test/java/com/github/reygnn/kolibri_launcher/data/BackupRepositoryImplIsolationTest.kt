@@ -91,8 +91,6 @@ class BackupRepositoryImplIsolationTest {
     private val baselineAutoKeyboard = false
     private val baselineAutoLaunch = false
 
-    private val baselineThreshold = 0
-
     // Target (Zustand im Backup)
     private val targetFavorites = setOf("com.target/TargetActivity")
     private val targetOrder = listOf("com.target/TargetActivity")
@@ -118,8 +116,6 @@ class BackupRepositoryImplIsolationTest {
 
     private val targetAutoKeyboard = true
     private val targetAutoLaunch = true
-
-    private val targetThreshold = 100
 
     @Before
     fun setup() {
@@ -190,8 +186,6 @@ class BackupRepositoryImplIsolationTest {
 
         fakeSettingsRepo.autoShowKeyboard = baselineAutoKeyboard
         fakeSettingsRepo.autoLaunchApp = baselineAutoLaunch
-
-        fakeSettingsRepo.splitModeThreshold = baselineThreshold
     }
 
     private fun createTargetBackupJson(): String {
@@ -214,8 +208,7 @@ class BackupRepositoryImplIsolationTest {
             doubleTapToLockEnabled = targetDoubleTap,
             swipeDownToNotificationsEnabled = targetSwipeDown,
             autoShowKeyboard = targetAutoKeyboard,
-            autoLaunchApp = targetAutoLaunch,
-            splitModeThreshold = targetThreshold
+            autoLaunchApp = targetAutoLaunch
         )
         val backup = BackupData(
             version = "1.0.0",
@@ -250,7 +243,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -273,7 +265,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -296,7 +287,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -318,7 +308,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -341,7 +330,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -364,7 +352,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -392,7 +379,6 @@ class BackupRepositoryImplIsolationTest {
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -415,7 +401,6 @@ class BackupRepositoryImplIsolationTest {
         assertThemeUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -438,7 +423,6 @@ class BackupRepositoryImplIsolationTest {
         assertThemeUnchanged()
         assertGesturesUnchanged()
         assertQoLUnchanged()
-        assertPowerUserUnchanged()
     }
 
     @Test
@@ -461,29 +445,6 @@ class BackupRepositoryImplIsolationTest {
         assertThemeUnchanged()
         assertGesturesUnchanged()
         assertTimeEventsUnchanged()
-        assertPowerUserUnchanged()
-    }
-
-    @Test
-    fun `ISOLATION 10 - Power User Settings`() = runTest {
-        // FIX: Nutze Helper
-        val options = createIsolationOptions(importPowerUserSettings = true)
-        val result = backupManager.importFromJson(createTargetBackupJson(), options)
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // CHANGED:
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(targetThreshold)
-
-        // UNCHANGED:
-        assertFavoritesUnchanged()
-        assertOrderUnchanged()
-        assertHiddenUnchanged()
-        assertNamesUnchanged()
-        assertSwipesUnchanged()
-        assertThemeUnchanged()
-        assertGesturesUnchanged()
-        assertTimeEventsUnchanged()
-        assertQoLUnchanged()
     }
 
     // ========================================================================
@@ -566,10 +527,6 @@ class BackupRepositoryImplIsolationTest {
     private fun assertQoLUnchanged() {
         assertThat(fakeSettingsRepo.autoShowKeyboard).isEqualTo(baselineAutoKeyboard)
         assertThat(fakeSettingsRepo.autoLaunchApp).isEqualTo(baselineAutoLaunch)
-    }
-
-    private fun assertPowerUserUnchanged() {
-        assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(baselineThreshold)
     }
 
     private fun createApp(pkg: String, cls: String) = AppInfo(

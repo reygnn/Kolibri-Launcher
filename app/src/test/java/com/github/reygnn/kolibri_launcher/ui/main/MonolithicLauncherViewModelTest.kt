@@ -34,7 +34,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSett
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -183,7 +182,6 @@ class MonolithicLauncherViewModelTest {
     private val checkAppUsageUseCase: CheckAppUsageUseCase = mockk(relaxed = true)
     private val observeHomeSettingsUseCase: ObserveHomeSettingsUseCase = mockk(relaxed = true)
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase = mockk(relaxed = true)
-    private val getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase = mockk(relaxed = true)
     private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase = mockk(relaxed = true)
     private val setWallpaperImageUseCase: SetWallpaperImageUseCase = mockk(relaxed = true)
@@ -219,7 +217,6 @@ class MonolithicLauncherViewModelTest {
         every { observeInstalledAppsUseCase.invoke() } returns flowOf(AppLoadResult.Success)
 
         every { observeHomeSettingsUseCase.invoke() } returns flowOf(HomeSettings())
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
 
         every { getLayoutSettingsUseCase.layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
         every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
@@ -258,7 +255,6 @@ class MonolithicLauncherViewModelTest {
             checkAppUsageUseCase,
             getAutoShowKeyboardSettingUseCase,
             getTextShadowEnabledUseCase,
-            getSplitModeThresholdUseCase,
             getLayoutSettingsUseCase,
             setLayoutScaleUseCase,
             setVerticalPaddingUseCase,
@@ -1459,51 +1455,6 @@ class MonolithicLauncherViewModelTest {
     }
 
     @Test
-    fun `splitModeThreshold - reflects value from UseCase`() = runTest {
-        // Arrange
-        val expectedThreshold = 250
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(expectedThreshold)
-
-        // Act
-        setupViewModel()
-
-        // Assert mit Turbine
-        viewModel.splitModeThreshold.test {
-            // StateFlow emittiert sofort den Initialwert (0) beim Subscriben
-            val initialValue = awaitItem()
-
-            // Wenn der Flow extrem schnell war, könnte es schon 250 sein,
-            // aber meistens kommt erst 0, dann 250.
-            if (initialValue == expectedThreshold) {
-                return@test
-            }
-
-            // Jetzt warten wir auf das Update vom UseCase, da wir "subscribed" sind
-            assertEquals(expectedThreshold, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - updates dynamically when UseCase emits new value`() = runTest {
-        // Arrange: Wir nutzen einen MutableStateFlow, um Werte zur Laufzeit zu ändern
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            // Initialer Wert (0)
-            assertEquals(0, awaitItem())
-
-            // Act: Simuliere Änderung in den Settings (z.B. Slider bewegt auf 150px)
-            thresholdFlow.value = 150
-
-            // Assert: ViewModel muss den neuen Wert propagieren
-            assertEquals(150, awaitItem())
-        }
-    }
-
-    @Test
     fun `refreshDynamicUiData - updates time but preserves battery state`() = runTest {
         // 1. Arrange: Wir simulieren einen System-Intent mit 88% Akku
         val batteryIntent = mockk<Intent>()
@@ -1543,9 +1494,6 @@ class MonolithicLauncherViewModelTest {
     fun `goldenStateIntegration_updatesAllComponentsCorrectly`() = runTest {
 
         // === ARRANGE ===
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
         val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
         every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
 
@@ -1554,13 +1502,7 @@ class MonolithicLauncherViewModelTest {
 
         setupViewModel()
 
-        // Simuliert einen UI-Subscriber, damit WhileSubscribed aktiv wird
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-
         // === ACT ===
-        thresholdFlow.value = 300
         colorsFlow.value = UiColorsState(textColor = Color.YELLOW)
         eventsFlow.value = listOf(
             TimeBasedEvent(System.currentTimeMillis(), "Jubiläum", TimeBasedEventType.CALENDAR)
@@ -1570,487 +1512,13 @@ class MonolithicLauncherViewModelTest {
 
         // === ASSERT ===
 
-        // 1. Threshold
-        assertEquals(300, viewModel.splitModeThreshold.value)
-
-        // 2. Colors
+        // 1. Colors
         assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
 
-        // 3. Events
+        // 2. Events
         val currentState = viewModel.uiState.value
         assertEquals(1, currentState.timeBasedEvents.size)
         assertEquals("Jubiläum", currentState.timeBasedEvents.first().title)
-    }
-
-    // ========== ZUSÄTZLICHE SPLIT-MODE THRESHOLD TESTS ==========
-    // Diese Tests zu LauncherViewModelTest.kt hinzufügen
-
-    @Test
-    fun `splitModeThreshold - default value is 0 (Auto mode)`() = runTest {
-        // Arrange
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
-
-        // Act
-        setupViewModel()
-
-        // Assert
-        viewModel.splitModeThreshold.test {
-            assertEquals(0, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - maximum value 512 works correctly`() = runTest {
-        // Arrange
-        val maxThreshold = 512
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(maxThreshold)
-
-        // Act
-        setupViewModel()
-
-        // Assert
-        viewModel.splitModeThreshold.test {
-            val initialValue = awaitItem()
-            if (initialValue == maxThreshold) {
-                return@test
-            }
-            assertEquals(maxThreshold, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - typical power-user value 42px works`() = runTest {
-        // Arrange
-        val recommendedThreshold = 42
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(recommendedThreshold)
-
-        // Act
-        setupViewModel()
-
-        // Assert
-        viewModel.splitModeThreshold.test {
-            val initialValue = awaitItem()
-            if (initialValue == recommendedThreshold) {
-                return@test
-            }
-            assertEquals(recommendedThreshold, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - rapid changes are all propagated`() = runTest {
-        // Arrange: Simuliere schnelle Slider-Bewegung
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            assertEquals(0, awaitItem())
-
-            // Act: Simuliere User bewegt Slider schnell
-            thresholdFlow.value = 50
-            assertEquals(50, awaitItem())
-
-            thresholdFlow.value = 100
-            assertEquals(100, awaitItem())
-
-            thresholdFlow.value = 150
-            assertEquals(150, awaitItem())
-
-            thresholdFlow.value = 42  // User landet bei 42
-            assertEquals(42, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - change during app launch does not interfere`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        // WICHTIG: Erst nach setupViewModel() aufrufen!
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-
-        advanceUntilIdle()
-
-        // Act: Gleichzeitig App Launch + Threshold-Änderung
-        launch {
-            viewModel.onAppClicked(app1)
-        }
-        launch {
-            thresholdFlow.value = 100
-        }
-
-        advanceUntilIdle()
-
-        // Assert: Beide Operationen sollten erfolgreich sein
-        coVerify { recordAppLaunchUseCase.invoke(app1) }
-        assertEquals(100, viewModel.splitModeThreshold.value)
-    }
-
-    @Test
-    fun `splitModeThreshold - survives UseCase throwing exception`() = runTest {
-        // Arrange: UseCase wirft beim ersten Mal Exception, dann funktioniert es
-        var callCount = 0
-        every { getSplitModeThresholdUseCase.invoke() } returns flow {
-            callCount++
-            if (callCount == 1) {
-                throw RuntimeException("Settings corrupted")
-            }
-            emit(42)
-        }
-
-        // Act
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Assert: ViewModel sollte überleben und Default haben
-        assertNotNull(viewModel.splitModeThreshold)
-        // Der Flow sollte den Fehler geschluckt haben, initialValue bleibt
-        assertEquals(0, viewModel.splitModeThreshold.value)
-    }
-
-    @Test
-    fun `splitModeThreshold - preset values work correctly`() = runTest {
-        // Test alle empfohlenen Preset-Werte
-        val presetValues = listOf(0, 42, 60, 100, 512)
-
-        for (preset in presetValues) {
-            // Arrange
-            val thresholdFlow = MutableStateFlow(preset)
-            every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-            // Act
-            setupViewModel()
-
-            // Assert
-            viewModel.splitModeThreshold.test {
-                val value = awaitItem()
-                assertTrue(
-                    value == preset,
-                    "Expected preset $preset but got $value"
-                )
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - zero to non-zero transition works`() = runTest {
-        // Arrange: User aktiviert Split-Mode-Threshold zum ersten Mal
-        val thresholdFlow = MutableStateFlow(0)  // Start: Auto-Mode
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            assertEquals(0, awaitItem())  // Initial: Auto
-
-            // Act: User aktiviert Power-User-Modus
-            thresholdFlow.value = 42
-
-            // Assert: Wechsel zu manuellem Threshold
-            assertEquals(42, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - non-zero to zero transition works`() = runTest {
-        // Arrange: User deaktiviert Split-Mode-Threshold
-        val thresholdFlow = MutableStateFlow(100)  // Start: Manuell
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            skipItems(1)  // Skip initial
-
-            // Act: User wechselt zurück zu Auto
-            thresholdFlow.value = 0
-
-            // Assert: Zurück zu Auto-Mode
-            assertEquals(0, awaitItem())
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - changes while battery and time update simultaneously`() = runTest {
-        // Arrange: Realistische Multi-Update-Situation
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        // WICHTIG: Erst nach setupViewModel() aufrufen!
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-
-        advanceUntilIdle()
-
-        // Act: Alles gleichzeitig
-        launch { thresholdFlow.value = 100 }
-        launch { viewModel.updateBatteryLevel(75, 100) }
-        launch { viewModel.updateTimeAndDate() }
-
-        advanceUntilIdle()
-
-        // Assert: Alle Updates erfolgreich
-        assertEquals(100, viewModel.splitModeThreshold.value)
-        assertEquals("75%", viewModel.uiState.value.batteryString)
-        assertTrue(viewModel.uiState.value.timeString.isNotEmpty())
-    }
-
-    @Test
-    fun `splitModeThreshold - multiple subscribers receive same values`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        // Act: Zwei "Observers" gleichzeitig (wie HomeFragment + SettingsFragment)
-        val subscriber1 = mutableListOf<Int>()
-        val subscriber2 = mutableListOf<Int>()
-
-        val job1 = launch {
-            viewModel.splitModeThreshold.collect { subscriber1.add(it) }
-        }
-
-        val job2 = launch {
-            viewModel.splitModeThreshold.collect { subscriber2.add(it) }
-        }
-
-        advanceUntilIdle()
-
-        thresholdFlow.value = 42
-        advanceUntilIdle()
-
-        thresholdFlow.value = 100
-        advanceUntilIdle()
-
-        job1.cancel()
-        job2.cancel()
-
-        // Assert: Beide Subscriber haben alle Werte erhalten
-        assertTrue(subscriber1.contains(0))
-        assertTrue(subscriber1.contains(42))
-        assertTrue(subscriber1.contains(100))
-
-        assertTrue(subscriber2.contains(0))
-        assertTrue(subscriber2.contains(42))
-        assertTrue(subscriber2.contains(100))
-    }
-
-    @Test
-    fun `splitModeThreshold - Flow is hot (StateFlow behavior)`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(42)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Act: Ändere Wert BEVOR wir subscriben
-        thresholdFlow.value = 100
-        advanceUntilIdle()
-
-        // Assert: Späte Subscriber bekommen den aktuellen Wert (StateFlow-Verhalten)
-        viewModel.splitModeThreshold.test {
-            val currentValue = awaitItem()
-            assertTrue(
-                currentValue == 100,
-                "StateFlow should provide current value to late subscribers"
-            )
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - ViewModel recreation preserves UseCase subscription`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(42)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        // --- VM 1 ---
-        setupViewModel()
-
-        // Subscriber für VM 1
-        val job1 = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-        advanceUntilIdle()
-
-        // Change Value
-        thresholdFlow.value = 100
-        advanceUntilIdle()
-        assertEquals(100, viewModel.splitModeThreshold.value)
-
-        // Destroy VM 1
-        job1.cancel()
-
-        // --- VM 2 (Recreation) ---
-        setupViewModel() // Überschreibt die 'viewModel' Variable
-
-        // Subscriber für VM 2 starten
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-        advanceUntilIdle()
-
-        // Assert: VM 2 sollte sofort den aktuellen Wert vom Repo (100) haben
-        assertEquals(100, viewModel.splitModeThreshold.value)
-    }
-
-    @Test
-    fun `splitModeThreshold - extreme rapid changes are handled gracefully`() = runTest {
-        // Arrange: Stress-Test
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        val receivedValues = mutableListOf<Int>()
-        val job = launch {
-            viewModel.splitModeThreshold.collect { receivedValues.add(it) }
-        }
-
-        advanceUntilIdle()
-
-        // Act: 100 schnelle Änderungen
-        repeat(100) { i ->
-            thresholdFlow.value = i % 512  // Rotiere durch alle Werte
-        }
-        advanceUntilIdle()
-
-        job.cancel()
-
-        // Assert: Keine Crashes, Flow funktioniert noch
-        assertTrue(receivedValues.size > 0, "Should have received values")
-        assertNotNull(viewModel.splitModeThreshold.value)
-    }
-
-    @Test
-    fun `splitModeThreshold - integration with homeSettings changes`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(0)
-        val homeSettingsFlow = MutableStateFlow(HomeSettings())
-
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-        every { observeHomeSettingsUseCase.invoke() } returns homeSettingsFlow
-
-        setupViewModel(enableTestMode = false)
-
-        // WICHTIG: Erst nach setupViewModel() aufrufen!
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-
-        // Act: Beide Settings gleichzeitig ändern
-        launch {
-            thresholdFlow.value = 100
-            homeSettingsFlow.value = HomeSettings(sortOrder = SortOrder.TIME_WEIGHTED_USAGE)
-        }
-
-        advanceUntilIdle()
-
-        // Assert: Beide Updates erfolgreich
-        assertEquals(100, viewModel.splitModeThreshold.value)
-        viewModel.sortOrder.asFlow().test {
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-// ========== BOUNDARY/EDGE CASE TESTS ==========
-
-    @Test
-    fun `splitModeThreshold - boundary value 1 works (smallest non-zero)`() = runTest {
-        val thresholdFlow = MutableStateFlow(1)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            skipItems(1)
-            assertEquals(1, viewModel.splitModeThreshold.value)
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - boundary value 511 works (max minus 1)`() = runTest {
-        val thresholdFlow = MutableStateFlow(511)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            skipItems(1)
-            assertEquals(511, viewModel.splitModeThreshold.value)
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - toggle between two values repeatedly`() = runTest {
-        // Realistisches Szenario: User experimentiert mit zwei Werten
-        val thresholdFlow = MutableStateFlow(0)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        viewModel.splitModeThreshold.test {
-            assertEquals(0, awaitItem())
-
-            // Hin und her zwischen Auto und 42
-            repeat(10) { iteration ->
-                val newValue = if (iteration % 2 == 0) 42 else 0
-                thresholdFlow.value = newValue
-                assertEquals(newValue, awaitItem())
-            }
-        }
-    }
-
-    @Test
-    fun `splitModeThreshold - survives ViewModel being in background`() = runTest {
-        // Arrange
-        val thresholdFlow = MutableStateFlow(42)
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
-
-        setupViewModel()
-
-        // Wir simulieren hier KEINEN dauerhaften Collector im backgroundScope,
-        // weil wir das "Background"-Verhalten (kein Subscriber) testen wollen.
-        // Stattdessen nutzen wir temporary jobs.
-
-        // 1. App im Vordergrund (Subscriber da)
-        val foregroundJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-        advanceUntilIdle()
-        assertEquals(42, viewModel.splitModeThreshold.value)
-
-        // 2. App geht in Hintergrund (Subscriber weg)
-        foregroundJob.cancel()
-
-        // WhileSubscribed(5000) hält den Flow noch 5 Sekunden am Leben.
-        // Wir ändern den Wert "im Hintergrund"
-        thresholdFlow.value = 100
-
-        // Da wir im Test keine echte Zeit haben, simulieren wir,
-        // dass wir innerhalb des 5s Fensters zurückkommen.
-
-        // 3. App kommt zurück in den Vordergrund
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
-        advanceUntilIdle()
-
-        // Assert: Der Wert sollte aktualisiert sein
-        assertEquals(100, viewModel.splitModeThreshold.value)
     }
 
     // ========== LAYOUT SETTINGS TESTS ==========
@@ -2210,21 +1678,14 @@ class MonolithicLauncherViewModelTest {
         val scaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
         val paddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         val boldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
-        val thresholdFlow = MutableStateFlow(0)
         val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
 
         every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
         every { getLayoutSettingsUseCase.verticalPadding } returns paddingFlow
         every { getLayoutSettingsUseCase.isFontBold } returns boldFlow
-        every { getSplitModeThresholdUseCase.invoke() } returns thresholdFlow
         every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
 
         setupViewModel()
-
-        // WICHTIG: Subscriber für WhileSubscribed Flow
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.splitModeThreshold.collect {}
-        }
 
         advanceUntilIdle()
 
@@ -2232,7 +1693,6 @@ class MonolithicLauncherViewModelTest {
         scaleFlow.value = 0.8f
         paddingFlow.value = 0.6f
         boldFlow.value = !AppConstants.DEFAULT_FONT_BOLD
-        thresholdFlow.value = 100
         colorsFlow.value = UiColorsState(textColor = Color.YELLOW)
 
         advanceUntilIdle()
@@ -2240,7 +1700,6 @@ class MonolithicLauncherViewModelTest {
         assertEquals(0.8f, viewModel.layoutScaleState.value)
         assertEquals(0.6f, viewModel.verticalPaddingState.value)
         assertEquals(!AppConstants.DEFAULT_FONT_BOLD, viewModel.isFontBoldState.value)
-        assertEquals(100, viewModel.splitModeThreshold.value)
         assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
     }
 

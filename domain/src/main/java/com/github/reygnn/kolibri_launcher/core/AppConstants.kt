@@ -13,10 +13,6 @@ object AppConstants {
     const val SWIPE_VELOCITY_THRESHOLD = 50
     const val DOUBLE_CLICK_THRESHOLD = 300L
     const val LOCK_GESTURE_BLOCK_DURATION_MS = 1000L
-    const val LANDSCAPE_SPLIT_SCROLL_WEIGHT = 40F
-    const val LANDSCAPE_SPLIT_GESTURE_WEIGHT = (100F - LANDSCAPE_SPLIT_SCROLL_WEIGHT)
-    const val PORTRAIT_SPLIT_SCROLL_WEIGHT = 55F
-    const val PORTRAIT_SPLIT_GESTURE_WEIGHT = (100F - PORTRAIT_SPLIT_SCROLL_WEIGHT)
 
 
     // Text Shadow Constants (verwendet in HomeFragment)
@@ -44,8 +40,6 @@ object AppConstants {
     const val CONTENT_TOP_MARGIN_SCALE_MIN = 0.0f
     const val CONTENT_TOP_MARGIN_SCALE_MAX = 2.0f
 
-    const val SPLIT_MODE_THRESHOLD_MIN = 0
-    const val SPLIT_MODE_THRESHOLD_MAX = 512
     const val DEFAULT_ROTATION_LOCKED = false
 
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
@@ -98,9 +92,6 @@ object AppConstants {
      * Flow bleibt 5 Sekunden nach letztem Collector aktiv.
      */
     const val FLOW_SHARING_TIMEOUT_MS = 5000L
-
-    // Split Mode Logic
-    const val SPLIT_MODE_TINKERING_LIMIT = 200 // Grenze für "Bastler"-Beschreibung
 
     // URLs
     const val URL_ABOUT_PAGE = "https://docs.kolibri-launcher.ch/about.html"
@@ -187,9 +178,6 @@ object AppConstants {
         const val AUTO_SHOW_KEYBOARD = "auto_show_keyboard_drawer"
         const val AUTO_LAUNCH_APP = "auto_launch_app"
 
-        // Power User
-        const val SPLIT_MODE_THRESHOLD = "split_mode_threshold"
-
         // Gestures
         const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
         const val SWIPE_DOWN_TO_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
@@ -234,8 +222,6 @@ object AppConstants {
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
     const val DEFAULT_SECURE_WINDOW = false
-
-    const val DEFAULT_SPLIT_MODE_THRESHOLD = 0
 
     // Readability Modes
     const val READABILITY_MODE_SMART_CONTRAST = "smart_contrast"

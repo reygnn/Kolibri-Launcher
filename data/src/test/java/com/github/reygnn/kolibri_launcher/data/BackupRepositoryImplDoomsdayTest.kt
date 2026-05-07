@@ -292,7 +292,6 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo.swipeDown = true
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
-        fakeSettingsRepo.splitModeThreshold = 60
 
         val jsonString = backupManager.exportToJson()
         val backup = json.decodeFromString<BackupData>(jsonString)
@@ -310,7 +309,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
         Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
         Truth.assertThat(backup.settings.autoLaunchApp).isTrue()
-        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(60)
     }
 
     @Test
@@ -325,36 +323,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(backup.timestamp).isAtLeast(beforeExport)
         Truth.assertThat(backup.timestamp).isAtMost(afterExport)
         Truth.assertThat(backup.timestamp).isGreaterThan(0L)
-    }
-
-    @Test
-    fun `exportToJson - with splitModeThreshold enabled - includes in backup`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 42
-
-        val jsonString = backupManager.exportToJson()
-        val backup = json.decodeFromString<BackupData>(jsonString)
-
-        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(42)
-    }
-
-    @Test
-    fun `exportToJson - with splitModeThreshold at default zero - returns null`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 0
-
-        val jsonString = backupManager.exportToJson()
-        val backup = json.decodeFromString<BackupData>(jsonString)
-
-        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(0)
-    }
-
-    @Test
-    fun `exportToJson - with splitModeThreshold at 100px - includes in backup`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 100
-
-        val jsonString = backupManager.exportToJson()
-        val backup = json.decodeFromString<BackupData>(jsonString)
-
-        Truth.assertThat(backup.settings.splitModeThreshold).isEqualTo(100)
     }
 
     // ========== IMPORT TESTS - SELECTIVE ==========
@@ -570,100 +538,6 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - only power user settings - imports only threshold`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 0
-        fakeSettingsRepo.color = Color.BLACK
-
-        val backup = createTestBackup(
-            favorites = setOf("com.app1/com.app1.MainActivity"),
-            textColor = Color.RED,
-            splitModeThreshold = 42
-        )
-        val jsonString = json.encodeToString(backup)
-
-        val options = ImportOptions(
-            importFavorites = false,
-            importOrder = false,
-            importHiddenApps = false,
-            importCustomNames = false,
-            importSwipeActions = false,
-            importThemeSettings = false,
-            importGestureSettings = false,
-            importTimeBasedEvents = false,
-            importQualityOfLife = false,
-            importPowerUserSettings = true
-        )
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
-        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
-        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
-    }
-
-    @Test
-    fun `importFromJson - power user disabled - does not import threshold`() = runTest {
-        fakeInstalledAppsRepo.installedApps = listOf(
-            createAppInfo("com.app1", "com.app1.MainActivity")
-        )
-        fakeSettingsRepo.splitModeThreshold = 0
-        fakeSettingsRepo.color = Color.BLACK
-
-        val backup = createTestBackup(
-            favorites = setOf("com.app1/com.app1.MainActivity"),
-            textColor = Color.RED,
-            splitModeThreshold = 100
-        )
-        val jsonString = json.encodeToString(backup)
-
-        val options = ImportOptions(
-            importFavorites = true,
-            importThemeSettings = true,
-            importPowerUserSettings = false
-        )
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // Assert 1: Threshold sollte NICHT importiert worden sein (bleibt 0)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
-
-        // Assert 2: Farbe sollte importiert worden sein (wird RED)
-        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
-
-        // Assert 3: Favorit sollte importiert worden sein (da Option true und App installiert)
-        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
-    }
-
-    @Test
-    fun `importFromJson - threshold validates to 0-512 range`() = runTest {
-
-        val backup = createTestBackup(splitModeThreshold = 999)
-        val jsonString = json.encodeToString(backup)
-        val options = ImportOptions(importPowerUserSettings = true)
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(512)
-    }
-
-    @Test
-    fun `importFromJson - threshold validates negative to zero`() = runTest {
-
-        val backup = createTestBackup(splitModeThreshold = -50)
-        val jsonString = json.encodeToString(backup)
-        val options = ImportOptions(importPowerUserSettings = true)
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
-    }
-
-    @Test
     fun `importFromJson - swipe actions - filters non-installed left app`() = runTest {
         // 1. Mock: App2 ist installiert
         fakeInstalledAppsRepo.installedApps = listOf(
@@ -743,8 +617,7 @@ class BackupRepositoryImplDoomsdayTest {
         // Erstelle valides Backup via Helper
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
-            textColor = Color.BLUE,
-            splitModeThreshold = 42
+            textColor = Color.BLUE
         )
         val jsonString = json.encodeToString(backup)
 
@@ -757,7 +630,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     // ========== VALIDATION TESTS ==========
@@ -991,8 +863,7 @@ class BackupRepositoryImplDoomsdayTest {
             doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
-            autoLaunchApp = true,
-            splitModeThreshold = 42
+            autoLaunchApp = true
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1015,7 +886,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(42)
     }
 
     @Test
@@ -1061,56 +931,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
         Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
-    }
-
-    @Test
-    fun `importFromJson - old backup without threshold key - does not change threshold`() =
-        runTest {
-            fakeSettingsRepo.splitModeThreshold = 100
-
-            val backup = createTestBackup(
-                favorites = setOf("com.app1/com.app1.MainActivity"),
-                splitModeThreshold = null
-            )
-            val oldBackupJson = json.encodeToString(backup)
-
-            val options = ImportOptions(importPowerUserSettings = true)
-
-            val result = backupManager.importFromJson(oldBackupJson, options)
-
-            Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
-        }
-
-    @Test
-    fun `importFromJson - threshold zero in backup - imports as zero`() = runTest {
-        fakeSettingsRepo.splitModeThreshold = 42
-
-        val backup = createTestBackup(splitModeThreshold = 0)
-        val jsonString = json.encodeToString(backup)
-        val options = ImportOptions(importPowerUserSettings = true)
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(0)
-    }
-
-    @Test
-    fun `importFromJson - threshold at preset values - imports correctly`() = runTest {
-
-        val presetValues = listOf(0, 42, 60, 100, 512)
-
-        for (presetValue in presetValues) {
-            val backup = createTestBackup(splitModeThreshold = presetValue)
-            val jsonString = json.encodeToString(backup)
-            val options = ImportOptions(importPowerUserSettings = true)
-
-            val result = backupManager.importFromJson(jsonString, options)
-
-            Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(presetValue)
-        }
     }
 
     // ========== EXPORT TESTS - AUTO SHOW KEYBOARD ==========
@@ -1394,44 +1214,6 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
-
-    @Test
-    fun `doomsday - toxic JSON - wrong data types (String instead of Int)`() = runTest {
-        // SZENARIO: "splitModeThreshold" ist ein String, sollte Int sein.
-        // Das muss manuell als String gebaut werden, da das Datenmodell das nicht zulässt.
-        val toxicJson = """
-            {
-                "version": "1.0.0",
-                "timestamp": 123456,
-                "settings": {
-                    "split_mode_threshold": "THIS IS TEXT NOT A NUMBER",
-                    "text_color": 0
-                }
-            }
-        """.trimIndent()
-
-        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
-
-        // Strict Parser: getInt("splitModeThreshold") wirft JSONException -> InvalidFormat
-        Truth.assertThat(result).isEqualTo(ImportResult.InvalidFormat)
-    }
-
-    @Test
-    fun `doomsday - toxic values - massive integer overflow`() = runTest {
-        // SZENARIO: User will den Launcher crashen und setzt Threshold auf MAX_INT + 1
-        // oder einfach eine riesige Zahl.
-
-        val hugeValue = 999999
-        val toxicJson = createJsonWithThreshold(hugeValue)
-
-        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // WICHTIG: Der Wert muss auf das Maximum (512) gecapped sein!
-        // Wenn hier 999999 steht, hast du eine Sicherheitslücke.
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(512)
-    }
 
     @Test
     fun `doomsday - toxic values - negative layout scale (physics violation)`() = runTest {
@@ -1722,8 +1504,8 @@ class BackupRepositoryImplDoomsdayTest {
             "version": "999.0.0",
             "timestamp": 123456,
             "settings": {
-                "splitModeThreshold": 42,
-                "splitModeThreshold": 999,
+                "textColor": 42,
+                "textColor": 999,
                 "favoriteComponents": [],
                 "favoritesOrder": [],
                 "hiddenComponents": []
@@ -1731,7 +1513,7 @@ class BackupRepositoryImplDoomsdayTest {
         }
     """.trimIndent()
 
-        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
         // Verhalten ist JSON-Parser abhängig, sollte aber nicht crashen
         Truth.assertThat(result).isNotNull()
     }
@@ -1748,8 +1530,7 @@ class BackupRepositoryImplDoomsdayTest {
                 "hiddenComponents": [],
                 "customAppNames": [],
                 "textColor": "not a color",
-                "layoutScale": 1e999,
-                "splitModeThreshold": 99999999999999999999
+                "layoutScale": 1e999
             }
         }
     """.trimIndent()
@@ -1812,26 +1593,25 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `doomsday - phantom data - settings fields are explicitly null`() = runTest {
         // SZENARIO: Ein JSON-Generator hat "null" geschrieben statt das Feld wegzulassen.
-        fakeSettingsRepo.splitModeThreshold = 50 // Alter Wert
+        fakeSettingsRepo.color = 50 // Alter Wert
 
         val toxicJson = """
         {
             "version": "1.0.0",
             "timestamp": 123456,
             "settings": {
-                "splitModeThreshold": null,
                 "textColor": null
             }
         }
     """.trimIndent()
 
-        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
+        val result = backupManager.importFromJson(toxicJson, ImportOptions(importThemeSettings = true))
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         // Erwartung: Der alte Wert (50) bleibt erhalten.
         // Der "null"-Wert im JSON überschreibt NICHT den Default/Backup Wert.
-        Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(50)
+        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(50)
     }
 
     @Test
@@ -1923,28 +1703,6 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `doomsday - scientific notation in integers`() = runTest {
-        // Manche JSON-Generatoren schreiben große Zahlen als 1e5
-        val toxicJson = """
-        {
-            "version": "1.0.0",
-            "timestamp": 1e10,
-            "settings": {
-                "split_mode_threshold": 1e2,
-                "text_color": -1
-            }
-        }
-    """.trimIndent()
-
-        val result = backupManager.importFromJson(toxicJson, ImportOptions(importPowerUserSettings = true))
-
-        if (result is ImportResult.Success) {
-            // 1e2 = 100, sollte akzeptiert werden
-            Truth.assertThat(fakeSettingsRepo.splitModeThreshold).isEqualTo(100)
-        }
-    }
-
-    @Test
     fun `doomsday - whitespace and control characters in strings`() = runTest {
         val toxicJson = """
         {
@@ -1962,21 +1720,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isNotNull()
     }
 
-
-
-    // Helper für manuelles JSON bauen
-    private fun createJsonWithThreshold(value: Int): String {
-        return """
-            {
-                "version": "1.0.0",
-                "timestamp": 123456,
-                "appVersion": "1.0.0",
-                "settings": {
-                    "split_mode_threshold": $value
-                }
-            }
-        """.trimIndent()
-    }
 
 
     // ========== HELPER METHODS ==========
@@ -2012,8 +1755,7 @@ class BackupRepositoryImplDoomsdayTest {
         doubleTapToLockEnabled: Boolean? = null,
         swipeDownToNotificationsEnabled: Boolean? = null,
         autoShowKeyboard: Boolean? = null,
-        autoLaunchApp: Boolean? = null,
-        splitModeThreshold: Int? = null
+        autoLaunchApp: Boolean? = null
     ): BackupData {
         return BackupData(
             version = version,
@@ -2038,8 +1780,7 @@ class BackupRepositoryImplDoomsdayTest {
                 doubleTapToLockEnabled = doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,
-                autoLaunchApp = autoLaunchApp,
-                splitModeThreshold = splitModeThreshold
+                autoLaunchApp = autoLaunchApp
             )
         )
     }

@@ -13,7 +13,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
@@ -72,7 +71,6 @@ class LauncherViewModelDoomsdayTest {
     private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
     private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
-    private lateinit var getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase
     private lateinit var getLayoutSettingsUseCase: GetLayoutSettingsUseCase
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
     private lateinit var refreshAppsUseCase: RefreshAppsUseCase
@@ -109,9 +107,6 @@ class LauncherViewModelDoomsdayTest {
 
         observeWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
-
-        getSplitModeThresholdUseCase = mockk(relaxed = true)
-        every { getSplitModeThresholdUseCase.invoke() } returns flowOf(0)
 
         getLayoutSettingsUseCase = mockk {
             every { layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
@@ -155,7 +150,6 @@ class LauncherViewModelDoomsdayTest {
         checkAppUsageUseCase = mockk(relaxed = true),
         getAutoShowKeyboardSettingUseCase = mockk(relaxed = true),
         getTextShadowEnabledUseCase = mockk(relaxed = true),
-        getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
         setLayoutScaleUseCase = mockk(relaxed = true),
         setVerticalPaddingUseCase = mockk(relaxed = true),

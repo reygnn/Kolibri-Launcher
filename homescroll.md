@@ -954,7 +954,7 @@ rather than the navigation system internals.
   (`scaledTouchSlop * 4`, `1.2 px/ms`, `1.5x`); the tuning UI is
   a separate follow-up branch, not part of this work.
 
-### Step 6 — Deactivate split mode (cleanup deferred)
+### Step 6 — Deactivate split mode (cleanup deferred) [DONE 2026-05-07]
 
 Decision (see §8): split-mode code stays physically in place during
 this migration. It is only deactivated, not removed. A separate
@@ -983,6 +983,92 @@ The cleanup branch later removes: `_needsSplit`, the
 `LayoutDelegate` split bits, `gestureZone` from XML, the dual-mode
 in `NonInterceptingScrollView` (replaced with plain `ScrollView`),
 and `ScrollViewBorderDecorator`.
+
+**Cleanup-branch implementation notes (2026-05-07):**
+
+The cleanup ran on branch `chore/remove-split-mode-deadcode`,
+ff-merged into `main` directly after the migration. Aggressive
+scope (per user decision): the backup format also drops
+`splitModeThreshold` — old backups that still carry the field
+import correctly because `BackupSettings.splitModeThreshold` was
+nullable-with-default, so the JSON deserializer just ignores
+unknown / missing properties.
+
+What was actually removed:
+
+- HomeFragment fields: `_needsSplit`, `needsSplit`,
+  `_orientationState`, `orientationState`, `wasInSplitMode`,
+  `gestureDetector`, `verifyJob`, `splitModeCalculator`,
+  `splitWeightCalculator`, `scrollStateVerifier`,
+  `borderDecorator`, `orientationSynchronizer`.
+- HomeFragment methods: `checkAndEmitScrollState`,
+  `verifyAndFixScrollState`, `scheduleScrollVerification`,
+  `safePost`, `checkScrollStateAfterNextLayout`,
+  `checkAndSyncOrientation`, `adjustScrollViewWidth`. Six
+  `safePost { scheduleScrollVerification() }` callsites and the
+  `verifyAndFixScrollState()` call in `onResume` are gone.
+  `onConfigurationChanged` shrunk to a one-line
+  `lastSpacingInput = null` cache invalidation.
+- Observers 2 (needsSplit + orientation → adjustScrollViewWidth)
+  and 6 (splitModeThreshold → checkScrollStateAfterNextLayout)
+  in `observeViewModel`.
+- Eight Kotlin classes deleted: `SplitWeightCalculator`,
+  `SplitModeCalculator`, `ScrollStateVerifier`, `VerifyResult`,
+  `ScrollViewBorderDecorator`, `OrientationSynchronizer`,
+  `SyncResult`, `NonInterceptingScrollView`. Their five JVM
+  test files also gone (the contract test for OrientationSynchronizer
+  was the only multi-Test one).
+- XML: `<View id="gestureZone" />` removed; the favorites
+  ScrollView is now a plain `<ScrollView>` with `match_parent`
+  width (no more `weight=1`/`0dp` semantic).
+- Domain layer: `GetSplitModeThresholdUseCase` + its test deleted;
+  `SettingsRepository.splitModeThresholdFlow` /
+  `setSplitModeThreshold(...)` removed from the interface;
+  `SettingsRepositoryImpl` removed the corresponding flow,
+  setter, DataStore key declaration (`PreferenceKeys.SPLIT_MODE_THRESHOLD`),
+  and the `purgeRepository` `remove(...)` line.
+- `LayoutDelegate.splitModeThreshold` and the
+  `getSplitModeThresholdUseCase` constructor parameter; same on
+  `LauncherViewModel`'s pass-through getter and constructor wiring.
+- `BackupData.BackupSettings.splitModeThreshold` field removed;
+  `BackupSerializer` no longer reads/writes the JSON key
+  (`mergeWithStrictValues` and `parseStrictly`); `BackupDataAssembler`
+  no longer reads from / writes to the repository for the field;
+  `hasPowerUserSettings` flag in the export-summary now only
+  considers `secureWindow` and `rotationLocked`.
+- `SettingsFragment` lost its
+  `splitModeThresholdPreference` field, `setOnPreferenceChangeListener`
+  block, the flow-collection observer, and the teardown nulls.
+- `app/src/main/res/xml/preferences.xml` lost the
+  `<EditTextPreference android:key="split_mode_threshold" />`
+  entry. Both `values/strings.xml` and `values-de/strings.xml`
+  lost the eight split-mode strings each (title, summary,
+  dialog title, dialog message, three desc variants, invalid
+  toast, saved toast).
+- `AppConstants` lost: `LANDSCAPE_SPLIT_SCROLL_WEIGHT`,
+  `LANDSCAPE_SPLIT_GESTURE_WEIGHT`, `PORTRAIT_SPLIT_SCROLL_WEIGHT`,
+  `PORTRAIT_SPLIT_GESTURE_WEIGHT`, `SPLIT_MODE_THRESHOLD_MIN`,
+  `SPLIT_MODE_THRESHOLD_MAX`, `SPLIT_MODE_TINKERING_LIMIT`,
+  `DEFAULT_SPLIT_MODE_THRESHOLD`, `PrefKeys.SPLIT_MODE_THRESHOLD`.
+- `FakeSettingsRepository` and `SettingsRepositoryContract` lost
+  their respective `splitModeThreshold` plumbing (the contract
+  used to host five clamping tests; all five gone).
+- 14 test files in `:app:test` and `:data:test` had stale refs
+  removed; 43 tests deleted entirely (those whose only purpose
+  was verifying split-mode behavior); 30+ tests had only the
+  split-mode-specific lines stripped while keeping the test for
+  the rest of its assertions. `TESTING_CONVENTIONS.kt` lost its
+  example mention.
+- `TODO.md` §19 (`LayoutDelegate.splitModeThreshold`
+  cold-`.value`-read on `WhileSubscribed`-StateFlow) removed —
+  the underlying flow no longer exists.
+
+Backup-format change is the only externally observable effect:
+Kolibri-Launcher backups produced from `0.99.64` and onwards no
+longer carry the `split_mode_threshold` JSON property. Older
+backups (from `v0.99.62-stable` and earlier) still import cleanly
+— the field is silently dropped during JSON deserialization
+because every `BackupSettings` field is `Int? = null` etc.
 
 ### Step 7 — Branch + commit + ff-merge + push [DONE 2026-05-07]
 

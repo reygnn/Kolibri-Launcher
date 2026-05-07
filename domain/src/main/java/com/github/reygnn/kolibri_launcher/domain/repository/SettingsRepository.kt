@@ -51,24 +51,6 @@ interface SettingsRepository : Purgeable {
     val contentTopMarginScaleFlow: Flow<Float>
     suspend fun setContentTopMarginScale(scale: Float)
 
-    /**
-     * Flow für den Split-Mode Threshold in Pixel.
-     *
-     * - 0 = Default Verhalten (Android's canScrollVertically)
-     * - > 0 = Custom Threshold (z.B. 42, 60, 100)
-     *
-     * Max: 512 Pixel
-     */
-    val splitModeThresholdFlow: Flow<Int>
-    /**
-     * Setzt den Split-Mode Threshold.
-     *
-     * @param thresholdPixels Threshold in Pixel (0-512)
-     *                        0 = Android decides (fail-safe)
-     *                        2-200 = Typische Power-User Werte
-     */
-    suspend fun setSplitModeThreshold(thresholdPixels: Int)
-
     val secureWindowFlow: Flow<Boolean>
     suspend fun setSecureWindow(isEnabled: Boolean)
 

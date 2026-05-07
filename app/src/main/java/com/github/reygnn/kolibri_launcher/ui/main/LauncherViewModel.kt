@@ -33,7 +33,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSett
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSplitModeThresholdUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -112,7 +111,6 @@ class LauncherViewModel @Inject constructor(
     checkAppUsageUseCase: CheckAppUsageUseCase,
     getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase,
     getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
-    getSplitModeThresholdUseCase: GetSplitModeThresholdUseCase,
     getLayoutSettingsUseCase: GetLayoutSettingsUseCase,
     setLayoutScaleUseCase: SetLayoutScaleUseCase,
     setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
@@ -189,7 +187,6 @@ class LauncherViewModel @Inject constructor(
 
     private val layoutDelegate = LayoutDelegate(
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
-        getSplitModeThresholdUseCase = getSplitModeThresholdUseCase,
         setLayoutScaleUseCase = setLayoutScaleUseCase,
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
@@ -245,7 +242,6 @@ class LauncherViewModel @Inject constructor(
     val verticalPaddingState: StateFlow<Float> get() = layoutDelegate.verticalPaddingState
     val isFontBoldState: StateFlow<Boolean> get() = layoutDelegate.isFontBoldState
     val contentTopMarginState: StateFlow<Float> get() = layoutDelegate.contentTopMarginState
-    val splitModeThreshold: StateFlow<Int> get() = layoutDelegate.splitModeThreshold
 
     val wallpaperState: StateFlow<WallpaperState> get() = wallpaperDelegate.wallpaperState
     val isWallpaperEditMode: StateFlow<Boolean> get() = wallpaperDelegate.isWallpaperEditMode

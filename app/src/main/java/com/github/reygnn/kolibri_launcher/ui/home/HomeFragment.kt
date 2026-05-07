@@ -183,8 +183,7 @@ import javax.inject.Inject
  *   Teardown races (fragment gone, coroutine still delivering) —
  *     prevented structurally via viewLifecycleOwner.lifecycleScope
  *     and local _binding snapshots, not masked with a post-hoc
- *     catch. Examples: checkScrollStateAfterNextLayout, safePost,
- *     updateWallpaper.
+ *     catch. Example: updateWallpaper.
  *
  *   Programmer errors (NPE, IllegalState, IndexOutOfBounds) — bugs,
  *     not conditions. Crash loudly in DEBUG via silentError;
@@ -290,16 +289,6 @@ class HomeFragment : Fragment() {
     private val favoritesScrollView get() = binding.favoritesScrollView
 
     // ===========================================
-    // REACTIVE STATE - SCROLL & ORIENTATION
-    // ===========================================
-
-    private val _needsSplit = MutableStateFlow(false)
-    private val needsSplit: StateFlow<Boolean> = _needsSplit.asStateFlow()
-
-    private lateinit var _orientationState: MutableStateFlow<Int>
-    val orientationState: StateFlow<Int> get() = _orientationState.asStateFlow()
-
-    // ===========================================
     // LAYOUT CACHE - COMPUTED VALUES
     // ===========================================
 
@@ -310,28 +299,10 @@ class HomeFragment : Fragment() {
     private var lastSpacingInput: SpacingInput? = null
 
     // ===========================================
-    // SPLIT MODE TRACKING
-    // ===========================================
-
-    private var wasInSplitMode = false
-
-    // ===========================================
-    // GESTURE HANDLING
-    // ===========================================
-
-    private var gestureDetector: GestureDetector? = null
-
-    // ===========================================
     // CONTEXT MENU STATE
     // ===========================================
 
     private var longClickedApp: AppInfo? = null
-
-    // ===========================================
-    // COROUTINE MANAGEMENT
-    // ===========================================
-
-    private var verifyJob: Job? = null
 
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
@@ -345,18 +316,11 @@ class HomeFragment : Fragment() {
     // HELPER / CALCULATOR CLASSES
     // ===========================================
 
-    private val splitModeCalculator = SplitModeCalculator()
-    private val scrollStateVerifier = ScrollStateVerifier()
     private val layoutCalculator = LayoutCalculator()
     private val topMarginCalculator = TopMarginCalculator()
-    private val splitWeightCalculator = SplitWeightCalculator()
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
-    private val borderDecorator = ScrollViewBorderDecorator()
     private val timeFormatter = TimeEventFormatter()
-    private val orientationSynchronizer by lazy {
-        OrientationSynchronizer { resources.configuration.orientation }
-    }
     private val wallpaperViewBinder = WallpaperViewBinder(
         bitmapLoader = { uri -> loadBitmapFromUri(uri) }
     )
@@ -377,13 +341,6 @@ class HomeFragment : Fragment() {
     // ===========================================
     // LIFECYCLE
     // ===========================================
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        // Dieser Code greift bei der Instanziierung auf Ressourcen zu!
-        _orientationState = MutableStateFlow(resources.configuration.orientation)
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -406,8 +363,6 @@ class HomeFragment : Fragment() {
         // half-broken" states — exactly the failure mode the file-header
         // try/catch-audit calls out. Real init failures (inflate, OOM)
         // belong to silentDeath, not silentError.
-        checkAndSyncOrientation()
-
         recalculateLayoutCache(
             viewModel.layoutScaleState.value,
             viewModel.verticalPaddingState.value,
@@ -465,76 +420,10 @@ class HomeFragment : Fragment() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-
-        // No try/catch: cache reset, StateFlow update, and safePost-
-        // scheduled work do not throw. checkScrollStateAfterNextLayout
-        // posts via ViewTreeObserver — a setter, not a runner. Programmer
-        // errors propagate to the FragmentManager, where they belong.
         Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
-
-        // 1. SICHERHEIT: Cache leeren.
-        // Damit garantieren wir, dass beim nächsten Layout-Pass
-        // auf jeden Fall neu gerechnet und der Margin neu gesetzt wird.
+        // Invalidate the spacing cache so the next layout pass recomputes
+        // margin / padding for the new configuration.
         lastSpacingInput = null
-
-        // Den Orientation-State sofort aktualisieren
-        _orientationState.value = newConfig.orientation
-
-        // Warte bis Layout wirklich fertig ist!
-        checkScrollStateAfterNextLayout("Scroll state checked after rotation")
-
-        safePost { scheduleScrollVerification() }
-    }
-
-// ============================================================================
-    // REACTIVE SCROLL STATE DETECTION (POWER USER UPDATED)
-    // ============================================================================
-
-    private fun checkAndEmitScrollState() {
-        // The structural teardown-race guard is the early-return below.
-        // After it, every operation reads/writes a non-null view or a
-        // pure StateFlow value — none can throw. The previous
-        // catch(Throwable) had a "force split mode on error" fallback
-        // which only helped hide invisible failures (no observable user
-        // signal) — removed in favour of letting real bugs surface.
-        if (_binding == null || !isAdded) return
-
-        val scrollView = binding.favoritesScrollView
-        val threshold = viewModel.splitModeThreshold.value
-        val childView = scrollView.getChildAt(0)
-
-        val shouldSplit = splitModeCalculator.shouldSplit(
-            threshold = threshold,
-            canScrollDown = scrollView.canScrollVertically(1),
-            canScrollUp = scrollView.canScrollVertically(-1),
-            contentHeight = childView?.height ?: 0,
-            containerHeight = scrollView.height
-        )
-
-        // Debug Log nur bei Änderung
-        if (_needsSplit.value != shouldSplit) {
-            if (threshold == 0) {
-                Timber.d("Scroll check (Auto): split=$shouldSplit")
-            } else {
-                val scrollablePixels = splitModeCalculator.calculateScrollablePixels(
-                    childView?.height ?: 0,
-                    scrollView.height
-                )
-                Timber.d("Scroll check (PowerUser): pixels=$scrollablePixels, threshold=$threshold -> split=$shouldSplit")
-            }
-
-            // Split mode is deactivated as of 2026-05-07 (homescroll.md
-            // §8 decision 4). The `shouldSplit` computation is preserved
-            // so a future cleanup branch removes everything in one go,
-            // but the StateFlow is forced to `false` here so the
-            // downstream split-mode setup block never runs.
-            _needsSplit.value = false
-
-            // Reset scroll position wenn kein Split Mode
-            if (!shouldSplit) {
-                scrollView.scrollTo(0, 0)
-            }
-        }
     }
 
     // ============================================================================
@@ -573,27 +462,6 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 2: Scroll state → Layout adjustment
-        collectOnStarted(
-            flow = needsSplit.combine(orientationState) { split, orientation ->
-                // Ein Tupel (Pair) zurückgeben,
-                // das sowohl den Split-Status als auch die Ausrichtung enthält.
-                Pair(split, orientation)
-            }
-                // distinctUntilChanged() vergleicht nun BEIDE Werte im Pair
-                .distinctUntilChanged(),
-            errorTag = "scroll state",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { (split, orientation) -> // Destrukturierung des Pairs
-            if (_binding == null) return@collectOnStarted
-
-            Timber.d("Adjusting layout: split=$split (Orientation=$orientation)")
-            val colors = viewModel.uiColorsState.value
-            // adjustScrollViewWidth(split, colors) wird aufgerufen,
-            // wenn sich SPLIT ändert ODER wenn sich ORIENTATION ändert.
-            adjustScrollViewWidth(split, colors)
-        }
-
         // Observer 3: Time, date, battery
         collectOnStarted(
             flow = viewModel.uiState,
@@ -627,17 +495,6 @@ class HomeFragment : Fragment() {
         ) { colors ->
             if (_binding == null) return@collectOnStarted
             updateAllColors(colors)
-        }
-
-        // Observer 6: Split Mode Threshold Changes
-        collectOnStarted(
-            flow = viewModel.splitModeThreshold,
-            errorTag = "threshold",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { threshold ->
-            Timber.d("Split threshold changed to: $threshold")
-            checkScrollStateAfterNextLayout("Threshold changed check")
-            safePost { scheduleScrollVerification() }
         }
 
         // Observer 7: Wallpaper State
@@ -813,10 +670,6 @@ class HomeFragment : Fragment() {
                     Timber.d("📏 Spacing applied: ${params.topMargin} → $newMargin")
                     params.topMargin = newMargin
                     favoritesContainer.layoutParams = params
-
-                    // Nur Layout-Checks triggern, wenn wir wirklich etwas geändert haben
-                    checkScrollStateAfterNextLayout("Dynamic spacing applied: $newMargin")
-                    safePost { scheduleScrollVerification() }
                 }
             }
         }
@@ -872,9 +725,6 @@ class HomeFragment : Fragment() {
                 button.typeface = targetTypeface
             }
         }
-
-        checkScrollStateAfterNextLayout("Layout resized")
-        safePost { scheduleScrollVerification() }
     }
 
     // ============================================================================
@@ -909,101 +759,6 @@ class HomeFragment : Fragment() {
                 TimberWrapper.silentError(e, "Error creating button for ${app.packageName}")
             }
         }
-
-        // Warte bis Layout wirklich fertig ist!
-        checkScrollStateAfterNextLayout("Scroll state checked after rendering")
-        safePost { scheduleScrollVerification() }
-    }
-
-    /**
-     * Adjust ScrollView width based on split mode
-     */
-    private fun adjustScrollViewWidth(enableSplit: Boolean, colors: UiColorsState) {
-        // Outer + inner try/catch removed per Rule 11. Body is pure View-
-        // setter / property-write code plus splitWeightCalculator (pure
-        // math). The only conceivable throw was a ClassCastException on
-        // the layoutParams cast — that's a programmer error if the XML
-        // ever changes type, and should crash loudly in DEBUG, not get
-        // swallowed. scrollView.scrollTo is a setter that does not throw.
-        val scrollParams = binding.favoritesScrollView.layoutParams as LinearLayout.LayoutParams
-        val gestureParams = binding.gestureZone.layoutParams as LinearLayout.LayoutParams
-        val customScrollView = binding.favoritesScrollView
-
-        val weights = splitWeightCalculator.calculate(
-            enableSplit = enableSplit,
-            orientation = resources.configuration.orientation,
-            portraitScrollWeight = AppConstants.PORTRAIT_SPLIT_SCROLL_WEIGHT,
-            portraitGestureWeight = AppConstants.PORTRAIT_SPLIT_GESTURE_WEIGHT,
-            landscapeScrollWeight = AppConstants.LANDSCAPE_SPLIT_SCROLL_WEIGHT,
-            landscapeGestureWeight = AppConstants.LANDSCAPE_SPLIT_GESTURE_WEIGHT
-        )
-
-        scrollParams.weight = weights.scrollViewWeight
-        gestureParams.weight = weights.gestureZoneWeight
-
-        if (enableSplit) {
-            wasInSplitMode = true
-
-            Timber.d("Split mode: ${if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"} (${weights.scrollViewWeight}/${weights.gestureZoneWeight})")
-
-            binding.gestureZone.isVisible = true
-
-            // ScrollView darf Touches abfangen (zum Scrollen)
-            customScrollView.allowIntercept = true
-            customScrollView.isScrollContainer = true
-            customScrollView.isClickable = true
-            customScrollView.isFocusable = true
-            customScrollView.isFocusableInTouchMode = true
-
-            // Touch Listener für Split Mode
-            binding.gestureZone.setOnTouchListener { view, event ->
-                if (event.action == MotionEvent.ACTION_UP) {
-                    view.performClick()
-                }
-                gestureDetector?.onTouchEvent(event) ?: false
-            }
-
-        } else {
-            // GESTURE-WRAPPER MODE (post-2026-05-07 migration).
-            //
-            // The HomeGestureLayout above intercepts directional swipes
-            // via dispatchTouchEvent regardless of what the ScrollView
-            // does, so the ScrollView is now configured to handle
-            // touches normally — it must claim ACTION_DOWN and scroll
-            // on slow drags. The previous "touch-transparent" config
-            // here was a relic of the split-mode design where
-            // gestures had to bubble up to the rootLayout's
-            // OnTouchListener; with the wrapper that bypass route is
-            // gone, but if `allowIntercept` is left at `false` the
-            // ScrollView never claims DOWN, never scrolls, and a long
-            // overflowing favorites list becomes unscrollable. This
-            // whole if/else block is removed by the cleanup branch
-            // (homescroll.md §6 step 6); until then the configuration
-            // here matches what split-mode used to set on the
-            // scrollable side.
-            binding.gestureZone.isVisible = false
-            borderDecorator.remove(binding.favoritesScrollView)
-
-            if (wasInSplitMode) {
-                binding.favoritesScrollView.scrollTo(0, 0)
-                Timber.d("Scroll position reset to top (split→full)")
-            }
-            wasInSplitMode = false
-
-            customScrollView.allowIntercept = true
-            customScrollView.isScrollContainer = true
-            customScrollView.isClickable = true
-            customScrollView.isFocusable = true
-            customScrollView.isFocusableInTouchMode = true
-
-            customScrollView.setOnTouchListener(null)
-            binding.gestureZone.setOnTouchListener(null)
-
-            Timber.d("Gesture-wrapper mode: ScrollView intercepts for scrolling")
-        }
-
-        binding.favoritesScrollView.layoutParams = scrollParams
-        binding.gestureZone.layoutParams = gestureParams
     }
 
     private fun clearAllViews() {
@@ -1055,10 +810,6 @@ class HomeFragment : Fragment() {
 
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(textColor, shadowColor)
-
-        if (_needsSplit.value) {
-            borderDecorator.apply(binding.favoritesScrollView, textColor)
-        }
     }
 
     private fun updateCalendarChipsColors(colors: UiColorsState) {
@@ -1292,11 +1043,6 @@ class HomeFragment : Fragment() {
 
         binding.calendarEventsScroll.visibility = View.VISIBLE
         updateDynamicSpacing()
-
-        // Warte bis Layout wirklich fertig ist!
-        checkScrollStateAfterNextLayout("Scroll state checked after chips updated")
-
-        safePost { scheduleScrollVerification() }
     }
 
     // Both methods below: try/catch removed per Rule 11 — body is
@@ -1723,139 +1469,6 @@ class HomeFragment : Fragment() {
 
 
     // ============================================================================
-    // HELPER
-    // ==========================================================================
-
-    /**
-     * Registriert einen ONE-SHOT OnGlobalLayoutListener.
-     * Wird nach dem nächsten Layout-Pass automatisch entfernt.
-     * Ruft dann checkAndEmitScrollState() auf.
-     */
-    private fun checkScrollStateAfterNextLayout(debugMessage: String = "") {
-        // Outer try/catch removed per Rule 11. Snapshot _binding to a
-        // local val so registration is null-safe without the !!-getter.
-        val outerBinding = _binding ?: return
-        if (!isAdded) return
-
-        val listener = object : ViewTreeObserver.OnGlobalLayoutListener {
-            override fun onGlobalLayout() {
-                // ViewTreeObserver invokes us on the layout pass. By
-                // then onDestroyView may have nulled _binding — read it
-                // through a local snapshot to avoid the !!-getter NPE
-                // that the old code's `binding?` call site silently
-                // triggered + caught. If teardown happened, leave the
-                // listener dangling: it goes out with the View it was
-                // bound to.
-                val current = _binding
-                if (current == null || !isAdded) return
-
-                current.favoritesScrollView.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                checkAndEmitScrollState()
-
-                if (debugMessage.isNotEmpty()) {
-                    Timber.d(debugMessage)
-                }
-            }
-        }
-
-        outerBinding.favoritesScrollView.viewTreeObserver.addOnGlobalLayoutListener(listener)
-    }
-
-    private fun scheduleScrollVerification() {
-        verifyJob?.cancel()
-        // No try/catch per Rule 11. verifyAndFixScrollState is internal
-        // and self-bounded; lifecycleScope.launch already supplies the
-        // coroutine-scope safety net.
-        verifyJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(AppConstants.SCROLL_VERIFICATION_DELAY_MS) // debounce
-            verifyAndFixScrollState()
-        }
-    }
-
-    private fun safePost(action: () -> Unit) {
-        // No try/catch per Rule 11. Snapshot _binding to a local val so
-        // registration is null-safe; the .post{} lambda re-checks
-        // _binding before invoking the action — both the registration
-        // and the action are internal-only call sites.
-        val binding = _binding ?: return
-        if (!isAdded) return
-
-        binding.favoritesScrollView.post {
-            if (_binding != null && isAdded) {
-                action()
-            }
-        }
-    }
-
-    private fun verifyAndFixScrollState() {
-        // No try/catch per Rule 11. _binding null-check at top, then
-        // pure: scrollStateVerifier.verify is pure Kotlin, the when-
-        // arms call into View setters / internal helpers only.
-        if (_binding == null || !isAdded) return
-
-        val customScrollView = binding.favoritesScrollView
-
-        val result = scrollStateVerifier.verify(
-            currentSplitState = _needsSplit.value,
-            allowIntercept = customScrollView.allowIntercept,
-            canScrollDown = customScrollView.canScrollVertically(1),
-            canScrollUp = customScrollView.canScrollVertically(-1)
-        )
-
-        when (result) {
-            VerifyResult.Consistent -> {
-                // Alles gut, nichts tun
-            }
-            VerifyResult.FixFullMode -> {
-                // No-op since the 2026-05-07 deactivation. The verifier's
-                // "Full Mode = allowIntercept off" expectation is inverted
-                // in the new wrapper world: with split mode permanently
-                // off (homescroll.md §8 decision 4), the ScrollView MUST
-                // keep `allowIntercept = true` so it can claim touches
-                // and scroll. Letting this branch run would silently
-                // undo the scroll fix on every periodic verification.
-                // The whole ScrollStateVerifier path is removed by the
-                // cleanup branch (§6 step 6).
-                Timber.d("Skipping FixFullMode (split mode permanently off)")
-            }
-            VerifyResult.FixSplitMode -> {
-                Timber.w("Split mode but intercept disabled - fixing...")
-                customScrollView.allowIntercept = true
-            }
-            VerifyResult.ReEvaluateNeeded -> {
-                Timber.w("Split mode active but no scroll capability - re-evaluating...")
-                checkAndEmitScrollState()
-            }
-        }
-    }
-
-    /**
-     * Prüft, ob der gespeicherte Orientierungs-State mit der System-Wirklichkeit übereinstimmt.
-     * Falls nicht, wird der State aktualisiert und die Caches geleert.
-     */
-    private fun checkAndSyncOrientation() {
-        val result = orientationSynchronizer.check(_orientationState.value)
-
-        when (result) {
-            is SyncResult.CorrectionNeeded -> {
-                Timber.d("⟳ Orientation mismatch detected: ${result.oldOrientation} -> ${result.newOrientation}. Syncing...")
-
-                // 1. State korrigieren (löst Flow-Updates aus)
-                _orientationState.value = result.newOrientation
-
-                // 2. Caches leeren (damit Layout-Berechnungen frisch starten)
-                lastSpacingInput = null
-            }
-
-            is SyncResult.UpToDate -> {
-                // Optional: Verbose log
-                // Timber.v("Orientation check passed. State is consistent.")
-            }
-        }
-    }
-
-
-    // ============================================================================
     // WALLPAPER HANDLING
     // ============================================================================
 
@@ -1951,11 +1564,7 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // No try/catch per Rule 11. All three callees are internal and
-        // self-bounded.
-        checkAndSyncOrientation()
         hideStatusBar()
-        verifyAndFixScrollState()
     }
 
     override fun onPause() {
@@ -1986,20 +1595,13 @@ class HomeFragment : Fragment() {
         // manager call but it self-protects against missing dialogs.
         // The two inner catches that wrapped setListener-null /
         // property-null sweeps were defensive Programmer-Error swallows.
-        // 1. Laufende Jobs stoppen (WICHTIG!)
-        // Verhindert Abstürze durch nachträgliche UI-Updates
-        verifyJob?.cancel()
-        verifyJob = null
 
-        // 2. Dialog sicher schliessen
+        // 1. Dialog sicher schliessen
         ContextMenuHelper.dismiss(childFragmentManager)
 
-        // 3. Eigene Referenzen aufräumen
-        // Das ist wichtig, weil 'gestureDetector' eine Variable in der HomeFragment Klasse ist
-        gestureDetector = null
+        // 2. Eigene Referenzen aufräumen
         longClickedApp = null
         lastSpacingInput = null
-        borderDecorator.clear()
 
         binding.wallpaperTouchInterceptor.setOnTouchListener(null)
         binding.btnWallpaperSave.setOnClickListener(null)

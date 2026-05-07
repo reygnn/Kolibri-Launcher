@@ -457,20 +457,6 @@ class SettingsRepositoryImplTest {
         assertTrue(settingsManager.showCalendarEventFlow.first())
     }
 
-    // ========== SPLIT MODE VALIDATION TEST ==========
-
-    @Test
-    fun `setSplitModeThreshold - validates input range correctly`() = runTest {
-        settingsManager.setSplitModeThreshold(100)
-        Assert.assertEquals(100, settingsManager.splitModeThresholdFlow.first())
-
-        settingsManager.setSplitModeThreshold(-50)
-        Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first())
-
-        settingsManager.setSplitModeThreshold(1000)
-        Assert.assertEquals(512, settingsManager.splitModeThresholdFlow.first())
-    }
-
     // ========== PURGE TEST ==========
 
     @Test
@@ -478,14 +464,12 @@ class SettingsRepositoryImplTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
         settingsManager.setDoubleTapToLock(true)
         settingsManager.setShowAlarm(true)
-        settingsManager.setSplitModeThreshold(100)
 
         settingsManager.purgeRepository()
 
         Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
         assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertFalse(settingsManager.showAlarmFlow.first())
-        Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first())
     }
 
     // ========================================================================
@@ -519,18 +503,6 @@ class SettingsRepositoryImplTest {
         val result = doomsdayManager.sortOrderFlow.first()
 
         Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
-    }
-
-    @Test
-    fun `doomsday - integer overflow - threshold handles max int`() = runTest {
-        settingsManager.setSplitModeThreshold(Int.MAX_VALUE)
-        Assert.assertEquals(512, settingsManager.splitModeThresholdFlow.first())
-    }
-
-    @Test
-    fun `doomsday - integer underflow - threshold handles min int`() = runTest {
-        settingsManager.setSplitModeThreshold(Int.MIN_VALUE)
-        Assert.assertEquals(0, settingsManager.splitModeThresholdFlow.first())
     }
 
     @Test
