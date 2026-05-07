@@ -49,7 +49,7 @@ import javax.inject.Inject
  *  2. A swipe-down gesture on `app_drawer_root` triggers the
  *     SwipeDownDismissLayout callback, which calls
  *     `findNavController().popBackStack()` and brings HomeFragment back.
- *  3. HomeFragment's `appList` is visible, proving we're back at the
+ *  3. HomeFragment's `favoritesRecyclerView` is visible, proving we're back at the
  *     start destination of the nav graph.
  *
  * Why a custom GeneralSwipeAction instead of `swipeDown()`: Espresso's
@@ -133,7 +133,7 @@ class AppDrawerSwipeDismissTest {
                 )
             )
 
-            // ── ASSERT: HomeFragment is back. `appList` is HomeFragment's
+            // ── ASSERT: HomeFragment is back. `favoritesRecyclerView` is HomeFragment's
             // favorites RecyclerView; AppDrawerFragment doesn't have a view
             // with that id, so its presence is a unique structural signal
             // that the navigation popped back.
@@ -142,7 +142,7 @@ class AppDrawerSwipeDismissTest {
                 describe = { "HomeFragment never returned after swipe-down" },
             ) {
                 try {
-                    onView(withId(R.id.appList)).check(matches(isDisplayed()))
+                    onView(withId(R.id.favoritesRecyclerView)).check(matches(isDisplayed()))
                     true
                 } catch (_: Throwable) {
                     false

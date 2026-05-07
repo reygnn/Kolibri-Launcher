@@ -62,7 +62,7 @@ import javax.inject.Inject
  *  3. A SLOW drag on the same axis stays under the wrapper's
  *     `1.2 px/ms` velocity threshold, the analyzer returns IGNORED,
  *     the parent dispatches normally to children — and HomeFragment's
- *     `appList` stays visible (no nav transition fired).
+ *     `favoritesRecyclerView` stays visible (no nav transition fired).
  *
  * Why VISIBLE_CENTER, not TOP_CENTER, as the swipe origin:
  * `INSTRUMENTED_TESTING_NOTES.kt` rule 11. TOP_CENTER lands at y=0
@@ -113,7 +113,7 @@ class HomeGestureLayoutTest {
             // HomeFragment (onboarding redirect, ACRA dialog, etc.) and
             // every other assertion below would be misleading.
             onView(withId(R.id.homeGestureRoot)).check(matches(isDisplayed()))
-            onView(withId(R.id.appList)).check(matches(isDisplayed()))
+            onView(withId(R.id.favoritesRecyclerView)).check(matches(isDisplayed()))
 
             // ACT: fast upward swipe on the wrapper.
             //
@@ -163,7 +163,7 @@ class HomeGestureLayoutTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launchIntent).use {
             onView(withId(R.id.homeGestureRoot)).check(matches(isDisplayed()))
-            onView(withId(R.id.appList)).check(matches(isDisplayed()))
+            onView(withId(R.id.favoritesRecyclerView)).check(matches(isDisplayed()))
 
             // ACT: slow drag on the same axis. Espresso's `Swipe.SLOW`
             // dispatches the same coordinate path over a longer
@@ -200,7 +200,7 @@ class HomeGestureLayoutTest {
             // FragmentManager.commit, AppDrawer view inflation. A real
             // misfire would surface well within this window.
             Thread.sleep(1_500)
-            onView(withId(R.id.appList)).check(matches(isDisplayed()))
+            onView(withId(R.id.favoritesRecyclerView)).check(matches(isDisplayed()))
         }
     }
 }
