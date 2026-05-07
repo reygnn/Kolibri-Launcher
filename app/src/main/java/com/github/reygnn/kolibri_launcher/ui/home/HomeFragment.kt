@@ -353,7 +353,10 @@ class HomeFragment : Fragment() {
     private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
     private val borderDecorator = ScrollViewBorderDecorator()
-    private val swipeAnalyzer = SwipeGestureAnalyzer()
+    private val swipeAnalyzer = SwipeGestureAnalyzer(
+        distanceThreshold = AppConstants.SWIPE_THRESHOLD.toFloat(),
+        velocityThreshold = AppConstants.SWIPE_VELOCITY_THRESHOLD.toFloat(),
+    )
     private val timeFormatter = TimeEventFormatter()
     private val orientationSynchronizer by lazy {
         OrientationSynchronizer { resources.configuration.orientation }

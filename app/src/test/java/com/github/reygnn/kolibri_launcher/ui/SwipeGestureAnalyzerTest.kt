@@ -12,11 +12,13 @@ class SwipeGestureAnalyzerTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val analyzer = SwipeGestureAnalyzer()
-
-    // Die Konstanten aus dem AppConstants File (zur Referenz im Test)
-    // SWIPE_THRESHOLD = 50
-    // SWIPE_VELOCITY_THRESHOLD = 50
+    // Test reproduces the legacy `AppConstants.SWIPE_*_THRESHOLD = 50`
+    // calibration explicitly. Default `dominanceFactor = 1f` preserves
+    // the original binary axis check.
+    private val analyzer = SwipeGestureAnalyzer(
+        distanceThreshold = 50f,
+        velocityThreshold = 50f,
+    )
 
     // ========== GRENZWERT-TESTS (BOUNDARY TESTING) ==========
 

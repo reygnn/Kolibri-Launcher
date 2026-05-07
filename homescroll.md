@@ -372,7 +372,7 @@ long-press must call `viewModel.onSetWallpaperEditMode(false)` instead.
 
 ## 6. Migration plan
 
-### Step 1 — Build `HomeGestureLayout`
+### Step 1 — Build `HomeGestureLayout` [DONE 2026-05-07]
 
 New file: `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeGestureLayout.kt`.
 
@@ -415,6 +415,50 @@ invariants from §3.3 must be visible to future maintainers.
 Estimated size: ~200–250 lines (vs. 162 for `SwipeDownDismissLayout`,
 the delta is the four-direction expansion + GestureDetector
 integration + sealed-class trigger state).
+
+**Implementation notes (2026-05-07):**
+
+- **§8.5 (analyzer reuse) crystallized as parameterization, not
+  drop-in reuse.** Reading both call sites end-to-end exposed a
+  scale mismatch: `AppConstants.SWIPE_THRESHOLD = 50` (px) and
+  `SWIPE_VELOCITY_THRESHOLD = 50` (px/sec) are calibrated for
+  `GestureDetector.onFling`'s VelocityTracker-smoothed output, while
+  `SwipeDownDismissLayout`'s values (`scaledTouchSlop * 4`,
+  `1.2 px/ms` = 1200 px/sec, `1.5x` dominance) are calibrated for
+  raw-dispatch deltas — the latter's velocity threshold is ~24×
+  higher. Reusing the analyzer as-is with the existing AppConstants
+  values would have triggered on every casual finger movement.
+  Resolution: `SwipeGestureAnalyzer` now takes `distanceThreshold`,
+  `velocityThreshold`, and `dominanceFactor` (default `1f`) as
+  constructor parameters. HomeFragment's pre-existing call site at
+  line 356 was updated to pass AppConstants values explicitly (will
+  be deleted in Step 3). The existing JVM test
+  `SwipeGestureAnalyzerTest` was updated to construct the analyzer
+  with explicit `50f / 50f` and default dominance — it preserves
+  the original semantics and all boundary tests still pass.
+- **Subtle analyzer behavior change at exact axis equality.** The
+  old binary check (`if (absDiffX > absDiffY) horizontal else
+  vertical`) defaulted equal magnitudes to vertical. The new
+  symmetric form with `dominanceFactor = 1f` returns IGNORED for
+  exact `|dx| == |dy|`. Real-world touch traces practically never
+  produce exact equality so no existing test case fails; documented
+  for completeness.
+- **Tap detector also receives ACTION_CANCEL on trigger.** The doc
+  described the embedded `GestureDetector` integration but didn't
+  detail how its state should be reset when a directional swipe
+  fires. `HomeGestureLayout.cancelChildGesture` synthesizes
+  ACTION_CANCEL and feeds it to BOTH `super.dispatchTouchEvent` (the
+  ScrollView and other children) AND the embedded `tapDetector`.
+  Any in-progress long-press timer or tap-counting state aborts in
+  the same step, so the gesture stays clean. Reflected in
+  `cancelChildGesture`'s KDoc.
+- **No try/catch around the public callbacks.** Mirrors
+  `SwipeDownDismissLayout`, which deliberately doesn't wrap
+  `onSwipeDown?.invoke()`. Consistent with Rule 11 (no defensive
+  try/catch around simple invoke operations) — the consumer's
+  existing safety nets (`launchSafe` inside `GestureDelegate`)
+  already cover the realistic failure modes.
+- **Final size: ~210 lines** (the estimate of 200–250 held).
 
 ### Step 2 — Update layout XML
 
