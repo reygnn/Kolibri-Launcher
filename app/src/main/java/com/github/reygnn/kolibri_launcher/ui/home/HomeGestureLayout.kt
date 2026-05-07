@@ -209,7 +209,36 @@ class HomeGestureLayout @JvmOverloads constructor(
                 }
             }
         }
-        return if (triggered) true else super.dispatchTouchEvent(ev)
+
+        // Always run the children's dispatch so they get every event
+        // (clicks on favorites, ScrollView's own drag handling, etc.).
+        // The return value is what the *parent* (the wallpaperContainer
+        // FrameLayout) sees; once we own the gesture the children's
+        // result is irrelevant to dispatch routing.
+        val consumedBySuper = super.dispatchTouchEvent(ev)
+
+        // ACTION_DOWN claim — even if no descendant returned true,
+        // we MUST tell the grandparent "yes, this branch wants the
+        // gesture". Without that claim, the FrameLayout treats this
+        // branch as rejecting the touch and routes every later
+        // ACTION_MOVE / ACTION_UP to a different child or swallows
+        // them — `dispatchTouchEvent` then never fires again for
+        // the rest of the gesture and our analyzer cannot decide.
+        // The descendant tree under this layout is intentionally
+        // touch-passive in the migration-commit state: the
+        // `NonInterceptingScrollView` inside is hardcoded
+        // `allowIntercept = false` per §6 step 6 (homescroll.md), so
+        // it deliberately rejects DOWN. Without this claim, the
+        // wrapper would only ever see one event per gesture.
+        // SwipeDownDismissLayout in the AppDrawer does NOT need the
+        // same workaround because its child is a RecyclerView that
+        // claims DOWN unconditionally; that's an accident of its
+        // contents, not a property of the dispatchTouchEvent pattern.
+        return when {
+            triggered -> true
+            ev.actionMasked == MotionEvent.ACTION_DOWN -> true
+            else -> consumedBySuper
+        }
     }
 
     /**

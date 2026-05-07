@@ -681,13 +681,58 @@ rather than the navigation system internals.
   per rule 11 in the testing notes (TOP_CENTER as origin lands
   at y=0 = system status bar window). Mirrors
   `AppDrawerSwipeDismissTest`'s pattern.
-- **No Run/Pass status for the tests yet** — no emulator was
-  attached at write-time, so compile-only verification was
-  performed (`:app:assembleDebugAndroidTest` and the convention
-  linter both green). The tests will run as part of Step 5
-  real-device validation. If they fail there, the failure mode
-  itself is the signal — adjust thresholds and assertions in a
-  follow-up.
+- **Tests revealed a real architectural bug in `HomeGestureLayout`;
+  fix landed alongside Step 4.** First emulator run (Pixel 9a AVD)
+  hit a UI-blocking misfire: every fast swipe was misinterpreted
+  as a long-press, because `dispatchTouchEvent` only ever received
+  ACTION_DOWN — the subsequent ACTION_MOVE / ACTION_UP events for
+  the same gesture were routed away from the wrapper.
+
+  **Root cause:** when a `ViewGroup.dispatchTouchEvent` returns
+  `false` for ACTION_DOWN, the framework treats that branch as
+  rejecting the gesture and routes every later event for that
+  gesture to a different sibling or up to the grandparent.
+  `HomeGestureLayout`'s ACTION_DOWN code path called
+  `super.dispatchTouchEvent`, which routed to children. The
+  immediate child is `NonInterceptingScrollView`, which is locked
+  to `allowIntercept = false` per §6 step 6 — by design it does
+  NOT claim DOWN. With no other clickable descendant in the swipe
+  region, super returned `false`, the wrapper returned `false`,
+  the parent `wallpaperContainer` excluded the wrapper from the
+  rest of the gesture, and every subsequent ACTION_MOVE bypassed
+  `dispatchTouchEvent` entirely. The embedded
+  `GestureDetector`'s long-press timer (~500 ms after DOWN) then
+  fired because nothing cancelled it, and the user saw the
+  Customize dialog open instead of the AppDrawer.
+
+  **Fix:** `HomeGestureLayout.dispatchTouchEvent` now claims
+  ACTION_DOWN unconditionally (`return true` in the DOWN branch
+  after `super.dispatchTouchEvent`). The grandparent then keeps
+  the wrapper as the active branch for the rest of the gesture
+  and every event flows through. Children still receive each
+  event normally via `super.dispatchTouchEvent`; the override of
+  the DOWN return value only affects what the *grandparent*
+  thinks about us, not what the children get to handle.
+
+  **Why `SwipeDownDismissLayout` doesn't need the same
+  workaround:** its single child is a `RecyclerView` which always
+  claims ACTION_DOWN, so its `super.dispatchTouchEvent` returns
+  true and the original "claim only when triggered" logic
+  works. That's an accident of the AppDrawer's contents, not a
+  property of the dispatchTouchEvent pattern. Fix is documented
+  inline in `HomeGestureLayout.dispatchTouchEvent`'s body.
+
+  **Production impact had this not been caught:** every fresh
+  install (empty favorites list, no clickable descendants under
+  the wrapper at most touch points) would have shown the
+  Customize dialog on every tap. JVM/Robolectric tests of the
+  analyzer pass — the bug only manifests in the real touch
+  pipeline. This is exactly the kind of dispatch-routing failure
+  `INSTRUMENTED_TESTING_NOTES.kt` rule 8 says instrumented tests
+  exist to catch.
+
+- **Test results on Pixel 9a AVD: both pass.** Run via
+  `./gradlew :app:connectedDebugAndroidTest`.
 
 ### Step 5 — Real-device validation
 
