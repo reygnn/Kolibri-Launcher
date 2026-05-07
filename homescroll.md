@@ -592,7 +592,7 @@ File: `app/src/main/res/layout/fragment_home.xml`.
   scroll-state verifier, observer 2 layout adjustment) just sees
   permanent `false` and short-circuits to the no-split branch.
 
-### Step 4 — Tests
+### Step 4 — Tests [DONE 2026-05-07]
 
 Add `app/src/androidTest/java/com/github/reygnn/kolibri_launcher/ui/home/HomeGestureLayoutTest.kt`.
 
@@ -621,6 +621,73 @@ the test can observe "the callback fired" without needing to verify
 the system-side effect. Same approach as the AppDrawer test, which
 asserts on the structural signal (`appList` view becomes visible)
 rather than the navigation system internals.
+
+**Implementation notes (2026-05-07):**
+
+- **Major reduction from 12 tests to 2.** Reading
+  `app/src/androidTest/INSTRUMENTED_TESTING_NOTES.kt` (the canonical
+  conventions for instrumented tests, separate from
+  `TESTING_CONVENTIONS.kt`) surfaced rule 8: "keep this source set
+  small. Each test must target something that JVM + Robolectric
+  structurally cannot reach. If a test could pass as Robolectric,
+  write it there instead — feedback loop is 50× faster." The
+  doc's 12-test plan predates that file, and the two sources are
+  in tension. Resolution: the notes file wins because it's the
+  newer convention and the instrumented suite is meant to stay
+  lean. The committed test file
+  (`HomeGestureLayoutTest.kt`) ships exactly two tests:
+  - `fastSwipeUpOnHome_opensAppDrawer` — end-to-end positive:
+    Wrapper attached, FAST swipe-up classified as UP, `onSwipeUp`
+    callback fires, `viewModel.onFlingUp()` → `GestureDelegate`
+    → `UiEvent.ShowAppDrawer` → `MainActivity` collector →
+    `nav.navigate(...)` → `apps_recycler_view` becomes visible.
+    A single test exercises the whole wiring path that this
+    migration introduces.
+  - `slowDragUpOnHome_doesNotOpenAppDrawer` — pass-through
+    negative: SLOW drag stays under the `1.2 px/ms` velocity
+    threshold, analyzer returns IGNORED, `super.dispatchTouchEvent`
+    forwards to the ScrollView, no callback fires, AppDrawer never
+    opens.
+- **Why the other 10 tests were dropped.** `swipeDown`, `swipeLeft`,
+  `swipeRight` route to system-level effects (notifications via
+  accessibility service, configured swipe-app launch) that have
+  no observable side effect inside the app's view tree without
+  adding a test-only callback hook to the wrapper — which would
+  pollute the production API surface. The analyzer's
+  direction-discrimination is already JVM-tested in
+  `SwipeGestureAnalyzerTest`; the wrapper's wiring per direction
+  is a one-line callback assignment that's symmetrical across all
+  four. Per real-device validation in §6 Step 5, per-direction
+  feel is verified by hand. Long-press and double-tap (system
+  lock, customization dialog) are also dropped for similar
+  reasons; the wallpaper-edit-mode carve-out for long-press
+  belongs in a JVM/Robolectric test of `HomeFragment` rather than
+  an instrumented one.
+- **`Thread.sleep(1500)` in the negative test is intentional, not
+  an anti-pattern.** Rule 7 in the testing notes forbids
+  `Thread.sleep` for *synchronization* (waiting until a state
+  becomes true). The negative test is the inverse — verifying
+  that no nav transition fires within a window long enough that
+  one would have completed if it were going to. There's no
+  positive condition for `awaitUntil` to converge on, so a fixed
+  window is the right idiom here. 1500 ms covers the
+  `GestureDelegate.launchSafe` coroutine hop, the `UiEvent`
+  SharedFlow emission, the MainActivity collector, the
+  `FragmentManager.commit`, and the AppDrawer view inflation
+  — a real misfire would surface well within this window.
+  Annotated inline with this reasoning so a future reviewer
+  doesn't "fix" it back to the rule.
+- **VISIBLE_CENTER → TOP_CENTER, not TOP_CENTER → BOTTOM_CENTER**,
+  per rule 11 in the testing notes (TOP_CENTER as origin lands
+  at y=0 = system status bar window). Mirrors
+  `AppDrawerSwipeDismissTest`'s pattern.
+- **No Run/Pass status for the tests yet** — no emulator was
+  attached at write-time, so compile-only verification was
+  performed (`:app:assembleDebugAndroidTest` and the convention
+  linter both green). The tests will run as part of Step 5
+  real-device validation. If they fail there, the failure mode
+  itself is the signal — adjust thresholds and assertions in a
+  follow-up.
 
 ### Step 5 — Real-device validation
 
