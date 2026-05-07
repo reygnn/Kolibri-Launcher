@@ -379,13 +379,14 @@ New file: `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeGest
 - Extends `ConstraintLayout`, `@JvmOverloads constructor`.
 - Public API: six nullable callback fields (`onSwipeUp`, `onSwipeDown`,
   `onSwipeLeft`, `onSwipeRight`, `onDoubleTap`, `onLongPress`).
-- Optional gating field `gesturesEnabled: Boolean = true` to support
-  wallpaper-edit-mode suppression (or use a more specific flag if
-  preferred — see "open questions" below).
+  No `gesturesEnabled` boolean — gating is per-callback via null
+  (decision, see §8). Wallpaper-edit-mode sets the four swipe
+  callbacks + `onDoubleTap` to `null` and keeps `onLongPress` wired,
+  with the long-press callback handling its dual behavior internally.
 - Tuning constants: start with the SwipeDownDismissLayout values
-  (`scaledTouchSlop * 4`, `1.2f`, `1.5f`). Same values for vertical
-  and horizontal as a starting point; tune per-direction on real
-  device if needed.
+  (`scaledTouchSlop * 4`, `1.2f`, `1.5f`). One shared velocity
+  threshold for all four directions (decision, see §8). Split into
+  per-direction constants only if real-device feel turns out uneven.
 - Per-gesture state: `downX`, `downY`, `downTime`, and a
   `triggered: GestureType?` (sealed class with the four directional
   cases — tap-based gestures don't need to set this since they fire
@@ -450,16 +451,13 @@ File: `app/src/main/res/layout/fragment_home.xml`.
       else viewModel.onLongPress()
   }
   ```
-- The locking-in-progress short-circuit currently in the
-  `GestureDetector.onFling` (HomeFragment.kt:1445–1448) needs to move
-  somewhere. Two options:
-  - Into the wrapper callbacks at the call site (the wiring code
-    above gates each call).
-  - Into the `viewModel.onFling*` methods themselves (centralize the
-    check). The latter is cleaner per Rule 10.
-  Verify whether `viewModel.isLockingInProgress` is the correct flag
-  (matches the existing check) and which approach matches the
-  delegate-extracted style.
+- The locking-in-progress short-circuit currently in
+  `GestureDetector.onFling` (HomeFragment.kt:1445–1448) moves into
+  `viewModel.onFling*` methods themselves: each method's first line
+  becomes `if (isLockingInProgress) return` (decision, see §8). Per
+  Rule 10 — JVM-testable, centralizes the gate, future call sites
+  (e.g. hardware button) inherit it. Verify the actual flag name
+  (`isLockingInProgress` or whichever) when implementing.
 
 ### Step 4 — Tests
 
@@ -509,20 +507,32 @@ rather than the navigation system internals.
   acceptable — natural thumb motion is asymmetric (down is easier
   than up).
 
-### Step 6 — Cleanup
+### Step 6 — Deactivate split mode (cleanup deferred)
 
-After real-device validation passes:
+Decision (see §8): split-mode code stays physically in place during
+this migration. It is only deactivated, not removed. A separate
+later branch handles the actual cleanup in one go.
 
-- Remove `_needsSplit` `StateFlow`, the `LayoutDelegate` computation
-  for split mode, and any related dead code paths.
-- Consider replacing `NonInterceptingScrollView` with a plain
-  `ScrollView` (the dual-mode field is now dead).
-- Update `HomeFragmentRobolectricTest` to drop the split-mode
-  Robolectric coverage if it tests anything split-mode-specific
-  (probably it just tests the smoke / inflate path; check before
-  removing).
-- Update the relevant `*-de` strings if any messaging tied to the
-  split mode existed (probably none, but grep to confirm).
+In the migration commit:
+
+- `_needsSplit` is hardcoded to emit `false` permanently (or the
+  conditional in HomeFragment.kt:940–987 is forced to take the
+  no-split branch).
+- The split-mode setup block becomes unreachable but stays in the
+  source.
+- `NonInterceptingScrollView.allowIntercept = false` permanently;
+  the dual-mode field stays.
+- The `gestureZone` view stays in `fragment_home.xml` with
+  `isVisible = false` permanently.
+- `LayoutDelegate`'s split-mode computation stays.
+- `ScrollViewBorderDecorator` stays (decision: removed in cleanup).
+- `HomeFragmentRobolectricTest` and any `*-de` strings tied to
+  split mode are reviewed in the cleanup branch, not here.
+
+The cleanup branch later removes: `_needsSplit`, the
+`LayoutDelegate` split bits, `gestureZone` from XML, the dual-mode
+in `NonInterceptingScrollView` (replaced with plain `ScrollView`),
+and `ScrollViewBorderDecorator`.
 
 ### Step 7 — Branch + commit + ff-merge + push
 
@@ -548,56 +558,57 @@ ff-merge to main, push, ask the user before deleting the branch.
 
 ---
 
-## 8. Open questions / decisions to make before starting
+## 8. Decisions made (2026-05-07)
 
-These are decisions that affect the design but couldn't be settled
-without more context than this session had:
+The five questions left open in the original draft of this
+document have been settled. Recorded here so a future session
+doesn't re-litigate them.
 
-1. **Should `HomeGestureLayout` be generic enough to also replace
-   `SwipeDownDismissLayout`** (one-class-fits-both)? Pro: less
-   duplication, single tuning surface. Con: slightly larger class,
-   the AppDrawer pattern is currently single-purpose and that's part
-   of why it's clean. Recommendation: keep them separate for now;
-   reconsider once `HomeGestureLayout` is proven and the API surface
-   has settled.
+1. **`HomeGestureLayout` and `SwipeDownDismissLayout` stay
+   separate.** No premature unification. Once `HomeGestureLayout`
+   is proven on the home screen, replacing `SwipeDownDismissLayout`
+   with the same wrapper is a candidate follow-up — but explicitly
+   not part of this migration.
 
-2. **Per-direction velocity thresholds.** Real-device tuning may
-   reveal that natural thumb motion is asymmetric (e.g., easier to
-   swipe down than up). Decide whether to start with one shared
-   constant for all four directions or four separate constants.
-   Recommendation: start with one shared constant, only split if
-   real-device feel is uneven.
+2. **One shared velocity threshold for all four directions.**
+   Start with the SwipeDownDismissLayout values
+   (`scaledTouchSlop * 4`, `1.2f` px/ms, `1.5f` dominance). Only
+   split into per-direction constants if real-device feel turns
+   out uneven during §6 step 5.
 
-3. **`gesturesEnabled` vs. per-callback null gating.** A boolean
-   gating field is simpler; nullable callbacks gate per-gesture. The
-   wallpaper-edit-mode case wants to suppress some gestures but keep
-   long-press (which exits edit mode). Recommendation: nullable
-   callbacks are the cleaner fit. Wallpaper-edit-mode toggles the
-   non-long-press callbacks to `null`; long-press's callback handles
-   the dual behavior internally.
+3. **Nullable per-gesture callbacks, no `gesturesEnabled`
+   boolean.** Each callback is null by default; the Fragment
+   wires the ones it wants. Wallpaper-edit-mode toggles the
+   four swipe callbacks + `onDoubleTap` to `null` while keeping
+   `onLongPress` wired (the long-press callback handles its
+   dual behavior — exit edit mode vs. open settings — internally).
 
-4. **Migration scope of the cleanup step.** Cleanup in §6 step 6 is
-   "obvious" once the wrapper works, but each item (NonIntercepting
-   replacement, `_needsSplit` removal, `ScrollViewBorderDecorator`
-   handling) has its own surface. Decide whether to bundle into the
-   migration commit or do as a separate follow-up commit per item.
-   Recommendation: separate follow-up commits, easier to review and
-   revert individually if anything breaks.
+4. **Cleanup of split-mode dead code is a separate later
+   branch.** The migration commit only deactivates split mode
+   (see §6 step 6 for what stays). Removal of `_needsSplit`,
+   `gestureZone`, the `NonInterceptingScrollView` dual-mode,
+   `LayoutDelegate` split-mode bits, and `ScrollViewBorderDecorator`
+   happens in a follow-up branch after real-device validation.
 
-5. **Whether to keep `SwipeGestureAnalyzer`** (51 lines, JVM-tested).
-   Two paths:
-   - The new wrapper internalizes its own analysis logic (mirror of
-     `SwipeDownDismissLayout` pattern). `SwipeGestureAnalyzer` becomes
-     dead code, removable. `SwipeGestureAnalyzerTest` goes too.
-   - Refactor `SwipeGestureAnalyzer` to be the shared pure-logic
-     analyzer for both `SwipeDownDismissLayout` and `HomeGestureLayout`.
-     One source of truth for "is this a fast swipe in direction X?".
-     Tests stay relevant.
-   Recommendation: lean toward option 2 (extract shared analyzer)
-   because it matches Rule 10's "testable logic outside Android-runtime
-   classes" and produces uniform behavior across both layouts. But
-   this is a subtle decision — done wrong, it forces an awkward
-   abstraction. Read both implementations end-to-end before deciding.
+5. **Reuse `SwipeGestureAnalyzer`.** Don't internalize the
+   analysis logic into the wrapper. The concrete shape — call
+   into the existing analyzer with deltas-derived velocities,
+   or generalize the analyzer's interface so both layouts can
+   share it — is decided during implementation (read both
+   call sites end-to-end first). JVM tests in
+   `SwipeGestureAnalyzerTest` stay relevant.
+
+**Additional decisions captured during the same review:**
+
+6. **Locking-in-progress check moves into `viewModel.onFling*`
+   methods**, not the wrapper-callback site in HomeFragment. Per
+   Rule 10 — JVM-testable, centralizes the gate, future callers
+   inherit it. See §6 step 3.
+
+7. **Branch-first applies to the migration itself.** The
+   migration uses `refactor/home-gesture-wrapper` (or a name
+   confirmed at session start). The cleanup follow-up gets its
+   own branch.
 
 ---
 
