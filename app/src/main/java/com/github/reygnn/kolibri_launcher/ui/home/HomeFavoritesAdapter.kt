@@ -7,6 +7,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -74,13 +75,28 @@ class HomeFavoritesAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        // Width = MATCH_PARENT so the button-internal `gravity` controls
-        // the row-level horizontal placement of the text. Earlier versions
-        // used WRAP_CONTENT, which made text alignment a no-op visually
-        // (the button hugged the text and was placed at the row's start by
-        // the LinearLayoutManager). The actual gravity value is set
-        // per-bind from Styling.alignment so it stays a runtime setting.
-        val button = Button(parent.context).apply {
+        // The row is a MATCH_PARENT FrameLayout that hosts a WRAP_CONTENT
+        // button. Alignment is encoded as `FrameLayout.LayoutParams.gravity`
+        // on the button — that positions the button (start / center / end)
+        // within the row WITHOUT widening the button itself.
+        //
+        // Why two views, not just a MATCH_PARENT button:
+        // [HomeGestureLayout.hasLongClickableDescendantAt] walks the view
+        // tree at the touch point and decides whether the wrapper's own
+        // long-press fires. A MATCH_PARENT button covers the whole row →
+        // every long-press on a favorites row hits the favorite's
+        // long-press (app-context-menu) and the wrapper's customize-options
+        // dialog never gets a chance. Keeping the button WRAP_CONTENT
+        // means the empty space next to a short favorite belongs to the
+        // FrameLayout (which is NOT long-clickable), so the wrapper's
+        // long-press path stays alive there.
+        val container = FrameLayout(parent.context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+        val button = Button(container.context).apply {
             background = null
             includeFontPadding = false
             minHeight = 0
@@ -89,17 +105,27 @@ class HomeFavoritesAdapter(
             minimumWidth = 0
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
             )
         }
-        return ViewHolder(button)
+        container.addView(button)
+        return ViewHolder(container, button)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         try {
             val app = getItem(position)
+            // Position the button within the row. Wrap-content + layout
+            // gravity keeps the click/long-press hit area on the text only,
+            // leaving empty space for the wrapper's own long-press handler.
+            val params = holder.button.layoutParams as FrameLayout.LayoutParams
+            val newGravity = styling.alignment.toHorizontalGravity() or Gravity.CENTER_VERTICAL
+            if (params.gravity != newGravity) {
+                params.gravity = newGravity
+                holder.button.layoutParams = params
+            }
             with(holder.button) {
                 text = app.displayName
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, styling.textSizePx)
@@ -109,7 +135,6 @@ class HomeFavoritesAdapter(
                     styling.horizPaddingPx,
                     styling.verticalPaddingPx,
                 )
-                gravity = styling.alignment.toHorizontalGravity() or Gravity.CENTER_VERTICAL
                 typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                 setTextColor(createSubtlePressColor(styling.textColor))
                 setShadowLayer(
@@ -129,7 +154,10 @@ class HomeFavoritesAdapter(
         }
     }
 
-    class ViewHolder(val button: Button) : RecyclerView.ViewHolder(button)
+    class ViewHolder(
+        container: FrameLayout,
+        val button: Button,
+    ) : RecyclerView.ViewHolder(container)
 
     private companion object {
         val INITIAL_STYLING = Styling(
