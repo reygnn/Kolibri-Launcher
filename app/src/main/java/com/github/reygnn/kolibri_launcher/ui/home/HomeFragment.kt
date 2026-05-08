@@ -28,6 +28,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import android.widget.LinearLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
@@ -43,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
@@ -746,6 +748,25 @@ class HomeFragment : Fragment() {
         favoritesAdapter.setStyling(
             buildFavoritesStyling(viewModel.uiColorsState.value)
         )
+        applyTimeContainerAlignment()
+    }
+
+    /**
+     * Mirrors the favorites alignment onto `timeContainer` so the clock,
+     * date and battery TextViews shift in lockstep with the favorites
+     * list. The container is wrap_content inside a match_parent vertical
+     * LinearLayout, so its `LinearLayout.LayoutParams.gravity` controls
+     * its horizontal placement within the parent. Same idiom as
+     * `HomeFavoritesAdapter.onBindViewHolder`.
+     */
+    private fun applyTimeContainerAlignment() {
+        val container = _binding?.timeContainer ?: return
+        val lp = container.layoutParams as? LinearLayout.LayoutParams ?: return
+        val newGravity = currentFavoritesAlignment.toHorizontalGravity()
+        if (lp.gravity != newGravity) {
+            lp.gravity = newGravity
+            container.layoutParams = lp
+        }
     }
 
     // ============================================================================
