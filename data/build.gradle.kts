@@ -17,10 +17,10 @@
  * The `kapt(libs.hilt.compiler)` invocation here generates the per-module
  * aggregating class that :app's @HiltAndroidApp picks up at link time.
  *
- * BuildConfig: enabled here so `BuildConfig.DEBUG` resolves in
- * FavoritesRepositoryImpl. The app's `versionName` is NOT duplicated as a
- * `buildConfigField` — it's injected from :app via Hilt
- * (`@Named("appVersionName")`) so there's a single source of truth.
+ * BuildConfig: not generated for :data — DEBUG-build branches use
+ * `TimberWrapper.isDebugBuild` (wired from :app at startup), and the
+ * app's `versionName` is injected from :app via Hilt
+ * (`@Named("appVersionName")`) rather than duplicated as a `buildConfigField`.
  */
 plugins {
     alias(libs.plugins.android.library)
@@ -36,10 +36,6 @@ android {
 
     defaultConfig {
         minSdk = 36
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     @Suppress("UnstableApiUsage")

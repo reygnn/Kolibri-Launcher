@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import com.github.reygnn.kolibri_launcher.data.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
@@ -286,7 +285,7 @@ class FavoritesRepositoryImpl : FavoritesRepository {
                     val removedCount = currentFavorites.size - cleanedFavorites.size
                     Timber.w("Removed $removedCount invalid favorites")
 
-                    if (BuildConfig.DEBUG) {
+                    if (TimberWrapper.isDebugBuild) {
                         Timber.d("Backup favorites before cleanup: $currentFavorites")
                     }
 
