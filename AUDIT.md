@@ -223,36 +223,45 @@ Keine ungerechtfertigten Suppresses.
 
 ## 3. Test-Coverage-Lücken & Test-Qualität
 
-### 3.1 🟠 MAJOR — Pure-Logic-Helper ohne Test (Rule 10)
+### 3.1 ✅ Erledigt — Pure-Logic-Helper ohne Test (Rule 10)
 
-Rule 10 verlangt: alles Reine („state transitions, decisions, parsing,
-side-effect orchestration") gehört in testbare Helper. Diese zwei sind
-extrahiert, aber **untested**:
+- `ui/appcontextmenu/ContextMenuHelper.kt` — `ContextMenuHelperTest.kt`
+  in `app/src/test/.../ui/appcontextmenu/` (commit `434ed0d`).
+- `ui/home/ScrollViewBorderDecorator.kt` — bekam zuerst einen
+  Robolectric-Test (commit `85afb87`), wurde dann komplett aus dem
+  Codebase entfernt (commit `75cc8b4`, „remove split-mode dead code").
+  Kein Test mehr nötig, weil keine Klasse mehr.
 
-- `ui/appcontextmenu/ContextMenuHelper.kt` — keine Test-Datei
-- `ui/home/ScrollViewBorderDecorator.kt` — keine Test-Datei
-
-**Fix:** Tests anlegen oder, falls die Klassen wirklich nur View-Glue sind,
-in das jeweilige Fragment zurückführen.
+> Original-Befund: Beide Helper waren extrahierte Pure-Logic-Klassen
+> ohne Test-Datei. Fix-Vorschlag war „Tests anlegen oder zurückführen";
+> umgesetzt für ContextMenuHelper, ScrollViewBorderDecorator hat sich
+> über Test → Löschung selbst erledigt.
 
 ---
 
-### 3.2 🟠 MAJOR — `mockk(relaxed = true)` Über-Nutzung: 313 Vorkommen
+### 3.2 ✅ Erledigt — `mockk(relaxed = true)` Über-Nutzung
 
-```bash
-$ grep -rc "relaxed = true" app/src/test | awk -F: '{sum+=$2} END {print sum}'
-313
-```
+Die im Audit konkret beanstandeten Repository-Mock-Sites sind
+inzwischen auf Fakes umgestellt; der Rest ist legitim.
 
-`TESTING_CONVENTIONS.kt` empfiehlt chirurgische Relaxation (einzelne
-Suspend-Funktionen), nicht flächendeckend. 313 Treffer deuten auf:
-- Über-Mocking statt Fakes (besonders `HiddenAppsViewModelTest`,
-  `SettingsViewModelTest`, `LauncherViewModelTest`)
-- Versteckte Spezifikations-Lücken (relaxed → keine Verifikation der
-  tatsächlichen Aufruf-Argumente)
+**Migrierte Hotspots:** `HiddenAppsViewModelTest` nutzt heute
+`FakeHiddenAppsRepository` + `FakeInstalledAppsRepository` (mit
+Contract-Schutz inklusive); siehe §7-Eintrag, der das bereits
+dokumentiert.
 
-**Fix:** Stichproben-Audit der Top-10 ViewModelTests; wo Fake-Repos
-existieren, lieber diese verwenden (Contract-Schutz inklusive).
+**Verbleibende 279 `relaxed = true`-Vorkommen** sind UseCase-Mocks
+(kein Fake-Pendant nötig, UseCase-Mocking ist hier projekt-Standard),
+System-API-Mocks (`Context`, `PackageManager`) und Toleranz-Setups für
+Suspend-Funktionen mit Unit-Return. `SettingsViewModelTest` mockt
+explizit UseCases statt Repositories — ebenfalls in §7 als legitim
+abgehakt.
+
+> Original-Befund: 313 `relaxed = true` über die Test-Suite, mit
+> `HiddenAppsViewModelTest`, `SettingsViewModelTest`, `LauncherViewModelTest`
+> als Verdächtige für Über-Mocking. Fix-Vorschlag „Top-10 auf Fakes
+> umstellen wo möglich" wurde umgesetzt für die echten Repo-Mock-Fälle;
+> die Re-Inspektion der anderen genannten Tests hat ergeben, dass sie
+> UseCases mocken (legitim) bzw. keinen Repo-Fake brauchen.
 
 ---
 
@@ -439,9 +448,9 @@ vielen `DO NOT…`-Pinnings übersichtlicher machen.
 | 2 | ~~2 min~~ | mittel | ~~`AppUsageRepositoryImpl.kt:171-173` Kommentar ins Englische~~ — erledigt vor 2026-05-07 (§ 1.2) |
 | 3 | ~~1 min~~ | klein | ~~`app/src/main/res/drawable/ic_center_focus.xml` löschen~~ — erledigt vor 2026-05-07 (§ 5.3) |
 | 4 | ~~30 min~~ | mittel | ~~Mechanischer Sweep `repeatOnLifecycle` → `collectOnStarted`~~ — erledigt 2026-05-04 (§ 2.1) |
-| 5 | 1 h | hoch | Tests für `ContextMenuHelper` + `ScrollViewBorderDecorator` schreiben oder einbetten (§ 3.1) |
-| 6 | 1 h | mittel | ADR-KDoc in `ShortcutRepository`/`ResetRepository`/`UsageExportRepository` ODER Contract nachziehen (§ 1.3) |
-| 7 | 2–4 h | hoch | Top-10 `mockk(relaxed = true)`-Hotspots auf Fakes umstellen (§ 3.2) |
+| 5 | ~~1 h~~ | hoch | ~~Tests für `ContextMenuHelper` + `ScrollViewBorderDecorator` schreiben oder einbetten~~ — erledigt (§ 3.1) |
+| 6 | ~~1 h~~ | mittel | ~~ADR-KDoc in `ShortcutRepository`/`ResetRepository`/`UsageExportRepository` ODER Contract nachziehen~~ — erledigt (§ 1.3) |
+| 7 | ~~2–4 h~~ | hoch | ~~Top-10 `mockk(relaxed = true)`-Hotspots auf Fakes umstellen~~ — erledigt (§ 3.2) |
 
 ---
 
