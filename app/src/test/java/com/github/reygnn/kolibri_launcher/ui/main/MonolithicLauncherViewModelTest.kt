@@ -205,7 +205,7 @@ class MonolithicLauncherViewModelTest {
     @Before
     fun setup() {
         every { context.registerReceiver(any(), any(), any<Int>()) } returns null
-        every { appUpdateSignal.events } returns MutableSharedFlow()
+        every { appUpdateSignal.events } returns MutableSharedFlow(extraBufferCapacity = 1)
         every { context.getString(any()) } returns "Test String"
         every { context.getString(any(), any()) } returns "Test String with args"
 

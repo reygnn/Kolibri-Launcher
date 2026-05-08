@@ -207,7 +207,7 @@ class LauncherViewModelContractTest {
         }
 
         val appUpdateSignal: AppUpdateSignal = mockk {
-            every { events } returns MutableSharedFlow()
+            every { events } returns MutableSharedFlow(extraBufferCapacity = 1)
         }
 
         val testMode: TestMode = mockk {

@@ -190,7 +190,7 @@ class LauncherViewModelTest {
         wallpaperFileManager = mockk(relaxed = true)
 
         appUpdateSignal = mockk {
-            every { events } returns MutableSharedFlow()
+            every { events } returns MutableSharedFlow(extraBufferCapacity = 1)
         }
 
         testMode = mockk {

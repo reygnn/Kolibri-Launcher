@@ -137,7 +137,7 @@ class LauncherViewModelSecurityTest {
         }
 
         val appUpdateSignal: AppUpdateSignal = mockk {
-            every { events } returns MutableSharedFlow()
+            every { events } returns MutableSharedFlow(extraBufferCapacity = 1)
         }
 
         viewModel = LauncherViewModel(

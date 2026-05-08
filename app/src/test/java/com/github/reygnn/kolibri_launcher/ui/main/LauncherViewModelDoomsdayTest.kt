@@ -119,7 +119,7 @@ class LauncherViewModelDoomsdayTest {
         refreshAppsUseCase = mockk(relaxed = true)
 
         appUpdateSignal = mockk {
-            every { events } returns MutableSharedFlow()
+            every { events } returns MutableSharedFlow(extraBufferCapacity = 1)
         }
     }
 
