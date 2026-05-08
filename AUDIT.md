@@ -467,7 +467,7 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 
 ### 8.1 🟡 MINOR — Delegate-Wrap und `launchSafe`-Doppel-Sicherung
 
-`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (5 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden), analog in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
+`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (6 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden), analog in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
 
 `DelegateScope.launchSafe` (`DelegateScope.kt:41-54`) kapselt bereits
 ```kotlin
@@ -688,9 +688,9 @@ Bei der Verifikation der eigenen Findings sind drei Drifts im Original-
 Audit aufgefallen:
 
 **§3.4 „Null `advanceUntilIdle()`":** Faktisch falsch. Aktueller Stand:
-**661 Vorkommen über 21 Files** in `app/src/test/` allein
-(`MonolithicLauncherViewModelTest`: 154, `OnboardingViewModelTest`: 83,
-`HiddenAppsViewModelTest`: 38, `LauncherViewModelTest`: 57). Wahrscheinlich
+**640 Vorkommen über 21 Files** in `app/src/test/` allein
+(`MonolithicLauncherViewModelTest`: 153, `OnboardingViewModelTest`: 82,
+`HiddenAppsViewModelTest`: 37, `LauncherViewModelTest`: 56). Wahrscheinlich
 gemeint: „Null `advanceUntilIdle` gegen `WhileSubscribed`-Flows" (das wäre
 die Konvention aus `app/src/test/CLAUDE.md` §1). Sollte präzisiert oder
 gestrichen werden.
