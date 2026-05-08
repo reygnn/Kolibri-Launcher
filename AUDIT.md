@@ -412,19 +412,27 @@ PreferenceFragmentCompat-spezifische Argument.
 
 ---
 
-### 5.6 🟢 NIT — Hardcoded „100%" in `fragment_home.xml:61`
+### 5.6 ✅ Erledigt — Hardcoded „100%" in `fragment_home.xml`
 
-`android:text="100%"` als Vorschau-Fallback auf `batteryText`. Wird
-runtime überschrieben — aber Layout-Editor-Preview leidet weniger, wenn
-`@string/battery_placeholder` mit `translatable="false"`.
+`fragment_home.xml:78` (`batteryText`) referenziert
+`@string/battery_placeholder` mit `translatable="false"` — genau die
+Audit-Empfehlung.
+
+> Original-Befund: `android:text="100%"` als Vorschau-Fallback. Fix
+> via String-Resource umgesetzt.
 
 ---
 
-### 5.7 🟢 NIT — Kein Gradle-Version-Catalog
+### 5.7 ✅ Erledigt — Gradle-Version-Catalog
 
-Versionen sind direkt in `app/build.gradle.kts` hardcoded. Bei einem
-Single-Module-Projekt akzeptabel; ein `gradle/libs.versions.toml` würde die
-vielen `DO NOT…`-Pinnings übersichtlicher machen.
+`gradle/libs.versions.toml` existiert; `app/build.gradle.kts` und
+`data/build.gradle.kts` referenzieren Versionen jetzt durchgängig über
+`libs.…`. Pinning-Marker (DO NOT UPGRADE / DO NOT DOWNGRADE / DO NOT
+CHANGE) sitzen im Catalog neben den jeweiligen Versionen, mit Hinweis
+im Header von `app/build.gradle.kts`.
+
+> Original-Befund: Versionen direkt im build.gradle.kts hardcoded. Fix
+> via Version Catalog umgesetzt.
 
 ---
 
