@@ -77,33 +77,39 @@ geschrieben — also unter Rule 13 fallend.
 
 ---
 
-### 1.3 🟠 MAJOR — 3 Repositories ohne Contract-Triple, nicht dokumentiert
+### 1.3 ✅ Erledigt — 3 Repositories ohne Contract-Triple, nicht dokumentiert
 
-Rule 2 verlangt das Triple `XyzRepositoryContract` + `Fake…ContractTest` +
-`Impl…ContractTest`. Ausnahmen müssen in der Contract-KDoc begründet sein.
+Beide Sub-Findings (System-API-ADR-KDoc + Komposition-KDoc) sind
+inzwischen aufgelöst:
 
-**13 vollständige/dokumentierte Triples** (✓): AppUsage, Backup (Fake-only,
-dokumentiert), CustomNames, FavoritesOrder, Favorites, HiddenApps,
-InstalledApps (Fake-only, dokumentiert), InstalledAppsState, ScreenLock,
-Settings, SwipeActions, TimeBasedEvents (ADR-only, dokumentiert), Wallpaper.
+**System-API-ADRs:** Alle drei Contract-Dateien existieren in
+`domain/src/testFixtures/.../` mit ausführlicher ADR-KDoc:
 
-**3 echte Repositories ohne Contract-Datei** (Impl-Tests existieren, aber
-keine Drift-Protection zwischen Fake und Impl):
+- `ShortcutRepositoryContract.kt` — „NO CONTRACT TEST (ADR) — System-API
+  (LauncherApps + Context)"
+- `ResetRepositoryContract.kt` — „NO CONTRACT TEST (ADR) — composition
+  repository, holds no state, behavior is iteration over 11 Purgeable
+  children"
+- `UsageExportRepositoryContract.kt` — „NO CONTRACT TEST (ADR) — Mixed:
+  pure JSON + Uri-File-I/O"
 
-| Repository | Impl-Test vorhanden? | Contract |
-|---|---|---|
-| `ShortcutRepository` | ✓ `ShortcutRepositoryImplTest.kt` | ✗ fehlt |
-| `ResetRepository` | ✓ `ResetRepositoryImplTest.kt` | ✗ fehlt |
-| `UsageExportRepository` | ✓ `UsageExportRepositoryImplTest.kt` (+ 4 Spec-Files) | ✗ fehlt |
+**Komposition-Sub-Finding (Audit-Diagnose-Korrektur):** Die im Audit
+genannten `GetFavoriteAppsUseCaseRepository` / `GetDrawerAppsUseCaseRepository`
+/ `GetOnboardingAppsUseCaseRepository` waren keine
+„Komposition-Repositories ohne Contract" — sondern **dead code**.
+Verifiziert per grep: keine `class … : GetFavoriteAppsUseCaseRepository`-
+Implementierung, keine `import` aus Production-Code, keine `@Binds` in
+Hilt. Reste vom §9.2-Module-Split (2026-05-03), beim Verschieben der
+Interfaces ins `:domain` nicht ans neue Hilt-Wiring angeschlossen.
+Entfernt in `chore/remove-dead-usecase-repo-interfaces` (2026-05-08);
+der Komposition-Hinweis in `ResetRepositoryContract.kt` wurde
+entsprechend gestrafft (`Purgeable` bleibt das einzige tatsächliche
+Beispiel).
 
-**Bewertung:** Kein BLOCKER, weil Tests existieren — aber die zentrale
-Drift-Schutz-Disziplin fehlt. Entweder Contract nachziehen oder ADR-KDoc
-schreiben („System-API, kein Fake möglich").
-
-**Komposition-Repositories** (`GetFavoriteAppsUseCaseRepository`,
-`GetDrawerAppsUseCaseRepository`, `GetOnboardingAppsUseCaseRepository`,
-`Purgeable`) sind keine echten Daten-Repositories; für sie sind Contracts
-nicht nötig — sollte aber explizit in deren KDoc stehen.
+> Original-Befund: 3 echte Repositories ohne Contract-Datei
+> (`ShortcutRepository` / `ResetRepository` / `UsageExportRepository`)
+> plus die Komposition-Repos ohne KDoc-Begründung. Letztere existierten
+> nur als Karteileichen.
 
 ---
 

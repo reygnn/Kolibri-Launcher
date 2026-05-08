@@ -31,10 +31,8 @@ package com.github.reygnn.kolibri_launcher.data
  *    verify those tautologies against a fake that simply returns `true`,
  *    which proves nothing about the impl's actual coordination.
  *
- *    This matches the framing for the other composition interfaces
- *    (`GetFavoriteAppsUseCaseRepository`, `GetDrawerAppsUseCaseRepository`,
- *    `GetOnboardingAppsUseCaseRepository`, `Purgeable` itself) — surface
- *    too thin for contract testing.
+ *    This matches the framing for `Purgeable` itself — surface too thin
+ *    for contract testing.
  *
  * 2. **The actual coordination IS the value, and it IS tested.**
  *    The impl's coordination logic — which child gets purged in which
