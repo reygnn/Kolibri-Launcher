@@ -1646,6 +1646,123 @@ grep -rn "sealed.*Result\|sealed.*Error" domain/src/main
 
 Modul-Audit-Reihe (§9.6 KolibriLauncherApp + §9.7 Delegates + §9.8 ZoomableImageView in `:app` / §9.13 in `:data` / §9.14 in `:domain`) damit komplett.
 
+### 9.15 🟠 :app/ui Sub-Pakete Bombensicher-Audit (2026-05-08)
+
+> Folgeschritt zur Modul-Audit-Reihe: nachdem das gesamte `:app/ui/`-Tree
+> bisher nur an gezielten Punkten auditiert war (MainActivity, HomeFragment,
+> AppDrawerFragment, BaseActivity, BaseViewModel, LauncherViewModel im
+> ursprünglichen §9 / 7 Delegates in §9.7 / ZoomableImageView in §9.8),
+> deckt §9.15 alle übrigen Sub-Pakete ab — pro Datei.
+>
+> Audit-Methode: 1) Grep aller `catch`-Sites (~200 Stellen), 2) Per-File-
+> Klassifikation (pure data / state-machine / adapter / fragment / activity),
+> 3) Für jede `catch (e: Exception)` Stelle: Rule-11-four-category-frame-
+> Bewertung (expected error → narrow / teardown race → restructure /
+> programmer error → don't catch / unrecoverable → silentDeath).
+
+**Sub-Pakete (Pakete, NICHT einzelne Files, weil bisher keine Audit-Reihe):**
+
+| Sub-Paket | Files | Catch-Sites | Status |
+|---|---|---|---|
+| `appcontextmenu/` | 4 | 9 | 🟠 3 Befunde (Exception statt Throwable) |
+| `backup/` | 7 | 9 | 🟠 3 Befunde (registerForActivityResult + Dialog) |
+| `colorcustomization/` | 1 | 0 | ✅ clean |
+| `customnames/` | 5 | 9 | ✅ alle Throwable / narrow |
+| `extensions/` | 1 | 1 | ✅ Throwable |
+| `favorites/` | 3 | 9 | 🟠 3 Befunde (ViewHolder.from KDoc nennt OOM aber catcht Exception) |
+| `flow/` | 1 | 4 | ✅ Two-layer-Throwable-Pattern (Helper-Definition) |
+| `hiddenapps/` | 3 | 5 | ✅ alle Throwable |
+| `layoutcustomization/` | 1 | 9 | ✅ alle Throwable |
+| `onboarding/` | 7 | 11 | ✅ alle Throwable |
+| `settings/` | 3 | 75 | ✅ Grep bestätigt: alle broad catches Throwable |
+| `swipeactions/` | 5 | 7 | ✅ alle Throwable |
+| `usageexport/` | 3 | 8 | ✅ alle Throwable |
+| `util/` | 18 | 30 | 🟠 ScreenLockAccessibilityService: 16× Exception an System-Callback-Boundaries |
+| `appdrawer/` (rest) | 4 | 9 | 🟡 Adapter mit User-Callback-Catches auf Exception |
+| `home/` (rest) | 14 | 5 | ✅ alle Throwable |
+| `home/wallpaper/` | 4 | 4 | ✅ alle Throwable |
+| `main/` (rest) | 4 | 0 | ✅ pure sealed types |
+| `base/` (rest) | 2 | 0 | ✅ pure sealed types / interfaces |
+
+---
+
+**🟠 ECHTE BUGS — gleicher OOM-Pattern wie §9.8/§9.13 (Allocation-Sites mit Exception statt Throwable):**
+
+| Datei | Z. | Stelle | Failure-Mode | Status |
+|---|---|---|---|---|
+| `appcontextmenu/AppContextMenuDialogFragment.kt` | 298 | `showRenameDialog` outer (AlertDialog.Builder + EditText alloc + show) | OOM während Dialog/View-Inflation | ✅ Throwable (commit `7e9f4d8`) |
+| `backup/BackupFragment.kt` | 227 | `showImportOptionsDialog` outer (DialogImportOptionsBinding.inflate + MaterialAlertDialogBuilder + show) | OOM während Dialog-Inflation | ✅ Throwable |
+| `favorites/FavoritesAdapter.kt` | 46 | `ViewHolder.from()` (LayoutInflater.inflate) — KDoc sagt EXPLIZIT „OOM bei Bitmap-Resources" | OOM während Layout-Inflation | ✅ Throwable |
+| `favorites/FavoritesAdapter.kt` | 68 | `createFallbackViewHolder` (gleicher Inflate-Pfad) | OOM während Layout-Inflation | ✅ Throwable |
+
+`OutOfMemoryError extends Error extends Throwable` — **NICHT** `Exception`. Die KDoc-Texte erkennen das Problem (`FavoritesAdapter`: „OOM bei Bitmap-Resources" — explizit), aber der Catch fängt den Fall trotzdem nicht. Dasselbe Pattern wie ZoomableImageView §9.8 und BackupRepositoryImpl §9.13.
+
+**Fix-Commit `7e9f4d8`:** alle 4 Sites Exception → Throwable plus inline four-category-frame-Annotation. Innerer Catch in `AppContextMenuDialogFragment.showRenameDialog` setPositiveButton (Z. 283, customNamesRepository DataStore I/O) ebenfalls auf Throwable konsolidiert. Build + Tests + checkConventions + checkRule13 alle grün.
+
+**🟡 INKONSISTENZ — System-Callback-Boundary-Catches auf Exception (sollten Throwable sein per §9.7-Delegates-Pattern, aber nicht OOM-kritisch):**
+
+| Datei | Z. | Boundary-Typ |
+|---|---|---|
+| `util/ScreenLockAccessibilityService.kt` | 42, 58, 66, 74, 90, 98, 105, 110, 119, 125, 135, 141, 157, 165, 169, 182 | AccessibilityService Lifecycle (onServiceConnected/onUnbind/onDestroy/onInterrupt) + GLOBAL_ACTION_LOCK_SCREEN/NOTIFICATIONS |
+| `appcontextmenu/AppContextMenuDialogFragment.kt` | 113, 169, 221, 283, 309 | onCreate Bundle-Parsing + use-case-coroutine + DataStore-Repository-coroutine + onDestroyView teardown |
+| `backup/BackupFragment.kt` | 63, 79 | registerForActivityResult Callback |
+| `appdrawer/AppDrawerAdapter.kt` | 140, 160 | User-Code-Callback (onAppClicked, onAppLongClicked) |
+| `favorites/FavoritesAdapter.kt` | 151 | User-Code-Callback (onOrderChanged) |
+| `base/BaseActivity.kt` | 213 | Toast.makeText (Samsung-IPC-Defensive) |
+
+Per §9.7 Delegates-Pattern und Rule-11-four-category-frame: System-Callback-Boundaries sollten `Throwable` catchen, weil der Caller-Stack ein System-Thread (RemoteCallback, IPC) ist und ein durchschlagendes `Error` dort ohne Diagnose-Stack-Trace landet.
+
+**🟢 DEFENSIBLY NARROW (Rule 11 ✓) oder grandfathered (Rule 9 exception list ✓):**
+
+| Datei | Z. | Begründung |
+|---|---|---|
+| `appdrawer/AppDrawerAdapter.kt` | 51, 70, 93, 131, 152 | Narrow: IllegalStateException (notifyItemRangeChanged) / IndexOutOfBoundsException (getItem race). KDoc erklärt jeden Fall. |
+| `favorites/FavoritesAdapter.kt` | 81, 116, 123, 131 | Narrow: IndexOutOfBoundsException (List.removeAt/add race) — Rule 11 ✓ |
+| `favorites/FavoritesAdapter.kt` | 141 | submitList Exception — könnte enger sein, akzeptabel |
+| `util/CrashReportConsent.kt` | 101 | Plain `Timber.e` per Rule 9 exception list, KDoc admits inkonsistent — out-of-scope per data→ui cycle elimination |
+| `util/CrashReportLimiter.kt` | 85 | Plain `Timber.e` per Rule 9 exception list (bootstrap path) |
+| `base/BaseActivity.kt` | 153 | Plain `Timber.e` per Rule 9 exception list. Wrapping `finish()` ist Rule-11-grenzwertig (programmer-error path) — aber outer Throwable-catch im umschließenden collect-block fängt es ohnehin |
+
+---
+
+**Gesamtbewertung:**
+
+| Kategorie | Anzahl |
+|---|---|
+| 🟠 Echte Bugs (OOM-pattern) | **3** (§9.8/§9.13-Familie) |
+| 🟡 Inkonsistenzen (System-Callback Throwable-vs-Exception) | ~25 sites in 6 Files |
+| 🟢 Defensibly narrow / grandfathered | ~10 |
+| ✅ Komplett saubere Sub-Pakete | 13 / 19 |
+
+Die 3 echten Bugs folgen exakt dem Pattern aus §9.8 (ZoomableImageView, 3× Exception→Throwable an Allocation-Sites) und §9.13 (BackupRepositoryImpl, 8× Exception→Throwable an JSON/ZIP/Bitmap-Allocation-Sites). Empfehlung: ein zusammenfassender Fix-Commit, gleiche four-category-frame-Annotation wie in `MainActivity` / `ZoomableImageView` / `BackupRepositoryImpl`.
+
+Die ~25 System-Callback-Inkonsistenzen sind LOWER-RISK (kein OOM-prone Allocation), aber die Konsistenz mit §9.7 (Delegates) und §9.13 (Repositories) wäre wertvoll. Zweite Sweep-Welle, aber keine Korrektheits-Lücke.
+
+**Vergleich mit den anderen Modulen:**
+
+| Modul | LOC | Bugs gefunden | Sub-Befund |
+|---|---|---|---|
+| `:app/ui/main/MainActivity` (§9 original) | ~1000 | 0 | sauber |
+| `:app/ui/home/HomeFragment` (§9.1) | ~1480 | 1 | fragmentExceptionHandler |
+| `:app/ui/appdrawer/AppDrawerFragment` (§9.1) | ~660 | 1 | fragmentExceptionHandler |
+| `:app/ui/main/delegate/*` (§9.7) | ~3500 | 0 | sauber |
+| `:app/ui/home/ZoomableImageView` (§9.8) | ~1490 | 3 | Exception→Throwable |
+| `:app/ui/` (§9.15 dieser Audit, alle übrigen Sub-Pakete) | ~14000 | 3 | Exception→Throwable an OOM-Allocation-Sites |
+| `:data/` (§9.13) | ~6350 | 8 | Exception→Throwable an JSON/ZIP/Bitmap-Allocation-Sites |
+| `:domain/` (§9.14) | ~3500 | 0 | sauber |
+
+`:app/ui/` ist damit komplett bombensicher-auditiert. Die UI-Layer-Befunde clustern alle um das **gleiche Pattern**: `catch (e: Exception)` an Stellen, die explizit OOM adressieren sollen, aber `OutOfMemoryError` durchlassen, weil es `Error`/`Throwable` ist, nicht `Exception`.
+
+**Verifizierbar für künftige Sessions:**
+
+```bash
+# Inventory aller Exception-vs-Throwable broad catches:
+grep -rn 'catch\s*(\s*[a-zA-Z_]\+\s*:\s*Exception\b' app/src/main/java/com/github/reygnn/kolibri_launcher/ui/
+
+# Erwartet: nach Fix der 3 Bugs (§9.15-fix) sollte die Anzahl der Sites in
+# Allocation-Boundaries sinken; System-Callback-Sites bleiben bis Sweep 2.
+```
+
 ---
 
 ## Zusammenfassung
