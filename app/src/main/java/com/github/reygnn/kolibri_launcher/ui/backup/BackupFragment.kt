@@ -58,9 +58,13 @@ class BackupFragment : Fragment() {
         ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_ZIP)
     ) { uri ->
         uri?.let {
+            // Outer Catchall kept: registerForActivityResult callback runs
+            // on a system-callback boundary; `viewModel.exportBackup` itself
+            // is launchSafe so synchronous throws are unlikely, but we own
+            // the boundary. §9.15-Sweep widened to Throwable.
             try {
                 viewModel.exportBackup(it.toString())
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Export failed")
                 showError(getString(R.string.backup_export_failed))
             }
@@ -71,12 +75,15 @@ class BackupFragment : Fragment() {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
+            // Outer Catchall kept: same shape as exportLauncher above.
+            // showImportOptionsDialog has its own inner catch; this catch
+            // covers `viewModel.previewBackup` plus the dialog setup.
             try {
                 viewModel.resetBackupState()
 
                 viewModel.previewBackup(it.toString())
                 showImportOptionsDialog(it.toString())
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Import preview failed")
                 showError(getString(R.string.error_generic))
             }

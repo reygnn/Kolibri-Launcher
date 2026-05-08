@@ -136,8 +136,10 @@ class AppDrawerAdapter(
                     if (item != null) {
                         try {
                             // User-Code-Callback — kann beliebig werfen.
+                            // §9.15-Sweep: Throwable per Rule 11
+                            // four-category-frame (system-callback boundary).
                             onAppClicked(item)
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in onAppClicked callback for ${item.packageName}")
                         }
                     }
@@ -156,8 +158,9 @@ class AppDrawerAdapter(
 
                     if (item != null) {
                         try {
+                            // §9.15-Sweep: same as onAppClicked above.
                             onAppLongClicked(item)
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in onAppLongClicked callback for ${item.packageName}")
                         }
                     }

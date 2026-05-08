@@ -151,8 +151,10 @@ class FavoritesAdapter(
         // currentList ist eine ListAdapter-Property — wirft nicht.
         try {
             // Callback ist User-Code (Fragment-Lambda) — kann beliebig werfen.
+            // §9.15-Sweep: Throwable per Rule 11 four-category-frame
+            // (system-callback boundary).
             onOrderChanged(currentList)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onOrderChanged callback")
         }
     }

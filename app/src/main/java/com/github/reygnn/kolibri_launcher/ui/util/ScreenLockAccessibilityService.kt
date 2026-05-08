@@ -16,6 +16,16 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * AccessibilityService for screen-lock and notification-drawer actions.
+ *
+ * **Crash-safety profile (§9.15 sweep, 2026-05-08):** every catch in this
+ * file is now `Throwable`-broad. The file is end-to-end system-callback
+ * driven (AccessibilityService lifecycle, GLOBAL_ACTION_* IPC, Hilt
+ * injection at service connect). System-Callback-Boundaries gehen nach
+ * Rule-11-four-category-frame auf Throwable: ein durchschlagender `Error`
+ * landet sonst ohne Diagnose-Stack-Trace im System-Thread.
+ */
 @AndroidEntryPoint
 class ScreenLockAccessibilityService : AccessibilityService() {
     @Inject
@@ -39,7 +49,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
 
             try {
                 screenLockRepository.setServiceState(true)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting service state to true")
             }
 
@@ -55,7 +65,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 Timber.d("Lock request received, performing global action.")
                                 val success = try {
                                     performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     TimberWrapper.silentError(e, "Error performing lock screen action")
                                     false
                                 }
@@ -63,7 +73,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 if (!success) {
                                     Timber.w("Failed to lock screen - action not successful")
                                 }
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error processing lock request")
                                 // Einzelner Fehler darf nicht die Collection stoppen
                             }
@@ -71,7 +81,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                 } catch (e: CancellationException) {
                     Timber.d("Lock request collection cancelled")
                     throw e
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Critical error in lock request coroutine")
                 }
             }
@@ -87,7 +97,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 Timber.d("Open notifications request received, performing global action.")
                                 val success = try {
                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
-                                } catch (e: Exception) {
+                                } catch (e: Throwable) {
                                     TimberWrapper.silentError(e, "Error performing open notifications action")
                                     false
                                 }
@@ -95,19 +105,19 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                                 if (!success) {
                                     Timber.w("Failed to open notifications - action not successful")
                                 }
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
                                 TimberWrapper.silentError(e, "Error processing open notifications request")
                             }
                         }
                 } catch (e: CancellationException) {
                     Timber.d("Open notifications request collection cancelled")
                     throw e
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Critical error in open notifications request coroutine")
                 }
             }
 
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Critical error in onServiceConnected")
         }
     }
@@ -116,13 +126,13 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         try {
             Timber.i("Accessibility service unbound")
             cleanupService()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onUnbind")
         }
 
         return try {
             super.onUnbind(intent)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error calling super.onUnbind")
             false
         }
@@ -132,13 +142,13 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         try {
             Timber.i("Accessibility service destroyed")
             cleanupService()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroy")
         }
 
         try {
             super.onDestroy()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error calling super.onDestroy")
         }
     }
@@ -154,7 +164,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
             if (::screenLockRepository.isInitialized) {
                 try {
                     screenLockRepository.setServiceState(false)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error setting service state to false")
                 }
             }
@@ -162,11 +172,11 @@ class ScreenLockAccessibilityService : AccessibilityService() {
             // Scope canceln
             try {
                 serviceScope.cancel()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error cancelling service scope")
             }
 
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in cleanupService")
         }
     }
@@ -179,7 +189,7 @@ class ScreenLockAccessibilityService : AccessibilityService() {
         // No-op - aber absicherbar für zukünftige Implementierung
         try {
             Timber.d("Accessibility service interrupted")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onInterrupt")
         }
     }

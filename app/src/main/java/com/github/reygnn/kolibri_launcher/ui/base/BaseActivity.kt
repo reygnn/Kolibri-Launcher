@@ -210,7 +210,10 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
             runWithStrictModeDisabled {
                 Toast.makeText(this, message, duration).show()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // §9.15-Sweep: Toast.makeText IPC at system-callback boundary,
+            // widened to Throwable for consistency with the rest of the
+            // crash-safety pipeline.
             TimberWrapper.silentError(e, "Error showing toast")
         }
     }

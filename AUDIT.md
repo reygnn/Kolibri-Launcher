@@ -1712,6 +1712,8 @@ Modul-Audit-Reihe (§9.6 KolibriLauncherApp + §9.7 Delegates + §9.8 ZoomableIm
 
 Per §9.7 Delegates-Pattern und Rule-11-four-category-frame: System-Callback-Boundaries sollten `Throwable` catchen, weil der Caller-Stack ein System-Thread (RemoteCallback, IPC) ist und ein durchschlagendes `Error` dort ohne Diagnose-Stack-Trace landet.
 
+**Sweep-Commit (2026-05-08, follow-up zu `7e9f4d8`):** alle 25 oben gelisteten Sites in 6 Files Exception → Throwable konsolidiert, mit inline `§9.15-Sweep`-Annotation pro Site. Begründung pro Site verweist auf die Boundary-Klassifikation (System-Callback / lifecycle-teardown / user-code-callback). `ScreenLockAccessibilityService.kt` Class-KDoc auf Englisch übersetzt (Rule 13: Datei wurde komplett re-written). Build + Tests (auch `--rerun-tasks`-Sanity) + checkConventions + checkRule13 alle grün. Nach diesem Sweep enthält `:app/ui/` nur noch die in der „🟢 DEFENSIBLY NARROW"-Liste klassifizierten Exception-Catches — System-Callback-Boundary Throwable-Konsistenz vollständig.
+
 **🟢 DEFENSIBLY NARROW (Rule 11 ✓) oder grandfathered (Rule 9 exception list ✓):**
 
 | Datei | Z. | Begründung |

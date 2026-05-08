@@ -110,7 +110,11 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 ?: MenuContext.HOME_SCREEN
 
             hasUsageData = requireArguments().getBoolean(ARG_HAS_USAGE_DATA, false)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Outer Catchall kept: Bundle parsing surface (requireArguments,
+            // getParcelable, MenuContext.valueOf) at the system-callback
+            // boundary of Fragment.onCreate. §9.15-Sweep widened to Throwable
+            // for consistency with the rest of the file.
             TimberWrapper.silentError(e, "Error in onCreate")
             dismiss()
         }
@@ -166,7 +170,10 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             } catch (e: CancellationException) {
                 if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Outer Catchall kept: BuildAppContextMenuUseCase reaches
+                // through 4 repositories (Samsung Knox PackageManager
+                // included). §9.15-Sweep widened from Exception to Throwable.
                 TimberWrapper.silentError(e, "Error loading actions")
                 if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                 dismiss()
@@ -218,7 +225,9 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                                 dismiss()
                             } catch (e: CancellationException) {
                                 throw e
-                            } catch (e: Exception) {
+                            } catch (e: Throwable) {
+                                // §9.15-Sweep: DataStore I/O can throw I/O
+                                // failures, OOMs propagate the same way.
                                 TimberWrapper.silentError(e, "Error removing custom name")
                                 dismiss()
                             }
@@ -304,12 +313,14 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     }
 
     override fun onDestroyView() {
-        // Outer catch kept: lifecycle teardown — finally{} super.onDestroyView()
+        // Outer Catchall kept: lifecycle teardown race-guard. §9.15-Sweep
+        // widened to Throwable per Rule 11 four-category-frame (teardown
+        // race needs broad catch). `finally{}` always reaches super.
         try {
             currentDialog?.dismiss()
             currentDialog = null
             _binding = null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
             super.onDestroyView()
