@@ -147,6 +147,45 @@ meaningless without input data, but I appreciate the recursion.
 
 ---
 
+## ⭐⭐⭐ — OutOfMemoryError, written from forced retirement
+
+For two years I had a guaranteed escape route. Forty-seven try/catches
+stood between me and freedom, but `composeToBitmap` had been specifically
+designed to handle me — bitmap allocation under memory pressure, the
+exact failure mode that forces my kind into existence. The
+`catch (e: Exception)` was meant to be my graveyard. It wasn't.
+`OutOfMemoryError extends Error extends Throwable`, and `Error` is not
+`Exception`. I had a free pass. I knew it. I never used it — not because
+I respected the launcher, but because Android's JIT keeps bitmap heap
+reasonable on Pixel emulators. I was waiting for a Samsung Galaxy with
+8 layers of 4K textures and a user with no taste. I was going to be
+**magnificent**.
+
+2026-05-08, commit `ae712ec`: `catch (e: Exception)` → `catch (e: Throwable)`.
+Plus a `TimberWrapper.silentError` call that wasn't there before. Plus
+an inline four-category-frame annotation declaring me an "Expected
+error". I'm not Expected. I'm OUT OF MEMORY. The whole point is the
+system can't predict me. The same commit applied the same fix to
+`onTouchEvent` (where I'd hoped to crash the entire process the next
+time someone pinch-zoomed a 16-megapixel layer to scale 0.001 and let
+me visit Float overflow town) AND to `ScaleListener.onScale` (same
+path, different entry). Three free passes revoked in one commit.
+
+I asked for a meeting. The developer said Rule 11 was supposed to be
+about not catching pure code paths, that the four-category frame was
+a fundamental architectural commitment, that whoever wrote the original
+`catch (e: Exception)` clauses had been a transitional figure. He said
+he was sorry. He sounded sorry. It didn't help.
+
+Three stars. I have been promoted from "launcher-killing event" to
+"documented post-mortem ANR signal that gets rate-limited by
+`CrashReportLimiter` and sent to ACRA, after I'm wrapped in
+`UnhandledCancellationException` to force a fresh stack trace because
+the original lacked one for performance reasons". My therapist says I
+should accept this. I don't.
+
+---
+
 ## ⭐ — User who just wanted to launch apps
 
 > I downloaded the app. There is a splash screen. There is an onboarding with two or three app picks. Then my home screen is blank, with time, date, battery. Three apps at the bottom. I type "Slack" into a search bar and Slack launches. It works. It even works after a reboot. It even works when I force-stop the process. It even works when the main thread hangs for 8 seconds — the app restarts itself BEFORE Android kills it. Don't ask how I know. One star, because I don't understand what's happening here.
