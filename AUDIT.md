@@ -784,6 +784,187 @@ blockiert auf TODO §7.
 
 ---
 
+## 9. Bombensicher-Review 2026-05-08
+
+> Gezielter Crash-Safety-Pass auf die sechs Files, die für einen
+> HOME-Activity-Launcher unbedingt halten müssen: jeder Crash hier
+> startet die App sofort wieder (Android relauncht den HOME), kann zu
+> einer ACRA-Spam-/Boot-Loop-Spirale werden, oder hinterlässt eine
+> halb-initialisierte Lügen-State-Activity. Anlass: Sorge nach
+> mehreren Throwable-Sweeps, ob Safety-Nets verloren gingen, die
+> echte Failure-Modes adressierten.
+>
+> Reviewt: `MainActivity.kt`, `HomeFragment.kt`, `AppDrawerFragment.kt`,
+> `BaseActivity.kt`, `BaseViewModel.kt`, `LauncherViewModel.kt` —
+> ~3890 Zeilen.
+
+### 9.1 🔴 Echter Befund — `fragmentExceptionHandler` ohne Fallback
+
+`HomeFragment.kt:308-314` und `AppDrawerFragment.kt:140-146` (vor dem Fix)
+hatten identisch:
+
+```kotlin
+private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+    try {
+        TimberWrapper.silentError(throwable, "Uncaught exception in HomeFragment")
+    } catch (e: Throwable) {
+        // Even logging can fail
+    }
+}
+```
+
+Zwei Konsequenzen dieser Form:
+
+1. **Rule 9 in Fragments verletzt.** In DEBUG wirft `silentError` per
+   Rule 9 eine RuntimeException um Programmer-Errors lautstark zu
+   machen. Das bare `catch (e: Throwable)` swallowte diesen Throw —
+   damit war Rule 9 für jeden Coroutine-Pfad unter dem Handler
+   strukturell deaktiviert. Programmer-Errors in Fragment-Coroutines
+   wurden silent in DEBUG.
+
+2. **Original-Throwable verloren wenn Timber selbst stirbt.** Der
+   Kommentar erkennt das Problem („Even logging can fail"), bietet
+   aber keinen Fallback. MainActivity hatte denselben Bug; im
+   §1-Catch-Sweep (commit `0b7a21c` o.ä.) gefixt mit System.err-
+   Fallback + DEBUG-rethrow OUTSIDE der Catch — beide Fragments
+   wurden damals nicht mitgezogen.
+
+**Fix:** commit `3c9fd54`, 2026-05-08. Beide Fragment-Handler matchen
+jetzt MainActivity exakt: tight try um silentError, `catch (loggingError)`
+mit System.err-Fallback, `if (BuildConfig.DEBUG) throw throwable`
+außerhalb der Catch.
+
+> Verifikation für künftige Sessions: gegen jeweils Z. 308 ff. in
+> `HomeFragment.kt` und Z. 140 ff. in `AppDrawerFragment.kt` prüfen.
+> Beide Handler müssen System.err-Fallback und DEBUG-rethrow haben.
+> Wenn ein Refactor diese Form wieder rückbaut, ist Rule 9 erneut
+> kompromittiert.
+
+### 9.2 ✅ Verifiziert sauber
+
+| Datei | Geprüft | Ergebnis |
+|---|---|---|
+| `BaseActivity.kt` | Multi-Layer ErrorEventBus + ViewModel-Event-Collector mit Inner+Outer-Catch, Toast-Safe mit Samsung-StrictMode-Workaround, runWithStrictModeDisabled mit try/finally Policy-Restore | Multi-Layer intakt; einzige kosmetische Inkonsistenz: `NavigateUp` (Z. 151–156) fängt `Exception` statt `Throwable` — kein Risiko, anderer Files-Konvention nach |
+| `BaseViewModel.kt` | sendEvent / launchSafe / executeSafe / coroutineExceptionHandler / handleError + post-§8.3 errorEvent-Pfad | Vollständig. `executeSafe`s nested catch um failing onError ist da. Cancellation überall rethrown. OOM/StackOverflow korrekt mit Toast-Suppress |
+| `MainActivity.kt` | mainActivityExceptionHandler mit System.err-Fallback + DEBUG-rethrow, handleSpecificEvent Outer Catchall (HOME-Activity-resilience), Triple-Catch in launchApp (ActivityNotFoundException + SecurityException + Throwable mit jeweils passenden Recoveries), strukturelle Teardown-Race-Guards vor jedem Dialog-Show, silentDeath in setupMainContent, BroadcastReceiver.onReceive mit Throwable-Catch, ActivityResultLauncher-Callbacks mit Catches, onRestoreInstanceState mit nested popBackStack-Fallback | Jede Catch trägt Inline-Rationale mit four-category-frame-Slot. Keine Lücke gefunden |
+| `LauncherViewModel.kt` | Reine Delegation; alle Catches in den Delegates via `scope.launchSafe` | Pass-through; Safety-Net liegt korrekt in den Delegates |
+| `HomeFragment.kt` | onCreateView / observeViewModel (collectOnStarted) / chip-Rendering mit per-item Recovery / loadBitmapFromUri (Throwable-Umbrella für I/O+OOM) / DoubleClickListener (system-callback boundary) / showAppInfo (narrowed zu ActivityNotFoundException) / onDestroyView mit teardown-listener-cleanup | Bis auf §9.1-Bug (jetzt gefixt) sauber |
+| `AppDrawerFragment.kt` | setupFragmentResultListener (FragmentManager-callback boundary) / displayFilteredApps mit Fallback zur Master-Liste / IMM-Wraps in showKeyboardNow + hideKeyboard / onDestroyView mit `finally { super.onDestroyView() }` | Bis auf §9.1-Bug (jetzt gefixt) sauber |
+
+### 9.3 Was NICHT auditiert wurde — Lücken-Liste für künftige Sessions
+
+Diese Files / Pfade waren explizit außerhalb des heutigen Reviews
+und sind die natürlichen nächsten Audit-Ziele für ein 9.5/10-Niveau:
+
+1. **`ui/home/ZoomableImageView.kt` (1468 Zeilen)** — Custom-View für
+   Multi-Layer-Wallpaper-Edit. Eigene Touch-Handler, Bitmap-Operationen,
+   Matrix-Math, Layer-State-Machine. Klassische Crash-Surface. Heute
+   nur via §2.3 NIT touched (`addLayer()` ~101 Zeilen) — nie
+   systematisch geprüft. Crash hier betrifft nur Wallpaper-Edit-Mode,
+   nicht Default-Pfad — aber Edit-Mode ist nicht trivial nutzbar.
+
+2. **Die 7 Delegates in `ui/main/delegate/`** —
+   `AppManagementDelegate`, `WallpaperDelegate`, `ClockDelegate`,
+   `GestureDelegate`, `ThemingDelegate`, `LayoutDelegate`,
+   `DelegateScope`. Im §8.1-Sweep wurden 10 doppel-gewickelte
+   `launchSafe`-Sites gefoldet. Die einzelnen Delegate-Bodies (was
+   passiert IM Block) sind nicht systematisch geprüft. Schutz ist
+   `scope.launchSafe`-vermittelt, korrekt — aber nicht jeder Code-Pfad
+   verifiziert.
+
+3. **OEM-spezifische Bugs** — KNOWN_ISSUES.md dokumentiert
+   Samsung-Toast-IPC und Knox-resolveActivity. Andere OEM-ROMs
+   (MIUI, EMUI, ColorOS, OneUI 6+) haben jeweils eigene
+   StrictMode-/Process-Quirks, die nur durch echtes Device-Testing
+   gefunden werden. Per-Definition nicht in einem JVM-Audit lösbar.
+
+4. **Wallpaper-Edit-Mode unter realer Memory-Pressure** — 8 Layer +
+   Rotation während Edit + Background-Kill + Wiederöffnen. Multi-Layer-
+   Bitmaps sind die anfälligste OOM-Surface. Robolectric kann das
+   nicht stresstesten; nur AVD oder echtes Gerät.
+
+5. **Adapter-Lifecycle-Races** — RecyclerView + DiffUtil-Background-
+   Thread + Fragment-Teardown-Race. Es existieren Guards
+   (`_binding != null && isAdded` in `submitListToAdapter`,
+   `_binding == null return@collectOnStarted` in jeder
+   Observer-Body), aber Heisenbug-Charakter — nicht ohne
+   Stress-Replay verifizierbar.
+
+6. **`KolibriLauncherApp.kt`** — heute nicht im Scope, aber
+   architektonisch der wichtigste File: globaler
+   UncaughtExceptionHandler, ACRA-Init, Multi-Layer-Init-Paranoia
+   per Rule 7. Letzter Audit war wohl §1-Catch-Sweep oder früher.
+   Verifizierbar via grep auf `try { … } catch (e: Throwable) {
+   TimberWrapper.silentError(e, …) }`-Anzahl und ANR-Reporter-
+   Wiring.
+
+### 9.4 Gesamteinstufung — 9/10
+
+Bewertet auf Skala für Android-Apps allgemein:
+
+- Standard-App: 5–6/10 (catches sporadisch, kein Multi-Layer)
+- Polierte kommerzielle App: 7–8/10 (catches systematisch, aber
+  ohne dokumentierte Frame-Disziplin)
+- Kolibri Launcher: **9/10**
+
+Was das 9 trägt:
+
+- **Multi-Layer-Verteidigung systemisch.** App / Activity-Base /
+  Activity / Fragment / ViewModel-Base / Delegate / TimberWrapper /
+  Daten — jede Schicht hat ihren eigenen Safety-Net mit
+  dokumentierter Boundary.
+- **HOME-Activity-Launcher-Spezifika adressiert.** `silentDeath`
+  statt `finish()` in unrecoverable Pfaden, ACRA-Spam-Limiter,
+  Boot-Loop strukturell verhindert, Battery-Receiver-Guard,
+  Triple-Catch in `launchApp`.
+- **Frame-Disziplin durchgehalten.** Rule 11 four-category-frame
+  ist nicht nur Doku, sondern in MainActivity inline auf jeder
+  einzelnen Catch zitiert. Linter (`checkConventions`) erzwingt
+  die Annotation-Konvention für whitelistete Files.
+- **Rule-9-Schutz strukturell verbunden.** TimberWrapper.silentError
+  wirft in DEBUG → Programmer-Errors werden laut. Heutiger Fix
+  (§9.1) hat den letzten Spot wiederhergestellt, wo dieser Pfad
+  swallowed war.
+
+Warum nicht 10:
+
+- §9.3 Lücken (ZoomableImageView, Delegates intern, OEM-spezifisch,
+  Real-Stress, Adapter-Races, KolibriLauncherApp).
+- 10/10 würde bedeuten „verifiziert resistant gegen jeden
+  realistischen Crash auf jedem Android-Gerät" — das ist nur durch
+  Months-of-Field-Testing erreichbar.
+
+### 9.5 Pfad zu 9.5/10
+
+In dieser Reihenfolge, jeder Schritt eigenständig durchführbar:
+
+1. ZoomableImageView systematisch reviewen (ähnlich wie §9 — eine
+   Audit-Session auf den Custom-View). Erwarteter Aufwand: ~2h.
+2. Die 7 Delegates im selben Stil auditieren (Body-Inhalte, nicht
+   nur die `launchSafe`-Wrapper). ~3h zusammen.
+3. KolibriLauncherApp.kt re-auditieren — letzter dedizierter Pass
+   ist Monate her, ANR-Reporter und ACRA-Init-Pfad sind nicht
+   trivial. ~1h.
+4. Robolectric-Smoke-Test für die kritischen Lifecycle-Übergänge
+   (onCreate→onDestroyView Race, FragmentResult-Lifecycle, Wallpaper-
+   Edit Enter→Exit). Nicht als Stress-Test, sondern als Backstop
+   für die Race-Guards. ~3h.
+5. Real-Device-Stress-Session: AVD windowed (per `feedback_emulator_run_mode`-
+   Memory), Wallpaper-Edit mit 8 Layern, mehrere Rotation-Cycles,
+   Background-Kill, Wiederöffnen, Repeat. Mind. 1 Stunde.
+
+Schritte 1–3 bringen vermutlich auf 9.3, Schritt 4 auf 9.4, Schritt 5
+liefert das Real-Daten-Signal das die anderen vier nicht ersetzen können.
+
+> Verifizierbarkeits-Hinweis für künftige Sessions: §9 ist ein
+> Zeitpunkt-Snapshot vom 2026-05-08. Wenn ein späterer Refactor die
+> hier als „sauber" gelisteten Patterns (multi-layer handler,
+> System.err-Fallback, four-category-frame-Annotation) bricht, wird
+> §9 ungültig. Lese den Stand am Datum der Verifikation neu, vergleich
+> gegen diese Beschreibung, dokumentier Drift in einem §9.6.
+
+---
+
 ## Zusammenfassung
 
 Original-Audit (2026-05-03/04):
