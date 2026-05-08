@@ -62,6 +62,17 @@ private class TestViewModel(
     fun testOnCleared() = onCleared()
 }
 
+/**
+ * Variant that does NOT override errorEvent — pins the default-null
+ * path used by ViewModels whose event type has no toast variant
+ * (e.g. OnboardingViewModel<OnboardingEvent>).
+ */
+private class TestViewModelWithoutErrorEvent(
+    dispatcher: CoroutineDispatcher
+) : BaseViewModel<UiEvent>(dispatcher) {
+    fun testLaunchSafe(block: suspend CoroutineScope.() -> Unit) = launchSafe(block)
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class BaseViewModelTest {
 
@@ -289,6 +300,20 @@ class BaseViewModelTest {
         val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
 
         vm.testLaunchSafe { throw CancellationException("Cancelled") }
+        advanceUntilIdle()
+
+        assertFalse(events.any { it is UiEvent.ShowToast })
+        job.cancel()
+    }
+
+    @Test
+    fun `default null errorEvent emits no toast on RuntimeException`() = runTest {
+        val vm = TestViewModelWithoutErrorEvent(mainDispatcherRule.testDispatcher)
+
+        val events = mutableListOf<UiEvent>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+
+        vm.testLaunchSafe { throw RuntimeException("Boom") }
         advanceUntilIdle()
 
         assertFalse(events.any { it is UiEvent.ShowToast })
