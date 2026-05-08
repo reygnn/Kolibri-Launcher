@@ -301,14 +301,8 @@ class FavoritesRepositoryImpl : FavoritesRepository {
     }
 
     override suspend fun purgeRepository() {
-        try {
-            dataStore.edit { preferences ->
-                preferences[PreferencesKeys.FAVORITES] = emptySet()
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Failed to purge FavoritesRepositoryImpl repository")
+        dataStore.safePurge("FavoritesRepositoryImpl") { preferences ->
+            preferences[PreferencesKeys.FAVORITES] = emptySet()
         }
     }
 }

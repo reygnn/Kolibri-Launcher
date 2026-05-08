@@ -310,14 +310,8 @@ open class FavoritesOrderRepositoryImpl private constructor(
     }
 
     override suspend fun purgeRepository() {
-        try {
-            dataStore.edit { preferences ->
-                preferences.remove(PreferencesKeys.ORDER_LIST)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to purge FavoritesOrderRepositoryImpl repository")
+        dataStore.safePurge("FavoritesOrderRepositoryImpl") { preferences ->
+            preferences.remove(PreferencesKeys.ORDER_LIST)
         }
     }
 }

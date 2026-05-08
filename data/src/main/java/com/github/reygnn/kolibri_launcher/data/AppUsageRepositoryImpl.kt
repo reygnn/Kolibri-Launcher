@@ -233,21 +233,15 @@ class AppUsageRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeRepository() {
-        try {
-            dataStore.edit { preferences ->
-                val keysToRemove = preferences.asMap().keys
-                    .filter { key ->
-                        key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)
-                    }
-
-                keysToRemove.forEach { key ->
-                    preferences.remove(key)
+        dataStore.safePurge("AppUsageRepositoryImpl") { preferences ->
+            val keysToRemove = preferences.asMap().keys
+                .filter { key ->
+                    key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)
                 }
+
+            keysToRemove.forEach { key ->
+                preferences.remove(key)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to purge AppUsageRepositoryImpl repository")
         }
     }
 }
