@@ -1103,6 +1103,104 @@ auf 9.3 setzt Steps 1+2 voraus.
 Step 2+3 zusammen bringen das Rating auf ~9.2; Step 1 (ZoomableImageView)
 würde es auf 9.3 schieben.
 
+### 9.8 🟠 ZoomableImageView audit (Schritt 1 von §9.5) — 2026-05-08
+
+> Dritter §9.3-Item abgearbeitet (#1 ZoomableImageView). 1469 Zeilen
+> Custom-View für Multi-Layer-Wallpaper-Edit. Anlass: hat eigene
+> Touch-Handler-Logic, Bitmap-Operationen, Matrix-Math, Layer-State-
+> Machine — klassische Crash-Surface. Im §9.3 als „nicht systematisch
+> geprüft" gelistet.
+>
+> Befund: **Drei echte Bugs gefunden**, alle in einem Commit gefixt
+> (siehe unten). Darüber hinaus solide Architektur (state-machine
+> sauber, Lifecycle-Cleanup korrekt, Edge-Cases dokumentiert).
+
+**Drei echte Bugs (commit `ae712ec`, alle gefixt):**
+
+1. **`onTouchEvent` (Z. 789–804)** — System-callback boundary (Android
+   input dispatcher). Catch war auf `Exception` statt `Throwable`. Plus
+   silent swallow ohne Logging. Konsequenzen:
+   - **OOM-Schutz fehlte:** Matrix-Math auf extremen Zoom-Werten
+     (Z. 1349–1354 mit `imageMatrix.postScale(sf, sf, focusX, focusY)`
+     bei sehr großen Bitmaps) kann theoretisch OOM werfen — wäre
+     escape worden.
+   - **Kein Logging:** Real-world-Fehler hier wären komplett unsichtbar
+     gewesen.
+   - **Fix:** Catch auf `Throwable`, plus `TimberWrapper.silentError`,
+     plus inline four-category-frame-Annotation.
+2. **`composeToBitmap` (Z. 650–723)** — Catch war auf `Exception` statt
+   `Throwable`. **Kritisch:** die Funktion wurde explizit für den
+   bitmap-OOM-Fall designed (große Dimensionen, viele Layer), aber
+   `OutOfMemoryError extends Error extends Throwable` — NICHT
+   `Exception`. Der Catch hätte den genau-dafür-existierenden
+   Failure-Mode nicht erwischt.
+   - **Fix:** Catch auf `Throwable`, plus `silentError`. Das `null`-
+     Fallback war schon korrekt — Caller (export path) handelt
+     null.
+3. **`ScaleListener.onScale` (Z. 1333–1361)** — gleiches Pattern:
+   `Exception` statt `Throwable`, kein Logging. Matrix-Mutations auf
+   torn-down view oder bei extremen Werten wäre escape worden.
+   - **Fix:** `Throwable`, plus `silentError`, plus four-category-
+     frame-Annotation.
+
+**Verifiziert sauber bei der Restprüfung:**
+
+| Surface | Schutz |
+|---|---|
+| `onDraw` (Z. 729–770) | Recycled-Bitmap-Guards (`bmp.isRecycled` → return / continue), pro-Layer-Skip wenn Layer-Bitmap null. Kein Catch — Canvas-Pipeline-Throws sind framework-level, andere Throws hier wären Programmer-Errors |
+| `addLayer`/`removeLayer`/`swapLayers` (Z. 464–561) | Sauberer State-Machine-Update mit korrektem `activeLayerIndex`-Recompute (verifizierter Bug-Fix-Kommentar bei `removeLayer` zeigt frühere Drift-Ecke wurde adressiert) |
+| `applyTransform`/`centerCrop`/`fitToWidth`/`showOriginalSize` (Z. 326–446) | Pure Matrix-Math + StateFlow-ähnliche Property-Writes, alle mit Null-Guards (`drawable ?: return`, `width == 0 || height == 0`-Guards) |
+| `animateSingleSnapBack`/`animateLayerSnapBack` (Z. 1148–1321) | ValueAnimator mit BOTH `onAnimationEnd` AND `onAnimationCancel` Listenern, die `snapBackAnimator = null` setzen — stale Animator-Referenz strukturell verhindert |
+| `onSizeChanged` (Z. 1434–1463) | Re-Berechnung von base-scale + snap-back bei Rotation. Pure math, programmer-error-only |
+| `onDetachedFromWindow` (Z. 1465–1468) | Cancelt snapBackAnimator. Pure Lifecycle-Cleanup |
+
+**Edge-Case ohne Crash-Risiko (zur Vollständigkeit):**
+
+- Bitmap-Lifecycle: `onDetachedFromWindow` recyceltt keine Layer-
+  Bitmaps. Diese werden von `WallpaperFileManager.copyToInternal`
+  geliefert (extern owned), nicht von ZoomableImageView besessen.
+  Recycling hier wäre ein Double-Free-Risiko. Korrektes Verhalten.
+
+**Fix-Commit-Schema:**
+
+```kotlin
+// Vorher:
+} catch (e: Exception) {
+    isDragging = false; ...
+    false
+}
+
+// Nachher:
+} catch (e: Throwable) {
+    TimberWrapper.silentError(e, "Error handling wallpaper touch event")
+    isDragging = false; ...
+    false
+}
+```
+
+Plus Inline-four-category-frame-Annotation-Block über jedem Catch
+(Pattern matcht MainActivity).
+
+**Verifizierbar für künftige Sessions:**
+
+- Z. 794+ (onTouchEvent) — `catch (e: Throwable)` + `silentError`
+- Z. 720+ (composeToBitmap) — same
+- Z. 1358+ (ScaleListener.onScale) — same
+
+Wenn ein späterer Refactor die Catches wieder auf `Exception` zurückbaut,
+ist die OOM-Resilienz erneut kompromittiert.
+
+**§9.5-Roadmap-Fortschritt nach §9.8:**
+
+- [x] Step 3 (KolibriLauncherApp) — §9.6
+- [x] Step 2 (7 Delegates) — §9.7
+- [x] Step 1 (ZoomableImageView) — §9.8
+- [ ] Step 4 (Robolectric-Smoke-Tests ~3h)
+- [ ] Step 5 (Real-Device-Stress mind. 1h)
+
+Drei JVM-auditierbare §9.3-Items abgehakt; Rating-Progression auf ~9.3.
+Steps 4+5 sind außerhalb des reinen Code-Review-Workflows.
+
 ---
 
 ## Zusammenfassung
