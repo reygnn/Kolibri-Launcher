@@ -30,6 +30,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
+| 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | offen — wiederholter User-Wunsch, aktuell hardcoded `Gravity.START` in `HomeFavoritesAdapter.kt:81` | klein-mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1661,6 +1662,77 @@ sich nach realer Nutzung der Pre-Releases v0.99.65 / v0.99.66 als
 Indikatoren für „dann doch nötig": mehrere User berichten dass das
 Wischen sich nicht richtig anfühlt und sie pro Gerät
 unterschiedlich kalibrieren wollen.
+
+---
+
+## 21. (offen) Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen
+
+User-Wunsch, der wiederholt aufgekommen ist: die Favoriten auf dem
+Home-Screen sollen nicht nur linksbündig (`Gravity.START`) angezeigt
+werden, sondern wahlweise auch zentriert oder rechtsbündig. Aktuell
+ist die Ausrichtung in `HomeFavoritesAdapter.kt:81` hardcoded:
+
+```kotlin
+gravity = Gravity.START or Gravity.CENTER_VERTICAL
+```
+
+Plus der ViewHolder-Button hat `WRAP_CONTENT` als Width
+(`HomeFavoritesAdapter.kt:84-87`), d.h. jeder Button ist nur so
+breit wie sein Text — die Adapter-interne Gravity wirkt nur
+text-intern.
+
+**Architektur-Anker (was angefasst werden muss):**
+
+1. **Adapter** — `HomeFavoritesAdapter.kt`:
+   - Button-Width auf `MATCH_PARENT` umstellen, damit `gravity`
+     die ganze Row-Breite ausnutzt (statt nur Text-intern).
+   - `Styling`-Datentyp (Z. 54-61) um ein neues Feld
+     `alignment: FavoritesAlignment` erweitern. Sealed Enum mit
+     drei Werten (`Start`, `Center`, `End`); compiler-driven
+     exhaustiveness, gleicher Pattern wie `WallpaperBlendMode`.
+   - In `onBindViewHolder` (Z. 95+) das `gravity` aus dem
+     Styling-Snapshot setzen statt aus dem hardcodierten
+     `Gravity.START`.
+2. **Domain/State** — `:domain` neuer Sealed-Enum
+   `FavoritesAlignment` (Start / Center / End); plus
+   `HomeSettings`-Modell um das Feld erweitern. Sealed-Identifier
+   gehören in `:domain` (per Modul-Architektur), das `Gravity.X`-
+   Mapping in `:app/ui/util/` (analog zu
+   `WallpaperBlendModeMapper.kt`).
+3. **Persistence** — neue Preference Key in `PrefKeys`
+   (`FAVORITES_ALIGNMENT`, String mit Enum-Name). Default: `Start`
+   (Backward-Compat). Migration nicht nötig (neuer Schlüssel,
+   default greift wenn fehlt). Backup-Schema: in
+   `BackupRepositoryImpl`/`BackupSerializer` als neues optionales
+   Feld in der Theme-/Layout-Section ergänzen.
+4. **ViewModel/Flow** — `LauncherViewModel`/`SettingsRepository`
+   den State-Flow ergänzen, `HomeFragment` reicht den Wert via
+   `setStyling` an den Adapter weiter (existierender Pfad).
+5. **Settings-UI** — Naturhöhle ist
+   `LayoutCustomizationDialogFragment.kt`, das schon Sliders für
+   Layout-Scale und Padding hat. Drei Radio-Buttons (oder ein
+   3-State-Toggle / SegmentedButton) ergänzen.
+
+**Verwandte Pattern im Codebase:**
+
+- `LayerButtonsState` / `WallpaperEditTransition` /
+  `RenameDecision` als Vorlage für reine Decision-Klassen mit
+  Sealed-Identifier.
+- `WallpaperBlendModeMapper.kt` als Vorlage für Domain-Enum →
+  Android-Type-Mapping über die Modulgrenze.
+- Backup-Schema-Erweiterung folgt dem Pattern aus
+  `ImportOptionsUiState.kt` (per-Section optional).
+
+**Aufwand:** klein-mittel. Adapter + Mapper + Settings-UI sind
+jeweils kleine Änderungen, der Bulk ist die Backup-Schema-
+Erweiterung mit Round-Trip-Test (analog zu
+`BackupRoundTripSafTest`) und der Settings-UI-Test.
+
+**Wann:** Die Funktion ist isoliert (nur Home-Screen-Favoriten,
+kein anderer Screen rendert Favoriten ausgerichtet) und ohne
+Lifecycle-/Race-Risiko. Kein Druck-Termin — passende Gelegenheit
+ist ein freier Slot, in dem mehrere kleine User-Wünsche zusammen
+gebündelt werden.
 
 ---
 
