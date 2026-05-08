@@ -8,6 +8,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,6 +50,72 @@ class AppDrawerFragmentRobolectricTest {
 
                 assertNotNull(
                     "AppDrawerFragment must attach without throwing",
+                    activity.supportFragmentManager.findFragmentByTag("test")
+                )
+            }
+        }
+    }
+
+    /**
+     * Add+remove cycle: pins onCreateView → onViewCreated → onDestroyView.
+     * AppDrawerFragment's onDestroyView holds a single outer try/catch
+     * with `finally { super.onDestroyView() }` per AUDIT §9.2 — this test
+     * is the lifecycle backstop for that path: searchJob must be
+     * cancelled, ContextMenuHelper.dismiss must run, _binding must be
+     * nulled, and super must always reach.
+     */
+    @Test
+    fun `add then remove cycle does not crash`() {
+        val intent = Intent(
+            ApplicationProvider.getApplicationContext(),
+            HiltTestActivity::class.java
+        )
+        ActivityScenario.launch<HiltTestActivity>(intent).use { scenario ->
+            scenario.onActivity { activity ->
+                val fragment = AppDrawerFragment()
+                val fm = activity.supportFragmentManager
+
+                fm.beginTransaction()
+                    .add(android.R.id.content, fragment, "test")
+                    .commitNow()
+
+                fm.beginTransaction()
+                    .remove(fragment)
+                    .commitNow()
+
+                assertNull(
+                    "AppDrawerFragment must be removed cleanly",
+                    fm.findFragmentByTag("test")
+                )
+            }
+        }
+    }
+
+    /**
+     * Activity recreate: pins AppDrawerFragment behaviour across a
+     * configuration change. The drawer is rotation-independent and must
+     * survive recreate without losing the search-query SavedStateHandle
+     * binding or crashing on RecyclerView re-attach.
+     */
+    @Test
+    fun `add then recreate does not crash`() {
+        val intent = Intent(
+            ApplicationProvider.getApplicationContext(),
+            HiltTestActivity::class.java
+        )
+        ActivityScenario.launch<HiltTestActivity>(intent).use { scenario ->
+            scenario.onActivity { activity ->
+                val fragment = AppDrawerFragment()
+                activity.supportFragmentManager.beginTransaction()
+                    .add(android.R.id.content, fragment, "test")
+                    .commitNow()
+            }
+
+            scenario.recreate()
+
+            scenario.onActivity { activity ->
+                assertNotNull(
+                    "AppDrawerFragment must survive recreate",
                     activity.supportFragmentManager.findFragmentByTag("test")
                 )
             }

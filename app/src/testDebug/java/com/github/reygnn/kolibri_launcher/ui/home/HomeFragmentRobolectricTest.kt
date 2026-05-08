@@ -8,6 +8,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +49,71 @@ class HomeFragmentRobolectricTest {
 
                 assertNotNull(
                     "HomeFragment must attach without throwing",
+                    activity.supportFragmentManager.findFragmentByTag("test")
+                )
+            }
+        }
+    }
+
+    /**
+     * Add+remove cycle: pins onCreateView → onViewCreated → onDestroyView.
+     * The teardown path nulls `_binding`, removes 14 setListener references,
+     * cancels animators, and dismisses the context-menu dialog. AUDIT §9
+     * lists this lifecycle pair as a critical race-guard surface.
+     */
+    @Test
+    fun `add then remove cycle does not crash`() {
+        val intent = Intent(
+            ApplicationProvider.getApplicationContext(),
+            HiltTestActivity::class.java
+        )
+        ActivityScenario.launch<HiltTestActivity>(intent).use { scenario ->
+            scenario.onActivity { activity ->
+                val fragment = HomeFragment()
+                val fm = activity.supportFragmentManager
+
+                fm.beginTransaction()
+                    .add(android.R.id.content, fragment, "test")
+                    .commitNow()
+
+                fm.beginTransaction()
+                    .remove(fragment)
+                    .commitNow()
+
+                assertNull(
+                    "HomeFragment must be removed cleanly",
+                    fm.findFragmentByTag("test")
+                )
+            }
+        }
+    }
+
+    /**
+     * Activity recreate: pins HomeFragment's behavior across a configuration
+     * change. The launcher's `MainActivity` declares `android:configChanges`
+     * to suppress recreation in production (see AUDIT §5.5), but the
+     * fragment must still survive a forced recreate cleanly — a defensive
+     * test against future changes that drop the suppression.
+     */
+    @Test
+    fun `add then recreate does not crash`() {
+        val intent = Intent(
+            ApplicationProvider.getApplicationContext(),
+            HiltTestActivity::class.java
+        )
+        ActivityScenario.launch<HiltTestActivity>(intent).use { scenario ->
+            scenario.onActivity { activity ->
+                val fragment = HomeFragment()
+                activity.supportFragmentManager.beginTransaction()
+                    .add(android.R.id.content, fragment, "test")
+                    .commitNow()
+            }
+
+            scenario.recreate()
+
+            scenario.onActivity { activity ->
+                assertNotNull(
+                    "HomeFragment must survive recreate",
                     activity.supportFragmentManager.findFragmentByTag("test")
                 )
             }
