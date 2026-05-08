@@ -1472,12 +1472,52 @@ manuelle Test-Items für Maintainer-Sessions oder Produktions-Telemetrie
 - [x] Step 1 (ZoomableImageView) — §9.8
 - [x] Step 4 (Robolectric-Smoke-Tests) — §9.9
 - [x] Step 5 (Real-Device-Stress) — §9.11 (autonom durchgeführt für 6 von
-  9 Sub-Szenarien; Multi-Touch-/Code-Hook-abhängige bleiben offen)
+  9 Sub-Szenarien; Multi-Touch-/Code-Hook-abhängige bleiben offen) +
+  §9.12 (Instrumented Regression-Backstop)
 
 **Alle fünf §9.5-Steps abgeschlossen.** Rating-Progression voll
 erreicht: ~9.4/10. Der verbleibende Halb-Punkt zu 10/10 entspricht
 Months-of-Field-Testing über echte OEM-Geräte — strukturell
 unerreichbar via Audit-Workflow.
+
+### 9.12 ✅ Instrumented Monkey-Stress-Regression (commit `72424f1`)
+
+> Folgeschritt zu §9.11: das einmalige manuelle Real-Device-Result soll
+> auch deterministisch wiederholbar sein, damit ein künftiger Refactor
+> der Safety-Nets nicht silent durchgeht.
+
+**`MainActivityMonkeyStressTest.kt`** in `app/src/androidTest/.../ui/`:
+
+- 200 zufällige Monkey-Events mit Fixed-Seed (`-s 12345`), 30ms throttle
+- Setzt Kolibri als Default HOME via `DefaultHomeRoleHelper` → Monkey-
+  HOME-Events routen über ATM zurück an MainActivity, was die
+  singleTask-Resolution unter höherem Event-Volumen als
+  `MainActivityHomeIntentTest` exerziert
+- Launch via `am start` shell command (NICHT ActivityScenario.launch —
+  letzteres race-conditioned mit HiltTestApplication's Component-
+  Bringup, KDoc dokumentiert das)
+- Drei Assertion-Schichten:
+  1. Monkeys eigene `// CRASH:` / `// NOT RESPONDING:` Marker
+  2. `Events injected: 200` — wenn der Process mid-run stirbt, ist die
+     Zahl niedriger
+  3. Logcat-Scan auf `AndroidRuntime:E` + `SILENT_ERROR:*` für die
+     non-throwing-silent-error-Pfade die Monkey selbst nicht erkennt
+
+**Verifikation:** Passed auf `Virtual_Pixel_9a`, ~26s inkl. build.
+
+**Per Rule 8 berechtigt** (Test-Notes §8): Monkey-Events routen über
+die **echte** Android-Input-Dispatcher-Kette
+(`InputManagerService` → window dispatcher → `View.onTouchEvent`).
+Robolectric modelliert Input anders und würde diesen Pfad nicht
+exerzieren — also ist die Anforderung „something that JVM + Robolectric
+structurally cannot reach" erfüllt.
+
+**Coverage-Limit dokumentiert:** Monkey ist Smoke-Stress, kein
+Functional-Test. Wallpaper-Edit-Mode (Multi-Touch-Pinch),
+synthetischer 8s-Main-Thread-Block, OEM-spezifische Quirks bleiben in
+§9.10 als manual-or-telemetry-Items.
+
+Damit ist der §9.11-Befund auch in der CI-Suite gepinnt.
 
 ---
 
