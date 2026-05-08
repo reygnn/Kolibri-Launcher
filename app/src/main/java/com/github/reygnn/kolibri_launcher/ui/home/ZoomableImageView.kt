@@ -17,6 +17,7 @@ import android.view.animation.DecelerateInterpolator
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -717,7 +718,14 @@ class ZoomableImageView @JvmOverloads constructor(
             }
 
             result
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): the
+            // primary failure mode is OutOfMemoryError on createBitmap()
+            // or canvas.drawBitmap() with large dimensions / many layers.
+            // OOM extends Error → was missed by the previous Exception
+            // catch. Returning null lets the caller (export path) fall
+            // back gracefully.
+            TimberWrapper.silentError(e, "Error composing wallpaper bitmap")
             null
         }
     }
@@ -795,7 +803,14 @@ class ZoomableImageView @JvmOverloads constructor(
             if (isMultiLayerMode) handleMultiLayerTouch(event)
             else handleSingleLayerTouch(event)
             true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Unrecoverable / HOME-Activity-resilience boundary,
+            // four-category frame): onTouchEvent is invoked by Android's
+            // input dispatcher. An unhandled throw here crashes the
+            // launcher process. Throwable umbrella also covers OOM during
+            // matrix math on extreme values. Reset gesture state so the
+            // view doesn't stick in a half-completed drag.
+            TimberWrapper.silentError(e, "Error handling wallpaper touch event")
             isDragging = false
             hasDraggedBeyondThreshold = false
             resetEdgeState()
@@ -1355,7 +1370,15 @@ class ZoomableImageView @JvmOverloads constructor(
                 }
 
                 true
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Catch kept (Expected error, four-category frame):
+                // matrix math on extreme zoom values can overflow into
+                // ArithmeticException / IllegalStateException, and Matrix
+                // mutations on a torn-down view can throw on broken state.
+                // Throwable umbrella catches OOM during postScale on huge
+                // bitmaps too. Returning false signals "scale not consumed"
+                // so the gesture detector recovers.
+                TimberWrapper.silentError(e, "Error handling wallpaper scale gesture")
                 false
             }
         }
