@@ -30,7 +30,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | offen — vereinfacht Subscriber-Race-Patterns über alle Test-Schichten | klein |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
-| 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | offen — wiederholter User-Wunsch, aktuell hardcoded `Gravity.START` in `HomeFavoritesAdapter.kt:81` | klein-mittel |
+| 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | **Phase 1 erledigt 2026-05-08 (commit `9828def`)** — Adapter / Mapper / Repo / UseCase / Delegate / VM / Settings-UI gelandet, AVD-verifiziert. **Phase 2 offen**: Backup-Schema-Erweiterung (s. unten) | klein |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1665,74 +1665,131 @@ unterschiedlich kalibrieren wollen.
 
 ---
 
-## 21. (offen) Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen
+## 21. Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen
 
 User-Wunsch, der wiederholt aufgekommen ist: die Favoriten auf dem
-Home-Screen sollen nicht nur linksbündig (`Gravity.START`) angezeigt
-werden, sondern wahlweise auch zentriert oder rechtsbündig. Aktuell
-ist die Ausrichtung in `HomeFavoritesAdapter.kt:81` hardcoded:
+Home-Screen sollen nicht nur linksbündig angezeigt werden, sondern
+wahlweise auch zentriert oder rechtsbündig.
 
-```kotlin
-gravity = Gravity.START or Gravity.CENTER_VERTICAL
-```
+### Phase 1 — Settings + Live-Render — ✅ erledigt 2026-05-08 (commit `9828def`)
 
-Plus der ViewHolder-Button hat `WRAP_CONTENT` als Width
-(`HomeFavoritesAdapter.kt:84-87`), d.h. jeder Button ist nur so
-breit wie sein Text — die Adapter-interne Gravity wirkt nur
-text-intern.
+Was gelandet ist:
 
-**Architektur-Anker (was angefasst werden muss):**
+- `:domain/model/FavoritesAlignment.kt` — Pure-Kotlin enum mit
+  `START / CENTER / END`. Persistiert via `.name`, `valueOf` mit
+  Default-Fallback (`AppConstants.DEFAULT_FAVORITES_ALIGNMENT = START`).
+- `:app/ui/util/FavoritesAlignmentMapper.kt` —
+  `toHorizontalGravity()` (Pattern-Vorlage:
+  `WallpaperBlendModeMapper`).
+- `SettingsRepository.favoritesAlignmentFlow` + `setFavoritesAlignment()`,
+  `GetLayoutSettingsUseCase.favoritesAlignment` +
+  `SetFavoritesAlignmentUseCase`.
+- `LayoutDelegate.favoritesAlignmentState` + `onSetFavoritesAlignment(...)`,
+  Eltern-Wiring in `LauncherViewModel`. `onResetLayoutSettings()`
+  setzt das Feld mit zurück.
+- `HomeFavoritesAdapter.Styling` um `alignment`-Feld erweitert,
+  Button-Width auf `MATCH_PARENT` umgestellt (sonst wirkt
+  `gravity` nur Text-intern). `HomeFragment` cached
+  `currentFavoritesAlignment` und observed den Flow separat
+  (außerhalb des 4-Flow-`combine`, weil Alignment nicht in den
+  `LayoutCalculator` einfließt).
+- `dialog_layout_customization.xml` —
+  `MaterialButtonToggleGroup` mit drei Outlined-Buttons
+  (`btn_alignment_start/center/end`) ergänzt.
+  `LayoutCustomizationDialogFragment` wired Listener +
+  observe-back via `checkedIdToAlignment` /
+  `alignmentToCheckedId`.
+- DE + EN Strings (`layout_favorites_alignment*`).
+- Tests: `SettingsRepositoryContract` (default-emit / set+roundtrip /
+  purge-resets), `SettingsRepositoryImplTest` (parse-fallback,
+  String-Name-Roundtrip), `LayoutSettingsUseCasesTest` (Get + Set),
+  `LayoutDelegateTest` (state-default / flow-update / fallback /
+  setter / reset). FakeSettingsRepository mit field + purge-reset.
 
-1. **Adapter** — `HomeFavoritesAdapter.kt`:
-   - Button-Width auf `MATCH_PARENT` umstellen, damit `gravity`
-     die ganze Row-Breite ausnutzt (statt nur Text-intern).
-   - `Styling`-Datentyp (Z. 54-61) um ein neues Feld
-     `alignment: FavoritesAlignment` erweitern. Sealed Enum mit
-     drei Werten (`Start`, `Center`, `End`); compiler-driven
-     exhaustiveness, gleicher Pattern wie `WallpaperBlendMode`.
-   - In `onBindViewHolder` (Z. 95+) das `gravity` aus dem
-     Styling-Snapshot setzen statt aus dem hardcodierten
-     `Gravity.START`.
-2. **Domain/State** — `:domain` neuer Sealed-Enum
-   `FavoritesAlignment` (Start / Center / End); plus
-   `HomeSettings`-Modell um das Feld erweitern. Sealed-Identifier
-   gehören in `:domain` (per Modul-Architektur), das `Gravity.X`-
-   Mapping in `:app/ui/util/` (analog zu
-   `WallpaperBlendModeMapper.kt`).
-3. **Persistence** — neue Preference Key in `PrefKeys`
-   (`FAVORITES_ALIGNMENT`, String mit Enum-Name). Default: `Start`
-   (Backward-Compat). Migration nicht nötig (neuer Schlüssel,
-   default greift wenn fehlt). Backup-Schema: in
-   `BackupRepositoryImpl`/`BackupSerializer` als neues optionales
-   Feld in der Theme-/Layout-Section ergänzen.
-4. **ViewModel/Flow** — `LauncherViewModel`/`SettingsRepository`
-   den State-Flow ergänzen, `HomeFragment` reicht den Wert via
-   `setStyling` an den Adapter weiter (existierender Pfad).
-5. **Settings-UI** — Naturhöhle ist
-   `LayoutCustomizationDialogFragment.kt`, das schon Sliders für
-   Layout-Scale und Padding hat. Drei Radio-Buttons (oder ein
-   3-State-Toggle / SegmentedButton) ergänzen.
+AVD-verifiziert (manuell): Default = Left, Center / Right
+live-rendern, force-stop-Persistenz, Reset-Button.
 
-**Verwandte Pattern im Codebase:**
+### Phase 2 — Backup-Schema-Erweiterung — offen
 
-- `LayerButtonsState` / `WallpaperEditTransition` /
-  `RenameDecision` als Vorlage für reine Decision-Klassen mit
-  Sealed-Identifier.
-- `WallpaperBlendModeMapper.kt` als Vorlage für Domain-Enum →
-  Android-Type-Mapping über die Modulgrenze.
-- Backup-Schema-Erweiterung folgt dem Pattern aus
-  `ImportOptionsUiState.kt` (per-Section optional).
+Backup-Round-Trip muss `favoritesAlignment` mitnehmen, damit ein
+`Werks-Reset → Restore`-Flow die User-Wahl nicht verliert. Phase 1
+hat das bewusst ausgespart, weil das Feature eigenständig
+funktionsfähig sein soll.
 
-**Aufwand:** klein-mittel. Adapter + Mapper + Settings-UI sind
-jeweils kleine Änderungen, der Bulk ist die Backup-Schema-
-Erweiterung mit Round-Trip-Test (analog zu
-`BackupRoundTripSafTest`) und der Settings-UI-Test.
+**Sektion-Entscheidung (bereits getroffen, vorab aufschreiben):**
+`favoritesAlignment` gehört in **`importThemeSettings`** (Phase 7
+in `BackupDataAssembler.performImport`). Begründung: Die anderen
+visuellen Layout-Settings — `isFontBold`, `layoutScale`,
+`verticalPaddingScale`, `contentTopMarginScale`, `textColor`,
+`chipBackgroundColor`, `textShadowEnabled` — sind alle dort
+gruppiert (siehe `BackupDataAssembler.kt:288-310`). Eigene
+Sektion wäre Bloat; `qualityOfLife` gruppiert Verhalten, nicht
+Optik.
 
-**Wann:** Die Funktion ist isoliert (nur Home-Screen-Favoriten,
-kein anderer Screen rendert Favoriten ausgerichtet) und ohne
-Lifecycle-/Race-Risiko. Kein Druck-Termin — passende Gelegenheit
-ist ein freier Slot, in dem mehrere kleine User-Wünsche zusammen
-gebündelt werden.
+**Entry-Points (alle 6 Files an einem Ort):**
+
+1. `:data/BackupSerializer.kt` — JSON-Schema-Definition.
+   Neues optionales Feld in der Theme-Settings-Section
+   (z.B. `favoritesAlignment: String?`). Format: Enum-Name
+   wie alle anderen Sealed-Enum-Persistierungen. Beispiel-
+   Anker: `WallpaperState.layers[].blendMode` ist auch ein
+   Sealed-Enum-as-String.
+2. `:data/BackupDataAssembler.kt:288` (Phase 7
+   `importThemeSettings`) — neue Zeile analog zu
+   `backup.settings.isFontBold?.let { settingsRepository.setFontBold(it) }`:
+   `backup.settings.favoritesAlignment?.let { name -> ... }`.
+   Dazwischen: String → `FavoritesAlignment.valueOf` mit
+   try/catch (siehe `SettingsRepositoryImpl:280-289` für die
+   bestehende Parse-Fallback-Form).
+3. `:data/BackupRepositoryImpl.kt` — `exportToJson` /
+   `importFromJson` müssen das neue Feld lesen/schreiben.
+   `BackupSerializer` macht das automatisch wenn das Feld in
+   der Datenklasse hinzugefügt wird; nur prüfen.
+4. `app/src/main/res/layout/dialog_import_options.xml` +
+   `:app/ui/backup/ImportOptionsUiState.kt` +
+   `BackupFragment.kt` — die Theme-Settings-Checkbox
+   (`checkboxImportThemeSettings`) deckt Alignment automatisch
+   mit ab. **Keine** neue Checkbox nötig — ein-zu-eins-Mapping
+   zur Sektion.
+5. `BackupPreview` (in `:domain/model`) — wenn das Modell ein
+   `themeSettingsCount` o.ä. zählt, das auch erhöhen. Sonst
+   nichts zu tun.
+6. Test: `app/src/androidTest/data/BackupRoundTripSafTest.kt` —
+   nach existierendem Pattern um `favoritesAlignment` erweitern.
+   Set non-default → export → restore → assert non-default
+   ankommt. Der Test hat `instrumented`-Status, weil er reale
+   SAF-URIs braucht.
+
+**Backward-Compatibility-Invariante (load-bearing):**
+
+Ein altes Backup, vor Phase 1 erstellt, hat **kein**
+`favoritesAlignment`-Feld in der JSON. Beim Import:
+
+- Kotlin/Json ignoriert unbekannte Felder beim Schreiben (kein
+  Problem) und liefert `null` für fehlende beim Lesen.
+- `BackupDataAssembler.performImport` Phase 7 muss das
+  `?.let { ... }` (siehe Punkt 2) verwenden — dann wird das Feld
+  einfach nicht gesetzt und die DataStore-Default-Logik
+  (`SettingsRepositoryImpl.favoritesAlignmentFlow` defaultet auf
+  `START`) greift transparent.
+
+Kurz: solange das `?.let` korrekt ist, ist Backward-Compat
+geschenkt. Test, der das pinnt: ein synthetisches altes Backup
+(JSON ohne das Feld) muss importbar sein und `favoritesAlignment`
+auf `START` lassen — gehört in den Round-Trip-Test als zweiter
+Case.
+
+**Forward-Compatibility:** ein Phase-2-Backup, das auf einer
+Phase-1-only-Version (oder noch älter) restored wird, muss auch
+funktionieren — Schema-Versioning in `BackupSerializer`
+(`BackupConstants.BACKUP_VERSION`) muss prüfen, ob ein Bump nötig
+ist. Üblicherweise NICHT, weil neue **optionale** Felder ohne
+Bump funktionieren. Im Zweifel: bestehendes Pattern aus dem
+letzten Schema-Add-Field-Commit ansehen.
+
+**Aufwand:** ~1.5–2h. Bulk ist der Round-Trip-Test inkl. dem
+Backward-Compat-Case. UI-Code: nichts (Theme-Settings-Checkbox
+deckt es automatisch ab).
 
 ---
 
