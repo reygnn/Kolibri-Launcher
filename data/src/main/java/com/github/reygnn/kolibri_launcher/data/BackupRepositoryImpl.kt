@@ -132,7 +132,11 @@ class BackupRepositoryImpl @Inject constructor(
             serializer.encodeToJsonString(assembler.buildBackupData())
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): JSON
+            // encoding allocates memory proportional to the assembled
+            // BackupData size — large favorites / custom-names maps can
+            // OOM here. OOM extends Error → Throwable, not Exception.
             TimberWrapper.silentError(e, "Error exporting backup")
             throw BackupException("Export failed", e)
         }
@@ -159,7 +163,11 @@ class BackupRepositoryImpl @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): JSON
+            // parse + import allocates significant memory; OOM during
+            // parseBackupData on adversarial input or during repository
+            // writes is realistic. OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Error importing backup")
             ImportResult.Error(e.message ?: "Unknown error")
         }
@@ -348,7 +356,10 @@ class BackupRepositoryImpl @Inject constructor(
             assembler.performImport(resolvedBackup, options, wallpaperRestorer)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): bitmap
+            // copying during wallpaper restore + multi-repo writes are
+            // memory-heavy. OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Error importing ZIP backup")
             ImportResult.Error(e.message ?: "Unknown error")
         }
@@ -420,7 +431,11 @@ class BackupRepositoryImpl @Inject constructor(
                 } else {
                     Timber.w("Wallpaper layer $index URI not accessible, skipping: $uriString")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Catch kept (Expected error, four-category frame): per-layer
+                // bitmap copy can OOM on a large source bitmap; one bad layer
+                // must not abort the rest of the import. OOM extends Error →
+                // Throwable.
                 TimberWrapper.silentError(e, "Failed to validate wallpaper layer $index URI")
             }
         }
@@ -463,7 +478,10 @@ class BackupRepositoryImpl @Inject constructor(
             } else {
                 Timber.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): single-layer
+            // bitmap copy via WallpaperFileManager.copyToInternal can OOM on
+            // large source bitmap. OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Failed to restore wallpaper")
         }
     }
@@ -508,7 +526,12 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: IOException) {
             TimberWrapper.silentError(e, "I/O error while saving backup")
             throw BackupException("Failed to write file (storage full or unavailable?)", e)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Umbrella catch widened from Exception per four-category frame:
+            // writeZipBackup allocates memory for JSON encoding + ZIP buffers
+            // proportional to backup + embedded wallpaper sizes. Large multi-
+            // layer 4K wallpapers can OOM. OOM extends Error → Throwable, was
+            // missed by the previous `catch (e: Exception)` umbrella.
             TimberWrapper.silentError(e, "Unexpected error saving backup")
             throw BackupException("Failed to save backup: ${e.message}", e)
         }
@@ -565,7 +588,12 @@ class BackupRepositoryImpl @Inject constructor(
 
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Umbrella catch widened from Exception per four-category frame:
+            // file read + JSON parse + import is the OOM-prone path the
+            // MAX_BACKUP_SIZE_BYTES cap mitigates but doesn't eliminate (a
+            // backup at exactly the cap can still OOM during parse on a
+            // memory-tight device). OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Error loading backup")
             ImportResult.Error("Failed to load backup: ${e.message}")
         }
@@ -646,7 +674,13 @@ class BackupRepositoryImpl @Inject constructor(
         } catch (e: SecurityException) {
             TimberWrapper.silentError(e, "Permission denied for preview")
             null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Umbrella catch widened from Exception per four-category frame:
+            // preview path reads the JSON content and parses it; OOM during
+            // JSONObject construction or parseBackupData on a large input can
+            // still happen even with MAX_PREVIEW_SIZE_BYTES — the cap protects
+            // the read, not subsequent in-memory parsing. OOM extends Error →
+            // Throwable.
             TimberWrapper.silentError(e, "Unexpected error while creating preview")
             null
         }
