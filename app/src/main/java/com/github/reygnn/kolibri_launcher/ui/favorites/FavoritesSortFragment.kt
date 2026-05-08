@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
 import androidx.fragment.app.viewModels
@@ -214,7 +213,10 @@ class FavoritesSortFragment : Fragment() {
             is UiEvent.ShowToast -> showToast(getString(event.messageResId))
             is UiEvent.FavoritesOrderChanged -> {
                 try {
-                    setFragmentResult(REQUEST_KEY, bundleOf("changed" to true))
+                    setFragmentResult(
+                        REQUEST_KEY,
+                        Bundle().apply { putBoolean("changed", true) },
+                    )
                 } catch (e: Throwable) {
                     // Lifecycle race: setFragmentResult can throw
                     // IllegalStateException if the FragmentManager is

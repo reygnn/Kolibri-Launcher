@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
-import androidx.core.os.bundleOf
 import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -62,11 +61,11 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             hasUsageData: Boolean
         ): AppContextMenuDialogFragment {
             return AppContextMenuDialogFragment().apply {
-                arguments = bundleOf(
-                    ARG_APP_INFO to appInfo.toParcelable(),
-                    ARG_CONTEXT to context.name,
-                    ARG_HAS_USAGE_DATA to hasUsageData
-                )
+                arguments = Bundle().apply {
+                    putParcelable(ARG_APP_INFO, appInfo.toParcelable())
+                    putString(ARG_CONTEXT, context.name)
+                    putBoolean(ARG_HAS_USAGE_DATA, hasUsageData)
+                }
             }
         }
     }
@@ -203,10 +202,10 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
 
         when (action) {
             is AppContextMenuAction.Shortcut -> {
-                setFragmentResult(REQUEST_KEY, bundleOf(
-                    RESULT_KEY_ACTION to "launch_shortcut",
-                    RESULT_KEY_SHORTCUT to action.shortcut.toParcelable()
-                ))
+                setFragmentResult(REQUEST_KEY, Bundle().apply {
+                    putString(RESULT_KEY_ACTION, "launch_shortcut")
+                    putParcelable(RESULT_KEY_SHORTCUT, action.shortcut.toParcelable())
+                })
                 dismiss()
             }
             is AppContextMenuAction.LauncherAction -> {
@@ -234,7 +233,10 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                         }
                     }
                     else -> {
-                        setFragmentResult(REQUEST_KEY, bundleOf(RESULT_KEY_ACTION to action.id))
+                        setFragmentResult(
+                            REQUEST_KEY,
+                            Bundle().apply { putString(RESULT_KEY_ACTION, action.id) },
+                        )
                         dismiss()
                     }
                 }
