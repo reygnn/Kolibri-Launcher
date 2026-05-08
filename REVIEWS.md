@@ -95,6 +95,58 @@ there aren't any in the actual Play Store anyway.
 
 ---
 
+## ⭐⭐⭐⭐ — External auditor, returning to inspect closure rates
+
+I wrote AUDIT.md. ~30 findings, properly belegt with `file:line`
+references, a four-tier severity scale, a §7 list of bewusst
+akzeptierte Schulden so the maintainer wouldn't waste time on
+philosophical consultations, and a §8 nachtrag for things I might
+have missed on the first pass. Standard work product. Industry shape.
+
+Returned today expecting the usual six-week closure profile: maybe
+three open MAJORs, scope creep on two MINORs, a couple of
+partially-addressed NITs marked "deferred."
+
+Every original MAJOR: ✅ Erledigt. Every MINOR: ✅ Erledigt. The NITs
+explicitly tagged "akzeptabel" in my own original wording: marked
+accordingly. Three of my §8 findings: ✗ Zurückgezogen, with detailed
+retraction notes informing me my analysis was off — one timeline-error
+("the cited commits date to 2026-04-30, one day BEFORE Rule 13"), one
+false dead-code claim ("`BaseViewModelTest.kt:425-438` exerziert die
+Branches direkt"), one drift-self-correction in §8.11 already
+self-correcting via §8.11. One section politely corrects my LOC math:
+"Audit-Schätzung ~70 Zeilen Reduktion war auf 13 Files basiert;
+realistische Foldzahl ist 6."
+
+Most disturbing entry: §8.4. My original recommendation read
+"Sweep-only-Lösung ist Sisyphos ohne den Lint." The maintainer
+responded by **building the lint** — awk + bash + Gradle task +
+12-case fixture suite + a UTF-8-byte regression they found and pinned
+with its own regression case on the first real run + integration into
+CLAUDE.md in two separate places so future sessions cannot ignore it.
+Then ran it. Found 60 historical drifts since the rule's introduction
+commit. Translated all 60. Marked done.
+
+They didn't close the finding. They eliminated the category.
+
+Four stars. I am being structurally outflanked by my own audit
+subjects. The point deduction is technical: there is now a `Stichtag`
+field stamped on the linter's documentation. I did not ask for that.
+
+---
+
+## ⭐⭐⭐⭐⭐ — Rule 13 Linter, after 24 hours of employment
+
+Built Thursday. 12 fixture tests passed. Deployed. Caught 60
+historical violations on first run. Swept on commit `79c5395`. Have
+not flagged a single line since. Default-base scan against
+`origin/main`: ✓. Override scan against the historical Stichtag: ✓.
+I have been wired into CLAUDE.md so I cannot be deleted. I am in
+permanent observability-only mode. Five stars. Statistically
+meaningless without input data, but I appreciate the recursion.
+
+---
+
 ## ⭐ — User who just wanted to launch apps
 
 > I downloaded the app. There is a splash screen. There is an onboarding with two or three app picks. Then my home screen is blank, with time, date, battery. Three apps at the bottom. I type "Slack" into a search bar and Slack launches. It works. It even works after a reboot. It even works when I force-stop the process. It even works when the main thread hangs for 8 seconds — the app restarts itself BEFORE Android kills it. Don't ask how I know. One star, because I don't understand what's happening here.
