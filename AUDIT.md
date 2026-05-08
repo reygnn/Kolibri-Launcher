@@ -1572,6 +1572,80 @@ Acht `catch (e: Exception)` in `BackupRepositoryImpl.kt`, alle an Stellen, die e
 
 Wenn ein späterer Refactor die Catches wieder auf `Exception` zurückbaut, ist die OOM-Resilienz der Backup-Pipeline erneut kompromittiert.
 
+### 9.14 ✅ :domain Bombensicher-Audit (2026-05-08)
+
+> Folgeschritt zu §9.13: nachdem `:app` (§9.1, §9.6, §9.7, §9.8) und
+> `:data` (§9.13) auditiert waren, schließt §9.14 das dritte Modul des
+> `:app → :data → :domain` Dependency-Chains. ~3500 Zeilen über
+> `core/`, `domain/usecase/`, `domain/repository/`, `domain/model/`.
+
+**Erwartung vor dem Audit:** Weniger Reibungspunkte als `:app`/`:data`,
+weil `:domain` ein Pure-Kotlin-JVM-Modul ist (`kotlin("jvm")`,
+`hilt-core` JAR, kein Android SDK auf dem Compile-Classpath). Keine
+ContentResolver/LauncherApps/PackageManager-Calls heißt: keine Stellen,
+an denen eine OEM-Quirk oder eine RemoteException über die Modul-
+Grenze in einen Catch fällt.
+
+**Ergebnis:** Bestätigt. **Null Bugs gefunden.**
+
+**Verifiziert sauber (`core/`):**
+
+| Datei | Crash-Safety-Profil |
+|---|---|
+| `TimberWrapper.kt` | Two-Tier Error-System (`silentError` für DEBUG-throw, `silentDeath` für `exitProcess(1)`). `AtomicBoolean preventCrashForTesting`, `@Volatile isDebugBuild`. Multi-layer logging fallback in `die()`: `dieHandler` → `Throwable.printStackTrace(System.err)` → `System.err.println(message)`. Selbst wenn die Lambda-Handler nicht gewired sind, hat `die()` einen Pfad zu stderr |
+| `KolibriLog.kt` | Pure-Kotlin Façade mit `@Volatile`-Lambda-Handlers, keine eigene Crash-Surface — wired via `KolibriLauncherApp.onCreate` |
+| `AppUpdateSignal.kt` | `MutableSharedFlow(extraBufferCapacity = 1, onBufferOverflow = DROP_OLDEST)` — keine Suspendierung beim Emit, keine Buffer-Overflow-Race |
+| `CoerceExtensions.kt` | NaN/Infinity-safe `coerceInSafe(min, max)` (paired) — checks both endpoints. Standalone `coerceAtLeastSafe`/`coerceAtMostSafe` checken nur NaN, nicht Infinity (siehe Note unten) |
+| `ColorMath.kt` | Reine Math, keine Exception-Surface |
+
+**Verifiziert sauber (`domain/usecase/`, ~50 Use Cases — Stichprobe an den 6 mit komplexem Catch-Flow):**
+
+| Datei | Crash-Safety-Profil |
+|---|---|
+| `BuildAppContextMenuUseCase.kt` | Per-Repository `safelyXxx`-Wrapper mit `Throwable`-Catch und Empty-List-Fallback — eine fehlgeschlagene Repository-Quelle eliminiert nicht das gesamte Context-Menü |
+| `ObserveInstalledAppsUseCase.kt` | `retry` + `.catch` + per-collect try/catch mit Cached-Apps-Fallback. Drei Schutz-Schichten: Retry → Flow-Catch → cached-Apps-Recovery |
+| `GetDrawerAppsUseCase.kt` | `combine` mit per-Flow `.catch` + outer `.catch` — eine fehlende Quelle (Favorites, Hidden, etc.) führt nicht zum Drawer-Crash |
+| `LaunchShortcutUseCase.kt` | Sealed `Result`/`Error` types, triple-catch (specific → general → Throwable umbrella), translates raw failures zu Domain-Result |
+| `RequestLockUseCase.kt` | Sealed `Result` mit 4 Outcomes (`Success`, `NoAccessibilityService`, `NoPermission`, `Failure`) — UI maps via `DomainMessageMappers`, kein leakender Exception-Pfad |
+| `FactoryResetUseCase.kt` | Sealed `Result` mit try/`CancellationException`-rethrow/`Throwable` — saubere Cancellation-Semantik selbst im Reset-Pfad |
+
+**Verifiziert sauber (`domain/repository/`):**
+
+20 Interfaces — Pure Contracts, keine Implementierung, keine Catch-Surface. Failure-Mode-Übersetzung ist Job der `RepositoryImpl`s in `:data` (siehe §9.13).
+
+**Verifiziert sauber (`domain/model/`):**
+
+Pure Data-Classes. `WallpaperState.kt` (~300 Zeilen) hat bounds-checked Mutation-Helpers, `getOrNull`-basierte Reads, `AtomicLong` für IDs — keine indexbasierte Crash-Surface.
+
+**Architektonische Beobachtung — warum `:domain` weniger Reibung hat:**
+
+1. **Pure-Kotlin-Modul** — kein Android SDK auf dem Classpath, also keine RemoteException/SecurityException/PackageManager.NameNotFoundException-Surfaces. Failure-Modes sind hier Domain-Logik (eine Repository-Quelle ist leer, ein User-Input ist ungültig), nicht OEM-Quirks
+2. **Sealed-Result-Pattern** — UseCases übersetzen `Throwable` zu Domain-`Result` an der Modul-Grenze. Das verhindert exakt den OOM-Bug-Pattern aus §9.8/§9.13: wenn ein UseCase `catch (e: Throwable)` an der äußersten Schicht hat, fängt er auch `OutOfMemoryError` ab
+3. **Per-Flow `.catch`-Operator** — `GetDrawerAppsUseCase`/`ObserveInstalledAppsUseCase` zeigen das Pattern: jede Flow-Quelle in `combine` hat ihren eigenen `.catch` mit Empty-Fallback, plus ein outer `.catch` als Last-Line-Of-Defense
+4. **Repository-Interfaces als Contract-Boundary** — die OEM-Quirks und PackageManager-Failures bleiben in `:data` eingeschlossen. `:domain` bekommt nur die übersetzte Domain-Repräsentation
+
+**Vergleich Module:**
+
+| Modul | LOC | Bugs gefunden | Bug-Klassen |
+|---|---|---|---|
+| `:app` | ~50000 | 3 (§9.1, §9.8) | fragmentExceptionHandler ohne Fallback (§9.1), Exception statt Throwable an OOM-relevanten Stellen (§9.8 ZoomableImageView 3x) |
+| `:data` | ~6350 | 8 (§9.13) | Exception statt Throwable an OOM-relevanten Stellen (BackupRepositoryImpl) |
+| `:domain` | ~3500 | **0** | — |
+
+**Note (kein Bug):** `CoerceExtensions.kt` standalone `Float.coerceAtLeastSafe(min)` / `coerceAtMostSafe(max)` checken NaN, aber NICHT Infinity. Alle real existierenden Call-Sites verwenden die paired `coerceInSafe(min, max)`-Variante, die beide Endpoints checkt. Theoretischer Edge-Case nur, wenn ein zukünftiger Caller die Standalone-Variante mit `Float.POSITIVE_INFINITY` aufruft — Empfehlung: bei nächster Berührung der Datei symmetrische Infinity-Checks ergänzen, kein Aktion-Item dafür.
+
+**Verifizierbar für künftige Sessions:**
+
+```bash
+# :domain darf KEIN android.* import haben (außer in core/ImageOps.kt — gibt's nicht):
+./gradlew :domain:compileKotlin  # build-enforced
+
+# UseCase-Sealed-Result-Pattern ist nicht lint-enforced. Spot-check:
+grep -rn "sealed.*Result\|sealed.*Error" domain/src/main
+```
+
+Modul-Audit-Reihe (§9.6 KolibriLauncherApp + §9.7 Delegates + §9.8 ZoomableImageView in `:app` / §9.13 in `:data` / §9.14 in `:domain`) damit komplett.
+
 ---
 
 ## Zusammenfassung
