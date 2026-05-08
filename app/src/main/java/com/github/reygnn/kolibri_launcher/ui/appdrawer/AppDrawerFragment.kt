@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -137,11 +138,36 @@ class AppDrawerFragment : Fragment() {
     // COROUTINE MANAGEMENT
     // ===========================================
 
+    // CoroutineExceptionHandler for AppDrawerFragment scopes. Two responsibilities,
+    // mirrored from MainActivity.mainActivityExceptionHandler:
+    //
+    //   1. Log uncaught exceptions via silentError (RELEASE: logged; DEBUG:
+    //      silentError throws RuntimeException per Rule 9).
+    //   2. Re-throw the original throwable in DEBUG so programmer errors
+    //      surface instead of being silently absorbed by the handler.
+    //
+    // The previous shape used a bare `catch (e: Throwable)` with no fallback,
+    // which swallowed silentError's Rule-9 RuntimeException — defeating
+    // Rule 9 across every coroutine running under this handler. Layout now:
+    // `try` is tight around the logging call only; the DEBUG re-throw lives
+    // outside the catch. The catch's last-resort fallback is System.err so
+    // we don't lose the original error if Timber itself crashes.
     private val fragmentExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in AppDrawerFragment")
-        } catch (e: Throwable) {
-            // Even logging can fail
+        } catch (loggingError: Throwable) {
+            // Catch kept (Expected error, four-category frame): the
+            // recursion-into-error-pipeline guard documented in the field
+            // KDoc above. If Timber itself crashes, fall back to stderr
+            // so the original error is not lost.
+            System.err.println(
+                "AppDrawerFragment logging failed: ${loggingError.message}; " +
+                    "original error: ${throwable.message}"
+            )
+        }
+
+        if (BuildConfig.DEBUG) {
+            throw throwable
         }
     }
 
