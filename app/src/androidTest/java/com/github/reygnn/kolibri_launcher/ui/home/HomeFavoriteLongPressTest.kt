@@ -39,12 +39,13 @@ import javax.inject.Inject
  * parallel with the favorite Button's own `setOnLongClickListener`,
  * so a single long-press opened BOTH dialogs at once. Round-4
  * fixed it structurally with the
- * `HomeGestureLayout.hasLongClickableDescendantAt` hit-test that
+ * `HomeGestureLayout.hasOwnTouchPipelineDescendantAt` hit-test that
  * suppresses the wrapper's tap-detector when the touch lands on a
- * long-clickable descendant. This test pins that the hit-test
- * still gives the favorite priority — a future change to the
- * wrapper's dispatch logic, or to the way favorite buttons signal
- * `isLongClickable`, would surface here.
+ * descendant with its own touch pipeline (long-clickable or
+ * clickable). This test pins that the hit-test still gives the
+ * favorite priority — a future change to the wrapper's dispatch
+ * logic, or to the way favorite buttons signal `isLongClickable`,
+ * would surface here.
  */
 @HiltAndroidTest
 class HomeFavoriteLongPressTest {

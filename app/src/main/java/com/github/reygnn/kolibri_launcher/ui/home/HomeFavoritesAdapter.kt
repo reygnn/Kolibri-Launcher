@@ -31,7 +31,7 @@ import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
  *
  * Each item is a programmatically constructed `Button` with
  * `WRAP_CONTENT` width — important for the wrapper's
- * [HomeGestureLayout.hasLongClickableDescendantAt] hit-test, which
+ * [HomeGestureLayout.hasOwnTouchPipelineDescendantAt] hit-test, which
  * gives a long-press on a favorite text priority over the wrapper's
  * own customize-options dialog. `setOnLongClickListener` (set in
  * [onBindViewHolder]) implicitly toggles `isLongClickable = true`,
@@ -81,7 +81,7 @@ class HomeFavoritesAdapter(
         // within the row WITHOUT widening the button itself.
         //
         // Why two views, not just a MATCH_PARENT button:
-        // [HomeGestureLayout.hasLongClickableDescendantAt] walks the view
+        // [HomeGestureLayout.hasOwnTouchPipelineDescendantAt] walks the view
         // tree at the touch point and decides whether the wrapper's own
         // long-press fires. A MATCH_PARENT button covers the whole row →
         // every long-press on a favorites row hits the favorite's

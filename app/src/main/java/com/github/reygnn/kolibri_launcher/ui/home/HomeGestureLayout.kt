@@ -99,15 +99,16 @@ class HomeGestureLayout @JvmOverloads constructor(
 
     /**
      * Whether the touch at the current gesture's ACTION_DOWN landed
-     * on (or under) a descendant view with `isLongClickable = true`.
-     * Used to suppress the wrapper's own [tapDetector] when a
-     * long-clickable child (e.g. a favorite button) has its own
-     * long-press pipeline — otherwise both detectors fire in
-     * parallel and the user sees TWO dialogs on a single long-press
-     * (the favorite's app-context-menu plus the wrapper's
-     * customization-options dialog).
+     * on (or under) a descendant view that runs its own touch
+     * pipeline — either `isLongClickable = true` (favorite button →
+     * app-context-menu) or `hasOnClickListeners() = true` (clock /
+     * date / battery TextViews → double-click-to-launch). Used to
+     * suppress the wrapper's own [tapDetector] there; otherwise both
+     * detectors fire in parallel and the user sees the wrapper's
+     * action (lock / customization-options dialog) layered on top of
+     * the child's intended action.
      *
-     * Computed via a manual hit-test in [hasLongClickableDescendantAt],
+     * Computed via a manual hit-test in [hasOwnTouchPipelineDescendantAt],
      * NOT from `super.dispatchTouchEvent`'s consumed signal: the
      * latter is true even when the ScrollView claims DOWN itself
      * (its `onTouchEvent` always returns true when it has children),
@@ -193,7 +194,7 @@ class HomeGestureLayout @JvmOverloads constructor(
                 downY = ev.y
                 downTime = ev.eventTime
                 triggered = false
-                childClaimedDown = hasLongClickableDescendantAt(ev.x, ev.y)
+                childClaimedDown = hasOwnTouchPipelineDescendantAt(ev.x, ev.y)
             }
 
             MotionEvent.ACTION_MOVE -> if (!triggered) {
@@ -228,15 +229,16 @@ class HomeGestureLayout @JvmOverloads constructor(
         // result is irrelevant to dispatch routing.
         val consumedBySuper = super.dispatchTouchEvent(ev)
 
-        // The tap detector only sees events when no long-clickable
-        // descendant lives at the touch position. A favorite button
-        // has its own long-press pipeline (`setOnLongClickListener`
-        // → app-context-menu); running the wrapper's tapDetector in
-        // parallel would double-fire (button menu plus wrapper's
-        // customization-options dialog) on a single long-press. For
-        // every other surface — the empty space beside a short
-        // favorite, the empty area below the favorites list, the
-        // padding around the clock — there is no long-clickable
+        // The tap detector only sees events when no descendant with
+        // its own touch pipeline lives at the touch position. Two
+        // pipelines are recognised: long-clickable (favorite button
+        // → app-context-menu) and clickable (clock / date / battery
+        // TextViews → double-click-to-launch). Running the wrapper's
+        // tapDetector in parallel with either would double-fire (the
+        // child's action plus the wrapper's lock / customization
+        // dialog). For every other surface — empty space beside a
+        // short favorite, the empty area below the favorites list,
+        // the wallpaper background — there is no own-pipeline
         // descendant at the touch point and the wrapper's tap
         // detector is the sole long-press / double-tap source.
         if (!childClaimedDown) {
@@ -268,17 +270,19 @@ class HomeGestureLayout @JvmOverloads constructor(
      * Walks the visible view tree from this layout downward, mirroring
      * `ViewGroup.dispatchTouchEvent`'s hit-testing for axis-aligned,
      * untransformed children, and returns `true` if any view on the
-     * path to the deepest descendant at (`rootX`, `rootY`) has
-     * `isLongClickable = true`.
+     * path to the deepest descendant at (`rootX`, `rootY`) runs its
+     * own touch pipeline — either `isLongClickable = true` (favorite
+     * button → app-context-menu) or `hasOnClickListeners() = true`
+     * (clock / date / battery TextViews → double-click-to-launch).
      *
      * Why a manual walk and not `super.dispatchTouchEvent`'s consumed
      * signal: ScrollView's `onTouchEvent` always returns true on
      * ACTION_DOWN when it has children (its custom logic claims the
      * gesture for scroll-handling), so the consumed signal is true
      * even when the touch landed in empty scroll-space with no
-     * long-clickable descendant. We need the finer-grained answer:
-     * "is there a view here that will fire its OWN long-press?". If
-     * yes, suppress ours; if no, fire ours.
+     * own-pipeline descendant. We need the finer-grained answer:
+     * "is there a view here that will fire its OWN long-press or
+     * click?". If yes, suppress ours; if no, fire ours.
      *
      * Accuracy gap: this hit-test does NOT account for runtime
      * matrix transforms (rotation, scale, translation via
@@ -287,12 +291,12 @@ class HomeGestureLayout @JvmOverloads constructor(
      * untransformed — if you add an animated/rotated view inside,
      * audit this method.
      */
-    private fun hasLongClickableDescendantAt(rootX: Float, rootY: Float): Boolean {
+    private fun hasOwnTouchPipelineDescendantAt(rootX: Float, rootY: Float): Boolean {
         var view: View = this
         var x = rootX
         var y = rootY
         while (view is ViewGroup) {
-            if (view !== this && view.isLongClickable) return true
+            if (view !== this && view.hasOwnTouchPipeline()) return true
             var hitChild: View? = null
             var hitX = 0f
             var hitY = 0f
@@ -314,8 +318,11 @@ class HomeGestureLayout @JvmOverloads constructor(
             x = hitX
             y = hitY
         }
-        return view.isLongClickable
+        return view.hasOwnTouchPipeline()
     }
+
+    private fun View.hasOwnTouchPipeline(): Boolean =
+        isLongClickable || hasOnClickListeners()
 
     /**
      * Synthesize ACTION_CANCEL so any child currently consuming the
