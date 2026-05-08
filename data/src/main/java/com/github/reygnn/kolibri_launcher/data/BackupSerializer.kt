@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
@@ -84,10 +83,14 @@ class BackupSerializer @Inject constructor() {
         val backup = try {
             json.decodeFromString<BackupData>(jsonString)
         } catch (e: SerializationException) {
-            TimberWrapper.silentError(e, "kotlinx.serialization failed, trying strict parsing")
+            // Timber.w (not silentError): an expected, recoverable condition
+            // for legacy / hand-edited backups — the strict-parsing fallback
+            // is *meant* to handle this. silentError would throw in DEBUG
+            // (`crashInDebug`) and tear down the recovery path itself.
+            Timber.w(e, "kotlinx.serialization failed, trying strict parsing")
             return tryStrictParsing(jsonString)
         } catch (e: IllegalArgumentException) {
-            TimberWrapper.silentError(e, "Invalid argument, trying strict parsing")
+            Timber.w(e, "Invalid argument, trying strict parsing")
             return tryStrictParsing(jsonString)
         }
 
@@ -184,10 +187,14 @@ class BackupSerializer @Inject constructor() {
         return try {
             parseStrictly(jsonString)
         } catch (e: JSONException) {
-            TimberWrapper.silentError(e, "Strict parsing failed")
+            // Timber.w (not silentError): both kotlinx and strict paths
+            // failed → user-supplied backup is malformed beyond recovery.
+            // Returning null is the contract. Programmer-error semantics
+            // do not apply — this is external-input failure.
+            Timber.w(e, "Strict parsing failed")
             null
         } catch (e: NumberFormatException) {
-            TimberWrapper.silentError(e, "Number format error")
+            Timber.w(e, "Number format error in strict parsing")
             null
         }
     }
@@ -227,7 +234,11 @@ class BackupSerializer @Inject constructor() {
 
             backup.copy(settings = enrichedSettings)
         } catch (e: JSONException) {
-            TimberWrapper.silentError(e, "Failed to merge with strict values")
+            // Timber.w (not silentError): graceful degradation — return the
+            // kotlinx-parsed backup unchanged when the strict-merge overlay
+            // can't be derived. silentError would throw in DEBUG and lose
+            // the kotlinx result entirely.
+            Timber.w(e, "Failed to merge with strict values")
             backup
         }
     }
@@ -252,7 +263,10 @@ class BackupSerializer @Inject constructor() {
 
             layers
         } catch (e: JSONException) {
-            TimberWrapper.silentError(e, "Failed to parse wallpaperLayers array")
+            // Timber.w (not silentError): the wallpaperLayers field is
+            // optional and skip-on-malformed is the intended behaviour
+            // (other fields still apply). silentError would throw in DEBUG.
+            Timber.w(e, "Failed to parse wallpaperLayers array")
             null
         }
     }
@@ -462,7 +476,11 @@ class BackupSerializer @Inject constructor() {
 
             true
         } catch (e: JSONException) {
-            TimberWrapper.silentError(e, "JSON validation failed - malformed JSON")
+            // Timber.w (not silentError): user-input rejection — returning
+            // false causes parseBackupData to return null, the documented
+            // contract for malformed backups. Same semantic as the
+            // Timber.w("Type validation failed - …") site above.
+            Timber.w(e, "JSON validation failed - malformed JSON")
             false
         }
     }
