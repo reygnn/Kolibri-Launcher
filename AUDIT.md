@@ -1519,6 +1519,59 @@ synthetischer 8s-Main-Thread-Block, OEM-spezifische Quirks bleiben in
 
 Damit ist der §9.11-Befund auch in der CI-Suite gepinnt.
 
+### 9.13 🟠 :data Bombensicher-Audit (2026-05-08)
+
+> Folgeschritt zu §9.6/§9.7/§9.8: nach :app/MainActivity, :app/Fragments,
+> :app/ViewModel-Base und :app/Delegates wurde auch das gesamte
+> `:data`-Modul auf Crash-Safety geprüft. ~6350 Zeilen über 28 Files.
+
+**Verifiziert sauber (10 Files):**
+
+| Datei | Status |
+|---|---|
+| `BackupSerializer.kt` | Narrow Catches sind hier korrekt (Rule 11) — JSON-Format-spezifische Failure-Modes (SerializationException, JSONException). OOM-Schutz strukturell upstream durch `MAX_BACKUP_SIZE_BYTES` cap |
+| `UsageExportRepositoryImpl.kt` | Alle public-Methoden auf `Throwable`, Size-Cap, Type-Validation, DoS-Schutz via `MAX_TIMESTAMPS_PER_APP` |
+| `WallpaperFileManager.kt` | Herausragend — gcOrphans mit dokumentierter Race-Window-Analyse + 60s Age-Cutoff-Safety-Net + path-constraint auf `wallpapers/`-dir, `AtomicLong` für concurrent file naming, alle Catches Throwable |
+| `PackageUpdateReceiver.kt` | Multi-Layer goAsync/finish/timeout-Schutz (justifies §8.5 retraction). `safeOnFinish` als terminal recovery, alle Catches Throwable, PII-Hash für Paketnamen |
+| `BackupDataAssembler.kt` | 10-Phase-Import mit `withTimeoutOrNull` gegen WhileSubscribed-cold-subscriber-Race. Keine eigenen Catches by design — propagiert an Caller's outer try |
+| `CustomNamesRepositoryImpl.kt` | Alle Throwable-Catches, Trigger nur on success, Batch-Variante mit single-trigger |
+| `InstalledAppsRepositoryImpl.kt` | Multi-Layer Flow-Catches (onStart-catch, .catch with nested-catch, per-Item-Recovery), alle Throwable |
+| `DataMigrationManager.kt` | Schon im Rule-13-Sweep gesehen — `silentDeath` für lying-state-Pfad ("First launch detected" wäre falsch) |
+| `CrashReportConsentStore.kt` | Bootstrap-context, plain `Timber.e` per Rule-9-exception-list. Catches auf Exception aber strukturell durch caller (KolibriLauncherApp.attachBaseContext) gebunden |
+| `ShortcutLauncherServiceImpl.kt` | Minimaler System-API-Wrapper, theoretischer OOM-gap aber System-API-Path |
+
+Plus alle 7 weiteren Repository-Impls sind via §8.7 (`safePurge`-Konsolidierung) oder §1.3 (Contract-ADRs) bereits in vorherigen Audits abgedeckt.
+
+**🟠 Echter Befund: BackupRepositoryImpl — gleicher OOM-Bug-Pattern wie ZoomableImageView §9.8**
+
+Acht `catch (e: Exception)` in `BackupRepositoryImpl.kt`, alle an Stellen, die explizit OOM-Failure-Modes adressieren sollen:
+
+| Methode | Z. | Failure-Mode | Status |
+|---|---|---|---|
+| exportToJson outer | ~135 | OOM during JSON encoding | ✅ Throwable (commit `96dc7be`) |
+| importFromJson outer | ~162 | OOM during JSONObject construction | ✅ Throwable |
+| importFromZip outer | ~351 | OOM during assembler.performImport | ✅ Throwable |
+| importMultiLayerWallpaper per-layer outer | ~423 | OOM during bitmap copy | ✅ Throwable |
+| importSingleLayerWallpaper outer | ~466 | Same | ✅ Throwable |
+| saveBackupToFile umbrella | ~511 | OOM during writeZipBackup (after typed SecurityException + IOException) | ✅ Throwable |
+| loadBackupFromFile umbrella | ~568 | OOM during file read+parse | ✅ Throwable |
+| previewBackup umbrella | ~649 | OOM during preview build (after typed SecurityException) | ✅ Throwable |
+
+`OutOfMemoryError extends Error extends Throwable` — NICHT `Exception`. Backup-Operationen sind die ersten OOM-Kandidaten der App (MB-große ZIP-Archive mit eingebetteten 4K-Bitmaps, JSON-Encoding/Parsing über Custom-Names + Hidden + Favorites + Wallpaper-Layers). Inkonsistenz: `isZipFile` und `resolveToLocalFile` catchen korrekt `Throwable`, die Public-API-Methoden nicht. Genau der Pattern aus §9.8.
+
+**Spezifisch NICHT verbreitet** (korrekt narrow per Rule 11):
+- URI-Parsing-Catches auf `IllegalArgumentException` — engste passende Failure-Mode
+- File-Size-Check-Catches auf Exception mit Fallback zu 0L — Failure-Mode ist „no FD available", nicht OOM
+- canAccess-inner-Checks in `importMultiLayerWallpaper`/`importSingleLayerWallpaper` — Failure-Mode ist „URI not accessible"
+
+**Fix-Commit `96dc7be`:** alle 8 Sites Exception → Throwable plus inline four-category-frame-Annotation (gleiche Pattern wie MainActivity / ZoomableImageView §9.8 Fix `ae712ec`).
+
+**Verifizierbar für künftige Sessions:**
+- `grep -n "catch (e: Exception)" BackupRepositoryImpl.kt` sollte nur noch URI-Parsing- und canAccess-inner-Catches finden
+- Alle Public-API-Outer-Umbrellas: `catch (e: Throwable)` mit four-category-frame-Annotation
+
+Wenn ein späterer Refactor die Catches wieder auf `Exception` zurückbaut, ist die OOM-Resilienz der Backup-Pipeline erneut kompromittiert.
+
 ---
 
 ## Zusammenfassung
