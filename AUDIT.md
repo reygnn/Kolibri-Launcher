@@ -961,7 +961,72 @@ liefert das Real-Daten-Signal das die anderen vier nicht ersetzen können.
 > hier als „sauber" gelisteten Patterns (multi-layer handler,
 > System.err-Fallback, four-category-frame-Annotation) bricht, wird
 > §9 ungültig. Lese den Stand am Datum der Verifikation neu, vergleich
-> gegen diese Beschreibung, dokumentier Drift in einem §9.6.
+> gegen diese Beschreibung, dokumentier Drift in einer Folge-Sektion.
+
+### 9.6 ✅ KolibriLauncherApp re-audit (Schritt 3 von §9.5) — 2026-05-08
+
+> Erster der drei JVM-auditierbaren §9.3-Items abgearbeitet (#6
+> KolibriLauncherApp). Datei: 580 Zeilen, Anlass: letzter dedizierter
+> Audit ist Monate her, ist aber architektonisch der wichtigste File
+> (globaler UncaughtExceptionHandler, ACRA-Init, multi-layer-init-
+> Paranoia per Rule 7, AnrReporter-Wiring, RecoveryWatchdog,
+> AcraTree mit CrashReportLimiter).
+>
+> Befund: **Kein Crash-Safety-Bug gefunden.** Die Datei ist eine
+> Stilreferenz für mehrschichtige Krisensicherung.
+
+**Was geprüft wurde — verifizierbar pro Surface:**
+
+| Surface | Z. | Verifiziert |
+|---|---|---|
+| `attachBaseContext` | 129–180 | ACRA-Init in try/catch(Throwable) mit Log.e-Fallback nested in inner try/catch; ACRA sofort disabled (Rule 8 privacy-by-default); consent via `runBlocking` mit dokumentierter Begründung in der KDoc (verhindert privacy-race-window); Re-Enable nur bei consent |
+| `applicationExceptionHandler` | 80–91 | try/Timber.e/catch(Throwable)/Log.e-Fallback/inner-catch-ignored — drei-Ebenen-Fallback; nutzt Timber.e statt silentError per Rule-9-Ausnahmeliste (würde sonst rekursiv in die eigene error-pipeline laufen) |
+| `onCreate` | 182–295 | Init-Reihenfolge bewusst und korrekt: `TimberWrapper.isDebugBuild` Z. 188 vor jedem möglichen silentError; `KolibriLog.{d,w,taggedError}Handler` Z. 194–201 vor jedem :domain-Log-Pfad; `CrashReportLimiter.init` Z. 205 in try/catch vor jedem Crash; Timber-Trees Z. 215–228 in try/catch mit Log.e-Fallback; `setupGlobalExceptionHandler`/`setupStrictMode`/`reportPendingAnrsAsync`/`startRecoveryWatchdogAfterBootstrap`/`registerPackageUpdateReceiver` jeweils gewrappt; Migration in coroutine mit nested ACRA-Record-Fallback Z. 287–292 |
+| `handleUncaughtException` | 333–384 | Outer try/catch um den ganzen Handler-Body; Spam-Protection-Check; OOM-spezifische GC-Recovery in eigenem try/catch; handlerCalled-Flag verhindert Double-Invoke; **finally{}** mit Thread.sleep(500) für ACRA-Send-Zeit + Process.killProcess + exitProcess(10) **garantiert** (selbst wenn Handler-Body crasht, sterbt der Prozess sauber für Android-Restart) |
+| `AcraTree` | 531–580 | CrashReportLimiter.shouldSendReport vor jedem Send; **CancellationException wird in `UnhandledCancellationException` gewrappt** um frische Stack-Trace zu erzwingen — clevere Diagnose-Lösung für Kotlin's traceless-by-default cancellation, zeigt direkt auf den fehlerhaften `catch`-Block; reportErrorToAcra mit try/catch + Log.e-Fallback + nested-ignored |
+
+**Stärken über die §9.4-Bewertung hinaus:**
+
+1. AcraTree's CancellationException-Wrap-Diagnostik ist genuinely
+   clever — turn-the-uselessness-into-actionable.
+2. Spam-Protection an zwei Stellen verdrahtet (Logging-Pfad +
+   catastrophic-Pfad) statt nur einer.
+3. Init-Reihenfolge ist nicht zufällig: jeder Pre-Requisite läuft
+   wirklich vor seinem Konsumenten.
+4. `finally{}` im Crash-Handler garantiert process-die-cleanly —
+   verhindert Zombie-Process bei einem catch-im-catch-Failure.
+5. AnrReporter-via-AEI-statt-live-watchdog: keine
+   Daemon-Thread-Overhead, keine veraltete (2018)
+   ANRWatchDog-Dependency, post-mortem nutzt richere
+   System-Multi-Thread-Dumps.
+
+**Ehrlich nicht geprüft (eigene Audit-Pässe nötig):**
+
+- `AnrReporter.kt` Implementation — nur die Caller hier geprüft.
+  Die Klasse selbst (AEI-Walk, threadDump-Extraktion,
+  Watermark-Persistence) ist eigene Audit-Surface.
+- `RecoveryWatchdog.kt` Implementation — nur Caller geprüft. Der
+  Daemon-Thread + 8s-Timeout-Logic + AEI-Categorization sind
+  eigene Surface.
+- `CrashReportLimiter.shouldSendReport` Innenleben — nur
+  Wiring-Punkte verifiziert. Die SharedPreferences-basierte
+  Rate-Limit-Logik (Rule-5-Ausnahme) wäre eigene Audit-Surface.
+- `AcraTree.UnhandledCancellationException` unter realer Last —
+  die Idee ist richtig, das tatsächliche Verhalten unter
+  Hochfrequenz-Cancellation (z. B. rapid Suchquery-Cancellation
+  in AppDrawerFragment) wäre Stress-Test-Material.
+
+**§9.5-Roadmap-Fortschritt:**
+
+- [x] Step 3 (KolibriLauncherApp) — diese Sektion (§9.6)
+- [ ] Step 1 (ZoomableImageView ~2h)
+- [ ] Step 2 (7 Delegates ~3h zusammen)
+- [ ] Step 4 (Robolectric-Smoke-Tests ~3h)
+- [ ] Step 5 (Real-Device-Stress mind. 1h)
+
+Per §9.5: „Schritte 1–3 bringen vermutlich auf 9.3" — Step 3
+allein bewegt das Rating moderat (≈9.1), die volle Steigerung
+auf 9.3 setzt Steps 1+2 voraus.
 
 ---
 
