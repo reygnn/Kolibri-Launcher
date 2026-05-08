@@ -127,7 +127,6 @@ class UsageExportRepositoryImpl @Inject constructor(
                 }
             }
 
-            // Manuelles JSON bauen, da UsageExportData jetzt List<String> statt List<Long> hat
             buildExportJson(usageData, currentTime)
 
         } catch (e: CancellationException) {

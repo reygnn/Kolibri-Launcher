@@ -66,7 +66,6 @@ import javax.inject.Inject
  * reach non-favorite apps.
  */
 @AndroidEntryPoint
-//class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 class AppDrawerFragment : Fragment() {
 
     // ===========================================
