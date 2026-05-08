@@ -497,38 +497,28 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 > verifiziert. Stichproben-Verifikation der konkreten Site-Zahlen ist im
 > Konversations-Log dokumentiert.
 
-### 8.1 🟡 MINOR — Delegate-Wrap und `launchSafe`-Doppel-Sicherung
+### 8.1 ✅ Erledigt — Delegate-Wrap und `launchSafe`-Doppel-Sicherung
 
-`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/AppManagementDelegate.kt:129-223` (6 Methoden), `ThemingDelegate.kt:74-105` (3 Methoden), analog in `WallpaperDelegate.kt` und `ClockDelegate.kt`.
+`DelegateScope.launchSafe` bekam einen optionalen
+`defaultErrorToast: @StringRes Int? = null`-Parameter. Wenn gesetzt,
+emittiert der `Throwable`-Catch zusätzlich zu `silentError` einen
+`UiEvent.ShowToast(defaultErrorToast)`. 10 Call-Sites (5 in
+`AppManagementDelegate`, 3 in `ThemingDelegate`, 2 in `WallpaperDelegate`)
+sind auf den Overload gefoldet — Inner-Try/Catch-Boilerplate weg.
 
-`DelegateScope.launchSafe` (`DelegateScope.kt:41-54`) kapselt bereits
-```kotlin
-try { block() }
-catch (e: CancellationException) { throw e }
-catch (e: Throwable) { TimberWrapper.silentError(e, errorMessage) }
-```
-Jede Delegate-Methode wickelt ihren Body in **exakt dasselbe** try/catch und
-sendet zusätzlich einen Toast-Event. Tatsächliches Verhalten:
+Methoden mit feature-spezifischem Toast (`AppManagementDelegate.onAppClicked`
+→ `error_launching_app`) bleiben inline; ebenso die Result-Pfade
+(`WallpaperDelegate.onSetWallpaperImage` early-return,
+`GestureDelegate` `RequestNotificationsUseCase.Result.ErrorGeneric`-Branch),
+weil das keine Catches sind, sondern explizite Result-Handling-Pfade.
 
-- **Production:** Innerer `Throwable`-Catch swallowed alles; der äußere
-  `launchSafe`-Catch sieht nichts, ein einziger `silentError` pro Error.
-  Der `launchSafe`-Catch ist hier reine ungenutzte Sicherheits-Schicht.
-- **DEBUG:** Innerer `silentError` wirft → äußerer `launchSafe`-Catch
-  fängt → zweiter `silentError` wirft erneut. Doppel-Throw-Kaskade.
+Net-LOC: −32 Zeilen. DEBUG-Doppel-Throw-Kaskade ist weg
+(`silentError` läuft nur noch einmal pro Error).
 
-Der ursprüngliche Befund („zwei `silentError`-Aufrufe in Production") war
-falsch und ist hier korrigiert.
-
-**Reduktions-Potenzial:** Methoden mit `R.string.error_generic` als
-Toast (4 von 5 in `AppManagementDelegate`, alle 3 in `ThemingDelegate`)
-könnten auf eine `launchSafe(errorMessage, defaultToast = R.string.error_generic)`-Variante
-kondensieren. Methoden mit feature-spezifischem Toast (`onAppClicked` →
-`error_launching_app`) bleiben inline. Realistische Schätzung: ~20 Zeilen
-Reduktion, nicht die initial behaupteten 40.
-
-**Bewertung MINOR statt MAJOR:** kein Korrektheits-Bug (das Verhalten ist
-in Production identisch zur idealen Form), nur Boilerplate-Konsolidierung
-plus DEBUG-Doppel-Throw vermeiden.
+> Original-Befund: 9+ Methoden wickelten ihren Body in *exakt dasselbe*
+> `try/catch (CancellationException) / catch (Throwable)`-Pattern, das
+> `DelegateScope.launchSafe` schon kapselt. Doppel-Wrap. Fix-Vorschlag
+> war ein `defaultToast`-Parameter; entsprechend umgesetzt.
 
 ---
 
@@ -748,7 +738,7 @@ das Framing „einzige Differenz" ist veraltet.
 | 1 | ~~§8.2 Test-Fix `MutableSharedFlow`~~ | ~15 min | erledigt 2026-05-08 — alle 6 Sites auf `extraBufferCapacity = 1` (matcht Production-Wiring `di/AppUpdateModule.kt:18`) |
 | 2 | ~~§8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1)~~ | ~5 min | erledigt 2026-05-08 — Inline-Strikethrough/Erledigt-Marker in den jeweiligen Original-Sektionen |
 | 3 | ~~§8.6 + §8.10~~ + §8.9 Cleanup-Sammel-Branch | ~10 min | erledigt 2026-05-08 für §8.6 (`UsageExport.kt` weg) und §8.10 (auskommentierte Klassendeklaration weg). §8.9 zurückgezogen — siehe Sektion. |
-| 4 | §8.1 Delegate `launchSafe`-Overload | ~30 min | Boilerplate-Konsolidierung ~20 Zeilen; nur die `error_generic`-Sites fold-bar, feature-spezifische Toasts bleiben inline |
+| 4 | ~~§8.1 Delegate `launchSafe`-Overload~~ | ~30 min | erledigt 2026-05-08 — `defaultErrorToast: Int?`-Parameter in `DelegateScope.launchSafe`; 10 Sites gefoldet, −32 LOC, DEBUG-Doppel-Throw weg |
 | 5 | ~~§8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported`~~ | ~30 min | erledigt 2026-05-08 — `errorEvent: E?`-Property in `BaseViewModel`; alle 7 UiEvent-Subklassen + TestViewModel opten ein, OnboardingViewModel bleibt ohne Override (Verhalten unverändert) |
 | 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
 | 7 | ~~§8.8 `:data` `buildConfig = false`~~ | ~10 min | erledigt 2026-05-08 — `BuildConfig.DEBUG` durch `TimberWrapper.isDebugBuild` ersetzt, `buildFeatures.buildConfig` aus `data/build.gradle.kts` entfernt |
