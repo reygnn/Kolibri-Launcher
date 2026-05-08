@@ -652,16 +652,30 @@ weniger.
 
 ---
 
-### 8.9 🟢 NIT — `BaseViewModel.handleError` mit unreachable Cancellation-Branches
+### 8.9 ✗ Zurückgezogen — `BaseViewModel.handleError` Cancellation-Branches
 
-`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt:122` (`is CancellationException -> Timber.d("...cancelled (normal)")`) und Z. 141 (`is CancellationException -> true` in `shouldSuppressErrorToast`).
+Initialer Befund: `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt:122` (`is CancellationException -> Timber.d(...)`) und Z. 141 (`is CancellationException -> true` in `shouldSuppressErrorToast`) seien dead code, weil alle drei Aufrufpfade (`launchSafe`, `executeSafe`, `coroutineExceptionHandler`) CancellationException herausfiltern.
 
-`handleError` wird aus drei Pfaden aufgerufen:
-- `launchSafe` (Z. 66-77): rethrowt CancellationException auf Z. 71, **bevor** `handleError` (Z. 74) erreicht wird.
-- `executeSafe` (Z. 87-105): rethrowt CancellationException auf Z. 94, **bevor** `handleError` (Z. 97) erreicht wird.
-- `coroutineExceptionHandler` (Z. 56): bekommt CancellationException in `viewModelScope` per Coroutine-Semantik gar nicht erst zugestellt.
+**Zurückgezogen:** Die Pfad-Analyse stimmt für `launchSafe`/`executeSafe`/`coroutineExceptionHandler`, übersieht aber die **`protected open` API-Surface**. `BaseViewModelTest.kt:425-438` exerziert `handleError` direkt mit `CancellationException`:
 
-Beide CancellationException-Branches in `handleError`/`shouldSuppressErrorToast` sind dead code.
+```kotlin
+@Test
+fun `handleError processes CancellationException without toast`() = runTest {
+    val vm = createViewModel()
+    val events = mutableListOf<UiEvent>()
+    val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+    vm.testHandleError(CancellationException("Cancelled"), "test-context")
+    advanceUntilIdle()
+    assertFalse(events.any { it is UiEvent.ShowToast })
+    job.cancel()
+}
+```
+
+Entfernt man die `is CancellationException -> true` aus `shouldSuppressErrorToast`, wird der Test rot — Cancellation rutscht in den Toast-Pfad. Die Branches sind kein dead code, sondern enforcen den Vertrag der `protected open` API.
+
+Außerdem: Rule 11 betrifft `try/catch` um can't-throw Operationen, nicht `when`-Pattern-Matching auf einer Throwable-Hierarchie. Defensives Type-Dispatching in einer offenen Vertrags-Methode ist legitim und nicht von Rule 11 erfasst.
+
+Hier dokumentiert, damit künftige Audits den Befund nicht erneut ziehen. Korrekter Ort wäre §7 („Bewusst akzeptierte Schulden"); bislang dort nicht eingetragen, weil die Test-Verbindung im Audit nicht sichtbar war.
 
 ---
 
@@ -753,8 +767,8 @@ Nachtrag (2026-05-07):
 | 🔴 BLOCKER | **0** |
 | 🟠 MAJOR | **3** (8.2, 8.3, 8.4) |
 | 🟡 MINOR | **4** (8.1 [von MAJOR herabgestuft], 8.6, 8.7, 8.8) |
-| 🟢 NIT | **2** (8.9, 8.10) |
-| Zurückgezogen | **1** (8.5 — bereits in TODO §2-Sweep akzeptiert) |
+| 🟢 NIT | **1** (8.10) |
+| Zurückgezogen | **2** (8.5 — bereits in TODO §2-Sweep akzeptiert; 8.9 — `BaseViewModelTest:425-438` exerziert die Branches direkt) |
 | Korrekturen am Original | **3** (3.4, 5.8, 4.1) |
 
 **Reifegrad:** Hoch. Die Architektur-Disziplin ist außergewöhnlich, und die
