@@ -1201,6 +1201,198 @@ ist die OOM-Resilienz erneut kompromittiert.
 Drei JVM-auditierbare §9.3-Items abgehakt; Rating-Progression auf ~9.3.
 Steps 4+5 sind außerhalb des reinen Code-Review-Workflows.
 
+### 9.9 ✅ Robolectric-Smoke-Tests (Schritt 4 von §9.5) — 2026-05-08
+
+> Step 4 mit Re-Scope: bei der Bestandsaufnahme zeigte sich, dass die
+> Robolectric-Infrastruktur weit ausgebauter ist als §9.5 angenommen
+> hatte — 9 Robolectric-Tests existieren bereits (6 Activities + 3
+> Fragments inkl. HomeFragment / AppDrawerFragment / AppContextMenuDialogFragment).
+>
+> Die existierenden Tests sind minimale "attaches without crashing"
+> Smoke-Tests (~50 Zeilen). Step 4 ergänzt jetzt die Race-Guard-
+> Coverage gezielt — kein Neubau, sondern erweitern um die im §9.5
+> genannten Lifecycle-Übergänge.
+
+**Hinzugefügte Tests (commit `fe334da`):**
+
+`HomeFragmentRobolectricTest`:
+- `add then remove cycle does not crash` — pins onCreateView →
+  onViewCreated → onDestroyView. Der teardown-Pfad nullt `_binding`,
+  removed 14 setListener-Referenzen, cancelt Animatoren und
+  dismissed das Context-Menu-Dialog. §9.2 listet diese
+  Lifecycle-Pair als kritische Race-Guard-Surface.
+- `add then recreate does not crash` — pins HomeFragment-Verhalten
+  über config-change. MainActivity unterdrückt Recreation per
+  `android:configChanges` (§5.5), aber das Fragment muss trotzdem
+  einen erzwungenen Recreate clean überleben — defensive Test
+  gegen künftige Änderungen, die die Suppression entfernen.
+
+`AppDrawerFragmentRobolectricTest`:
+- `add then remove cycle does not crash` — pins den outer
+  try/catch + `finally { super.onDestroyView() }` aus §9.2:
+  searchJob cancelled, ContextMenuHelper.dismiss läuft,
+  _binding genullt, super wird IMMER erreicht.
+- `add then recreate does not crash` — Drawer-Verhalten über
+  config-change inklusive search-query SavedStateHandle-Bindung.
+
+**Bewusst NICHT als Robolectric-Test geschrieben:**
+
+- **FragmentResult-Lifecycle** (§9.5 ursprünglich genannt) — würde
+  AppInfo-Injection, LauncherApps-Mock, Bundle-Routing und sechs
+  ContextMenuResult-Branches benötigen. Die FragmentResult-Routing-
+  Logik ist bereits durch die JVM-Unit-Tests von `ContextMenuResult`
+  als pure-logic-Resolver gepinnt; der Robolectric-Anteil wäre nur
+  noch "lambda fires when setFragmentResult is called", was Android
+  garantiert. Kein neuer Logik-Wert.
+- **Wallpaper-Edit Enter→Exit** (§9.5 ursprünglich genannt) — bereits
+  durch JVM-Unit-Tests in `WallpaperDelegateTest` mit den im
+  WallpaperDelegate-KDoc gelisteten Regression-Guard-Test-Namen
+  abgedeckt (§9.7). Kein neuer Wert von Robolectric-Wrapping.
+
+**Verifikation:**
+
+```
+./gradlew test checkConventions checkRule13   → all green
+```
+
+Beide Robolectric-Files testDebug-only (HiltTestActivity ist in
+`src/debug/`). Die zwei neuen Tests pro File sind ~30 Zeilen each
+mit ausführlicher KDoc-Begründung verlinkt zu §9.
+
+**§9.5-Roadmap-Fortschritt nach §9.9:**
+
+- [x] Step 3 (KolibriLauncherApp) — §9.6
+- [x] Step 2 (7 Delegates) — §9.7
+- [x] Step 1 (ZoomableImageView) — §9.8
+- [x] Step 4 (Robolectric-Smoke-Tests) — §9.9
+- [ ] Step 5 (Real-Device-Stress) — siehe §9.10
+
+Vier von fünf Steps abgeschlossen. Step 5 erfordert echtes Gerät
+und ist der einzige verbleibende Item.
+
+### 9.10 Real-Device-Stress-Test-Plan (Schritt 5 von §9.5)
+
+> Step 5 erfordert echtes AVD/Gerät — nicht im Code-Review-Workflow
+> erreichbar. Dieser Abschnitt definiert konkrete, ausführbare
+> Test-Szenarien, die der Maintainer manuell auf AVD durchläuft und
+> Ergebnisse hier zurückmeldet.
+
+**Vorbereitung (per `feedback_emulator_run_mode`):**
+- AVD windowed starten, NICHT mit `-no-window` / `-gpu swiftshader_indirect`
+- Debug-Build installieren: `./gradlew installDebug`
+- ACRA-Consent-Dialog vorab clearen für stabile Reproduzierbarkeit
+- Logcat-Filter aktivieren: `adb logcat | grep -E "Kolibri|silentError|silentDeath|FATAL"`
+
+**Szenario A: Wallpaper-Edit unter Memory-Pressure**
+
+Adressiert §9.3 #4. Pins die jetzt mit Throwable+silentError
+abgedeckten Catches in `composeToBitmap` und `ScaleListener.onScale`.
+
+Schritte:
+1. App öffnen, Default-Wallpaper aktiv
+2. Long-Press → Customize → Edit Wallpaper
+3. Layer 1 hinzufügen (großes Bild, ≥4K)
+4. Layer 2 hinzufügen (großes Bild, ≥4K)
+5. Layer 3 hinzufügen (großes Bild, ≥4K)
+6. Auf jedem Layer: aggressives Pinch-Zoom auf max + min, Pan in alle Ecken
+7. Zwischen Layern wechseln, jeweils Transform aggressiv
+8. Layer 4 hinzufügen (während Zoom-Animation läuft)
+9. Layer 2 entfernen während Edit-Mode aktiv
+10. Cancel
+11. Verifizieren: Wallpaper-State entspricht VOR-Edit-Snapshot
+
+Pass-Kriterien:
+- Keine Crashes
+- Keine `FATAL`-Logcat-Einträge
+- Keine ANR-Dialoge
+- silentError-Logs OK (zeigen auftretende OOMs / Matrix-Probleme,
+  aber kein App-Tod)
+- Cancel restauriert Original sichtbar in <500ms
+
+**Szenario B: Background-Kill + Wiederöffnen während Edit**
+
+Adressiert §9.3 #5 (Adapter-Lifecycle-Race) im Wallpaper-Kontext.
+
+Schritte:
+1. Wallpaper-Edit-Mode aktivieren (3 Layer wie oben)
+2. Layer 2 transformieren (nicht-trivialer Zoom + Pan)
+3. Per `adb shell am kill com.github.reygnn.kolibri_launcher` (oder
+   Recents-Swipe) Background-Kill
+4. Launcher wieder öffnen (Home-Button)
+
+Pass-Kriterien:
+- App startet ohne Crash
+- Wallpaper-State entspricht zuletzt persistiertem State (nicht
+  zwingend gleich pre-kill-state, aber konsistent)
+- Edit-Mode ist NICHT mehr aktiv (commit/cancel war strukturell
+  nicht erfolgt → in-memory editSnapshot ist weg, was korrekt ist)
+- Keine orphan-files in `filesDir/wallpapers/` außer den
+  state-referenzierten (gcOrphans läuft beim ersten emit)
+
+**Szenario C: Rapid Rotation während aktiver Animations**
+
+Adressiert §9.3 #5 + indirekt §5.5 (configChanges-Suppression).
+
+Schritte:
+1. Default-Wallpaper, Home-Screen sichtbar
+2. App-Drawer öffnen (Swipe up)
+3. In das Suchfeld tippen, eine App auswählen die fast launcht
+4. Während App startet: Rotation triggern
+5. Zurück zum Home-Screen
+6. Schritte 2–5 mehrfach in Folge
+
+Pass-Kriterien:
+- Keine Crashes
+- Keine FLAG_SECURE-Stale-State (Status-Bar bleibt konsistent)
+- Smooth Rotation (HomeFragment.onConfigurationChanged gerendert)
+
+**Szenario D: ANR-Detection mit synthetischem Block**
+
+Adressiert §9.3 #6-relevant (KolibriLauncherApp.RecoveryWatchdog).
+
+Schritte:
+1. App öffnen
+2. Per Debug-Hook (oder synthetischer adb-shell-Eingriff) Main-Thread
+   für 10s blockieren — z.B. `adb shell am dumpheap` während intensiver
+   Anim
+3. Watchdog soll process-kill bei 8s triggern
+4. App startet wieder (HOME-Activity-Restart)
+
+Pass-Kriterien:
+- Process wurde nach ~8s gekillt (logcat: RecoveryWatchdog kill)
+- App relaunched cleanly
+- AnrReporter erfasst beim NÄCHSTEN Start den ApplicationExitInfo
+  als ANR und forwardet (sichtbar im logcat als
+  "ANR (post-mortem from ApplicationExitInfo)")
+
+**Szenario E: ACRA-Smoke-Test**
+
+Adressiert §9.3 #6 (KolibriLauncherApp ACRA-Wiring).
+
+Schritte (im DEBUG-Build):
+1. ACRA-Consent in den Settings aktivieren
+2. CrashReportLimiter clearen (per Debug-Hook oder fresh install)
+3. Synthetischen Crash auslösen (Debug-Menü, oder per
+   `Thread.currentThread().uncaughtExceptionHandler.uncaughtException(...)`)
+4. App restart
+5. Logcat prüfen
+
+Pass-Kriterien:
+- Crash wurde an ACRA forwardet (logcat: ACRA-Sender-Output)
+- Spam-Limiter aktiv beim 2. identischen Crash
+- App startet nach Crash sauber neu
+
+**Reporting-Schema:**
+
+Wenn Maintainer die Szenarien durchläuft, soll Ergebnis hier in §9.11
+landen — pro Szenario: PASS / FAIL mit zugehörigen logcat-Snippets bei
+FAIL. Bei FAIL: separater Branch / Audit-Eintrag pro Bug, fix-first.
+
+**Status:**
+
+- Test-Plan dokumentiert: ✅
+- Tatsächliche Durchführung: ⏳ wartet auf Maintainer-Session am AVD
+
 ---
 
 ## Zusammenfassung
