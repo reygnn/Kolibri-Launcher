@@ -936,12 +936,12 @@ class HomeFragment : Fragment() {
                 val is24Hour = DateFormat.is24HourFormat(context)
 
                 // PURE LOGIC DELEGATION:
-                // Die Berechnung passiert jetzt isoliert und getestet im Formatter.
-                // Wir übergeben nur Rohdaten.
+                // The calculation lives isolated and tested in the formatter.
+                // We pass only raw data here.
                 val timeString = timeFormatter.formatAlarmTime(
                     triggerTimeMillis = event.triggerTimeMillis,
                     is24Hour = is24Hour
-                    // locale nutzen wir default vom Device, optional hier übergeben
+                    // locale defaults to the device's; pass it here if needed.
                 )
 
                 text = "$timeString ${event.title}"
@@ -1367,9 +1367,9 @@ class HomeFragment : Fragment() {
         // null/CharSequence and never throws.
         viewModel.refreshTimeNow()
 
-        // Daten sofort schreiben (Pixel Injection)
-        // Das überbrückt die Millisekunden, bis der Flow anläuft.
-        // Damit ist der erste Frame, den die App selbst zeichnet, garantiert korrekt.
+        // Inject the data immediately (pixel injection).
+        // Bridges the milliseconds until the Flow starts emitting,
+        // so the first frame the app draws itself is guaranteed correct.
         val state = viewModel.uiState.value
         binding.timeText.text = state.timeString
         binding.dateText.text = state.dateString
@@ -1410,10 +1410,10 @@ class HomeFragment : Fragment() {
         // The two inner catches that wrapped setListener-null /
         // property-null sweeps were defensive Programmer-Error swallows.
 
-        // 1. Dialog sicher schliessen
+        // 1. Close the dialog safely.
         ContextMenuHelper.dismiss(childFragmentManager)
 
-        // 2. Eigene Referenzen aufräumen
+        // 2. Clear our own references.
         longClickedApp = null
         lastSpacingInput = null
 
@@ -1432,17 +1432,16 @@ class HomeFragment : Fragment() {
         binding.btnLayerDown.setOnClickListener(null)
         binding.btnToolbarDock.setOnClickListener(null)
 
-        // Wallpaper Callback aufräumen
+        // Clear wallpaper callbacks.
         binding.wallpaperView.onTransformChanged = null
         binding.wallpaperView.onLayerTransformChanged = null
         binding.wallpaperView.onActiveLayerChanged = null
         binding.wallpaperView.onLayerTapped = null
 
-        // 4. Wallpaper-Edit-Controller nullen — bevor _binding weg ist,
-        // damit die Controller-Referenzen auf das Binding noch gültig
-        // sind falls der Controller im Tear-Down noch etwas aufräumen
-        // möchte. Aktuell hält er nur Closures auf das Binding;
-        // Reihenfolge ist defensiv, nicht funktional erzwungen.
+        // 4. Null out the wallpaper-edit controller — before _binding is gone,
+        // so the controller's binding references are still valid if it does
+        // any tear-down work of its own. Currently it only holds closures on
+        // the binding; this ordering is defensive, not functionally required.
         wallpaperEditController = null
 
         // 5. Binding nullen - Der "Golden Hammer"

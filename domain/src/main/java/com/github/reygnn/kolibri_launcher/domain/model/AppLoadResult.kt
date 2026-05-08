@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 /**
- * Definiert das Ergebnis des App-Ladevorgangs für das ViewModel.
+ * Result of the app-loading flow exposed to the ViewModel.
  *
  * UI-Layer maps the [Failure] payload to `R.string.*` resources at the
  * call site. Sealed instead of `@StringRes Int` so the domain stays free

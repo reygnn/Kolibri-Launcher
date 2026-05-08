@@ -18,6 +18,13 @@
 #   against a different branch:
 #     CHECK_BASE=feature/foo ./tools/check-rule13-german-comments.sh
 #
+# Historical cutoff:
+#   Rule 13 was introduced on 2026-05-01 (commit a65a6b2 — "scope language
+#   convention to new code only"). Anything before that is grandfathered
+#   per Rule 13's "pre-existing German comments are intentionally not
+#   swept". The post-Rule-13 history was swept on 2026-05-08 to a clean
+#   state, so `CHECK_BASE=a65a6b2` should now yield no violations.
+#
 # Diff scope:
 #   `git diff <base>...HEAD -- '*.kt' '*.kts'` plus working-tree changes
 #   relative to HEAD. Scoping to .kt/.kts only — .xml is not scanned in v1

@@ -39,10 +39,10 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
     }
 
     /**
-     * Wird vom ViewModel aufgerufen, um das Öffnen der Benachrichtigungen anzufordern.
+     * Called from the ViewModel to request opening the notification shade.
      */
     override suspend fun requestOpenNotifications() {
-        // Sende nur dann eine Anfrage, wenn der Service auch wirklich läuft
+        // Only emit a request when the service is actually running.
         if (_isAvailable.value) {
             _openNotificationsRequest.emit(Unit)
             Timber.d("Open notifications requested")

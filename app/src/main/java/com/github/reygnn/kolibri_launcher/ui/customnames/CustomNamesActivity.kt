@@ -242,10 +242,10 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
 
             currentDialog?.show()
 
-            // Coroutine — ihre Lifecycle-Bindung über lifecycleScope reicht;
-            // CancellationException bei Activity-Death wird vom Scope selbst
-            // weitergeleitet. IMM showSoftInput ist EXTERNAL (system service IPC),
-            // daher der innere Catch dort.
+            // Coroutine — the lifecycleScope binding is enough on its own;
+            // a CancellationException on Activity death is forwarded by the
+            // scope itself. IMM showSoftInput is EXTERNAL (system-service IPC),
+            // hence the inner catch there.
             lifecycleScope.launch {
                 kotlinx.coroutines.delay(100)
                 if (currentDialog?.isShowing == true && editText.isAttachedToWindow) {

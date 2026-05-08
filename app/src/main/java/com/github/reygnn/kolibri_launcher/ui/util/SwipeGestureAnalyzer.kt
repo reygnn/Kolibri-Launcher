@@ -3,15 +3,15 @@ package com.github.reygnn.kolibri_launcher.ui.util
 import kotlin.math.abs
 
 /**
- * PURE LOGIC - Swipe Gesture Analyzer
+ * PURE LOGIC — swipe-gesture analyzer.
  *
- * Analysiert Rohdaten eines Fling-Events und entscheidet,
- * ob und welche Aktion ausgeführt werden soll.
+ * Analyzes the raw data of a fling event and decides whether (and which)
+ * action should be triggered.
  *
- * Entscheidet basierend auf:
- * 1. Dominante Achse (X vs Y)
- * 2. Mindest-Distanz (Pixel)
- * 3. Mindest-Geschwindigkeit (Velocity)
+ * Decision basis:
+ * 1. Dominant axis (X vs Y)
+ * 2. Minimum distance (pixels)
+ * 3. Minimum velocity
  *
  * Thresholds and dominance factor are passed as constructor parameters
  * so multiple call sites can share the algorithm with their own
@@ -45,20 +45,20 @@ class SwipeGestureAnalyzer(
         val absVelX = abs(velocityX)
         val absVelY = abs(velocityY)
 
-        // 1. Dominante Achse bestimmen
+        // 1. Determine the dominant axis.
         if (absDiffX > absDiffY * dominanceFactor) {
-            // Horizontaler Swipe
+            // Horizontal swipe.
             if (absDiffX > distanceThreshold && absVelX > velocityThreshold) {
                 return if (diffX > 0) SwipeResult.TOWARDS_RIGHT else SwipeResult.TOWARDS_LEFT
             }
         } else if (absDiffY > absDiffX * dominanceFactor) {
-            // Vertikaler Swipe
+            // Vertical swipe.
             if (absDiffY > distanceThreshold && absVelY > velocityThreshold) {
                 return if (diffY < 0) SwipeResult.UP else SwipeResult.DOWN
             }
         }
 
-        // Zu kurz, zu langsam oder diagonal ungültig
+        // Too short, too slow, or diagonally ambiguous.
         return SwipeResult.IGNORED
     }
 

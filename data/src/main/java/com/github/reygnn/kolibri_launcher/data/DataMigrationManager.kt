@@ -84,11 +84,11 @@ class DataMigrationManager @Inject constructor(
         private const val LEGACY_ACRA_KEY_ASKED = "has_asked"
     }
 
-    // WICHTIG: Kein 'by lazy' hier, das den Main Thread blockieren könnte.
-    // Wir holen die Prefs explizit im IO-Context.
+    // IMPORTANT: no `by lazy` here — that could block the main thread.
+    // The prefs are loaded explicitly inside the IO context below.
 
     suspend fun runMigrationIfNeeded() {
-        // Wrapper, um sicherzustellen, dass alles im Hintergrund passiert
+        // Wrapper to make sure everything runs off the main thread.
         withContext(Dispatchers.IO) {
             try {
                 val currentVersion = getCurrentVersion()
@@ -195,7 +195,7 @@ class DataMigrationManager @Inject constructor(
     }
 
     /**
-     * Liest die Version sicher im IO-Thread.
+     * Reads the version safely on the IO dispatcher.
      */
     private fun getCurrentVersion(): Int {
         return try {
@@ -204,10 +204,10 @@ class DataMigrationManager @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // Ein silent return 0 würde "First launch detected" triggern und
-            // den Onboarding-Flow über echte User-Daten kippen. Lieber
-            // kontrolliert sterben — beim Neustart kommt der Read-Versuch
-            // nochmal, und wenn er weiter failt, häuft sich der ACRA-Report.
+            // A silent `return 0` would trigger "First launch detected" and
+            // tip the onboarding flow over real user data. Prefer a controlled
+            // death — on restart the read is attempted again, and if it keeps
+            // failing the ACRA reports accumulate.
             TimberWrapper.silentDeath(
                 e,
                 "Cannot read data version — refusing to assume first launch"
@@ -220,8 +220,8 @@ class DataMigrationManager @Inject constructor(
             val prefs = context.getSharedPreferences(VERSION_PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit {
                 putInt(KEY_DATA_VERSION, version)
-                // commit() ist hier okay, da wir bereits im Dispatchers.IO Block sind (via runMigrationIfNeeded)
-                // commit() schreibt sofort, apply() asynchron. Bei Migrationen ist Sicherheit > Speed.
+                // commit() is fine here — we're already inside the Dispatchers.IO block (via runMigrationIfNeeded).
+                // commit() writes synchronously, apply() asynchronously. For migrations, safety > speed.
                 commit()
             }
             Timber.i("Data version updated to $version")
@@ -233,8 +233,8 @@ class DataMigrationManager @Inject constructor(
     }
 
     /**
-     * Prüft "First Launch" Status.
-     * ACHTUNG: Muss suspend sein, um StrictMode zu vermeiden!
+     * Returns the "first launch" status.
+     * NOTE: must be suspend to avoid StrictMode violations.
      */
     suspend fun isFirstLaunch(): Boolean {
         return withContext(Dispatchers.IO) {

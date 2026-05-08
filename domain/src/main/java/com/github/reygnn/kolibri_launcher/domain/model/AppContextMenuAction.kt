@@ -1,35 +1,34 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 /**
- * Eine sealed class, die alle möglichen Aktionen im App-Kontextmenü repräsentiert.
- * Sie ist rein datenbasiert und enthält keine UI-Elemente wie Icons.
+ * Sealed class representing every possible action in the app context menu.
+ * Pure data — no UI elements such as icons.
  */
 sealed class AppContextMenuAction {
 
     /**
-     * Stellt eine von einer App bereitgestellte Verknüpfung dar.
-     * Enthält den [LauncherShortcut], um ihn später starten zu können.
+     * An app-provided shortcut. Carries the [LauncherShortcut] so it can
+     * be launched later.
      */
     data class Shortcut(val shortcut: LauncherShortcut) : AppContextMenuAction()
 
     /**
-     * Stellt eine Standard-Launcher-Aktion dar, die durch eine ID und ein
-     * Domain-Label-Identifier definiert ist. Der Adapter mappt das
-     * Identifier-Label am Render-Zeitpunkt zu einer `R.string.*`-Resource —
-     * so kann der Build-Pfad dieser Liste auf JVM-Seite getestet werden,
-     * ohne Android-Runtime und ohne dass die Domain `R.string`-Konstanten
-     * referenziert.
+     * A standard launcher action identified by an ID and a domain-side
+     * label identifier. The adapter maps the label identifier to an
+     * `R.string.*` resource at render time, so the build path of this
+     * list is JVM-testable without the Android runtime and without the
+     * domain referencing `R.string` constants.
      */
     data class LauncherAction(val id: String, val label: LauncherActionLabel) : AppContextMenuAction()
 
     /**
-     * Stellt einen nicht klickbaren, visuellen Trenner dar.
-     * Der Adapter kann diesen Typ erkennen und ein anderes Layout dafür verwenden.
+     * A non-clickable visual separator. The adapter can recognise this
+     * type and use a different layout for it.
      */
     object Separator : AppContextMenuAction()
 
     companion object {
-        // IDs für die Standardaktionen, die als Ergebnis an das aufrufende Fragment gesendet werden.
+        // IDs for the standard actions sent back as results to the calling fragment.
         const val ACTION_ID_APP_INFO = "app_info"
         const val ACTION_ID_TOGGLE_FAVORITE = "toggle_favorite"
         const val ACTION_ID_HIDE_APP = "hide_app"

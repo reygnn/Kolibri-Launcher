@@ -20,27 +20,27 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * ULTRA-SAFE ResetRepositoryImpl
- * Verwaltet das Zurücksetzen aller App-Daten durch Koordination der Purgeable Repositories
+ * ULTRA-SAFE ResetRepositoryImpl.
+ * Coordinates a reset across the Purgeable repositories.
  */
 @Singleton
 class ResetRepositoryImpl @Inject constructor(
-    // User-Data Repositories
-    private val favoritesRepository: FavoritesRepository, // mit purgeRepository
-    private val hiddenAppsRepository: HiddenAppsRepository, // mit purgeRepository
-    private val customNamesRepository: CustomNamesRepository, // mit purgeRepository
-    private val appUsageRepository: AppUsageRepository, // mit purgeRepository
-    private val favoritesOrderRepository: FavoritesOrderRepository, // mit purgeRepository
-    private val swipeActionsRepository: SwipeActionsRepository, // mit purgeRepository
-    private val wallpaperRepository: WallpaperRepository, // mit purgeRepository
+    // User-data repositories
+    private val favoritesRepository: FavoritesRepository, // has purgeRepository
+    private val hiddenAppsRepository: HiddenAppsRepository, // has purgeRepository
+    private val customNamesRepository: CustomNamesRepository, // has purgeRepository
+    private val appUsageRepository: AppUsageRepository, // has purgeRepository
+    private val favoritesOrderRepository: FavoritesOrderRepository, // has purgeRepository
+    private val swipeActionsRepository: SwipeActionsRepository, // has purgeRepository
+    private val wallpaperRepository: WallpaperRepository, // has purgeRepository
 
-    // Settings Repository
-    private val settingsRepository: SettingsRepository, // mit purgeRepository
+    // Settings repository
+    private val settingsRepository: SettingsRepository, // has purgeRepository
 
-    // Weitere Repositories falls vorhanden
+    // Other repositories
     private val screenLockRepository: ScreenLockRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val timeBasedEventsRepository: TimeBasedEventsRepository // kein purgeRepository nötig
+    private val timeBasedEventsRepository: TimeBasedEventsRepository // no purgeRepository needed
 ) : ResetRepository {
 
     override suspend fun resetAllData(): Boolean {

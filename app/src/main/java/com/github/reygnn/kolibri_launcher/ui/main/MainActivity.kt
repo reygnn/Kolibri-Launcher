@@ -867,8 +867,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             isWallpaperEditMode = viewModel.isWallpaperEditMode.value,
         )
 
-        // Dialog wird im Edit-Mode unterdrückt — die Inline-Buttons
-        // sind dann ohnehin sichtbar.
+        // The dialog is suppressed while in edit mode — the inline
+        // buttons are visible there anyway.
         val visible = model as? CustomizationDialogModel.Visible ?: return
 
         val labels = visible.options.map { resolveCustomizationLabel(it) }

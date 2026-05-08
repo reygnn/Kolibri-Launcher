@@ -3,42 +3,43 @@ package com.github.reygnn.kolibri_launcher.domain.service
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 
 /**
- * Implementierung von ShortcutLauncherService.
+ * Contract for the shortcut-launcher service.
  *
- * Wrapped den Android LauncherApps System Service.
+ * Wraps the Android LauncherApps system service.
  *
- * ⚠️ NICHT DIREKT VERWENDEN!
- * Immer über [com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase] gehen
- * - der UseCase bietet:
- * - Null-Safety
- * - Vollständiges Error-Handling
- * - Typsichere Result-Objekte
+ * ⚠️ DO NOT USE DIRECTLY!
+ * Always go through
+ * [com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase]
+ * — the UseCase provides:
+ * - null safety
+ * - complete error handling
+ * - type-safe result objects
  *
- * Direkter Zugriff wirft unchecked [ShortcutLaunchException].
+ * Direct access throws an unchecked [ShortcutLaunchException].
  */
 interface ShortcutLauncherService {
 
     /**
-     * Startet einen App-Shortcut.
+     * Launches an app shortcut.
      *
-     * @param shortcut Der zu startende Shortcut
-     * @throws ShortcutLaunchException wenn der Launch fehlschlägt
+     * @param shortcut The shortcut to launch.
+     * @throws ShortcutLaunchException if the launch fails.
      */
     fun startShortcut(shortcut: LauncherShortcut)
 
     /**
-     * Prüft ob der Service verfügbar ist.
+     * Returns whether the service is available.
      */
     fun isAvailable(): Boolean
 }
 
 /**
- * Exception für fehlgeschlagene Shortcut-Launches.
+ * Exception raised when a shortcut launch fails.
  *
- * RuntimeException (unchecked) weil:
- * 1. Kotlin hat keine checked Exceptions
- * 2. Mockito kann sonst nicht doThrow() verwenden
- * 3. Der Caller soll nicht gezwungen werden zu catchen
+ * RuntimeException (unchecked) because:
+ * 1. Kotlin has no checked exceptions.
+ * 2. Test stubs work cleanest with unchecked exceptions.
+ * 3. Callers should not be forced to catch.
  */
 class ShortcutLaunchException(
     message: String,

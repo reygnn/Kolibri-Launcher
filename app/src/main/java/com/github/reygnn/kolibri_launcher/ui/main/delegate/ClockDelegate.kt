@@ -135,7 +135,7 @@ class ClockDelegate(
         val newTime = timeFormat.format(now)
         val newDate = dateFormat.format(now)
 
-        // Smart Update: Nur emittieren wenn sich was geändert hat
+        // Smart update: only emit when the formatted value actually changed.
         _timeString.update { current -> if (current == newTime) current else newTime }
         _dateString.update { current -> if (current == newDate) current else newDate }
     }

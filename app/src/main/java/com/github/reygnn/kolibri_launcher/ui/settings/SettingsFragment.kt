@@ -60,24 +60,25 @@ import javax.inject.Inject
 
 /**
  * CRASH-SAFE VERSION
- * (Inklusive Kalender-Berechtigungslogik)
+ * (includes calendar-permission handling)
  *
- * Throwable-Audit-Notiz: Die früher um jede `findPreference + setOn*Listener`-
- * Verdrahtung gewickelten Outer-Catches sind entfernt — sowohl `findPreference`
- * (gibt null zurück) als auch `setOn*Listener` auf einer Safe-Call-Receiver
- * werfen nicht. Inner-Catches im Listener-Body bleiben überall, weil dort
- * echte Arbeit passiert (startActivity / Fragment-Transaktion / suspend
- * Repo-Call). Gleiches Muster für die Flow-Observer in `observeSettings`:
- * der `?.isChecked = X`-Setter im inneren Block kann nicht werfen, der
- * Outer-Catch um die `.collect { }` schon (weshalb der bleibt).
+ * Throwable-audit note: the outer catches that used to wrap every
+ * `findPreference + setOn*Listener` wiring are gone — neither
+ * `findPreference` (returns null on miss) nor `setOn*Listener` on a
+ * safe-call receiver can throw. Inner catches inside listener bodies
+ * stay everywhere because real work happens there (startActivity /
+ * fragment transaction / suspend repo call). Same pattern for the
+ * Flow observers in `observeSettings`: the `?.isChecked = X` setter
+ * inside the block can't throw, but the outer catch around
+ * `.collect { }` can — that's why it stays.
  *
- * 2026-05-02: Nachgesweept — Listener-Bodies, die nur eine Sub-Methode mit
- * eigenem try/catch aufrufen (`openSystemWallpaperPicker`,
+ * 2026-05-02 follow-up sweep: listener bodies that only call a sub-method
+ * with its own try/catch (`openSystemWallpaperPicker`,
  * `showFactoryResetDialog`, `openAccessibilitySettings`,
- * `openDefaultLauncherSettings`), brauchen keinen zusätzlichen Outer-Catch.
- * Listener mit `viewLifecycleOwner`-Zugriff oder direkter System-API
- * (`startActivity`, `parentFragmentManager`) behalten ihren Inner-Catch
- * (Lifecycle-Race-Schutz).
+ * `openDefaultLauncherSettings`) need no additional outer catch.
+ * Listeners with `viewLifecycleOwner` access or direct system-API calls
+ * (`startActivity`, `parentFragmentManager`) keep their inner catch
+ * (lifecycle-race protection).
  */
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {

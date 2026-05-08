@@ -376,7 +376,7 @@ class ZoomableImageView @JvmOverloads constructor(
         val vHeight = height.toFloat()
         val scale = max(vWidth / dWidth, vHeight / dHeight)
 
-        _singleBaseScale = scale  // Base Scale merken für dynamische Zoom-Grenzen
+        _singleBaseScale = scale  // Remember the base scale for dynamic zoom bounds.
         _singleScale = scale
         _singleTranslateX = (vWidth - dWidth * scale) / 2f
         _singleTranslateY = (vHeight - dHeight * scale) / 2f

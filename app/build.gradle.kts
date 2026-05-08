@@ -3,16 +3,16 @@ import java.util.Properties
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════
- * WICHTIG FÜR KI-ASSISTENTEN (Gemini, Claude, etc.):
+ * IMPORTANT FOR AI ASSISTANTS (Gemini, Claude, etc.):
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Versionen leben jetzt in `gradle/libs.versions.toml` — NICHT mehr hier
- * im build.gradle.kts. Pinning-Marker (DO NOT UPGRADE / DO NOT DOWNGRADE
- * / DO NOT CHANGE / OK to upgrade) stehen direkt neben den Versionen im
- * Catalog. ⚠️ Das Ignorieren dieser Marker führt zu Build-Fehlern! ⚠️
+ * Versions now live in `gradle/libs.versions.toml` — NOT here in
+ * build.gradle.kts. Pinning markers (DO NOT UPGRADE / DO NOT DOWNGRADE /
+ * DO NOT CHANGE / OK to upgrade) sit next to the versions in the Catalog.
+ * ⚠️ Ignoring these markers causes build failures! ⚠️
  *
- * minSdk=36 und compileSdk=36 sind ABSICHTLICH so gesetzt (Android 16)!
- * Diese Werte NICHT ändern ohne explizite Anweisung!
+ * minSdk=36 and compileSdk=36 are DELIBERATELY set this way (Android 16)!
+ * Do NOT change these values without explicit instruction!
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -26,12 +26,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Lädt die sensiblen Daten aus der keystore.properties-Datei
-// Diese Datei sollte im Stammverzeichnis des Projekts liegen und in .gitignore eingetragen sein
+// Loads the sensitive data from the keystore.properties file.
+// This file should sit in the project root and be listed in .gitignore.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 
-// Nur laden wenn Datei existiert (für CI)
+// Only load if the file exists (CI builds may not have it).
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
@@ -223,7 +223,7 @@ dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
-    implementation(libs.androidx.appcompat)  // Achtung: bringt älteres 'MaterialYou' mit
+    implementation(libs.androidx.appcompat)  // Heads up: drags in older 'MaterialYou'.
     implementation(libs.androidx.activity)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.recyclerview)
@@ -244,7 +244,7 @@ dependencies {
 
     // Utilities
     implementation(libs.timber)
-    implementation(libs.kotlinx.serialization.json)  // 1.10.0 benötigt Kotlin 2.3.0
+    implementation(libs.kotlinx.serialization.json)  // 1.10.0 requires Kotlin 2.3.0.
     testImplementation(libs.robolectric)
 
     // Hilt
@@ -257,7 +257,7 @@ dependencies {
 
     debugImplementation(libs.leakcanary.android)
 
-    // --- LOKALE UNIT-TESTS (laufen auf dem PC/JVM) ---
+    // --- LOCAL UNIT TESTS (run on the host JVM) ---
     testImplementation(libs.junit)
     testImplementation(libs.androidx.arch.core.testing)
     testImplementation(libs.kotlin.test.junit)
@@ -266,19 +266,19 @@ dependencies {
     testImplementation(libs.truth)
     testImplementation(libs.json)
 
-    // Hilt für Unit-Tests
+    // Hilt for unit tests.
     testImplementation(libs.hilt.android.testing)
     kaptTest(libs.hilt.compiler)
 
-    // MockK für Unit-Tests
+    // MockK for unit tests.
     testImplementation(libs.mockk)
 
-    // AndroidX Test (für Robolectric-basierte Activity/Fragment-Tests)
+    // AndroidX Test (for Robolectric-based Activity/Fragment tests).
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
 
 
-    // --- INSTRUMENTIERTE TESTS (laufen auf Emulator/Gerät) ---
+    // --- INSTRUMENTED TESTS (run on emulator / device) ---
     androidTestUtil(libs.androidx.test.orchestrator)
 
     androidTestImplementation(libs.androidx.test.runner)
@@ -295,15 +295,16 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.web)
     debugImplementation(libs.androidx.test.espresso.idling.resource)
 
-    // Hilt für instrumentierte Tests
+    // Hilt for instrumented tests.
     androidTestImplementation(libs.hilt.android.testing)
     kaptAndroidTest(libs.hilt.compiler)
 
     androidTestImplementation(libs.kotlinx.coroutines.test)
-    // Turbine für SharedFlow-Subscriber-Race-Pattern in Receiver-Tests
-    // (siehe TESTING_CONVENTIONS „MUTABLESHAREDFLOW IN CONSTRUCTOR" — die
-    // Subscriber-vor-Trigger-Garantie funktioniert auf instrumentierter
-    // Hardware genauso wie unter JVM, nur ohne TestDispatcher).
+    // Turbine — needed for the SharedFlow subscribe-before-trigger pattern
+    // in receiver tests (see TESTING_CONVENTIONS "MUTABLESHAREDFLOW IN
+    // CONSTRUCTOR" — the subscriber-before-emit guarantee works on
+    // instrumented hardware just as it does on the JVM, only without a
+    // TestDispatcher).
     androidTestImplementation(libs.turbine)
 }
 
@@ -314,8 +315,9 @@ kapt {
 configurations.all {
     resolutionStrategy {
         // DO NOT REMOVE !!!
-        // Erzwingt material auch wenn appcompat eine ältere Version mitbringt.
-        // Warnung: ohne diesen force WIRD es bei falscher Reihenfolge der Dependencies zu Dependency-Konflikten kommen!
+        // Forces `material` even when appcompat drags in an older version.
+        // Warning: without this force, dependency conflicts WILL appear when
+        // the dependency declaration order is wrong.
         force("com.google.android.material:material:${libs.versions.material.get()}")
 
         force("androidx.test:runner:${libs.versions.androidxTest.get()}")
@@ -367,7 +369,7 @@ tasks.register<Exec>("checkRule13") {
     commandLine = listOf("bash", "tools/check-rule13-german-comments.sh")
 }
 
-// Code Coverage Configuration mit JaCoCo
+// Code coverage configuration via JaCoCo.
 tasks.register<JacocoReport>("jacocoTestReport") {
     dependsOn("testDebugUnitTest")
 
@@ -435,7 +437,7 @@ tasks.register("uploadProguardMapping") {
 
         println("📤 Uploading ProGuard mapping via script...")
 
-        // Script ausführen
+        // Run the script.
         val process = ProcessBuilder(
             "bash",
             scriptPath,
@@ -457,7 +459,7 @@ tasks.register("uploadProguardMapping") {
     }
 }
 
-// Automatisch nach Release Build für APK und Bundle
+// Run automatically after the release build for APK and bundle.
 tasks.configureEach {
     if (name in listOf("assembleRelease", "bundleRelease")) {
         finalizedBy("uploadProguardMapping")

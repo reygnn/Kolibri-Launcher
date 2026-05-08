@@ -562,19 +562,20 @@ nicht-passendem Event-Typ), aber jetzt strukturell statt per Cast-Catch.
 
 ---
 
-### 8.4 🟠 MAJOR — Rule 13 verletzt: weitere net-new deutsche Kommentare
+### 8.4 ✅ Erledigt — Rule 13 verletzt: weitere net-new deutsche Kommentare
 
-Zwei zusätzliche Sites zur Existing-Finding §1.2:
+Zweistufige Auflösung:
 
-- `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt:388-400` (Commit `014d9f5c`, 2026-04-30) — kompletter Erklär-Block in Deutsch zu `silentDeath`-Strategie und HOME-Activity-Restart-Loop.
-- `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerAdapter.kt:102-104` (Commit `5033e123`, 2026-04-30) — „when auf String-Payloads + holder.updateX-Aufrufe sind reine TextView-Setter…".
+1. **Linter** (commit `7886473` + `74a9357`) — `tools/check-rule13-german-comments.{sh,awk}` plus Gradle-Task `checkRule13`. Vergleicht `git diff <base>...HEAD` (Default `origin/main`), flaggt `+`-Zeilen die wie Kommentare mit Deutsch aussehen. Zwei Signale: Umlaute (hart) oder ≥2 deutsche Funktionswörter (weich, mit Whitelist gegen English-Overlap). 11+1 Fixture-Tests in `tools/check-rule13-test.sh`.
 
-Beide stammen aus Rule-11-Sweep-Commits, also nach Einführung von Rule 13.
-`tools/check-conventions.sh` fängt Rule 13 nicht (per TODO §7 wäre git-diff-
-Integration nötig), daher silent drift. Weitere Sites wahrscheinlich.
+2. **Sweep** (dieser Commit) — alle 60 Verletzungen seit Stichtag `a65a6b2` (2026-05-01, Rule-13-Einführung) auf Englisch übersetzt. Touch auf 16 Files quer durch `:domain`, `:data`, `:app`, plus `app/build.gradle.kts`. Inhaltliche Bedeutung erhalten, keine technischen Korrekturen mitgeschmuggelt.
 
-**Fix:** Komment-Sweep über alle 2026er Sweep-Commits, oder TODO §7 vorziehen
-(git-diff-aware Lint). Sweep-only-Lösung ist Sisyphos ohne den Lint.
+Zwei Korrekturen am Original-Befund während der Auflösung:
+
+- **Timeline:** Audit sagte „Beide stammen aus Rule-11-Sweep-Commits, also **nach** Einführung von Rule 13." Das ist faktisch falsch. Rule 13 wurde am 2026-05-01 (`a65a6b2`) eingeführt, beide zitierten Commits (`014d9f5c`, `5033e123`) waren am 2026-04-30 — einen Tag **vor** Rule 13. Streng genommen pre-existing, aber der Maintainer hat „Stichtag = 2026-05-01" gewählt und sweepen lassen.
+- **MainActivity-Site:** Der zitierte Block in `MainActivity.kt:388-400` ist nicht „kompletter Erklär-Block in Deutsch" — er ist Mix aus EN (`Catch kept (Unrecoverable…)`) und DE (`Gleicher Grund wie oben…`). Beide Teile sind jetzt englisch.
+
+> Original-Befund: zwei beispielhaft gefundene Sites, plus Verdacht auf weitere. Fix-Vorschlag „TODO §7 vorziehen, dann sweepen" — beides umgesetzt.
 
 ---
 
@@ -742,7 +743,7 @@ das Framing „einzige Differenz" ist veraltet.
 | 5 | ~~§8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported`~~ | ~30 min | erledigt 2026-05-08 — `errorEvent: E?`-Property in `BaseViewModel`; alle 7 UiEvent-Subklassen + TestViewModel opten ein, OnboardingViewModel bleibt ohne Override (Verhalten unverändert) |
 | 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
 | 7 | ~~§8.8 `:data` `buildConfig = false`~~ | ~10 min | erledigt 2026-05-08 — `BuildConfig.DEBUG` durch `TimberWrapper.isDebugBuild` ersetzt, `buildFeatures.buildConfig` aus `data/build.gradle.kts` entfernt |
-| 8 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
+| 8 | ~~§8.4 Rule-13-Sweep~~ | mehrere h | erledigt 2026-05-08 — git-diff-aware Linter (`checkRule13`) + Sweep aller 60 Sites seit Stichtag `a65a6b2` (2026-05-01) |
 
 §8.5 zurückgezogen (siehe Sektion). Reihenfolge optimiert für Risiko-Profil
 (klein/isoliert zuerst), nicht strikt nach Schweregrad. §8.4 bleibt

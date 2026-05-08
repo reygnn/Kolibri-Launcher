@@ -328,13 +328,13 @@ class AppDrawerFragment : Fragment() {
             adapter = appDrawerAdapter
             layoutManager = LinearLayoutManager(requireContext())
 
-            // CRASH-SAFE: Animationen aus (verhindert Bugs bei schnellen Updates)
+            // CRASH-SAFE: animations off (prevents bugs on rapid updates).
             itemAnimator = null
 
             // PERFORMANCE (Monk Approved):
-            // Da der Drawer den Screen füllt (match_parent), ändert sich die
-            // Grösse des RecyclerViews nie. Das spart Layout-Berechnungen
-            // bei jedem einzelnen Tastenanschlag in der Suche!
+            // The drawer fills the screen (match_parent), so the RecyclerView's
+            // size never changes. setHasFixedSize(true) skips a layout pass on
+            // every keystroke in the search box.
             setHasFixedSize(true)
         }
     }
@@ -504,11 +504,11 @@ class AppDrawerFragment : Fragment() {
                 false
             }
 
-            // 2. Binding Check (könnte während suspend weg sein)
+            // 2. Binding check (could have gone away during suspend).
             val currentBinding = _binding ?: return@launch
             val editText = currentBinding.searchEditText
 
-            // 3. Strategie bestimmen (testbare Logik)
+            // 3. Pick the strategy (testable logic).
             val strategy = keyboardShowCoordinator.determineStrategy(
                 isViewLaidOut = editText.isLaidOut,
                 isViewEffectivelyVisible = editText.canReceiveKeyboardInput(),
@@ -516,7 +516,7 @@ class AppDrawerFragment : Fragment() {
                 isAutoShowEnabled = isAutoShowEnabled
             )
 
-            // 4. Strategie ausführen
+            // 4. Execute the strategy.
             when (strategy) {
                 is KeyboardShowCoordinator.ShowKeyboardStrategy.ShowImmediately -> {
                     Timber.d("Keyboard: View already laid out → showing immediately")
