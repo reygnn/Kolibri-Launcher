@@ -353,6 +353,20 @@ tasks.register<Exec>("checkConventions") {
     commandLine = listOf("bash", "tools/check-conventions.sh")
 }
 
+// Rule 13 — git-diff-aware German-comment linter. Flags `+` lines (added
+// or modified relative to the comparison base, default `origin/main`) that
+// look like comments containing German prose. Pre-existing German lines
+// are intentionally not swept per Rule 13. Source: tools/check-rule13-german-comments.sh.
+//
+// Run via `./gradlew checkRule13` or invoke the script directly. Override
+// the comparison base with the CHECK_BASE env var.
+tasks.register<Exec>("checkRule13") {
+    group = "verification"
+    description = "Runs the Rule 13 (German comments) linter against the git diff."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/check-rule13-german-comments.sh")
+}
+
 // Code Coverage Configuration mit JaCoCo
 tasks.register<JacocoReport>("jacocoTestReport") {
     dependsOn("testDebugUnitTest")
