@@ -6,7 +6,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.view.Window
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -117,6 +121,30 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             TimberWrapper.silentError(e, "Error in onCreate")
             dismiss()
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Each Dialog is a separate Window from the host Activity, so the
+        // host's status-bar hide does not reach it. We mirror whatever the
+        // host currently shows: HomeFragment runs immersive, AppDrawer
+        // shows the status bar — the menu must match either way, otherwise
+        // the bar pops in (HomeFragment) or out (AppDrawer) on open.
+        dialog?.window?.let(::matchHostStatusBarOn)
+    }
+
+    private fun matchHostStatusBarOn(window: Window) {
+        if (!isHostStatusBarHidden()) return
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun isHostStatusBarHidden(): Boolean {
+        val hostWindow = activity?.window ?: return false
+        val insets = ViewCompat.getRootWindowInsets(hostWindow.decorView) ?: return false
+        return !insets.isVisible(WindowInsetsCompat.Type.statusBars())
     }
 
     override fun onCreateView(
@@ -309,6 +337,9 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 .create()
 
             currentDialog?.show()
+            // Same window-mirror treatment as the BottomSheet itself —
+            // the AlertDialog is yet another Window, must match the host.
+            currentDialog?.window?.let(::matchHostStatusBarOn)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating rename dialog")
         }
