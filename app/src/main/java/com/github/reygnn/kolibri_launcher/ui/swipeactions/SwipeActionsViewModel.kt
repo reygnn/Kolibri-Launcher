@@ -32,6 +32,8 @@ class SwipeActionsViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     private val _uiState = MutableStateFlow(SwipeActionsUiState())
     val uiState: StateFlow<SwipeActionsUiState> = _uiState.asStateFlow()
 

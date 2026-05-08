@@ -31,6 +31,8 @@ class HiddenAppsViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 

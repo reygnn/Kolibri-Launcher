@@ -28,6 +28,8 @@ private class TestViewModel(
     dispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(dispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     /** Expose sendEvent for testing */
     suspend fun testSendEvent(event: UiEvent) = sendEvent(event)
 

@@ -35,6 +35,8 @@ class CustomNamesViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     private var masterAppList: List<AppInfo> = emptyList()
 
     private val _uiState = MutableStateFlow(CustomNamesUiState())

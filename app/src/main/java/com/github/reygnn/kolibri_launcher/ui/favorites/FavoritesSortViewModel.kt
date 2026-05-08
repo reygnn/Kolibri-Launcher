@@ -39,6 +39,8 @@ class FavoritesSortViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
     val apps: StateFlow<List<AppInfo>> = _apps.asStateFlow()
 

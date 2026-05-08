@@ -19,6 +19,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -127,6 +128,8 @@ class LauncherViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
+
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
 
     // ===========================================
     // DELEGATE SCOPE (shared infrastructure)

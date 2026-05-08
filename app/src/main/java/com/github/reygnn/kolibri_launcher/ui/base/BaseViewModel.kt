@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.base
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.reygnn.kolibri_launcher.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -152,22 +151,20 @@ abstract class BaseViewModel<E>(
     }
 
     /**
-     * Override this in child ViewModels where E is NOT UiEvent.
-     * Default implementation assumes E extends UiEvent.
+     * Subclasses opt into a generic error toast by overriding this with
+     * a concrete value. Default `null` = no toast — appropriate for
+     * ViewModels whose event type has no toast variant.
+     */
+    protected open val errorEvent: E? = null
+
+    /**
+     * Emits [errorEvent] when [handleError] decides a toast should
+     * surface. No-op when [errorEvent] is null.
      */
     protected open fun showErrorToastIfSupported() {
+        val event = errorEvent ?: return
         viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                // The UNCHECKED_CAST will throw ClassCastException if E
-                // is not UiEvent — that case is handled below.
-                @Suppress("UNCHECKED_CAST")
-                sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ClassCastException) {
-                // E is not UiEvent - that's okay, this ViewModel doesn't support error toasts
-                Timber.d("This ViewModel does not support UiEvent error toasts")
-            }
+            sendEvent(event)
         }
     }
 

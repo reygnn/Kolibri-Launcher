@@ -25,6 +25,8 @@ class SettingsViewModel @Inject constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
+    override val errorEvent = UiEvent.ShowToast(R.string.error_generic)
+
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val installedApps: StateFlow<List<AppInfo>> = _installedApps.asStateFlow()
 
