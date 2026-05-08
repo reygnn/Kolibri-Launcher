@@ -214,6 +214,25 @@ EOF
 )"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Case 11b — Multiplication sign `×` (U+00D7) in English context.
+# Regression: an earlier version used `[äöüßÄÖÜ]` as a character class,
+# which awk treats byte-wise — `×` (UTF-8 C3 97) shares leading byte
+# `0xC3` with the umlauts, causing a false positive. The fix uses
+# alternation `(ä|ö|ü|ß|Ä|Ö|Ü)` for full multi-byte matching.
+# ─────────────────────────────────────────────────────────────────────────────
+run_case "case11b: × multiplication sign in English (silent)" "" \
+  "$(cat <<'EOF'
+diff --git a/Foo.kt b/Foo.kt
+--- a/Foo.kt
++++ b/Foo.kt
+@@ -1,2 +1,3 @@
+ fun foo() {
++    // feedback loop is 50× faster than the alternative
+     work()
+EOF
+)"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Case 11 — Two violations in one diff, line numbers must track correctly.
 # ─────────────────────────────────────────────────────────────────────────────
 run_case "case11: two violations, line counter correctness" \

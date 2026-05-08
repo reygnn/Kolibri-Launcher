@@ -140,8 +140,12 @@ function strip_trailing_close(text) {
 }
 
 function is_german(text,    count, i, w, re) {
-    # Hard signal: umlaut or eszett.
-    if (text ~ /[äöüßÄÖÜ]/) return 1
+    # Hard signal: umlaut or eszett. Alternation rather than a character
+    # class — awk regex treats the [] as a set of bytes, which would also
+    # match any character whose UTF-8 sequence shares the leading byte
+    # `0xC3` with these letters (e.g. `×` U+00D7 → C3 97). Alternation
+    # forces full multi-byte sequence matching.
+    if (text ~ /(ä|ö|ü|ß|Ä|Ö|Ü)/) return 1
 
     # Soft signal: count distinct German function-word matches.
     count = 0
