@@ -139,87 +139,67 @@ class AppManagementDelegate(
         }
     }
 
-    fun onToggleFavorite(app: AppInfo) = scope.launchSafe("Error toggling favorite") {
-        try {
-            val currentMax = maxFavoritesOnHome.value
-            when (val result = toggleFavoriteUseCase(app, currentMax)) {
-                is ToggleFavoriteUseCase.Result.Success -> {
-                    val message = context.getString(result.toStringResId(), app.displayName)
-                    scope.sendEvent(UiEvent.ShowToastFromString(message))
-                }
-                is ToggleFavoriteUseCase.Result.Error -> {
-                    val limit = (result as ToggleFavoriteUseCase.Result.Error.LimitReached).maxFavorites
-                    val message = context.getString(result.toStringResId(), limit)
-                    scope.sendEvent(UiEvent.ShowToastFromString(message))
-                }
+    fun onToggleFavorite(app: AppInfo) = scope.launchSafe(
+        errorMessage = "Error toggling favorite for ${app.packageName}",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        val currentMax = maxFavoritesOnHome.value
+        when (val result = toggleFavoriteUseCase(app, currentMax)) {
+            is ToggleFavoriteUseCase.Result.Success -> {
+                val message = context.getString(result.toStringResId(), app.displayName)
+                scope.sendEvent(UiEvent.ShowToastFromString(message))
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling favorite for ${app.packageName}")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            is ToggleFavoriteUseCase.Result.Error -> {
+                val limit = (result as ToggleFavoriteUseCase.Result.Error.LimitReached).maxFavorites
+                val message = context.getString(result.toStringResId(), limit)
+                scope.sendEvent(UiEvent.ShowToastFromString(message))
+            }
         }
     }
 
-    fun onHideApp(app: AppInfo) = scope.launchSafe("Error hiding app") {
-        try {
-            hideAppUseCase(app)
-            scope.sendEvent(
-                UiEvent.ShowToastFromString(
-                    context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
-                )
+    fun onHideApp(app: AppInfo) = scope.launchSafe(
+        errorMessage = "Error hiding app ${app.packageName}",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        hideAppUseCase(app)
+        scope.sendEvent(
+            UiEvent.ShowToastFromString(
+                context.getString(R.string.app_now_hidden_in_drawer, app.displayName)
             )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error hiding app ${app.packageName}")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
+        )
     }
 
-    fun onShowApp(app: AppInfo) = scope.launchSafe("Error showing app") {
-        try {
-            showAppUseCase(app)
-            scope.sendEvent(
-                UiEvent.ShowToastFromString(
-                    context.getString(R.string.app_now_visible_in_drawer, app.displayName)
-                )
+    fun onShowApp(app: AppInfo) = scope.launchSafe(
+        errorMessage = "Failed to show app ${app.packageName}",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        showAppUseCase(app)
+        scope.sendEvent(
+            UiEvent.ShowToastFromString(
+                context.getString(R.string.app_now_visible_in_drawer, app.displayName)
             )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to show app ${app.packageName}")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
+        )
     }
 
-    fun onResetAppUsage(app: AppInfo) = scope.launchSafe("Error resetting usage") {
-        try {
-            resetAppUsageUseCase(app)
-            scope.sendEvent(
-                UiEvent.ShowToastFromString(
-                    context.getString(R.string.usage_data_reset_success, app.displayName)
-                )
+    fun onResetAppUsage(app: AppInfo) = scope.launchSafe(
+        errorMessage = "Error resetting usage data for ${app.packageName}",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        resetAppUsageUseCase(app)
+        scope.sendEvent(
+            UiEvent.ShowToastFromString(
+                context.getString(R.string.usage_data_reset_success, app.displayName)
             )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error resetting usage data for ${app.packageName}")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
+        )
     }
 
     // --- Public API: Sort & Search ---
 
-    fun toggleSortOrder() = scope.launchSafe("Error toggling sort order") {
-        try {
-            toggleSortOrderUseCase()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error toggling sort order")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
+    fun toggleSortOrder() = scope.launchSafe(
+        errorMessage = "Error toggling sort order",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        toggleSortOrderUseCase()
     }
 
     fun onAppDrawerSearchQueryChanged(query: String) {

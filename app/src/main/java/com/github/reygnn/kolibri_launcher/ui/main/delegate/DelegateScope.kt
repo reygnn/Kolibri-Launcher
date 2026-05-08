@@ -9,6 +9,7 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import androidx.annotation.StringRes
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import kotlinx.coroutines.CancellationException
@@ -37,9 +38,16 @@ class DelegateScope(
     /**
      * Safe coroutine launch mirroring BaseViewModel.launchSafe().
      * Catches all Throwable except CancellationException.
+     *
+     * If [defaultErrorToast] is non-null, a `UiEvent.ShowToast` with that
+     * resource is emitted on Throwable catch — covers the common case
+     * where a delegate method's only error UX is a generic toast.
+     * Methods with a feature-specific error toast keep their inline
+     * try/catch and pass null here.
      */
     fun launchSafe(
         errorMessage: String = "Unexpected error in delegate",
+        @StringRes defaultErrorToast: Int? = null,
         block: suspend CoroutineScope.() -> Unit
     ) {
         coroutineScope.launch(mainDispatcher) {
@@ -49,6 +57,9 @@ class DelegateScope(
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, errorMessage)
+                if (defaultErrorToast != null) {
+                    sendEvent(UiEvent.ShowToast(defaultErrorToast))
+                }
             }
         }
     }

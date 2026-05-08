@@ -116,7 +116,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUs
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -279,26 +278,22 @@ class WallpaperDelegate(
     // SINGLE-LAYER WALLPAPER
     // ===========================================
 
-    fun onSetWallpaperImage(imageUri: Uri) = scope.launchSafe("Error setting wallpaper image") {
-        try {
-            val displayName = getDisplayName(imageUri)
+    fun onSetWallpaperImage(imageUri: Uri) = scope.launchSafe(
+        errorMessage = "Error setting wallpaper image",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        val displayName = getDisplayName(imageUri)
 
-            val internalUri = wallpaperFileManager.copyToInternal(imageUri)
-            if (internalUri == null) {
-                TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
-                scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-                return@launchSafe
-            }
-            setWallpaperImageUseCase(internalUri.toString())
-
-            val message = displayName ?: context.getString(R.string.wallpaper_set_success)
-            scope.sendEvent(UiEvent.ShowToastFromString(message))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error setting wallpaper image")
+        val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+        if (internalUri == null) {
+            TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
             scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            return@launchSafe
         }
+        setWallpaperImageUseCase(internalUri.toString())
+
+        val message = displayName ?: context.getString(R.string.wallpaper_set_success)
+        scope.sendEvent(UiEvent.ShowToastFromString(message))
     }
 
     fun onSaveWallpaperTransform(
@@ -317,17 +312,13 @@ class WallpaperDelegate(
         }
     }
 
-    fun onClearWallpaper() = scope.launchSafe("Error clearing wallpaper") {
-        try {
-            wallpaperFileManager.clearAll()
-            clearWallpaperUseCase()
-            scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error clearing wallpaper")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-        }
+    fun onClearWallpaper() = scope.launchSafe(
+        errorMessage = "Error clearing wallpaper",
+        defaultErrorToast = R.string.error_generic
+    ) {
+        wallpaperFileManager.clearAll()
+        clearWallpaperUseCase()
+        scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
     }
 
     // ===========================================
