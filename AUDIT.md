@@ -619,35 +619,49 @@ aller Welten.
 
 ---
 
-### 8.7 🟡 MINOR — `purgeRepository`-Duplikation in `:data`
+### 8.7 ✅ Erledigt — `purgeRepository`-Duplikation in `:data`
 
-13 Repository-Impls in `:data` haben `purgeRepository`-Methoden mit
-identischem Body-Schema:
+Helper `safePurge` ist jetzt in `data/.../DataStorePurge.kt`:
 
 ```kotlin
-override suspend fun purgeRepository() {
-    try {
-        dataStore.edit { preferences -> /* remove keys */ }
-    } catch (e: CancellationException) { throw e }
-    catch (e: Throwable) {
-        TimberWrapper.silentError(e, "Failed to purge X repository")
-    }
+internal suspend fun DataStore<Preferences>.safePurge(
+    repoName: String,
+    block: suspend (MutablePreferences) -> Unit
+) {
+    try { edit(block) }
+    catch (e: CancellationException) { throw e }
+    catch (e: Throwable) { TimberWrapper.silentError(e, "Failed to purge $repoName repository") }
 }
 ```
 
-Alle 13 Files: `AppUsageRepositoryImpl`, `CustomNamesRepositoryImpl`,
-`FavoritesRepositoryImpl`, `FavoritesOrderRepositoryImpl`, `HiddenAppsRepositoryImpl`,
-`InstalledAppsRepositoryImpl`, `InstalledAppsStateRepositoryImpl`,
-`ScreenLockRepositoryImpl`, `SettingsRepositoryImpl`, `ShortcutRepositoryImpl`,
-`SwipeActionsRepositoryImpl`, `TimeBasedEventsRepositoryImpl`, `WallpaperRepositoryImpl`.
+6 Repo-Impls auf den Helper umgestellt: `HiddenAppsRepositoryImpl`,
+`FavoritesRepositoryImpl`, `AppUsageRepositoryImpl`, `WallpaperRepositoryImpl`
+(post-edit Success-Log gedroppt — silentError loggt den Failure-Pfad bereits),
+`FavoritesOrderRepositoryImpl`, `SwipeActionsRepositoryImpl`.
 
-`SettingsRepositoryImpl` hat schon eine `safeEdit`-Helper-Methode, die
-nirgends sonst genutzt wird.
+**Bewusst NICHT gefoldet** (per Audit-Caveat „dokumentiert No-Op bleiben"
+plus Erweiterung um Ordering-Sensitivität):
 
-**Fix:** Module-Helper `suspend fun DataStore<Preferences>.safePurge(repoName: String, edit: MutablePreferences.() -> Unit)`. Schätzung ~70 Zeilen Reduktion.
-Caveat: Einige `purgeRepository`-Bodies sind absichtlich No-Op
-(`InstalledAppsStateRepository` ist in der Drift-Doku) — die müssen
-dokumentiert No-Op bleiben, nicht in den Helper hineinrefactort.
+- `CustomNamesRepositoryImpl` — der `triggerCustomNameUpdate()`-Aufruf
+  läuft nach dem Edit, AUSSERHALB des Helpers. Im Helper-Pattern würde
+  Trigger auch nach silent-failed-edit feuern (würde Subscriber über
+  „neue" Daten benachrichtigen, die gar nicht geschrieben wurden).
+- `SettingsRepositoryImpl` — hat eigenes `safeEdit`, das von allen 30+
+  Settern genutzt wird. Interne Konsistenz erhalten, getrennte
+  Konsolidierung in TODO §7-Style nicht in Scope.
+- `InstalledAppsStateRepositoryImpl`, `ShortcutRepositoryImpl`,
+  `InstalledAppsRepositoryImpl`, `TimeBasedEventsRepositoryImpl`,
+  `ScreenLockRepositoryImpl` — alle dokumentiert No-Op (System-Daten
+  oder reiner Runtime-State).
+
+Net-LOC: −37 in den 6 gefoldeten Files, +44 im neuen Helper (mit KDoc),
+~7 LOC Reduktion gesamt. Audit-Schätzung ~70 war auf 13 Files basiert;
+realistische Foldzahl ist 6, plus Helper-KDoc-Aufwand. Der eigentliche
+Wert ist Drift-Resistenz: zukünftige DataStore-Repos kriegen den
+sicheren Pfad per Default.
+
+> Original-Befund: 13 Files mit identischem `try/catch` um
+> `dataStore.edit`. Fix-Vorschlag „Module-Helper safePurge" — umgesetzt.
 
 ---
 
@@ -741,7 +755,7 @@ das Framing „einzige Differenz" ist veraltet.
 | 3 | ~~§8.6 + §8.10~~ + §8.9 Cleanup-Sammel-Branch | ~10 min | erledigt 2026-05-08 für §8.6 (`UsageExport.kt` weg) und §8.10 (auskommentierte Klassendeklaration weg). §8.9 zurückgezogen — siehe Sektion. |
 | 4 | ~~§8.1 Delegate `launchSafe`-Overload~~ | ~30 min | erledigt 2026-05-08 — `defaultErrorToast: Int?`-Parameter in `DelegateScope.launchSafe`; 10 Sites gefoldet, −32 LOC, DEBUG-Doppel-Throw weg |
 | 5 | ~~§8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported`~~ | ~30 min | erledigt 2026-05-08 — `errorEvent: E?`-Property in `BaseViewModel`; alle 7 UiEvent-Subklassen + TestViewModel opten ein, OnboardingViewModel bleibt ohne Override (Verhalten unverändert) |
-| 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
+| 6 | ~~§8.7 `purgeRepository`-Helper~~ | ~2 h | erledigt 2026-05-08 — `safePurge`-Extension in `DataStorePurge.kt`; 6 von 13 Repos gefoldet (5 dokumentierte No-Ops + 2 ordering-sensitive bleiben inline) |
 | 7 | ~~§8.8 `:data` `buildConfig = false`~~ | ~10 min | erledigt 2026-05-08 — `BuildConfig.DEBUG` durch `TimberWrapper.isDebugBuild` ersetzt, `buildFeatures.buildConfig` aus `data/build.gradle.kts` entfernt |
 | 8 | ~~§8.4 Rule-13-Sweep~~ | mehrere h | erledigt 2026-05-08 — git-diff-aware Linter (`checkRule13`) + Sweep aller 60 Sites seit Stichtag `a65a6b2` (2026-05-01) |
 
