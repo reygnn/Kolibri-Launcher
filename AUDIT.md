@@ -1028,6 +1028,81 @@ Per §9.5: „Schritte 1–3 bringen vermutlich auf 9.3" — Step 3
 allein bewegt das Rating moderat (≈9.1), die volle Steigerung
 auf 9.3 setzt Steps 1+2 voraus.
 
+### 9.7 ✅ 7 Delegates audit (Schritt 2 von §9.5) — 2026-05-08
+
+> Zweiter JVM-auditierbarer §9.3-Item abgearbeitet (#2 die 7
+> Delegates). ~1480 Zeilen total über `ui/main/delegate/`.
+> Anlass: nach §8.1 wurde das `launchSafe`-Wrapping konsolidiert,
+> aber die Bodies INSIDE der `launchSafe`-Calls waren nicht
+> systematisch geprüft.
+>
+> Befund: **Kein Crash-Safety-Bug gefunden.** Alle sieben Files
+> sauber. Drei theoretische Edge-Cases dokumentiert (keine Crashes).
+
+**Per-File-Bestand (verifizierbar pro Datei):**
+
+| Delegate | Zeilen | Surface |
+|---|---|---|
+| `DelegateScope.kt` | 65 | Helper-Infrastruktur. Bereits in §8.1 auditiert (`launchSafe` + `defaultErrorToast`-Overload). Im scope hier nur konsumiert |
+| `ClockDelegate.kt` | 176 | `updateBatteryLevelFromIntent` mit Throwable-Catch + DEFAULT_BATTERY-Fallback (Z. 96–109); `getInitialBatteryState` mit Throwable-Catch (Z. 143–155); `observeSystemTimeChanges` als callbackFlow mit awaitClose-Cleanup (Z. 157–176); `updateBatteryLevel` mit dokumentiertem CANT_THROW-Rationale (divide-by-zero-Guard) |
+| `AppManagementDelegate.kt` | 272 | Jede public Methode in `scope.launchSafe` mit passendem `defaultErrorToast`. `onAppClicked` behält inneres try/catch wegen feature-spezifischem Toast (`error_launching_app` statt `error_generic`). `handleFavoriteAppsState` (Z. 245–260) mit CancellationException-rethrow + Throwable-Catch. `listenForAppUpdates` (Z. 262–272) mit per-Event-Catch um `refreshAppsUseCase` |
+| `GestureDelegate.kt` | 149 | Jeder Gesture-Handler in `scope.launchSafe`. Result-based dispatch via sealed `RequestLockUseCase.Result` / `HandleSwipeActionUseCase.Result` / `RequestNotificationsUseCase.Result`. `_isLockingInProgress`-Gate verhindert Re-Entry während Lock-Animation. One-time-Toast-Flags (`enableLockToastShown`, `enableSwipeDownToastShown`) für Permission-Hinweise |
+| `ThemingDelegate.kt` | 97 | Alle drei Setter (`onSetTextColor`/`onSetTextShadowEnabled`/`onSetChipBackgroundColor`) in `scope.launchSafe` mit `defaultErrorToast`. `start()` Flow-Observer in launchSafe. `updateUiColors` ist sync StateFlow-Write |
+| `LayoutDelegate.kt` | 123 | **Besonders:** jeder StateFlow hat eigene `.catch { e -> silentError + emit(default) }`-Recovery (Z. 41–83). Setter mit `coerceInSafe`-Klammerung. `onResetLayoutSettings` ruft alle vier Default-Set-UseCases sequentiell |
+| `WallpaperDelegate.kt` | 600 | **Außergewöhnlich:** transaktionales Edit-Session-Protokoll mit `editSnapshot` + `pendingRemovalsOnCommit` + `pendingRemovalsOnCancel`-Bookkeeping. Sync state restore on cancel (Z. 384–398) explizit dokumentiert weil Fragment-Read sofort danach erfolgt. Per-file try/catch in commit/cancel batch deletes (Z. 364–369, 406–411). Orphan-GC genau einmal pro Process (Z. 261–273) mit dokumentierter Begründung gegen per-emission und gegen inline-after-save. `getDisplayName` mit Throwable→null-Catch und `?.use {}` für Cursor-Cleanup (Z. 588–600) |
+
+**Architektonische Highlights über §9.4-Bewertung hinaus:**
+
+1. **WallpaperDelegate's edit-session** ist die qualitativ herausragendste Stelle des Codebases:
+   - 100-Zeilen Architektur-KDoc erklärt **WARUM** (naïve Implementierung scheiterte am Delete-then-Cancel-Pfad — Datei war schon gelöscht, Cancel konnte sie nicht restaurieren)
+   - Explizite Invarianten-Liste für künftige Maintainer
+   - Regression-Guard-Liste mit konkreten Test-Namen aus `WallpaperDelegateTest`
+   - Sync state restore + async persistence + per-file catch in batch deletes
+2. **LayoutDelegate's per-Flow `.catch`** ist sauberer als der Standard-launchSafe-Ansatz: jeder StateFlow recovert zu seinem dokumentierten Default. Stack-Overflow im Use-Case-Flow kompromittiert nicht den Layout-State.
+3. **Orphan-GC-Logik** in WallpaperDelegate.start ist defensive engineering der Extra-Klasse: explizite Dokumentation gegen-per-emission (Backup-Restore-Race), gegen-inline-after-save (gleicher Race), und mit Edit-Mode-Check (pending-removal-files würden GC nicht überleben).
+
+**Drei theoretische Edge-Cases (keine Crashes, dokumentiert für Vollständigkeit):**
+
+1. `ClockDelegate.updateTimeAndDate` (Z. 124–141) — wird von
+   `MainActivity.onStart()` sync ohne try/catch aufgerufen. Operationen
+   (`SimpleDateFormat` mit hardcoded Pattern, `Locale.getDefault()`)
+   sind in der Praxis sicher; MainActivity dokumentiert das als „no
+   realistic sync-throw path remains".
+2. `GestureDelegate.onDoubleTapToLock` (Z. 113–135) — wenn `delay()` im
+   Lock-Animation-Pfad gecancelt wird, bleibt `_isLockingInProgress = true`
+   stecken. Aber Cancel passiert nur bei VM-Teardown, wo der ganze
+   State weggeworfen wird → praktisch irrelevant.
+3. `WallpaperDelegate.onEnterWallpaperEditMode` (Z. 340–345) — kein
+   `if (_isWallpaperEditMode.value) return`-Guard. Doppel-Enter
+   überschreibt den Snapshot. Cancel danach würde auf Mid-Edit-State
+   recovern statt Original-Pre-Edit-State. Defensiver Fix wäre eine
+   Zeile, ist aber State-Recovery-Edge-Case ohne Crash-Risiko.
+
+**Ehrlich nicht geprüft (Tiefer-Audit eigener Surfaces):**
+
+- `WallpaperFileManager` — wurde nur als Caller benutzt, nicht das
+  Innere (`copyToInternal`, `deleteFile`, `gcOrphans`, `clearAll`).
+  Das ist die I/O-Boundary für das ganze Wallpaper-System, eigene
+  Audit-Surface.
+- Use-Cases in `:domain/usecase/` — die Delegates rufen sie auf,
+  aber das Innere (Validierung, DataStore-Wiring,
+  Throwable-Pfade) ist nicht Teil dieses Pass.
+- `WallpaperViewBinder` und `WallpaperViewDiff` — werden von
+  HomeFragment konsumiert, nicht von den Delegates direkt. Eigene
+  View-Layer-Surface.
+- `ZoomableImageView.kt` (1468 Zeilen) — bleibt §9.5 Step 1.
+
+**§9.5-Roadmap-Fortschritt nach §9.7:**
+
+- [x] Step 3 (KolibriLauncherApp) — §9.6
+- [x] Step 2 (7 Delegates) — §9.7 (diese Sektion)
+- [ ] Step 1 (ZoomableImageView ~2h)
+- [ ] Step 4 (Robolectric-Smoke-Tests ~3h)
+- [ ] Step 5 (Real-Device-Stress mind. 1h)
+
+Step 2+3 zusammen bringen das Rating auf ~9.2; Step 1 (ZoomableImageView)
+würde es auf 9.3 schieben.
+
 ---
 
 ## Zusammenfassung
