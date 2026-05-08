@@ -269,7 +269,9 @@ ziehen und die Fake-Schule als Default etablieren.
 - Alle 10 ViewModels haben Test-Dateien.
 - Alle 7 Delegates in `ui/main/delegate/` haben Tests.
 - Null `runTest {` ohne `mainDispatcherRule.dispatcher`.
-- Null `advanceUntilIdle()`.
+- ~~Null `advanceUntilIdle()`.~~ Falsch — siehe §8.11 (640 Vorkommen über
+  21 Files; gemeint war wahrscheinlich „kein `advanceUntilIdle` gegen
+  `WhileSubscribed`-Flows").
 - Null Mockito-Imports — Migration vollständig.
 - Null `@Ignore`, null `TODO()` in Test-Funktionen.
 - `androidTest/` ist leer (historisch, dokumentiert).
@@ -280,14 +282,17 @@ ziehen und die Fake-Schule als Default etablieren.
 
 ## 4. Error-Handling, Security, Privacy
 
-### 4.1 🟡 MINOR — PII-Log: Paketnamen in Debug
+### 4.1 ✅ Erledigt — PII-Log: Paketnamen in Debug
 
-`KolibriLauncherApp.kt` Bereich `PackageUpdateReceiver` — Zeile ~59 loggt
-`"package: $packageName"` bei `PACKAGE_ADDED/REMOVED`. Nur `.d()`-Level,
-also nur bei aktivem Debug-Logging sichtbar. Aber Paketnamen aller User-Apps
-sind potenziell PII (z. B. `com.gambling.bigwin`, `com.affair.app`).
+`PackageUpdateReceiver.kt:66-67` hasht den Paketnamen via
+`packageName.hashCode().toString(16)`, statt ihn im Klartext zu loggen.
+Begründung steht im Kommentar darüber. Siehe §8.11.
 
-**Fix:** Tag mit `BuildConfig.DEBUG`-Guard oder Hash statt Klartext.
+> Original-Befund: `KolibriLauncherApp.kt` Bereich `PackageUpdateReceiver` —
+> Zeile ~59 loggte `"package: $packageName"` bei `PACKAGE_ADDED/REMOVED`.
+> Nur `.d()`-Level, aber Paketnamen aller User-Apps sind potenziell PII
+> (z. B. `com.gambling.bigwin`, `com.affair.app`). Fix-Vorschlag war
+> `BuildConfig.DEBUG`-Guard oder Hash statt Klartext — Hash wurde umgesetzt.
 
 ---
 
@@ -400,8 +405,10 @@ vielen `DO NOT…`-Pinnings übersichtlicher machen.
 
 ### 5.8 ✅ Keine Funde
 
-- **String-Parität EN/DE** — 237/236 Keys, einziger Unterschied
-  `time_placeholder` (`translatable="false"`). Vollständig lokalisiert.
+- **String-Parität EN/DE** — ~~237/236 Keys, einziger Unterschied
+  `time_placeholder`~~. Aktualisiert per §8.11: 246 EN / 232 DE; alle 14
+  Differenzen sind `translatable="false"` (`battery_placeholder` + 13
+  `blend_mode_*`). Vollständig lokalisiert.
 - **Hardcoded UI-Strings in Code** — null gefunden.
 - **Material-3-Compliance** — `Theme.Material3.DynamicColors.DayNight`,
   Splash-Screen-API, Edge-to-Edge alles korrekt.
@@ -422,9 +429,9 @@ vielen `DO NOT…`-Pinnings übersichtlicher machen.
 
 | # | Aufwand | Wert | Aktion |
 |---|---|---|---|
-| 1 | 5 min | hoch | CLAUDE.md Rule 1 + Rule 2 von „XyzManager" auf „XyzRepositoryImpl" aktualisieren (§ 1.1) |
-| 2 | 2 min | mittel | `AppUsageRepositoryImpl.kt:171-173` Kommentar ins Englische (§ 1.2) |
-| 3 | 1 min | klein | `app/src/main/res/drawable/ic_center_focus.xml` löschen (§ 5.3) |
+| 1 | ~~5 min~~ | hoch | ~~CLAUDE.md Rule 1 + Rule 2 von „XyzManager" auf „XyzRepositoryImpl" aktualisieren~~ — erledigt vor 2026-05-07 (§ 1.1) |
+| 2 | ~~2 min~~ | mittel | ~~`AppUsageRepositoryImpl.kt:171-173` Kommentar ins Englische~~ — erledigt vor 2026-05-07 (§ 1.2) |
+| 3 | ~~1 min~~ | klein | ~~`app/src/main/res/drawable/ic_center_focus.xml` löschen~~ — erledigt vor 2026-05-07 (§ 5.3) |
 | 4 | ~~30 min~~ | mittel | ~~Mechanischer Sweep `repeatOnLifecycle` → `collectOnStarted`~~ — erledigt 2026-05-04 (§ 2.1) |
 | 5 | 1 h | hoch | Tests für `ContextMenuHelper` + `ScrollViewBorderDecorator` schreiben oder einbetten (§ 3.1) |
 | 6 | 1 h | mittel | ADR-KDoc in `ShortcutRepository`/`ResetRepository`/`UsageExportRepository` ODER Contract nachziehen (§ 1.3) |
@@ -699,7 +706,9 @@ zurückkehren (kürzer).
 ### 8.11 Korrekturen am bestehenden Audit
 
 Bei der Verifikation der eigenen Findings sind drei Drifts im Original-
-Audit aufgefallen:
+Audit aufgefallen. Alle drei sind inzwischen in den Original-Sektionen
+inline markiert (§3.4 strikethrough mit Korrektur, §4.1 als „Erledigt"
+umgeschrieben, §5.8 mit aktualisierter Zahl).
 
 **§3.4 „Null `advanceUntilIdle()`":** Faktisch falsch. Aktueller Stand:
 **640 Vorkommen über 21 Files** in `app/src/test/` allein
@@ -723,13 +732,13 @@ das Framing „einzige Differenz" ist veraltet.
 
 | # | Schritt | Aufwand | Begründung |
 |---|---|---|---|
-| 1 | §8.2 Test-Fix `MutableSharedFlow` | ~15 min | Latente Flake-Quelle, isoliert, eine Konstruktor-Argument-Änderung pro Site |
-| 2 | §8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1) | ~5 min | Doku-Refresh ohne Code-Änderung; verhindert dass folgende Audits die alten Behauptungen erben |
-| 3 | §8.6 + §8.10 + §8.9 Cleanup-Sammel-Branch | ~10 min | Tote `UsageExport.kt`-Datei, auskommentierte Klassendeklaration in `AppDrawerFragment`, dead Cancellation-Branches in `BaseViewModel.handleError`. Alle drei trivial und punktuell. |
+| 1 | ~~§8.2 Test-Fix `MutableSharedFlow`~~ | ~15 min | erledigt 2026-05-08 — alle 6 Sites auf `extraBufferCapacity = 1` (matcht Production-Wiring `di/AppUpdateModule.kt:18`) |
+| 2 | ~~§8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1)~~ | ~5 min | erledigt 2026-05-08 — Inline-Strikethrough/Erledigt-Marker in den jeweiligen Original-Sektionen |
+| 3 | ~~§8.6 + §8.10~~ + §8.9 Cleanup-Sammel-Branch | ~10 min | erledigt 2026-05-08 für §8.6 (`UsageExport.kt` weg) und §8.10 (auskommentierte Klassendeklaration weg). §8.9 zurückgezogen — siehe Sektion. |
 | 4 | §8.1 Delegate `launchSafe`-Overload | ~30 min | Boilerplate-Konsolidierung ~20 Zeilen; nur die `error_generic`-Sites fold-bar, feature-spezifische Toasts bleiben inline |
 | 5 | §8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported` | ~30 min | Strukturelle Änderung (`errorEvent: E?` statt Cast-Catch); Touch auf alle Subklassen |
 | 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
-| 7 | §8.8 `:data` `buildConfig = false` | ~10 min | Build-Konfig + `Timber.d`-Branch über `TimberWrapper.isDebugBuild` ersetzen |
+| 7 | ~~§8.8 `:data` `buildConfig = false`~~ | ~10 min | erledigt 2026-05-08 — `BuildConfig.DEBUG` durch `TimberWrapper.isDebugBuild` ersetzt, `buildFeatures.buildConfig` aus `data/build.gradle.kts` entfernt |
 | 8 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
 
 §8.5 zurückgezogen (siehe Sektion). Reihenfolge optimiert für Risiko-Profil
