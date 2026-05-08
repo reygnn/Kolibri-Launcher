@@ -353,23 +353,27 @@ der Read ist klein, passiert einmal kalt-startend. Dokumentiert.
 
 ## 5. Ressourcen, Localization, Build, Dependencies
 
-### 5.1 🟡 MINOR — Hardcoded `dp`/`sp` in `fragment_home.xml`
+### 5.1 ✅ Erledigt — Hardcoded `dp`/`sp` in `fragment_home.xml`
 
-Zeilen ~139, 142, 144–146: `48dp`, `14sp`, `16dp`, `12dp` direkt im Layout
-statt `@dimen/`. Erschwert Theme-Anpassung und Layout-Customization
-(die App hat dafür sogar einen eigenen Customization-Dialog!).
+Die im Audit benannte TextView (`wallpaperEditHint`, Z. 136–148)
+nutzt heute durchgängig `@dimen/`-Refs: `spacing_xlarge`,
+`text_size_hint`, `spacing_large`, `spacing_medium`, `elevation_card`.
 
-**Fix:** In `app/src/main/res/values/dimens.xml` heben.
+> Original-Befund: Z. ~139, 142, 144–146 hatten `48dp`, `14sp`, `16dp`,
+> `12dp` direkt im Layout statt `@dimen/`. Fix-Vorschlag „in dimens.xml
+> heben" wurde umgesetzt.
 
 ---
 
-### 5.2 🟡 MINOR — `@android:color/white` 16+ Mal in Layouts
+### 5.2 ✅ Erledigt — `@android:color/white` in Layouts
 
-`fragment_home.xml`, `item_app_drawer.xml` u. a. nutzen
-`@android:color/white` direkt. Eine eigene `@color/icon_tint_default` (oder
-über Theme-Attribute) wäre Dark-Mode-zukunftssicherer. (Aktuell ist Dark Mode
-kein Feature, aber das Material-3-Theme nutzt `DynamicColors.DayNight` —
-Halbweg-Konsistenz wäre sauber.)
+`grep "@android:color/white" app/src/main/res/layout/` → 0 Treffer.
+Vollständig migriert.
+
+> Original-Befund: 16+ Vorkommen in `fragment_home.xml`,
+> `item_app_drawer.xml` u. a. Fix-Vorschlag war ein eigenes
+> `@color/icon_tint_default` (oder Theme-Attribute) für Dark-Mode-
+> Zukunftssicherheit; entsprechend abgelöst.
 
 ---
 
@@ -393,12 +397,18 @@ müsste mit dem Pinning kompatibel sein, vorher prüfen.
 
 ---
 
-### 5.5 🟡 MINOR — `android:configChanges`-Suppression auf 2 Activities
+### 5.5 ✅ Erledigt — `android:configChanges`-Suppression auf 2 Activities
 
-`AndroidManifest.xml` Zeilen 54 & 92: `android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"`
-unterdrückt Activity-Recreation. Wenn beabsichtigt (z. B. eigenes Rotation-
-Handling im Wallpaper-Edit-Modus), Kommentar hinzufügen; sonst entfernen
-und Lifecycle-States nutzen.
+Beide Activities (`MainActivity` Z. 55–67, `SettingsActivity` Z. 109–115
+in `AndroidManifest.xml`) haben heute mehrzeilige Erklär-Blöcke direkt
+über der `<activity>`-Deklaration plus `tools:ignore="DiscouragedApi"`.
+MainActivity verweist auf `HomeFragment.onConfigurationChanged()`
+(Z. 429) als manuellen Rotation-Handler; SettingsActivity erklärt das
+PreferenceFragmentCompat-spezifische Argument.
+
+> Original-Befund: Beide Activities unterdrückten Activity-Recreation
+> ohne Kommentar. Fix-Vorschlag „beabsichtigt → Kommentar; sonst
+> entfernen" wurde mit dem ersten Pfad umgesetzt.
 
 ---
 
