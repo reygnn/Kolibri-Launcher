@@ -109,6 +109,12 @@ abstract class BaseViewModel<E>(
      * type is one the user can't act on (cancellation, OOM, stack
      * overflow). Override `showErrorToastIfSupported` in child
      * ViewModels where `E` is not `UiEvent`.
+     *
+     * Handles `CancellationException` defensively even though the
+     * in-class callers (launchSafe, executeSafe, coroutineExceptionHandler)
+     * all filter it first: this is `protected open`, so subclasses and
+     * tests may invoke it directly with any Throwable. Same rationale
+     * for the matching branch in `shouldSuppressErrorToast`.
      */
     protected open fun handleError(throwable: Throwable, context: String) {
         when (throwable) {
