@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
@@ -86,6 +87,7 @@ class BackupDataAssembler @Inject constructor(
         val verticalPaddingScale = settingsRepository.verticalPaddingStateFlow.first()
         val isFontBold = settingsRepository.isFontBoldStateFlow.first()
         val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
+        val favoritesAlignment = settingsRepository.favoritesAlignmentFlow.first()
 
         val wallpaperState = wallpaperRepository.getWallpaperStateSync()
 
@@ -132,6 +134,7 @@ class BackupDataAssembler @Inject constructor(
             verticalPaddingScale = verticalPaddingScale,
             isFontBold = isFontBold,
             contentTopMarginScale = contentTopMarginScale,
+            favoritesAlignment = favoritesAlignment.name,
             chipBackgroundColor = chipBackgroundColor,
             textShadowEnabled = textShadowEnabled,
             wallpaperUri = wallpaperUri,
@@ -299,6 +302,20 @@ class BackupDataAssembler @Inject constructor(
             }
             backup.settings.contentTopMarginScale?.let {
                 settingsRepository.setContentTopMarginScale(it.coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX))
+            }
+
+            backup.settings.favoritesAlignment?.let { name ->
+                try {
+                    settingsRepository.setFavoritesAlignment(FavoritesAlignment.valueOf(name))
+                } catch (e: IllegalArgumentException) {
+                    // Skip-on-invalid: keep the user's current alignment when
+                    // the backup carries an unknown enum name (hand-edited or
+                    // produced by a newer build than the importer knows). The
+                    // SettingsRepositoryImpl read path has the same fallback,
+                    // but persisting the unknown name would leave DataStore in
+                    // a state only the read-side fallback rescues.
+                    Timber.w(e, "Unknown favoritesAlignment in backup: $name — keeping current value")
+                }
             }
 
             // Reset only the DataStore state — files are overwritten by

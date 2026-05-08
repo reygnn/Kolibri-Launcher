@@ -1709,87 +1709,38 @@ Was gelandet ist:
 AVD-verifiziert (manuell): Default = Left, Center / Right
 live-rendern, force-stop-Persistenz, Reset-Button.
 
-### Phase 2 — Backup-Schema-Erweiterung — offen
+### Phase 2 — Backup-Schema-Erweiterung — ✅ erledigt 2026-05-08
 
-Backup-Round-Trip muss `favoritesAlignment` mitnehmen, damit ein
-`Werks-Reset → Restore`-Flow die User-Wahl nicht verliert. Phase 1
-hat das bewusst ausgespart, weil das Feature eigenständig
-funktionsfähig sein soll.
+Was gelandet ist:
 
-**Sektion-Entscheidung (bereits getroffen, vorab aufschreiben):**
-`favoritesAlignment` gehört in **`importThemeSettings`** (Phase 7
-in `BackupDataAssembler.performImport`). Begründung: Die anderen
-visuellen Layout-Settings — `isFontBold`, `layoutScale`,
-`verticalPaddingScale`, `contentTopMarginScale`, `textColor`,
-`chipBackgroundColor`, `textShadowEnabled` — sind alle dort
-gruppiert (siehe `BackupDataAssembler.kt:288-310`). Eigene
-Sektion wäre Bloat; `qualityOfLife` gruppiert Verhalten, nicht
-Optik.
+- `LauncherSettings.favoritesAlignment: String? = null` mit
+  `@JsonNames("favorites_alignment")` (camelCase-Write,
+  snake_case-Forward-Compat-Read).
+- `BackupDataAssembler.buildBackupData` schreibt
+  `settingsRepository.favoritesAlignmentFlow.first().name`.
+- `BackupDataAssembler.performImport` Phase 7 setzt das Feld via
+  `?.let { name -> try valueOf catch IllegalArgumentException →
+  Timber.w }`. Skip-on-invalid bewahrt den User-Wert bei
+  hand-edited oder Future-Version-Backups (DataStore bleibt sauber,
+  statt sich auf den Read-Side-Fallback in
+  `SettingsRepositoryImpl:263-272` zu verlassen).
+- `BackupSerializer`: `validateJsonTypes` (stringFields ergänzt um
+  beide Namensformen), `mergeWithStrictValues` + `parseStrictly`
+  mit `?:`-chain für camelCase + snake_case, `buildPreview.hasThemeSettings`
+  inkl. `favoritesAlignment != null`.
+- JVM-Tests in `BackupRepositoryImplLogicTest`: Export enthält
+  `"favoritesAlignment": "CENTER"`, Import-Roundtrip CENTER/END,
+  Backward-Compat (Legacy-JSON ohne Feld lässt User-Wert),
+  Skip-on-invalid (`"DIAGONAL_FROM_LEFT"` → User-Wert bleibt),
+  Gating durch `importThemeSettings = false`, snake_case-Read via
+  `@JsonNames`.
+- `BackupRoundTripSafTest` (androidTest) erweitert um Set
+  `CENTER` → wipe auf `START` → Restore → Assert `CENTER`.
 
-**Entry-Points (alle 6 Files an einem Ort):**
-
-1. `:data/BackupSerializer.kt` — JSON-Schema-Definition.
-   Neues optionales Feld in der Theme-Settings-Section
-   (z.B. `favoritesAlignment: String?`). Format: Enum-Name
-   wie alle anderen Sealed-Enum-Persistierungen. Beispiel-
-   Anker: `WallpaperState.layers[].blendMode` ist auch ein
-   Sealed-Enum-as-String.
-2. `:data/BackupDataAssembler.kt:288` (Phase 7
-   `importThemeSettings`) — neue Zeile analog zu
-   `backup.settings.isFontBold?.let { settingsRepository.setFontBold(it) }`:
-   `backup.settings.favoritesAlignment?.let { name -> ... }`.
-   Dazwischen: String → `FavoritesAlignment.valueOf` mit
-   try/catch (siehe `SettingsRepositoryImpl:280-289` für die
-   bestehende Parse-Fallback-Form).
-3. `:data/BackupRepositoryImpl.kt` — `exportToJson` /
-   `importFromJson` müssen das neue Feld lesen/schreiben.
-   `BackupSerializer` macht das automatisch wenn das Feld in
-   der Datenklasse hinzugefügt wird; nur prüfen.
-4. `app/src/main/res/layout/dialog_import_options.xml` +
-   `:app/ui/backup/ImportOptionsUiState.kt` +
-   `BackupFragment.kt` — die Theme-Settings-Checkbox
-   (`checkboxImportThemeSettings`) deckt Alignment automatisch
-   mit ab. **Keine** neue Checkbox nötig — ein-zu-eins-Mapping
-   zur Sektion.
-5. `BackupPreview` (in `:domain/model`) — wenn das Modell ein
-   `themeSettingsCount` o.ä. zählt, das auch erhöhen. Sonst
-   nichts zu tun.
-6. Test: `app/src/androidTest/data/BackupRoundTripSafTest.kt` —
-   nach existierendem Pattern um `favoritesAlignment` erweitern.
-   Set non-default → export → restore → assert non-default
-   ankommt. Der Test hat `instrumented`-Status, weil er reale
-   SAF-URIs braucht.
-
-**Backward-Compatibility-Invariante (load-bearing):**
-
-Ein altes Backup, vor Phase 1 erstellt, hat **kein**
-`favoritesAlignment`-Feld in der JSON. Beim Import:
-
-- Kotlin/Json ignoriert unbekannte Felder beim Schreiben (kein
-  Problem) und liefert `null` für fehlende beim Lesen.
-- `BackupDataAssembler.performImport` Phase 7 muss das
-  `?.let { ... }` (siehe Punkt 2) verwenden — dann wird das Feld
-  einfach nicht gesetzt und die DataStore-Default-Logik
-  (`SettingsRepositoryImpl.favoritesAlignmentFlow` defaultet auf
-  `START`) greift transparent.
-
-Kurz: solange das `?.let` korrekt ist, ist Backward-Compat
-geschenkt. Test, der das pinnt: ein synthetisches altes Backup
-(JSON ohne das Feld) muss importbar sein und `favoritesAlignment`
-auf `START` lassen — gehört in den Round-Trip-Test als zweiter
-Case.
-
-**Forward-Compatibility:** ein Phase-2-Backup, das auf einer
-Phase-1-only-Version (oder noch älter) restored wird, muss auch
-funktionieren — Schema-Versioning in `BackupSerializer`
-(`BackupConstants.BACKUP_VERSION`) muss prüfen, ob ein Bump nötig
-ist. Üblicherweise NICHT, weil neue **optionale** Felder ohne
-Bump funktionieren. Im Zweifel: bestehendes Pattern aus dem
-letzten Schema-Add-Field-Commit ansehen.
-
-**Aufwand:** ~1.5–2h. Bulk ist der Round-Trip-Test inkl. dem
-Backward-Compat-Case. UI-Code: nichts (Theme-Settings-Checkbox
-deckt es automatisch ab).
+Backward-Compat ist durch das `?.let` und den Read-Side-Default
+abgedeckt (Test pinnt das). Forward-Compat: kein `BACKUP_VERSION`-
+Bump nötig, weil neues optionales Feld; `ignoreUnknownKeys = true`
+trägt's.
 
 ---
 

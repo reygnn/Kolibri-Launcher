@@ -6,6 +6,7 @@ import io.mockk.mockk
 import android.content.ContentResolver
 import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.*
@@ -266,6 +267,157 @@ class BackupRepositoryImplLogicTest {
 
         // Theme sollte aktualisiert sein (-1)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-1)
+    }
+
+    // ========================================================================
+    // TEST 4: FAVORITES ALIGNMENT (Phase 2 of TODO §21)
+    // ========================================================================
+
+    @Test
+    fun `exportToJson - includes favoritesAlignment as enum name`() = runTest {
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.CENTER
+
+        val jsonString = backupManager.exportToJson()
+
+        assertThat(jsonString).contains("\"favoritesAlignment\": \"CENTER\"")
+    }
+
+    @Test
+    fun `importFromJson - applies favoritesAlignment when present`() = runTest {
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.START
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoritesAlignment": "END",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
+            .isEqualTo(FavoritesAlignment.END)
+    }
+
+    @Test
+    fun `importFromJson - legacy backup without favoritesAlignment leaves current value`() = runTest {
+        // Simulates a backup JSON produced before Phase 2 — the field is
+        // simply absent. The `?.let` in BackupDataAssembler Phase 7 must
+        // skip the setter so the user's current alignment survives the
+        // restore. SettingsRepositoryImpl's read-side default-fallback
+        // would mask a wrong setter call here, so we pre-seed CENTER and
+        // assert it stays CENTER.
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.CENTER
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
+            .isEqualTo(FavoritesAlignment.CENTER)
+    }
+
+    @Test
+    fun `importFromJson - unknown favoritesAlignment is skipped, current value kept`() = runTest {
+        // Hand-edited or future-version backup carries a name the importer
+        // doesn't recognise. Skip-on-invalid: the current value survives,
+        // no crash, no Success-degradation.
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.END
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoritesAlignment": "DIAGONAL_FROM_LEFT",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
+            .isEqualTo(FavoritesAlignment.END)
+    }
+
+    @Test
+    fun `importFromJson - favoritesAlignment ignored when importThemeSettings is false`() = runTest {
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.START
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoritesAlignment": "END",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = false)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
+            .isEqualTo(FavoritesAlignment.START)
+    }
+
+    @Test
+    fun `importFromJson - snake_case favorites_alignment is accepted via JsonNames`() = runTest {
+        // @JsonNames("favorites_alignment") on LauncherSettings gives the
+        // forward-compat alternate read path. Belt-and-braces: the strict-
+        // path fallback in BackupSerializer also accepts the snake_case
+        // form, but the kotlinx-pass should already catch this case before
+        // strict ever runs.
+        fakeSettingsRepo.favoritesAlignment = FavoritesAlignment.START
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favorites_alignment": "CENTER",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
+            .isEqualTo(FavoritesAlignment.CENTER)
     }
 
     // --- Helper ---

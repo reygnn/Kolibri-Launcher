@@ -116,6 +116,15 @@ data class LauncherSettings(
     @JsonNames("top_margin_scale")
     val contentTopMarginScale: Float? = null,
 
+    /**
+     * Persisted as the [FavoritesAlignment] enum's `name` string
+     * (`"START"` / `"CENTER"` / `"END"`). Optional — legacy backups
+     * created before this field existed deserialize as `null` and the
+     * import path leaves the user's current value untouched.
+     */
+    @JsonNames("favorites_alignment")
+    val favoritesAlignment: String? = null,
+
     // --- Wallpaper Single-Layer (Backward Compat) ---
 
     @JsonNames("wallpaper_uri")

@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
@@ -100,6 +101,9 @@ class BackupRoundTripSafTest {
         // we set here. doubleTapToLock falls under importQualityOfLife,
         // which defaults to true in ImportOptions().
         settings.setDoubleTapToLock(true)
+        // favoritesAlignment rides under importThemeSettings (Phase 7).
+        // Default is START; we pick a non-default to make restore visible.
+        settings.setFavoritesAlignment(FavoritesAlignment.CENTER)
 
         val uri = backupFile.toUri().toString()
 
@@ -114,6 +118,7 @@ class BackupRoundTripSafTest {
         hidden.purgeRepository()
         customNames.purgeRepository()
         settings.setDoubleTapToLock(false)
+        settings.setFavoritesAlignment(FavoritesAlignment.START)
 
         assertThat(favorites.favoriteComponentsFlow.first()).isEmpty()
 
@@ -128,6 +133,7 @@ class BackupRoundTripSafTest {
         assertThat(hidden.hiddenAppsFlow.first()).contains(componentB)
         assertThat(customNames.getAllCustomNames()[packageA]).isEqualTo("α")
         assertThat(settings.doubleTapToLockEnabledFlow.first()).isTrue()
+        assertThat(settings.favoritesAlignmentFlow.first()).isEqualTo(FavoritesAlignment.CENTER)
     }
 
     @Test
