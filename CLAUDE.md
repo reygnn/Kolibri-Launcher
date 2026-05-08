@@ -37,6 +37,8 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming)
+./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
 
@@ -344,6 +346,15 @@ activities.
     live in `res/values/strings.xml` + `res/values-de/strings.xml`
     (per the Localization section below) and are unaffected by
     this rule.
+
+    Enforced by `./gradlew checkRule13` — a git-diff-aware linter
+    (`tools/check-rule13-german-comments.{sh,awk}`) that flags `+`
+    lines containing umlauts or ≥2 high-precision German function
+    words. Default base is `origin/main`, override with
+    `CHECK_BASE=<ref>`. The historical post-Rule-13 sweep ran
+    against `a65a6b2` (2026-05-01, the rule's introduction commit)
+    and left the codebase clean from that cutoff forward; anything
+    earlier is grandfathered legacy.
 
 ---
 
