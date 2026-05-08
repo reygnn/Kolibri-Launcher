@@ -4,6 +4,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -262,6 +263,8 @@ class FakeSettingsRepository : SettingsRepository {
 
         secureWindow = AppConstants.DEFAULT_SECURE_WINDOW
 
+        favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+
         onboardingCompletedState.value = wasOnboardingCompleted
     }
 
@@ -294,5 +297,19 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setRotationLocked(isEnabled: Boolean) {
         rotationLocked = isEnabled
+    }
+
+    // favoritesAlignment
+    private val favoritesAlignmentState =
+        MutableStateFlow(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+
+    var favoritesAlignment: FavoritesAlignment
+        get() = favoritesAlignmentState.value
+        set(value) { favoritesAlignmentState.value = value }
+
+    override val favoritesAlignmentFlow: Flow<FavoritesAlignment> = favoritesAlignmentState
+
+    override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) {
+        favoritesAlignment = alignment
     }
 }

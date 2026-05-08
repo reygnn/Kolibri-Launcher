@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -79,6 +80,26 @@ class SettingsRepositoryImplTest {
 
         val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
         Assert.assertEquals(SortOrder.ALPHABETICAL.name, savedValue)
+    }
+
+    private val FAVORITES_ALIGNMENT_KEY = stringPreferencesKey("favorites_alignment")
+
+    @Test
+    fun `favoritesAlignmentFlow - when invalid value is stored - returns default`() = runTest {
+        fakeDataStore.edit { it[FAVORITES_ALIGNMENT_KEY] = "INVALID_ALIGNMENT_VALUE" }
+
+        Assert.assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            settingsManager.favoritesAlignmentFlow.first(),
+        )
+    }
+
+    @Test
+    fun `setFavoritesAlignment - correctly saves the enum name`() = runTest {
+        settingsManager.setFavoritesAlignment(FavoritesAlignment.CENTER)
+
+        val savedValue = fakeDataStore.data.first()[FAVORITES_ALIGNMENT_KEY]
+        Assert.assertEquals(FavoritesAlignment.CENTER.name, savedValue)
     }
 
     @Test

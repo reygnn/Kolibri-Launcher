@@ -1,8 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
@@ -42,6 +44,7 @@ class LayoutDelegateTest {
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
+    private lateinit var setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase
 
     @Before
     fun setUp() {
@@ -52,12 +55,14 @@ class LayoutDelegateTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         setLayoutScaleUseCase = mockk(relaxed = true)
         setVerticalPaddingUseCase = mockk(relaxed = true)
         setFontBoldUseCase = mockk(relaxed = true)
         setContentTopMarginUseCase = mockk(relaxed = true)
+        setFavoritesAlignmentUseCase = mockk(relaxed = true)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -74,6 +79,7 @@ class LayoutDelegateTest {
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
         setContentTopMarginUseCase = setContentTopMarginUseCase,
+        setFavoritesAlignmentUseCase = setFavoritesAlignmentUseCase,
         scope = createDelegateScope()
     )
 
@@ -113,6 +119,57 @@ class LayoutDelegateTest {
         assertEquals(0f, delegate.contentTopMarginState.value)
     }
 
+    @Test
+    fun `favoritesAlignmentState starts with default value`() = runTest {
+        val delegate = createDelegate()
+        advanceUntilIdle()
+
+        assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            delegate.favoritesAlignmentState.value,
+        )
+    }
+
+    @Test
+    fun `favoritesAlignmentState reflects flow updates`() = runTest {
+        val alignmentFlow = MutableStateFlow(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        val useCase: GetLayoutSettingsUseCase = mockk {
+            every { layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
+            every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+            every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
+            every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns alignmentFlow
+        }
+
+        val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
+        advanceUntilIdle()
+
+        alignmentFlow.value = FavoritesAlignment.CENTER
+        advanceUntilIdle()
+        assertEquals(FavoritesAlignment.CENTER, delegate.favoritesAlignmentState.value)
+    }
+
+    @Test
+    fun `favoritesAlignmentState falls back to default on error`() = runTest {
+        val useCase: GetLayoutSettingsUseCase = mockk {
+            every { layoutScale } returns flowOf(AppConstants.DEFAULT_LAYOUT_SCALE)
+            every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+            every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
+            every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flow<FavoritesAlignment> {
+                throw RuntimeException("DB error")
+            }
+        }
+
+        val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
+        advanceUntilIdle()
+
+        assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            delegate.favoritesAlignmentState.value,
+        )
+    }
+
     // ===========================================
     // OBSERVED STATE UPDATES
     // ===========================================
@@ -125,6 +182,7 @@ class LayoutDelegateTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
@@ -146,6 +204,7 @@ class LayoutDelegateTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
@@ -290,6 +349,20 @@ class LayoutDelegateTest {
     }
 
     // ===========================================
+    // SET FAVORITES ALIGNMENT
+    // ===========================================
+
+    @Test
+    fun `onSetFavoritesAlignment calls useCase with selected value`() = runTest {
+        val delegate = createDelegate()
+
+        delegate.onSetFavoritesAlignment(FavoritesAlignment.END)
+        advanceUntilIdle()
+
+        coVerify { setFavoritesAlignmentUseCase.invoke(FavoritesAlignment.END) }
+    }
+
+    // ===========================================
     // RESET LAYOUT SETTINGS
     // ===========================================
 
@@ -304,6 +377,7 @@ class LayoutDelegateTest {
         coVerify { setVerticalPaddingUseCase.invoke(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR) }
         coVerify { setFontBoldUseCase.invoke(AppConstants.DEFAULT_FONT_BOLD) }
         coVerify { setContentTopMarginUseCase.invoke(AppConstants.DEFAULT_TOP_MARGIN) }
+        coVerify { setFavoritesAlignmentUseCase.invoke(AppConstants.DEFAULT_FAVORITES_ALIGNMENT) }
     }
 
     @Test

@@ -48,6 +48,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
@@ -194,6 +195,7 @@ class MonolithicLauncherViewModelTest {
     private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase = mockk(relaxed = true)
     private val setFontBoldUseCase: SetFontBoldUseCase = mockk(relaxed = true)
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase = mockk(relaxed = true)
+    private val setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase = mockk(relaxed = true)
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -222,6 +224,7 @@ class MonolithicLauncherViewModelTest {
         every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         every { getLayoutSettingsUseCase.isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
         every { getLayoutSettingsUseCase.contentTopMargin } returns flowOf(0f)
+        every { getLayoutSettingsUseCase.favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
 
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
 
@@ -260,6 +263,7 @@ class MonolithicLauncherViewModelTest {
             setVerticalPaddingUseCase,
             setFontBoldUseCase,
             setContentTopMarginUseCase,
+            setFavoritesAlignmentUseCase,
             observeWallpaperStateUseCase,
             saveWallpaperStateUseCase,
             setWallpaperImageUseCase,

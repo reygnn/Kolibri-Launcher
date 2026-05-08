@@ -63,6 +63,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -204,6 +205,7 @@ class LauncherViewModelContractTest {
             every { verticalPadding } returns verticalPaddingFlow
             every { isFontBold } returns fontBoldFlow
             every { contentTopMargin } returns contentTopMarginFlow
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         val appUpdateSignal: AppUpdateSignal = mockk {
@@ -243,6 +245,7 @@ class LauncherViewModelContractTest {
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
+            setFavoritesAlignmentUseCase = mockk(relaxed = true),
             observeWallpaperStateUseCase = observeWallpaperStateUseCase,
             saveWallpaperStateUseCase = saveWallpaperStateUseCase,
             setWallpaperImageUseCase = setWallpaperImageUseCase,

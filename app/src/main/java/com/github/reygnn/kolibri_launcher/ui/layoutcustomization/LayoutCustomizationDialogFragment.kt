@@ -14,9 +14,11 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -87,6 +89,9 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
 
                 // Switch Listener nullen
                 binding.switchBoldText.setOnCheckedChangeListener(null)
+
+                // Toggle group listener entfernen
+                binding.toggleFavoritesAlignment.clearOnButtonCheckedListeners()
             }
 
             _binding = null
@@ -163,7 +168,22 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             }
         }
 
-        // 5. Reset Button
+        // 5. Favorites alignment toggle group. The listener fires on every
+        // selection change (not just user-initiated), so we filter via
+        // `isChecked` + compare against the current ViewModel value to
+        // avoid an emit-loop when programmatic selection from the
+        // observer below sets the toggle to match what's already there.
+        binding.toggleFavoritesAlignment.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            safeRun("toggleFavoritesAlignment.onChange") {
+                val alignment = checkedIdToAlignment(checkedId) ?: return@safeRun
+                if (alignment != viewModel.favoritesAlignmentState.value) {
+                    viewModel.onSetFavoritesAlignment(alignment)
+                }
+            }
+        }
+
+        // 6. Reset Button
         binding.btnReset.setOnClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
             safeRun("btnReset.onClick") {
@@ -249,6 +269,32 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             }
         }
 
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.favoritesAlignment") {
+            viewModel.favoritesAlignmentState.collectLatest { alignment ->
+                safeRun("apply.favoritesAlignment") {
+                    val checkedId = alignmentToCheckedId(alignment)
+                    if (binding.toggleFavoritesAlignment.checkedButtonId != checkedId) {
+                        binding.toggleFavoritesAlignment.check(checkedId)
+                    }
+                }
+            }
+        }
+
+    }
+
+    // ==================== Alignment Toggle Mapping ====================
+
+    private fun checkedIdToAlignment(checkedId: Int): FavoritesAlignment? = when (checkedId) {
+        R.id.btn_alignment_start -> FavoritesAlignment.START
+        R.id.btn_alignment_center -> FavoritesAlignment.CENTER
+        R.id.btn_alignment_end -> FavoritesAlignment.END
+        else -> null
+    }
+
+    private fun alignmentToCheckedId(alignment: FavoritesAlignment): Int = when (alignment) {
+        FavoritesAlignment.START -> R.id.btn_alignment_start
+        FavoritesAlignment.CENTER -> R.id.btn_alignment_center
+        FavoritesAlignment.END -> R.id.btn_alignment_end
     }
 
     // ==================== Drag Handling ====================

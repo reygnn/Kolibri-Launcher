@@ -134,6 +134,7 @@ class LauncherViewModelSecurityTest {
             every { verticalPadding } returns flowOf(1.0f)
             every { isFontBold } returns flowOf(false)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         val appUpdateSignal: AppUpdateSignal = mockk {
@@ -169,6 +170,7 @@ class LauncherViewModelSecurityTest {
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
+            setFavoritesAlignmentUseCase = mockk(relaxed = true),
             observeWallpaperStateUseCase = observeWallpaperStateUseCase,
             saveWallpaperStateUseCase = mockk(relaxed = true),
             setWallpaperImageUseCase = mockk(relaxed = true),

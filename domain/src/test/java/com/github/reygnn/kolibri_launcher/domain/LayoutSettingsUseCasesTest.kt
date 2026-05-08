@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
@@ -27,6 +29,7 @@ class LayoutSettingsUseCasesTest {
     private val verticalPaddingFlow = MutableStateFlow(1.0f)
     private val isFontBoldFlow = MutableStateFlow(false)
     private val contentTopMarginFlow = MutableStateFlow(1.0f)
+    private val favoritesAlignmentFlow = MutableStateFlow(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
 
     @Before
     fun setup() {
@@ -36,6 +39,7 @@ class LayoutSettingsUseCasesTest {
         every { repository.verticalPaddingStateFlow } returns verticalPaddingFlow
         every { repository.isFontBoldStateFlow } returns isFontBoldFlow
         every { repository.contentTopMarginScaleFlow } returns contentTopMarginFlow
+        every { repository.favoritesAlignmentFlow } returns favoritesAlignmentFlow
     }
 
     @Test
@@ -46,6 +50,7 @@ class LayoutSettingsUseCasesTest {
         assertSame(verticalPaddingFlow, useCase.verticalPadding)
         assertSame(isFontBoldFlow, useCase.isFontBold)
         assertSame(contentTopMarginFlow, useCase.contentTopMargin)
+        assertSame(favoritesAlignmentFlow, useCase.favoritesAlignment)
     }
 
     @Test
@@ -74,5 +79,12 @@ class LayoutSettingsUseCasesTest {
         val useCase = SetContentTopMarginUseCase(repository)
         useCase(0.8f)
         coVerify { repository.setContentTopMarginScale(0.8f) }
+    }
+
+    @Test
+    fun `SetFavoritesAlignmentUseCase - delegates to repository`() = runTest {
+        val useCase = SetFavoritesAlignmentUseCase(repository)
+        useCase(FavoritesAlignment.CENTER)
+        coVerify { repository.setFavoritesAlignment(FavoritesAlignment.CENTER) }
     }
 }

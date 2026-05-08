@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -108,6 +109,15 @@ abstract class SettingsRepositoryContract {
         assertEquals(AppConstants.DEFAULT_ROTATION_LOCKED, repo.rotationLockedFlow.first())
     }
 
+    @Test
+    fun `fresh repository emits default favoritesAlignment`() = runTest {
+        val repo = createRepository()
+        assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            repo.favoritesAlignmentFlow.first(),
+        )
+    }
+
     // ---------- Roundtrip: Set -> Flow reflects change ----------
 
     @Test
@@ -159,6 +169,15 @@ abstract class SettingsRepositoryContract {
         val flipped = !AppConstants.DEFAULT_ROTATION_LOCKED
         repo.setRotationLocked(flipped)
         assertEquals(flipped, repo.rotationLockedFlow.first())
+    }
+
+    @Test
+    fun `setFavoritesAlignment reflects in flow`() = runTest {
+        val repo = createRepository()
+        val newValue = FavoritesAlignment.entries
+            .first { it != AppConstants.DEFAULT_FAVORITES_ALIGNMENT }
+        repo.setFavoritesAlignment(newValue)
+        assertEquals(newValue, repo.favoritesAlignmentFlow.first())
     }
 
     @Test
@@ -238,6 +257,21 @@ abstract class SettingsRepositoryContract {
         assertEquals(
             AppConstants.DEFAULT_READABILITY_MODE,
             repo.readabilityModeFlow.first()
+        )
+    }
+
+    @Test
+    fun `purgeRepository resets favoritesAlignment to default`() = runTest {
+        val repo = createRepository()
+        val nonDefault = FavoritesAlignment.entries
+            .first { it != AppConstants.DEFAULT_FAVORITES_ALIGNMENT }
+        repo.setFavoritesAlignment(nonDefault)
+
+        repo.purgeRepository()
+
+        assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            repo.favoritesAlignmentFlow.first(),
         )
     }
 

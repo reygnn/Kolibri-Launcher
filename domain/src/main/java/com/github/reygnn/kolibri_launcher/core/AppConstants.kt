@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 
 /**
@@ -49,6 +50,7 @@ object AppConstants {
     const val FALLBACK_VERTICAL_PADDING_PX = 16
     const val FALLBACK_FONT_BOLD = DEFAULT_FONT_BOLD
     val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
+    val DEFAULT_FAVORITES_ALIGNMENT = FavoritesAlignment.START
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"
@@ -166,6 +168,7 @@ object AppConstants {
         const val LAYOUT_SCALE = "layout_scale"
         const val VERTICAL_PADDING_SCALE = "vertical_padding_scale"
         const val CONTENT_TOP_MARGIN_SCALE = "content_top_margin_scale"
+        const val FAVORITES_ALIGNMENT = "favorites_alignment"
         const val ROTATION_LOCKED = "rotation_locked"
 
         // Home Screen Features

@@ -12,8 +12,10 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
@@ -33,6 +35,7 @@ class LayoutDelegate(
     private val setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     private val setFontBoldUseCase: SetFontBoldUseCase,
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase,
+    private val setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase,
     private val scope: DelegateScope
 ) {
 
@@ -82,6 +85,17 @@ class LayoutDelegate(
             initialValue = 0f
         )
 
+    val favoritesAlignmentState: StateFlow<FavoritesAlignment> = getLayoutSettingsUseCase.favoritesAlignment
+        .catch { e ->
+            TimberWrapper.silentError(e, "Error observing favorites alignment")
+            emit(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        }
+        .stateIn(
+            scope = scope.coroutineScope,
+            started = SharingStarted.Eagerly,
+            initialValue = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+        )
+
     // --- Public API: Setters ---
 
     fun onSetLayoutScale(scale: Float) = scope.launchSafe("Error setting layout scale") {
@@ -115,10 +129,16 @@ class LayoutDelegate(
         )
     }
 
+    fun onSetFavoritesAlignment(alignment: FavoritesAlignment) =
+        scope.launchSafe("Error setting favorites alignment") {
+            setFavoritesAlignmentUseCase(alignment)
+        }
+
     fun onResetLayoutSettings() = scope.launchSafe("Error resetting layout settings") {
         setLayoutScaleUseCase(AppConstants.DEFAULT_LAYOUT_SCALE)
         setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
         setContentTopMarginUseCase(AppConstants.DEFAULT_TOP_MARGIN)
+        setFavoritesAlignmentUseCase(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
     }
 }

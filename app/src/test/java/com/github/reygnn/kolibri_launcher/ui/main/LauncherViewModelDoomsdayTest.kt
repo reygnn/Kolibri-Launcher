@@ -113,6 +113,7 @@ class LauncherViewModelDoomsdayTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         recordAppLaunchUseCase = mockk(relaxed = true)
@@ -155,6 +156,7 @@ class LauncherViewModelDoomsdayTest {
         setVerticalPaddingUseCase = mockk(relaxed = true),
         setFontBoldUseCase = mockk(relaxed = true),
         setContentTopMarginUseCase = mockk(relaxed = true),
+        setFavoritesAlignmentUseCase = mockk(relaxed = true),
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = mockk(relaxed = true),
         setWallpaperImageUseCase = mockk(relaxed = true),

@@ -35,6 +35,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
@@ -297,6 +298,7 @@ class HomeFragment : Fragment() {
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
+    private var currentFavoritesAlignment: FavoritesAlignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
     private var currentUserPreferredMarginPx: Int = 0
     private var lastSpacingInput: SpacingInput? = null
 
@@ -396,6 +398,7 @@ class HomeFragment : Fragment() {
             viewModel.isFontBoldState.value
         )
 
+        currentFavoritesAlignment = viewModel.favoritesAlignmentState.value
         applyTopMargin(viewModel.contentTopMarginState.value)
         applyLayoutToExistingViews()
 
@@ -579,6 +582,21 @@ class HomeFragment : Fragment() {
                 config.isBold,
             )
             applyTopMargin(config.marginScale)
+            applyLayoutToExistingViews()
+        }
+
+        // Favorites alignment is observed separately because it does NOT
+        // feed into the LayoutCalculator math (it only re-applies the
+        // adapter styling). Keeping it out of the 4-arg combine above
+        // avoids triggering a recalculateLayoutCache + applyTopMargin
+        // pass on every alignment toggle.
+        collectOnStarted(
+            flow = viewModel.favoritesAlignmentState,
+            errorTag = "favoritesAlignment",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { alignment ->
+            if (_binding == null) return@collectOnStarted
+            currentFavoritesAlignment = alignment
             applyLayoutToExistingViews()
         }
     }
@@ -776,6 +794,7 @@ class HomeFragment : Fragment() {
             isBold = isCurrentFontBold,
             textColor = colors.textColor,
             shadowColor = colors.shadowColor,
+            alignment = currentFavoritesAlignment,
         )
     }
 

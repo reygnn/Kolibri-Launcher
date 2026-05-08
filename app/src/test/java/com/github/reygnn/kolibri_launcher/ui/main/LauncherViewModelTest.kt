@@ -33,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
@@ -110,6 +111,7 @@ class LauncherViewModelTest {
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
+    private lateinit var setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
@@ -174,12 +176,14 @@ class LauncherViewModelTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
+            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         setLayoutScaleUseCase = mockk(relaxed = true)
         setVerticalPaddingUseCase = mockk(relaxed = true)
         setFontBoldUseCase = mockk(relaxed = true)
         setContentTopMarginUseCase = mockk(relaxed = true)
+        setFavoritesAlignmentUseCase = mockk(relaxed = true)
 
         observeWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
@@ -227,6 +231,7 @@ class LauncherViewModelTest {
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
         setContentTopMarginUseCase = setContentTopMarginUseCase,
+        setFavoritesAlignmentUseCase = setFavoritesAlignmentUseCase,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
         setWallpaperImageUseCase = setWallpaperImageUseCase,

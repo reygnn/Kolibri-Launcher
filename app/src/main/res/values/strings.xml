@@ -309,6 +309,10 @@
     <string name="layout_bold_text">Bold Text</string>
     <string name="action_reset">Reset</string>
     <string name="layout_top_margin">Top offset</string>
+    <string name="layout_favorites_alignment">Favorites alignment</string>
+    <string name="layout_favorites_alignment_start">Left</string>
+    <string name="layout_favorites_alignment_center">Center</string>
+    <string name="layout_favorites_alignment_end">Right</string>
     <string name="secure_window_title">Secure Window Mode</string>
 <string name="secure_window_summary">Prevents screenshots and screen recording. Also fixes the issue where an outdated time is briefly displayed when unlocking the device.</string>
 

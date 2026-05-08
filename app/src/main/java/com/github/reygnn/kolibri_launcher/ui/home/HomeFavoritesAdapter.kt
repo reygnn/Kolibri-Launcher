@@ -13,7 +13,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
+import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 
 /**
  * RecyclerView adapter for the home favorites list.
@@ -58,6 +60,7 @@ class HomeFavoritesAdapter(
         val isBold: Boolean,
         val textColor: Int,
         val shadowColor: Int,
+        val alignment: FavoritesAlignment,
     )
 
     private var styling: Styling = INITIAL_STYLING
@@ -71,6 +74,12 @@ class HomeFavoritesAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        // Width = MATCH_PARENT so the button-internal `gravity` controls
+        // the row-level horizontal placement of the text. Earlier versions
+        // used WRAP_CONTENT, which made text alignment a no-op visually
+        // (the button hugged the text and was placed at the row's start by
+        // the LinearLayoutManager). The actual gravity value is set
+        // per-bind from Styling.alignment so it stays a runtime setting.
         val button = Button(parent.context).apply {
             background = null
             includeFontPadding = false
@@ -78,11 +87,10 @@ class HomeFavoritesAdapter(
             minimumHeight = 0
             minWidth = 0
             minimumWidth = 0
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
         }
@@ -101,6 +109,7 @@ class HomeFavoritesAdapter(
                     styling.horizPaddingPx,
                     styling.verticalPaddingPx,
                 )
+                gravity = styling.alignment.toHorizontalGravity() or Gravity.CENTER_VERTICAL
                 typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                 setTextColor(createSubtlePressColor(styling.textColor))
                 setShadowLayer(
@@ -130,6 +139,7 @@ class HomeFavoritesAdapter(
             isBold = AppConstants.FALLBACK_FONT_BOLD,
             textColor = AppConstants.DEFAULT_TEXT_COLOR,
             shadowColor = AppConstants.DEFAULT_TEXT_COLOR,
+            alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
         )
 
         fun createSubtlePressColor(normalColor: Int): ColorStateList {

@@ -24,6 +24,7 @@ import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -50,6 +51,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
@@ -117,6 +119,7 @@ class LauncherViewModel @Inject constructor(
     setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     setFontBoldUseCase: SetFontBoldUseCase,
     setContentTopMarginUseCase: SetContentTopMarginUseCase,
+    setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase,
     observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
     setWallpaperImageUseCase: SetWallpaperImageUseCase,
@@ -194,6 +197,7 @@ class LauncherViewModel @Inject constructor(
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
         setContentTopMarginUseCase = setContentTopMarginUseCase,
+        setFavoritesAlignmentUseCase = setFavoritesAlignmentUseCase,
         scope = delegateScope
     )
 
@@ -245,6 +249,7 @@ class LauncherViewModel @Inject constructor(
     val verticalPaddingState: StateFlow<Float> get() = layoutDelegate.verticalPaddingState
     val isFontBoldState: StateFlow<Boolean> get() = layoutDelegate.isFontBoldState
     val contentTopMarginState: StateFlow<Float> get() = layoutDelegate.contentTopMarginState
+    val favoritesAlignmentState: StateFlow<FavoritesAlignment> get() = layoutDelegate.favoritesAlignmentState
 
     val wallpaperState: StateFlow<WallpaperState> get() = wallpaperDelegate.wallpaperState
     val isWallpaperEditMode: StateFlow<Boolean> get() = wallpaperDelegate.isWallpaperEditMode
@@ -348,6 +353,7 @@ class LauncherViewModel @Inject constructor(
     fun onSetVerticalPadding(factor: Float) = layoutDelegate.onSetVerticalPadding(factor)
     fun onSetFontBold(isBold: Boolean) = layoutDelegate.onSetFontBold(isBold)
     fun onSetContentTopMargin(scale: Float) = layoutDelegate.onSetContentTopMargin(scale)
+    fun onSetFavoritesAlignment(alignment: FavoritesAlignment) = layoutDelegate.onSetFavoritesAlignment(alignment)
     fun onResetLayoutSettings() = layoutDelegate.onResetLayoutSettings()
 
     // ===========================================

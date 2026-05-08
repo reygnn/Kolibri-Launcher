@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.flow.Flow
 
@@ -34,6 +35,9 @@ interface SettingsRepository : Purgeable {
 
     val isFontBoldStateFlow: Flow<Boolean>
     suspend fun setFontBold(isBold: Boolean)
+
+    val favoritesAlignmentFlow: Flow<FavoritesAlignment>
+    suspend fun setFavoritesAlignment(alignment: FavoritesAlignment)
 
 
     val showCalendarEventFlow: Flow<Boolean>
