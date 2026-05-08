@@ -372,10 +372,22 @@ class BackupFragment : Fragment() {
         }
     }
 
+    /**
+     * UI-only error display — does not log. Callers that have a Throwable
+     * must call [TimberWrapper.silentError] themselves before invoking this.
+     *
+     * Why: the fragment-scoped [exceptionHandler] (Rule 9 safety net) calls
+     * [showError] as its UI fallback. A `silentError` here would throw in
+     * DEBUG (`crashInDebug`) and escape that handler, surfacing as
+     * `RuntimeException: Exception while trying to handle coroutine
+     * exception`. State-driven outcomes (LimitExceeded / UnsupportedVersion
+     * / InvalidFormat) are not programmer errors either, so a Throwable-less
+     * `silentError` would only produce Logcat noise — `AcraTree` filters it
+     * out anyway.
+     */
     private fun showError(message: String) {
         _binding?.let {
             Snackbar.make(it.root, message, Snackbar.LENGTH_LONG).show()
-            TimberWrapper.silentError("Backup error: $message")
         }
     }
 

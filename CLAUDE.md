@@ -240,6 +240,14 @@ activities.
      `CoroutineExceptionHandler` (one site only — the rest of the file
      uses `silentError`). Same recursion shape as `BaseActivity`.
 
+   **Transitive form.** The recursion ban applies to helpers these files
+   *invoke* too: a UI fallback called from a `CoroutineExceptionHandler`
+   (e.g. `BackupFragment.showError`) must not contain `silentError`
+   either, or the DEBUG throw simply lands one frame deeper and surfaces
+   as `RuntimeException: Exception while trying to handle coroutine
+   exception`. Document the constraint on the helper itself, not in this
+   rule.
+
    New code in any other file: use `silentError`. Adding a new file to
    this list requires the same recursion-into-the-error-pipeline
    justification.
