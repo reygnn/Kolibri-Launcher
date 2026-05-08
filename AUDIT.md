@@ -555,32 +555,20 @@ Helper-Funktion nötig, ein Konstruktor-Argument reicht.
 
 ---
 
-### 8.3 🟠 MAJOR — Rule 11 in `BaseViewModel.showErrorToastIfSupported`
+### 8.3 ✅ Erledigt — Rule 11 in `BaseViewModel.showErrorToastIfSupported`
 
-`app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt:152-166`
+`BaseViewModel` exponiert heute `protected open val errorEvent: E? = null`;
+`showErrorToastIfSupported` wurde auf `errorEvent?.let { sendEvent(it) }`
+reduziert. Subklassen mit `E = UiEvent` opten via
+`override val errorEvent = UiEvent.ShowToast(R.string.error_generic)` ein
+(7 Production-VMs + Test-Subklasse). `OnboardingViewModel<OnboardingEvent>`
+bleibt ohne Override — gleiches Verhalten wie vorher (kein Toast bei
+nicht-passendem Event-Typ), aber jetzt strukturell statt per Cast-Catch.
 
-```kotlin
-protected open fun showErrorToastIfSupported() {
-    viewModelScope.launch(coroutineExceptionHandler) {
-        try {
-            @Suppress("UNCHECKED_CAST")
-            sendEvent(UiEvent.ShowToast(R.string.error_generic) as E)
-        } catch (e: CancellationException) { throw e }
-        catch (e: ClassCastException) {
-            Timber.d("This ViewModel does not support UiEvent error toasts")
-        }
-    }
-}
-```
-
-`try/catch ClassCastException` als Runtime-Type-Check ist genau der
-Anti-Pattern aus Rule 11 — Catch um eine Operation, deren einzige Failure-
-Mode Programmer-Error ist. Fire-Pfad: jeder ViewModel mit `E != UiEvent`
-landet bei jedem Error in dieser Catch-Branch.
-
-**Fix:** Strukturell — `protected open val errorEvent: E? = null` (oder
-Factory-Lambda im Constructor) und `errorEvent?.let { sendEvent(it) }`.
-Der Type-Test wird zu einem Null-Check, kein Catch nötig.
+> Original-Befund: `try/catch (ClassCastException)` als Runtime-Type-
+> Check in der Default-Implementation, plus `@Suppress("UNCHECKED_CAST")`.
+> Fix-Vorschlag „strukturelle Änderung mit `errorEvent: E?`-Property"
+> wurde direkt umgesetzt.
 
 ---
 
@@ -761,7 +749,7 @@ das Framing „einzige Differenz" ist veraltet.
 | 2 | ~~§8.11 Korrekturen am Original-Audit (§3.4, §5.8, §4.1)~~ | ~5 min | erledigt 2026-05-08 — Inline-Strikethrough/Erledigt-Marker in den jeweiligen Original-Sektionen |
 | 3 | ~~§8.6 + §8.10~~ + §8.9 Cleanup-Sammel-Branch | ~10 min | erledigt 2026-05-08 für §8.6 (`UsageExport.kt` weg) und §8.10 (auskommentierte Klassendeklaration weg). §8.9 zurückgezogen — siehe Sektion. |
 | 4 | §8.1 Delegate `launchSafe`-Overload | ~30 min | Boilerplate-Konsolidierung ~20 Zeilen; nur die `error_generic`-Sites fold-bar, feature-spezifische Toasts bleiben inline |
-| 5 | §8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported` | ~30 min | Strukturelle Änderung (`errorEvent: E?` statt Cast-Catch); Touch auf alle Subklassen |
+| 5 | ~~§8.3 Rule-11-Fix in `BaseViewModel.showErrorToastIfSupported`~~ | ~30 min | erledigt 2026-05-08 — `errorEvent: E?`-Property in `BaseViewModel`; alle 7 UiEvent-Subklassen + TestViewModel opten ein, OnboardingViewModel bleibt ohne Override (Verhalten unverändert) |
 | 6 | §8.7 `purgeRepository`-Helper | ~2 h | 13 Files; ~70 Zeilen Reduktion; sorgfältig gegen die dokumentierten No-Op-Drifts checken |
 | 7 | ~~§8.8 `:data` `buildConfig = false`~~ | ~10 min | erledigt 2026-05-08 — `BuildConfig.DEBUG` durch `TimberWrapper.isDebugBuild` ersetzt, `buildFeatures.buildConfig` aus `data/build.gradle.kts` entfernt |
 | 8 | §8.4 Rule-13-Sweep | offen | Nur sinnvoll, wenn `checkConventions` git-diff-aware wird (TODO §7); sonst Sisyphos |
