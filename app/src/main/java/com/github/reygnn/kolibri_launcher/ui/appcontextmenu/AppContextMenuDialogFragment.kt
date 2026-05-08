@@ -250,9 +250,12 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             return
         }
 
-        // Outer catch kept: AlertDialog.Builder + show() can throw
-        // BadTokenException / IllegalStateException when the activity is
-        // finishing.
+        // Outer catch kept: AlertDialog.Builder + EditText alloc + show()
+        // can throw BadTokenException / IllegalStateException when the
+        // activity is finishing, AND the View/Dialog inflation chain may
+        // OutOfMemoryError on low-memory devices. OOM extends Error/
+        // Throwable, NOT Exception — same pattern as §9.8 ZoomableImageView
+        // and §9.13 BackupRepositoryImpl.
         try {
             val editText = EditText(ctx).apply {
                 setText(appInfo.displayName)
@@ -280,7 +283,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                             dismiss()
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error setting custom name")
                             dismiss()
                         }
@@ -295,7 +298,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 .create()
 
             currentDialog?.show()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating rename dialog")
         }
     }

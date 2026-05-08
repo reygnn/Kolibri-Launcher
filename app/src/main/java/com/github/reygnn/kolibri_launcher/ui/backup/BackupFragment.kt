@@ -224,7 +224,15 @@ class BackupFragment : Fragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
 
-            } catch (e: Exception) {
+            // Outer Catchall kept: DialogImportOptionsBinding.inflate +
+            // MaterialAlertDialogBuilder + show() — Dialog/View-Inflation
+            // chain may OutOfMemoryError on low-memory devices, plus
+            // BadTokenException / IllegalStateException when the activity
+            // is finishing. OOM extends Error/Throwable, NOT Exception —
+            // same pattern as §9.8 ZoomableImageView and §9.13
+            // BackupRepositoryImpl. The hideLoading + showError fallback
+            // gives the user an exit either way.
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading backup preview")
                 hideLoading()
                 showError(getString(R.string.error_generic))

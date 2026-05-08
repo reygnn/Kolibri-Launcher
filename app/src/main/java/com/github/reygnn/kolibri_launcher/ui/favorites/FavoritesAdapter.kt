@@ -37,13 +37,15 @@ class FavoritesAdapter(
         companion object {
             fun from(parent: ViewGroup): ViewHolder? {
                 return try {
-                    // Layout-Inflation kann InflateException oder
-                    // ResourcesNotFoundException werfen, OOM bei Bitmap-
-                    // Resources. Echter Wurfpfad — Catch behalten.
+                    // Outer Catchall kept: layout inflation can throw
+                    // InflateException or Resources.NotFoundException, AND
+                    // OutOfMemoryError on bitmap resources. OOM extends
+                    // Error/Throwable, NOT Exception — same pattern as §9.8
+                    // ZoomableImageView and §9.13 BackupRepositoryImpl.
                     val layoutInflater = LayoutInflater.from(parent.context)
                     val binding = ItemFavoriteBinding.inflate(layoutInflater, parent, false)
                     ViewHolder(binding)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     TimberWrapper.silentError(e, "Error creating ViewHolder")
                     null
                 }
@@ -65,10 +67,12 @@ class FavoritesAdapter(
             val layoutInflater = LayoutInflater.from(parent.context)
             val binding = ItemFavoriteBinding.inflate(layoutInflater, parent, false)
             ViewHolder(binding)
-        } catch (e: Exception) {
-            // Wenn auch der Fallback-Inflate failt, ist die Liste nicht
-            // mehr renderbar. Re-throw, damit der RecyclerView-Stack
-            // explizit failen kann statt zombiehaft weiterzulaufen.
+        } catch (e: Throwable) {
+            // Outer Catchall kept: gleicher Inflate-Pfad wie ViewHolder.from
+            // (siehe dort) — OOM extends Throwable, NOT Exception. Wenn auch
+            // der Fallback-Inflate failt, ist die Liste nicht mehr
+            // renderbar. Re-throw, damit der RecyclerView-Stack explizit
+            // failen kann statt zombiehaft weiterzulaufen.
             TimberWrapper.silentError(e, "Critical error in fallback ViewHolder")
             throw RuntimeException("Unable to create ViewHolder", e)
         }
