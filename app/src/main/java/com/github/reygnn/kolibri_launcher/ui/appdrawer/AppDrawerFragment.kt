@@ -236,7 +236,19 @@ class AppDrawerFragment : Fragment() {
             appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
         }
 
-        // Observer 4: search query → debounced filter
+        // Observer 4: favorites alignment — same setting drives both the
+        // home favorites row and the AppDrawer item gravity, so the two
+        // surfaces stay in lockstep.
+        collectOnStarted(
+            flow = viewModel.favoritesAlignmentState,
+            errorTag = "favoritesAlignment",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { alignment ->
+            if (_binding == null || !isAdded) return@collectOnStarted
+            appDrawerAdapter?.setAlignment(alignment)
+        }
+
+        // Observer 5: search query → debounced filter
         // The fragmentExceptionHandler on the launch covers any exceptions
         // that escape the inner blocks; CancellationException needs no
         // explicit catch in the inner search-job because `launch { delay; ... }`

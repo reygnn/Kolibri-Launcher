@@ -12,7 +12,9 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
+import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 
 /**
  * Adapter für die App-Liste im Drawer.
@@ -26,10 +28,41 @@ class AppDrawerAdapter(
 
     private var textColor: Int = Color.WHITE
     private var shadowColor: Int = Color.BLACK
+    private var currentAlignment: FavoritesAlignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
 
     companion object {
         const val PAYLOAD_COLOR_CHANGE = "color_change"
         const val PAYLOAD_NAME_CHANGE = "name_change"
+        const val PAYLOAD_ALIGNMENT_CHANGE = "alignment_change"
+    }
+
+    /**
+     * Mirrors [HomeFavoritesAdapter.setStyling] for alignment: pushes the
+     * current `FavoritesAlignment` (Start/Center/End) into every visible
+     * row's `app_name` TextView via a payload-based partial rebind, so
+     * the AppDrawer follows the same alignment setting as the favorites
+     * list. The `notifyItemRangeChanged(..., PAYLOAD_ALIGNMENT_CHANGE)`
+     * makes `DefaultItemAnimator.canReuseUpdatedViewHolder` return true,
+     * eliminating the cross-fade and keeping the change in lockstep with
+     * the home-screen update.
+     */
+    fun setAlignment(alignment: FavoritesAlignment) {
+        if (currentAlignment == alignment) return
+        currentAlignment = alignment
+
+        // Same race-condition catch as setUiColors below — notifyItem*
+        // can throw IllegalStateException when the RecyclerView is
+        // mid-scroll/layout.
+        try {
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_ALIGNMENT_CHANGE)
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Error notifying alignment change, attempting full refresh")
+            try {
+                notifyDataSetChanged()
+            } catch (e2: Exception) {
+                TimberWrapper.silentError(e2, "Error in fallback notifyDataSetChanged")
+            }
+        }
     }
 
     /**
@@ -106,6 +139,7 @@ class AppDrawerAdapter(
             when (payload) {
                 PAYLOAD_COLOR_CHANGE -> holder.updateColors(textColor, shadowColor)
                 PAYLOAD_NAME_CHANGE -> holder.updateName(item.displayName)
+                PAYLOAD_ALIGNMENT_CHANGE -> holder.updateAlignment(currentAlignment)
             }
         }
     }
@@ -173,6 +207,7 @@ class AppDrawerAdapter(
             // Reine TextView-Setter — können nicht werfen.
             updateName(appInfo.displayName)
             updateColors(textColor, shadowColor)
+            updateAlignment(currentAlignment)
         }
 
         fun updateColors(textColor: Int, shadowColor: Int) {
@@ -183,6 +218,14 @@ class AppDrawerAdapter(
                 AppConstants.SHADOW_DY,
                 shadowColor,
             )
+        }
+
+        fun updateAlignment(alignment: FavoritesAlignment) {
+            // The TextView is match_parent within the row; setting `gravity`
+            // shifts the text horizontally without restructuring layout
+            // (no hit-test concern here — the AppDrawer has no wrapper
+            // long-press to defer to, unlike HomeFavorites).
+            appName?.gravity = alignment.toHorizontalGravity()
         }
 
         fun updateName(name: String) {
