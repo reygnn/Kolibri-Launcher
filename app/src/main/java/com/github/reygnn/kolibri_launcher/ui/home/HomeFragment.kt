@@ -21,6 +21,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -552,10 +553,13 @@ class HomeFragment : Fragment() {
             applyWallpaperEditModeToGestures(isEditMode)
         }
 
-        // Observer 9: Lock-transition overlay. Paints
-        // lockTransitionOverlay solid black during the
-        // GLOBAL_ACTION_LOCK_SCREEN transition. Full rationale lives
-        // on GestureDelegate.onDoubleTapToLock's KDoc.
+        // Observer 9: Lock-transition overlay (dismiss path). Drives
+        // lockTransitionOverlay's visibility off the StateFlow. The
+        // *paint-before-lock* path is handled by Observer 10, which
+        // sets visibility synchronously to avoid depending on this
+        // collector's order. Full rationale on
+        // GestureDelegate.onDoubleTapToLock's KDoc, "The two-channel
+        // split".
         collectOnStarted(
             flow = viewModel.showLockOverlay,
             errorTag = "lock transition",
@@ -563,6 +567,19 @@ class HomeFragment : Fragment() {
         ) { show ->
             if (_binding == null) return@collectOnStarted
             binding.lockTransitionOverlay.isVisible = show
+        }
+
+        // Observer 10: Lock paint trigger (paint-before-lock path).
+        // Runs the OneShotPreDrawListener that synchronizes the lock
+        // IPC with the overlay's first frame, so the overlay reaches
+        // SurfaceFlinger before the keyguard surface does. Full
+        // rationale on GestureDelegate.onDoubleTapToLock's KDoc.
+        collectOnStarted(
+            flow = viewModel.lockPaintTrigger,
+            errorTag = "lock paint trigger",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) {
+            scheduleLockAfterOverlayPaint()
         }
 
     }
@@ -1467,6 +1484,45 @@ class HomeFragment : Fragment() {
         // (and the rejected alternatives) lives on
         // GestureDelegate.onDoubleTapToLock's KDoc.
         viewModel.dismissLockOverlay()
+    }
+
+    /**
+     * Synchronizes the lock IPC with the lock-transition overlay's
+     * first frame. Sets the overlay visible, attaches a
+     * OneShotPreDrawListener (which fires inside the frame
+     * pipeline, after layout), and arms a postDelayed fallback in
+     * case the listener never fires. Both paths route through the
+     * same idempotent `trigger` Runnable, so whichever wins the
+     * race calls `executeLockAfterOverlayPaint` exactly once. Full
+     * rationale on GestureDelegate.onDoubleTapToLock's KDoc.
+     *
+     * If `_binding` is null (fragment view destroyed mid-flight),
+     * fall back to triggering the use-case directly so the
+     * delegate's locking flags get reset rather than stuck — the
+     * frame-sync benefit is moot when there is no view to paint.
+     */
+    private fun scheduleLockAfterOverlayPaint() {
+        val view = _binding?.lockTransitionOverlay ?: run {
+            viewModel.executeLockAfterOverlayPaint()
+            return
+        }
+
+        // Synchronously set visibility here, NOT via Observer 9.
+        // The two collectors (Observer 9 / Observer 10) run on
+        // separate launch blocks and the order between them is not
+        // guaranteed within a single dispatch tick. By setting
+        // visibility here, the listener attached below sees a
+        // VISIBLE view regardless of Observer 9's timing.
+        view.isVisible = true
+
+        var triggered = false
+        val trigger = Runnable {
+            if (triggered) return@Runnable
+            triggered = true
+            viewModel.executeLockAfterOverlayPaint()
+        }
+        OneShotPreDrawListener.add(view) { trigger.run() }
+        view.postDelayed(trigger, AppConstants.LOCK_OVERLAY_PAINT_FALLBACK_MS)
     }
 
     private fun getInsetsController(): WindowInsetsControllerCompat? {

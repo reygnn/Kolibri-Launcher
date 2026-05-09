@@ -76,6 +76,7 @@ import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -259,8 +260,10 @@ class LauncherViewModel @Inject constructor(
 
     val isLockingInProgress: StateFlow<Boolean> get() = gestureDelegate.isLockingInProgress
     val showLockOverlay: StateFlow<Boolean> get() = gestureDelegate.showLockOverlay
+    val lockPaintTrigger: SharedFlow<Unit> get() = gestureDelegate.lockPaintTrigger
 
     fun dismissLockOverlay() = gestureDelegate.dismissLockOverlay()
+    fun executeLockAfterOverlayPaint() = gestureDelegate.executeLockAfterOverlayPaint()
 
     // ===========================================
     // APP LIFECYCLE OBSERVER

@@ -28,6 +28,18 @@ object AppConstants {
      */
     const val LOCK_OVERLAY_WATCHDOG_DURATION_MS = 3 * LOCK_GESTURE_BLOCK_DURATION_MS
 
+    /**
+     * Fallback timeout in `HomeFragment.scheduleLockAfterOverlayPaint`
+     * for the OneShotPreDrawListener that synchronizes the lock-IPC
+     * with the overlay's first frame. If the listener never fires
+     * (view detached mid-flight, layout pass skipped, exotic OEM
+     * edge case), the fallback runs the trigger anyway so the lock
+     * goes through. 100 ms is well past one VSync at any refresh
+     * rate (16.7 ms @ 60 Hz, 8.3 ms @ 120 Hz) so it can't fire
+     * before the legitimate Pre-Draw on the normal path.
+     */
+    const val LOCK_OVERLAY_PAINT_FALLBACK_MS = 100L
+
 
     // Text Shadow Constants (verwendet in HomeFragment)
     const val SHADOW_RADIUS_TIME = 4f      // Für grosse Zeit-Anzeige

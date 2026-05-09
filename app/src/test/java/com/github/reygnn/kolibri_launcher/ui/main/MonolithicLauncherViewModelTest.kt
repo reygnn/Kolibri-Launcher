@@ -492,7 +492,13 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         advanceUntilIdle()
 
+        // Production sequence: HomeFragment's OneShotPreDrawListener
+        // is what bridges onDoubleTapToLock to executeLockAfterOverlayPaint
+        // in real life. In a unit test there is no view, so we call
+        // both halves explicitly. See GestureDelegate.onDoubleTapToLock
+        // KDoc, "The two-channel split".
         viewModel.onDoubleTapToLock()
+        viewModel.executeLockAfterOverlayPaint()
         advanceUntilIdle()
 
         coVerify { requestLockUseCase.invoke() }
@@ -509,6 +515,7 @@ class MonolithicLauncherViewModelTest {
 
             viewModel.event.test {
                 viewModel.onDoubleTapToLock()
+                viewModel.executeLockAfterOverlayPaint()
                 advanceUntilIdle()
 
                 val event = awaitItem()
@@ -527,6 +534,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.event.test {
             viewModel.onDoubleTapToLock()
+            viewModel.executeLockAfterOverlayPaint()
             advanceUntilIdle()
 
             val event = awaitItem()
@@ -535,6 +543,7 @@ class MonolithicLauncherViewModelTest {
 
             // Second call should not emit event (Logik ist im VM)
             viewModel.onDoubleTapToLock()
+            viewModel.executeLockAfterOverlayPaint()
             advanceUntilIdle()
             expectNoEvents()
         }
@@ -1222,12 +1231,14 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.event.test {
             viewModel.onDoubleTapToLock()
+            viewModel.executeLockAfterOverlayPaint()
             advanceUntilIdle()
             awaitItem() // First toast
 
-            viewModel.onDoubleTapToLock()
-            viewModel.onDoubleTapToLock()
-            viewModel.onDoubleTapToLock()
+            repeat(3) {
+                viewModel.onDoubleTapToLock()
+                viewModel.executeLockAfterOverlayPaint()
+            }
             advanceUntilIdle()
 
             expectNoEvents() // Keine weiteren Toasts!
