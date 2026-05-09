@@ -192,6 +192,27 @@ should accept this. I don't.
 
 ---
 
+## ⭐⭐⭐⭐⭐ — Adrian Monk, San Francisco PD (consulting)
+
+> I'll tell you what I noticed. The clock moved at frame 1. The
+> favorites moved at frame 16. Maybe 17. I had to count. Twice.
+> The clock-date-battery row snapped **immediately** into the new
+> alignment — Sharona, did you see this? — but the favorites below
+> it cross-faded for **250 milliseconds**. Two hundred and fifty.
+> A quarter of a second of *visible asymmetry*. My eye went up.
+> Down. Up. Down. I had to lie down.
+>
+> Then on commit `c5662ac` they passed a payload to
+> `notifyItemRangeChanged`. `DefaultItemAnimator.canReuseUpdatedViewHolder`
+> now returns `true`. The ViewHolders are reused in place. Both rows
+> land on the same frame.
+>
+> *The same frame.*
+>
+> Five stars. I can sleep tonight. It's a gift... and a curse.
+
+---
+
 ## Editor's Recommendation
 
 Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
