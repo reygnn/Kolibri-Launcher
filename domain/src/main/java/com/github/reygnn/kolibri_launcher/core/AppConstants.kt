@@ -13,6 +13,21 @@ object AppConstants {
     const val DOUBLE_CLICK_THRESHOLD = 300L
     const val LOCK_GESTURE_BLOCK_DURATION_MS = 1000L
 
+    /**
+     * Watchdog after which `GestureDelegate.onDoubleTapToLock` force-
+     * dismisses the lock-transition overlay if `HomeFragment.onPause`
+     * never fires (Success returned but the system silently failed
+     * to lock — service unbinding race etc.). Generous on purpose so
+     * we never compete with the normal onPause-driven dismissal on
+     * the success path; only the abnormal path benefits.
+     *
+     * 3 × `LOCK_GESTURE_BLOCK_DURATION_MS` is well past the keyguard
+     * slide-in window (~600 ms on Pixel 9a), so on the normal path
+     * the overlay is already dismissed by onPause when this fires
+     * and the assignment is a no-op.
+     */
+    const val LOCK_OVERLAY_WATCHDOG_DURATION_MS = 3 * LOCK_GESTURE_BLOCK_DURATION_MS
+
 
     // Text Shadow Constants (verwendet in HomeFragment)
     const val SHADOW_RADIUS_TIME = 4f      // Für grosse Zeit-Anzeige

@@ -51,6 +51,12 @@ class GestureDelegate(
      * Reset hook called from `HomeFragment.onPause`. See
      * [onDoubleTapToLock]'s KDoc for why dismissal happens at this
      * lifecycle point and why the alternatives were rejected.
+     *
+     * Wired to `onPause` unconditionally — i.e., also fires for
+     * non-lock pauses (Onboarding launch, AppDrawer push, Settings
+     * open). On those paths [_showLockOverlay] is already false and
+     * the assignment is a no-op; the breadth is intentional, not
+     * something to narrow with a guard.
      */
     fun dismissLockOverlay() {
         _showLockOverlay.value = false
@@ -213,7 +219,11 @@ class GestureDelegate(
      *   - [_showLockOverlay] — "should the lock-transition black
      *     overlay be on screen?". Lifecycle-bound: stays true until
      *     HomeFragment dismisses it on onPause, when the keyguard
-     *     has taken focus.
+     *     has taken focus. A watchdog
+     *     (`LOCK_OVERLAY_WATCHDOG_DURATION_MS` after the gesture-
+     *     block delay on the success path) acts as a floor for the
+     *     case where onPause never fires — see the closing section
+     *     below for the failure mode it covers.
      *
      * Coupling the two as one flag was the first attempt; see below.
      *
@@ -272,8 +282,17 @@ class GestureDelegate(
      * is a strictly smaller glitch than the wallpaper flicker on the
      * success path. On the success branch the flags then diverge:
      * [_isLockingInProgress] resets after the gesture-block delay,
-     * [_showLockOverlay] is intentionally NOT reset here and waits
-     * for the lifecycle hook.
+     * [_showLockOverlay] is intentionally NOT reset together with it
+     * and waits for the lifecycle hook (with the watchdog as a
+     * floor; see below).
+     *
+     * Note that flipping [_isLockingInProgress] true BEFORE the use
+     * case is a behavior change vs. the pre-overlay version, which
+     * gated only the success branch. Other gesture handlers
+     * (`onFlingUp`, `onFlingDown`, `onSwipe*`) now short-circuit
+     * during the use-case validation window too. In practice the
+     * use case is settings-flag + service-status check (sub-ms), so
+     * this only affects truly back-to-back gestures.
      *
      * ## What this method does NOT solve
      *
@@ -292,10 +311,14 @@ class GestureDelegate(
      *   - Edge case: a lock request that returns Success but the
      *     system then silently doesn't lock (e.g., service-binding
      *     loss between the emit and the performGlobalAction call).
-     *     The overlay would stay until the next onPause, which never
-     *     comes if the activity stays in foreground. Not seen in
-     *     practice; would need a max-time fallback in this method
-     *     to handle.
+     *     Without a fallback the overlay would stay until the next
+     *     onPause, which never comes if the activity stays in
+     *     foreground. Mitigated by the watchdog `delay
+     *     (LOCK_OVERLAY_WATCHDOG_DURATION_MS)` after the
+     *     gesture-block delay on the success branch — worst case
+     *     becomes ~3 s of black instead of "black until next app
+     *     switch". On the normal path onPause has already dismissed
+     *     the overlay and the watchdog assignment is a no-op.
      *
      * ## Related sites
      *
@@ -319,6 +342,19 @@ class GestureDelegate(
             is RequestLockUseCase.Result.Success -> {
                 delay(AppConstants.LOCK_GESTURE_BLOCK_DURATION_MS)
                 _isLockingInProgress.value = false
+                // Watchdog. Normally the overlay is dismissed by
+                // HomeFragment.onPause when the keyguard takes focus.
+                // If the system silently fails to lock (Success
+                // returned but performGlobalAction lost the call,
+                // service unbinding race, etc.), onPause never fires
+                // and the overlay would stay black until the next
+                // foreground change. Fall back to dismissing it here
+                // after a generous delay so the worst case becomes
+                // "~3 s of black" instead of "black until app
+                // switch". On the normal path onPause has already
+                // set the flag to false; this assignment is a no-op.
+                delay(AppConstants.LOCK_OVERLAY_WATCHDOG_DURATION_MS)
+                _showLockOverlay.value = false
             }
 
             is RequestLockUseCase.Result.ErrorAccessibility -> {

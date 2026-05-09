@@ -71,6 +71,12 @@ class GestureDelegateTest {
         assertFalse(delegate.isLockingInProgress.value)
     }
 
+    @Test
+    fun `initial showLockOverlay is false`() {
+        val delegate = createDelegate()
+        assertFalse(delegate.showLockOverlay.value)
+    }
+
     // ===========================================
     // FLING UP
     // ===========================================
@@ -297,6 +303,143 @@ class GestureDelegateTest {
                 delegate.isLockingInProgress.value,
             )
         }
+
+    @Test
+    fun `onDoubleTapToLock sets showLockOverlay before the use case suspends`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.Success
+
+        val delegate = createDelegate()
+
+        // UnconfinedTestDispatcher runs the launched coroutine up to
+        // the first suspending point (delay() in the success branch),
+        // so the overlay must already be visible when we observe it.
+        // The KDoc on `onDoubleTapToLock` requires this ordering: the
+        // overlay must paint before the lock request can reach the
+        // accessibility service.
+        delegate.onDoubleTapToLock()
+        assertTrue(
+            "showLockOverlay must be set before the use case suspends",
+            delegate.showLockOverlay.value,
+        )
+    }
+
+    /**
+     * The overlay must NOT be reset when [_isLockingInProgress] is
+     * reset after the gesture-block delay. The overlay's lifetime
+     * deliberately extends past the gesture-block one — see
+     * `onDoubleTapToLock`'s KDoc, "Two flags for two concerns".
+     */
+    @Test
+    fun `onDoubleTapToLock keeps showLockOverlay set after gesture-block delay`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.Success
+
+        val delegate = createDelegate()
+
+        delegate.onDoubleTapToLock()
+
+        // Cross the gesture-block boundary; isLockingInProgress
+        // releases here, but the overlay must persist.
+        advanceTimeBy(AppConstants.LOCK_GESTURE_BLOCK_DURATION_MS + 1)
+        assertFalse(
+            "isLockingInProgress released after block delay",
+            delegate.isLockingInProgress.value,
+        )
+        assertTrue(
+            "showLockOverlay must persist past the block delay",
+            delegate.showLockOverlay.value,
+        )
+    }
+
+    /**
+     * Pins the watchdog duration in virtual time. The watchdog only
+     * matters on the abnormal path where `HomeFragment.onPause` never
+     * fires — it bounds the worst case so the user doesn't sit on a
+     * black screen until the next foreground change. Without this
+     * test a regression that drops the watchdog (or shortens it to
+     * zero) would still pass `keeps showLockOverlay set after
+     * gesture-block delay` because that test only crosses the
+     * gesture-block boundary, not the watchdog one.
+     */
+    @Test
+    fun `onDoubleTapToLock dismisses showLockOverlay after watchdog — TIME-PIN`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.Success
+
+        val delegate = createDelegate()
+
+        delegate.onDoubleTapToLock()
+
+        // Skip past the gesture-block delay; we're now in the
+        // watchdog window.
+        advanceTimeBy(AppConstants.LOCK_GESTURE_BLOCK_DURATION_MS)
+
+        // Just before the watchdog boundary the overlay must still
+        // be on screen.
+        advanceTimeBy(AppConstants.LOCK_OVERLAY_WATCHDOG_DURATION_MS - 1)
+        assertTrue(
+            "Watchdog must not fire at duration - 1 ms",
+            delegate.showLockOverlay.value,
+        )
+
+        // Crossing the boundary dismisses the overlay.
+        advanceTimeBy(2)
+        assertFalse(
+            "Watchdog must dismiss the overlay after duration ms have elapsed",
+            delegate.showLockOverlay.value,
+        )
+    }
+
+    @Test
+    fun `onDoubleTapToLock resets showLockOverlay synchronously on ErrorAccessibility`() =
+        runTest {
+            coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.ErrorAccessibility
+
+            val delegate = createDelegate()
+
+            delegate.onDoubleTapToLock()
+            advanceUntilIdle()
+
+            assertFalse(delegate.showLockOverlay.value)
+        }
+
+    @Test
+    fun `onDoubleTapToLock resets showLockOverlay synchronously on ErrorDisabled`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.ErrorDisabled
+
+        val delegate = createDelegate()
+
+        delegate.onDoubleTapToLock()
+        advanceUntilIdle()
+
+        assertFalse(delegate.showLockOverlay.value)
+    }
+
+    @Test
+    fun `onDoubleTapToLock resets showLockOverlay synchronously on ErrorGeneric`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.ErrorGeneric
+
+        val delegate = createDelegate()
+
+        delegate.onDoubleTapToLock()
+        advanceUntilIdle()
+
+        assertFalse(delegate.showLockOverlay.value)
+    }
+
+    @Test
+    fun `dismissLockOverlay sets showLockOverlay to false`() = runTest {
+        coEvery { requestLockUseCase() } returns RequestLockUseCase.Result.Success
+
+        val delegate = createDelegate()
+
+        delegate.onDoubleTapToLock()
+        assertTrue(
+            "Precondition: overlay must be set before dismissal",
+            delegate.showLockOverlay.value,
+        )
+
+        delegate.dismissLockOverlay()
+        assertFalse(delegate.showLockOverlay.value)
+    }
 
     @Test
     fun `onDoubleTapToLock shows accessibility dialog on ErrorAccessibility`() = runTest {
