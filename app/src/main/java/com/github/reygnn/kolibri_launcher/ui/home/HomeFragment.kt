@@ -552,6 +552,19 @@ class HomeFragment : Fragment() {
             applyWallpaperEditModeToGestures(isEditMode)
         }
 
+        // Observer 9: Lock-transition overlay. Paints
+        // lockTransitionOverlay solid black during the
+        // GLOBAL_ACTION_LOCK_SCREEN transition. Full rationale lives
+        // on GestureDelegate.onDoubleTapToLock's KDoc.
+        collectOnStarted(
+            flow = viewModel.showLockOverlay,
+            errorTag = "lock transition",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { show ->
+            if (_binding == null) return@collectOnStarted
+            binding.lockTransitionOverlay.isVisible = show
+        }
+
     }
 
     private fun observeLayoutChanges() {
@@ -1450,6 +1463,10 @@ class HomeFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         showStatusBar()
+        // Dismissal point for the lock-transition overlay. Rationale
+        // (and the rejected alternatives) lives on
+        // GestureDelegate.onDoubleTapToLock's KDoc.
+        viewModel.dismissLockOverlay()
     }
 
     private fun getInsetsController(): WindowInsetsControllerCompat? {

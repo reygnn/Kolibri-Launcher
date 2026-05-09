@@ -258,6 +258,9 @@ class LauncherViewModel @Inject constructor(
     fun consumePendingFocusLayerId() = wallpaperDelegate.consumePendingFocusLayerId()
 
     val isLockingInProgress: StateFlow<Boolean> get() = gestureDelegate.isLockingInProgress
+    val showLockOverlay: StateFlow<Boolean> get() = gestureDelegate.showLockOverlay
+
+    fun dismissLockOverlay() = gestureDelegate.dismissLockOverlay()
 
     // ===========================================
     // APP LIFECYCLE OBSERVER
