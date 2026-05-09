@@ -70,7 +70,13 @@ class HomeFavoritesAdapter(
         if (styling == newStyling) return
         styling = newStyling
         if (itemCount > 0) {
-            notifyItemRangeChanged(0, itemCount)
+            // Payload makes DefaultItemAnimator.canReuseUpdatedViewHolder
+            // return true, so existing ViewHolders are rebound in place
+            // without the cross-fade change animation. Keeps the favorites
+            // styling/alignment update in lockstep with the timeContainer
+            // gravity flip in HomeFragment.applyLayoutToExistingViews —
+            // otherwise the RV cross-fade lags ~250ms behind.
+            notifyItemRangeChanged(0, itemCount, STYLING_PAYLOAD)
         }
     }
 
@@ -160,6 +166,9 @@ class HomeFavoritesAdapter(
     ) : RecyclerView.ViewHolder(container)
 
     private companion object {
+        // Marker payload for notifyItemRangeChanged — see setStyling KDoc.
+        private val STYLING_PAYLOAD = Any()
+
         val INITIAL_STYLING = Styling(
             textSizePx = AppConstants.FALLBACK_TEXT_SIZE_PX,
             verticalPaddingPx = AppConstants.FALLBACK_VERTICAL_PADDING_PX,
