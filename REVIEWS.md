@@ -213,6 +213,37 @@ should accept this. I don't.
 
 ---
 
+## ⭐⭐⭐⭐ — Feature-request inbox, end-of-quarter retrospective
+
+> Four entries this quarter, each from a different drive-by reviewer.
+>
+> **Visitor #1** demanded widgets. The launcher's core identity is
+> *no widgets*. Decline issued. Visitor went elsewhere; presumably
+> found a launcher with widgets, of which there are dozens.
+>
+> **Visitor #2** asked for features that the old split-mode
+> architecture made non-trivial. I wrote a long, technical
+> explanation of the constraint. They read it. They nodded. They
+> moved on. This is a category of interaction I had not previously
+> encountered and have now mentally framed and hung on the wall.
+>
+> **Visitor #3** delivered a comprehensive feature list, every entry
+> of which was out of scope. Declined wholesale. Their list, taken
+> seriously, would have produced a fundamentally different product —
+> roughly: a different launcher, with a different name, written by
+> a different person.
+>
+> **Visitor #4 — a coworker, in passing:** "Could you add optional
+> icons?" This is a **text-only** launcher. The optional icons would
+> be optional in the sense that they would optionally undo the entire
+> project. *Are you kidding me?*
+>
+> Four stars; the filter is doing exactly what it should. Point
+> deduction is structural: I had to tell a coworker no, and the
+> coworker still has to be a coworker.
+
+---
+
 ## Editor's Recommendation
 
 Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
