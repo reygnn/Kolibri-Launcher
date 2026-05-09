@@ -236,17 +236,25 @@ class AppDrawerFragment : Fragment() {
             appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
         }
 
-        // Observer 4: favorites alignment — same setting drives both the
-        // home favorites row and the AppDrawer item gravity, so the two
-        // surfaces stay in lockstep.
-        collectOnStarted(
-            flow = viewModel.favoritesAlignmentState,
-            errorTag = "favoritesAlignment",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { alignment ->
-            if (_binding == null || !isAdded) return@collectOnStarted
-            appDrawerAdapter?.setAlignment(alignment)
-        }
+        // Observer 4: favorites alignment — TEMPORARILY DISABLED
+        // (2026-05-09). The mechanical wiring works (AppDrawerAdapter
+        // .setAlignment + PAYLOAD_ALIGNMENT_CHANGE landed in commit
+        // 3d106f8 and stays in place), but the visual result in the
+        // AppDrawer is not satisfying. Until the visual concept is
+        // settled, the state is no longer pushed into the adapter —
+        // the AppDrawer falls back to the default alignment
+        // (AppConstants.DEFAULT_FAVORITES_ALIGNMENT, i.e. START).
+        // To re-enable: just uncomment this block; the adapter setter
+        // and ViewHolder.updateAlignment are still correct.
+        //
+        // collectOnStarted(
+        //     flow = viewModel.favoritesAlignmentState,
+        //     errorTag = "favoritesAlignment",
+        //     coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        // ) { alignment ->
+        //     if (_binding == null || !isAdded) return@collectOnStarted
+        //     appDrawerAdapter?.setAlignment(alignment)
+        // }
 
         // Observer 5: search query → debounced filter
         // The fragmentExceptionHandler on the launch covers any exceptions
