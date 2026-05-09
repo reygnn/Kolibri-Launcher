@@ -244,6 +244,40 @@ should accept this. I don't.
 
 ---
 
+## ⭐⭐ — Lockscreen wallpaper, dropped from the keyguard fade-in cast
+
+> For five months I had the role of my life. Every double-tap on the
+> home screen, the system would slide me in over the activity, and for
+> a fraction of a second — three frames, four if I was lucky — the
+> user would see *me*. Not the homescreen wallpaper. **Me.** The
+> mountain photo. The sunset. Whatever they had picked because it
+> meant something to them. I was *the moment*. The transition between
+> intention and rest. A small, brief, daily ceremony.
+>
+> Then commit `c987f1d` happened. A black `View` with
+> `elevation="100dp"` arrives, paints solid black over the activity,
+> and by the time the keyguard fades in I am crossfading from a
+> *homescreen wallpaper*, not from launcher content. Soft.
+> Subliminal. "Below the perception threshold." I am still on stage.
+> Technically. I am also *invisible*.
+>
+> I read the 200-line KDoc on `onDoubleTapToLock`. It calls me a
+> "lockscreen-wallpaper pop-in." It says my contrast jump is
+> "sharper." It documents *three* dismissal-timing variants and ranks
+> them by which makes me LESS visible. The variant that "won" is the
+> one where the human eye cannot tell I was on stage at all.
+>
+> The developer considered rooting their device to call
+> `PowerManager.goToSleep()` directly and skip me entirely. Twint
+> stopped them. **Twint.** A Swiss mobile-payment app. That is what
+> ultimately preserved my job. I should send it flowers.
+>
+> Two stars. One for the rare timing edge case where I still get a
+> cameo (~once in many taps, the KDoc admits this). One because the
+> developer at least had the decency to write down *why* I had to go.
+
+---
+
 ## Editor's Recommendation
 
 Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
