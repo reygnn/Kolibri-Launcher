@@ -2,11 +2,15 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import android.graphics.Color
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.kolibri_launcher.domain.usecase.ClassifyWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -21,18 +25,29 @@ class ObserveUiColorsUseCaseTest {
     val timberRule = TimberRule()
 
     private lateinit var settingsRepository: FakeSettingsRepository
+    private lateinit var classifyWallpaperUseCase: ClassifyWallpaperUseCase
+    private lateinit var classificationFlow: MutableStateFlow<AppDrawerSurfaceClassification>
     private lateinit var useCase: ObserveUiColorsUseCase
     private lateinit var wallpaperColorsFlow: MutableStateFlow<DomainWallpaperColors?>
 
     @Before
     fun setup() {
         settingsRepository = FakeSettingsRepository()
-        useCase = ObserveUiColorsUseCase(settingsRepository)
+        // Default to DARK so callers that don't care about classification
+        // (user-override / adaptive_colors / default mode) get WHITE in
+        // smart_contrast — same as the old supportsDarkText=false default.
+        classificationFlow = MutableStateFlow(AppDrawerSurfaceClassification.DARK)
+        classifyWallpaperUseCase = mockk()
+        every { classifyWallpaperUseCase() } returns classificationFlow
+        useCase = ObserveUiColorsUseCase(
+            settingsRepository = settingsRepository,
+            classifyWallpaperUseCase = classifyWallpaperUseCase,
+        )
         wallpaperColorsFlow = MutableStateFlow(null)
     }
 
     // =========================================================================
-    // Benutzerdefinierte Textfarbe
+    // User-defined text colour
     // =========================================================================
 
     @Test
@@ -40,6 +55,9 @@ class ObserveUiColorsUseCaseTest {
         val customColor = Color.RED
         settingsRepository.setTextColor(customColor)
         settingsRepository.setReadabilityMode("smart_contrast")
+        // Even with classification=LIGHT (which would produce BLACK in
+        // smart_contrast), the user override wins.
+        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(customColor)
@@ -48,15 +66,14 @@ class ObserveUiColorsUseCaseTest {
     }
 
     // =========================================================================
-    // Smart Contrast Mode
+    // Smart Contrast Mode — driven by ClassifyWallpaperUseCase
     // =========================================================================
 
     @Test
-    fun `smart contrast mode with light wallpaper returns black text`() = runTest {
+    fun `smart contrast with classification LIGHT returns black text`() = runTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-
-        wallpaperColorsFlow.value = DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null)
+        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.BLACK)
@@ -65,11 +82,10 @@ class ObserveUiColorsUseCaseTest {
     }
 
     @Test
-    fun `smart contrast mode with dark wallpaper returns white text`() = runTest {
+    fun `smart contrast with classification DARK returns white text`() = runTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-
-        wallpaperColorsFlow.value = DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null)
+        classificationFlow.value = AppDrawerSurfaceClassification.DARK
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
@@ -78,19 +94,28 @@ class ObserveUiColorsUseCaseTest {
     }
 
     @Test
-    fun `smart contrast mode without wallpaper returns white text`() = runTest {
-        settingsRepository.setTextColor(0)
-        settingsRepository.setReadabilityMode("smart_contrast")
-        wallpaperColorsFlow.value = null
+    fun `smart contrast ignores wallpaperColors supportsDarkText — classifier drives it now`() =
+        runTest {
+            // Pre-Commit-3 contract: smart_contrast read supportsDarkText
+            // directly. Now the classifier owns the binary decision.
+            // Even with supportsDarkText=true on the wallpaper-colours
+            // signal, classification=DARK pins text to WHITE.
+            settingsRepository.setTextColor(0)
+            settingsRepository.setReadabilityMode("smart_contrast")
+            wallpaperColorsFlow.value = DomainWallpaperColors(
+                supportsDarkText = true,
+                secondaryColorArgb = null,
+            )
+            classificationFlow.value = AppDrawerSurfaceClassification.DARK
 
-        useCase(wallpaperColorsFlow).test {
-            assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
-            cancelAndIgnoreRemainingEvents()
+            useCase(wallpaperColorsFlow).test {
+                assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     // =========================================================================
-    // Adaptive Colors Mode
+    // Adaptive Colors Mode — still uses system-wallpaper secondaryColorArgb
     // =========================================================================
 
     @Test
@@ -100,7 +125,7 @@ class ObserveUiColorsUseCaseTest {
 
         wallpaperColorsFlow.value = DomainWallpaperColors(
             supportsDarkText = false,
-            secondaryColorArgb = Color.CYAN
+            secondaryColorArgb = Color.CYAN,
         )
 
         useCase(wallpaperColorsFlow).test {
@@ -121,6 +146,26 @@ class ObserveUiColorsUseCaseTest {
         }
     }
 
+    @Test
+    fun `adaptive colors mode is independent of classification`() = runTest {
+        // Classifier output doesn't reach the adaptive_colors branch.
+        // Pin that by setting classification=LIGHT (which would produce
+        // BLACK in smart_contrast) and asserting the secondary colour
+        // still wins.
+        settingsRepository.setTextColor(0)
+        settingsRepository.setReadabilityMode("adaptive_colors")
+        wallpaperColorsFlow.value = DomainWallpaperColors(
+            supportsDarkText = false,
+            secondaryColorArgb = Color.CYAN,
+        )
+        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
+
+        useCase(wallpaperColorsFlow).test {
+            assertThat(awaitItem().textColor).isEqualTo(Color.CYAN)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // =========================================================================
     // Default Mode
     // =========================================================================
@@ -137,7 +182,7 @@ class ObserveUiColorsUseCaseTest {
     }
 
     // =========================================================================
-    // Schatten-Logik
+    // Shadow logic
     // =========================================================================
 
     @Test
@@ -177,7 +222,7 @@ class ObserveUiColorsUseCaseTest {
     }
 
     // =========================================================================
-    // Reaktivität
+    // Reactivity
     // =========================================================================
 
     @Test
@@ -195,21 +240,44 @@ class ObserveUiColorsUseCaseTest {
     }
 
     @Test
-    fun `emits new state when wallpaper colors change`() = runTest {
+    fun `emits new state when classification changes — smart_contrast`() = runTest {
+        // Pre-Commit-3 reactivity test was "wallpaperColorsFlow change
+        // re-emits". Updated to the new contract: smart_contrast reacts
+        // to classifier output, not to wallpaper-colours hints.
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-
-        val darkWallpaper = DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null)
-        val lightWallpaper = DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null)
+        classificationFlow.value = AppDrawerSurfaceClassification.DARK
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
 
-            wallpaperColorsFlow.value = darkWallpaper
-            assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
-
-            wallpaperColorsFlow.value = lightWallpaper
+            classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
             assertThat(awaitItem().textColor).isEqualTo(Color.BLACK)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `emits new state when wallpaper colours change — adaptive_colors`() = runTest {
+        // Reactivity to wallpaper-colour changes is preserved for
+        // adaptive_colors mode (which still consumes that signal
+        // directly).
+        settingsRepository.setTextColor(0)
+        settingsRepository.setReadabilityMode("adaptive_colors")
+        wallpaperColorsFlow.value = DomainWallpaperColors(
+            supportsDarkText = false,
+            secondaryColorArgb = Color.CYAN,
+        )
+
+        useCase(wallpaperColorsFlow).test {
+            assertThat(awaitItem().textColor).isEqualTo(Color.CYAN)
+
+            wallpaperColorsFlow.value = DomainWallpaperColors(
+                supportsDarkText = false,
+                secondaryColorArgb = Color.MAGENTA,
+            )
+            assertThat(awaitItem().textColor).isEqualTo(Color.MAGENTA)
 
             cancelAndIgnoreRemainingEvents()
         }
