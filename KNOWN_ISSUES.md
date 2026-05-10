@@ -10,6 +10,11 @@ This document tracks known `StrictMode` violations seen in DEBUG. Two categories
    stronger guarantee (privacy, correctness, etc.). These are not bugs;
    the rationale lives in the KDoc of the offending method.
 
+> **See also:** `ACCEPTED_LIMITATIONS.md` is the sister doc for
+> *intentional UX or behavioural* limitations (rather than StrictMode
+> ones) that are direct consequences of an architectural decision —
+> same "deliberately not fixed" shape, different category.
+
 ---
 
 # Framework / OEM / library violations

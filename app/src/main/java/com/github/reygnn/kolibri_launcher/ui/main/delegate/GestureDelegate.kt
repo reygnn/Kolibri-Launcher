@@ -429,6 +429,9 @@ class GestureDelegate(
      *     View.
      *   - ScreenLockAccessibilityService — the consumer of the
      *     SharedFlow-emitted lock request.
+     *   - ACCEPTED_LIMITATIONS.md §1 — the residual single-frame
+     *     wallpaper pop-in this method does not (and cannot) fully
+     *     close, with the "why we stopped here" rationale.
      */
     fun onDoubleTapToLock() = scope.launchSafe("Error on double tap to lock") {
         _isLockingInProgress.value = true

@@ -374,6 +374,17 @@ framework or Samsung modifications (OneUI `IdsController`, Knox
 `Dispatchers.IO` wrap. Before chasing a StrictMode warning, cross-check
 `KNOWN_ISSUES.md`.
 
+## Accepted UX limitations
+
+`ACCEPTED_LIMITATIONS.md` is the sister doc for *intentional* UX or
+behavioural limitations that are direct consequences of an architectural
+decision (e.g., the residual wallpaper pop-in on double-tap-to-lock that
+falls out of the AccessibilityService model the launcher uses to stay
+banking-app-compatible). Each entry carries the rationale and a
+re-evaluation trigger. Before "fixing" a perceived UX bug that touches
+locking, accessibility, or the home/keyguard boundary, cross-check
+`ACCEPTED_LIMITATIONS.md`.
+
 ---
 
 ## Test conventions (short version)
@@ -470,6 +481,8 @@ or historical reference may still hang on the branch. Always confirm first.
 - Not a TODO list (see `TODO.md`).
 - Not the full testing reference (see `app/src/test/CLAUDE.md` and
   `TESTING_CONVENTIONS.kt`).
+- Not the place for known StrictMode issues (see `KNOWN_ISSUES.md`)
+  or intentional UX limitations (see `ACCEPTED_LIMITATIONS.md`).
 - Not a holding pen for transient refactor notes — those belong in commit
   messages on short-lived feature branches.
 
