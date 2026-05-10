@@ -11,7 +11,8 @@ re-litigate the decision every time the limitation is noticed.
 ## 1. Wallpaper pop-in on double-tap-to-lock
 
 - **Status:** 🟡 Intentional / Documented
-- **Frequency:** ≲ 5% of taps (empirical, Pixel 9a, GrapheneOS not tested)
+- **Frequency:** ≲ 5% of taps (observed, not instrumented; Pixel 9a,
+  GrapheneOS not tested)
 - **Affected:** All devices; severity varies with display refresh rate
   and AOD configuration
 
@@ -39,9 +40,9 @@ latter would require either:
 
 ### Why we don't fix it further
 
-The current implementation (commits c987f1d, 96ee9a1, and the
-PreDraw-sync follow-up) reduces the pop-in from "every tap" to
-"occasional." Closing the residual gap would require leaving the
+The current implementation (commits c987f1d, 96ee9a1, and c88c14b
+for the PreDraw-sync follow-up) reduces the pop-in from "every tap"
+to "occasional." Closing the residual gap would require leaving the
 AccessibilityService model entirely. The trade — banking apps stop
 working — is strictly worse than the cosmetic cost. See also the
 Adrian-Monk-grade temptation to root or fork GrapheneOS, both
@@ -55,5 +56,9 @@ Reopen this entry if any of the following changes:
   allows synchronous power-off without keyguard composite.
 - A future Pixel/Android version changes the keyguard window
   composition such that the overlay-z-order workaround breaks.
+- Relevant banking apps drop the Play Integrity *Strong* requirement
+  (or establish another auth path that does), which would re-open
+  the Magisk + `/system/priv-app/` overlay route and put
+  `PowerManager#goToSleep` back on the table.
 - The launcher is forked into a "developer build" variant where
   banking compatibility is no longer a constraint.
