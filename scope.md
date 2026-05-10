@@ -291,3 +291,64 @@ for a user other than the maintainer's test devices).
 `0.99.73` (or the next suitable point release per the project's
 versioning convention). Tag accordingly per
 `CLAUDE.md` § Versioning.
+
+**Update (commit `40b0945`):** done — bumped to 0.99.73 / 93
+after the adaptive-surface train landed. Entry kept here as a
+pattern reference for the next iteration cycle: re-use the
+in-flight versionCode for test AABs, bump once before the next
+distributable.
+
+---
+
+## 10. Coverage-threshold borderline — empirical anchor `huggie.png`
+
+**Status:** Deferred — current heuristic is correct for all
+verified examples; tuning is about robustness, not correctness.
+
+**What's there today.** `WallpaperBitmapLuminanceImpl` uses
+`MIN_OPAQUE_COVERAGE = 0.5f` to decide whether a Kolibri-internal
+layer is visually dominant enough to drive the classification.
+Below 50% effectively-opaque pixels, the classifier falls
+through to the system signal.
+
+**Empirical anchor.** During Doré-style verification on real
+maintainer wallpapers, `huggie.png` (a chiaroscuro-converted
+illustration) measured **48.7% coverage** — 1.3 percentage
+points below the gate, sitting on the routing-strategy fence.
+The two paths happened to converge for that image:
+
+- Fall-through (current behaviour at 48.7%): system-signal
+  driven — DARK if user's system wallpaper is dark/neutral.
+- Layer-classification (would happen at 51%): median over the
+  opaque pixels = 0.258, also below the 0.5 luminance threshold
+  → DARK.
+
+So the Doré chiaroscuro pipeline + maintainer's typical system
+wallpaper produce the same perceived outcome regardless of
+which route the classifier takes. The fragility is currently
+invisible.
+
+**Why deferred.** No UX symptom in real usage. A re-encoding
+pass that shifts pixel coverage by a percent point would change
+the routing strategy without changing the visible outcome.
+
+**Trigger.**
+
+- A user reports AUTO picking the wrong surface for an image
+  whose coverage sits in the 40..60% borderline (where the two
+  routes might disagree if the layer-classification's median is
+  on the opposite side of 0.5 from the system signal).
+- A wallpaper-asset pipeline change (lossless re-encoding,
+  alpha-edge processing) starts moving coverage values
+  systematically and reveals the routing fragility.
+
+**Sketch.** Tune `MIN_OPAQUE_COVERAGE` upward — 0.6 or 0.7
+would push `huggie`-shape images firmly into fall-through
+territory. Risk: images with 50..70% coverage that today
+classify correctly might lose that path. Empirical decision —
+collect more borderline samples before tuning.
+Alternative: add hysteresis at the coverage gate (a deadband
+between e.g. 0.45 and 0.55 where the routing decision sticks
+to its previous value), but that's the same hysteresis-pattern
+deferred for the luminance pathway in §6 of this file — wait
+until dynamic Kolibri-internal layers actually motivate it.
