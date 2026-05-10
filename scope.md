@@ -180,6 +180,23 @@ bottom + detail overlays).
 **Trigger.** See `ACCEPTED_LIMITATIONS.md` §2 for the three
 specific re-evaluation conditions.
 
+**Empirical signal against the trigger (commit `2423ddb`+).**
+Two maintainer-curated multi-layer Doré-style collages were
+tested on AVD with AUTO mode and produced the correct
+DARK classification (white homescreen text + dark AppDrawer
+surface) — neither workaround (a-tone-anchor at `layers[0]`,
+or manual override) nor (c-composite renderer) was needed.
+Reading: in the maintainer's actual collage workflow, all
+routing paths through the heuristic converge on the same
+perceived outcome because the Doré aesthetic is consistently
+dark-dominant across whatever layer the classifier ends up
+inspecting. The trigger condition ("AUTO consistently picks
+the wrong surface for a multi-layer wallpaper actually used")
+is not firing as of this verification. Re-test if the
+maintainer's collage style diversifies (e.g., adds light
+pop-art layers over dark Doré bases) where routing paths
+might genuinely diverge.
+
 ---
 
 ## 6. Hysteresis on the luminance pathway
