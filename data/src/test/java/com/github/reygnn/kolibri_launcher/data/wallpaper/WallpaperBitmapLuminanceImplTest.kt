@@ -83,6 +83,92 @@ class WallpaperBitmapLuminanceImplTest {
             assertTrue("expected ~0.215, got $result", result!! in 0.18f..0.25f)
         }
 
+    @Test
+    fun `fully transparent image returns null — coverage gate`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // 0% effectively-opaque pixels → coverage 0.0 < 0.5 → null.
+            val bitmap = solidBitmap(Color.TRANSPARENT)
+            stubContentResolver(bitmap)
+            val result = luminance.compute("file:///fully-transparent.png")
+            assertNull(result)
+        }
+
+    @Test
+    fun `low-coverage opaque content over transparent returns null — coverage gate`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // 25% opaque — below the 50% gate. Mirrors the empirical
+            // anchor in the impl's KDoc: testPics/transparent.png at
+            // 13.8% coverage falls through; this synthetic case at
+            // 25% is still below the threshold.
+            val bitmap = bitmapWithCoverage(
+                opaqueColor = Color.BLACK,
+                opaqueFraction = 0.25f,
+            )
+            stubContentResolver(bitmap)
+            val result = luminance.compute("file:///mostly-transparent.png")
+            assertNull(result)
+        }
+
+    @Test
+    fun `coverage above gate uses only opaque pixels for median`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // 75% opaque WHITE, 25% transparent. Without alpha
+            // awareness the transparent-RGB-zero pixels would drag
+            // the median toward black; the alpha-filter means the
+            // median is computed over the white pixels only and
+            // returns ~1.0.
+            val bitmap = bitmapWithCoverage(
+                opaqueColor = Color.WHITE,
+                opaqueFraction = 0.75f,
+            )
+            stubContentResolver(bitmap)
+            val result = luminance.compute("file:///mostly-white.png")
+            assertNotNull(result)
+            assertEquals(1.0f, result!!, 0.01f)
+        }
+
+    // ============================================================
+    // Real-world-fixture pin: empirical anchors for the AMOLED-to-
+    // transparent converter use case. The two PNGs in
+    // `data/src/test/resources/wallpaper/` are real outputs of that
+    // converter (a panther illustration; see git log of this
+    // commit). They lock in the ground truth Python analysis
+    // produced (amoled.png 100% opaque + dark; transparent.png
+    // 13.8% opaque, well below the 50% gate). If a future change
+    // breaks AMOLED-converted wallpapers — e.g., raising the
+    // coverage threshold past 13.8%, or losing alpha awareness in
+    // the median compute — these tests catch it.
+    //
+    // Bands rather than exact values: Robolectric's PNG decode is
+    // faithful but not floating-point-byte-identical to the Android
+    // framework, and the impl downscales 704×1504 → 32×32 with
+    // bilinear filtering, which can shift the median by a few
+    // promille across runs.
+    // ============================================================
+
+    @Test
+    fun `fixture amoled-png — fully-opaque AMOLED, classifies dark`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubContentResolverFromResource("/wallpaper/amoled.png")
+            val result = luminance.compute("file:///amoled.png")
+            assertNotNull("expected non-null for fully-opaque image", result)
+            assertTrue(
+                "expected near-black luminance for AMOLED original, got $result",
+                result!! < 0.05f,
+            )
+        }
+
+    @Test
+    fun `fixture transparent-png — AMOLED-converted, returns null via coverage gate`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            stubContentResolverFromResource("/wallpaper/transparent.png")
+            val result = luminance.compute("file:///transparent.png")
+            assertNull(
+                "expected null because 13.8% opaque coverage is below the 50% gate",
+                result,
+            )
+        }
+
     // Note: `BitmapFactory.decodeStream` on malformed bytes is not
     // testable here — Robolectric's shadow returns a stub bitmap
     // for any input, so the JVM-side decode-failure path can't be
@@ -112,6 +198,32 @@ class WallpaperBitmapLuminanceImplTest {
         return bmp
     }
 
+    /**
+     * Builds a 32×32 ARGB_8888 bitmap with exactly
+     * `round(opaqueFraction × 1024)` pixels set to [opaqueColor]
+     * and the rest fully transparent. The opaque pixels are placed
+     * as a contiguous prefix (top rows first); the spatial pattern
+     * doesn't matter for the median, only the count.
+     *
+     * 32×32 matches the impl's downscale target, so
+     * `createScaledBitmap` is a no-op and the pixel counts survive
+     * exactly into the impl's filter.
+     */
+    private fun bitmapWithCoverage(
+        @androidx.annotation.ColorInt opaqueColor: Int,
+        opaqueFraction: Float,
+    ): Bitmap {
+        require(opaqueFraction in 0f..1f) { "fraction $opaqueFraction out of [0, 1]" }
+        val total = 32 * 32
+        val opaqueCount = (total * opaqueFraction).toInt()
+        val bmp = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(total) { idx ->
+            if (idx < opaqueCount) opaqueColor else Color.TRANSPARENT
+        }
+        bmp.setPixels(pixels, 0, 32, 0, 0, 32, 32)
+        return bmp
+    }
+
     private fun stubContentResolver(bitmap: Bitmap) {
         val baos = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
@@ -119,6 +231,19 @@ class WallpaperBitmapLuminanceImplTest {
         // openInputStream is called once per compute() invocation;
         // return a fresh stream each time so multiple calls in one
         // test don't fail on a closed stream.
+        every { contentResolver.openInputStream(any()) } answers { ByteArrayInputStream(bytes) }
+    }
+
+    /**
+     * Stubs `ContentResolver.openInputStream` to read a real PNG
+     * from `src/test/resources/...`. Buffers the resource into a
+     * byte array so each `openInputStream` call gets a fresh
+     * stream — symmetric to [stubContentResolver] above.
+     */
+    private fun stubContentResolverFromResource(resourcePath: String) {
+        val bytes = javaClass.getResourceAsStream(resourcePath)
+            ?.use { it.readBytes() }
+            ?: error("Test resource not found: $resourcePath")
         every { contentResolver.openInputStream(any()) } answers { ByteArrayInputStream(bytes) }
     }
 }

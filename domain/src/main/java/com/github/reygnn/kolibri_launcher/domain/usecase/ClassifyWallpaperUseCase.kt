@@ -19,12 +19,24 @@ import javax.inject.Inject
  *    visually dominant). Single-layer: classify the only image.
  *    Multi-layer: classify `layers[0]` (the bottom-most layer in
  *    the render order, painted first), but only when it is "opaque
- *    enough to dominate perception" — alpha ≥
- *    [DOMINANT_ALPHA_THRESHOLD] **and** Normal blend mode (no
- *    `blendModeName`). Otherwise the classifier falls through to
- *    the system signal, because the user is layering transparent
- *    detail layers over the system wallpaper and the system colour
- *    is what they actually see.
+ *    enough to dominate perception". Two cooperating gates decide
+ *    that:
+ *
+ *    - **Layer-level alpha gate** (this use case): the persisted
+ *      `WallpaperLayerState.alpha` ≥ [DOMINANT_ALPHA_THRESHOLD]
+ *      **and** Normal blend mode (no `blendModeName`).
+ *    - **Pixel-level coverage gate**
+ *      (`WallpaperBitmapLuminanceImpl`): the bitmap itself must
+ *      have a high enough fraction of effectively-opaque pixels
+ *      (alpha ≥ 80%) to dominate. AMOLED-converted wallpapers
+ *      typically have 10..20% coverage and fall through this gate;
+ *      fully-opaque images have ~100% and pass. The impl signals
+ *      "not visually dominant" by returning `null` from
+ *      `compute()`, indistinguishable from a load failure.
+ *
+ *    When either gate fails, the classifier falls through to the
+ *    system signal — that's what the user actually sees through the
+ *    transparent or low-coverage Kolibri layer.
  *
  *    Edge case (documented limitation): an opaque layer with a
  *    non-Normal blend mode (e.g. MULTIPLY at alpha 1.0 over a

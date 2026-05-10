@@ -78,14 +78,17 @@ inspecting *one* signal at a time, in priority order:
 
 1. Kolibri-internal wallpaper, but only `layers[0]` (the bottom-
    most layer in render order) — and only when it's "opaque
-   enough to dominate perception": `alpha >= 0.8` **and** Normal
-   blend mode (no `blendModeName`).
+   enough to dominate perception". Two cooperating gates make that
+   call: a **layer-level** alpha gate (`WallpaperLayerState.alpha`
+   ≥ 0.8 and Normal blend) and a **pixel-level** coverage gate
+   (≥ 50% of pixels with alpha ≥ 80% inside the bitmap itself).
+   Either gate failing routes the classifier to the next signal.
 2. System-wallpaper `colorHints` (`HINT_SUPPORTS_DARK_TEXT`).
 3. Fallback: DARK.
 
 The classifier never composites multiple Kolibri layers together
 to estimate the user-perceived background. When `layers[0]` fails
-the alpha-or-blend gate, the classifier punts to the system
+either dominance gate, the classifier punts to the system
 signal — even if a *higher* layer (e.g. `layers[1]`) is fully
 opaque and dominates the actual composition.
 
