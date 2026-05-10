@@ -90,6 +90,18 @@
     <string name="change_wallpaper_title">Wallpaper ändern</string>
     <string name="change_wallpaper_summary">System-Wallpaper Auswahl öffnen</string>
 
+    <string name="app_drawer_mode_title">Stil des App-Drawers</string>
+    <string-array name="app_drawer_mode_entries">
+        <item>Automatisch (folgt Wallpaper)</item>
+        <item>Hell</item>
+        <item>Dunkel</item>
+    </string-array>
+    <string-array name="app_drawer_mode_values">
+        <item>AUTO</item>
+        <item>LIGHT</item>
+        <item>DARK</item>
+    </string-array>
+
     <string name="category_gestures_title">Gesten</string>
     <string name="double_tap_to_lock_title">Doppeltippen zum Sperren</string>
     <string name="double_tap_to_lock_summary">Sperrt den Bildschirm durch doppeltes Tippen auf einen leeren Bereich</string>

@@ -4,6 +4,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -264,6 +265,7 @@ class FakeSettingsRepository : SettingsRepository {
         secureWindow = AppConstants.DEFAULT_SECURE_WINDOW
 
         favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+        appDrawerModeState.value = AppConstants.DEFAULT_APP_DRAWER_MODE
 
         onboardingCompletedState.value = wasOnboardingCompleted
     }
@@ -311,5 +313,19 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) {
         favoritesAlignment = alignment
+    }
+
+    // appDrawerMode
+    private val appDrawerModeState =
+        MutableStateFlow(AppConstants.DEFAULT_APP_DRAWER_MODE)
+
+    var appDrawerMode: AppDrawerMode
+        get() = appDrawerModeState.value
+        set(value) { appDrawerModeState.value = value }
+
+    override val appDrawerModeFlow: Flow<AppDrawerMode> = appDrawerModeState
+
+    override suspend fun setAppDrawerMode(mode: AppDrawerMode) {
+        appDrawerMode = mode
     }
 }

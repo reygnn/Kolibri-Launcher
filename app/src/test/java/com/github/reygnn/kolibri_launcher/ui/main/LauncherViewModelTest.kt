@@ -8,8 +8,10 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.SavedStateHandle
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
@@ -112,6 +114,7 @@ class LauncherViewModelTest {
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
     private lateinit var setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase
+    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
@@ -132,6 +135,10 @@ class LauncherViewModelTest {
             every { registerReceiver(any(), any(), any<Int>()) } returns null
             every { getString(any<Int>(), any<Any>()) } returns "formatted"
             every { getString(any<Int>()) } returns "string"
+            // ContextCompat.getColor() routes through Context.getColor() on
+            // API 23+; the actual int doesn't matter for these tests, only
+            // that the call returns without throwing.
+            every { getColor(any<Int>()) } returns 0
         }
 
         getFavoriteAppsUseCase = mockk {
@@ -184,6 +191,9 @@ class LauncherViewModelTest {
         setFontBoldUseCase = mockk(relaxed = true)
         setContentTopMarginUseCase = mockk(relaxed = true)
         setFavoritesAlignmentUseCase = mockk(relaxed = true)
+        resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
+        every { resolveAppDrawerSurfaceUseCase.invoke() } returns
+                flowOf(AppDrawerSurfaceClassification.DARK)
 
         observeWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
@@ -232,6 +242,7 @@ class LauncherViewModelTest {
         setFontBoldUseCase = setFontBoldUseCase,
         setContentTopMarginUseCase = setContentTopMarginUseCase,
         setFavoritesAlignmentUseCase = setFavoritesAlignmentUseCase,
+        resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
         setWallpaperImageUseCase = setWallpaperImageUseCase,

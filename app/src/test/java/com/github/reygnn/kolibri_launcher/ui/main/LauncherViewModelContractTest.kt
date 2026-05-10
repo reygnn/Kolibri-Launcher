@@ -246,6 +246,7 @@ class LauncherViewModelContractTest {
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
             setFavoritesAlignmentUseCase = mockk(relaxed = true),
+            resolveAppDrawerSurfaceUseCase = mockk(relaxed = true),
             observeWallpaperStateUseCase = observeWallpaperStateUseCase,
             saveWallpaperStateUseCase = saveWallpaperStateUseCase,
             setWallpaperImageUseCase = setWallpaperImageUseCase,

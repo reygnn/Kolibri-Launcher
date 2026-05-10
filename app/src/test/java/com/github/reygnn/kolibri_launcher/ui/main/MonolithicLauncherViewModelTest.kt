@@ -48,6 +48,8 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -196,6 +198,7 @@ class MonolithicLauncherViewModelTest {
     private val setFontBoldUseCase: SetFontBoldUseCase = mockk(relaxed = true)
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase = mockk(relaxed = true)
     private val setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase = mockk(relaxed = true)
+    private val resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel
@@ -227,6 +230,9 @@ class MonolithicLauncherViewModelTest {
         every { getLayoutSettingsUseCase.favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
 
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
+
+        every { resolveAppDrawerSurfaceUseCase.invoke() } returns
+                flowOf(AppDrawerSurfaceClassification.DARK)
 
         coEvery { setWallpaperImageUseCase.invoke(any()) } returns Unit
         coEvery { clearWallpaperUseCase.invoke() } returns Unit
@@ -264,6 +270,7 @@ class MonolithicLauncherViewModelTest {
             setFontBoldUseCase,
             setContentTopMarginUseCase,
             setFavoritesAlignmentUseCase,
+            resolveAppDrawerSurfaceUseCase,
             observeWallpaperStateUseCase,
             saveWallpaperStateUseCase,
             setWallpaperImageUseCase,

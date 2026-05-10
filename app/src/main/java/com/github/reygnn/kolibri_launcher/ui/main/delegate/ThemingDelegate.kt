@@ -11,10 +11,13 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import android.app.WallpaperColors
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
@@ -34,6 +37,15 @@ class ThemingDelegate(
     private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase,
     private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
+    private val resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase,
+    /**
+     * The two pre-defined AppDrawer surface colours, resolved by the
+     * ViewModel from `R.color.app_drawer_surface_*` and passed in as
+     * raw ARGB ints. Doing the resource resolution outside the
+     * delegate keeps `ThemingDelegate` Context-free.
+     */
+    private val appDrawerSurfaceLightColor: Int,
+    private val appDrawerSurfaceDarkColor: Int,
     private val scope: DelegateScope
 ) {
 
@@ -41,6 +53,10 @@ class ThemingDelegate(
 
     private val _uiColorsState = MutableStateFlow(UiColorsState())
     val uiColorsState: StateFlow<UiColorsState> = _uiColorsState.asStateFlow()
+
+    private val _appDrawerSurfaceState =
+        MutableStateFlow<ResolvedBackground>(ResolvedBackground.SolidColor(appDrawerSurfaceDarkColor))
+    val appDrawerSurfaceState: StateFlow<ResolvedBackground> = _appDrawerSurfaceState.asStateFlow()
 
     // --- Internal: WallpaperColors als Input für den UseCase ---
 
@@ -52,6 +68,15 @@ class ThemingDelegate(
         scope.launchSafe("Error observing UI colors") {
             observeUiColorsUseCase(wallpaperColorsFlow).collect { colorsState ->
                 _uiColorsState.value = colorsState
+            }
+        }
+        scope.launchSafe("Error observing AppDrawer surface") {
+            resolveAppDrawerSurfaceUseCase().collect { classification ->
+                val color = when (classification) {
+                    AppDrawerSurfaceClassification.LIGHT -> appDrawerSurfaceLightColor
+                    AppDrawerSurfaceClassification.DARK -> appDrawerSurfaceDarkColor
+                }
+                _appDrawerSurfaceState.value = ResolvedBackground.SolidColor(color)
             }
         }
     }

@@ -1,9 +1,11 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import android.app.WallpaperColors
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
@@ -44,6 +46,7 @@ class ThemingDelegateTest {
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
+    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase
 
     @Before
     fun setUp() {
@@ -54,6 +57,9 @@ class ThemingDelegateTest {
         setTextShadowEnabledUseCase = mockk(relaxed = true)
         setChipBackgroundColorUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
+        resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
+        every { resolveAppDrawerSurfaceUseCase.invoke() } returns
+                flowOf(AppDrawerSurfaceClassification.DARK)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -68,8 +74,16 @@ class ThemingDelegateTest {
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
+        resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
+        appDrawerSurfaceLightColor = APP_DRAWER_LIGHT_TEST_COLOR,
+        appDrawerSurfaceDarkColor = APP_DRAWER_DARK_TEST_COLOR,
         scope = createDelegateScope()
     )
+
+    companion object {
+        private const val APP_DRAWER_LIGHT_TEST_COLOR: Int = 0xF0FFFFFF.toInt()
+        private const val APP_DRAWER_DARK_TEST_COLOR: Int = 0xDD000000.toInt()
+    }
 
     // ===========================================
     // INITIAL STATE

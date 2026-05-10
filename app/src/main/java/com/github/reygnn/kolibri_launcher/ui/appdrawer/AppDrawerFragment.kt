@@ -226,14 +226,28 @@ class AppDrawerFragment : Fragment() {
             binding.fabSort.setImageResource(iconRes)
         }
 
-        // Observer 3: UI colors
+        // Observer 3: AppDrawer surface — drives drawer root background AND
+        // the adapter's text/shadow colours. Decoupled from `uiColorsState`
+        // (which still feeds the homescreen) on purpose: the drawer is its
+        // own binary visual surface, so its foreground colour follows
+        // `ResolvedBackground.foregroundColor()` per WCAG, NOT the
+        // homescreen-wallpaper-derived colour. Shadow is 0 (transparent)
+        // because the drawer surface is solid and shadow exists for
+        // wallpaper-legibility, which doesn't apply here.
+        //
+        // Initial StateFlow value is `SolidColor(@color/app_drawer_surface_dark)`,
+        // matching the XML default — regression-safe.
         collectOnStarted(
-            flow = viewModel.uiColorsState,
-            errorTag = "uiColorsState",
+            flow = viewModel.appDrawerSurfaceState,
+            errorTag = "appDrawerSurfaceState",
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { colors ->
+        ) { surface ->
             if (_binding == null || !isAdded) return@collectOnStarted
-            appDrawerAdapter?.setUiColors(colors.textColor, colors.shadowColor)
+            binding.appDrawerRoot.setBackgroundColor(surface.color)
+            appDrawerAdapter?.setUiColors(
+                textColor = surface.foregroundColor(),
+                shadowColor = 0,
+            )
         }
 
         // Observer 4: favorites alignment — TEMPORARILY DISABLED

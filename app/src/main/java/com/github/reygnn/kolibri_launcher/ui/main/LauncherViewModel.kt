@@ -13,6 +13,7 @@ import android.app.WallpaperColors
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LiveData
@@ -25,6 +26,7 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
+import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -48,6 +50,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
@@ -121,6 +124,7 @@ class LauncherViewModel @Inject constructor(
     setFontBoldUseCase: SetFontBoldUseCase,
     setContentTopMarginUseCase: SetContentTopMarginUseCase,
     setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase,
+    resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase,
     observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
     setWallpaperImageUseCase: SetWallpaperImageUseCase,
@@ -189,6 +193,9 @@ class LauncherViewModel @Inject constructor(
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
+        resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
+        appDrawerSurfaceLightColor = ContextCompat.getColor(context, R.color.app_drawer_surface_light),
+        appDrawerSurfaceDarkColor = ContextCompat.getColor(context, R.color.app_drawer_surface_dark),
         scope = delegateScope
     )
 
@@ -245,6 +252,7 @@ class LauncherViewModel @Inject constructor(
     val appDrawerSearchQuery: StateFlow<String> get() = appDelegate.appDrawerSearchQuery
 
     val uiColorsState: StateFlow<UiColorsState> get() = themingDelegate.uiColorsState
+    val appDrawerSurfaceState: StateFlow<ResolvedBackground> get() = themingDelegate.appDrawerSurfaceState
 
     val layoutScaleState: StateFlow<Float> get() = layoutDelegate.layoutScaleState
     val verticalPaddingState: StateFlow<Float> get() = layoutDelegate.verticalPaddingState

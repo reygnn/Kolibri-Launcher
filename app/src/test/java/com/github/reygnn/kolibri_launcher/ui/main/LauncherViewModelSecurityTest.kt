@@ -171,6 +171,7 @@ class LauncherViewModelSecurityTest {
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,
             setFavoritesAlignmentUseCase = mockk(relaxed = true),
+            resolveAppDrawerSurfaceUseCase = mockk(relaxed = true),
             observeWallpaperStateUseCase = observeWallpaperStateUseCase,
             saveWallpaperStateUseCase = mockk(relaxed = true),
             setWallpaperImageUseCase = mockk(relaxed = true),

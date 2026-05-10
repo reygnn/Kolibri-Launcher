@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 
@@ -78,6 +79,7 @@ object AppConstants {
     const val FALLBACK_FONT_BOLD = DEFAULT_FONT_BOLD
     val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
     val DEFAULT_FAVORITES_ALIGNMENT = FavoritesAlignment.START
+    val DEFAULT_APP_DRAWER_MODE = AppDrawerMode.AUTO
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"
@@ -197,6 +199,7 @@ object AppConstants {
         const val CONTENT_TOP_MARGIN_SCALE = "content_top_margin_scale"
         const val FAVORITES_ALIGNMENT = "favorites_alignment"
         const val ROTATION_LOCKED = "rotation_locked"
+        const val APP_DRAWER_MODE = "app_drawer_mode"
 
         // Home Screen Features
         const val SHOW_CALENDAR_EVENT = "show_calendar_event"

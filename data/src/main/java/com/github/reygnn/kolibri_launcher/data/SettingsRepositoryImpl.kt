@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -38,6 +39,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
         val READABILITY_MODE = stringPreferencesKey(AppConstants.PrefKeys.READABILITY_MODE)
         val FAVORITES_ALIGNMENT = stringPreferencesKey(AppConstants.PrefKeys.FAVORITES_ALIGNMENT)
+        val APP_DRAWER_MODE = stringPreferencesKey(AppConstants.PrefKeys.APP_DRAWER_MODE)
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
@@ -273,6 +275,21 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) {
         safeEdit { it[PreferenceKeys.FAVORITES_ALIGNMENT] = alignment.name }
+    }
+
+    override val appDrawerModeFlow: Flow<AppDrawerMode> = dataStore.data.safeData
+        .map { preferences ->
+            val name = preferences[PreferenceKeys.APP_DRAWER_MODE]
+                ?: return@map AppConstants.DEFAULT_APP_DRAWER_MODE
+            try {
+                AppDrawerMode.valueOf(name)
+            } catch (e: Throwable) {
+                AppConstants.DEFAULT_APP_DRAWER_MODE
+            }
+        }
+
+    override suspend fun setAppDrawerMode(mode: AppDrawerMode) {
+        safeEdit { it[PreferenceKeys.APP_DRAWER_MODE] = mode.name }
     }
 
     override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data.safeData

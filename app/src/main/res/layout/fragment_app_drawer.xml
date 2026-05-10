@@ -6,7 +6,7 @@
     android:id="@+id/app_drawer_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#DD000000"
+    android:background="@color/app_drawer_surface_dark"
     android:fitsSystemWindows="true"> <FrameLayout
         android:id="@+id/search_container"
         android:layout_width="0dp"

@@ -157,6 +157,7 @@ class LauncherViewModelDoomsdayTest {
         setFontBoldUseCase = mockk(relaxed = true),
         setContentTopMarginUseCase = mockk(relaxed = true),
         setFavoritesAlignmentUseCase = mockk(relaxed = true),
+        resolveAppDrawerSurfaceUseCase = mockk(relaxed = true),
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = mockk(relaxed = true),
         setWallpaperImageUseCase = mockk(relaxed = true),

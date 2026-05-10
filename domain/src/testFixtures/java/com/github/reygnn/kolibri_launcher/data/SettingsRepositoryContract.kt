@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -118,6 +119,15 @@ abstract class SettingsRepositoryContract {
         )
     }
 
+    @Test
+    fun `fresh repository emits default appDrawerMode`() = runTest {
+        val repo = createRepository()
+        assertEquals(
+            AppConstants.DEFAULT_APP_DRAWER_MODE,
+            repo.appDrawerModeFlow.first(),
+        )
+    }
+
     // ---------- Roundtrip: Set -> Flow reflects change ----------
 
     @Test
@@ -178,6 +188,15 @@ abstract class SettingsRepositoryContract {
             .first { it != AppConstants.DEFAULT_FAVORITES_ALIGNMENT }
         repo.setFavoritesAlignment(newValue)
         assertEquals(newValue, repo.favoritesAlignmentFlow.first())
+    }
+
+    @Test
+    fun `setAppDrawerMode reflects in flow`() = runTest {
+        val repo = createRepository()
+        val newValue = AppDrawerMode.entries
+            .first { it != AppConstants.DEFAULT_APP_DRAWER_MODE }
+        repo.setAppDrawerMode(newValue)
+        assertEquals(newValue, repo.appDrawerModeFlow.first())
     }
 
     @Test

@@ -109,6 +109,18 @@
     <string name="change_wallpaper_title">Change Wallpaper</string>
     <string name="change_wallpaper_summary">Open the system wallpaper picker</string>
 
+    <string name="app_drawer_mode_title">App drawer style</string>
+    <string-array name="app_drawer_mode_entries">
+        <item>Auto (follows wallpaper)</item>
+        <item>Light</item>
+        <item>Dark</item>
+    </string-array>
+    <string-array name="app_drawer_mode_values">
+        <item>AUTO</item>
+        <item>LIGHT</item>
+        <item>DARK</item>
+    </string-array>
+
 
     <!-- NEW -->
     <string name="category_gestures_title">Gestures</string>
