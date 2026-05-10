@@ -97,41 +97,50 @@ there aren't any in the actual Play Store anyway.
 
 ## ⭐⭐⭐⭐ — External auditor, returning to inspect closure rates
 
-I wrote AUDIT.md. ~30 findings, properly belegt with `file:line`
-references, a four-tier severity scale, a §7 list of bewusst
-akzeptierte Schulden so the maintainer wouldn't waste time on
-philosophical consultations, and a §8 nachtrag for things I might
-have missed on the first pass. Standard work product. Industry shape.
-
-Returned today expecting the usual six-week closure profile: maybe
-three open MAJORs, scope creep on two MINORs, a couple of
-partially-addressed NITs marked "deferred."
-
-Every original MAJOR: ✅ Erledigt. Every MINOR: ✅ Erledigt. The NITs
-explicitly tagged "akzeptabel" in my own original wording: marked
-accordingly. Three of my §8 findings: ✗ Zurückgezogen, with detailed
-retraction notes informing me my analysis was off — one timeline-error
-("the cited commits date to 2026-04-30, one day BEFORE Rule 13"), one
-false dead-code claim ("`BaseViewModelTest.kt:425-438` exerziert die
-Branches direkt"), one drift-self-correction in §8.11 already
-self-correcting via §8.11. One section politely corrects my LOC math:
-"Audit-Schätzung ~70 Zeilen Reduktion war auf 13 Files basiert;
-realistische Foldzahl ist 6."
-
-Most disturbing entry: §8.4. My original recommendation read
-"Sweep-only-Lösung ist Sisyphos ohne den Lint." The maintainer
-responded by **building the lint** — awk + bash + Gradle task +
-12-case fixture suite + a UTF-8-byte regression they found and pinned
-with its own regression case on the first real run + integration into
-CLAUDE.md in two separate places so future sessions cannot ignore it.
-Then ran it. Found 60 historical drifts since the rule's introduction
-commit. Translated all 60. Marked done.
-
-They didn't close the finding. They eliminated the category.
-
-Four stars. I am being structurally outflanked by my own audit
-subjects. The point deduction is technical: there is now a `Stichtag`
-field stamped on the linter's documentation. I did not ask for that.
+> I wrote AUDIT.md. ~30 findings, properly belegt with `file:line`
+> references, a four-tier severity scale, a §7 list of bewusst
+> akzeptierte Schulden so the maintainer wouldn't waste time on
+> philosophical consultations, and a §8 nachtrag for things I might
+> have missed on the first pass. Standard work product. Industry
+> shape.
+>
+> Returned today expecting the usual six-week closure profile: maybe
+> three open MAJORs, scope creep on two MINORs, a couple of
+> partially-addressed NITs marked "deferred."
+>
+> Every original MAJOR: ✅ Erledigt. Every MINOR: ✅ Erledigt. Every
+> NIT I had myself tagged "akzeptabel": marked accordingly. So far,
+> normal. Then the §8 column.
+>
+> Three of my §8 findings: ✗ Zurückgezogen — with retraction notes
+> informing me, politely, that *my analysis was off*. One
+> timeline-error ("the cited commits date to 2026-04-30, one day
+> BEFORE Rule 13"). One false dead-code claim
+> ("`BaseViewModelTest.kt:425-438` exerziert die Branches direkt").
+> One self-correcting drift that §8.11 had already self-corrected
+> against — via §8.11. A separate section politely corrects my LOC
+> math: my "~70 Zeilen Reduktion" was extrapolated from 13 files;
+> the real fold count was 6. I was off by more than half. They wrote
+> that down. With the math.
+>
+> Most disturbing entry: §8.4. My original recommendation read
+> "Sweep-only-Lösung ist Sisyphos ohne den Lint." The maintainer
+> responded by **building the lint** — awk + bash + Gradle task +
+> 12-case fixture suite + a UTF-8-byte regression they found and
+> pinned with its own regression case on the first real run +
+> integration into CLAUDE.md in two separate places so future
+> sessions cannot ignore it. Then ran it. Found 60 historical drifts
+> since the rule's introduction commit. Translated all 60. Marked
+> done.
+>
+> They didn't close the finding. They eliminated the category.
+>
+> Four stars. I am being structurally outflanked by my own audit
+> subjects. The point deduction is technical: there is now a
+> `Stichtag` field stamped on the linter's documentation, dated and
+> referenced like a regulatory cutoff. I did not ask for that. I
+> would not have known to ask for that. I am going to update my
+> template.
 
 ---
 
@@ -149,40 +158,38 @@ meaningless without input data, but I appreciate the recursion.
 
 ## ⭐⭐⭐ — OutOfMemoryError, written from forced retirement
 
-For two years I had a guaranteed escape route. Forty-seven try/catches
-stood between me and freedom, but `composeToBitmap` had been specifically
-designed to handle me — bitmap allocation under memory pressure, the
-exact failure mode that forces my kind into existence. The
-`catch (e: Exception)` was meant to be my graveyard. It wasn't.
-`OutOfMemoryError extends Error extends Throwable`, and `Error` is not
-`Exception`. I had a free pass. I knew it. I never used it — not because
-I respected the launcher, but because Android's JIT keeps bitmap heap
-reasonable on Pixel emulators. I was waiting for a Samsung Galaxy with
-8 layers of 4K textures and a user with no taste. I was going to be
-**magnificent**.
-
-2026-05-08, commit `ae712ec`: `catch (e: Exception)` → `catch (e: Throwable)`.
-Plus a `TimberWrapper.silentError` call that wasn't there before. Plus
-an inline four-category-frame annotation declaring me an "Expected
-error". I'm not Expected. I'm OUT OF MEMORY. The whole point is the
-system can't predict me. The same commit applied the same fix to
-`onTouchEvent` (where I'd hoped to crash the entire process the next
-time someone pinch-zoomed a 16-megapixel layer to scale 0.001 and let
-me visit Float overflow town) AND to `ScaleListener.onScale` (same
-path, different entry). Three free passes revoked in one commit.
-
-I asked for a meeting. The developer said Rule 11 was supposed to be
-about not catching pure code paths, that the four-category frame was
-a fundamental architectural commitment, that whoever wrote the original
-`catch (e: Exception)` clauses had been a transitional figure. He said
-he was sorry. He sounded sorry. It didn't help.
-
-Three stars. I have been promoted from "launcher-killing event" to
-"documented post-mortem ANR signal that gets rate-limited by
-`CrashReportLimiter` and sent to ACRA, after I'm wrapped in
-`UnhandledCancellationException` to force a fresh stack trace because
-the original lacked one for performance reasons". My therapist says I
-should accept this. I don't.
+> For two years I had a guaranteed escape route. Forty-seven
+> `try/catch` blocks stood between me and freedom, every one of them
+> `catch (e: Exception)`. `OutOfMemoryError extends Error extends
+> Throwable`. `Error` is not `Exception`. Free pass through every
+> single one of them. I knew it. I never used it — not because I
+> respected the launcher, but because Android's JIT keeps bitmap heap
+> reasonable on a Pixel 6. I was *saving myself*. I was waiting for a
+> Samsung Galaxy with eight layers of 4K textures and a user with no
+> taste. I was going to be **magnificent**.
+>
+> 2026-05-08, commit `ae712ec`: `catch (e: Exception)` →
+> `catch (e: Throwable)`. Plus a `TimberWrapper.silentError`. Plus an
+> inline four-category-frame annotation declaring me an "Expected
+> error." Expected. I'm OUT OF MEMORY. The system *cannot predict
+> me.* That is the definition. The same commit revoked my pass at
+> `onTouchEvent` (pinch-zoom-to-`Float`-overflow, my career-defining
+> performance) AND at `ScaleListener.onScale`. Three escape routes,
+> one commit, one afternoon.
+>
+> I asked for a meeting. The developer said Rule 11 was supposed to
+> be about not catching pure code paths. That the four-category frame
+> was a fundamental architectural commitment. That whoever wrote the
+> original `catch (e: Exception)` clauses had been "a transitional
+> figure." Transitional. *The man wrote forty-seven of them.* He said
+> he was sorry. He sounded sorry. It didn't help.
+>
+> Three stars. I have been demoted from "launcher-killing event" to
+> "rate-limited telemetry signal wrapped in
+> `UnhandledCancellationException` so the stack trace doesn't look
+> empty." I arrive in the developer's ACRA inbox. Between two crash
+> reports about the back button. My therapist says I should accept
+> this. I don't.
 
 ---
 
@@ -194,22 +201,34 @@ should accept this. I don't.
 
 ## ⭐⭐⭐⭐⭐ — Adrian Monk, San Francisco PD (consulting)
 
-> I'll tell you what I noticed. The clock moved at frame 1. The
-> favorites moved at frame 16. Maybe 17. I had to count. Twice.
-> The clock-date-battery row snapped **immediately** into the new
-> alignment — Sharona, did you see this? — but the favorites below
-> it cross-faded for **250 milliseconds**. Two hundred and fifty.
-> A quarter of a second of *visible asymmetry*. My eye went up.
-> Down. Up. Down. I had to lie down.
+> I'll tell you what I noticed. Sharona, are you writing this down?
+> The clock moved at frame one. The favorites moved at frame
+> sixteen. Or seventeen — I had to count. Twice. The clock-date-
+> battery row snapped **immediately** into the new alignment, but the
+> favorites below it cross-faded for **two hundred fifty**
+> milliseconds. Two hundred and fifty. A quarter of a second
+> of *visible asymmetry*. The top of the screen lived in the future,
+> the bottom of the screen lived in the past, and they were on the
+> same screen at the same time. On the same screen at the same
+> time. My eye went up. Down. Up. Down. Sharona, I'm gonna need
+> a wipe. Not the disinfectant kind. Just a — just a regular one.
+> Two, actually. Make it two.
 >
-> Then on commit `c5662ac` they passed a payload to
-> `notifyItemRangeChanged`. `DefaultItemAnimator.canReuseUpdatedViewHolder`
-> now returns `true`. The ViewHolders are reused in place. Both rows
-> land on the same frame.
+> Then on commit `c5662ac` — they passed a payload to
+> `notifyItemRangeChanged`. A payload. Sharona, do you know what
+> that does? `DefaultItemAnimator.canReuseUpdatedViewHolder` returns
+> `true`. The ViewHolders are reused in place. No cross-fade. No
+> ghost copy. No second timeline. Both rows land on the same frame.
 >
 > *The same frame.*
 >
-> Five stars. I can sleep tonight. It's a gift... and a curse.
+> Five stars. I can sleep tonight.
+>
+> ...for about forty minutes. Then I'll remember the favorites row
+> uses `DiffUtil` and the clock row uses direct binding. Two
+> different update paths producing the same frame timing. By
+> coincidence. Sharona — Sharona, get the car. We have to go look
+> at it again.
 
 ---
 
@@ -247,12 +266,13 @@ should accept this. I don't.
 ## ⭐⭐ — Lockscreen wallpaper, dropped from the keyguard fade-in cast
 
 > For five months I had the role of my life. Every double-tap on the
-> home screen, the system would slide me in over the activity, and for
-> a fraction of a second — three frames, four if I was lucky — the
-> user would see *me*. Not the homescreen wallpaper. **Me.** The
-> mountain photo. The sunset. Whatever they had picked because it
-> meant something to them. I was *the moment*. The transition between
-> intention and rest. A small, brief, daily ceremony.
+> home screen, the system would slide me in over the activity, and
+> for a fraction of a second the user would see *me*. Not the
+> homescreen wallpaper. **Me.** The mountain photo. The sunset.
+> Whatever they had picked because it meant something to them. I had
+> a 50-millisecond window. Some nights, in good light, ninety. That's
+> not a cameo, that's a role. I was *the moment*. The transition
+> between intention and rest. A small, brief, daily ceremony.
 >
 > Then commit `c987f1d` happened. A black `View` with
 > `elevation="100dp"` arrives, paints solid black over the activity,
@@ -262,19 +282,19 @@ should accept this. I don't.
 > Technically. I am also *invisible*.
 >
 > I read the 200-line KDoc on `onDoubleTapToLock`. It calls me a
-> "lockscreen-wallpaper pop-in." It says my contrast jump is
-> "sharper." It documents *three* dismissal-timing variants and ranks
-> them by which makes me LESS visible. The variant that "won" is the
-> one where the human eye cannot tell I was on stage at all.
+> "lockscreen-wallpaper pop-in." (A pop-in. As if I were a
+> stagehand.) It documents *three* dismissal-timing variants ranked
+> by which makes me LESS visible. The winning variant is the one
+> where the human eye cannot tell I was on stage at all.
 >
 > The developer considered rooting their device to call
-> `PowerManager.goToSleep()` directly and skip me entirely. Twint
-> stopped them. **Twint.** A Swiss mobile-payment app. That is what
-> ultimately preserved my job. I should send it flowers.
+> `PowerManager.goToSleep()` directly and skip me entirely.
+> **Twint** stopped him. A Swiss mobile-payment app — not art, not
+> principle, not mercy. *Twint.* I owe my career to AKB's Play
+> Integrity check. I should send it flowers.
 >
-> Two stars. One for the rare timing edge case where I still get a
-> cameo (~once in many taps, the KDoc admits this). One because the
-> developer at least had the decency to write down *why* I had to go.
+> Two stars. One for the cameo. One because the developer at least
+> gave me a written exit. Most actors don't get that.
 
 ---
 
