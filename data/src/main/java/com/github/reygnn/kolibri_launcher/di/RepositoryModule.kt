@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.UsageExportRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.WallpaperRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -32,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
@@ -110,4 +112,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWallpaperRepository(impl: WallpaperRepositoryImpl): WallpaperRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWallpaperBitmapLuminance(impl: WallpaperBitmapLuminanceImpl): WallpaperBitmapLuminance
 }

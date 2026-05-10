@@ -62,3 +62,73 @@ Reopen this entry if any of the following changes:
   `PowerManager#goToSleep` back on the table.
 - The launcher is forked into a "developer build" variant where
   banking compatibility is no longer a constraint.
+
+---
+
+## 2. AppDrawer AUTO-mode classifier ignores layer composition
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Two narrow shapes — see "When the heuristic punts"
+- **Affected:** Multi-layer Kolibri-internal wallpapers in AUTO mode
+
+### Explanation
+
+`ClassifyWallpaperUseCase` decides between LIGHT and DARK by
+inspecting *one* signal at a time, in priority order:
+
+1. Kolibri-internal wallpaper, but only `layers[0]` (the bottom-
+   most layer in render order) — and only when it's "opaque
+   enough to dominate perception": `alpha >= 0.8` **and** Normal
+   blend mode (no `blendModeName`).
+2. System-wallpaper `colorHints` (`HINT_SUPPORTS_DARK_TEXT`).
+3. Fallback: DARK.
+
+The classifier never composites multiple Kolibri layers together
+to estimate the user-perceived background. When `layers[0]` fails
+the alpha-or-blend gate, the classifier punts to the system
+signal — even if a *higher* layer (e.g. `layers[1]`) is fully
+opaque and dominates the actual composition.
+
+### When the heuristic punts (the two known soft spots)
+
+- **Transparent `layers[0]` + opaque `layers[1]+`.** A user with
+  `[transparent grey detail, opaque blue background]` would have
+  the blue dominate visually. The classifier sees `layers[0].alpha
+  < 0.8`, falls through to the system signal, and may pick the
+  wrong surface. (In practice the typical Kolibri-multi-layer
+  setup is "opaque background at index 0, detail overlays above"
+  — the inverse — so this case is uncommon.)
+- **Opaque `layers[0]` with non-Normal blend.** An opaque layer
+  with e.g. MULTIPLY at alpha 1.0 over a bright underlying image
+  visually darkens the result, but the classifier punts to the
+  system signal rather than approximate the blend. Documented in
+  the use-case KDoc.
+
+### Why we don't fix it further
+
+Compositing layers properly requires loading every layer's
+bitmap, allocating an N×M ARGB buffer, running the blend ops in
+order, and sampling luminance from the result. That's a real
+mini-render pipeline. The cost-vs.-coverage trade is unfavourable
+right now: the alpha-gate-on-`layers[0]` heuristic is correct for
+the common shape (opaque bottom + detail overlays + the
+single-layer case), and shipping a partially-correct compositor
+would only paper over edge cases that the user can already work
+around by picking LIGHT or DARK manually (the explicit overrides
+exist for exactly this).
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- A user reports that AUTO consistently picks the wrong surface
+  for a multi-layer wallpaper they actually use, *and* the
+  manual LIGHT/DARK override is unsatisfactory (e.g., they
+  alternate between wallpapers that legitimately need different
+  surfaces).
+- The wallpaper editor grows a "preview composite as bitmap"
+  step that already runs the render pipeline — at that point the
+  classifier could reuse the result for free.
+- Multi-layer alpha conventions in the codebase shift (e.g.,
+  `layers[0]` becomes the *top* layer instead of the bottom by
+  some refactor) — the alpha-gate semantics would need to follow.

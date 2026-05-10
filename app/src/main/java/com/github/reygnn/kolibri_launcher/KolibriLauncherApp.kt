@@ -10,6 +10,8 @@
 package com.github.reygnn.kolibri_launcher
 
 import android.app.Application
+import android.app.WallpaperColors
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -18,7 +20,9 @@ import android.os.Looper
 import android.os.Process
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
@@ -69,6 +73,8 @@ class KolibriLauncherApp : Application() {
     lateinit var dataStoreBackup: DataStoreBackup
     @Inject
     lateinit var anrReporter: AnrReporter
+    @Inject
+    lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val packageUpdateReceiver = PackageUpdateReceiver()
@@ -258,6 +264,15 @@ class KolibriLauncherApp : Application() {
         Timber.d("[LIFECYCLE] Application.onCreate - Registering receiver...")
         registerPackageUpdateReceiver()
 
+        // Wire SystemWallpaperColorsSignal to WallpaperManager. Drives the
+        // AppDrawer's AUTO surface mode (and any future surface that wants
+        // to react to system-wallpaper colour-hint changes). Listener +
+        // initial poll, both inside the same outer catch — Rule 7 paranoia
+        // applies, and Rule 9's plain-Timber.e exception covers this file.
+        // No unregister: Application.onTerminate isn't called on real
+        // devices, and the signal is a process-lifetime singleton.
+        registerSystemWallpaperColorsListener()
+
         // Data migration - Ultra Paranoid version
         applicationScope.launch(applicationExceptionHandler) {
             try {
@@ -310,6 +325,53 @@ class KolibriLauncherApp : Application() {
             Timber.d("[LIFECYCLE] PackageUpdateReceiver registered successfully.")
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "[LIFECYCLE] Could not register PackageUpdateReceiver")
+        }
+    }
+
+    private fun registerSystemWallpaperColorsListener() {
+        // Plain Timber.e per Rule 9: KolibriLauncherApp is on the
+        // crash-handling-infrastructure exception list. silentError
+        // would throw in DEBUG and recurse into the same path it's
+        // supposed to be the safety net for.
+        try {
+            val wallpaperManager = WallpaperManager.getInstance(this)
+
+            wallpaperManager.addOnColorsChangedListener(
+                { colors, which ->
+                    if (which and WallpaperManager.FLAG_SYSTEM != 0) {
+                        emitSystemWallpaperColors(colors)
+                    }
+                },
+                // Main-thread callback. The body is a single StateFlow
+                // assignment; main-thread is fine.
+                Handler(Looper.getMainLooper()),
+            )
+
+            // Initial poll AFTER registration. The OS may post a
+            // duplicate emission for the already-current colours; the
+            // signal's StateFlow.value = … is idempotent so it's
+            // harmless. Polling after registering ensures we never
+            // miss a colour change that races with onCreate.
+            val initial = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            emitSystemWallpaperColors(initial)
+
+            Timber.d("[LIFECYCLE] SystemWallpaperColors listener registered.")
+        } catch (e: Throwable) {
+            Timber.e(e, "[LIFECYCLE] Could not wire SystemWallpaperColorsSignal")
+        }
+    }
+
+    private fun emitSystemWallpaperColors(colors: WallpaperColors?) {
+        try {
+            val domain = colors?.let {
+                DomainWallpaperColors(
+                    supportsDarkText = (it.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0,
+                    secondaryColorArgb = it.secondaryColor?.toArgb(),
+                )
+            }
+            systemWallpaperColorsSignal.emit(domain)
+        } catch (e: Throwable) {
+            Timber.e(e, "[LIFECYCLE] Could not emit SystemWallpaperColors")
         }
     }
 
