@@ -130,14 +130,16 @@ class WallpaperBitmapLuminanceImplTest {
     // ============================================================
     // Real-world-fixture pin: empirical anchors for the AMOLED-to-
     // transparent converter use case. The two PNGs in
-    // `data/src/test/resources/wallpaper/` are real outputs of that
-    // converter (a panther illustration; see git log of this
-    // commit). They lock in the ground truth Python analysis
-    // produced (amoled.png 100% opaque + dark; transparent.png
-    // 13.8% opaque, well below the 50% gate). If a future change
-    // breaks AMOLED-converted wallpapers — e.g., raising the
-    // coverage threshold past 13.8%, or losing alpha awareness in
-    // the median compute — these tests catch it.
+    // `data/src/test/resources/wallpaper/` are real outputs of
+    // chiaroscuro (https://github.com/reygnn/chiaroscuro), the
+    // maintainer's AMOLED-black → transparent PNG converter; see
+    // the README in that resource directory for provenance and
+    // ground-truth pixel statistics. These tests lock in the
+    // Python analysis (amoled.png 100% opaque + dark;
+    // transparent.png 13.8% opaque, well below the 50% gate). If
+    // a future change breaks AMOLED-converted wallpapers — e.g.,
+    // raising the coverage threshold past 13.8%, or losing alpha
+    // awareness in the median compute — these tests catch it.
     //
     // Bands rather than exact values: Robolectric's PNG decode is
     // faithful but not floating-point-byte-identical to the Android

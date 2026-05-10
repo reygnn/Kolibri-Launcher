@@ -42,11 +42,12 @@ import javax.inject.Singleton
  *   `compute` returns `null`. The caller then falls through to
  *   the system signal, which is what the user actually perceives.
  *
- * Empirical anchors (testPics/transparent.png, an AMOLED-converted
- * panther illustration over white system wallpaper): 13.8% opaque
- * coverage → falls through → system signal wins. The same image's
- * AMOLED original (testPics/amoled.png) has 100% coverage → passes,
- * classified DARK as expected.
+ * Empirical anchors live as test fixtures in
+ * `data/src/test/resources/wallpaper/` — see the README.md there
+ * for provenance ([chiaroscuro](https://github.com/reygnn/chiaroscuro)
+ * AMOLED-to-transparent converter). transparent.png at 13.8%
+ * coverage falls through to the system signal; the same image's
+ * AMOLED original at 100% coverage classifies DARK as expected.
  *
  * ## Sample size & threading
  *
