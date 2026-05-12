@@ -95,6 +95,19 @@ internal class WallpaperEditController(
     private fun wireEditModeListeners() {
         val wallpaperView = binding.wallpaperView
 
+        // ── TOUCH FORWARDING ──
+        // wallpaperEditOverlay sits above wallpaperView with a full-
+        // screen wallpaperTouchInterceptor as its bottom child. Without
+        // an explicit forward, pinch-to-zoom and drag-to-pan in edit
+        // mode never reach the wallpaperView — the interceptor (non-
+        // clickable, no listener) silently ends the touch dispatch for
+        // taps that fall outside the FAB cluster / CommandsPanel.
+        // Forward to the underlying view so its existing edit-mode
+        // gesture handling kicks in.
+        binding.wallpaperTouchInterceptor.setOnTouchListener { _, event ->
+            wallpaperView.onTouchEvent(event)
+        }
+
         // ── SAVE (Main FAB tap, drag-aware) ──
         fabCluster.setOnSaveClicked {
             val currentWallpaperState = viewModel.wallpaperState.value
@@ -209,6 +222,8 @@ internal class WallpaperEditController(
     }
 
     private fun clearEditModeListeners() {
+        binding.wallpaperTouchInterceptor.setOnTouchListener(null)
+
         fabCluster.setOnSaveClicked { /* no-op */ }
         fabCluster.setOnCancelClicked { /* no-op */ }
         fabCluster.setOnAddLayerClicked { /* no-op */ }
