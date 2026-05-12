@@ -38,8 +38,6 @@ class WallpaperEditTransitionTest {
             snapMode = ZoomableImageView.SnapMode.EDGE,
             overlayVisible = true,
             rootLayoutAlpha = 0.7f,
-            toolbarAlpha = 1.0f,
-            toolbarDockedTop = false,
         )
         assertEquals(expected, WallpaperEditTransition.targetState(WallpaperEditTransition.Enter))
     }
@@ -54,8 +52,6 @@ class WallpaperEditTransitionTest {
             snapMode = ZoomableImageView.SnapMode.EDGE,
             overlayVisible = false,
             rootLayoutAlpha = 1.0f,
-            toolbarAlpha = 1.0f,
-            toolbarDockedTop = false,
         )
         assertEquals(expected, WallpaperEditTransition.targetState(WallpaperEditTransition.Exit))
     }

@@ -353,7 +353,6 @@
 <string name="wallpaper_choose">Choose image</string>
 <string name="wallpaper_remove">Remove wallpaper</string>
 <string name="wallpaper_edit_hint">Pinch to zoom, drag to pan</string>
-<string name="wallpaper_save">Save</string>
 <string name="wallpaper_cancel">Cancel</string>
 <string name="wallpaper_snap_toggle">Snap on/off</string>
 <string name="wallpaper_snap_mode_toggle">Toggle snap-mode</string>
@@ -366,8 +365,10 @@
 <string name="wallpaper_original_size">Original size (1:1)</string>
 <string name="wallpaper_remove_confirm">Remove wallpaper and all layers? This cannot be undone.</string>
 <string name="wallpaper_remove_yes">Remove</string>
-<string name="toolbar_dock_toggle">Move toolbar</string>
 <string name="wallpaper_fit_width">Fit to width</string>
+<string name="cd_fab_save_drag">Save wallpaper edits. Drag to move this button.</string>
+<string name="cd_open_commands">More wallpaper-edit controls</string>
+<string name="cd_close_commands">Close controls</string>
 
 <string name="rotation_lock_title">Lock screen rotation</string>
 <string name="rotation_lock_summary">Keep the display in portrait orientation</string>

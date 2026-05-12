@@ -64,8 +64,6 @@ sealed interface WallpaperEditTransition {
                     snapMode = ZoomableImageView.SnapMode.EDGE,
                     overlayVisible = true,
                     rootLayoutAlpha = 0.7f,
-                    toolbarAlpha = 1.0f,
-                    toolbarDockedTop = false,
                 )
                 Exit -> WallpaperEditState(
                     isEditMode = false,
@@ -75,8 +73,6 @@ sealed interface WallpaperEditTransition {
                     snapMode = ZoomableImageView.SnapMode.EDGE,
                     overlayVisible = false,
                     rootLayoutAlpha = 1.0f,
-                    toolbarAlpha = 1.0f,
-                    toolbarDockedTop = false,
                 )
             }
     }
@@ -102,6 +98,4 @@ data class WallpaperEditState(
     val snapMode: ZoomableImageView.SnapMode,
     val overlayVisible: Boolean,
     val rootLayoutAlpha: Float,
-    val toolbarAlpha: Float,
-    val toolbarDockedTop: Boolean,
 )

@@ -8,7 +8,9 @@ import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -22,6 +24,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -53,6 +56,8 @@ class WallpaperDelegateTest {
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
+    private lateinit var getFabPositionUseCase: GetFabPositionUseCase
+    private lateinit var saveFabPositionUseCase: SaveFabPositionUseCase
     private lateinit var wallpaperFileManager: WallpaperFileManager
 
     private val testUri: Uri = mockk()
@@ -79,6 +84,10 @@ class WallpaperDelegateTest {
         setWallpaperImageUseCase = mockk(relaxed = true)
         clearWallpaperUseCase = mockk(relaxed = true)
 
+        getFabPositionUseCase = mockk(relaxed = true)
+        every { getFabPositionUseCase.invoke() } returns emptyFlow()
+        saveFabPositionUseCase = mockk(relaxed = true)
+
         wallpaperFileManager = mockk(relaxed = true)
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
     }
@@ -98,6 +107,8 @@ class WallpaperDelegateTest {
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
         setWallpaperImageUseCase = setWallpaperImageUseCase,
         clearWallpaperUseCase = clearWallpaperUseCase,
+        getFabPositionUseCase = getFabPositionUseCase,
+        saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         scope = scope
     )
@@ -1121,5 +1132,47 @@ class WallpaperDelegateTest {
             "cancel must drop the pending-focus hint — the added layer no longer exists",
             delegate.pendingFocusLayerId.value
         )
+    }
+
+    // ===========================================
+    // FAB POSITION
+    // ===========================================
+
+    @Test
+    fun `fabPosition starts at DEFAULT when the use case has not emitted`() {
+        val delegate = createDelegate()
+        // initialValue of stateIn — the empty flow never emits.
+        assertEquals(com.github.reygnn.kolibri_launcher.domain.model.FabPosition.DEFAULT, delegate.fabPosition.value)
+    }
+
+    @Test
+    fun `fabPosition reflects use-case flow emissions`() = runTest {
+        val flow = MutableStateFlow(com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.2f, yFraction = 0.3f))
+        every { getFabPositionUseCase.invoke() } returns flow
+
+        val delegate = createDelegate()
+        // StateIn(WhileSubscribed) requires at least one collector. Trigger it
+        // on the test's backgroundScope so the test body owns no cancel.
+        backgroundScope.launch { delegate.fabPosition.collect { } }
+        advanceUntilIdle()
+        assertEquals(0.2f, delegate.fabPosition.value.xFraction)
+        assertEquals(0.3f, delegate.fabPosition.value.yFraction)
+
+        flow.value = com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.7f, yFraction = 0.8f)
+        advanceUntilIdle()
+        assertEquals(0.7f, delegate.fabPosition.value.xFraction)
+        assertEquals(0.8f, delegate.fabPosition.value.yFraction)
+    }
+
+    @Test
+    fun `onFabPositionChanged invokes saveFabPositionUseCase with the given fractions`() = runTest {
+        val delegate = createDelegate()
+        delegate.onFabPositionChanged(xFraction = 0.42f, yFraction = 0.58f)
+        advanceUntilIdle()
+        coVerify {
+            saveFabPositionUseCase.invoke(
+                com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.42f, yFraction = 0.58f)
+            )
+        }
     }
 }

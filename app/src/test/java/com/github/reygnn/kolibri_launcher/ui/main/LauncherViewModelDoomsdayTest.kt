@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
@@ -162,6 +163,8 @@ class LauncherViewModelDoomsdayTest {
         saveWallpaperStateUseCase = mockk(relaxed = true),
         setWallpaperImageUseCase = mockk(relaxed = true),
         clearWallpaperUseCase = mockk(relaxed = true),
+        getFabPositionUseCase = mockk<GetFabPositionUseCase>(relaxed = true).also { every { it.invoke() } returns emptyFlow() },
+        saveFabPositionUseCase = mockk(relaxed = true),
         wallpaperFileManager = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
         savedStateHandle = savedStateHandle,

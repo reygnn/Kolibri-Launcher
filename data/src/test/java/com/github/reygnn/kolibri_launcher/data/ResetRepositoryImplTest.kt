@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -37,6 +38,7 @@ class ResetRepositoryImplTest {
     @MockK(relaxUnitFun = true) private lateinit var favoritesOrderRepository: FavoritesOrderRepository
     @MockK(relaxUnitFun = true) private lateinit var swipeActionsRepository: SwipeActionsRepository
     @MockK(relaxUnitFun = true) private lateinit var wallpaperRepository: WallpaperRepository
+    @MockK(relaxUnitFun = true) private lateinit var fabPositionRepository: FabPositionRepository
     @MockK(relaxUnitFun = true) private lateinit var settingsRepository: SettingsRepository
     @MockK(relaxUnitFun = true) private lateinit var screenLockRepository: ScreenLockRepository
     @MockK(relaxUnitFun = true) private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
@@ -55,6 +57,7 @@ class ResetRepositoryImplTest {
             favoritesOrderRepository,
             swipeActionsRepository,
             wallpaperRepository,
+            fabPositionRepository,
             settingsRepository,
             screenLockRepository,
             installedAppsStateRepository,
@@ -76,6 +79,7 @@ class ResetRepositoryImplTest {
         coVerify { customNamesRepository.purgeRepository() }
         coVerify { swipeActionsRepository.purgeRepository() }
         coVerify { wallpaperRepository.purgeRepository() }
+        coVerify { fabPositionRepository.purgeRepository() }
         coVerify { installedAppsStateRepository.purgeRepository() }
         coVerify { screenLockRepository.purgeRepository() }
         coVerify { timeBasedEventsRepository.purgeRepository() }

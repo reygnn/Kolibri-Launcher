@@ -68,6 +68,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -87,6 +88,8 @@ import android.content.IntentFilter
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
@@ -189,6 +192,10 @@ class MonolithicLauncherViewModelTest {
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase = mockk(relaxed = true)
     private val setWallpaperImageUseCase: SetWallpaperImageUseCase = mockk(relaxed = true)
     private val clearWallpaperUseCase: ClearWallpaperUseCase = mockk(relaxed = true)
+    private val getFabPositionUseCase: GetFabPositionUseCase = mockk<GetFabPositionUseCase>(relaxed = true).also {
+        every { it.invoke() } returns emptyFlow()
+    }
+    private val saveFabPositionUseCase: SaveFabPositionUseCase = mockk(relaxed = true)
     private val wallpaperFileManager: WallpaperFileManager = mockk(relaxed = true)
     private val appUpdateSignal: AppUpdateSignal = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
@@ -275,6 +282,8 @@ class MonolithicLauncherViewModelTest {
             saveWallpaperStateUseCase,
             setWallpaperImageUseCase,
             clearWallpaperUseCase,
+            getFabPositionUseCase,
+            saveFabPositionUseCase,
             wallpaperFileManager,
             appUpdateSignal,
             SavedStateHandle(),

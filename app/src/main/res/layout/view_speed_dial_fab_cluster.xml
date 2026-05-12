@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Internal layout for SpeedDialFabCluster. Order top→bottom mirrors
+  what the user sees: overflow at the top, then FitWidth, 1:1,
+  Add-Layer, Cancel, and finally the main Save FAB at the bottom.
+  The whole column moves together when the user drags the main FAB.
+  Spacing is set via layout_marginBottom on each row so the bottom
+  Save FAB has no trailing margin.
+-->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabOpenCommands"
+        style="@style/Widget.Material3.FloatingActionButton.Small.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:contentDescription="@string/cd_open_commands"
+        app:srcCompat="@drawable/ic_menu" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabFitWidth"
+        style="@style/Widget.Material3.FloatingActionButton.Small.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:contentDescription="@string/wallpaper_fit_width"
+        app:srcCompat="@drawable/ic_fit_width" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabOneToOne"
+        style="@style/Widget.Material3.FloatingActionButton.Small.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:contentDescription="@string/wallpaper_original_size"
+        app:srcCompat="@drawable/ic_one_to_one" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAddLayer"
+        style="@style/Widget.Material3.FloatingActionButton.Small.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:contentDescription="@string/wallpaper_add_layer"
+        app:srcCompat="@drawable/ic_add" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCancel"
+        style="@style/Widget.Material3.FloatingActionButton.Small.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:contentDescription="@string/wallpaper_cancel"
+        app:srcCompat="@drawable/ic_close" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSave"
+        style="@style/Widget.Material3.FloatingActionButton.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/cd_fab_save_drag"
+        app:srcCompat="@drawable/ic_save" />
+
+</merge>

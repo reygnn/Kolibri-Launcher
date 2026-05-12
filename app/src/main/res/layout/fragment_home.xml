@@ -147,196 +147,31 @@
             android:paddingVertical="@dimen/spacing_medium"
             android:elevation="@dimen/elevation_card" />
 
-        <!-- Button-Leiste unten (2 Zeilen) -->
-        <LinearLayout
-                android:id="@+id/wallpaperEditButtons"
-                android:background="@drawable/bg_wallpaper_edit_toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="16dp">
+        <!--
+          Overflow panel for snap controls + layer-reorder. Hidden by
+          default; the SpeedDialFabCluster's ☰ FAB toggles it.
+        -->
+        <com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
+            android:id="@+id/wallpaperCommandsPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginHorizontal="@dimen/spacing_large"
+            android:layout_marginBottom="@dimen/spacing_large"
+            android:elevation="@dimen/elevation_card" />
 
-            <!-- ═══ Zeile 1: Layer Management ═══ -->
-            <LinearLayout
-                android:id="@+id/layerButtonsRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingBottom="4dp">
-
-                <!-- Dock Toggle (oben ↔ unten) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToolbarDock"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/toolbar_dock_toggle"
-                    app:icon="@drawable/ic_dock_top"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Add Layer -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLayerAdd"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_add_layer"
-                    app:icon="@drawable/ic_add"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Delete Layer -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLayerDelete"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_delete_layer"
-                    android:visibility="gone"
-                    app:icon="@drawable/ic_delete"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Layer Down (Z-Order runter) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLayerDown"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_move_layer_down"
-                    android:visibility="gone"
-                    app:icon="@drawable/ic_arrow_down"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Layer Up (Z-Order hoch) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLayerUp"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_move_layer_up"
-                    android:visibility="gone"
-                    app:icon="@drawable/ic_arrow_up"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Original Size (1:1) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWallpaperOneToOne"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_original_size"
-                    app:icon="@drawable/ic_one_to_one"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-                    
-                    <!-- Fit to Width -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWallpaperFitWidth"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:contentDescription="@string/wallpaper_fit_width"
-                    app:icon="@drawable/ic_fit_width"
-                    app:iconTint="@color/wallpaper_edit_foreground"
-                    app:iconSize="20dp" />
-
-                <!-- Layer Indicator: "Layer 1/3" -->
-                <TextView
-                    android:id="@+id/txtLayerIndicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/wallpaper_edit_foreground"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-
-            </LinearLayout>
-
-            <!-- ═══ Zeile 2: Snap Controls + Save/Cancel ═══ -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-            <!-- 1. Snap On/Off (Magnet) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperSnap"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@string/wallpaper_snap_toggle"
-                app:icon="@drawable/ic_magnet_on"
-                app:iconTint="@color/wallpaper_edit_foreground"
-                app:iconSize="24dp" />
-
-            <!-- 2. Snap-Modus (Edge ↔ Center) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperSnapMode"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@string/wallpaper_snap_mode_toggle"
-                app:icon="@drawable/ic_rectangle_on"
-                app:iconTint="@color/wallpaper_edit_foreground"
-                app:iconSize="24dp" />
-
-            <!-- 3. Horizontal Snap -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperHSnap"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@string/wallpaper_horizontal_snap_toggle"
-                app:icon="@drawable/ic_horizontal_on"
-                app:iconTint="@color/wallpaper_edit_foreground"
-                app:iconSize="24dp" />
-
-            <!-- 4. Vertical Snap -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperVSnap"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@string/wallpaper_vertical_snap_toggle"
-                app:icon="@drawable/ic_vertical_on"
-                app:iconTint="@color/wallpaper_edit_foreground"
-                app:iconSize="24dp" />
-
-            <!-- Spacer -->
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <!-- Cancel + Save rechts -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperCancel"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/wallpaper_cancel"
-                android:textColor="@color/wallpaper_edit_foreground" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWallpaperSave"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/wallpaper_save" />
-
-            </LinearLayout>
-
-        </LinearLayout>
+        <!--
+          Speed-dial cluster: Save (main, draggable) plus five mini-FABs
+          stacked above it. The user-dragged position persists via
+          LauncherViewModel.fabPosition / onFabPositionChanged.
+        -->
+        <com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
+            android:id="@+id/wallpaperFabCluster"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="@dimen/spacing_large"
+            android:layout_marginBottom="@dimen/spacing_large" />
 
     </FrameLayout>
 

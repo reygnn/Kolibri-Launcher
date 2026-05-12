@@ -108,17 +108,23 @@ import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Delegate responsible for wallpaper management:
@@ -139,6 +145,8 @@ class WallpaperDelegate(
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
     private val setWallpaperImageUseCase: SetWallpaperImageUseCase,
     private val clearWallpaperUseCase: ClearWallpaperUseCase,
+    private val getFabPositionUseCase: GetFabPositionUseCase,
+    private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val wallpaperFileManager: WallpaperFileManager,
     private val scope: DelegateScope
 ) {
@@ -174,6 +182,30 @@ class WallpaperDelegate(
     fun consumePendingFocusLayerId() {
         _pendingFocusLayerId.value = null
     }
+
+    /**
+     * Persisted position of the wallpaper-edit speed-dial FAB. Emits
+     * [FabPosition.DEFAULT] until the user has dragged the FAB and the
+     * write round-trips through DataStore. Stateflow rather than raw
+     * Flow so the view can read `.value` synchronously on edit-mode
+     * entry without suspending.
+     */
+    val fabPosition: StateFlow<FabPosition> = getFabPositionUseCase()
+        .stateIn(
+            scope = scope.coroutineScope,
+            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            initialValue = FabPosition.DEFAULT,
+        )
+
+    /**
+     * Persists the user-dragged FAB position. Both axes are stored as
+     * fractions of the parent container — clamping into the visible
+     * range is the view's job (see the drag handler).
+     */
+    fun onFabPositionChanged(xFraction: Float, yFraction: Float) =
+        scope.launchSafe("Error saving FAB position") {
+            saveFabPositionUseCase(FabPosition(xFraction = xFraction, yFraction = yFraction))
+        }
 
     // --- Edit Session State ---
 

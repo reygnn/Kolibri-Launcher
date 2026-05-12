@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -33,6 +34,7 @@ class ResetRepositoryImpl @Inject constructor(
     private val favoritesOrderRepository: FavoritesOrderRepository, // has purgeRepository
     private val swipeActionsRepository: SwipeActionsRepository, // has purgeRepository
     private val wallpaperRepository: WallpaperRepository, // has purgeRepository
+    private val fabPositionRepository: FabPositionRepository, // has purgeRepository
 
     // Settings repository
     private val settingsRepository: SettingsRepository, // has purgeRepository
@@ -77,6 +79,7 @@ class ResetRepositoryImpl @Inject constructor(
                 "custom names" to customNamesRepository,
                 "swipe actions" to swipeActionsRepository,
                 "wallpaper" to wallpaperRepository,
+                "wallpaper-edit fab position" to fabPositionRepository,
                 "installed apps state" to installedAppsStateRepository,
                 "screen lock" to screenLockRepository,
                 "time-based events" to timeBasedEventsRepository,

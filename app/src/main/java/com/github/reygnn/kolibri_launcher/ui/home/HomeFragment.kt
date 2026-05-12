@@ -416,13 +416,11 @@ class HomeFragment : Fragment() {
         wallpaperEditController = WallpaperEditController(
             binding = binding,
             viewModel = viewModel,
-            resources = resources,
             launchLayerPicker = {
                 layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
             },
             rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
         )
-        wallpaperEditController?.setupInsets()
 
         registerLayerImagePicker()
         observeViewModel()
@@ -551,6 +549,19 @@ class HomeFragment : Fragment() {
             // own outer catch as the orchestration boundary.
             wallpaperEditController?.applyEditMode(isEditMode)
             applyWallpaperEditModeToGestures(isEditMode)
+        }
+
+        // Observer: persisted FAB position. Re-applies the cluster's
+        // on-screen location whenever DataStore emits a new value, so
+        // a drag-then-rotate-then-edit-again sequence places the FAB
+        // where the user last left it.
+        collectOnStarted(
+            flow = viewModel.fabPosition,
+            errorTag = "wallpaper-edit FAB position",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { position ->
+            if (_binding == null) return@collectOnStarted
+            wallpaperEditController?.applyFabPosition(position)
         }
 
         // Observer 9: Lock-transition overlay (dismiss path). Drives
@@ -1557,19 +1568,10 @@ class HomeFragment : Fragment() {
         lastSpacingInput = null
 
         binding.wallpaperTouchInterceptor.setOnTouchListener(null)
-        binding.btnWallpaperSave.setOnClickListener(null)
-        binding.btnWallpaperCancel.setOnClickListener(null)
-        binding.btnWallpaperSnap.setOnClickListener(null)
-        binding.btnWallpaperSnapMode.setOnClickListener(null)
-        binding.btnWallpaperHSnap.setOnClickListener(null)
-        binding.btnWallpaperVSnap.setOnClickListener(null)
-        binding.btnWallpaperOneToOne.setOnClickListener(null)
-        binding.btnWallpaperFitWidth.setOnClickListener(null)
-        binding.btnLayerAdd.setOnClickListener(null)
-        binding.btnLayerDelete.setOnClickListener(null)
-        binding.btnLayerUp.setOnClickListener(null)
-        binding.btnLayerDown.setOnClickListener(null)
-        binding.btnToolbarDock.setOnClickListener(null)
+        // FAB cluster + commands panel are reset by
+        // WallpaperEditController.clearEditModeListeners on edit-mode
+        // exit; nulling them again here would be redundant and the
+        // controller is about to be released anyway.
 
         // Clear wallpaper callbacks.
         binding.wallpaperView.onTransformChanged = null

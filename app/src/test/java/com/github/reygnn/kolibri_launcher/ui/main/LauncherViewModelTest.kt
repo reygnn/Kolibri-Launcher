@@ -14,6 +14,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
@@ -119,6 +121,8 @@ class LauncherViewModelTest {
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
+    private lateinit var getFabPositionUseCase: GetFabPositionUseCase
+    private lateinit var saveFabPositionUseCase: SaveFabPositionUseCase
     private lateinit var wallpaperFileManager: WallpaperFileManager
     private lateinit var appUpdateSignal: AppUpdateSignal
     private lateinit var context: Context
@@ -201,6 +205,9 @@ class LauncherViewModelTest {
         saveWallpaperStateUseCase = mockk(relaxed = true)
         setWallpaperImageUseCase = mockk(relaxed = true)
         clearWallpaperUseCase = mockk(relaxed = true)
+        getFabPositionUseCase = mockk(relaxed = true)
+        every { getFabPositionUseCase.invoke() } returns emptyFlow()
+        saveFabPositionUseCase = mockk(relaxed = true)
         wallpaperFileManager = mockk(relaxed = true)
 
         appUpdateSignal = mockk {
@@ -247,6 +254,8 @@ class LauncherViewModelTest {
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
         setWallpaperImageUseCase = setWallpaperImageUseCase,
         clearWallpaperUseCase = clearWallpaperUseCase,
+        getFabPositionUseCase = getFabPositionUseCase,
+        saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         appUpdateSignal = appUpdateSignal,
         savedStateHandle = SavedStateHandle(),
