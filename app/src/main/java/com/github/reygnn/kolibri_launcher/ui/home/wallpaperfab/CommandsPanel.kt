@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.github.reygnn.kolibri_launcher.R
 import com.google.android.material.button.MaterialButton
 
@@ -63,31 +65,71 @@ class CommandsPanel @JvmOverloads constructor(
         txtLayerIndicator = findViewById(R.id.txtLayerIndicator)
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // The panel sits at the screen's bottom edge via
+        // layout_gravity="bottom"; without an inset adjustment it
+        // would render behind the 3-button navigation bar (and behind
+        // the gesture-nav pill). Translate up by exactly the nav-bar
+        // inset so the rounded card stays fully visible.
+        //
+        // translationY (rather than layout-params margin tweaking) is
+        // used so the existing show/hide animation in [showPanel] /
+        // [hidePanel] still composes additively — those animate
+        // translationY too, so the resting Y is just the inset offset
+        // and the slide-in goes from `restingY + SLIDE_IN_DISTANCE_PX`
+        // back to `restingY`.
+        ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+            val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            restingTranslationY = -navBars.bottom.toFloat()
+            if (!isInAnimation) {
+                view.translationY = restingTranslationY
+            }
+            insets
+        }
+    }
+
     // ============================================================
     // VISIBILITY
     // ============================================================
 
     val isPanelShown: Boolean get() = visibility == View.VISIBLE
 
+    /**
+     * Resting `translationY` value — the nav-bar inset offset applied
+     * by [onAttachedToWindow]. Show / hide animations interpolate
+     * between this and `restingTranslationY + SLIDE_IN_DISTANCE_PX`
+     * instead of `0` and `SLIDE_IN_DISTANCE_PX`, so the panel never
+     * jumps back below the nav bar mid-animation.
+     */
+    private var restingTranslationY: Float = 0f
+    private var isInAnimation: Boolean = false
+
     fun showPanel() {
         if (isPanelShown) return
         visibility = View.VISIBLE
         alpha = 0f
-        translationY = SLIDE_IN_DISTANCE_PX
+        translationY = restingTranslationY + SLIDE_IN_DISTANCE_PX
+        isInAnimation = true
         animate()
             .alpha(1f)
-            .translationY(0f)
+            .translationY(restingTranslationY)
             .setDuration(ANIM_DURATION_MS)
+            .withEndAction { isInAnimation = false }
             .start()
     }
 
     fun hidePanel() {
         if (!isPanelShown) return
+        isInAnimation = true
         animate()
             .alpha(0f)
-            .translationY(SLIDE_IN_DISTANCE_PX)
+            .translationY(restingTranslationY + SLIDE_IN_DISTANCE_PX)
             .setDuration(ANIM_DURATION_MS)
-            .withEndAction { visibility = View.GONE }
+            .withEndAction {
+                visibility = View.GONE
+                isInAnimation = false
+            }
             .start()
     }
 

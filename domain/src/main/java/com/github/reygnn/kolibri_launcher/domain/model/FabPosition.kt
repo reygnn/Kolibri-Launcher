@@ -19,10 +19,15 @@ data class FabPosition(
 ) {
     companion object {
         /**
-         * Bottom-right starting position. Matches the canonical FAB
-         * placement (Material BottomEnd) when the user has never moved
-         * the FAB.
+         * Bottom-right starting position when the user has never moved
+         * the FAB. The Y fraction is deliberately set above the
+         * absolute bottom (0.9f, not 1.0f) so the Save FAB does not
+         * land inside the system's bottom edge-swipe / Assistant
+         * gesture zone on gesture-navigation devices — dragging from
+         * the very bottom edge gets intercepted by the system before
+         * the FAB sees the touch. Users can still drag the cluster
+         * further down; only the first-run default is conservative.
          */
-        val DEFAULT: FabPosition = FabPosition(xFraction = 0.9f, yFraction = 0.9f)
+        val DEFAULT: FabPosition = FabPosition(xFraction = 0.9f, yFraction = 0.75f)
     }
 }
