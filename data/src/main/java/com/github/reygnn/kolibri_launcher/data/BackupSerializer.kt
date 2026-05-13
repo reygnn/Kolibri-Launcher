@@ -162,7 +162,8 @@ class BackupSerializer @Inject constructor() {
                 backup.settings.verticalPaddingScale != null ||
                 backup.settings.isFontBold != null ||
                 backup.settings.contentTopMarginScale != null ||
-                backup.settings.favoritesAlignment != null,
+                backup.settings.favoritesAlignment != null ||
+                backup.settings.wallpaperSurfaceMode != null,
             hasWallpaper = if (hasMultiLayer) {
                 backup.settings.wallpaperLayers.any { it.imageUri != null || it.imageFileName != null }
             } else {
@@ -225,6 +226,9 @@ class BackupSerializer @Inject constructor() {
                 favoritesAlignment = settings.getStrictString("favoritesAlignment")
                     ?: settings.getStrictString("favorites_alignment")
                     ?: backup.settings.favoritesAlignment,
+                wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode")
+                    ?: settings.getStrictString("wallpaper_surface_mode")
+                    ?: backup.settings.wallpaperSurfaceMode,
                 textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
                 showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: backup.settings.showCalendarEvent,
                 showAlarm = settings.getStrictBool("show_alarm") ?: backup.settings.showAlarm,
@@ -345,6 +349,8 @@ class BackupSerializer @Inject constructor() {
             isFontBold = settingsJson.getStrictBool("is_font_bold"),
             favoritesAlignment = settingsJson.getStrictString("favoritesAlignment")
                 ?: settingsJson.getStrictString("favorites_alignment"),
+            wallpaperSurfaceMode = settingsJson.getStrictString("wallpaperSurfaceMode")
+                ?: settingsJson.getStrictString("wallpaper_surface_mode"),
             textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
             showCalendarEvent = settingsJson.getStrictBool("show_calendar_event"),
             showAlarm = settingsJson.getStrictBool("show_alarm"),
@@ -426,6 +432,7 @@ class BackupSerializer @Inject constructor() {
             val stringFields = listOf(
                 "swipe_left_app", "swipe_right_app", "wallpaper_uri",
                 "favoritesAlignment", "favorites_alignment",
+                "wallpaperSurfaceMode", "wallpaper_surface_mode",
             )
             for (field in stringFields) {
                 if (settings.has(field) && !settings.isNull(field)) {

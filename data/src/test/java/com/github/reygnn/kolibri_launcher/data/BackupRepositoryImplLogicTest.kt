@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.fakes.*
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
@@ -418,6 +419,150 @@ class BackupRepositoryImplLogicTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.favoritesAlignmentFlow.first())
             .isEqualTo(FavoritesAlignment.CENTER)
+    }
+
+    // ========================================================================
+    // WALLPAPER SURFACE MODE (mirror of favoritesAlignment suite)
+    // ========================================================================
+
+    @Test
+    fun `exportToJson - includes wallpaperSurfaceMode as enum name`() = runTest {
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.DARK
+
+        val jsonString = backupManager.exportToJson()
+
+        assertThat(jsonString).contains("\"wallpaperSurfaceMode\": \"DARK\"")
+    }
+
+    @Test
+    fun `importFromJson - applies wallpaperSurfaceMode when present`() = runTest {
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.AUTO
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperSurfaceMode": "LIGHT",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
+            .isEqualTo(WallpaperSurfaceMode.LIGHT)
+    }
+
+    @Test
+    fun `importFromJson - legacy backup without wallpaperSurfaceMode leaves current value`() = runTest {
+        // Simulates any backup produced before this field existed — the
+        // field is simply absent. The `?.let` in BackupDataAssembler
+        // Phase 7 must skip the setter so the user's current mode survives
+        // the restore.
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.DARK
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
+            .isEqualTo(WallpaperSurfaceMode.DARK)
+    }
+
+    @Test
+    fun `importFromJson - unknown wallpaperSurfaceMode is skipped, current value kept`() = runTest {
+        // Hand-edited or future-version backup carries a name the importer
+        // doesn't recognise. Skip-on-invalid: the current value survives,
+        // no crash, no Success-degradation.
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.LIGHT
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperSurfaceMode": "NEON_PINK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
+            .isEqualTo(WallpaperSurfaceMode.LIGHT)
+    }
+
+    @Test
+    fun `importFromJson - wallpaperSurfaceMode ignored when importThemeSettings is false`() = runTest {
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.AUTO
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperSurfaceMode": "DARK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = false)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
+            .isEqualTo(WallpaperSurfaceMode.AUTO)
+    }
+
+    @Test
+    fun `importFromJson - snake_case wallpaper_surface_mode is accepted via JsonNames`() = runTest {
+        fakeSettingsRepo.wallpaperSurfaceMode = WallpaperSurfaceMode.AUTO
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaper_surface_mode": "DARK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
+            .isEqualTo(WallpaperSurfaceMode.DARK)
     }
 
     // --- Helper ---

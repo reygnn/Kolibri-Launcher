@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -88,6 +89,7 @@ class BackupDataAssembler @Inject constructor(
         val isFontBold = settingsRepository.isFontBoldStateFlow.first()
         val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
         val favoritesAlignment = settingsRepository.favoritesAlignmentFlow.first()
+        val wallpaperSurfaceMode = settingsRepository.wallpaperSurfaceModeFlow.first()
 
         val wallpaperState = wallpaperRepository.getWallpaperStateSync()
 
@@ -135,6 +137,7 @@ class BackupDataAssembler @Inject constructor(
             isFontBold = isFontBold,
             contentTopMarginScale = contentTopMarginScale,
             favoritesAlignment = favoritesAlignment.name,
+            wallpaperSurfaceMode = wallpaperSurfaceMode.name,
             chipBackgroundColor = chipBackgroundColor,
             textShadowEnabled = textShadowEnabled,
             wallpaperUri = wallpaperUri,
@@ -315,6 +318,15 @@ class BackupDataAssembler @Inject constructor(
                     // but persisting the unknown name would leave DataStore in
                     // a state only the read-side fallback rescues.
                     Timber.w(e, "Unknown favoritesAlignment in backup: $name — keeping current value")
+                }
+            }
+
+            backup.settings.wallpaperSurfaceMode?.let { name ->
+                try {
+                    settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.valueOf(name))
+                } catch (e: IllegalArgumentException) {
+                    // Same skip-on-unknown semantics as favoritesAlignment above.
+                    Timber.w(e, "Unknown wallpaperSurfaceMode in backup: $name — keeping current value")
                 }
             }
 
