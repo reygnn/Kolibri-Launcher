@@ -19,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Robolectric coverage for the SpeedDialFabCluster behaviour that
@@ -207,19 +208,35 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                 )
 
-                // Force the OnLayoutChangeListener to actually run with
-                // identical corners. Plain `view.layout(same, same, ...)`
-                // short-circuits inside `View.setFrame` and never fires
-                // the listener at all — so the diff-guard would be
-                // untested. `requestLayout()` sets PFLAG_LAYOUT_REQUIRED
-                // which makes `View.layout(...)` dispatch the listener
-                // even when `setFrame` reports `changed=false` (see
-                // View.layout: `if (changed || (mPrivateFlags & ...) ==
-                // PFLAG_LAYOUT_REQUIRED)`). Now the listener runs, sees
-                // matching old vs. new corners, and the guard skips
-                // applyPositionImmediate — leaving our scribble in place.
+                // To honestly test the diff-guard, the listener must
+                // actually run with identical corners — otherwise the
+                // assertion below passes simply because `View.setFrame`
+                // short-circuited and `View.layout` never dispatched a
+                // single listener call. Two pieces are needed:
+                //
+                //   1. A separate counter listener to prove dispatch
+                //      happened at all (the guard inside the cluster's
+                //      own listener is what we're testing — we can't
+                //      use it as evidence).
+                //   2. `requestLayout()` + `measure()` to set
+                //      `PFLAG_LAYOUT_REQUIRED`. `requestLayout()` alone
+                //      only sets `PFLAG_FORCE_LAYOUT`; the listener-
+                //      dispatch check in `View.layout` reads
+                //      `PFLAG_LAYOUT_REQUIRED`, which is set during
+                //      `View.measure`. Skipping `measure()` would
+                //      leave the dispatch short-circuited even with
+                //      `requestLayout()`.
+                val listenerInvocations = AtomicInteger(0)
+                cluster.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    listenerInvocations.incrementAndGet()
+                }
+
                 cluster.x = 42f
                 cluster.requestLayout()
+                cluster.measure(
+                    View.MeasureSpec.makeMeasureSpec(CLUSTER_SIZE, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(CLUSTER_SIZE, View.MeasureSpec.EXACTLY),
+                )
                 cluster.layout(
                     PARENT_SIZE - CLUSTER_SIZE,
                     PARENT_SIZE - CLUSTER_SIZE,
@@ -227,9 +244,16 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                 )
 
+                assertTrue(
+                    "Counter listener must have fired — otherwise the " +
+                        "diff-guard inside the cluster's listener was " +
+                        "never reached, and the assertion below would " +
+                        "pass for the wrong reason.",
+                    listenerInvocations.get() > 0,
+                )
                 assertEquals(
-                    "Listener fires (PFLAG_LAYOUT_REQUIRED set), but " +
-                        "diff-guard must short-circuit on identical corners.",
+                    "Diff-guard must short-circuit on identical corners " +
+                        "and leave the scribbled x untouched.",
                     42f,
                     cluster.x,
                     0.01f,
