@@ -104,6 +104,15 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     // CRASH-SAFE: Track current dialog
     private var currentDialog: AlertDialog? = null
 
+    /**
+     * Last surface classification emitted by
+     * `resolveWallpaperSurfaceUseCase`. Cached so the rename dialog —
+     * built synchronously from a click listener, not in a coroutine —
+     * can read it without re-subscribing to the flow. Null until the
+     * first emission.
+     */
+    private var currentClassification: LuminanceClassification? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -191,6 +200,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             coroutineContext = Dispatchers.Main,
         ) { classification ->
             if (_binding == null) return@collectOnStarted
+            currentClassification = classification
             val surface = ResolvedBackground.SolidColor(
                 color = ContextCompat.getColor(
                     requireContext(),
@@ -386,9 +396,53 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             // Same window-mirror treatment as the BottomSheet itself —
             // the AlertDialog is yet another Window, must match the host.
             currentDialog?.window?.let(::matchHostStatusBarOn)
+            // Wallpaper-following: the rename dialog hovers inside the
+            // already-wallpaper-aware sheet. Tint after show() so the
+            // AlertDialog's framework views (title, buttons, decor
+            // background) exist and can be looked up.
+            currentDialog?.let { tintRenameDialog(it, editText) }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error creating rename dialog")
         }
+    }
+
+    /**
+     * Programmatically tint an [AlertDialog] to follow the same
+     * surface classification as the host sheet. Uses the cached
+     * [currentClassification] — no-op until the first emission has
+     * arrived. The corner radius of the decor's framework drawable is
+     * preserved because we call `setTint` rather than swapping the
+     * drawable.
+     *
+     * The lookup uses framework id `android.R.id.title`, which is a
+     * documented AlertDialog convention. If a future Android release
+     * renames it, the title stays on its Material3 day/night colour —
+     * the dialog still works, just visually mismatched.
+     */
+    private fun tintRenameDialog(dialog: AlertDialog, editText: EditText) {
+        val classification = currentClassification ?: return
+        val surface = ResolvedBackground.SolidColor(
+            color = ContextCompat.getColor(
+                requireContext(),
+                when (classification) {
+                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                },
+            ),
+        )
+        val fg = surface.foregroundColor()
+        dialog.window?.decorView?.background?.setTint(surface.color)
+        @Suppress("DEPRECATION")
+        dialog.findViewById<android.widget.TextView>(android.R.id.title)?.setTextColor(fg)
+        editText.setTextColor(fg)
+        // Hint at 60% alpha keeps it readable but visibly secondary —
+        // mirrors Material3's `colorOnSurfaceVariant` convention.
+        editText.setHintTextColor((fg and 0x00FFFFFF) or 0x99000000.toInt())
+        // EditText's underline indicator pulls from the same colour so
+        // the focus line stays visible across surfaces.
+        editText.backgroundTintList = ColorStateList.valueOf(fg)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(fg)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(fg)
     }
 
     override fun onDestroyView() {

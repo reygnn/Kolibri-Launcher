@@ -12,7 +12,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.annotation.AttrRes
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
@@ -22,10 +24,15 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogColorCustomizationBinding
 import com.github.reygnn.kolibri_launcher.databinding.ItemColorSwatchBinding
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class ColorCustomizationDialogFragment : DialogFragment() {
@@ -33,6 +40,9 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     private val viewModel: LauncherViewModel by activityViewModels()
     private var _binding: DialogColorCustomizationBinding? = null
     private val binding get() = _binding!!
+
+    @Inject
+    lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
 
     // Zwei separate Listen für die UI-Zustände der Paletten
     private val textSwatchViews = mutableMapOf<Int, MaterialCardView>()
@@ -71,7 +81,61 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         setupShadowSwitch()
         setupPalettes()
         observeChanges()
+        observeWallpaperSurface()
         setupDragListener()
+    }
+
+    /**
+     * Wallpaper-following surface. Mirrors the long-press menu +
+     * Layout & Size dialog: same `LuminanceClassification`, same
+     * `app_drawer_surface_light/_dark` colour pair, same WCAG-derived
+     * foreground. Differs from those two in the tint anchor — this
+     * dialog uses a `<shape>` drawable (`bottom_sheet_background`) as
+     * its root background, so the rounded corners come from the
+     * drawable and we tint it via `backgroundTintList` instead of
+     * setting a raw colour (which would wipe the corner radius).
+     * Colour swatches are intentionally not tinted — they show real
+     * choosable colours.
+     */
+    private fun observeWallpaperSurface() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            resolveWallpaperSurfaceUseCase().collectLatest { classification ->
+                if (_binding == null) return@collectLatest
+                val color = ContextCompat.getColor(
+                    requireContext(),
+                    when (classification) {
+                        LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                        LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                    },
+                )
+                val fg = ResolvedBackground.SolidColor(color).foregroundColor()
+                binding.root.backgroundTintList = ColorStateList.valueOf(color)
+                binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
+                // Sweep only the label-bearing siblings of the swatch
+                // containers; the swatch containers themselves stay
+                // untouched so colour previews keep their real colours.
+                applyForegroundColorToLabels(binding.root, fg)
+            }
+        }
+    }
+
+    /**
+     * Walks the dialog tree and tints every [TextView] outside the
+     * swatch containers. The swatch containers (`color_palette_container`
+     * and `chip_bg_palette_container`) hold colour-preview cards whose
+     * background colour is the actual swatch — we must not overwrite
+     * those, and there is no TextView inside them anyway. Skipping
+     * them keeps the sweep cheap and future-proof against item layouts
+     * that ever add a text label inside a swatch.
+     */
+    private fun applyForegroundColorToLabels(root: ViewGroup, color: Int) {
+        for (i in 0 until root.childCount) {
+            val child = root.getChildAt(i)
+            if (child.id == R.id.color_palette_container ||
+                child.id == R.id.chip_bg_palette_container) continue
+            if (child is TextView) child.setTextColor(color)
+            if (child is ViewGroup) applyForegroundColorToLabels(child, color)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
