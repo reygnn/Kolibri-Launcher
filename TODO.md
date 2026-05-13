@@ -1790,6 +1790,57 @@ bleibt). Hysterese wurde im Scope-Register als eigener Punkt
 gedroppt (kein dynamischer Layer-Input geplant), würde hier aber
 am gleichen Mechanismus hängen.
 
+## 23. (offen) `readabilityMode` Setting — toter Production-Code
+
+Aufgedeckt 2026-05-13 beim Backup-Audit für `wallpaperSurfaceMode` /
+`sortOrder`.
+
+**Where.** `SettingsRepository.readabilityModeFlow` + `setReadabilityMode`,
+gelesen in `ObserveUiColorsUseCase.kt:53-83`. DataStore-Key
+`text_readability_mode`, Default `READABILITY_MODE_SMART_CONTRAST =
+"smart_contrast"`.
+
+**Status.** **Kein einziger Production-Caller von `setReadabilityMode()`.**
+Grep über `**/main/**` ergibt nur die Definition (Interface + Impl)
+und den Read-Path im UseCase. Die `when`-Branches im UseCase
+behandeln drei Werte: `"smart_contrast"` (BLACK/WHITE binär nach
+`ClassifyWallpaperUseCase`), `"adaptive_colors"`
+(`secondaryColorArgb` aus System-Wallpaper-Hints) und alles andere
+(WHITE-Fallback). Es gibt kein UI, das den Wert ändert — jeder User
+hängt auf Default fest.
+
+**Drift im Code.** `AppConstants` definiert
+`READABILITY_MODE_SMART_CONTRAST = "smart_contrast"` und
+`READABILITY_MODE_STANDARD = "standard"`. Aber `"standard"` matched
+keinen `when`-Branch und fällt in den WHITE-Fallback;
+`"adaptive_colors"`, das *einen* Branch hat, hat keine Konstante.
+Klassischer Leftover-Wildwuchs aus einer früheren Iteration mit
+mehreren Modi.
+
+**Backup-Konsequenz.** Heute nicht im Backup — schadet nichts,
+weil der Wert in Production nicht vom Default abweichen kann.
+
+**Drei Resolution-Pfade**, jeweils sauber:
+
+1. **Killen** (vermutlich der ehrlichste): Setting + Interface-
+   Methode + Impl + `setReadabilityMode` in Fake + `READABILITY_MODE`-
+   Konstanten + den `when` im UseCase löschen, `smart_contrast`-
+   Behavior hardcoden. Erspart Backup-Schema-Erweiterung.
+2. **UI dazubauen**: Wenn `adaptive_colors` (Material-You-Stil
+   Sekundärfarbe statt B/W) als echte User-Option ausgespielt
+   werden soll, Toggle in Settings ergänzen, Backup-Eintrag
+   gleich mitziehen (analog `sortOrder` in Phase 9, oder neue
+   Phase 7-Theme-Subgruppe).
+3. **Aufräumen ohne Funktionsänderung**: Mindestens
+   `READABILITY_MODE_STANDARD` löschen und `"adaptive_colors"`
+   als Konstante einführen, damit Code und Constants
+   konsistent sind — aber das ist Polituren am toten Pferd.
+
+**Empfehlung.** Pfad 1 (Killen) — wenn in 6 Monaten immer noch
+niemand `adaptive_colors` braucht, ist es Ballast. `git log -S
+"setReadabilityMode" -- "**/main/**"` zeigt den letzten Toucher
+und kann die Killing-Entscheidung kalibrieren.
+
 ---
 
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.

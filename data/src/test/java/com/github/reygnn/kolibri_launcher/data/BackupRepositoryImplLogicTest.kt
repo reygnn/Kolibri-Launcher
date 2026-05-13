@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.fakes.*
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -563,6 +564,143 @@ class BackupRepositoryImplLogicTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
             .isEqualTo(WallpaperSurfaceMode.DARK)
+    }
+
+    // ========================================================================
+    // SORT ORDER (mirror of favoritesAlignment / wallpaperSurfaceMode suites)
+    // ========================================================================
+
+    @Test
+    fun `exportToJson - includes sortOrder as enum name`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.ALPHABETICAL)
+
+        val jsonString = backupManager.exportToJson()
+
+        assertThat(jsonString).contains("\"sortOrder\": \"ALPHABETICAL\"")
+    }
+
+    @Test
+    fun `importFromJson - applies sortOrder when present`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.TIME_WEIGHTED_USAGE)
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "sortOrder": "ALPHABETICAL",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importQualityOfLife = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.sortOrderFlow.first())
+            .isEqualTo(SortOrder.ALPHABETICAL)
+    }
+
+    @Test
+    fun `importFromJson - legacy backup without sortOrder leaves current value`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.ALPHABETICAL)
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importQualityOfLife = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.sortOrderFlow.first())
+            .isEqualTo(SortOrder.ALPHABETICAL)
+    }
+
+    @Test
+    fun `importFromJson - unknown sortOrder is skipped, current value kept`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.ALPHABETICAL)
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "sortOrder": "RANDOM_SHUFFLE",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importQualityOfLife = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.sortOrderFlow.first())
+            .isEqualTo(SortOrder.ALPHABETICAL)
+    }
+
+    @Test
+    fun `importFromJson - sortOrder ignored when importQualityOfLife is false`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.TIME_WEIGHTED_USAGE)
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "sortOrder": "ALPHABETICAL",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importQualityOfLife = false)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.sortOrderFlow.first())
+            .isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
+    }
+
+    @Test
+    fun `importFromJson - snake_case sort_order is accepted via JsonNames`() = runTest {
+        fakeSettingsRepo.setSortOrderForTest(SortOrder.TIME_WEIGHTED_USAGE)
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "sort_order": "ALPHABETICAL",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importQualityOfLife = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.sortOrderFlow.first())
+            .isEqualTo(SortOrder.ALPHABETICAL)
     }
 
     // --- Helper ---

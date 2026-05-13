@@ -175,7 +175,8 @@ class BackupSerializer @Inject constructor() {
             hasGestureSettings = backup.settings.doubleTapToLockEnabled != null ||
                 backup.settings.swipeDownToNotificationsEnabled != null,
             hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
-                backup.settings.autoLaunchApp != null,
+                backup.settings.autoLaunchApp != null ||
+                backup.settings.sortOrder != null,
             hasPowerUserSettings = backup.settings.secureWindow != null ||
                 backup.settings.rotationLocked != null,
         )
@@ -229,6 +230,9 @@ class BackupSerializer @Inject constructor() {
                 wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode")
                     ?: settings.getStrictString("wallpaper_surface_mode")
                     ?: backup.settings.wallpaperSurfaceMode,
+                sortOrder = settings.getStrictString("sortOrder")
+                    ?: settings.getStrictString("sort_order")
+                    ?: backup.settings.sortOrder,
                 textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
                 showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: backup.settings.showCalendarEvent,
                 showAlarm = settings.getStrictBool("show_alarm") ?: backup.settings.showAlarm,
@@ -351,6 +355,8 @@ class BackupSerializer @Inject constructor() {
                 ?: settingsJson.getStrictString("favorites_alignment"),
             wallpaperSurfaceMode = settingsJson.getStrictString("wallpaperSurfaceMode")
                 ?: settingsJson.getStrictString("wallpaper_surface_mode"),
+            sortOrder = settingsJson.getStrictString("sortOrder")
+                ?: settingsJson.getStrictString("sort_order"),
             textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
             showCalendarEvent = settingsJson.getStrictBool("show_calendar_event"),
             showAlarm = settingsJson.getStrictBool("show_alarm"),
@@ -433,6 +439,7 @@ class BackupSerializer @Inject constructor() {
                 "swipe_left_app", "swipe_right_app", "wallpaper_uri",
                 "favoritesAlignment", "favorites_alignment",
                 "wallpaperSurfaceMode", "wallpaper_surface_mode",
+                "sortOrder", "sort_order",
             )
             for (field in stringFields) {
                 if (settings.has(field) && !settings.isNull(field)) {

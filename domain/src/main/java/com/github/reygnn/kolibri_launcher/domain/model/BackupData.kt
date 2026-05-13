@@ -167,6 +167,16 @@ data class LauncherSettings(
     val autoShowKeyboard: Boolean? = null,
     @JsonNames("auto_launch_app")
     val autoLaunchApp: Boolean? = null,
+
+    /**
+     * Persisted as the [SortOrder] enum's `name` string (`"ALPHABETICAL"`
+     * / `"TIME_WEIGHTED_USAGE"`). Optional — legacy backups created
+     * before this field existed deserialize as `null` and the import
+     * path leaves the user's current value untouched. Same
+     * skip-on-unknown semantics as [favoritesAlignment].
+     */
+    @JsonNames("sort_order")
+    val sortOrder: String? = null,
     @JsonNames("secure_window")
     val secureWindow: Boolean? = null,
     @JsonNames("rotation_locked")

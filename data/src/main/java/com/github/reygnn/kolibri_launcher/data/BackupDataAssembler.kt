@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
@@ -99,6 +100,7 @@ class BackupDataAssembler @Inject constructor(
         val swipeDownToNotificationsEnabled = settingsRepository.swipeDownToNotificationsEnabledFlow.first()
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
+        val sortOrder = settingsRepository.sortOrderFlow.first()
         val secureWindow = settingsRepository.secureWindowFlow.first()
         val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
@@ -151,6 +153,7 @@ class BackupDataAssembler @Inject constructor(
             swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
+            sortOrder = sortOrder.name,
             secureWindow = secureWindow,
             rotationLocked = rotationLocked,
         )
@@ -348,6 +351,15 @@ class BackupDataAssembler @Inject constructor(
         if (options.importQualityOfLife) {
             backup.settings.autoShowKeyboard?.let { settingsRepository.setAutoShowKeyboard(it) }
             backup.settings.autoLaunchApp?.let { settingsRepository.setAutoLaunchApp(it) }
+
+            backup.settings.sortOrder?.let { name ->
+                try {
+                    settingsRepository.setSortOrder(SortOrder.valueOf(name))
+                } catch (e: IllegalArgumentException) {
+                    // Same skip-on-unknown semantics as favoritesAlignment in Phase 7.
+                    Timber.w(e, "Unknown sortOrder in backup: $name — keeping current value")
+                }
+            }
         }
 
         // ===== PHASE 10: Import Power-User Settings =====
