@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.layoutcustomization
 
 import android.annotation.SuppressLint
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
@@ -10,6 +11,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
@@ -19,6 +22,9 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -26,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class LayoutCustomizationDialogFragment : DialogFragment() {
@@ -33,6 +40,9 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     private val viewModel: LauncherViewModel by activityViewModels()
     private var _binding: DialogLayoutCustomizationBinding? = null
     private val binding get() = _binding!!
+
+    @Inject
+    lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
 
     // ==================== Lifecycle ====================
 
@@ -280,6 +290,47 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
             }
         }
 
+        // Wallpaper-following surface. Mirrors the AppContextMenu (long-
+        // press) treatment: same LuminanceClassification, same colour
+        // pair, same WCAG-derived foreground. The card-root is the
+        // dialog's visible Material surface, so we tint it directly
+        // instead of going through the bottom-sheet container path the
+        // long-press menu uses. TextViews (including MaterialButton +
+        // MaterialSwitch, which both subclass TextView) get the
+        // foreground colour via a child-sweep so a future label
+        // addition doesn't need a separate wiring.
+        viewLifecycleOwner.lifecycleScope.launchSafe("observe.wallpaperSurface") {
+            resolveWallpaperSurfaceUseCase().collectLatest { classification ->
+                safeRun("apply.wallpaperSurface") {
+                    val color = ContextCompat.getColor(
+                        requireContext(),
+                        when (classification) {
+                            LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                            LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                        },
+                    )
+                    val fg = ResolvedBackground.SolidColor(color).foregroundColor()
+                    binding.cardRoot.setCardBackgroundColor(color)
+                    binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
+                    applyForegroundColorRecursive(binding.cardRoot, fg)
+                }
+            }
+        }
+    }
+
+    /**
+     * Walks the dialog's view tree and tints every [TextView] descendant
+     * with [color]. Catches `MaterialButton` and `MaterialSwitch` too
+     * (both subclass TextView), so the Reset button and the
+     * "Bold text" switch label end up readable on every wallpaper-
+     * driven surface colour.
+     */
+    private fun applyForegroundColorRecursive(root: ViewGroup, color: Int) {
+        for (i in 0 until root.childCount) {
+            val child = root.getChildAt(i)
+            if (child is TextView) child.setTextColor(color)
+            if (child is ViewGroup) applyForegroundColorRecursive(child, color)
+        }
     }
 
     // ==================== Alignment Toggle Mapping ====================
