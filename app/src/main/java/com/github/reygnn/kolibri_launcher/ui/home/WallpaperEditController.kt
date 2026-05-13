@@ -88,6 +88,11 @@ internal class WallpaperEditController(
                 Timber.d("Wallpaper edit mode: OFF")
             }
         } catch (e: Throwable) {
+            // Outer Catchall kept: this is the orchestration boundary
+            // for edit-mode entry / exit. HomeFragment's observer relies
+            // on this catch so it can drop its own inner try/catch
+            // (see HomeFragment.kt around the wallpaper-edit-mode
+            // observer). silentError makes the failure loud in DEBUG.
             TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
         }
     }

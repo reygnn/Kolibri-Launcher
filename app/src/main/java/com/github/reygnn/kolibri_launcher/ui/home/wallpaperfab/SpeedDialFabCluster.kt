@@ -89,11 +89,13 @@ class SpeedDialFabCluster @JvmOverloads constructor(
 
     init {
         orientation = VERTICAL
-        // Bottom-aligned children: the column grows upwards from the
-        // last child (the main FAB) so adding/removing mini-FABs would
-        // stack on top of Save rather than pushing it around.
-        gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
-
+        // No `setGravity` here on purpose: this LinearLayout is
+        // `wrap_content`, so there is no extra space for gravity to
+        // distribute. The "Save at the bottom, mini-FABs stacked
+        // above" effect comes from the <merge> children order in
+        // view_speed_dial_fab_cluster.xml plus the host's
+        // `layout_gravity="bottom|end"` in fragment_home.xml — both
+        // of which already do the right thing.
         LayoutInflater.from(context).inflate(R.layout.view_speed_dial_fab_cluster, this, true)
 
         fabOpenCommands = findViewById(R.id.fabOpenCommands)
@@ -338,7 +340,4 @@ class SpeedDialFabCluster @JvmOverloads constructor(
     /** Identifier for the per-mini-FAB setters. */
     enum class MiniFab { Cancel, AddLayer, OneToOne, FitWidth, OpenCommands }
 
-    private companion object {
-        const val DISABLED_ALPHA = 0.38f
-    }
 }

@@ -34,6 +34,15 @@ class CommandsPanel @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
+    /**
+     * Slide-in distance for the show / hide animation in pixels.
+     * Resolved at construction from `R.dimen.wallpaper_panel_slide_distance`
+     * (24dp) so the offset is density-aware — the previous raw-`24f`
+     * was visually invisible on high-dpi displays.
+     */
+    private val slideInDistancePx: Float =
+        context.resources.getDimension(R.dimen.wallpaper_panel_slide_distance)
+
     private val btnSnapToggle: MaterialButton
     private val btnSnapMode: MaterialButton
     private val btnHSnap: MaterialButton
@@ -77,7 +86,7 @@ class CommandsPanel @JvmOverloads constructor(
         // used so the existing show/hide animation in [showPanel] /
         // [hidePanel] still composes additively — those animate
         // translationY too, so the resting Y is just the inset offset
-        // and the slide-in goes from `restingY + SLIDE_IN_DISTANCE_PX`
+        // and the slide-in goes from `restingY + slideInDistancePx`
         // back to `restingY`.
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
@@ -98,8 +107,8 @@ class CommandsPanel @JvmOverloads constructor(
     /**
      * Resting `translationY` value — the nav-bar inset offset applied
      * by [onAttachedToWindow]. Show / hide animations interpolate
-     * between this and `restingTranslationY + SLIDE_IN_DISTANCE_PX`
-     * instead of `0` and `SLIDE_IN_DISTANCE_PX`, so the panel never
+     * between this and `restingTranslationY + slideInDistancePx`
+     * instead of `0` and `slideInDistancePx`, so the panel never
      * jumps back below the nav bar mid-animation.
      */
     private var restingTranslationY: Float = 0f
@@ -109,7 +118,7 @@ class CommandsPanel @JvmOverloads constructor(
         if (isPanelShown) return
         visibility = View.VISIBLE
         alpha = 0f
-        translationY = restingTranslationY + SLIDE_IN_DISTANCE_PX
+        translationY = restingTranslationY + slideInDistancePx
         isInAnimation = true
         animate()
             .alpha(1f)
@@ -124,7 +133,7 @@ class CommandsPanel @JvmOverloads constructor(
         isInAnimation = true
         animate()
             .alpha(0f)
-            .translationY(restingTranslationY + SLIDE_IN_DISTANCE_PX)
+            .translationY(restingTranslationY + slideInDistancePx)
             .setDuration(ANIM_DURATION_MS)
             .withEndAction {
                 visibility = View.GONE
@@ -202,7 +211,5 @@ class CommandsPanel @JvmOverloads constructor(
 
     private companion object {
         const val ANIM_DURATION_MS = 180L
-        const val SLIDE_IN_DISTANCE_PX = 24f
-        const val DISABLED_ALPHA = 0.38f
     }
 }
