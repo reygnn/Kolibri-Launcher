@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab
 
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -10,6 +12,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -204,11 +207,19 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                 )
 
-                // Now scribble over x and re-layout with the SAME
-                // corners. The diff-guard inside the listener must
-                // skip applyPositionImmediate, leaving our scribble in
-                // place — proves the guard isn't a paranoia no-op.
+                // Force the OnLayoutChangeListener to actually run with
+                // identical corners. Plain `view.layout(same, same, ...)`
+                // short-circuits inside `View.setFrame` and never fires
+                // the listener at all — so the diff-guard would be
+                // untested. `requestLayout()` sets PFLAG_LAYOUT_REQUIRED
+                // which makes `View.layout(...)` dispatch the listener
+                // even when `setFrame` reports `changed=false` (see
+                // View.layout: `if (changed || (mPrivateFlags & ...) ==
+                // PFLAG_LAYOUT_REQUIRED)`). Now the listener runs, sees
+                // matching old vs. new corners, and the guard skips
+                // applyPositionImmediate — leaving our scribble in place.
                 cluster.x = 42f
+                cluster.requestLayout()
                 cluster.layout(
                     PARENT_SIZE - CLUSTER_SIZE,
                     PARENT_SIZE - CLUSTER_SIZE,
@@ -217,7 +228,8 @@ class SpeedDialFabClusterRobolectricTest {
                 )
 
                 assertEquals(
-                    "Layout-pass with identical corners must NOT re-apply",
+                    "Listener fires (PFLAG_LAYOUT_REQUIRED set), but " +
+                        "diff-guard must short-circuit on identical corners.",
                     42f,
                     cluster.x,
                     0.01f,
@@ -227,7 +239,7 @@ class SpeedDialFabClusterRobolectricTest {
     }
 
     @Test
-    fun `drag-end caches new fraction so a later relayout does not snap back`() {
+    fun `drag-end synchronously caches the new fraction so a later relayout does not snap back`() {
         ActivityScenario.launch(HiltTestActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
                 val (_, cluster) = buildParentedCluster(activity)
@@ -238,36 +250,38 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                     PARENT_SIZE,
                 )
+                val centered = (PARENT_SIZE - CLUSTER_SIZE) / 2f
+                assertEquals(centered, cluster.x, 1f)
 
-                // Simulate a drag-end at a different position. The view
-                // ends up at (100, 100); the cluster updates its cached
-                // fraction internally before invoking onPositionChanged.
-                // We trigger that path by setting x/y and asking the
-                // public onPositionChanged callback to drive the math —
-                // but the touch dispatch is private, so we instead
-                // simulate the post-condition: x/y at a new location,
-                // then an external relayout. If the cache wasn't
-                // synced, the listener would snap back to (400, 400).
-                val draggedX = 100f
-                val draggedY = 100f
-                cluster.x = draggedX
-                cluster.y = draggedY
-                // applyPosition with the NEW fraction reflects what the
-                // touch handler does at drag-end (cache update +
-                // listener invoke). This is the public surface for the
-                // same effect.
-                val newFraction = (draggedX + CLUSTER_SIZE / 2f) / PARENT_SIZE
-                cluster.applyPosition(newFraction, newFraction)
-                cluster.layout(
-                    PARENT_SIZE - CLUSTER_SIZE,
-                    PARENT_SIZE - CLUSTER_SIZE,
-                    PARENT_SIZE,
-                    PARENT_SIZE,
+                // Drive the actual touch state machine: this is the
+                // path that contains the `lastXFraction = xFrac`
+                // synchronous cache write inside ACTION_UP. Dragging
+                // via dispatchTouchEvent on the save FAB exercises
+                // that branch — simulating the post-condition via
+                // applyPosition() would bypass it. The drag goes from
+                // (0, 0) raw to (DRAG_DELTA, DRAG_DELTA) raw, well past
+                // the touch slop on any device profile.
+                val fabSave = cluster.findViewById<View>(R.id.fabSave)
+                val downTime = SystemClock.uptimeMillis()
+                dispatchTouch(fabSave, downTime, downTime, MotionEvent.ACTION_DOWN, 0f, 0f)
+                dispatchTouch(fabSave, downTime, downTime + 50, MotionEvent.ACTION_MOVE, DRAG_DELTA, DRAG_DELTA)
+                dispatchTouch(fabSave, downTime, downTime + 100, MotionEvent.ACTION_UP, DRAG_DELTA, DRAG_DELTA)
+
+                // ACTION_UP wrote the new fraction synchronously. The
+                // drag clamps against parentSize - clusterSize = 800.
+                val draggedX = cluster.x
+                assertNotEquals(
+                    "Drag must have moved the cluster off centre — " +
+                        "otherwise the rest of this test is meaningless.",
+                    centered,
+                    draggedX,
                 )
 
-                // External relayout with different corners — must
-                // restore the dragged position, not the original 0.5
-                // center.
+                // External relayout with shifted corners forces the
+                // OnLayoutChangeListener to fire — applyPositionImmediate
+                // re-runs against the cache. If ACTION_UP failed to
+                // update the cache, x would snap back to `centered`
+                // (the pre-drag fraction 0.5 → 400).
                 cluster.layout(
                     PARENT_SIZE - CLUSTER_SIZE - 1,
                     PARENT_SIZE - CLUSTER_SIZE - 1,
@@ -275,14 +289,51 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE - 1,
                 )
 
-                assertEquals(draggedX, cluster.x, 1f)
-                assertEquals(draggedY, cluster.y, 1f)
+                assertEquals(
+                    "Cache must reflect the drag end-point, not the " +
+                        "pre-drag fraction.",
+                    draggedX,
+                    cluster.x,
+                    1f,
+                )
             }
+        }
+    }
+
+    /**
+     * Builds and dispatches a single [MotionEvent]; recycles after
+     * dispatch so the obtain-pool doesn't leak across the test method.
+     * `MotionEvent.obtain(downTime, eventTime, action, x, y, meta)`
+     * sets `rawX = x` / `rawY = y`, which is what [FabDragHandler]
+     * reads — so passing screen-space coordinates here is fine.
+     */
+    private fun dispatchTouch(
+        target: View,
+        downTime: Long,
+        eventTime: Long,
+        action: Int,
+        x: Float,
+        y: Float,
+    ) {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
+        try {
+            target.dispatchTouchEvent(event)
+        } finally {
+            event.recycle()
         }
     }
 
     private companion object {
         const val PARENT_SIZE = 1000
         const val CLUSTER_SIZE = 200
+
+        /**
+         * Drag distance in raw pixels — large enough to clear the
+         * default `ViewConfiguration.scaledTouchSlop` (16–24 px on
+         * Robolectric) on every device profile, and large enough to
+         * land outside the centred starting position so the test can
+         * tell the dragged x from the centred x.
+         */
+        const val DRAG_DELTA = 300f
     }
 }
