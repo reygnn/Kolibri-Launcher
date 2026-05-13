@@ -88,7 +88,7 @@ object TimberWrapper {
     //
     // Warum auch DEBUG exit statt throw: die Aufrufer von silentDeath sind
     // typischerweise von paranoiden äußeren catch(Throwable)-Blöcken umgeben
-    // (KolibriLauncherApp, DataMigrationManager). Ein DEBUG-Throw wird dort
+    // (KolibriLauncherApp). Ein DEBUG-Throw wird dort
     // geschluckt, der Senior sieht nichts Fatales, und die App läuft mit
     // demselben lügenden State weiter, den silentDeath verhindern soll.
     // exitProcess(1) ist uncatchable und damit der einzige verlässliche Tod.

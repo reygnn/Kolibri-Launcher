@@ -31,10 +31,10 @@ Contract-Tests.
 > Implementierungen `XyzManager`. Nach dem Rename auf `XyzRepositoryImpl`
 > kann ältere Doku oder ältere Commits noch die `Manager`-Schreibweise
 > verwenden — gemeint ist immer dasselbe: die konkrete Klasse, die das
-> jeweilige `XyzRepository`-Interface implementiert. Zwei Reste tragen den
+> jeweilige `XyzRepository`-Interface implementiert. Ein Rest trägt den
 > alten Namen weiterhin bewusst: `WallpaperFileManager` (kein Repo, reines
-> File-Helper-Konstrukt) und `DataMigrationManager` (Migrations-Bootstrap,
-> kein Repo).
+> File-Helper-Konstrukt). Ein zweiter Rest, `DataMigrationManager`, ist
+> mittlerweile gelöscht — siehe Migration-history-Note in CLAUDE.md §5.
 
 ---
 

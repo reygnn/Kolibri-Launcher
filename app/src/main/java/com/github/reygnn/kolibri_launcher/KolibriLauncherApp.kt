@@ -24,7 +24,6 @@ import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
-import com.github.reygnn.kolibri_launcher.data.DataMigrationManager
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
@@ -58,7 +57,6 @@ import kotlin.system.exitProcess
  * - Global uncaught exception handler with recovery attempts
  * - ACRA initialized with privacy-by-default
  * - Safe package receiver registration
- * - Protected migration with rollback capability
  * - ACRA spam protection (max 1 report per exception per 24h)
  *
  * This ensures the launcher stays alive even under extreme conditions
@@ -67,10 +65,6 @@ import kotlin.system.exitProcess
 @HiltAndroidApp
 class KolibriLauncherApp : Application() {
 
-    @Inject
-    lateinit var dataMigrationManager: DataMigrationManager
-    @Inject
-    lateinit var dataStoreBackup: DataStoreBackup
     @Inject
     lateinit var anrReporter: AnrReporter
     @Inject
@@ -272,41 +266,6 @@ class KolibriLauncherApp : Application() {
         // No unregister: Application.onTerminate isn't called on real
         // devices, and the signal is a process-lifetime singleton.
         registerSystemWallpaperColorsListener()
-
-        // Data migration - Ultra Paranoid version
-        applicationScope.launch(applicationExceptionHandler) {
-            try {
-                val isFirstLaunch = dataMigrationManager.isFirstLaunch()
-
-                if (isFirstLaunch && BuildConfig.DEBUG) {
-                    try {
-                        dataStoreBackup.restoreFromBackup()
-                    } catch (e: Throwable) {
-                        // Bleibt bewusst Timber.e (statt silentError):
-                        // dieser Pfad läuft nur in DEBUG, der Catch ist
-                        // Fail-Safe-by-Design ("Continue anyway - not
-                        // critical"). Ein silentError-Throw würde hier
-                        // die anschließende Migration killen UND in den
-                        // outer catch fallen, der dann fälschlich "Error
-                        // during migration" loggt — die Migration hat
-                        // aber gar nicht angefangen.
-                        Timber.e(e, "Error restoring backup")
-                        // Continue anyway - not critical
-                    }
-                }
-
-                dataMigrationManager.runMigrationIfNeeded()
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error during migration")
-                // Try to record the error in ACRA
-                try {
-                    ACRA.errorReporter.putCustomData("migration_error", e.message ?: "unknown")
-                    ACRA.errorReporter.putCustomData("migration_error_type", e::class.simpleName ?: "Throwable")
-                } catch (ignored: Throwable) {
-                    // ACRA might not be initialized or might fail
-                }
-            }
-        }
     }
 
     private fun registerPackageUpdateReceiver() {

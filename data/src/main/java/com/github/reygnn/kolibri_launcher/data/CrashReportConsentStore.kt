@@ -12,11 +12,11 @@ import timber.log.Timber
  * DataStore-backed persistence for ACRA crash-report consent state.
  *
  * Storage: Jetpack DataStore Preferences (the project-wide
- * [settingsDataStore]). Migrated from SharedPreferences in TODO §7;
- * the legacy SP file `acra_consent` is read once and deleted by
- * [DataMigrationManager] on the first launch after the migration
- * shipped. The keys are exposed (not private) so the migration step
- * can write to them by the same name.
+ * [settingsDataStore]). Historically migrated from a legacy SP file
+ * `acra_consent` via `DataMigrationManager` V1→V2 (TODO §7); both the
+ * manager and the legacy file have been removed once every existing
+ * install moved past V2. Today the keys are simply the DataStore
+ * source of truth.
  *
  * Plain `Timber.e` is intentional here per CLAUDE.md Rule 9: this
  * store's read methods are called synchronously from

@@ -25,8 +25,8 @@ import org.robolectric.annotation.Config
  *   PackageReceiver, etc. — none of that should run in tests).
  * - Production Hilt modules are still in effect; only `@TestInstallIn` would
  *   replace them. For the pilot we use the real bindings and accept that the
- *   few file-touching ones (DataStore, DataMigrationManager) get exercised
- *   on the Robolectric in-memory filesystem.
+ *   few file-touching ones (notably DataStore) get exercised on the
+ *   Robolectric in-memory filesystem.
  */
 @RunWith(RobolectricTestRunner::class)
 @HiltAndroidTest

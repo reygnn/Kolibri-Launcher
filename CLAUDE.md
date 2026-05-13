@@ -74,7 +74,7 @@ for now.
 :data    (Android Library, depends on :domain)
   data/                   repository implementations (FavoritesRepositoryImpl,
                           BackupRepositoryImpl, …), CrashReportConsentStore,
-                          PackageUpdateReceiver, DataMigrationManager
+                          PackageUpdateReceiver
   data/service/           ShortcutLauncherServiceImpl
   di/RepositoryModule     @Binds for every repository interface
   di/DataStoreModule      single Preferences DataStore + the internal
@@ -90,8 +90,7 @@ for now.
                           @Named("appVersionName") from BuildConfig),
                           AppUpdateModule, ViewModelModule
   KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
-                          AnrReporter (post-mortem ApplicationExitInfo),
-                          migration bootstrap
+                          AnrReporter (post-mortem ApplicationExitInfo)
 ```
 
 Key points to remember when adding code:
@@ -161,17 +160,10 @@ activities.
    RepositoryImpl` bindings always go in `RepositoryModule.kt`.
 
 5. **DataStore Preferences is the only app storage for user state.** No
-   `SharedPreferences`, no app-managed SQLite. Migrations run through
-   `DataMigrationManager` on app start. Backup/restore goes through
-   `BackupRepositoryImpl` + `DataStoreBackup`.
+   `SharedPreferences`, no app-managed SQLite. Backup/restore goes
+   through `BackupRepositoryImpl` + `DataStoreBackup`.
 
-   *Two deliberate exceptions, both `SharedPreferences`-backed and both
-   intentional:*
-
-   - **`DataMigrationManager`** uses a small `SharedPreferences` file
-     (`kolibri_data_version`) for the schema-version flag, because the
-     migration mechanism cannot bootstrap itself through the very thing
-     it might need to migrate. Chicken-and-egg by nature.
+   *One deliberate exception, `SharedPreferences`-backed and intentional:*
 
    - **`CrashReportLimiter`** uses `SharedPreferences` for ACRA crash-
      report rate-limit timestamps (`acra_report_limiter`), because its
@@ -183,8 +175,17 @@ activities.
      worth it for ephemeral telemetry timestamps that may be lost on
      any app update.
 
-   Both exceptions are explained in detail in the respective files'
-   KDocs. Don't try to "fix" either.
+   This exception is explained in detail in the file's KDoc. Don't try
+   to "fix" it.
+
+   *Migration history note:* A `DataMigrationManager` class used to live
+   in `data/` to bridge schema changes across app updates (most recently
+   ACRA-consent V1→V2 in early May 2026). It was removed once every
+   existing install had moved past V2 — since then, all new state lives
+   only in DataStore, and any future schema change has to be designed to
+   be additively backward-compatible. Git history under `data/` has the
+   full implementation if a future migration ever needs the same shape
+   back.
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments

@@ -102,12 +102,13 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Naming — production classes in `data/` use `*RepositoryImpl` since
-# commit 0f9e7be. Two intentional exceptions documented in
+# commit 0f9e7be. One intentional exception documented in
 # app/src/test/CLAUDE.md "Namens-Historie":
 #   - WallpaperFileManager (file-helper, not a repository)
-#   - DataMigrationManager (migration-bootstrap, not a repository)
+# (A second exception used to apply to `DataMigrationManager`; the
+# manager has since been removed.)
 # ─────────────────────────────────────────────────────────────────────────────
-naming_allowed='WallpaperFileManager\.kt|DataMigrationManager\.kt'
+naming_allowed='WallpaperFileManager\.kt'
 data_dir="$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data"
 
 naming_hits=$(

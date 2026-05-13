@@ -22,9 +22,10 @@ import timber.log.Timber
  *
  * ## Why this class uses SharedPreferences (CLAUDE.md Rule 5 exception)
  *
- * Rule 5 says DataStore is the only app storage. This class is one of the
- * two explicit exceptions (the other is `DataMigrationManager`'s version
- * flag — for unrelated reasons).
+ * Rule 5 says DataStore is the only app storage. This class is the one
+ * explicit exception left (a second one used to exist for
+ * `DataMigrationManager`'s version flag; the manager has since been
+ * removed, leaving this file as the sole opt-out).
  *
  * The key constraint is that [shouldSendReport] is called *synchronously*
  * from the ACRA crash handler, which runs on a plain thread, not a
