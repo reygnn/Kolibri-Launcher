@@ -20,22 +20,30 @@ internal object FabPositionMath {
      * Returns the FAB's top-left pixel coordinate given its center as a
      * fraction of [parentSize]. Coordinates are in the parent's local
      * space. The result is clamped so that the FAB stays fully inside
-     * the parent.
+     * the parent, excluding any system-UI insets on either edge.
      *
      * When the parent is smaller than the FAB (theoretical edge — happens
-     * during the first measure pass), returns `0` rather than a negative
-     * offset.
+     * during the first measure pass), returns `insetStart` rather than a
+     * negative offset.
+     *
+     * [insetStart] / [insetEnd] are the unobstructed-area insets on this
+     * axis (status-bar height for `top`, nav-bar height for `bottom`,
+     * cutout left/right for the horizontal axis). The fraction itself
+     * remains insets-free — that keeps a persisted position portable
+     * across devices with different bar heights.
      */
     fun centerFractionToTopLeftPx(
         centerFraction: Float,
         fabSize: Int,
         parentSize: Int,
+        insetStart: Int = 0,
+        insetEnd: Int = 0,
     ): Int {
-        if (parentSize <= fabSize) return 0
+        if (parentSize <= fabSize + insetStart + insetEnd) return insetStart
         val center = centerFraction * parentSize
         val topLeft = center - fabSize / 2f
-        val maxTopLeft = (parentSize - fabSize).toFloat()
-        return topLeft.coerceIn(0f, maxTopLeft).toInt()
+        val maxTopLeft = (parentSize - fabSize - insetEnd).toFloat()
+        return topLeft.coerceIn(insetStart.toFloat(), maxTopLeft).toInt()
     }
 
     /**
@@ -59,11 +67,20 @@ internal object FabPositionMath {
 
     /**
      * Clamps [topLeftPx] so that a FAB of [fabSize] stays fully inside
-     * [parentSize]. Used by the drag handler while a drag is in
-     * progress.
+     * [parentSize], with the unobstructed-area insets ([insetStart] /
+     * [insetEnd]) carved out on each edge. Used by the drag handler
+     * while a drag is in progress so the FAB never lands behind the
+     * status-bar / nav-bar / cutout where touches are eaten by the
+     * system.
      */
-    fun clampTopLeft(topLeftPx: Float, fabSize: Int, parentSize: Int): Float {
-        val maxTopLeft = max(0, parentSize - fabSize).toFloat()
-        return topLeftPx.coerceIn(0f, maxTopLeft)
+    fun clampTopLeft(
+        topLeftPx: Float,
+        fabSize: Int,
+        parentSize: Int,
+        insetStart: Int = 0,
+        insetEnd: Int = 0,
+    ): Float {
+        val maxTopLeft = max(insetStart, parentSize - fabSize - insetEnd).toFloat()
+        return topLeftPx.coerceIn(insetStart.toFloat(), maxTopLeft)
     }
 }

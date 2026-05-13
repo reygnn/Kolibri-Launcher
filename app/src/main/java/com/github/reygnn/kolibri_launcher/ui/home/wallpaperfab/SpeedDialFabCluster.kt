@@ -9,6 +9,8 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnLayout
 import com.github.reygnn.kolibri_launcher.R
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -62,6 +64,29 @@ class SpeedDialFabCluster @JvmOverloads constructor(
      */
     var onPositionChanged: ((xFraction: Float, yFraction: Float) -> Unit)? = null
 
+    /**
+     * Cached system-bars + display-cutout insets in the parent's local
+     * frame. Refreshed on every `setOnApplyWindowInsetsListener` call
+     * and consulted by the drag / apply paths so the cluster never
+     * lands behind the status-bar, nav-bar, or a cutout where touches
+     * are eaten by the system.
+     */
+    private var insetLeft: Int = 0
+    private var insetTop: Int = 0
+    private var insetRight: Int = 0
+    private var insetBottom: Int = 0
+
+    /**
+     * Last persisted fractions applied via [applyPosition] (or set by
+     * a drag end). Kept so the on-layout-change listener can re-apply
+     * after the parent's geometry shifts — without re-asking the
+     * ViewModel — because `setX`/`setY` store a translation relative
+     * to the live `left`/`top`, and those change on rotation, inset
+     * dispatch, and fold-state transitions.
+     */
+    private var lastXFraction: Float? = null
+    private var lastYFraction: Float? = null
+
     init {
         orientation = VERTICAL
         // Bottom-aligned children: the column grows upwards from the
@@ -78,7 +103,43 @@ class SpeedDialFabCluster @JvmOverloads constructor(
         fabCancel = findViewById(R.id.fabCancel)
         fabSave = findViewById(R.id.fabSave)
 
+        // OnClickListener is the canonical accessibility entry point:
+        // TalkBack and Switch Access dispatch via View.performClick(),
+        // not via the OnTouchListener. The touch listener calls
+        // performClick() in its tap branch so both paths converge here.
+        fabSave.setOnClickListener { saveTapListener?.invoke() }
         installDragHandle(fabSave)
+
+        // System-UI insets — refreshed by the platform on rotation,
+        // IME-toggle, and folding-state changes. systemBars covers
+        // status + navigation, displayCutout covers the camera notch /
+        // pinhole. Returning the insets unchanged keeps siblings'
+        // existing inset wiring intact (e.g. CommandsPanel).
+        ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            insetLeft = bars.left
+            insetTop = bars.top
+            insetRight = bars.right
+            insetBottom = bars.bottom
+            // Insets changed mid-edit-session? Re-apply against the
+            // new safe-area so the cluster doesn't sit behind a bar.
+            applyPositionImmediate()
+            insets
+        }
+
+        // Re-apply on every layout-pass where the cluster's slot moved.
+        // `setX`/`setY` write a translation off the live `left`/`top`,
+        // so a parent-size change would otherwise leave the cluster
+        // displaced by exactly the delta. Comparing old vs. new corners
+        // avoids redundant re-applies for layout passes that don't
+        // actually relocate the view.
+        addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+                applyPositionImmediate()
+            }
+        }
     }
 
     // ============================================================
@@ -87,9 +148,10 @@ class SpeedDialFabCluster @JvmOverloads constructor(
 
     /** Set by the controller; invoked when Save is tapped without dragging. */
     fun setOnSaveClicked(listener: () -> Unit) {
-        // Save uses the drag-aware path — see installDragHandle below.
-        // The dedicated field lives there so MOVE events can decide
-        // whether to suppress the tap.
+        // The drag-aware tap path routes through View.performClick() —
+        // see init for the OnClickListener wiring. Updating the field
+        // is enough; both touch-driven taps and accessibility-driven
+        // performClick()s read it.
         saveTapListener = listener
     }
 
@@ -141,14 +203,39 @@ class SpeedDialFabCluster @JvmOverloads constructor(
      * so `width` / `height` are non-zero.
      */
     fun applyPosition(xFraction: Float, yFraction: Float) {
-        doOnLayout {
-            val parent = parent as? ViewGroup ?: return@doOnLayout
-            val parentW = parent.width
-            val parentH = parent.height
-            if (parentW <= 0 || parentH <= 0) return@doOnLayout
-            x = FabPositionMath.centerFractionToTopLeftPx(xFraction, width, parentW).toFloat()
-            y = FabPositionMath.centerFractionToTopLeftPx(yFraction, height, parentH).toFloat()
-        }
+        lastXFraction = xFraction
+        lastYFraction = yFraction
+        doOnLayout { applyPositionImmediate() }
+    }
+
+    /**
+     * Apply the cached [lastXFraction] / [lastYFraction] using the
+     * current parent geometry and insets. No-op if either is null,
+     * the view hasn't laid out, or the parent isn't a ViewGroup.
+     * Driven by [applyPosition], the inset listener, and the layout-
+     * change listener — see init for the call sites.
+     */
+    private fun applyPositionImmediate() {
+        val parent = parent as? ViewGroup ?: return
+        val parentW = parent.width
+        val parentH = parent.height
+        if (parentW <= 0 || parentH <= 0) return
+        val fx = lastXFraction ?: return
+        val fy = lastYFraction ?: return
+        x = FabPositionMath.centerFractionToTopLeftPx(
+            centerFraction = fx,
+            fabSize = width,
+            parentSize = parentW,
+            insetStart = insetLeft,
+            insetEnd = insetRight,
+        ).toFloat()
+        y = FabPositionMath.centerFractionToTopLeftPx(
+            centerFraction = fy,
+            fabSize = height,
+            parentSize = parentH,
+            insetStart = insetTop,
+            insetEnd = insetBottom,
+        ).toFloat()
     }
 
     // ============================================================
@@ -157,14 +244,19 @@ class SpeedDialFabCluster @JvmOverloads constructor(
 
     private var saveTapListener: (() -> Unit)? = null
 
-    @SuppressLint("ClickableViewAccessibility") // The FAB is still click-accessible via setOnSaveClicked.
+    @SuppressLint("ClickableViewAccessibility") // Tap path routes through performClick() — see init.
     private fun installDragHandle(fab: FloatingActionButton) {
-        fab.setOnTouchListener { _, event ->
+        fab.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     dragHandler.onDown(event.rawX, event.rawY)
                     dragStartX = x
                     dragStartY = y
+                    // Manual pressed-state for ripple feedback: we
+                    // consume ACTION_DOWN here, so the FAB's own
+                    // onTouchEvent never sees it and never sets the
+                    // pressed state itself.
+                    v.isPressed = true
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -175,16 +267,24 @@ class SpeedDialFabCluster @JvmOverloads constructor(
                             topLeftPx = dragStartX + delta.dx,
                             fabSize = width,
                             parentSize = parent.width,
+                            insetStart = insetLeft,
+                            insetEnd = insetRight,
                         )
                         y = FabPositionMath.clampTopLeft(
                             topLeftPx = dragStartY + delta.dy,
                             fabSize = height,
                             parentSize = parent.height,
+                            insetStart = insetTop,
+                            insetEnd = insetBottom,
                         )
                     }
+                    // Past slop — this is a drag, not a tap. Drop the
+                    // ripple so the user gets a clean drag feel.
+                    if (v.isPressed) v.isPressed = false
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    v.isPressed = false
                     when (dragHandler.onUp()) {
                         FabDragHandler.EndState.Drag -> {
                             val parent = parent as? ViewGroup
@@ -199,14 +299,22 @@ class SpeedDialFabCluster @JvmOverloads constructor(
                                     fabSize = height,
                                     parentSize = parent.height,
                                 )
+                                // Update the cache synchronously: the
+                                // ViewModel round-trip is async, and a
+                                // layout-pass arriving in the meantime
+                                // would otherwise re-apply the pre-drag
+                                // fraction.
+                                lastXFraction = xFrac
+                                lastYFraction = yFrac
                                 onPositionChanged?.invoke(xFrac, yFrac)
                             }
                         }
-                        FabDragHandler.EndState.Tap -> saveTapListener?.invoke()
+                        FabDragHandler.EndState.Tap -> v.performClick()
                     }
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
                     dragHandler.onUp()
                     true
                 }

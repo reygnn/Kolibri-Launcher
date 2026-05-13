@@ -138,4 +138,103 @@ class FabPositionMathTest {
             FabPositionMath.clampTopLeft(100f, fabSize = 500, parentSize = 500),
         )
     }
+
+    // ---------- clampTopLeft + insets ----------
+
+    @Test
+    fun `clampTopLeft respects insetStart as new minimum`() {
+        // Status bar / left cutout reserves the first 80 px on this
+        // axis; the FAB must not land below that, even if the user
+        // dragged into the bar.
+        assertEquals(
+            80f,
+            FabPositionMath.clampTopLeft(
+                topLeftPx = -10f,
+                fabSize = 100,
+                parentSize = 1000,
+                insetStart = 80,
+                insetEnd = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `clampTopLeft respects insetEnd as new maximum`() {
+        // Nav bar / right cutout reserves the last 120 px on this axis.
+        // Max top-left = 1000 - 100 - 120 = 780.
+        assertEquals(
+            780f,
+            FabPositionMath.clampTopLeft(
+                topLeftPx = 10_000f,
+                fabSize = 100,
+                parentSize = 1000,
+                insetStart = 0,
+                insetEnd = 120,
+            ),
+        )
+    }
+
+    @Test
+    fun `clampTopLeft collapses to insetStart when usable area is smaller than fab`() {
+        // Edge case: the FAB literally doesn't fit between the insets.
+        // We bias to the start edge (top / left) so it remains tap-
+        // reachable.
+        assertEquals(
+            80f,
+            FabPositionMath.clampTopLeft(
+                topLeftPx = 200f,
+                fabSize = 900,
+                parentSize = 1000,
+                insetStart = 80,
+                insetEnd = 80,
+            ),
+        )
+    }
+
+    // ---------- centerFractionToTopLeftPx + insets ----------
+
+    @Test
+    fun `centerFractionToTopLeftPx clamps fraction 0 to insetStart not zero`() {
+        // A persisted fraction of 0.0 (left/top edge of the screen)
+        // must not place the FAB behind the status-bar / left-cutout.
+        assertEquals(
+            80,
+            FabPositionMath.centerFractionToTopLeftPx(
+                centerFraction = 0.0f,
+                fabSize = 100,
+                parentSize = 1000,
+                insetStart = 80,
+                insetEnd = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `centerFractionToTopLeftPx clamps fraction 1 to maximum minus insetEnd`() {
+        // Mirror of the above for the trailing edge.
+        assertEquals(
+            780,
+            FabPositionMath.centerFractionToTopLeftPx(
+                centerFraction = 1.0f,
+                fabSize = 100,
+                parentSize = 1000,
+                insetStart = 0,
+                insetEnd = 120,
+            ),
+        )
+    }
+
+    @Test
+    fun `centerFractionToTopLeftPx returns insetStart when fab plus insets exceed parent`() {
+        assertEquals(
+            80,
+            FabPositionMath.centerFractionToTopLeftPx(
+                centerFraction = 0.5f,
+                fabSize = 900,
+                parentSize = 1000,
+                insetStart = 80,
+                insetEnd = 80,
+            ),
+        )
+    }
 }
