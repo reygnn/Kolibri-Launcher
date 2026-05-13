@@ -13,6 +13,8 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
@@ -298,7 +300,10 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         // long-press menu uses. TextViews (including MaterialButton +
         // MaterialSwitch, which both subclass TextView) get the
         // foreground colour via a child-sweep so a future label
-        // addition doesn't need a separate wiring.
+        // addition doesn't need a separate wiring. The alignment
+        // toggle group is treated separately so the selected button's
+        // dark fill doesn't end up with dark-on-dark text on a light
+        // surface — see [applyToggleGroupSurfaceColors].
         viewLifecycleOwner.lifecycleScope.launchSafe("observe.wallpaperSurface") {
             resolveWallpaperSurfaceUseCase().collectLatest { classification ->
                 safeRun("apply.wallpaperSurface") {
@@ -309,10 +314,24 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
                             LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
                         },
                     )
+                    val inverseColor = ContextCompat.getColor(
+                        requireContext(),
+                        when (classification) {
+                            LuminanceClassification.LIGHT -> R.color.app_drawer_surface_dark
+                            LuminanceClassification.DARK -> R.color.app_drawer_surface_light
+                        },
+                    )
                     val fg = ResolvedBackground.SolidColor(color).foregroundColor()
+                    val inverseFg = ResolvedBackground.SolidColor(inverseColor).foregroundColor()
                     binding.cardRoot.setCardBackgroundColor(color)
                     binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
                     applyForegroundColorRecursive(binding.cardRoot, fg)
+                    applyToggleGroupSurfaceColors(
+                        binding.toggleFavoritesAlignment,
+                        fg = fg,
+                        inverseColor = inverseColor,
+                        inverseFg = inverseFg,
+                    )
                 }
             }
         }
@@ -323,13 +342,59 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
      * with [color]. Catches `MaterialButton` and `MaterialSwitch` too
      * (both subclass TextView), so the Reset button and the
      * "Bold text" switch label end up readable on every wallpaper-
-     * driven surface colour.
+     * driven surface colour. Children of a [MaterialButtonToggleGroup]
+     * are skipped — their colours are state-aware and applied by
+     * [applyToggleGroupSurfaceColors] right after this sweep so the
+     * selected button gets the inverted (high-contrast) treatment.
      */
     private fun applyForegroundColorRecursive(root: ViewGroup, color: Int) {
         for (i in 0 until root.childCount) {
             val child = root.getChildAt(i)
+            if (child is MaterialButtonToggleGroup) continue
             if (child is TextView) child.setTextColor(color)
             if (child is ViewGroup) applyForegroundColorRecursive(child, color)
+        }
+    }
+
+    /**
+     * Paints the alignment toggle group with a state-aware colour pair
+     * so the selected button reads as "inverted surface" — the
+     * opposite-surface fill, with that surface's WCAG foreground for
+     * the text — and the unselected buttons stay flush with the
+     * dialog's body. Without this, the Material default leaves the
+     * selected button's fill anchored to the activity theme
+     * (typically dark) while the dialog body follows the wallpaper —
+     * dark-on-dark text on a light wallpaper, the bug the user
+     * reported.
+     */
+    private fun applyToggleGroupSurfaceColors(
+        group: MaterialButtonToggleGroup,
+        fg: Int,
+        inverseColor: Int,
+        inverseFg: Int,
+    ) {
+        val textColors = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_checked),
+                intArrayOf(),
+            ),
+            intArrayOf(inverseFg, fg),
+        )
+        val backgroundTint = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_checked),
+                intArrayOf(),
+            ),
+            intArrayOf(inverseColor, Color.TRANSPARENT),
+        )
+        val strokeTint = ColorStateList.valueOf(fg)
+        for (i in 0 until group.childCount) {
+            val child = group.getChildAt(i)
+            if (child is MaterialButton) {
+                child.setTextColor(textColors)
+                child.backgroundTintList = backgroundTint
+                child.strokeColor = strokeTint
+            }
         }
     }
 

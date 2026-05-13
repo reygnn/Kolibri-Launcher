@@ -33,6 +33,33 @@
         <item name="shapeAppearanceOverlay">@style/DialogShapeAppearance</item>
         <item name="buttonBarButtonStyle">@style/DialogButtonStyle</item>
     </style>
+
+    <!-- Wallpaper-following overlays for MainActivity's home-anchored
+         dialogs. Picked at show-time based on
+         ResolveWallpaperSurfaceUseCase's classification — see
+         MainActivity.wallpaperAwareDialogStyle(). The surface / text
+         colours mirror the AppDrawer + Customize-dialog plumbing, so
+         all three home-anchored surfaces (drawer, layout/colour dialog,
+         alert dialogs) stay in sync on the same wallpaper. -->
+    <style name="CustomAlertDialog.Light" parent="CustomAlertDialog">
+        <item name="colorSurface">@color/app_drawer_surface_light</item>
+        <item name="colorSurfaceContainerHigh">@color/app_drawer_surface_light</item>
+        <item name="android:colorBackground">@color/app_drawer_surface_light</item>
+        <item name="colorOnSurface">@android:color/black</item>
+        <item name="colorOnSurfaceVariant">@android:color/black</item>
+        <item name="android:textColorPrimary">@android:color/black</item>
+        <item name="android:textColorSecondary">@android:color/black</item>
+    </style>
+
+    <style name="CustomAlertDialog.Dark" parent="CustomAlertDialog">
+        <item name="colorSurface">@color/app_drawer_surface_dark</item>
+        <item name="colorSurfaceContainerHigh">@color/app_drawer_surface_dark</item>
+        <item name="android:colorBackground">@color/app_drawer_surface_dark</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorOnSurfaceVariant">@android:color/white</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@android:color/white</item>
+    </style>
     
     <style name="DialogShapeAppearance">
         <item name="cornerFamily">rounded</item>

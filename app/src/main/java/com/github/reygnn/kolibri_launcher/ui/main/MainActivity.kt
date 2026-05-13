@@ -32,7 +32,9 @@ import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
@@ -264,6 +266,21 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     lateinit var appPackageManager: PackageManager
     @Inject
     lateinit var settingsRepository: SettingsRepository
+    @Inject
+    lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
+
+    /**
+     * Latest wallpaper-surface classification emitted by
+     * [resolveWallpaperSurfaceUseCase]. Cached so home-anchored dialogs
+     * — built synchronously from click listeners, not in coroutines —
+     * can pick the matching alert-dialog theme overlay
+     * (CustomAlertDialog.Light vs .Dark) without re-subscribing to the
+     * flow. Default is [LuminanceClassification.DARK] so the very
+     * first dialog (before the first emission lands) matches the
+     * historical look-and-feel.
+     */
+    private var currentSurfaceClassification: LuminanceClassification =
+        LuminanceClassification.DARK
 
     private val systemEventReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -349,6 +366,17 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
         if (!setupMainContent()) {
             return
+        }
+
+        // Keep the cached wallpaper-surface classification fresh across
+        // wallpaper / surface-mode changes for the lifetime of the
+        // Activity. Read at click-time by [wallpaperAwareDialogStyle]
+        // when the user opens one of the home-anchored MaterialAlertDialogs
+        // (long-press menu, remove-wallpaper confirm, accessibility prompt).
+        lifecycleScope.launch(mainActivityExceptionHandler) {
+            resolveWallpaperSurfaceUseCase().collect { classification ->
+                currentSurfaceClassification = classification
+            }
         }
 
         // Only run initial setup on first creation (not on config changes)
@@ -827,8 +855,22 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         currentDialog = builder.show()
     }
 
+    /**
+     * Picks the wallpaper-following alert-dialog theme overlay
+     * (CustomAlertDialog.Light vs .Dark) based on the cached
+     * [currentSurfaceClassification]. Home-anchored dialogs need this
+     * because they hover directly over the wallpaper — a dark dialog
+     * on a white wallpaper (or vice versa) reads as a theming bug.
+     * Settings-screen / Onboarding dialogs do NOT use this helper;
+     * they keep the activity-theme default via `alertDialogTheme`.
+     */
+    private fun wallpaperAwareDialogStyle(): Int = when (currentSurfaceClassification) {
+        LuminanceClassification.LIGHT -> R.style.CustomAlertDialog_Light
+        LuminanceClassification.DARK -> R.style.CustomAlertDialog_Dark
+    }
+
     private fun showAccessibilityDialog() {
-        val builder = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+        val builder = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.accessibility_service_title))
             .setMessage(getString(R.string.accessibility_service_explanation))
             .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
@@ -858,7 +900,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // Structural teardown-race guard before .show().
         if (isFinishing || isDestroyed) return
 
-        currentDialog = MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+        currentDialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.customize_title))
             .setItems(labels.toTypedArray()) { _, which ->
                 try {
@@ -913,7 +955,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     private fun confirmRemoveWallpaper() {
         // Structural teardown-race guard before .show().
         if (isFinishing || isDestroyed) return
-        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+        MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.wallpaper_remove))
             .setMessage(getString(R.string.wallpaper_remove_confirm))
             .setPositiveButton(getString(R.string.wallpaper_remove_yes)) { _, _ ->
