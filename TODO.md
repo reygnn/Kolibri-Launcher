@@ -1743,6 +1743,55 @@ trägt's.
 
 ---
 
+## 22. (offen) Coverage-Threshold im Wallpaper-Classifier — empirischer Anker `huggie.png`
+
+Migriert aus dem Scope-Register (war §10 dort, 2026-05-13).
+
+**Where.** `data/.../wallpaper/WallpaperBitmapLuminanceImpl.kt` —
+`MIN_OPAQUE_COVERAGE = 0.5f` als Gate, ob ein Kolibri-internes
+Layer als „visually dominant" zur Klassifikation herangezogen wird.
+Unter 50 % effektiv-opaker Pixel fällt der Classifier auf das
+System-Signal zurück.
+
+**Empirischer Anker.** Während der Doré-Verifikation auf realen
+Maintainer-Wallpapern hat `huggie.png` (eine chiaroscuro-konvertierte
+Illustration) **48.7 % Coverage** gemessen — 1.3 Prozentpunkte unter
+der Gate-Schwelle, also direkt auf dem Routing-Zaun. Die beiden
+Pfade konvergierten für dieses Bild zufällig:
+
+- Fall-through (aktuelles Verhalten bei 48.7 %): System-Signal-
+  getrieben — DARK, wenn das System-Wallpaper dunkel/neutral ist.
+- Layer-Klassifikation (würde bei 51 % passieren): Median über
+  die opaken Pixel = 0.258, auch unter dem 0.5-Luminanz-Threshold
+  → DARK.
+
+Doré-Pipeline + typisches System-Wallpaper produzieren also
+dasselbe wahrgenommene Ergebnis unabhängig vom Routing. Die
+Fragilität ist aktuell unsichtbar.
+
+**Trigger.** Erst angehen, wenn:
+
+- Ein Bild im 40..60-%-Borderline AUTO falsch klassifiziert,
+  weil die beiden Routen für dieses Bild *nicht* mehr
+  konvergieren (Layer-Klassifikations-Median auf der entgegen-
+  gesetzten Seite von 0.5 vom System-Signal), ODER
+- Eine Wallpaper-Asset-Pipeline-Änderung (verlustfreie Neukodierung,
+  Alpha-Edge-Processing) Coverage-Werte systematisch verschiebt
+  und die Routing-Fragilität sichtbar macht.
+
+**Sketch.** `MIN_OPAQUE_COVERAGE` nach oben tunen — 0.6 oder 0.7
+würde `huggie`-förmige Bilder klar in den Fall-through-Bereich
+schieben. Risiko: Bilder mit 50..70 % Coverage, die heute korrekt
+klassifizieren, könnten den Pfad verlieren. Empirische
+Entscheidung — mehr Borderline-Samples sammeln vor dem Tunen.
+Alternative: Hysterese am Coverage-Gate (Deadband z.B.
+0.45..0.55, in dem die Routing-Entscheidung bei der vorherigen
+bleibt). Hysterese wurde im Scope-Register als eigener Punkt
+gedroppt (kein dynamischer Layer-Input geplant), würde hier aber
+am gleichen Mechanismus hängen.
+
+---
+
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
 - Keine Test-Referenz — siehe `app/src/test/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.
