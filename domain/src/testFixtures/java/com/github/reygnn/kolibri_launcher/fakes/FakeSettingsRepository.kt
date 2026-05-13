@@ -4,7 +4,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -265,7 +265,7 @@ class FakeSettingsRepository : SettingsRepository {
         secureWindow = AppConstants.DEFAULT_SECURE_WINDOW
 
         favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
-        appDrawerModeState.value = AppConstants.DEFAULT_APP_DRAWER_MODE
+        wallpaperSurfaceModeState.value = AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
 
         onboardingCompletedState.value = wasOnboardingCompleted
     }
@@ -315,17 +315,17 @@ class FakeSettingsRepository : SettingsRepository {
         favoritesAlignment = alignment
     }
 
-    // appDrawerMode
-    private val appDrawerModeState =
-        MutableStateFlow(AppConstants.DEFAULT_APP_DRAWER_MODE)
+    // wallpaperSurfaceMode
+    private val wallpaperSurfaceModeState =
+        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE)
 
-    var appDrawerMode: AppDrawerMode
-        get() = appDrawerModeState.value
-        set(value) { appDrawerModeState.value = value }
+    var wallpaperSurfaceMode: WallpaperSurfaceMode
+        get() = wallpaperSurfaceModeState.value
+        set(value) { wallpaperSurfaceModeState.value = value }
 
-    override val appDrawerModeFlow: Flow<AppDrawerMode> = appDrawerModeState
+    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> = wallpaperSurfaceModeState
 
-    override suspend fun setAppDrawerMode(mode: AppDrawerMode) {
-        appDrawerMode = mode
+    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) {
+        wallpaperSurfaceMode = mode
     }
 }

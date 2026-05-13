@@ -52,7 +52,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
@@ -127,7 +127,7 @@ class LauncherViewModel @Inject constructor(
     setFontBoldUseCase: SetFontBoldUseCase,
     setContentTopMarginUseCase: SetContentTopMarginUseCase,
     setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase,
-    resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase,
+    resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase,
     observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
     setWallpaperImageUseCase: SetWallpaperImageUseCase,

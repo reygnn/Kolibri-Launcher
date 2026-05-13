@@ -16,7 +16,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
@@ -42,7 +42,7 @@ class ThemingDelegate(
     private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase,
     private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
-    private val resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase,
+    private val resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase,
     private val systemWallpaperColorsSignal: SystemWallpaperColorsSignal,
     /**
      * The two pre-defined AppDrawer surface colours, resolved by the

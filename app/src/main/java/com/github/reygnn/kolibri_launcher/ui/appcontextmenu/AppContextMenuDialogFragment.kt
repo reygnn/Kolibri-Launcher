@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.view.Window
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -21,8 +23,12 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.BottomSheetAppContextMenuBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -83,6 +89,9 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
 
     @Inject
     lateinit var buildAppContextMenuUseCase: BuildAppContextMenuUseCase
+
+    @Inject
+    lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
 
     // CRASH-SAFE: Nullable binding
     private var _binding: BottomSheetAppContextMenuBinding? = null
@@ -166,6 +175,43 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         binding.contextMenuItemsRecyclerView.layoutManager =
             LinearLayoutManager(requireContext())
         binding.contextMenuItemsRecyclerView.adapter = adapter
+
+        // Wallpaper-following surface. Long-press menu hovers directly
+        // over the homescreen wallpaper, so the same LuminanceClassification
+        // that drives AppDrawer + Home text colour drives this dialog's
+        // surface too. The Material3 bottom-sheet drawable (rounded
+        // top corners) sits above `binding.root`, so the body-level
+        // colour is set on the root and the Material3 layer's tint is
+        // refreshed from the same colour to keep the rounded corners
+        // matching the body. Text colour follows the WCAG-based
+        // foregroundColor() so labels stay legible on either surface.
+        collectOnStarted(
+            flow = resolveWallpaperSurfaceUseCase(),
+            errorTag = "wallpaperSurface",
+            coroutineContext = Dispatchers.Main,
+        ) { classification ->
+            if (_binding == null) return@collectOnStarted
+            val surface = ResolvedBackground.SolidColor(
+                color = ContextCompat.getColor(
+                    requireContext(),
+                    when (classification) {
+                        LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                        LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                    },
+                ),
+            )
+            val fg = surface.foregroundColor()
+            binding.root.setBackgroundColor(surface.color)
+            binding.appNameText.setTextColor(fg)
+            adapter.setActionTextColor(fg)
+            // Tint the Material3 bottom-sheet container so the rounded
+            // top corners match the body colour. Without this the body
+            // is wallpaper-aware but the rounded edge stays in the
+            // Material3 day/night palette and looks disconnected.
+            dialog?.findViewById<View>(
+                com.google.android.material.R.id.design_bottom_sheet
+            )?.backgroundTintList = ColorStateList.valueOf(surface.color)
+        }
 
         if (BuildConfig.DEBUG) {
             EspressoIdlingResource.increment()

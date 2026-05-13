@@ -12,7 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -277,18 +277,18 @@ class SettingsRepositoryImpl @Inject constructor(
         safeEdit { it[PreferenceKeys.FAVORITES_ALIGNMENT] = alignment.name }
     }
 
-    override val appDrawerModeFlow: Flow<AppDrawerMode> = dataStore.data.safeData
+    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> = dataStore.data.safeData
         .map { preferences ->
             val name = preferences[PreferenceKeys.APP_DRAWER_MODE]
-                ?: return@map AppConstants.DEFAULT_APP_DRAWER_MODE
+                ?: return@map AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
             try {
-                AppDrawerMode.valueOf(name)
+                WallpaperSurfaceMode.valueOf(name)
             } catch (e: Throwable) {
-                AppConstants.DEFAULT_APP_DRAWER_MODE
+                AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
             }
         }
 
-    override suspend fun setAppDrawerMode(mode: AppDrawerMode) {
+    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) {
         safeEdit { it[PreferenceKeys.APP_DRAWER_MODE] = mode.name }
     }
 

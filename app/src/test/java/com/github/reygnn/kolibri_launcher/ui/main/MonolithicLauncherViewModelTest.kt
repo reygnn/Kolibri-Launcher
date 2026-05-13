@@ -49,7 +49,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -206,7 +206,7 @@ class MonolithicLauncherViewModelTest {
     private val setFontBoldUseCase: SetFontBoldUseCase = mockk(relaxed = true)
     private val setContentTopMarginUseCase: SetContentTopMarginUseCase = mockk(relaxed = true)
     private val setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase = mockk(relaxed = true)
-    private val resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
+    private val resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase = mockk(relaxed = true)
     // --- ENDE DER MOCKS ---
 
     private lateinit var viewModel: LauncherViewModel

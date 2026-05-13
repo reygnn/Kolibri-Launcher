@@ -5,7 +5,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
@@ -46,7 +46,7 @@ class ThemingDelegateTest {
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
-    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase
+    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase
     private lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     @Before

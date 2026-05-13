@@ -11,7 +11,7 @@ import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
@@ -117,7 +117,7 @@ class LauncherViewModelTest {
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     private lateinit var setContentTopMarginUseCase: SetContentTopMarginUseCase
     private lateinit var setFavoritesAlignmentUseCase: SetFavoritesAlignmentUseCase
-    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase
+    private lateinit var resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase

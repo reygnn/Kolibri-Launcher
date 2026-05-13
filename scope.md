@@ -33,26 +33,25 @@ limitation cross-linked at the end.
 
 ## 1. `ResolvedBackground` adoption for other surfaces
 
-**Status:** Open — UX inconsistency between wallpaper-following and
-system-theme-following surfaces is mildly bothersome to the
-maintainer in daily use (2026-05-13 self-check).
+**Status:** Done with narrowed scope — see Update at the bottom of
+this entry.
 
-**What's there today.** `ResolvedBackground` (sealed interface,
-`:domain/model/`) was designed to be the central abstraction for
-text-on-surface decisions across the whole launcher. Today it
-drives only the AppDrawer surface (`SolidColor` variant) and is
-indirectly aligned with the homescreen via `ClassifyWallpaperUseCase`.
+**What's there today (historical).** `ResolvedBackground` (sealed
+interface, `:domain/model/`) was designed to be the central
+abstraction for text-on-surface decisions across the whole
+launcher. Before this entry shipped it drove only the AppDrawer
+surface (`SolidColor` variant) and was indirectly aligned with the
+homescreen via `ClassifyWallpaperUseCase`.
 
-Surfaces that should eventually adopt it:
+Surfaces that were on the original adoption list:
 
 - **Search overlay** (in-app search, currently inside the
   AppDrawer — already covered transitively).
-- **Long-press menu** (`AppContextMenuDialogFragment`) — uses its
-  own theme today.
+- **Long-press menu** (`AppContextMenuDialogFragment`) — used its
+  own theme.
 - **Settings activities** (`SettingsActivity`,
   `SwipeActionsActivity`, `HiddenAppsActivity`,
-  `CustomNamesActivity`, etc.) — currently follow the system
-  Day/Night theme, not the wallpaper signal.
+  `CustomNamesActivity`) — followed the system Day/Night theme.
 - **Onboarding** (`OnboardingActivity`) — same.
 
 **Why deferred originally.** Each surface has its own theming
@@ -62,9 +61,29 @@ Adopting the abstraction is mechanical; choosing the right
 `ResolvedBackground` shape per surface is a per-screen design
 question.
 
-**Trigger fired:** maintainer self-check 2026-05-13 — yes, the
-Day/Night-following Settings screens feel disconnected from the
-wallpaper-following Home + AppDrawer.
+**Update (2026-05-13):** Adoption shipped for **the long-press
+menu only**. Maintainer self-check ruled the Settings activities
++ Onboarding *out* of scope after walking the four screens
+mentally — those are standalone task screens, system Day/Night is
+the correct anchor there. The long-press menu sits on top of the
+home wallpaper itself, so the disconnect to the wallpaper-
+following Home + AppDrawer was real. Implementation in
+`AppContextMenuDialogFragment`: inject
+`ResolveWallpaperSurfaceUseCase`, observe it via
+`collectOnStarted`, push the resulting `LuminanceClassification`
+through the existing `app_drawer_surface_light/_dark` colours
+(intentional reuse — same transparency intent), tint both the
+content root and the Material3 bottom-sheet container so the
+rounded top corners track the body colour, and route the WCAG-
+derived foreground colour through the adapter's new
+`setActionTextColor`. Search overlay was already transitively
+covered. The remaining four screens stay Day/Night.
+
+Side effect: the `AppDrawerMode` enum + flow + setting was renamed
+to `WallpaperSurfaceMode` (it now drives two surfaces, will likely
+drive more if the policy ever broadens). The persisted DataStore
+key stayed `"app_drawer_mode"` for state-portability across the
+rename.
 
 ---
 

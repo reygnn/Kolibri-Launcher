@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -120,11 +120,11 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun `fresh repository emits default appDrawerMode`() = runTest {
+    fun `fresh repository emits default wallpaperSurfaceMode`() = runTest {
         val repo = createRepository()
         assertEquals(
-            AppConstants.DEFAULT_APP_DRAWER_MODE,
-            repo.appDrawerModeFlow.first(),
+            AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE,
+            repo.wallpaperSurfaceModeFlow.first(),
         )
     }
 
@@ -191,12 +191,12 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun `setAppDrawerMode reflects in flow`() = runTest {
+    fun `setWallpaperSurfaceMode reflects in flow`() = runTest {
         val repo = createRepository()
-        val newValue = AppDrawerMode.entries
-            .first { it != AppConstants.DEFAULT_APP_DRAWER_MODE }
-        repo.setAppDrawerMode(newValue)
-        assertEquals(newValue, repo.appDrawerModeFlow.first())
+        val newValue = WallpaperSurfaceMode.entries
+            .first { it != AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE }
+        repo.setWallpaperSurfaceMode(newValue)
+        assertEquals(newValue, repo.wallpaperSurfaceModeFlow.first())
     }
 
     @Test

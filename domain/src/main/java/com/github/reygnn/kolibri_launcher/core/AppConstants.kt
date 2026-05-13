@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 
@@ -79,7 +79,7 @@ object AppConstants {
     const val FALLBACK_FONT_BOLD = DEFAULT_FONT_BOLD
     val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
     val DEFAULT_FAVORITES_ALIGNMENT = FavoritesAlignment.START
-    val DEFAULT_APP_DRAWER_MODE = AppDrawerMode.AUTO
+    val DEFAULT_WALLPAPER_SURFACE_MODE = WallpaperSurfaceMode.AUTO
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"

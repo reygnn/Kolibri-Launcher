@@ -16,6 +16,21 @@ class AppContextMenuAdapter(
 ) : ListAdapter<AppContextMenuAction, RecyclerView.ViewHolder>(ActionDiffCallback()) {
 
     /**
+     * Foreground colour for action labels. Mirrors AppDrawerAdapter's
+     * pattern — the host fragment observes the wallpaper-driven surface
+     * classification and pushes the right colour here. Null means
+     * "fall back to the Material3 theme colour", which is how the
+     * adapter behaves before the first emission.
+     */
+    private var actionTextColor: Int? = null
+
+    fun setActionTextColor(color: Int) {
+        if (actionTextColor == color) return
+        actionTextColor = color
+        notifyItemRangeChanged(0, itemCount)
+    }
+
+    /**
      * Bestimmt, welches Layout für welches Element in der Liste verwendet werden soll.
      */
     override fun getItemViewType(position: Int): Int {
@@ -50,7 +65,7 @@ class AppContextMenuAdapter(
         val item = getItem(position)
         when (holder) {
             is ActionViewHolder -> {
-                holder.bind(item)
+                holder.bind(item, actionTextColor)
                 // Wichtig: Nur klickbare Elemente bekommen einen OnClickListener.
                 holder.itemView.setOnClickListener { onItemClicked(item) }
             }
@@ -66,7 +81,7 @@ class AppContextMenuAdapter(
     class ActionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val labelView: TextView = itemView.findViewById(R.id.actionLabel)
 
-        fun bind(action: AppContextMenuAction) {
+        fun bind(action: AppContextMenuAction, textColor: Int?) {
             labelView.text = when (action) {
                 is AppContextMenuAction.Shortcut -> action.shortcut.shortLabel
                 is AppContextMenuAction.LauncherAction ->
@@ -74,6 +89,7 @@ class AppContextMenuAdapter(
                 // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
                 is AppContextMenuAction.Separator -> ""
             }
+            textColor?.let(labelView::setTextColor)
         }
     }
 

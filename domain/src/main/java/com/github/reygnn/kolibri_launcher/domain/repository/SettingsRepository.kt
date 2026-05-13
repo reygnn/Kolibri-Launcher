@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.flow.Flow
@@ -40,8 +40,8 @@ interface SettingsRepository : Purgeable {
     val favoritesAlignmentFlow: Flow<FavoritesAlignment>
     suspend fun setFavoritesAlignment(alignment: FavoritesAlignment)
 
-    val appDrawerModeFlow: Flow<AppDrawerMode>
-    suspend fun setAppDrawerMode(mode: AppDrawerMode)
+    val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode>
+    suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode)
 
 
     val showCalendarEventFlow: Flow<Boolean>

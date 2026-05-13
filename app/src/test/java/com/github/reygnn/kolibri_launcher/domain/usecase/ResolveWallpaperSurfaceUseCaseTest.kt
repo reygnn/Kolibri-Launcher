@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -16,7 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * JVM tests for [ResolveAppDrawerSurfaceUseCase].
+ * JVM tests for [ResolveWallpaperSurfaceUseCase].
  *
  * Pins the mode → classification mapping. The classifier itself
  * (`ClassifyWallpaperUseCase`) is mocked here; its own logic has
@@ -27,20 +27,20 @@ import org.junit.Test
  * classifier entirely.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ResolveAppDrawerSurfaceUseCaseTest {
+class ResolveWallpaperSurfaceUseCaseTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var classifyWallpaperUseCase: ClassifyWallpaperUseCase
-    private lateinit var useCase: ResolveAppDrawerSurfaceUseCase
+    private lateinit var useCase: ResolveWallpaperSurfaceUseCase
 
     @Before
     fun setUp() {
         settingsRepository = FakeSettingsRepository()
         classifyWallpaperUseCase = mockk()
-        useCase = ResolveAppDrawerSurfaceUseCase(
+        useCase = ResolveWallpaperSurfaceUseCase(
             settingsRepository = settingsRepository,
             classifyWallpaperUseCase = classifyWallpaperUseCase,
         )
@@ -49,7 +49,7 @@ class ResolveAppDrawerSurfaceUseCaseTest {
     @Test
     fun `LIGHT mode resolves to LIGHT regardless of classifier`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            settingsRepository.setAppDrawerMode(AppDrawerMode.LIGHT)
+            settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.LIGHT)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.DARK)
             assertEquals(LuminanceClassification.LIGHT, useCase().first())
@@ -58,7 +58,7 @@ class ResolveAppDrawerSurfaceUseCaseTest {
     @Test
     fun `DARK mode resolves to DARK regardless of classifier`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            settingsRepository.setAppDrawerMode(AppDrawerMode.DARK)
+            settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.LIGHT)
             assertEquals(LuminanceClassification.DARK, useCase().first())
@@ -67,7 +67,7 @@ class ResolveAppDrawerSurfaceUseCaseTest {
     @Test
     fun `AUTO mode delegates to classifier — LIGHT path`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            settingsRepository.setAppDrawerMode(AppDrawerMode.AUTO)
+            settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.AUTO)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.LIGHT)
             assertEquals(LuminanceClassification.LIGHT, useCase().first())
@@ -76,7 +76,7 @@ class ResolveAppDrawerSurfaceUseCaseTest {
     @Test
     fun `AUTO mode delegates to classifier — DARK path`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            settingsRepository.setAppDrawerMode(AppDrawerMode.AUTO)
+            settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.AUTO)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.DARK)
             assertEquals(LuminanceClassification.DARK, useCase().first())

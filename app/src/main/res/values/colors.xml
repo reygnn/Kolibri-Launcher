@@ -9,9 +9,9 @@
     <color name="wallpaper_edit_foreground">#FFFFFF</color>
 
     <!-- AppDrawer surface — two pre-defined colours that the
-         AppDrawerMode setting (AUTO/LIGHT/DARK) picks between. The dark
+         WallpaperSurfaceMode setting (AUTO/LIGHT/DARK) picks between. The dark
          variant matches the historical hardcoded value (#DD000000, 85%
-         opaque) so a user on AppDrawerMode=DARK sees no visual change
+         opaque) so a user on WallpaperSurfaceMode=DARK sees no visual change
          vs. the pre-feature build. The light variant uses a higher
          alpha (94% / #F0) than its dark sibling because semi-transparent
          white reveals more wallpaper saturation than semi-transparent

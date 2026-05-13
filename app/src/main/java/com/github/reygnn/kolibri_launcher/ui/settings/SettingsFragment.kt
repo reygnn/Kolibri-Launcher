@@ -32,7 +32,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -465,23 +465,23 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         // App Drawer Mode (Auto / Light / Dark)
-        val appDrawerModePreference =
+        val wallpaperSurfaceModePreference =
             findPreference<ListPreference>(AppConstants.PrefKeys.APP_DRAWER_MODE)
-        appDrawerModePreference?.setOnPreferenceChangeListener { _, newValue ->
+        wallpaperSurfaceModePreference?.setOnPreferenceChangeListener { _, newValue ->
             if (newValue is String) {
                 val mode = try {
-                    AppDrawerMode.valueOf(newValue)
+                    WallpaperSurfaceMode.valueOf(newValue)
                 } catch (e: IllegalArgumentException) {
-                    TimberWrapper.silentError(e, "Unknown AppDrawerMode value: $newValue")
+                    TimberWrapper.silentError(e, "Unknown WallpaperSurfaceMode value: $newValue")
                     return@setOnPreferenceChangeListener false
                 }
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        settingsRepository.setAppDrawerMode(mode)
+                        settingsRepository.setWallpaperSurfaceMode(mode)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error setting AppDrawerMode")
+                        TimberWrapper.silentError(e, "Error setting WallpaperSurfaceMode")
                     }
                 }
             }
@@ -749,7 +749,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 // Observer for AppDrawer Mode Setting
                 launch {
                     try {
-                        settingsRepository.appDrawerModeFlow.collect { mode ->
+                        settingsRepository.wallpaperSurfaceModeFlow.collect { mode ->
                             if (!isAdded || isDetached) return@collect
                             findPreference<ListPreference>(AppConstants.PrefKeys.APP_DRAWER_MODE)?.value =
                                 mode.name
@@ -757,7 +757,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in appDrawerMode flow collection")
+                        TimberWrapper.silentError(e, "Error in wallpaperSurfaceMode flow collection")
                     }
                 }
 
