@@ -134,8 +134,12 @@ class SpeedDialFabCluster @JvmOverloads constructor(
         // so a parent-size change would otherwise leave the cluster
         // displaced by exactly the delta. Comparing old vs. new corners
         // avoids redundant re-applies for layout passes that don't
-        // actually relocate the view.
+        // actually relocate the view. Skipping mid-drag avoids the
+        // (rare) flicker where a rotation-driven layout pass would
+        // briefly snap the cluster back to the pre-drag fraction
+        // before the next MOVE event re-positions it.
         addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (dragHandler.isDragging) return@addOnLayoutChangeListener
             if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
                 applyPositionImmediate()
             }
