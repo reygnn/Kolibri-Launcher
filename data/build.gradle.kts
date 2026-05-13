@@ -64,9 +64,9 @@ android {
     testOptions {
         unitTests {
             // Robolectric needs Android resources on the test classpath; the
-            // BackupRepositoryImpl* / WallpaperRepositoryImpl* / DataMigrationManager
-            // tests run with @RunWith(RobolectricTestRunner::class). Mirrors
-            // the same flags in :app/build.gradle.kts.
+            // BackupRepositoryImpl* / WallpaperRepositoryImpl* tests run with
+            // @RunWith(RobolectricTestRunner::class). Mirrors the same flags
+            // in :app/build.gradle.kts.
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
@@ -123,8 +123,7 @@ dependencies {
     // mirrors :domain/build.gradle.kts's testImplementation block plus
     // Robolectric, since some Repository-Impls touch Android URI/Uri-
     // ContentResolver/InputStream APIs (BackupRepositoryImpl,
-    // WallpaperRepositoryImpl, UsageExportRepositoryImpl IO paths,
-    // DataMigrationManager).
+    // WallpaperRepositoryImpl, UsageExportRepositoryImpl IO paths).
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

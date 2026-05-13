@@ -481,7 +481,7 @@ aber **bewusste Architektur-Entscheidungen** und korrekt dokumentiert:
 |---|---|---|
 | `KolibriLauncherApp` Mehrschicht-Catches | Crash-Festung; jede Schicht muss überleben | Rule 7 |
 | 8 nackte `Timber.e(`-Aufrufe im Crash-Handler | `silentError` würde dort rekursieren | Rule 9 |
-| 2× SharedPreferences (`DataMigrationManager`, `CrashReportLimiter`) | Bootstrap-Henne-Ei + sync ACRA-Aufruf | Rule 5 |
+| 1× SharedPreferences (`CrashReportLimiter`) | Sync ACRA-Aufruf vom Non-Coroutine-Thread, DataStore ist suspend-only | Rule 5 |
 | `runBlocking` in `attachBaseContext` | Privacy-Race-Window vermeiden | KNOWN_ISSUES.md |
 | ProGuard `keep class …** { *; }` | Stack-Trace-Treue für Crash-Reports | Projekt-Philosophie (GPLv3) |
 | `HomeFragment` 1989 Zeilen (post-Brocken-A 2026-05-03) | Pure Logik bereits extrahiert; UI-Glue bleibt; verbleibende Catches sind echte Boundaries | CLAUDE.md, TODO „Pfad zu 9+" |
@@ -1536,7 +1536,6 @@ Damit ist der §9.11-Befund auch in der CI-Suite gepinnt.
 | `BackupDataAssembler.kt` | 10-Phase-Import mit `withTimeoutOrNull` gegen WhileSubscribed-cold-subscriber-Race. Keine eigenen Catches by design — propagiert an Caller's outer try |
 | `CustomNamesRepositoryImpl.kt` | Alle Throwable-Catches, Trigger nur on success, Batch-Variante mit single-trigger |
 | `InstalledAppsRepositoryImpl.kt` | Multi-Layer Flow-Catches (onStart-catch, .catch with nested-catch, per-Item-Recovery), alle Throwable |
-| `DataMigrationManager.kt` | Schon im Rule-13-Sweep gesehen — `silentDeath` für lying-state-Pfad ("First launch detected" wäre falsch) |
 | `CrashReportConsentStore.kt` | Bootstrap-context, plain `Timber.e` per Rule-9-exception-list. Catches auf Exception aber strukturell durch caller (KolibriLauncherApp.attachBaseContext) gebunden |
 | `ShortcutLauncherServiceImpl.kt` | Minimaler System-API-Wrapper, theoretischer OOM-gap aber System-API-Path |
 

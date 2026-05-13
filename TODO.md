@@ -532,9 +532,8 @@ Defensive-Religion nicht vorhanden):
 - `data/` Repository-Files (Backup, Reset, Wallpaper, TimeBased,
   Favorites, FavoritesOrder, AppUsage, HiddenApps, SwipeActions,
   Settings, CustomNames, Shortcut, ShortcutLauncherService,
-  WallpaperFileManager, DataMigrationManager) — alle EXTERNAL I/O,
-  per-Item-Recovery in ResetRepository, oder `silentDeath`-Lifecycle-
-  Critical-Pfade in DataMigrationManager.
+  WallpaperFileManager) — alle EXTERNAL I/O oder per-Item-Recovery
+  in ResetRepository.
 
 Geprüft, aber kein Sweep nötig (alle Catches sind echte UX-/
 Lifecycle-/Per-Item-Recovery, kein CANT_THROW):
@@ -824,7 +823,7 @@ in 9 Files. Linter wurde gebaut um diese Klasse dauerhaft zu beenden.
   (statt Line-Number-Pin).
 - **Rule 12** — kein `Timber.Forest.*`.
 - **Naming** — `*Manager`-Klassen in `data/` außer `WallpaperFileManager`
-  und `DataMigrationManager`.
+  (einzige verbliebene Ausnahme nach dem `DataMigrationManager`-Removal).
 - **Rule 11 (annotation discipline, positive list)** — Spec/Konvention
   in CLAUDE.md Rule 11 (kanonisch). Heute auf der Whitelist:
   nur MainActivity. Hinzugefügt 2026-05-04 als vierte Linter-Sektion;
@@ -1408,10 +1407,10 @@ Alle 32 Files aus `app/src/test/java/.../data/` sind nach
   (2), `SwipeActionsRepositoryImplContractTest`, `AppUsageRepositoryImpl*Test`
   (2), `UsageExportRepositoryImplFormatSpec` / `*TimeLordSpec` /
   `*XenomorphSpec` / `UsageExportRepositoryImplTest`.
-- **Robolectric (16 inkl. Helper):** `BackupRepositoryImpl*Test` (9 Files
+- **Robolectric (15 inkl. Helper):** `BackupRepositoryImpl*Test` (9 Files
   + `BackupRepositoryImplTestFactory`), `WallpaperRepositoryImpl*Test`
   (2 inkl. Contract-Test), `FakeWallpaperRepositoryContractTest`,
-  `UsageExportRepositoryImplDoomsdaySpec`, `DataMigrationManagerTest`,
+  `UsageExportRepositoryImplDoomsdaySpec`,
   `WallpaperFileManagerTest`, plus die kleinen Files `InstalledAppsRepositoryImplTest`,
   `InstalledAppsStateRepositoryImpl*Test` (2), `PackageUpdateReceiverTest`,
   `ResetRepositoryImplTest`, `ScreenLockRepositoryImpl*Test` (2),
