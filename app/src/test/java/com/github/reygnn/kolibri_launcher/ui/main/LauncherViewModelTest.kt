@@ -8,7 +8,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.SavedStateHandle
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
@@ -52,6 +52,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -197,7 +198,7 @@ class LauncherViewModelTest {
         setFavoritesAlignmentUseCase = mockk(relaxed = true)
         resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
-                flowOf(AppDrawerSurfaceClassification.DARK)
+                flowOf(LuminanceClassification.DARK)
 
         observeWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
@@ -258,6 +259,7 @@ class LauncherViewModelTest {
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         appUpdateSignal = appUpdateSignal,
+        systemWallpaperColorsSignal = SystemWallpaperColorsSignal(),
         savedStateHandle = SavedStateHandle(),
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,

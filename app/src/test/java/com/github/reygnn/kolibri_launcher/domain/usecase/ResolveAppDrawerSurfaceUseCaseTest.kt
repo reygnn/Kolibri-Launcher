@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerMode
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import io.mockk.every
@@ -51,8 +51,8 @@ class ResolveAppDrawerSurfaceUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             settingsRepository.setAppDrawerMode(AppDrawerMode.LIGHT)
             every { classifyWallpaperUseCase() } returns
-                    flowOf(AppDrawerSurfaceClassification.DARK)
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+                    flowOf(LuminanceClassification.DARK)
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -60,8 +60,8 @@ class ResolveAppDrawerSurfaceUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             settingsRepository.setAppDrawerMode(AppDrawerMode.DARK)
             every { classifyWallpaperUseCase() } returns
-                    flowOf(AppDrawerSurfaceClassification.LIGHT)
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+                    flowOf(LuminanceClassification.LIGHT)
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     @Test
@@ -69,8 +69,8 @@ class ResolveAppDrawerSurfaceUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             settingsRepository.setAppDrawerMode(AppDrawerMode.AUTO)
             every { classifyWallpaperUseCase() } returns
-                    flowOf(AppDrawerSurfaceClassification.LIGHT)
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+                    flowOf(LuminanceClassification.LIGHT)
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -78,7 +78,7 @@ class ResolveAppDrawerSurfaceUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             settingsRepository.setAppDrawerMode(AppDrawerMode.AUTO)
             every { classifyWallpaperUseCase() } returns
-                    flowOf(AppDrawerSurfaceClassification.DARK)
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+                    flowOf(LuminanceClassification.DARK)
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 }

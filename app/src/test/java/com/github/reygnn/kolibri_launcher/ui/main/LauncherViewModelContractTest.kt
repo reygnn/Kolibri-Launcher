@@ -56,6 +56,7 @@ import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -262,6 +263,7 @@ class LauncherViewModelContractTest {
             saveFabPositionUseCase = saveFabPositionUseCase,
             wallpaperFileManager = wallpaperFileManager,
             appUpdateSignal = appUpdateSignal,
+            systemWallpaperColorsSignal = SystemWallpaperColorsSignal(),
             savedStateHandle = SavedStateHandle(),
             context = context,
             mainDispatcher = mainDispatcherRule.testDispatcher,

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
-import android.app.WallpaperColors
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
@@ -47,6 +47,7 @@ class ThemingDelegateTest {
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
     private lateinit var resolveAppDrawerSurfaceUseCase: ResolveAppDrawerSurfaceUseCase
+    private lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     @Before
     fun setUp() {
@@ -58,8 +59,9 @@ class ThemingDelegateTest {
         setChipBackgroundColorUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
         resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
+        systemWallpaperColorsSignal = SystemWallpaperColorsSignal()
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
-                flowOf(AppDrawerSurfaceClassification.DARK)
+                flowOf(LuminanceClassification.DARK)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -75,6 +77,7 @@ class ThemingDelegateTest {
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
+        systemWallpaperColorsSignal = systemWallpaperColorsSignal,
         appDrawerSurfaceLightColor = APP_DRAWER_LIGHT_TEST_COLOR,
         appDrawerSurfaceDarkColor = APP_DRAWER_DARK_TEST_COLOR,
         scope = createDelegateScope()
@@ -131,26 +134,6 @@ class ThemingDelegateTest {
         advanceUntilIdle()
 
         assertEquals(colors2, delegate.uiColorsState.value)
-    }
-
-    // ===========================================
-    // UPDATE WALLPAPER COLORS
-    // ===========================================
-
-    @Test
-    fun `updateUiColors with null does not crash`() {
-        val delegate = createDelegate()
-        delegate.updateUiColors(null)
-    }
-
-    @Test
-    fun `updateUiColors accepts WallpaperColors`() {
-        // The delegate maps WallpaperColors → DomainWallpaperColors and reads
-        // colorHints + secondaryColor in the process; relaxed mock returns the
-        // type's primitive defaults (0 / null) which is fine for this smoke test.
-        val wallpaperColors: WallpaperColors = mockk(relaxed = true)
-        val delegate = createDelegate()
-        delegate.updateUiColors(wallpaperColors)
     }
 
     // ===========================================

@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.ColorMath
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -70,7 +70,7 @@ class ObserveUiColorsUseCase @Inject constructor(
                         // Driven by ClassifyWallpaperUseCase — Kolibri-
                         // internal layers AND system colorHints, in the
                         // priority order documented on that use case.
-                        if (signals.classification == AppDrawerSurfaceClassification.LIGHT) {
+                        if (signals.classification == LuminanceClassification.LIGHT) {
                             ColorMath.BLACK
                         } else {
                             ColorMath.WHITE
@@ -119,6 +119,6 @@ class ObserveUiColorsUseCase @Inject constructor(
 
     private data class Signals(
         val colors: DomainWallpaperColors?,
-        val classification: AppDrawerSurfaceClassification,
+        val classification: LuminanceClassification,
     )
 }

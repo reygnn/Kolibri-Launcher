@@ -48,7 +48,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveAppDrawerSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
@@ -63,6 +63,7 @@ import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -239,7 +240,7 @@ class MonolithicLauncherViewModelTest {
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
 
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
-                flowOf(AppDrawerSurfaceClassification.DARK)
+                flowOf(LuminanceClassification.DARK)
 
         coEvery { setWallpaperImageUseCase.invoke(any()) } returns Unit
         coEvery { clearWallpaperUseCase.invoke() } returns Unit
@@ -286,6 +287,7 @@ class MonolithicLauncherViewModelTest {
             saveFabPositionUseCase,
             wallpaperFileManager,
             appUpdateSignal,
+            SystemWallpaperColorsSignal(),
             SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -1399,19 +1401,6 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         coVerify { setChipBackgroundColorUseCase.invoke(Color.BLUE) }
-    }
-
-    @Test
-    fun `updateUiColors - updates wallpaper colors flow`() = runTest {
-        // Mock WallpaperColors (requires API level handling)
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.updateUiColors(null)
-        advanceUntilIdle()
-
-        // Verify that observeUiColorsUseCase was called with the flow
-        verify { observeUiColorsUseCase.invoke(any()) }
     }
 
     @Test

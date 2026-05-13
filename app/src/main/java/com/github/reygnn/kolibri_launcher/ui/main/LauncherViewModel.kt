@@ -9,7 +9,7 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
-import android.app.WallpaperColors
+import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -136,6 +136,7 @@ class LauncherViewModel @Inject constructor(
     saveFabPositionUseCase: SaveFabPositionUseCase,
     wallpaperFileManager: WallpaperFileManager,
     appUpdateSignal: AppUpdateSignal,
+    systemWallpaperColorsSignal: SystemWallpaperColorsSignal,
     private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
@@ -199,6 +200,7 @@ class LauncherViewModel @Inject constructor(
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
+        systemWallpaperColorsSignal = systemWallpaperColorsSignal,
         appDrawerSurfaceLightColor = ContextCompat.getColor(context, R.color.app_drawer_surface_light),
         appDrawerSurfaceDarkColor = ContextCompat.getColor(context, R.color.app_drawer_surface_dark),
         scope = delegateScope
@@ -364,7 +366,6 @@ class LauncherViewModel @Inject constructor(
     fun onSetTextColor(color: Int) = themingDelegate.onSetTextColor(color)
     fun onSetTextShadowEnabled(isEnabled: Boolean) = themingDelegate.onSetTextShadowEnabled(isEnabled)
     fun onSetChipBackgroundColor(color: Int) = themingDelegate.onSetChipBackgroundColor(color)
-    fun updateUiColors(wallpaperColors: WallpaperColors? = null) = themingDelegate.updateUiColors(wallpaperColors)
     suspend fun isTextShadowEnabled(): Boolean = themingDelegate.isTextShadowEnabled()
 
     // ===========================================

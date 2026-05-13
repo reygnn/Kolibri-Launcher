@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
@@ -55,7 +55,7 @@ import javax.inject.Inject
  * If both signals are unavailable (no Kolibri wallpaper AND no
  * system colour hints — rare; a custom wallpaper implementation
  * that returns `null` from `getWallpaperColors`) the classifier
- * defaults to [AppDrawerSurfaceClassification.DARK], matching the
+ * defaults to [LuminanceClassification.DARK], matching the
  * pre-feature behaviour.
  *
  * **Hysteresis is deliberately omitted.** Kolibri-internal
@@ -72,30 +72,30 @@ class ClassifyWallpaperUseCase @Inject constructor(
     private val wallpaperBitmapLuminance: WallpaperBitmapLuminance,
 ) {
 
-    operator fun invoke(): Flow<AppDrawerSurfaceClassification> {
+    operator fun invoke(): Flow<LuminanceClassification> {
         // Kolibri-internal classification only changes when the
         // wallpaper state changes; computing the bitmap luminance on
         // every system-colour emission too would be wasteful. Each
         // upstream feeds an independent intermediate flow; the final
         // combine just picks Kolibri-internal when present, else
         // system, else fallback.
-        val kolibriInternalFlow: Flow<AppDrawerSurfaceClassification?> =
+        val kolibriInternalFlow: Flow<LuminanceClassification?> =
             observeWallpaperStateUseCase()
                 .distinctUntilChanged()
                 .map { state -> classifyKolibriInternal(state) }
 
-        val systemFlow: Flow<AppDrawerSurfaceClassification?> =
+        val systemFlow: Flow<LuminanceClassification?> =
             systemWallpaperColorsSignal.colors
                 .map { it?.let(::classifySystem) }
 
         return combine(kolibriInternalFlow, systemFlow) { kolibri, system ->
-            kolibri ?: system ?: AppDrawerSurfaceClassification.DARK
+            kolibri ?: system ?: LuminanceClassification.DARK
         }
     }
 
     private suspend fun classifyKolibriInternal(
         state: WallpaperState,
-    ): AppDrawerSurfaceClassification? {
+    ): LuminanceClassification? {
         val uri = pickDominantUri(state) ?: return null
         val luminance = wallpaperBitmapLuminance.compute(uri) ?: return null
         return classifyByLuminance(luminance)
@@ -120,13 +120,13 @@ class ClassifyWallpaperUseCase @Inject constructor(
 
     private fun classifySystem(
         colors: DomainWallpaperColors,
-    ): AppDrawerSurfaceClassification =
-        if (colors.supportsDarkText) AppDrawerSurfaceClassification.LIGHT
-        else AppDrawerSurfaceClassification.DARK
+    ): LuminanceClassification =
+        if (colors.supportsDarkText) LuminanceClassification.LIGHT
+        else LuminanceClassification.DARK
 
-    private fun classifyByLuminance(luminance: Float): AppDrawerSurfaceClassification =
-        if (luminance > LUMINANCE_THRESHOLD) AppDrawerSurfaceClassification.LIGHT
-        else AppDrawerSurfaceClassification.DARK
+    private fun classifyByLuminance(luminance: Float): LuminanceClassification =
+        if (luminance > LUMINANCE_THRESHOLD) LuminanceClassification.LIGHT
+        else LuminanceClassification.DARK
 
     companion object {
         /**

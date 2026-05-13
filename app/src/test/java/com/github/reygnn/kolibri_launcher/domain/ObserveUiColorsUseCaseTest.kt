@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import android.graphics.Color
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClassifyWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
@@ -26,7 +26,7 @@ class ObserveUiColorsUseCaseTest {
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var classifyWallpaperUseCase: ClassifyWallpaperUseCase
-    private lateinit var classificationFlow: MutableStateFlow<AppDrawerSurfaceClassification>
+    private lateinit var classificationFlow: MutableStateFlow<LuminanceClassification>
     private lateinit var useCase: ObserveUiColorsUseCase
     private lateinit var wallpaperColorsFlow: MutableStateFlow<DomainWallpaperColors?>
 
@@ -36,7 +36,7 @@ class ObserveUiColorsUseCaseTest {
         // Default to DARK so callers that don't care about classification
         // (user-override / adaptive_colors / default mode) get WHITE in
         // smart_contrast — same as the old supportsDarkText=false default.
-        classificationFlow = MutableStateFlow(AppDrawerSurfaceClassification.DARK)
+        classificationFlow = MutableStateFlow(LuminanceClassification.DARK)
         classifyWallpaperUseCase = mockk()
         every { classifyWallpaperUseCase() } returns classificationFlow
         useCase = ObserveUiColorsUseCase(
@@ -57,7 +57,7 @@ class ObserveUiColorsUseCaseTest {
         settingsRepository.setReadabilityMode("smart_contrast")
         // Even with classification=LIGHT (which would produce BLACK in
         // smart_contrast), the user override wins.
-        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
+        classificationFlow.value = LuminanceClassification.LIGHT
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(customColor)
@@ -73,7 +73,7 @@ class ObserveUiColorsUseCaseTest {
     fun `smart contrast with classification LIGHT returns black text`() = runTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
+        classificationFlow.value = LuminanceClassification.LIGHT
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.BLACK)
@@ -85,7 +85,7 @@ class ObserveUiColorsUseCaseTest {
     fun `smart contrast with classification DARK returns white text`() = runTest {
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-        classificationFlow.value = AppDrawerSurfaceClassification.DARK
+        classificationFlow.value = LuminanceClassification.DARK
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
@@ -106,7 +106,7 @@ class ObserveUiColorsUseCaseTest {
                 supportsDarkText = true,
                 secondaryColorArgb = null,
             )
-            classificationFlow.value = AppDrawerSurfaceClassification.DARK
+            classificationFlow.value = LuminanceClassification.DARK
 
             useCase(wallpaperColorsFlow).test {
                 assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
@@ -158,7 +158,7 @@ class ObserveUiColorsUseCaseTest {
             supportsDarkText = false,
             secondaryColorArgb = Color.CYAN,
         )
-        classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
+        classificationFlow.value = LuminanceClassification.LIGHT
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.CYAN)
@@ -246,12 +246,12 @@ class ObserveUiColorsUseCaseTest {
         // to classifier output, not to wallpaper-colours hints.
         settingsRepository.setTextColor(0)
         settingsRepository.setReadabilityMode("smart_contrast")
-        classificationFlow.value = AppDrawerSurfaceClassification.DARK
+        classificationFlow.value = LuminanceClassification.DARK
 
         useCase(wallpaperColorsFlow).test {
             assertThat(awaitItem().textColor).isEqualTo(Color.WHITE)
 
-            classificationFlow.value = AppDrawerSurfaceClassification.LIGHT
+            classificationFlow.value = LuminanceClassification.LIGHT
             assertThat(awaitItem().textColor).isEqualTo(Color.BLACK)
 
             cancelAndIgnoreRemainingEvents()

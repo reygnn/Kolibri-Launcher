@@ -21,7 +21,7 @@ Distinguish from:
 
 ## 1. ThemingDelegate ↔ SystemWallpaperColorsSignal unification
 
-**Status:** Deferred — refactor of working code, no functional gap.
+**Status:** Done — see Update at the bottom of this entry.
 
 **What's there today.** Two parallel paths poll/observe
 system-wallpaper colour hints:
@@ -61,6 +61,15 @@ signal's `colors` StateFlow, delete `updateUiColors(...)` and
 the `MainActivity.onResume()` polling path. Verify
 `ObserveUiColorsUseCase` adaptive_colors-mode tests still pass
 unchanged.
+
+**Update (2026-05-13):** Done exactly as sketched. `ThemingDelegate`
+now injects `SystemWallpaperColorsSignal` and reads its `colors`
+StateFlow directly; `wallpaperColorsFlow`, `updateUiColors(...)`,
+and the `LauncherViewModel.updateUiColors` wrapper are gone, plus
+`MainActivity.updateWallpaperColors()` + its `onResume()` call.
+`ObserveUiColorsUseCase` adaptive_colors-mode tests pass without
+edits — the upstream type (`StateFlow<DomainWallpaperColors?>`) is
+identical, only the source moved.
 
 ---
 
@@ -229,17 +238,17 @@ falls in the deadband.
 
 ## 7. Rename `AppDrawerSurfaceClassification` → generic name
 
-**Status:** Deferred — minor naming correctness.
+**Status:** Done — see Update at the bottom of this entry.
 
-**What's there today.** The enum is named for its first consumer
-(AppDrawer surface), but as of Commit 3 the homescreen
-text-colour pipeline also consumes it via the same
-`ClassifyWallpaperUseCase`. The name is now a half-truth.
+**What's there today (historical).** The enum was named for its
+first consumer (AppDrawer surface), but as of Commit 3 the
+homescreen text-colour pipeline also consumes it via the same
+`ClassifyWallpaperUseCase`. The name was a half-truth.
 
-**Why deferred.** Touches every consumer (use case return type,
-delegate, ViewModel facade, fragment observer, all tests).
-Bundling it with the homescreen wiring would have inflated the
-diff for a name-only change.
+**Why deferred at the time.** Touches every consumer (use case
+return type, delegate, ViewModel facade, fragment observer, all
+tests). Bundling it with the homescreen wiring would have
+inflated the diff for a name-only change.
 
 **Trigger.** A third surface adopts the classifier (per §3 of
 this file), at which point the name is unambiguously wrong and
@@ -249,6 +258,12 @@ or simply `LuminanceClassification`.
 **Sketch.** `git grep -l AppDrawerSurfaceClassification | xargs
 sed -i 's/AppDrawerSurfaceClassification/LuminanceClassification/g'`,
 rename the file, run `./gradlew test checkConventions checkRule13`.
+
+**Update (2026-05-13):** Done. Sweep ran exactly as sketched —
+12 files plus the model file rename, no manual fixups beyond a
+local edit to this very entry to repair the sed self-collision on
+the (then-suggested) new name. Final name landed as
+`LuminanceClassification` (the shorter of the two options).
 
 ---
 

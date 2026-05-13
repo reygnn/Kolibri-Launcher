@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
-import com.github.reygnn.kolibri_launcher.domain.model.AppDrawerSurfaceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBlendMode
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
@@ -68,7 +68,7 @@ class ClassifyWallpaperUseCaseTest {
             fakeWallpaperRepository.currentState =
                 WallpaperState(imageUri = "file:///wallpapers/bright.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/bright.png") } returns 0.92f
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -77,7 +77,7 @@ class ClassifyWallpaperUseCaseTest {
             fakeWallpaperRepository.currentState =
                 WallpaperState(imageUri = "file:///wallpapers/dark.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/dark.png") } returns 0.05f
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     @Test
@@ -86,7 +86,7 @@ class ClassifyWallpaperUseCaseTest {
             fakeWallpaperRepository.currentState =
                 WallpaperState(imageUri = "file:///wallpapers/mid.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/mid.png") } returns 0.5f
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     @Test
@@ -99,7 +99,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     // ============================================================
@@ -116,7 +116,7 @@ class ClassifyWallpaperUseCaseTest {
                 ),
             )
             coEvery { bitmapLuminance.compute("file:///wallpapers/sky.png") } returns 0.8f
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -137,7 +137,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -151,7 +151,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     @Test
@@ -163,7 +163,7 @@ class ClassifyWallpaperUseCaseTest {
                 ),
             )
             coEvery { bitmapLuminance.compute("file:///x.png") } returns 0.95f
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -184,7 +184,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -198,7 +198,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     // ============================================================
@@ -212,7 +212,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.LIGHT, useCase().first())
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
 
     @Test
@@ -222,7 +222,7 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null),
             )
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 
     // ============================================================
@@ -234,6 +234,6 @@ class ClassifyWallpaperUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             fakeWallpaperRepository.currentState = WallpaperState.NONE
             // systemColorsSignal stays at its initial null value
-            assertEquals(AppDrawerSurfaceClassification.DARK, useCase().first())
+            assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 }

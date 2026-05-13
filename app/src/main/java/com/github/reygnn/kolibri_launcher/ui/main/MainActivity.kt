@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.app.ActivityOptions
-import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -86,9 +85,7 @@ import javax.inject.Inject
  *     it matters. Examples: `launchApp`'s
  *     ActivityNotFoundException + SecurityException + Throwable triple,
  *     `startActivitySafely`'s Intent-resolution catch with fallback,
- *     `OpenCalendar`'s Toast-recovery branch, `updateWallpaperColors`'
- *     WallpaperManager-read catch with graceful fallback to default UI
- *     colours.
+ *     `OpenCalendar`'s Toast-recovery branch.
  *
  *   Teardown races (Activity finishing / Window detached) — prevented
  *     structurally with `if (isFinishing || isDestroyed) return` guards
@@ -182,11 +179,10 @@ import javax.inject.Inject
  *
  *   7. `onResume` narrowed try-block (deliberate behaviour change) —
  *      the previous catch wrapped both `registerReceiver` AND the
- *      three `update*` calls (`updateWallpaperColors`,
- *      `updateSecureFlag`, `updateRotationLock`). A registerReceiver
- *      failure therefore skipped all three updates as a side effect.
- *      The catch is now tight around `registerReceiver` only; the
- *      three `update*` calls run unconditionally. Justification: the
+ *      `update*` calls (`updateSecureFlag`, `updateRotationLock`).
+ *      A registerReceiver failure therefore skipped both updates as
+ *      a side effect. The catch is now tight around `registerReceiver`
+ *      only; the `update*` calls run unconditionally. Justification: the
  *      three concerns (wallpaper colours, FLAG_SECURE, rotation-lock)
  *      are independent of battery-receiver registration — losing the
  *      receiver should not also leave the screen in stale tint or
@@ -473,8 +469,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     /**
      * Final app initialization. Runs ONLY ONCE thanks to isInitialized flag.
-     * Note: updateWallpaperColors() is intentionally NOT called here to avoid
-     * race conditions with onResume(). Colors are updated in onResume() instead.
      */
     private suspend fun initializeMainApp() {
         if (isInitialized) {
@@ -535,9 +529,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             isReceiverRegistered = false
         }
 
-        // updateWallpaperColors has its own catch with graceful fallback;
         // updateSecureFlag / updateRotationLock launch under the handler.
-        updateWallpaperColors()
+        // System-wallpaper colour hints flow continuously through
+        // SystemWallpaperColorsSignal (wired in KolibriLauncherApp.onCreate)
+        // — no onResume poll needed anymore.
         updateSecureFlag()
         updateRotationLock()
     }
@@ -980,19 +975,4 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
     }
 
-    private fun updateWallpaperColors() {
-        try {
-            val wallpaperManager = WallpaperManager.getInstance(this)
-            val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-            viewModel.updateUiColors(colors)
-        } catch (e: Throwable) {
-            // Catch kept (Expected error, four-category frame):
-            // WallpaperManager.getWallpaperColors can fail on permission
-            // races and on some OEM ROMs. Fallback to default UI colours
-            // (updateUiColors with no args) keeps the screen rendering
-            // sensibly instead of stuck on stale tint.
-            TimberWrapper.silentError(e, "Error updating wallpaper colors")
-            viewModel.updateUiColors()
-        }
-    }
 }

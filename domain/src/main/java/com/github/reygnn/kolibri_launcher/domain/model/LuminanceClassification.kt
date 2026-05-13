@@ -10,7 +10,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
  * layers map this to actual `@ColorInt Int`s via resources — the
  * domain stays free of `R`-references.
  */
-enum class AppDrawerSurfaceClassification {
+enum class LuminanceClassification {
     LIGHT,
     DARK,
 }
