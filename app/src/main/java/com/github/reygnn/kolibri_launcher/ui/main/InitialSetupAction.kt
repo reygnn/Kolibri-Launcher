@@ -9,7 +9,7 @@ package com.github.reygnn.kolibri_launcher.ui.main
  * `initializeMainApp()`) stay in `MainActivity` — they require Activity
  * scope and lifecycle-aware coroutine launching. What is testable on the
  * JVM is the *decision* of which path to take, given the persisted
- * onboarding flag and the presence of a backup file.
+ * onboarding flag.
  *
  * Pattern follows the existing pure-decision extracts in this codebase
  * (`AppLaunchAction`, `RenameDecision`, `WallpaperSaveAction`,
@@ -18,17 +18,12 @@ package com.github.reygnn.kolibri_launcher.ui.main
  */
 sealed interface InitialSetupAction {
 
-    /**
-     * First-time install with no backup. Caller should launch the
-     * onboarding flow.
-     */
+    /** First-time install. Caller should launch the onboarding flow. */
     data object LaunchOnboarding : InitialSetupAction
 
     /**
-     * Either the user has already completed onboarding, or a backup is
-     * present (typical wipe+reinstall scenario). Caller should skip
-     * onboarding and initialize the main app directly — the user has
-     * already gone through onboarding once and can restore from backup.
+     * The user has already completed onboarding. Caller should skip
+     * onboarding and initialize the main app directly.
      */
     data object InitializeImmediately : InitialSetupAction
 
@@ -36,17 +31,8 @@ sealed interface InitialSetupAction {
         /**
          * @param onboardingCompleted whether the persisted onboarding-
          *   completed flag is set.
-         * @param backupPresent whether a DataStore backup file exists in
-         *   the app's external/cache directory. If true, this is treated
-         *   as a wipe+reinstall: skip onboarding even if the
-         *   onboarding-completed flag is missing, since the backup itself
-         *   signals an experienced user.
          */
-        fun decide(
-            onboardingCompleted: Boolean,
-            backupPresent: Boolean,
-        ): InitialSetupAction =
-            if (!onboardingCompleted && !backupPresent) LaunchOnboarding
-            else InitializeImmediately
+        fun decide(onboardingCompleted: Boolean): InitialSetupAction =
+            if (onboardingCompleted) InitializeImmediately else LaunchOnboarding
     }
 }

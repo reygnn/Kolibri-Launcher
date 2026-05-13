@@ -30,7 +30,6 @@ import androidx.lifecycle.withStarted
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import com.github.reygnn.kolibri_launcher.DataStoreBackup
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -269,8 +268,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     lateinit var appPackageManager: PackageManager
     @Inject
     lateinit var settingsRepository: SettingsRepository
-    @Inject
-    lateinit var dataStoreBackup: DataStoreBackup
 
     private val systemEventReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -414,11 +411,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             // 1. Fetch data immediately (Async IO) - Don't wait for UI
             val onboardingCompleted = settingsRepository.onboardingCompletedFlow.first()
-            val backupPresent = dataStoreBackup.isBackupPresent()
 
             onboardingCheckCompleted = true
 
-            when (InitialSetupAction.decide(onboardingCompleted, backupPresent)) {
+            when (InitialSetupAction.decide(onboardingCompleted)) {
                 InitialSetupAction.LaunchOnboarding -> {
                     // 2. Wait for STARTED state, then launch ONCE
                     // This prevents BackgroundActivityLaunchViolation on Pixel/Android 14+
@@ -576,16 +572,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (isReceiverRegistered) {
             unregisterReceiver(systemEventReceiver)
             isReceiverRegistered = false
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-
-        if (BuildConfig.DEBUG) {
-            lifecycleScope.launch(mainActivityExceptionHandler) {
-                dataStoreBackup.createBackup()
-            }
         }
     }
 

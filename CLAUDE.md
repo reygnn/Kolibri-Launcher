@@ -160,8 +160,9 @@ activities.
    RepositoryImpl` bindings always go in `RepositoryModule.kt`.
 
 5. **DataStore Preferences is the only app storage for user state.** No
-   `SharedPreferences`, no app-managed SQLite. Backup/restore goes
-   through `BackupRepositoryImpl` + `DataStoreBackup`.
+   `SharedPreferences`, no app-managed SQLite. User-facing backup /
+   restore goes through `BackupRepositoryImpl` + `BackupDataAssembler`
+   (JSON export/import).
 
    *One deliberate exception, `SharedPreferences`-backed and intentional:*
 
