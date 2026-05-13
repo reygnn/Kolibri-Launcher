@@ -37,7 +37,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   4. Nur Kotlin/Coroutines APIs: MutableStateFlow, Flow, flowOf
  *
  * HELPER-METHODEN FÜR TESTS:
- *   - setReadabilityModeBlocking(): Synchrones Update für runOnMainSync {} Blöcke
  *   - Direkte Property-Setter (z.B. shadow = true) für einfache Test-Setups
  *
  * SIEHE AUCH:
@@ -67,11 +66,6 @@ class FakeSettingsRepository : SettingsRepository {
     private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
     private val secureWindowFlowState = MutableStateFlow(AppConstants.DEFAULT_SECURE_WINDOW)
-
-    // Mode Defaults
-    private val readabilityModeState = MutableStateFlow(AppConstants.DEFAULT_READABILITY_MODE)
-
-    override val readabilityModeFlow: Flow<String> = readabilityModeState
 
     private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE) // Enum Default ist okay
     override val sortOrderFlow: Flow<SortOrder> = sortOrderState
@@ -201,14 +195,6 @@ class FakeSettingsRepository : SettingsRepository {
         swipeDown = isEnabled
     }
 
-    override suspend fun setReadabilityMode(mode: String) {
-        readabilityModeState.value = mode
-    }
-
-    fun setReadabilityModeBlocking(mode: String) {
-        readabilityModeState.value = mode
-    }
-
     override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
         showCalendar = isEnabled
     }
@@ -259,7 +245,6 @@ class FakeSettingsRepository : SettingsRepository {
         autoShowKeyboard = AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
 
-        readabilityModeState.value = AppConstants.DEFAULT_READABILITY_MODE
         sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
 
         secureWindow = AppConstants.DEFAULT_SECURE_WINDOW

@@ -93,12 +93,6 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun `fresh repository emits default readabilityMode`() = runTest {
-        val repo = createRepository()
-        assertEquals(AppConstants.DEFAULT_READABILITY_MODE, repo.readabilityModeFlow.first())
-    }
-
-    @Test
     fun `fresh repository has onboarding not completed`() = runTest {
         val repo = createRepository()
         assertFalse(repo.onboardingCompletedFlow.first())
@@ -162,15 +156,6 @@ abstract class SettingsRepositoryContract {
         val newScale = AppConstants.DEFAULT_LAYOUT_SCALE + 0.25f
         repo.setLayoutScale(newScale)
         assertEquals(newScale, repo.layoutScaleStateFlow.first(), 0.0001f)
-    }
-
-    @Test
-    fun `setReadabilityMode reflects in flow`() = runTest {
-        val repo = createRepository()
-        val newMode = "contract-test-mode-xyz"
-        assertNotEquals(AppConstants.DEFAULT_READABILITY_MODE, newMode)
-        repo.setReadabilityMode(newMode)
-        assertEquals(newMode, repo.readabilityModeFlow.first())
     }
 
     @Test
@@ -263,20 +248,15 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun `purgeRepository resets sortOrder and readabilityMode`() = runTest {
+    fun `purgeRepository resets sortOrder`() = runTest {
         val repo = createRepository()
         val nonDefaultSort =
             SortOrder.entries.first { it != AppConstants.DEFAULT_SORT_ORDER }
         repo.setSortOrder(nonDefaultSort)
-        repo.setReadabilityMode("contract-test-mode")
 
         repo.purgeRepository()
 
         assertEquals(AppConstants.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
-        assertEquals(
-            AppConstants.DEFAULT_READABILITY_MODE,
-            repo.readabilityModeFlow.first()
-        )
     }
 
     @Test

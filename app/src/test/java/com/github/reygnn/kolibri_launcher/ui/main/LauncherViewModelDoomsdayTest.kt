@@ -26,7 +26,6 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
-import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -99,7 +98,7 @@ class LauncherViewModelDoomsdayTest {
         every { observeTimeBasedEventsUseCase.invoke() } returns emptyFlow()
 
         observeUiColorsUseCase = mockk(relaxed = true)
-        every { observeUiColorsUseCase.invoke(any()) } returns flowOf(UiColorsState())
+        every { observeUiColorsUseCase.invoke() } returns flowOf(UiColorsState())
 
         observeInstalledAppsUseCase = mockk(relaxed = true)
         every { observeInstalledAppsUseCase.invoke() } returns flowOf(AppLoadResult.Success)
@@ -168,7 +167,6 @@ class LauncherViewModelDoomsdayTest {
         saveFabPositionUseCase = mockk(relaxed = true),
         wallpaperFileManager = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
-        systemWallpaperColorsSignal = SystemWallpaperColorsSignal(),
         savedStateHandle = savedStateHandle,
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,

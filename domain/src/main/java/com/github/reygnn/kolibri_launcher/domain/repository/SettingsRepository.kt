@@ -10,12 +10,10 @@ interface SettingsRepository : Purgeable {
     val sortOrderFlow: Flow<SortOrder>
     val doubleTapToLockEnabledFlow: Flow<Boolean>
     val swipeDownToNotificationsEnabledFlow: Flow<Boolean>
-    val readabilityModeFlow: Flow<String>
 
     suspend fun setSortOrder(sortOrder: SortOrder)
     suspend fun setDoubleTapToLock(isEnabled: Boolean)
     suspend fun setSwipeDownToNotifications(isEnabled: Boolean)
-    suspend fun setReadabilityMode(mode: String)
 
     val onboardingCompletedFlow: Flow<Boolean>
     suspend fun setOnboardingCompleted()

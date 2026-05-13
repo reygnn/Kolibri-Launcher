@@ -43,7 +43,6 @@ class SettingsRepositoryImplTest {
     private val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
     private val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
     private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
-    private val READABILITY_MODE_KEY = stringPreferencesKey("text_readability_mode")
     private val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     private val SHOW_ALARM = booleanPreferencesKey("show_alarm")
 
@@ -247,51 +246,14 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `readabilityModeFlow - when no value is set - returns default`() = runTest {
-        Assert.assertEquals("smart_contrast", settingsManager.readabilityModeFlow.first())
-    }
-
-    @Test
-    fun `setReadabilityMode - correctly saves value`() = runTest {
-        settingsManager.setReadabilityMode("light")
-
-        val savedValue = fakeDataStore.data.first()[READABILITY_MODE_KEY]
-        Assert.assertEquals("light", savedValue)
-    }
-
-    @Test
-    fun `setReadabilityMode - when DataStore edit fails - does not crash`() = runTest {
-        fakeDataStore.makeEditFail()
-
-        settingsManager.setReadabilityMode("dark")
-
-        Assert.assertEquals("smart_contrast", settingsManager.readabilityModeFlow.first())
-    }
-
-    @Test
-    fun `readabilityModeFlow - emits new values when changed`() = runTest {
-        settingsManager.readabilityModeFlow.test {
-            Assert.assertEquals("smart_contrast", awaitItem())
-
-            settingsManager.setReadabilityMode("dark")
-            Assert.assertEquals("dark", awaitItem())
-
-            settingsManager.setReadabilityMode("light")
-            Assert.assertEquals("light", awaitItem())
-        }
-    }
-
-    @Test
     fun `multiple flows - all work independently`() = runTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
         settingsManager.setDoubleTapToLock(false)
         settingsManager.setOnboardingCompleted()
-        settingsManager.setReadabilityMode("dark")
 
         Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
         assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertTrue(settingsManager.onboardingCompletedFlow.first())
-        Assert.assertEquals("dark", settingsManager.readabilityModeFlow.first())
     }
 
     @Test

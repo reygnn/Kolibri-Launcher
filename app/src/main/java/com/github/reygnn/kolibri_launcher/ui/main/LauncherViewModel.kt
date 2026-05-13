@@ -9,7 +9,6 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
-import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -136,7 +135,6 @@ class LauncherViewModel @Inject constructor(
     saveFabPositionUseCase: SaveFabPositionUseCase,
     wallpaperFileManager: WallpaperFileManager,
     appUpdateSignal: AppUpdateSignal,
-    systemWallpaperColorsSignal: SystemWallpaperColorsSignal,
     private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
@@ -200,7 +198,6 @@ class LauncherViewModel @Inject constructor(
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
-        systemWallpaperColorsSignal = systemWallpaperColorsSignal,
         appDrawerSurfaceLightColor = ContextCompat.getColor(context, R.color.app_drawer_surface_light),
         appDrawerSurfaceDarkColor = ContextCompat.getColor(context, R.color.app_drawer_surface_dark),
         scope = delegateScope

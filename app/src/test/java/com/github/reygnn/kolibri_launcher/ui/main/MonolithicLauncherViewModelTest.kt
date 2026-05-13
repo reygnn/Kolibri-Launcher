@@ -63,7 +63,6 @@ import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
-import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -226,7 +225,7 @@ class MonolithicLauncherViewModelTest {
         every { getDrawerAppsUseCase.drawerApps } returns
                 MutableStateFlow<List<AppInfo>>(emptyList())
         every { observeTimeBasedEventsUseCase.invoke(any()) } returns flowOf(emptyList())
-        every { observeUiColorsUseCase.invoke(any()) } returns flowOf(UiColorsState())
+        every { observeUiColorsUseCase.invoke() } returns flowOf(UiColorsState())
         every { observeInstalledAppsUseCase.invoke() } returns flowOf(AppLoadResult.Success)
 
         every { observeHomeSettingsUseCase.invoke() } returns flowOf(HomeSettings())
@@ -287,7 +286,6 @@ class MonolithicLauncherViewModelTest {
             saveFabPositionUseCase,
             wallpaperFileManager,
             appUpdateSignal,
-            SystemWallpaperColorsSignal(),
             SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -591,7 +589,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `uiColorsState - observes ObserveUiColorsUseCase`() = runTest {
         val testColors = UiColorsState(textColor = Color.RED, shadowColor = Color.BLUE)
-        every { observeUiColorsUseCase.invoke(any()) } returns flowOf(testColors)
+        every { observeUiColorsUseCase.invoke() } returns flowOf(testColors)
 
         setupViewModel()
         advanceUntilIdle()
@@ -1208,7 +1206,7 @@ class MonolithicLauncherViewModelTest {
         every { observeTimeBasedEventsUseCase.invoke(any()) } returns flow {
             throw RuntimeException("Critical error")
         }
-        every { observeUiColorsUseCase.invoke(any()) } returns flow {
+        every { observeUiColorsUseCase.invoke() } returns flow {
             throw RuntimeException("Critical error")
         }
 
@@ -1515,7 +1513,7 @@ class MonolithicLauncherViewModelTest {
 
         // === ARRANGE ===
         val colorsFlow = MutableStateFlow(UiColorsState(textColor = Color.WHITE))
-        every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
+        every { observeUiColorsUseCase.invoke() } returns colorsFlow
 
         val eventsFlow = MutableStateFlow(emptyList<TimeBasedEvent>())
         every { observeTimeBasedEventsUseCase.invoke(any()) } returns eventsFlow
@@ -1703,7 +1701,7 @@ class MonolithicLauncherViewModelTest {
         every { getLayoutSettingsUseCase.layoutScale } returns scaleFlow
         every { getLayoutSettingsUseCase.verticalPadding } returns paddingFlow
         every { getLayoutSettingsUseCase.isFontBold } returns boldFlow
-        every { observeUiColorsUseCase.invoke(any()) } returns colorsFlow
+        every { observeUiColorsUseCase.invoke() } returns colorsFlow
 
         setupViewModel()
 

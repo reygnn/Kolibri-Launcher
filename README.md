@@ -80,8 +80,7 @@ probably find one.
 - Single image or multi-layer composition with per-layer scale,
   translation, and blend modes.
 - Dynamic text colours: foreground text adapts to wallpaper luminance
-  (`smart_contrast` mode) so dark text never lands on a dark
-  wallpaper region.
+  so dark text never lands on a dark wallpaper region.
 
 ### Backup & Restore
 

@@ -10,7 +10,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
@@ -27,14 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Delegate responsible for UI theming:
  * color observation, text color, text shadow, chip background,
- * and wallpaper color extraction.
- *
- * System-wallpaper colour hints come from
- * [SystemWallpaperColorsSignal] — a listener-driven process-lifetime
- * singleton wired in `KolibriLauncherApp.onCreate` via
- * `WallpaperManager.OnColorsChangedListener` plus an initial poll.
- * Reactive across the whole process lifetime, not only on
- * Activity.onResume like the previous polling path was.
+ * and AppDrawer surface resolution.
  */
 class ThemingDelegate(
     private val observeUiColorsUseCase: ObserveUiColorsUseCase,
@@ -43,7 +35,6 @@ class ThemingDelegate(
     private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
     private val resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase,
-    private val systemWallpaperColorsSignal: SystemWallpaperColorsSignal,
     /**
      * The two pre-defined AppDrawer surface colours, resolved by the
      * ViewModel from `R.color.app_drawer_surface_*` and passed in as
@@ -68,7 +59,7 @@ class ThemingDelegate(
 
     fun start() {
         scope.launchSafe("Error observing UI colors") {
-            observeUiColorsUseCase(systemWallpaperColorsSignal.colors).collect { colorsState ->
+            observeUiColorsUseCase().collect { colorsState ->
                 _uiColorsState.value = colorsState
             }
         }

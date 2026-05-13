@@ -87,43 +87,6 @@ rename.
 
 ---
 
-## 2. Palette-based `adaptive_colors` for Kolibri-internal layers
-
-**Status:** Open — maintainer notices the adaptive tint mismatching
-when only Kolibri-internal layers are visible (2026-05-13
-self-check).
-
-**What's there today.** `adaptive_colors` mode in
-`ObserveUiColorsUseCase` reads `DomainWallpaperColors.secondaryColorArgb`
-directly from the *system* wallpaper. Kolibri-internal layer
-wallpapers do not influence the adaptive tint — a user with a
-Kolibri-only wallpaper in adaptive_colors mode sees a tint
-derived from their (now-invisible) system wallpaper.
-
-**Why deferred originally.** `secondaryColorArgb` is the OS's
-curated palette pick. Replicating it for Kolibri-internal images
-requires palette extraction (the `androidx.palette` lib, or a
-custom clustering pass over the bitmap) AND a tinting heuristic
-(which swatch is the "secondary"? muted? dominant minus extremes?).
-Significantly more design surface than the binary
-`smart_contrast` extension. adaptive_colors is also an opt-in
-niche mode — so the cost/coverage ratio looked unfavourable at
-first.
-
-**Sketch.** Either add `androidx.palette:palette-ktx` (~50KB jar)
-and pull `palette.dominantSwatch.rgb` from the same bitmap the
-classifier already inspects, OR extend `BitmapLuminance` to
-return both luminance and a dominant ARGB. Plumb a new
-`Flow<Int?>` ("Kolibri-internal secondary colour") through
-`ClassifyWallpaperUseCase` (or a sibling) into
-`ObserveUiColorsUseCase`'s adaptive_colors branch.
-
-**Trigger fired:** maintainer self-check 2026-05-13 — yes, the
-adaptive tint reading from the *invisible* system wallpaper is
-the wrong source when Kolibri-internal layers cover everything.
-
----
-
 ## 3. Composite-rendering of multi-layer wallpapers (cross-link)
 
 **Status:** Already a documented limitation — see

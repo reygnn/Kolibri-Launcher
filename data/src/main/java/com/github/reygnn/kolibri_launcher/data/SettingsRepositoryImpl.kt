@@ -37,7 +37,6 @@ class SettingsRepositoryImpl @Inject constructor(
     private object PreferenceKeys {
         // String Keys
         val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
-        val READABILITY_MODE = stringPreferencesKey(AppConstants.PrefKeys.READABILITY_MODE)
         val FAVORITES_ALIGNMENT = stringPreferencesKey(AppConstants.PrefKeys.FAVORITES_ALIGNMENT)
         val APP_DRAWER_MODE = stringPreferencesKey(AppConstants.PrefKeys.APP_DRAWER_MODE)
 
@@ -141,16 +140,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
         safeEdit { it[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] = isEnabled }
-    }
-
-    override val readabilityModeFlow: Flow<String> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.READABILITY_MODE]
-                ?: AppConstants.DEFAULT_READABILITY_MODE
-        }
-
-    override suspend fun setReadabilityMode(mode: String) {
-        safeEdit { it[PreferenceKeys.READABILITY_MODE] = mode }
     }
 
     override val onboardingCompletedFlow: Flow<Boolean> = dataStore.data.safeData
@@ -334,7 +323,6 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
             preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
             preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
-            preferences.remove(PreferenceKeys.READABILITY_MODE)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)
             preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)

@@ -213,9 +213,6 @@ object AppConstants {
         const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
         const val SWIPE_DOWN_TO_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
 
-        // Appearance Mode
-        const val READABILITY_MODE = "text_readability_mode"
-
         // Keys, die nur für Klicks/Intents im Fragment genutzt werden (kein DataStore Value)
         const val SYSTEM_WALLPAPER = "system_wallpaper"
         const val EDIT_FAVORITES = "edit_favorites"
@@ -253,11 +250,6 @@ object AppConstants {
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
     const val DEFAULT_SECURE_WINDOW = false
-
-    // Readability Modes
-    const val READABILITY_MODE_SMART_CONTRAST = "smart_contrast"
-    const val READABILITY_MODE_STANDARD = "standard"
-    const val DEFAULT_READABILITY_MODE = READABILITY_MODE_SMART_CONTRAST
 
     // Chip Styling Constants
     const val CHIP_MAX_WIDTH_FACTOR = 0.80 // 80% der Bildschirmbreite

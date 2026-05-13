@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
-import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
@@ -47,7 +46,6 @@ class ThemingDelegateTest {
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
     private lateinit var resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase
-    private lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     @Before
     fun setUp() {
@@ -59,7 +57,6 @@ class ThemingDelegateTest {
         setChipBackgroundColorUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
         resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
-        systemWallpaperColorsSignal = SystemWallpaperColorsSignal()
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
                 flowOf(LuminanceClassification.DARK)
     }
@@ -77,7 +74,6 @@ class ThemingDelegateTest {
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
-        systemWallpaperColorsSignal = systemWallpaperColorsSignal,
         appDrawerSurfaceLightColor = APP_DRAWER_LIGHT_TEST_COLOR,
         appDrawerSurfaceDarkColor = APP_DRAWER_DARK_TEST_COLOR,
         scope = createDelegateScope()
@@ -105,7 +101,7 @@ class ThemingDelegateTest {
     @Test
     fun `start observes ui colors and updates state`() = runTest {
         val expectedColors: UiColorsState = mockk()
-        every { observeUiColorsUseCase(any()) } returns flowOf(expectedColors)
+        every { observeUiColorsUseCase() } returns flowOf(expectedColors)
 
         val delegate = createDelegate()
 
@@ -121,7 +117,7 @@ class ThemingDelegateTest {
         val colors2: UiColorsState = mockk()
         val colorsFlow = MutableStateFlow(colors1)
 
-        every { observeUiColorsUseCase(any()) } returns colorsFlow
+        every { observeUiColorsUseCase() } returns colorsFlow
 
         val delegate = createDelegate()
 
