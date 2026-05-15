@@ -81,6 +81,20 @@ probably find one.
   translation, and blend modes.
 - Dynamic text colours: foreground text adapts to wallpaper luminance
   so dark text never lands on a dark wallpaper region.
+- In-app wallpaper-edit mode with a draggable speed-dial FAB cluster
+  (rotation-survivable, respects nav-bar inset).
+
+### Adaptive theming
+
+- **Surfaces follow the wallpaper.** Menus, customization dialogs,
+  the app drawer, and home-anchored alert dialogs each pick a light
+  or dark surface based on the live wallpaper's luminance. Toggle the
+  behaviour (Auto / Force Light / Force Dark) per-user in Settings;
+  persisted across backup/restore.
+- **Two-signal classifier** combines Android's system
+  `WallpaperColors` hint with a Kolibri-side luminance +
+  transparency-coverage check, so AMOLED-targeting or
+  partially-transparent wallpapers don't get misread.
 
 ### Backup & Restore
 
@@ -207,6 +221,12 @@ the repo root and intentionally git-ignored:
 - [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) — StrictMode violations
   caused by the Android framework or OEM modifications that cannot
   be fixed in app code.
+- [`ACCEPTED_LIMITATIONS.md`](ACCEPTED_LIMITATIONS.md) — intentional
+  UX trade-offs that fall out of architectural decisions (e.g. the
+  residual wallpaper pop-in on double-tap-to-lock, accepted to keep
+  the AccessibilityService model that's required for banking-app
+  compatibility). Each entry carries the rationale and a re-evaluation
+  trigger.
 
 ## Contributing
 
