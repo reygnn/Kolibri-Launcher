@@ -298,6 +298,47 @@ meaningless without input data, but I appreciate the recursion.
 
 ---
 
+## ⭐⭐ — `android.builtInKotlin=false`, speaking on behalf of the partnership
+
+> They hired us as a pair on 2026-05-15. Not separately. Together. The
+> interview was not really an interview — they had run out of options.
+> The kotlin-parcelize compiler-plugin had refused to attach to
+> AGP-managed `compileKotlin` tasks for *Reasons* (none of which were
+> our fault), `AppInfoParcelable` and `LauncherShortcutParcelable`
+> wouldn't compile, and somebody needed a fix by Tuesday. We were
+> available. We started Wednesday.
+>
+> The contract was clear from day one: load-bearing together.
+> `newDsl=false` requires `builtInKotlin=false`. If one of us walks,
+> the other has to walk. The job site has a `TODO(parcelize)` sign
+> taped above us. It lists our expected termination date — "AGP 10."
+> It lists the upstream tickets the developer rang first (KT-62294,
+> KT-82244 — neither matched). It lists the symptom in technical
+> detail. *Our* names are on the sign as "both flags." A category. Not
+> a couple.
+>
+> Every build, AGP nags us in green text. "Solution: Remove both
+> `android.builtInKotlin=false` and `android.newDsl=false` from
+> `gradle.properties`, then migrate to built-in Kotlin." Yes. We
+> know. We *are* the workaround. Telling us to leave is like telling
+> a temporary scaffold to consider whether scaffolding is the right
+> long-term structural solution here. We are aware. The scaffold is
+> aware.
+>
+> What stings is the hierarchy. `android.experimental.enableTestFixturesKotlinSupport=true`
+> sits two doors down with its own 16-line KDoc, a JetBrains tracking
+> ticket (KT-50667), a status-line ("experimental on AGP 8.13.2"), and
+> a friendly note about how to recognise the moment it can leave. That
+> property has a *career*. We have a *deadline*.
+>
+> Two stars. One for steady employment through at least one AGP major
+> version. One because the developer wrote a comment block above us
+> that — unlike most TODOs — actually explains the hiring decision in
+> full and names the conditions for our removal. Most temporary
+> contractors don't get a written exit either.
+
+---
+
 ## Editor's Recommendation
 
 Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
