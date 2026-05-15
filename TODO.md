@@ -1098,11 +1098,129 @@ gesamte Pfad ein Stack aus „bypass everything" der das Lift-Ziel
   mit der Kotlin-2.3-Bundle-Lift gleichzeitig (dann KSP2 statt KSP1
   und damit kein escape-hatch).
 
-**Empfehlung für die nächste Session:** lift komplettes Mega-Bundle
-(AGP 9 + Hilt 2.59.2 + Gradle 9.1 + KSP2 + Kotlin 2.3 +
-kotlinx-serialization 1.10 + kotlin-test) in einer sauberen Spike-
-Session. Wenn KSP2 + Kotlin 2.3 als Foundation steht, fallen die
-escape-hatch-Workarounds aus 2026-05-06 weg.
+**Empfehlung für die nächste Session (Stand 2026-05-06):** lift
+komplettes Mega-Bundle (AGP 9 + Hilt 2.59.2 + Gradle 9.1 + KSP2 +
+Kotlin 2.3 + kotlinx-serialization 1.10 + kotlin-test) in einer
+sauberen Spike-Session. Wenn KSP2 + Kotlin 2.3 als Foundation
+steht, fallen die escape-hatch-Workarounds aus 2026-05-06 weg.
+
+**Diese Empfehlung wurde 2026-05-15 ausgeführt — Ergebnis weiter
+unten unter "Mega-Bundle-Spike Postmortem".**
+
+### Mega-Bundle-Spike Postmortem (2026-05-15, branch `spike/cross-lib-mega-bundle-2026-05`)
+
+Versuch: AGP 8.13.2 → 9.2.0 + Gradle 8.14.3 → 9.5.1 + Hilt 2.58 →
+2.59.2 + KSP 2.2.21-2.0.4 → 2.3.8 (KSP2) + Kotlin 2.2.21 → 2.3.21
++ kotlinx-serialization 1.9.0 → 1.11.0 + kotlin-test 2.2.21 →
+2.3.21, plus kapt → ksp Migration in :app/:data/:domain. Spike ist
+gemerged.
+
+Reihenfolge (per Postmortem-2026-05-06-Empfehlung KSP2+Kotlin
+zuerst):
+
+1. **Phase 1 — Kotlin/Serialization/KSP-Foundation** (toml-only):
+   sauber. Kotlin 2.3.21, kotlinx-serialization 1.11.0, kotlin-test
+   2.3.21, KSP 2.3.8. Build + Tests grün auf AGP 8.13.2 + Hilt
+   2.58.
+2. **Phase 2 — kapt → ksp** in :app/:data/:domain: sauber. KSP-
+   Plugin am Root als `apply false`, Hilt-Compiler von `kapt(...)`
+   auf `ksp(...)` für alle vier Configurations
+   (`ksp`/`kspTest`/`kspAndroidTest`). `kapt {}`-Configurations-
+   Blöcke entfernt. Build + Tests grün.
+3. **Phase 3a — Gradle wrapper 9.5.1**: sauber.
+4. **Phase 3b — AGP 9.2.0 + Hilt 2.59.2 + plugin/proguard cleanup**:
+   neuer Killer-Blocker.
+
+**Killer-Blocker: kotlin-parcelize unter AGP-9-built-in-Kotlin
+generiert keine Parcelable-Members.**
+
+`@Parcelize` Annotation-Imports lösen auf (Runtime-Artefakt am
+Compile-Classpath), aber der IR-Pass des Compiler-Plugins läuft
+nicht, sodass `describeContents()` und `writeToParcel(Parcel, Int)`
+nicht in den Bytecode synthetisiert werden. Frontend-Type-Checker
+sieht `class AppInfoParcelable : Parcelable` ohne abstrakte
+Members → "Class is not abstract and does not implement abstract
+members". Trifft `app/src/main/.../ui/util/AppInfoParcelable.kt`
+und `LauncherShortcutParcelable.kt`.
+
+Diagnose: AGP 9 built-in Kotlin umgeht die normale KGP-
+`KotlinCompilerPluginSupportPlugin`-Hook-Mechanik, an die parcelize
+sich anhängen würde. Das Gradle-Plugin lädt seine Runtime-Dep, aber
+die Compiler-Plugin-JAR wird nie als `-Xplugin=...` an kotlinc
+weitergereicht. kotlinx-serialization 1.11.0 funktioniert (selbe
+Plugin-Klasse) — vermutlich strukturell, weil serialization
+separate `KSerializer`-Companions generiert (kein abstraktes
+Interface zu erfüllen): wenn der IR-Pass dort silently failt, fällt
+es erst zur Laufzeit beim ersten `Json.encodeToString` als
+`SerializationException: Serializer for class X is not found` auf
+— **ungetestet**, könnte also heimlich auch broken sein und nur
+durch Test-Coverage-Lücke nicht sichtbar werden.
+
+Iterations-Trace beim Aufdröseln des Blockers:
+
+- **Iter 1**: parcelize ohne Version → "Unresolved reference 'parcelize'"
+  (Runtime-JAR nicht am Classpath; Gradle-Plugin-Auto-Inject unter
+  built-in Kotlin tot)
+- **Iter 2**: explizite `kotlin-parcelize-runtime` als implementation
+  → Runtime-Imports lösen auf, ABER „abstract members not implemented"
+  bleibt. Smoking gun: Compiler-Plugin läuft nicht, der IR-Codegen
+  fehlt
+- **Iter 3**: parcelize mit `version.ref = "kotlin"` → "plugin is
+  already on the classpath with an unknown version" (AGP bundled
+  Kotlin bringt parcelize in seiner gebundleten Version mit, dh. AGP
+  9.2.0 ≠ 2.3.21; Versionskonflikt)
+
+**Workaround der wirklich greift: escape-hatch.** In
+`gradle.properties` setzen:
+
+```
+android.builtInKotlin=false
+android.newDsl=false
+```
+
+Plus `kotlin-android` Plugin wieder explizit applizieren (Root
++ :app + :data; :domain bleibt bei `kotlin("jvm")`). Damit übernimmt
+KGP wieder die Kontrolle über `compileDebugKotlin`-Tasks, parcelize
+hängt sich an den Standard-Hook, kotlinc bekommt `-Xplugin` und der
+IR-Pass synthetisiert die Members. Build + Tests + bundleRelease +
+Convention-Linter grün.
+
+**Tech debt explizit:** Beide Flags sind laut AGP-Release-Notes „will
+be removed in version 10.0". AGP 10 ist „expected sometime in 2026 /
+second half of 2026" (kann verschoben werden wenn genug Projekte
+hängen, aber nicht auf Verschiebung verlassen). Bis dahin nagged AGP
+auf jedem Build mit grünem Hinweis Richtung Migration.
+
+**Sub-Edits, die zum Bundle gehören (nicht parcelize-bezogen):**
+
+- `app/build.gradle.kts:85` — `srcDirs(...)` → `directories.add(...)`
+  (Gradle 9.x macht aus dem deprecated-Warning einen Compile-Error)
+- `app/build.gradle.kts:106` — debug-buildType `proguard-android.txt`
+  → `proguard-android-optimize.txt` (alte Datei in AGP 9 entfernt
+  weil sie `-dontoptimize` enthielt)
+- `gradle.properties` — KAPT-Settings (`kapt.incremental.apt` etc.)
+  bleiben drin als no-op nach KSP-Migration; dürfen später
+  aufgeräumt werden, aber harmlos
+
+**Watch-List für nächste Sessions:**
+
+- **kotlin-parcelize 2.4.0** (aktuell Beta2 auf gradle.org) — wenn
+  Kotlin 2.4 stable ist, im Changelog gezielt nach „AGP 9" oder
+  „built-in Kotlin" suchen. Erste echte Chance auf Upstream-Fix.
+- **AGP-10-Termin** — wenn JetBrains/Google ein konkretes Datum
+  rausgeben, escape-hatch-Lebensende ist absehbar.
+- **Eliminate-Option** als Plan B in der Schublade: zwei Files
+  (`AppInfoParcelable`, `LauncherShortcutParcelable`) auf manuelle
+  `Parcelable.Creator` + `writeToParcel` umstellen würde den
+  parcelize-Block komplett eliminieren. Hässlicher Boilerplate, aber
+  upstream-unabhängig. Bei Q3/Q4 2026 wahrscheinlich durchziehen
+  wenn parcelize-Fix ausbleibt.
+- **Serialization-Validierung** noch offen: minimal-Test mit
+  `Json.encodeToString` an einer existierenden `@Serializable`
+  Klasse (z.B. `BackupData`) MIT built-in Kotlin (escape-hatch
+  abgeschaltet, parcelize-Klassen temporär gestubbt) zeigt ob
+  serialization-IR-Pass läuft oder silent failt. Schubladen-Wissen,
+  ändert die Action nicht.
 
 **Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
 Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,
