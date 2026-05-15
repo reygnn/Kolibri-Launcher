@@ -14,7 +14,7 @@
  * 695dd52) before this split landed.
  *
  * Hilt: declares modules (RepositoryModule, DataStoreModule, AppUpdateModule).
- * The `kapt(libs.hilt.compiler)` invocation here generates the per-module
+ * The `ksp(libs.hilt.compiler)` invocation here generates the per-module
  * aggregating class that :app's @HiltAndroidApp picks up at link time.
  *
  * BuildConfig: not generated for :data — DEBUG-build branches use
@@ -25,7 +25,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -105,7 +105,7 @@ dependencies {
     // need it (no Android platform classes available there).
 
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
 
     // testFixtures: shared test doubles consumed by :app's and :data's
     // own test source sets. Currently exposes FakeDataStore. The
@@ -140,6 +140,3 @@ dependencies {
     testImplementation(testFixtures(project(":domain")))
 }
 
-kapt {
-    correctErrorTypes = true
-}

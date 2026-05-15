@@ -122,7 +122,7 @@ Cycles eliminated in the cycle-elimination branches (see TODO.md
 
 ### Stack
 
-- **100 % Kotlin 2.2.x**, no Java sources.
+- **100 % Kotlin 2.3.x**, no Java sources.
 - **MVVM + Clean Architecture.** Activities/Fragments hold no
   business logic — every state path goes through a `ViewModel` which
   composes use cases.

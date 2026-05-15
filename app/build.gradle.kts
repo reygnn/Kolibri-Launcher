@@ -19,7 +19,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     id("kotlin-parcelize")
     id("jacoco")
@@ -83,7 +83,7 @@ android {
     }
 
     sourceSets {
-        getByName("androidTest").resources.srcDirs("src/androidTest/resources")
+        getByName("androidTest").resources.directories.add("src/androidTest/resources")
     }
 
     signingConfigs {
@@ -103,7 +103,7 @@ android {
             isShrinkResources = false
             isDebuggable = true
             proguardFiles(
-                getDefaultProguardFile("proguard-android.txt"),
+                getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
@@ -204,6 +204,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
 
+
     // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
     // Fake*Repository, Contract abstract classes). See `java-test-fixtures`
     // block in domain/build.gradle.kts. Brocken B.
@@ -250,7 +251,7 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     implementation(libs.androidx.browser)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
 
     implementation(libs.acra.core)
     implementation(libs.acra.http)
@@ -268,7 +269,7 @@ dependencies {
 
     // Hilt for unit tests.
     testImplementation(libs.hilt.android.testing)
-    kaptTest(libs.hilt.compiler)
+    kspTest(libs.hilt.compiler)
 
     // MockK for unit tests.
     testImplementation(libs.mockk)
@@ -297,7 +298,7 @@ dependencies {
 
     // Hilt for instrumented tests.
     androidTestImplementation(libs.hilt.android.testing)
-    kaptAndroidTest(libs.hilt.compiler)
+    kspAndroidTest(libs.hilt.compiler)
 
     androidTestImplementation(libs.kotlinx.coroutines.test)
     // Turbine — needed for the SharedFlow subscribe-before-trigger pattern
@@ -306,10 +307,6 @@ dependencies {
     // instrumented hardware just as it does on the JVM, only without a
     // TestDispatcher).
     androidTestImplementation(libs.turbine)
-}
-
-kapt {
-    correctErrorTypes = true
 }
 
 configurations.all {

@@ -17,12 +17,12 @@
  * adds Android-specific entry-point processing (`@AndroidEntryPoint`,
  * Application subclassing) which a pure-JVM module cannot host. What we
  * still need — code generation for `@Module` / `@Provides` / `@Binds` —
- * comes from the `kapt(libs.hilt.compiler)` invocation. The aggregating
+ * comes from the `ksp(libs.hilt.compiler)` invocation. The aggregating
  * glue runs in `:app`, where the `hilt-android` plugin IS applied.
  */
 plugins {
     kotlin("jvm")
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
     `java-test-fixtures`
     alias(libs.plugins.kotlin.serialization)
 }
@@ -58,7 +58,7 @@ dependencies {
     // is enough for what :domain declares (DispatcherModule etc.). The
     // aggregating glue runs in :app via the hilt-android plugin.
     implementation(libs.hilt.core)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
 
     // Test dependencies — pure-JVM tests in :domain/src/test/. Brocken-B
     // (Test-Isolation per Modul) starts here; see TODO §13 for status.
@@ -87,6 +87,3 @@ dependencies {
     testFixturesImplementation(libs.hilt.core)
 }
 
-kapt {
-    correctErrorTypes = true
-}
