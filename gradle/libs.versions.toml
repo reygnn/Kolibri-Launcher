@@ -72,7 +72,7 @@ kotlin = "2.2.21"  # 2.2.x — safe to update; kotlin-test must match exactly. R
 ksp = "2.2.21-2.0.4"  # not currently used; kept for the eventual KSP migration. Recheck 2026-Q3: matched to kotlin pin; KSP1 is deprecated, KSP2 line is 2.3.x — coupled to Kotlin 2.3 lift.
 
 # Hilt
-hilt = "2.57.2"  # DO NOT UPGRADE — keep proguard-rules.pro in sync if forced to bump. Recheck 2026-Q3: 2.58 turned `useBindingGraphFix` on by default (potentially breaking) and is incompatible with AGP 9; 2.59 requires AGP 9. Lift coupled to AGP 9 spike (header bundle 1).
+hilt = "2.58"  # DO NOT UPGRADE — 2.59 requires AGP 9 (cross-lib bundle 1). Recheck 2026-05-15: lifted from 2.57.2; 2.58 is the last release that supports AGP 8.x. The flipped `dagger.useBindingGraphFix` default is on; rollback flag = `dagger.useBindingGraphFix=disabled` in `gradle.properties` if a latent binding-graph issue surfaces.
 
 # UI / Material
 material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
@@ -85,18 +85,18 @@ recyclerview = "1.4.0"  # Recheck 2026-Q3: current = latest stable.
 
 # Lifecycle & Navigation
 lifecycle = "2.10.0"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (2.11.x is alpha).
-navigation = "2.9.7"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (2.10.x is alpha).
+navigation = "2.9.8"  # OK to upgrade. Recheck 2026-05-15: lifted 2.9.7 → 2.9.8 (patch on 2.9.x line); 2.10.x still alpha.
 
 # Data & Async
 datastore = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
 preference = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
-coroutines = "1.10.2"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (1.11 is RC). Lift when 1.11 ships stable.
+coroutines = "1.11.0"  # OK to upgrade. Recheck 2026-05-15: lifted 1.10.2 → 1.11.0 (1.11.0 went stable 2026-05-08).
 kotlinx-serialization = "1.9.0"  # 1.10.0 needs Kotlin 2.3.0 — bump together. Recheck 2026-Q3: pin reason still applies; coupled to header bundle 2.
 
 # Utilities
-timber = "5.0.1"  # DO NOT UPGRADE — 6.x has breaking changes. Recheck 2026-Q3: 6.x doesn't exist yet (only 5.1.0-SNAPSHOT in trunk); 5.0.1 has been latest stable for years. Pin marker is forward-looking, current state is "current = latest".
-acra = "5.11.4"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-Q3: current = latest stable (2024-09-13). Pin reason still applies.
-browser = "1.9.0"  # Recheck 2026-Q3: 1.9.0 resolves and runs; developer.android.com release notes lag behind Maven publish (only 1.8.0 + 1.9.0-alpha04 listed there, but Google Maven serves 1.9.0 stable). Verify next pass.
+timber = "5.0.1"  # Recheck 2026-05-15: 5.0.1 is the only stable release; no 6.x line exists, only 5.1.0-SNAPSHOT in trunk. The previous DO-NOT-UPGRADE marker referenced "6.x breaking changes" that don't exist — dropped. Re-add the marker IF a 6.x ships and turns out hostile.
+acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). proguard-rules.pro keeps are package-wide (`-keep class org.acra.**`) — verified compatible. Header comment in proguard-rules.pro updated.
+browser = "1.10.0"  # Recheck 2026-05-15: lifted 1.9.0 → 1.10.0 (developer.android.com stable channel now lists 1.10.0).
 leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
 json = "20251224"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
 

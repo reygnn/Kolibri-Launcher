@@ -138,7 +138,7 @@ Cycles eliminated in the cycle-elimination branches (see TODO.md
 - **Material 3** + AndroidX. View Binding, no Compose.
 - **Navigation Component** for fragment transitions inside the
   HOME activity.
-- **ACRA 5.11.4** for crash reporting (self-hosted, opt-in).
+- **ACRA 5.13.1** for crash reporting (self-hosted, opt-in).
 
 ### Testing
 

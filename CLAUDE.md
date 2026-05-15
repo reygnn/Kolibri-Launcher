@@ -23,9 +23,9 @@ testing reference.
 - Kotlin 2.2.21, Android Views + ViewBinding (**no Compose**), Material 3
 - Min SDK 36 / Target 36 / Compile 36 — **Android 16 only**, no compatibility shims
 - JDK 21 (Robolectric requires it for SDK 36)
-- MVVM + Clean Architecture, **DI via Hilt 2.57.2**
+- MVVM + Clean Architecture, **DI via Hilt 2.58**
 - Persistence: Jetpack DataStore Preferences (no SharedPreferences)
-- Crash reporting: ACRA 5.11.4, self-hosted, opt-in
+- Crash reporting: ACRA 5.13.1, self-hosted, opt-in
 - Coroutines/Flows throughout; UI state as `StateFlow`, events as `SharedFlow`
 - Tests: JUnit 4, **MockK** (Mockito has been fully migrated away), Turbine,
   kotlinx-coroutines-test, Robolectric (only for `android.net.Uri`-touching
@@ -190,7 +190,7 @@ activities.
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
-   (Hilt 2.57.2, ACRA 5.11.4, Timber 5.0.1, fragment-ktx 1.8.9, JUnit 4.13.2,
+   (Hilt 2.58, ACRA 5.13.1, fragment-ktx 1.8.9, JUnit 4.13.2,
    materialVersion 1.13.0, kotlinTestVersion 2.2.21, coreTestingVersion 2.2.0).
    These markers are not suggestions — violating them breaks builds or tests.
    `minSdk = compileSdk = targetSdk = 36` is also fixed.

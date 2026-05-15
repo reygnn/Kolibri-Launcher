@@ -31,7 +31,7 @@
 -dontwarn javax.annotation.processing.SupportedOptions
 
 
-# ====== ACRA 5.11.4 ======
+# ====== ACRA 5.13.1 ======
 -keep class org.acra.** { *; }
 -keep interface org.acra.** { *; }
 -dontwarn org.acra.**
