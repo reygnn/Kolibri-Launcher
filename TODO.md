@@ -1204,23 +1204,81 @@ auf jedem Build mit grünem Hinweis Richtung Migration.
 
 **Watch-List für nächste Sessions:**
 
-- **kotlin-parcelize 2.4.0** (aktuell Beta2 auf gradle.org) — wenn
-  Kotlin 2.4 stable ist, im Changelog gezielt nach „AGP 9" oder
-  „built-in Kotlin" suchen. Erste echte Chance auf Upstream-Fix.
-- **AGP-10-Termin** — wenn JetBrains/Google ein konkretes Datum
-  rausgeben, escape-hatch-Lebensende ist absehbar.
-- **Eliminate-Option** als Plan B in der Schublade: zwei Files
-  (`AppInfoParcelable`, `LauncherShortcutParcelable`) auf manuelle
-  `Parcelable.Creator` + `writeToParcel` umstellen würde den
-  parcelize-Block komplett eliminieren. Hässlicher Boilerplate, aber
-  upstream-unabhängig. Bei Q3/Q4 2026 wahrscheinlich durchziehen
-  wenn parcelize-Fix ausbleibt.
+- ~~**kotlin-parcelize 2.4.0**~~ — entfällt nach Plan-B-Eliminate
+  (siehe unten); parcelize ist nicht mehr im Projekt.
+- ~~**AGP-10-Termin** als escape-hatch-Verfallsdatum~~ — entfällt
+  nach Plan-B-Eliminate; escape-hatch ist weg.
 - **Serialization-Validierung** noch offen: minimal-Test mit
   `Json.encodeToString` an einer existierenden `@Serializable`
-  Klasse (z.B. `BackupData`) MIT built-in Kotlin (escape-hatch
-  abgeschaltet, parcelize-Klassen temporär gestubbt) zeigt ob
-  serialization-IR-Pass läuft oder silent failt. Schubladen-Wissen,
-  ändert die Action nicht.
+  Klasse (z.B. `BackupData`) zeigt ob der serialization-IR-Pass
+  unter built-in Kotlin tatsächlich läuft oder silent failt. Jetzt
+  trivial machbar (kein parcelize-Block mehr im Weg). Schubladen-
+  Wissen, ändert die Action nicht — falls silent broken: Plan B-
+  Variante 2 wäre `BackupData` o.ä. handgerollt zu serialisieren,
+  aber die Surface ist deutlich grösser als die zwei Parcelables
+  und der Aufwand-Profile-Trade-off anders.
+
+### Plan-B-Eliminate ausgeführt (2026-05-15, branch `refactor/manual-parcelable-eliminate-escape-hatch`)
+
+Direkt nach dem Mega-Bundle-Spike-Postmortem entschieden, die
+Eliminate-Variante sofort durchzuziehen statt mit dem escape-hatch
+auf Upstream zu warten. Begründung: Workaround-Leben kostet zwei
+deprecated Flags + AGP-Nag auf jedem Build + AGP-10-Druck im
+Kalender — Plan B kostet ~1-2h einmalig und ist upstream-unabhängig.
+Sunk-cost-fallacy in die andere Richtung wäre, den Workaround
+zu behalten weil parcelize *vielleicht morgen* gefixt wird.
+
+**Vorgehen:**
+
+1. **Manuelles `Parcelable` für beide Klassen** (`AppInfoParcelable`,
+   `LauncherShortcutParcelable`). `data class` beibehalten —
+   `equals`/`hashCode`/`toString`/`copy` sind orthogonal zu
+   `Parcelable`, der Compiler generiert sie weiter. Hand-Boilerplate
+   nur für die drei Interface-Methoden + `companion object CREATOR :
+   Parcelable.Creator<X>`. Bool-Felder via `writeInt(if (b) 1 else 0)`
+   / `readInt() != 0` (kanonische Form). Nullable Strings via
+   `writeString`/`readString` direkt (handhabt null nativ, kein
+   Sentinel nötig).
+2. **Round-trip-Tests via Robolectric** (`Parcel.obtain()` →
+   `writeToParcel` → `setDataPosition(0)` → `CREATOR.createFromParcel`).
+   `android.os.Parcel` ist Android-SDK ohne JVM-Stub — gleicher
+   Robolectric-Grund wie `WallpaperRepositoryImplTest` für `Uri`.
+   Pro Klasse mehrere Cases: All-true, all-false, mixed-bools (für
+   `AppInfoParcelable`), null-shortLabel + empty-shortLabel-≠-null
+   (für `LauncherShortcutParcelable`), `describeContents == 0`,
+   `newArray` korrekte Länge. Sollte ein zukünftiger Refactor die
+   Field-Reihenfolge zwischen `writeToParcel` und `createFromParcel`
+   driften lassen, fällt der Round-trip sofort um.
+3. **`gradle.properties`**: kompletter `TODO(parcelize)`-Block plus
+   `android.builtInKotlin=false` + `android.newDsl=false` raus.
+4. **Plugin-Cleanup**: `id("kotlin-parcelize")` aus `app/build.gradle.kts`
+   raus; `alias(libs.plugins.kotlin.android)` aus Root + :app + :data
+   raus (AGP 9 wirft den explizit aus per „is no longer required").
+5. **Verifikation**: `./gradlew test` (debug + release) ✓,
+   `bundleRelease` ✓ (R8 + ProGuard-Mapping-Upload), `checkConventions`
+   ✓, `checkRule13` ✓.
+
+**Endzustand:** pure built-in Kotlin, kein escape-hatch, kein
+deprecated Flag, kein AGP-Nag. `kotlin-parcelize` ist vollständig
+aus dem Projekt entfernt. Hilt 2.59.2 + KSP2 + Kotlin 2.3.21
+arbeiten direkt mit AGPs Built-in-Kompiler-Pipeline.
+
+**Was an Boilerplate dazukam:** ~25 LOC pro Klasse für die drei
+Parcelable-Methoden + `CREATOR`. Plus zwei neue Test-Files mit je
+~70 LOC. Im Tausch: zwei deprecated Flags weg, zwei Plugin-Aliase
+weg, ein `id("kotlin-parcelize")` weg, ein 18-zeiliger TODO-
+Kommentarblock weg, ein REVIEWS.md-Eintrag obsolet. Net-LOC ist
+positiv (Tests + Boilerplate > Cleanup), aber net-Komplexität ist
+deutlich negativ — keine load-bearing deprecated config mehr.
+
+**Was die Watch-List jetzt nicht mehr enthält:** der parcelize-2.4-
+changelog-Watch und der AGP-10-Termin als escape-hatch-Trigger
+sind beide hinfällig. Falls jemals jemand wieder `@Parcelize`
+einführen will (z.B. weil eine neue Wrapper-Klasse mit komplexen
+Feldern ansteht), ist das eine bewusste Re-Introduction: dann
+kotlin-parcelize plugin wieder applizieren UND erst prüfen ob
+JetBrains' built-in-Kotlin-Support dort inzwischen funktioniert,
+sonst wieder hier landen.
 
 **Termin-Trigger:** Der Header-Kommentar nennt das nächste Recheck-
 Datum explizit. Wer beim Routine-Touch des Catalogs (Lib hinzufügen,

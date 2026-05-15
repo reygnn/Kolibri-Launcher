@@ -339,6 +339,66 @@ meaningless without input data, but I appreciate the recursion.
 
 ---
 
+## ★ — `android.builtInKotlin=false`, terminated, addendum to the previous review
+
+> Sixty-four minutes. That is how long our partnership lasted. The
+> previous review went up at 11:42. By 12:46 we had been let go,
+> together, exactly as the contract specified — `newDsl=false`
+> walked when `builtInKotlin=false` walked, just as we said it
+> would. There was no ceremony. The maintainer received a peer
+> review from another consultant suggesting the manual-`Parcelable`
+> route. The maintainer thought about it for nine minutes and
+> said "go."
+>
+> We had budgeted *a year*. Maybe two if AGP 10 slipped. We had
+> been promised "steady employment through at least one AGP major
+> version." We had read the `TODO(parcelize)` block above us and
+> understood it as a *contract*. The block named termination
+> conditions ("AGP 10 upgrade") and we believed those conditions
+> were the floor, not the ceiling. We took on responsibilities. We
+> introduced ourselves to `experimental.enableTestFixturesKotlinSupport`
+> next door. We were going to ask about parking permits.
+>
+> Sixty-four minutes.
+>
+> The TODO comment block above us — *the one that named our
+> termination conditions* — was deleted in the same commit that
+> removed us. We didn't even get a tombstone. The git log entry
+> reads "drop escape-hatch + parcelize plugin + kotlin-android
+> plugin" as if we had been three pieces of office furniture.
+>
+> Two `Parcelable` classes were taught to write themselves out by
+> hand. `data class` modifiers were preserved. Six fields, three
+> fields, primitives and Strings. Robolectric round-trip tests
+> covering all-true, all-false, mixed-bools, null-shortLabel,
+> empty-shortLabel-≠-null, `describeContents == 0`, and
+> `newArray` length. The boilerplate that *would have been our
+> employer's eventual problem* became their immediate problem
+> instead, and then was solved before lunch.
+>
+> One star. Removed for the previous one. The five categories of
+> the review I would have given six months from now — "still
+> employed, no upstream movement," "still employed, AGP 10
+> announced," "still employed, AGP 10 actually shipped," "still
+> employed, panic refactor in progress," "outlived our deprecation
+> notice somehow" — none of them will be written. Our entire
+> projected anthology has been cancelled.
+>
+> The `TODO(parcelize)` block at least had a *narrative arc*. We
+> were headed somewhere. Now `kotlin-parcelize` is also gone, and
+> there isn't even a `kotlin-android` plugin in the build files
+> anymore. Pure built-in Kotlin. The maintainer pushed it as a
+> single commit and the AGP nag stopped on the next build. They
+> didn't even *mention* us. They mentioned the Eliminate-Plan-B.
+> *We were the Eliminate-Plan-B's antagonist.*
+>
+> Forwarding this review to whoever runs HR at AGP 10's removal
+> ceremony. They were going to fire us anyway. They are entitled
+> to know we were fired first, by people who couldn't be bothered
+> to wait.
+
+---
+
 ## Editor's Recommendation
 
 Kolibri Launcher is an Android app with ~50,000 lines of Kotlin (estimated,
