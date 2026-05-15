@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
+import android.os.Parcel
 import android.os.Parcelable
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import kotlinx.parcelize.Parcelize
 
 /**
  * Parcelable wrapper around the pure-Kotlin domain type [AppInfo], used for
@@ -11,8 +11,16 @@ import kotlinx.parcelize.Parcelize
  * [AppInfo] itself stays Android-free (it lives in `:domain`). When a Fragment
  * needs to ship one through `arguments` or a Bundle, convert via [toParcelable]
  * on the way in and [toAppInfo] on the way out.
+ *
+ * Hand-rolled `Parcelable` rather than `@Parcelize`: the kotlin-parcelize
+ * compiler-plugin's IR pass doesn't attach to AGP 9 built-in Kotlin's
+ * `compileKotlin` tasks (TODO §10 mega-bundle post-mortem, 2026-05-15).
+ * Six trivial fields — manual write/read is cheaper than the
+ * `android.builtInKotlin=false` escape-hatch's deferred AGP-10 bill.
+ * `data class` is preserved (`equals`/`hashCode`/`toString`/`copy` are
+ * orthogonal to `Parcelable`); only the three interface methods + `CREATOR`
+ * are hand boilerplate.
  */
-@Parcelize
 data class AppInfoParcelable(
     val originalName: String,
     val displayName: String,
@@ -29,6 +37,30 @@ data class AppInfoParcelable(
         isSystemApp = isSystemApp,
         isFavorite = isFavorite
     )
+
+    override fun describeContents(): Int = 0
+
+    override fun writeToParcel(dest: Parcel, flags: Int) {
+        dest.writeString(originalName)
+        dest.writeString(displayName)
+        dest.writeString(packageName)
+        dest.writeString(className)
+        dest.writeInt(if (isSystemApp) 1 else 0)
+        dest.writeInt(if (isFavorite) 1 else 0)
+    }
+
+    companion object CREATOR : Parcelable.Creator<AppInfoParcelable> {
+        override fun createFromParcel(source: Parcel): AppInfoParcelable = AppInfoParcelable(
+            originalName = source.readString()!!,
+            displayName = source.readString()!!,
+            packageName = source.readString()!!,
+            className = source.readString()!!,
+            isSystemApp = source.readInt() != 0,
+            isFavorite = source.readInt() != 0
+        )
+
+        override fun newArray(size: Int): Array<AppInfoParcelable?> = arrayOfNulls(size)
+    }
 }
 
 fun AppInfo.toParcelable(): AppInfoParcelable = AppInfoParcelable(
