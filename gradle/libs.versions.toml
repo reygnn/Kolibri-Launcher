@@ -67,7 +67,7 @@
 
 [versions]
 # Build & Kotlin
-agp = "9.2.0"  # Mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x). Coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
+agp = "9.2.1"  # Mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x). Coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
 kotlin = "2.3.21"  # Mega-bundle lift 2026-05-15: 2.2.21 → 2.3.21 as foundation for KSP2 + AGP 9 + Hilt 2.59. kotlin-test must match exactly.
 ksp = "2.3.8"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags (no `<kotlin>-<ksp>` schema). 2.3.8 is the current latest stable on the 2.3.x line.
 
@@ -98,7 +98,7 @@ timber = "5.0.1"  # Recheck 2026-05-15: 5.0.1 is the only stable release; no 6.x
 acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). proguard-rules.pro keeps are package-wide (`-keep class org.acra.**`) — verified compatible. Header comment in proguard-rules.pro updated.
 browser = "1.10.0"  # Recheck 2026-05-15: lifted 1.9.0 → 1.10.0 (developer.android.com stable channel now lists 1.10.0).
 leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
-json = "20251224"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
+json = "20260522"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
 
 # Test (JVM)
 junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration. Recheck 2026-Q3: current = latest 4.x stable. JUnit 5 lift is its own migration effort, no triggers visible.
