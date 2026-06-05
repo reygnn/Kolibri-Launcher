@@ -109,16 +109,12 @@ class AppDrawerFragment : Fragment() {
     private var searchJob: Job? = null
 
     /**
-     * The query value last delivered to the search collector (Observer 5).
-     *
-     * Distinguishes a genuine user keystroke (value differs from this) from a
-     * `StateFlow` replay of the current value when the collector re-subscribes
-     * (resume from the App Info screen, rotation, process restore). Only a real
-     * change may trigger the single-match auto-launch. `null` means "nothing
-     * seen yet", so the first emission after any (re)subscription is treated as
-     * a replay and never auto-launches.
+     * Gates single-match auto-launch to genuine user keystrokes, filtering out
+     * `StateFlow` replays of the current query on collector re-subscription
+     * (resume from App Info, rotation, process restore). Pure logic, JVM-tested
+     * — see [SearchQueryChangeTracker].
      */
-    private var lastSeenQuery: String? = null
+    private val searchQueryChangeTracker = SearchQueryChangeTracker()
 
     /**
      * Controls post-update scrolling behavior.
@@ -296,10 +292,7 @@ class AppDrawerFragment : Fragment() {
                     // transition — resume from App Info, rotation, process
                     // restore). Without this guard, reopening the drawer with a
                     // leftover one-match query would launch an app by itself.
-                    // See the lastSeenQuery field KDoc.
-                    val isUserQueryChange =
-                        lastSeenQuery != null && query != lastSeenQuery
-                    lastSeenQuery = query
+                    val isUserQueryChange = searchQueryChangeTracker.onQueryEmitted(query)
 
                     searchJob?.cancel()
                     searchJob = launch {
@@ -469,7 +462,8 @@ class AppDrawerFragment : Fragment() {
      * [allowAutoLaunch] gates the single-match auto-launch. It must only be
      * `true` when this call is driven by a genuine user search-query change —
      * Observer 5 passes the computed `isUserQueryChange`, which is `false` for a
-     * `StateFlow` replay of the current value (see [lastSeenQuery]). When the
+     * `StateFlow` replay of the current value (see [SearchQueryChangeTracker]).
+     * When the
      * call is driven by a change of the underlying app
      * list under a *stable* query (Observer 1 — e.g. an app was uninstalled,
      * updated, or hidden while a query was active), the list can collapse to a
@@ -728,7 +722,7 @@ class AppDrawerFragment : Fragment() {
 
             _binding = null
             longClickedApp = null
-            lastSeenQuery = null
+            searchQueryChangeTracker.reset()
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
