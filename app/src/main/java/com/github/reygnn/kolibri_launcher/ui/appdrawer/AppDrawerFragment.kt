@@ -109,6 +109,18 @@ class AppDrawerFragment : Fragment() {
     private var searchJob: Job? = null
 
     /**
+     * The query value last delivered to the search collector (Observer 5).
+     *
+     * Distinguishes a genuine user keystroke (value differs from this) from a
+     * `StateFlow` replay of the current value when the collector re-subscribes
+     * (resume from the App Info screen, rotation, process restore). Only a real
+     * change may trigger the single-match auto-launch. `null` means "nothing
+     * seen yet", so the first emission after any (re)subscription is treated as
+     * a replay and never auto-launches.
+     */
+    private var lastSeenQuery: String? = null
+
+    /**
      * Controls post-update scrolling behavior.
      *
      * WHY THIS "OLD-SCHOOL" FLAG BEATS A "SEXY" FLOW:
@@ -278,11 +290,22 @@ class AppDrawerFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main + fragmentExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.appDrawerSearchQuery.collect { query ->
+                    // Auto-launch only on a real user keystroke, never on a
+                    // StateFlow replay of the current value to this re-subscribing
+                    // collector (repeatOnLifecycle restarts it on every STARTED
+                    // transition — resume from App Info, rotation, process
+                    // restore). Without this guard, reopening the drawer with a
+                    // leftover one-match query would launch an app by itself.
+                    // See the lastSeenQuery field KDoc.
+                    val isUserQueryChange =
+                        lastSeenQuery != null && query != lastSeenQuery
+                    lastSeenQuery = query
+
                     searchJob?.cancel()
                     searchJob = launch {
                         try {
                             delay(AppConstants.SEARCH_DEBOUNCE_DELAY_MS)
-                            displayFilteredApps(query)
+                            displayFilteredApps(query, allowAutoLaunch = isUserQueryChange)
                         } catch (e: CancellationException) {
                             // Expected on rapid query changes — searchJob.cancel()
                         }
@@ -440,7 +463,23 @@ class AppDrawerFragment : Fragment() {
         }
     }
 
-    private fun displayFilteredApps(query: String) {
+    /**
+     * Filters [masterAppList] by [query] and updates the adapter.
+     *
+     * [allowAutoLaunch] gates the single-match auto-launch. It must only be
+     * `true` when this call is driven by a genuine user search-query change —
+     * Observer 5 passes the computed `isUserQueryChange`, which is `false` for a
+     * `StateFlow` replay of the current value (see [lastSeenQuery]). When the
+     * call is driven by a change of the underlying app
+     * list under a *stable* query (Observer 1 — e.g. an app was uninstalled,
+     * updated, or hidden while a query was active), the list can collapse to a
+     * single match without the user typing anything, and auto-launching it
+     * would start an app the user never tapped. That was a real bug: search
+     * "cas" → 2 hits, uninstall one via the context menu → on return the
+     * remaining app launched itself. So the default is `false` (safe): only the
+     * query-input path opts in.
+     */
+    private fun displayFilteredApps(query: String, allowAutoLaunch: Boolean = false) {
         val currentBinding = _binding
         if (currentBinding == null || !isAdded) return
 
@@ -454,10 +493,13 @@ class AppDrawerFragment : Fragment() {
                 }
 
                 // 2. PURE LOGIC aufrufen (Crash-Safe calculation)
+                // Auto-launch only when the user actively narrowed the query
+                // (allowAutoLaunch); a list change under a stable query must not
+                // trigger it — see the KDoc above.
                 val result = appSearchFilter.filterAndDecide(
                     allApps = masterAppList,
                     query = query,
-                    isAutoLaunchEnabled = isAutoLaunchEnabled
+                    isAutoLaunchEnabled = isAutoLaunchEnabled && allowAutoLaunch
                 )
 
                 // 3. UI Update basierend auf Ergebnis (Sealed Interface = Exhaustive when)
@@ -686,6 +728,7 @@ class AppDrawerFragment : Fragment() {
 
             _binding = null
             longClickedApp = null
+            lastSeenQuery = null
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
