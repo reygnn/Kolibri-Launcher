@@ -48,8 +48,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 36 // DO NOT CHANGE !!!
-        versionCode = 113
-        versionName = "0.99.93"
+        versionCode = 114
+        versionName = "0.99.94"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
