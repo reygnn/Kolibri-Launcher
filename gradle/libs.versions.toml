@@ -75,7 +75,7 @@ ksp = "2.3.8"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags
 hilt = "2.59.2"  # Mega-bundle lift 2026-05-15: 2.58 → 2.59.2 (requires AGP ≥ 9.0 + Gradle ≥ 9.1). 2.59.0 shipped broken (issue #5099 missing ComponentTreeDeps annotation), 2.59.1 fixed jetifierEnabled compile under AGP 9, 2.59.2 fixed slow incremental builds with HiltSyncTask under AGP 9 — DO NOT downgrade to 2.59.0 or 2.59.1.
 
 # UI / Material
-material = "1.13.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
+material = "1.14.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
 appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang. Recheck 2026-Q3: current = latest stable (no 1.8.x stable in sight).
 core-ktx = "1.18.0"  # Recheck 2026-Q3: lifted from 1.17.0 (2026-05-06); additive minor, no breaking changes.
 core-splashscreen = "1.2.0"  # Recheck 2026-Q3: current = latest stable.
@@ -190,7 +190,7 @@ androidx-test-espresso-idling-resource = { module = "androidx.test.espresso:espr
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
