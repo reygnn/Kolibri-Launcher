@@ -15,14 +15,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import javax.inject.Named
@@ -57,22 +54,8 @@ class UsageExportRepositoryImpl @Inject constructor(
     @param:Named("appVersionName") private val appVersionName: String,
 ) : UsageExportRepository {
 
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
-
     companion object {
         private const val USAGE_EXPORT_VERSION = "1.0.0"
-
-        // ISO 8601 Format mit UTC
-        private val isoFormatter: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
-
-        // Für lokale Zeitzone-Anzeige (optional, falls gewünscht)
-        private val localFormatter: DateTimeFormatter = DateTimeFormatter
-            .ofPattern("yyyy-MM-dd'T'HH:mm:ss")
-            .withZone(ZoneId.systemDefault())
     }
 
     /**

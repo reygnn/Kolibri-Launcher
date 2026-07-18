@@ -157,8 +157,4 @@ class GetFavoriteAppsUseCase @Inject constructor(
             .sortedBy { it.displayName.lowercase() }
             .take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
     }
-
-    suspend fun purgeRepository() {
-        // Für Tests
-    }
 }

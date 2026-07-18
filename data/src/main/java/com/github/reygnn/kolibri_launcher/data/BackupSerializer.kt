@@ -390,7 +390,7 @@ class BackupSerializer @Inject constructor() {
 
             val settings = root.getJSONObject("settings")
 
-            val intFields = listOf("text_color", "chip_bg_color", "split_mode_threshold")
+            val intFields = listOf("text_color", "chip_bg_color")
             for (field in intFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)

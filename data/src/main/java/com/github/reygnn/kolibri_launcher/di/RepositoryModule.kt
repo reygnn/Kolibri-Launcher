@@ -97,6 +97,7 @@ abstract class RepositoryModule {
     abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
 
     @Binds
+    @Singleton
     abstract fun bindUsageExportRepository(impl: UsageExportRepositoryImpl): UsageExportRepository
 
     @Binds

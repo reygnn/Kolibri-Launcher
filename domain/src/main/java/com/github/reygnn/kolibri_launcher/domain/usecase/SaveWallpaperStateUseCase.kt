@@ -38,38 +38,4 @@ class SaveWallpaperStateUseCase @Inject constructor(
             )
         )
     }
-
-    /**
-     * Convenience: Transform eines bestimmten Layers updaten.
-     * Funktioniert nur im Multi-Layer-Modus.
-     */
-    suspend fun updateLayerTransform(
-        currentState: WallpaperState,
-        layerIndex: Int,
-        scale: Float,
-        translateX: Float,
-        translateY: Float
-    ) {
-        val newState = currentState.withUpdatedLayer(layerIndex) {
-            it.copy(scale = scale, translateX = translateX, translateY = translateY)
-        }
-        repository.saveWallpaperState(newState)
-    }
-
-    /**
-     * Convenience: Alle Layer-Transforms auf einmal updaten.
-     * @param transforms Liste von (scale, translateX, translateY) pro Layer-Index
-     */
-    suspend fun updateAllLayerTransforms(
-        currentState: WallpaperState,
-        transforms: List<Triple<Float, Float, Float>>
-    ) {
-        var state = currentState
-        transforms.forEachIndexed { index, (scale, tx, ty) ->
-            state = state.withUpdatedLayer(index) {
-                it.copy(scale = scale, translateX = tx, translateY = ty)
-            }
-        }
-        repository.saveWallpaperState(state)
-    }
 }

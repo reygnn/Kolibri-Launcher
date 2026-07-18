@@ -256,16 +256,8 @@ object AppConstants {
     const val CHIP_TEXT_SIZE_SP = 12f
     const val CHIP_STROKE_WIDTH = 1f
 
-    // Timing Constants
-    const val SCROLL_VERIFICATION_DELAY_MS = 50L
-
     // Fallback Values für Ressourcen-Zugriffe (catch blocks)
     const val FALLBACK_DIMEN_PX = 16
-    const val FALLBACK_BORDER_WIDTH_PX = 4
-    const val FALLBACK_CORNER_RADIUS_PX = 16f
-
-    // Border Styling
-    const val BORDER_ALPHA = 51 // ca. 20%
 
     // Search Configuration
     const val SEARCH_DEBOUNCE_DELAY_MS = 150L

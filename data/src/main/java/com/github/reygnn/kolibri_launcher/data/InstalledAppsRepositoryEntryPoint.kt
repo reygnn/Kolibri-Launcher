@@ -12,6 +12,5 @@ import dagger.hilt.components.SingletonComponent
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface InstalledAppsRepositoryEntryPoint {
-    fun getInstalledAppsRepository(): InstalledAppsRepositoryImpl
     fun getAppUpdateSignal(): AppUpdateSignal
 }
