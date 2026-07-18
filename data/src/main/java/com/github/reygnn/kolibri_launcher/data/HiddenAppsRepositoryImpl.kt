@@ -134,19 +134,22 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         if (componentName.isNullOrBlank()) return false
 
         return try {
-            val currentHidden = hiddenAppsFlow.first()
-
-            // Bereits versteckt - frühzeitiger Erfolg
-            if (currentHidden.contains(componentName)) {
-                return true
-            }
-
+            // Read-modify-write inside the edit transaction so a concurrent
+            // show/batch-update cannot be clobbered by a stale outside snapshot.
+            var changed = false
             dataStore.edit { preferences ->
-                val newHidden = currentHidden + componentName
-                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
+                val currentHidden = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
+                // Already hidden — nothing to change
+                if (currentHidden.contains(componentName)) {
+                    return@edit
+                }
+                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = currentHidden + componentName
+                changed = true
             }
 
-            Timber.i("Component hidden: $componentName")
+            if (changed) {
+                Timber.i("Component hidden: $componentName")
+            }
             true
 
         } catch (e: CancellationException) {
@@ -161,19 +164,22 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         if (componentName.isNullOrBlank()) return false
 
         return try {
-            val currentHidden = hiddenAppsFlow.first()
-
-            // Bereits sichtbar - frühzeitiger Erfolg
-            if (!currentHidden.contains(componentName)) {
-                return true
-            }
-
+            // Read-modify-write inside the edit transaction so a concurrent
+            // hide/batch-update cannot be clobbered by a stale outside snapshot.
+            var changed = false
             dataStore.edit { preferences ->
-                val newHidden = currentHidden - componentName
-                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = newHidden
+                val currentHidden = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
+                // Already visible — nothing to change
+                if (!currentHidden.contains(componentName)) {
+                    return@edit
+                }
+                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = currentHidden - componentName
+                changed = true
             }
 
-            Timber.i("Component shown: $componentName")
+            if (changed) {
+                Timber.i("Component shown: $componentName")
+            }
             true
 
         } catch (e: CancellationException) {

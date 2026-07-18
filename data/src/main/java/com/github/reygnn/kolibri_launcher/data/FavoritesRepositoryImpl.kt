@@ -192,27 +192,31 @@ class FavoritesRepositoryImpl : FavoritesRepository {
         if (componentName.isBlank()) return false
 
         return try {
-            val currentFavorites = favoriteComponentsFlow.first()
-
-            if (currentFavorites.contains(componentName)) {
-                return true
-            }
-
-            val currentFavoritePackages = currentFavorites.map { it.split('/')[0] }.toSet()
-
-            if (currentFavoritePackages.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
-                val newPackageName = componentName.split('/')[0]
-                if (!currentFavoritePackages.contains(newPackageName)) {
-                    Timber.w("Favorites limit reached. Cannot add component from new package: $componentName")
-                    return false
-                }
-            }
-
+            // Read-modify-write fully inside the edit transaction: reading the
+            // current set outside edit (via flow.first()) races a concurrent
+            // cleanup/add — a stale snapshot would clobber the other change.
+            var success = true
             dataStore.edit { preferences ->
-                val newFavorites = currentFavorites + componentName
-                preferences[PreferencesKeys.FAVORITES] = newFavorites
+                val currentFavorites = preferences[PreferencesKeys.FAVORITES] ?: emptySet()
+
+                if (currentFavorites.contains(componentName)) {
+                    return@edit
+                }
+
+                val currentFavoritePackages = currentFavorites.map { it.split('/')[0] }.toSet()
+
+                if (currentFavoritePackages.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
+                    val newPackageName = componentName.split('/')[0]
+                    if (!currentFavoritePackages.contains(newPackageName)) {
+                        Timber.w("Favorites limit reached. Cannot add component from new package: $componentName")
+                        success = false
+                        return@edit
+                    }
+                }
+
+                preferences[PreferencesKeys.FAVORITES] = currentFavorites + componentName
             }
-            true
+            success
 
         } catch (e: CancellationException) {
             throw e
@@ -226,15 +230,13 @@ class FavoritesRepositoryImpl : FavoritesRepository {
         if (componentName.isBlank()) return false
 
         return try {
-            val currentFavorites = favoriteComponentsFlow.first()
-
-            if (!currentFavorites.contains(componentName)) {
-                return true
-            }
-
+            // Read-modify-write inside the edit transaction so a concurrent
+            // add/cleanup cannot be clobbered by a stale outside snapshot.
             dataStore.edit { preferences ->
-                val newFavorites = currentFavorites - componentName
-                preferences[PreferencesKeys.FAVORITES] = newFavorites
+                val currentFavorites = preferences[PreferencesKeys.FAVORITES] ?: emptySet()
+                if (currentFavorites.contains(componentName)) {
+                    preferences[PreferencesKeys.FAVORITES] = currentFavorites - componentName
+                }
             }
             true
 
