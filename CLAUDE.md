@@ -23,7 +23,7 @@ testing reference.
 - Kotlin 2.3.21, Android Views + ViewBinding (**no Compose**), Material 3
 - Min SDK 36 / Target 36 / Compile 36 — **Android 16 only**, no compatibility shims
 - JDK 21 (Robolectric requires it for SDK 36)
-- MVVM + Clean Architecture, **DI via Hilt 2.59.2** (KSP2, kapt-free)
+- MVVM + Clean Architecture, **DI via Hilt 2.60.1** (KSP2, kapt-free)
 - Persistence: Jetpack DataStore Preferences (no SharedPreferences)
 - Crash reporting: ACRA 5.13.1, self-hosted, opt-in
 - Coroutines/Flows throughout; UI state as `StateFlow`, events as `SharedFlow`
@@ -190,8 +190,8 @@ activities.
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
-   (Hilt 2.59.2, ACRA 5.13.1, fragment-ktx 1.8.9, JUnit 4.13.2,
-   materialVersion 1.13.0, kotlinTestVersion 2.3.21, coreTestingVersion 2.2.0).
+   (Hilt 2.60.1, ACRA 5.13.1, fragment-ktx 1.8.9, JUnit 4.13.2,
+   materialVersion 1.14.0, kotlinTestVersion 2.3.21, coreTestingVersion 2.2.0).
    These markers are not suggestions — violating them breaks builds or tests.
    `minSdk = compileSdk = targetSdk = 36` is also fixed.
 
@@ -436,7 +436,7 @@ Kotlin or XML.
 ## Versioning
 
 `versionName` and `versionCode` live in `app/build.gradle.kts`. The GitHub
-release tags mirror `versionName` exactly. Currently 0.99.62 / code 80.
+release tags mirror `versionName` exactly. Currently 0.99.95 / code 115.
 The `uploadProguardMapping` task fires automatically after `assembleRelease`
 or `bundleRelease` and pushes the mapping to ACRA.
 

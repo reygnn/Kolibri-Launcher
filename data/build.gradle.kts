@@ -31,7 +31,7 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher.data"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 36

@@ -36,7 +36,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher"
-    compileSdk = 36 // DO NOT CHANGE !!!
+    compileSdk = 37 // DO NOT CHANGE !!!
 
     val secretsPropertiesFile = rootProject.file("secrets.properties")
     val secretsProperties = Properties()
@@ -47,7 +47,7 @@ android {
     defaultConfig {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
-        targetSdk = 36 // DO NOT CHANGE !!!
+        targetSdk = 37 // DO NOT CHANGE !!!
         versionCode = 115
         versionName = "0.99.95"
 
