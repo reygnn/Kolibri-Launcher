@@ -50,6 +50,8 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                         } else {
                             false
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in retry logic")
                         false
