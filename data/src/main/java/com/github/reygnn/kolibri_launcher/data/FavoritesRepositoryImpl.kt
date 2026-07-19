@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -11,7 +10,6 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -95,7 +93,6 @@ import javax.inject.Singleton
  * Cleanup failures preserve current state rather than clearing favorites.
  *
  * @property dataStore Preferences DataStore for persisting favorites set
- * @property context Application context for system access
  * @property externalScope Application scope for hot Flow sharing (null in tests)
  * @property favoriteComponentsFlow Hot shared Flow of currently favorited component identifiers
  *
@@ -106,7 +103,6 @@ import javax.inject.Singleton
 class FavoritesRepositoryImpl : FavoritesRepository {
 
     private val dataStore: DataStore<Preferences>
-    private val context: Context
     private val externalScope: CoroutineScope?
     override val favoriteComponentsFlow: Flow<Set<String>>
 
@@ -120,11 +116,9 @@ class FavoritesRepositoryImpl : FavoritesRepository {
     @Inject
     constructor(
         dataStore: DataStore<Preferences>,
-        @ApplicationContext context: Context,
         @ApplicationScope externalScope: CoroutineScope?
     ) : this(
         dataStore = dataStore,
-        context = context,
         externalScope = externalScope,
         sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )
@@ -135,12 +129,10 @@ class FavoritesRepositoryImpl : FavoritesRepository {
     @VisibleForTesting
     constructor(
         dataStore: DataStore<Preferences>,
-        context: Context,
         externalScope: CoroutineScope?,
         sharingStrategy: SharingStarted
     ) {
         this.dataStore = dataStore
-        this.context = context
         this.externalScope = externalScope
         this.favoriteComponentsFlow = initializeFlow(sharingStrategy)
     }

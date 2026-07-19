@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -13,7 +12,6 @@ import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -121,7 +119,6 @@ import javax.inject.Singleton
  * - Multiple fallback layers ensure UI never breaks
  *
  * @property dataStore Preferences DataStore for persisting order as JSON
- * @property context Application context for system access
  * @property externalScope Application scope for hot Flow sharing (null in tests)
  * @property favoriteComponentsOrderFlow Hot shared Flow of ordered component identifiers
  *
@@ -131,7 +128,6 @@ import javax.inject.Singleton
 @Singleton
 open class FavoritesOrderRepositoryImpl private constructor(
     private val dataStore: DataStore<Preferences>,
-    private val context: Context,
     @param:ApplicationScope private val externalScope: CoroutineScope?,
     sharingStrategy: SharingStarted
 ) : FavoritesOrderRepository {
@@ -161,22 +157,19 @@ open class FavoritesOrderRepositoryImpl private constructor(
         @VisibleForTesting
         fun createForTesting(
             dataStore: DataStore<Preferences>,
-            context: Context,
             externalScope: CoroutineScope?,
             sharingStrategy: SharingStarted
         ): FavoritesOrderRepositoryImpl {
-            return FavoritesOrderRepositoryImpl(dataStore, context, externalScope, sharingStrategy)
+            return FavoritesOrderRepositoryImpl(dataStore, externalScope, sharingStrategy)
         }
     }
 
     @Inject
     constructor(
         dataStore: DataStore<Preferences>,
-        @ApplicationContext context: Context,
         @ApplicationScope externalScope: CoroutineScope?
     ) : this(
         dataStore = dataStore,
-        context = context,
         externalScope = externalScope,
         sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )

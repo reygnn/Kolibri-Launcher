@@ -49,7 +49,7 @@ class SettingsRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        settingsManager = SettingsRepositoryImpl(fakeDataStore, context)
+        settingsManager = SettingsRepositoryImpl(fakeDataStore)
     }
 
     // ========== EXISTING TESTS ==========
@@ -467,7 +467,7 @@ class SettingsRepositoryImplTest {
             throw ClassCastException("Expected Boolean but got String")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, context)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
 
         val result = doomsdayManager.showAlarmFlow.first()
 
@@ -481,7 +481,7 @@ class SettingsRepositoryImplTest {
             throw SecurityException("Read permission denied")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, context)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
 
         val result = doomsdayManager.sortOrderFlow.first()
 

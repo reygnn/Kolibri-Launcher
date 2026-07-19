@@ -21,11 +21,9 @@ class FavoritesOrderRepositoryImplContractTest : FavoritesOrderRepositoryContrac
 
     override fun createRepository(): FavoritesOrderRepository {
         val fakeDataStore = FakeDataStore()
-        val context: Context = mockk(relaxed = true)
 
         return FavoritesOrderRepositoryImpl.createForTesting(
             dataStore = fakeDataStore,
-            context = context,
             externalScope = null,
             sharingStrategy = SharingStarted.Lazily
         )

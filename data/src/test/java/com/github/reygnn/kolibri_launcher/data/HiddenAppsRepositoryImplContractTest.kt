@@ -23,7 +23,6 @@ class HiddenAppsRepositoryImplContractTest : HiddenAppsRepositoryContract() {
 
     override fun createRepository(): HiddenAppsRepository {
         val fakeDataStore = FakeDataStore()
-        val context: Context = mockk(relaxed = true)
-        return HiddenAppsRepositoryImpl(fakeDataStore, context)
+        return HiddenAppsRepositoryImpl(fakeDataStore)
     }
 }

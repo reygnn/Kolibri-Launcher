@@ -60,7 +60,6 @@ class FavoritesRepositoryImplShareInTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val context: Context = mockk(relaxed = true)
     private val favoritesKey = stringSetPreferencesKey("favorites_components_set")
 
     private val compA = "com.example.a/.MainActivity"
@@ -96,7 +95,6 @@ class FavoritesRepositoryImplShareInTest {
         sharingStrategy: SharingStarted
     ): FavoritesRepositoryImpl = FavoritesRepositoryImpl(
         dataStore = dataStore,
-        context = context,
         externalScope = scope,
         sharingStrategy = sharingStrategy
     )

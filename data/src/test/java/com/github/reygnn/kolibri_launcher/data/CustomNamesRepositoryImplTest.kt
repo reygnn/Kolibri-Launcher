@@ -44,7 +44,7 @@ class CustomNamesRepositoryImplTest {
     fun setup() {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
-        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger, context)
+        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger)
     }
 
     // ========== EXISTING TESTS ==========
@@ -132,7 +132,7 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw RuntimeException("Corrupted data") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger, context)
+        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger)
 
         val result = manager.getDisplayNameForPackage("com.test.app", "Original")
 
@@ -167,7 +167,7 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw CancellationException("Flow cancelled") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger, context)
+        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger)
 
         assertFailsWith<CancellationException> {
             manager.hasCustomNameForPackage("com.test.app")

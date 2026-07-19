@@ -23,7 +23,6 @@ class SettingsRepositoryImplContractTest : SettingsRepositoryContract() {
 
     override fun createRepository(): SettingsRepository {
         val fakeDataStore = FakeDataStore()
-        val context: Context = mockk(relaxed = true)
-        return SettingsRepositoryImpl(fakeDataStore, context)
+        return SettingsRepositoryImpl(fakeDataStore)
     }
 }

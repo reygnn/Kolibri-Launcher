@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -8,7 +7,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
@@ -221,15 +219,13 @@ import javax.inject.Singleton
  *
  * @property dataStore Preferences DataStore for persisting custom names
  * @property appsUpdateTrigger Shared event bus for notifying consumers of changes
- * @property context Application context for system access
  *
  * @see HiddenAppsRepositoryImpl for an example where Flow-based state exposure is correct
  */
 @Singleton
 class CustomNamesRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-    private val appsUpdateTrigger: MutableSharedFlow<Unit>,
-    @param:ApplicationContext private val context: Context
+    private val appsUpdateTrigger: MutableSharedFlow<Unit>
 ) : CustomNamesRepository {
 
     /**

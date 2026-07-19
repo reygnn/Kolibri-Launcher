@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -8,7 +7,6 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -88,15 +86,13 @@ import javax.inject.Singleton
  * [java.util.concurrent.CancellationException] is always re-thrown for proper coroutine cancellation.
  *
  * @property dataStore Preferences DataStore for persisting hidden app set
- * @property context Application context for system access
  * @property hiddenAppsFlow Reactive Flow of currently hidden component identifiers
  *
  * @see CustomNamesRepositoryImpl for an example where event-based triggers are more appropriate
  */
 @Singleton
 class HiddenAppsRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>,
-    @param:ApplicationContext private val context: Context
+    private val dataStore: DataStore<Preferences>
 ) : HiddenAppsRepository {
 
     private object PreferencesKeys {
