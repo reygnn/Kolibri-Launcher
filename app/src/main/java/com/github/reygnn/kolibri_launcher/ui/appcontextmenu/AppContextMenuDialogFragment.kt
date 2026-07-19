@@ -203,15 +203,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         ) { classification ->
             if (_binding == null) return@collectOnStarted
             currentClassification = classification
-            val surface = ResolvedBackground.SolidColor(
-                color = ContextCompat.getColor(
-                    requireContext(),
-                    when (classification) {
-                        LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                        LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                    },
-                ),
-            )
+            val surface = resolveSurface(classification)
             val fg = surface.foregroundColor()
             binding.root.setBackgroundColor(surface.color)
             binding.appNameText.setTextColor(fg)
@@ -422,6 +414,17 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
+    private fun resolveSurface(classification: LuminanceClassification): ResolvedBackground.SolidColor =
+        ResolvedBackground.SolidColor(
+            color = ContextCompat.getColor(
+                requireContext(),
+                when (classification) {
+                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                },
+            ),
+        )
+
     /**
      * Programmatically tint an [AlertDialog] to follow the same
      * surface classification as the host sheet. Uses the cached
@@ -437,15 +440,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
      */
     private fun tintRenameDialog(dialog: AlertDialog, editText: EditText) {
         val classification = currentClassification ?: return
-        val surface = ResolvedBackground.SolidColor(
-            color = ContextCompat.getColor(
-                requireContext(),
-                when (classification) {
-                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                },
-            ),
-        )
+        val surface = resolveSurface(classification)
         val fg = surface.foregroundColor()
         dialog.window?.decorView?.background?.setTint(surface.color)
         @Suppress("DEPRECATION")

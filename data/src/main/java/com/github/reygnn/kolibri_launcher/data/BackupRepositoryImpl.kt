@@ -622,7 +622,8 @@ class BackupRepositoryImpl @Inject constructor(
                 0L
             }
 
-            val sizeLimit = if (isZipFile(uri)) {
+            val isZip = isZipFile(uri)
+            val sizeLimit = if (isZip) {
                 AppConstants.MAX_BACKUP_SIZE_BYTES
             } else {
                 AppConstants.MAX_PREVIEW_SIZE_BYTES
@@ -633,7 +634,7 @@ class BackupRepositoryImpl @Inject constructor(
             }
 
             // Format detection: ZIP or JSON?
-            val jsonString = if (isZipFile(uri)) {
+            val jsonString = if (isZip) {
                 readJsonFromZip(uri)
             } else {
                 context.contentResolver.openInputStream(uri)?.use { input ->
