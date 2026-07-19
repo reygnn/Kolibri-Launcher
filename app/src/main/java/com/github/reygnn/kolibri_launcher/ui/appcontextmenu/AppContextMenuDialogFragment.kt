@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.Toast
 import android.view.Window
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -28,6 +29,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
+import com.github.reygnn.kolibri_launcher.ui.customnames.RenameDecision
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
@@ -367,15 +369,29 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                     // failure gives the user an exit.
                     viewLifecycleOwner.lifecycleScope.launch {
                         try {
-                            if (newName.isNotBlank() && newName != appInfo.originalName) {
-                                customNamesRepository.setCustomNameForPackage(
-                                    appInfo.packageName,
-                                    newName
-                                )
-                            } else {
-                                customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
+                            // Route through the same tested decision the CustomNames
+                            // screen uses, so both entry points share one path
+                            // (incl. the MAX_APP_NAME_LENGTH cap).
+                            when (val decision =
+                                RenameDecision.decide(newName, appInfo.originalName)) {
+                                RenameDecision.Remove -> {
+                                    customNamesRepository.removeCustomNameForPackage(appInfo.packageName)
+                                    dismiss()
+                                }
+                                is RenameDecision.Set -> {
+                                    customNamesRepository.setCustomNameForPackage(
+                                        appInfo.packageName,
+                                        decision.name
+                                    )
+                                    dismiss()
+                                }
+                                is RenameDecision.TooLong ->
+                                    Toast.makeText(
+                                        ctx,
+                                        getString(R.string.error_name_too_long, decision.maxLength),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                             }
-                            dismiss()
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
