@@ -125,6 +125,16 @@ data class WallpaperLayer(
     }
 
     /**
+     * Allocation-free twin of [buildMatrix] for the per-frame draw path:
+     * writes the layer transform into [out] instead of allocating a Matrix.
+     */
+    fun buildMatrixInto(out: Matrix) {
+        out.reset()
+        out.postScale(scale, scale)
+        out.postTranslate(translateX, translateY)
+    }
+
+    /**
      * Berechnet das transformierte Bounding-Rect des Layers.
      * Nützlich für Hit-Testing (welches Layer wurde getappt?).
      */
@@ -133,6 +143,20 @@ data class WallpaperLayer(
         val rect = RectF(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
         buildMatrix().mapRect(rect)
         return rect
+    }
+
+    /**
+     * Allocation-free twin of [getTransformedBounds] for the per-frame draw
+     * path: writes the transformed bounds into [out], using [tmp] as scratch
+     * for the matrix. Returns false (leaving [out] untouched) when there is
+     * no bitmap.
+     */
+    fun getTransformedBoundsInto(out: RectF, tmp: Matrix): Boolean {
+        val bmp = bitmap ?: return false
+        out.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
+        buildMatrixInto(tmp)
+        tmp.mapRect(out)
+        return true
     }
 
     // ===========================================

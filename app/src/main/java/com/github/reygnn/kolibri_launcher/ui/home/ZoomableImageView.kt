@@ -303,6 +303,8 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     private val drawMatrix = Matrix()
+    private val selectionBounds = RectF()
+    private val tmpMatrix = Matrix()
 
     // ===========================================
     // INITIALIZATION
@@ -761,8 +763,7 @@ class ZoomableImageView @JvmOverloads constructor(
             bitmapPaint.alpha = layer.alphaInt
             bitmapPaint.blendMode = layer.blendMode
 
-            drawMatrix.reset()
-            drawMatrix.set(layer.buildMatrix())
+            layer.buildMatrixInto(drawMatrix)
             canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
 
             bitmapPaint.alpha = 255
@@ -775,11 +776,11 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     private fun drawSelectionHighlight(canvas: Canvas, layer: WallpaperLayer) {
-        val bounds = layer.getTransformedBounds() ?: return
+        if (!layer.getTransformedBoundsInto(selectionBounds, tmpMatrix)) return
         val inset = SELECTION_BORDER_WIDTH / 2f
-        bounds.inset(inset, inset)
+        selectionBounds.inset(inset, inset)
         canvas.drawRoundRect(
-            bounds,
+            selectionBounds,
             SELECTION_CORNER_RADIUS,
             SELECTION_CORNER_RADIUS,
             selectionPaint
