@@ -4,12 +4,9 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.pm.LauncherApps
-import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.content.res.Resources
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -58,11 +55,7 @@ import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -75,8 +68,8 @@ import javax.inject.Inject
  *                    HomeFragment — Size & Refactoring Notes
  * =============================================================================
  *
- * Status: Post-Brocken-A (2026-05-03). 1972 lines, 19 try/catch blocks
- * (11 Throwable). Down from 2657 / 59 / 51 across two sweeps. The file
+ * Status: Post-Brocken-A (2026-05-03) + later trimming. Now 1593 lines,
+ * 11 try/catch blocks (7 Throwable). Down from 2657 / 59 / 51. The file
  * is at its structural floor — see "Why the floor is here" below
  * before proposing further size reduction.
  *
