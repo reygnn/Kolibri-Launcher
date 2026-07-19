@@ -16,6 +16,29 @@
 > Alle 38 verifizierten Findings sind severity `low` — kein
 > High/Medium, kein Crash-Bug.
 
+## Umsetzungsstand (2026-07-19)
+
+**Alle 38 Findings abgearbeitet** über 11 Commits (`ec43d8d` … `d9cc66e`),
+jeder Batch mit voller Testsuite + `checkConventions`/`checkRule13` grün.
+Reihenfolge: atomarer Favorites/HiddenApps-Fix → Quick-Win-Deletions →
+Doc-Drift → Dead-Code → `context`-Param-Entfernung (5 Repos) →
+CancellationException-Disziplin → Rename-50-Zeichen-Cap → Dedup/Efficiency.
+
+**Bewusst NICHT umgesetzt** (Risiko > Wert ohne Testabdeckung):
+
+- **`ZoomableImageView.onDraw` Matrix-Allokation pro Frame** (Efficiency) —
+  ausgelassen: Rendering-Pfad ohne Test, nur Edit-Mode, „modest impact".
+- **`ZoomableImageView.ZOOM_OUT_MULTIPLIER`** — Docs an den ausgelieferten
+  Wert `0.05f` angeglichen, statt ihn auf `0.25f` zu ändern (würde das
+  Rauszoom-Limit einschränken, keine Tests). Falls `0.25f` die Design-
+  Absicht war, ist es eine Ein-Zeilen-Wertänderung.
+- **`addLayer(centerCrop = …)` nicht umbenannt** — der Name zieht sich durch
+  das Spec-Modell (`WallpaperViewBinder`, `LayerSpec.centerCrop`); ein Rename
+  kaskadiert. Stattdessen: KDoc korrigiert (Legacy-Misnomer dokumentiert) +
+  toter `applyCenterCrop`-Block gelöscht.
+
+---
+
 ## Coverage / Statistik
 
 | Slice | Roh-Findings | Verifiziert überlebt |
