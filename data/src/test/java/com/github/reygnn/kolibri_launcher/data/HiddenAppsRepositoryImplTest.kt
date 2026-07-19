@@ -200,10 +200,15 @@ class HiddenAppsRepositoryImplTest {
         Assert.assertFalse(hiddenAppsManager.isComponentHidden("  "))
     }
 
-    // ========== OPTIMIZATION CHECKS ==========
+    // ========== IDEMPOTENCY ==========
+    //
+    // Note: the earlier zero-write fast path (assert updateDataCallCount == 0)
+    // was intentionally dropped when hide/show became atomic — membership is
+    // now re-checked on fresh data INSIDE the edit transaction to avoid a
+    // lost-update race, so a no-op still enters edit but leaves the set intact.
 
     @Test
-    fun `hideComponent - when component already hidden - returns true and DOES NOT edit DataStore`() = runTest {
+    fun `hideComponent - when component already hidden - returns true and keeps it hidden (idempotent)`() = runTest {
         fakeDataStore.setInitialData(
             preferencesOf(hiddenComponentsKey to setOf("com.test.app/Component"))
         )
@@ -211,15 +216,15 @@ class HiddenAppsRepositoryImplTest {
         val result = hiddenAppsManager.hideComponent("com.test.app/Component")
 
         Assert.assertTrue(result)
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        Assert.assertTrue(hiddenAppsManager.isComponentHidden("com.test.app/Component"))
     }
 
     @Test
-    fun `showComponent - when component not hidden - returns true and DOES NOT edit DataStore`() = runTest {
+    fun `showComponent - when component not hidden - returns true and stays visible (idempotent)`() = runTest {
         val result = hiddenAppsManager.showComponent("com.test.app/Component")
 
         Assert.assertTrue(result)
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        Assert.assertFalse(hiddenAppsManager.isComponentHidden("com.test.app/Component"))
     }
 
     // ========== MISSING TESTS (Purge & Batch Update) ==========
