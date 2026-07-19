@@ -35,12 +35,11 @@ class OnboardingViewModel @Inject constructor(
     private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
-) : BaseViewModel<OnboardingEvent>(mainDispatcher),
-    OnboardingViewModelInterface {
+) : BaseViewModel<OnboardingEvent>(mainDispatcher) {
 
     private var launchMode: LaunchMode = LaunchMode.INITIAL_SETUP
     private val _uiState = MutableStateFlow(OnboardingUiState())
-    override val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
     private val searchQuery = MutableStateFlow("")
@@ -94,7 +93,7 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    override fun setLaunchMode(mode: LaunchMode) {
+    fun setLaunchMode(mode: LaunchMode) {
         this.launchMode = mode
 
         val titleRes =
@@ -104,7 +103,7 @@ class OnboardingViewModel @Inject constructor(
         _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
     }
 
-    override fun loadInitialData() {
+    fun loadInitialData() {
         if (isInitialized) return
         isInitialized = true
 
@@ -124,11 +123,11 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    override fun onSearchQueryChanged(query: String) {
+    fun onSearchQueryChanged(query: String) {
         searchQuery.value = query
     }
 
-    override fun onAppToggled(app: AppInfo) {
+    fun onAppToggled(app: AppInfo) {
         launchSafe {
             val currentSelection = selectedComponents.value
             val component = app.componentName
@@ -145,7 +144,7 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    override fun onDoneClicked() {
+    fun onDoneClicked() {
         launchSafe {
             try {
                 completeOnboardingUseCase(

@@ -88,7 +88,7 @@ for now.
                           subpackage)
   di/                     AppModule (PackageManager, WallpaperManager,
                           @Named("appVersionName") from BuildConfig),
-                          AppUpdateModule, ViewModelModule
+                          AppUpdateModule
   KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
                           AnrReporter (post-mortem ApplicationExitInfo)
 ```

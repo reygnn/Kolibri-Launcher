@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.LayerButtonsState
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -35,7 +34,6 @@ class LayerButtonsStateTest {
         assertFalse(state.deleteVisible)
         assertFalse(state.upVisible)
         assertFalse(state.downVisible)
-        assertFalse(state.indicatorVisible)
     }
 
     @Test
@@ -48,7 +46,6 @@ class LayerButtonsStateTest {
         assertFalse(state.deleteVisible)
         assertFalse(state.upVisible)
         assertFalse(state.downVisible)
-        assertFalse(state.indicatorVisible)
     }
 
     @Test
@@ -61,7 +58,6 @@ class LayerButtonsStateTest {
         assertTrue(state.deleteVisible)
         assertTrue(state.upVisible)
         assertTrue(state.downVisible)
-        assertTrue(state.indicatorVisible)
     }
 
     // ========== ENABLED STATE - UP ==========
@@ -139,24 +135,6 @@ class LayerButtonsStateTest {
             activeLayerIndex = 0,
         )
         assertTrue(state.deleteEnabled)
-    }
-
-    // ========== ALPHA ==========
-
-    @Test
-    fun `up alpha reflects upEnabled`() {
-        val enabled = LayerButtonsState.from(isMultiLayerMode = true, layerCount = 3, activeLayerIndex = 1)
-        val disabled = LayerButtonsState.from(isMultiLayerMode = true, layerCount = 3, activeLayerIndex = 2)
-        assertEquals(LayerButtonsState.ENABLED_ALPHA, enabled.upAlpha, 0f)
-        assertEquals(LayerButtonsState.DISABLED_ALPHA, disabled.upAlpha, 0f)
-    }
-
-    @Test
-    fun `down alpha reflects downEnabled`() {
-        val enabled = LayerButtonsState.from(isMultiLayerMode = true, layerCount = 3, activeLayerIndex = 1)
-        val disabled = LayerButtonsState.from(isMultiLayerMode = true, layerCount = 3, activeLayerIndex = 0)
-        assertEquals(LayerButtonsState.ENABLED_ALPHA, enabled.downAlpha, 0f)
-        assertEquals(LayerButtonsState.DISABLED_ALPHA, disabled.downAlpha, 0f)
     }
 
     // ========== EDGE CASE: SINGLE LAYER ==========

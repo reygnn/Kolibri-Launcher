@@ -321,7 +321,6 @@ class LauncherViewModel @Inject constructor(
     fun updateTimeAndDate() = clockDelegate.refreshTimeNow()
     fun updateBatteryLevelFromIntent(intent: Intent?) = clockDelegate.updateBatteryLevelFromIntent(intent)
     fun updateBatteryLevel(level: Int, scale: Int) = clockDelegate.updateBatteryLevel(level, scale)
-    fun getInitialBatteryState() = clockDelegate.refreshAll()
 
     // ===========================================
     // DELEGATED PUBLIC API — APP MANAGEMENT
@@ -386,7 +385,6 @@ class LauncherViewModel @Inject constructor(
     fun onClearWallpaper() = wallpaperDelegate.onClearWallpaper()
     fun onSetWallpaperEditMode(enabled: Boolean) = wallpaperDelegate.onSetWallpaperEditMode(enabled)
     fun onToggleWallpaperEditMode() = wallpaperDelegate.onToggleWallpaperEditMode()
-    fun onEnterWallpaperEditMode() = wallpaperDelegate.onEnterWallpaperEditMode()
     fun onCommitWallpaperEditMode() = wallpaperDelegate.onCommitWallpaperEditMode()
     fun onCancelWallpaperEditMode() = wallpaperDelegate.onCancelWallpaperEditMode()
     fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) = wallpaperDelegate.onAddWallpaperLayer(imageUri, label)

@@ -44,10 +44,6 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
         }
     }
 
-    internal fun initialize() {
-        // Aktuell leer, aber vorhanden für Konsistenz und zukünftige Lade-Logik.
-    }
-
     override fun onDestroy() {
         try {
             // CRASH-SAFE: Cleanup

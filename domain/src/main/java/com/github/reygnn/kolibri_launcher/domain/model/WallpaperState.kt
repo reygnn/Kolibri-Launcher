@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicLong
  * Zustand eines einzelnen Wallpaper-Layers (Folie).
  *
  * Immutable – jede Änderung erzeugt eine neue Instanz.
- * Persistierbar über toMap() / fromMap().
  */
 data class WallpaperLayerState(
     /** Unique ID für Identifikation */
@@ -51,22 +50,6 @@ data class WallpaperLayerState(
         fun newId(): String =
             "layer_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
 
-        /**
-         * Erstellt einen LayerState aus einer Map (Restore aus SharedPreferences).
-         */
-        fun fromMap(map: Map<String, Any?>): WallpaperLayerState {
-            return WallpaperLayerState(
-                id = map["id"] as? String ?: newId(),
-                imageUri = (map["imageUri"] as? String)?.takeIf { it.isNotEmpty() },
-                scale = (map["scale"] as? Number)?.toFloat() ?: DEFAULT_SCALE,
-                translateX = (map["translateX"] as? Number)?.toFloat() ?: 0f,
-                translateY = (map["translateY"] as? Number)?.toFloat() ?: 0f,
-                alpha = (map["alpha"] as? Number)?.toFloat() ?: 1.0f,
-                blendModeName = (map["blendModeName"] as? String)?.takeIf { it.isNotEmpty() },
-                isVisible = map["isVisible"] as? Boolean ?: true,
-                label = (map["label"] as? String)?.takeIf { it.isNotEmpty() }
-            )
-        }
     }
 
     /** Wurde das Bild transformiert (nicht mehr default)? */
@@ -91,20 +74,6 @@ data class WallpaperLayerState(
             }
         }
 
-    /**
-     * Exportiert als Map für SharedPreferences / JSON.
-     */
-    fun toMap(): Map<String, Any> = mapOf(
-        "id" to id,
-        "imageUri" to (imageUri ?: ""),
-        "scale" to scale,
-        "translateX" to translateX,
-        "translateY" to translateY,
-        "alpha" to alpha,
-        "blendModeName" to (blendModeName ?: ""),
-        "isVisible" to isVisible,
-        "label" to (label ?: "")
-    )
 }
 
 /**

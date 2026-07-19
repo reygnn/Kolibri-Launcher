@@ -17,25 +17,17 @@ package com.github.reygnn.kolibri_launcher.ui.home
  *  - Up enabled: activeLayerIndex < layerCount - 1
  *  - Down enabled: activeLayerIndex > 0
  *  - Delete enabled: activeLayerIndex >= 0 && layerCount > 0
- *  - Alpha: ENABLED_ALPHA wenn enabled, DISABLED_ALPHA sonst (nur für Up/Down -
- *    die Originalimplementierung setzte Alpha nicht für Delete)
  */
 data class LayerButtonsState(
     val addVisible: Boolean,
     val deleteVisible: Boolean,
     val upVisible: Boolean,
     val downVisible: Boolean,
-    val indicatorVisible: Boolean,
     val upEnabled: Boolean,
     val downEnabled: Boolean,
     val deleteEnabled: Boolean,
-    val upAlpha: Float,
-    val downAlpha: Float,
 ) {
     companion object {
-        const val ENABLED_ALPHA = 1.0f
-        const val DISABLED_ALPHA = 0.3f
-
         fun from(
             isMultiLayerMode: Boolean,
             layerCount: Int,
@@ -51,12 +43,9 @@ data class LayerButtonsState(
                 deleteVisible = hasLayers,
                 upVisible = hasLayers,
                 downVisible = hasLayers,
-                indicatorVisible = hasLayers,
                 upEnabled = upEnabled,
                 downEnabled = downEnabled,
                 deleteEnabled = deleteEnabled,
-                upAlpha = if (upEnabled) ENABLED_ALPHA else DISABLED_ALPHA,
-                downAlpha = if (downEnabled) ENABLED_ALPHA else DISABLED_ALPHA,
             )
         }
     }

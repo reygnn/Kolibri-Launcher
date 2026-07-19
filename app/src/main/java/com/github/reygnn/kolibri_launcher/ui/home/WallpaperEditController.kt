@@ -48,7 +48,7 @@ internal class WallpaperEditController(
     // EDIT-MODE STATE — APPLY
     // ============================================================================
 
-    fun applyEditState(state: WallpaperEditState) {
+    private fun applyEditState(state: WallpaperEditState) {
         val wallpaperView = binding.wallpaperView
         wallpaperView.isEditMode = state.isEditMode
         wallpaperView.isSnapEnabled = state.snapEnabled

@@ -35,8 +35,6 @@ import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupFragment
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesActivity
@@ -88,9 +86,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private val viewModel: SettingsViewModel by viewModels({ requireActivity() })
 
     @Inject
-    lateinit var hiddenAppsRepository: HiddenAppsRepository
-
-    @Inject
     lateinit var favoritesRepository: FavoritesRepository
 
     @Inject
@@ -98,9 +93,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
-
-    @Inject
-    lateinit var screenLockRepository: ScreenLockRepository
 
     // 1. Deklaration für die Preference
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null

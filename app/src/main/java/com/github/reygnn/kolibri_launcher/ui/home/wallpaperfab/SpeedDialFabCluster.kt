@@ -29,7 +29,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
  *
  * Public API (used by `WallpaperEditController`):
  *   - `setOnSaveClicked / setOnCancelClicked / …` — per-action listeners
- *   - `setMiniFabEnabled` — visual disabled state via alpha + isEnabled
  *   - `applyPosition` — sets the cluster's translation from a fraction
  *   - `onPositionChanged` — drag-end callback for persistence
  */
@@ -179,19 +178,6 @@ class SpeedDialFabCluster @JvmOverloads constructor(
 
     fun setOnOpenCommandsClicked(listener: () -> Unit) {
         fabOpenCommands.setOnClickListener { listener() }
-    }
-
-    /**
-     * Toggles a mini-FAB's enabled state with a half-transparent
-     * appearance for the disabled case. Material's `isEnabled = false`
-     * already greys out the FAB; the explicit alpha is belt-and-
-     * suspenders and matches what the legacy toolbar did for the
-     * layer-reorder buttons.
-     */
-    fun setMiniFabEnabled(id: MiniFab, enabled: Boolean) {
-        val fab = fabFor(id)
-        fab.isEnabled = enabled
-        fab.alpha = if (enabled) 1f else DISABLED_ALPHA
     }
 
     fun setMiniFabVisible(id: MiniFab, visible: Boolean) {

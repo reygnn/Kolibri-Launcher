@@ -91,10 +91,6 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
         }
     }
 
-    internal fun initialize() {
-        // Aktuell leer, aber vorhanden für Konsistenz und zukünftige Lade-Logik.
-    }
-
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         _binding?.let {

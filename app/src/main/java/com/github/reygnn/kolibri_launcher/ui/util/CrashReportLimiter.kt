@@ -226,24 +226,4 @@ object CrashReportLimiter {
         }
     }
 
-    /**
-     * Get statistics about blocked reports (for debugging).
-     */
-    fun getStatistics(): String {
-        return try {
-            val preferences = prefs ?: return "Limiter not initialized"
-
-            synchronized(lock) {
-                val allEntries = preferences.all.filter { it.key != LAST_CLEANUP_KEY }
-                val now = System.currentTimeMillis()
-                val activeBlocks = allEntries.count { (_, value) ->
-                    value is Long && (now - value) < REPORT_COOLDOWN_MS
-                }
-
-                "Total tracked: ${allEntries.size}, Active blocks: $activeBlocks"
-            }
-        } catch (e: Throwable) {
-            "Error getting statistics"
-        }
-    }
 }

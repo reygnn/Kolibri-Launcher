@@ -135,14 +135,6 @@ data class WallpaperLayer(
         return rect
     }
 
-    /** Skalierte Breite des Bitmaps. */
-    val scaledWidth: Float
-        get() = (bitmap?.width ?: intrinsicWidth) * scale
-
-    /** Skalierte Höhe des Bitmaps. */
-    val scaledHeight: Float
-        get() = (bitmap?.height ?: intrinsicHeight) * scale
-
     // ===========================================
     // ALPHA HELPERS
     // ===========================================
@@ -154,25 +146,6 @@ data class WallpaperLayer(
     var alphaInt: Int
         get() = (alpha * 255).toInt().coerceIn(0, 255)
         set(value) { alpha = (value.coerceIn(0, 255) / 255f) }
-
-    // ===========================================
-    // PERSISTENCE
-    // ===========================================
-
-    /**
-     * Exportiert den Transform-State als Map für SharedPreferences / JSON.
-     */
-    fun toTransformMap(): Map<String, Any> = mapOf(
-        "id" to id,
-        "sourceUri" to (sourceUri?.toString() ?: ""),
-        "scale" to scale,
-        "translateX" to translateX,
-        "translateY" to translateY,
-        "isVisible" to isVisible,
-        "alpha" to alpha,
-        "blendMode" to (blendMode?.toString() ?: ""),
-        "label" to (label ?: "")
-    )
 
     /**
      * Wendet eine "Cover"-Transformation an: Skaliert das Bild so,
