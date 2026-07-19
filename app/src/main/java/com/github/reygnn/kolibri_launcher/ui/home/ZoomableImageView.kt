@@ -110,7 +110,7 @@ class ZoomableImageView @JvmOverloads constructor(
         // Erlaubt Rein-/Rauszoomen unabhängig von der absoluten Bildgröße.
         // z.B. bei einem 50x50 Bild mit baseScale=40: maxScale = 40 * 3 = 120
         private const val ZOOM_IN_MULTIPLIER = 3.0f   // Max 3x über Cover hinaus
-        private const val ZOOM_OUT_MULTIPLIER = 0.05f  // Min 25% des Cover-Scales
+        private const val ZOOM_OUT_MULTIPLIER = 0.05f  // Min 5% of the reference scale
 
         private const val DRAG_THRESHOLD_PX = 10f
         private const val EDGE_RESISTANCE_STRENGTH = 0.01f
@@ -152,8 +152,8 @@ class ZoomableImageView @JvmOverloads constructor(
                 _singleBaseScale
             }
             // Referenz = das kleinere von Base und Current
-            // → Nach 1:1 (current=1.0, base=40.0): Referenz=1.0, Min=0.25
-            // → Nach CenterCrop (current=40.0, base=40.0): Referenz=40.0, Min=10.0
+            // → Nach 1:1 (current=1.0, base=40.0): Referenz=1.0, Min=0.05
+            // → Nach CenterCrop (current=40.0, base=40.0): Referenz=40.0, Min=2.0
             val referenceScale = minOf(baseScale, currentScale)
             return minOf(
                 if (isMultiLayerMode) MULTI_LAYER_MIN_SCALE else MIN_SCALE,
@@ -456,7 +456,8 @@ class ZoomableImageView @JvmOverloads constructor(
      *
      * @param bitmap Das Bild für diese Folie
      * @param label Optionaler Name (z.B. "Oben", "Unten")
-     * @param centerCrop Wenn true, wird das Bild automatisch auf Cover skaliert
+     * @param centerCrop When true, the new layer is auto-scaled to fit the view
+     *   width on first layout. Legacy name — it applies fit-width, not center-crop.
      * @param alpha Deckkraft der Folie (0.0–1.0, Default: 1.0 = voll deckend)
      * @param blendMode Wie sich die Folie mit darunterliegenden mischt (null = normal)
      * @param sourceUri Source URI für Persistierung
@@ -486,10 +487,6 @@ class ZoomableImageView @JvmOverloads constructor(
             blendMode = blendMode,
             label = label
         )
-
-        /*        if (centerCrop && width > 0 && height > 0) {
-                    layer.applyCenterCrop(width, height)
-                }*/
 
         if (centerCrop && width > 0 && height > 0) {
             layer.applyFitWidth(width, height)

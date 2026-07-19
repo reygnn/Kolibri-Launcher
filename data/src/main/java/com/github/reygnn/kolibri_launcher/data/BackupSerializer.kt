@@ -208,43 +208,7 @@ class BackupSerializer @Inject constructor() {
             if (!root.has("settings")) return backup
             val settings = root.getJSONObject("settings")
 
-            val strictLayers = parseWallpaperLayersFromJson(settings)
-
-            val enrichedSettings = backup.settings.copy(
-                swipeLeftApp = settings.getStrictString("swipe_left_app") ?: backup.settings.swipeLeftApp,
-                swipeRightApp = settings.getStrictString("swipe_right_app") ?: backup.settings.swipeRightApp,
-                textColor = settings.getStrictInt("text_color") ?: backup.settings.textColor,
-                chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: backup.settings.chipBackgroundColor,
-                layoutScale = settings.getStrictFloat("layout_scale") ?: backup.settings.layoutScale,
-                verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: backup.settings.verticalPaddingScale,
-                contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: backup.settings.contentTopMarginScale,
-                wallpaperUri = settings.getStrictString("wallpaper_uri") ?: backup.settings.wallpaperUri,
-                wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: backup.settings.wallpaperScale,
-                wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: backup.settings.wallpaperTranslateX,
-                wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: backup.settings.wallpaperTranslateY,
-                wallpaperLayers = if (strictLayers != null) strictLayers else backup.settings.wallpaperLayers,
-                isFontBold = settings.getStrictBool("is_font_bold") ?: backup.settings.isFontBold,
-                favoritesAlignment = settings.getStrictString("favoritesAlignment")
-                    ?: settings.getStrictString("favorites_alignment")
-                    ?: backup.settings.favoritesAlignment,
-                wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode")
-                    ?: settings.getStrictString("wallpaper_surface_mode")
-                    ?: backup.settings.wallpaperSurfaceMode,
-                sortOrder = settings.getStrictString("sortOrder")
-                    ?: settings.getStrictString("sort_order")
-                    ?: backup.settings.sortOrder,
-                textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: backup.settings.textShadowEnabled,
-                showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: backup.settings.showCalendarEvent,
-                showAlarm = settings.getStrictBool("show_alarm") ?: backup.settings.showAlarm,
-                doubleTapToLockEnabled = settings.getStrictBool("double_tap_to_lock_enabled") ?: backup.settings.doubleTapToLockEnabled,
-                swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: backup.settings.swipeDownToNotificationsEnabled,
-                autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: backup.settings.autoShowKeyboard,
-                autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: backup.settings.autoLaunchApp,
-                secureWindow = settings.getStrictBool("secure_window") ?: backup.settings.secureWindow,
-                rotationLocked = settings.getStrictBool("rotation_locked") ?: backup.settings.rotationLocked,
-            )
-
-            backup.copy(settings = enrichedSettings)
+            backup.copy(settings = extractStrictSettings(settings, backup.settings))
         } catch (e: JSONException) {
             // Timber.w (not silentError): graceful degradation — return the
             // kotlinx-parsed backup unchanged when the strict-merge overlay
@@ -331,41 +295,14 @@ class BackupSerializer @Inject constructor() {
             }
         }
 
-        val wallpaperLayers = parseWallpaperLayersFromJson(settingsJson) ?: emptyList()
-
-        val settings = LauncherSettings(
-            favoriteComponents = favoriteComponents,
-            favoritesOrder = favoritesOrder,
-            hiddenComponents = hiddenComponents,
-            customAppNames = customAppNames,
-            swipeLeftApp = settingsJson.getStrictString("swipe_left_app"),
-            swipeRightApp = settingsJson.getStrictString("swipe_right_app"),
-            textColor = settingsJson.getStrictInt("text_color"),
-            chipBackgroundColor = settingsJson.getStrictInt("chip_bg_color"),
-            layoutScale = settingsJson.getStrictFloat("layout_scale"),
-            verticalPaddingScale = settingsJson.getStrictFloat("vertical_padding_scale"),
-            contentTopMarginScale = settingsJson.getStrictFloat("top_margin_scale"),
-            wallpaperUri = settingsJson.getStrictString("wallpaper_uri"),
-            wallpaperScale = settingsJson.getStrictFloat("wallpaper_scale"),
-            wallpaperTranslateX = settingsJson.getStrictFloat("wallpaper_translate_x"),
-            wallpaperTranslateY = settingsJson.getStrictFloat("wallpaper_translate_y"),
-            wallpaperLayers = wallpaperLayers,
-            isFontBold = settingsJson.getStrictBool("is_font_bold"),
-            favoritesAlignment = settingsJson.getStrictString("favoritesAlignment")
-                ?: settingsJson.getStrictString("favorites_alignment"),
-            wallpaperSurfaceMode = settingsJson.getStrictString("wallpaperSurfaceMode")
-                ?: settingsJson.getStrictString("wallpaper_surface_mode"),
-            sortOrder = settingsJson.getStrictString("sortOrder")
-                ?: settingsJson.getStrictString("sort_order"),
-            textShadowEnabled = settingsJson.getStrictBool("text_shadow_enabled"),
-            showCalendarEvent = settingsJson.getStrictBool("show_calendar_event"),
-            showAlarm = settingsJson.getStrictBool("show_alarm"),
-            doubleTapToLockEnabled = settingsJson.getStrictBool("double_tap_to_lock_enabled"),
-            swipeDownToNotificationsEnabled = settingsJson.getStrictBool("swipe_down_to_notifications_enabled"),
-            autoShowKeyboard = settingsJson.getStrictBool("auto_show_keyboard"),
-            autoLaunchApp = settingsJson.getStrictBool("auto_launch_app"),
-            secureWindow = settingsJson.getStrictBool("secure_window"),
-            rotationLocked = settingsJson.getStrictBool("rotation_locked"),
+        val settings = extractStrictSettings(
+            settingsJson,
+            LauncherSettings(
+                favoriteComponents = favoriteComponents,
+                favoritesOrder = favoritesOrder,
+                hiddenComponents = hiddenComponents,
+                customAppNames = customAppNames,
+            ),
         )
 
         return BackupData(
@@ -373,6 +310,51 @@ class BackupSerializer @Inject constructor() {
             timestamp = timestamp,
             appVersion = root.optString("appVersion", ""),
             settings = settings,
+        )
+    }
+
+    /**
+     * Overlays the strict (org.json) scalar settings parsed from [settings]
+     * onto [base], keeping the [base] value wherever a key is absent. Shared
+     * by [parseStrictly] (base = defaults + the parsed collections) and
+     * [mergeWithStrictValues] (base = the kotlinx-parsed backup). Collections
+     * (favorites / order / hidden / custom names) are carried through from
+     * [base] untouched.
+     */
+    private fun extractStrictSettings(settings: JSONObject, base: LauncherSettings): LauncherSettings {
+        val strictLayers = parseWallpaperLayersFromJson(settings)
+        return base.copy(
+            swipeLeftApp = settings.getStrictString("swipe_left_app") ?: base.swipeLeftApp,
+            swipeRightApp = settings.getStrictString("swipe_right_app") ?: base.swipeRightApp,
+            textColor = settings.getStrictInt("text_color") ?: base.textColor,
+            chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: base.chipBackgroundColor,
+            layoutScale = settings.getStrictFloat("layout_scale") ?: base.layoutScale,
+            verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: base.verticalPaddingScale,
+            contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: base.contentTopMarginScale,
+            wallpaperUri = settings.getStrictString("wallpaper_uri") ?: base.wallpaperUri,
+            wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: base.wallpaperScale,
+            wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: base.wallpaperTranslateX,
+            wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: base.wallpaperTranslateY,
+            wallpaperLayers = strictLayers ?: base.wallpaperLayers,
+            isFontBold = settings.getStrictBool("is_font_bold") ?: base.isFontBold,
+            favoritesAlignment = settings.getStrictString("favoritesAlignment")
+                ?: settings.getStrictString("favorites_alignment")
+                ?: base.favoritesAlignment,
+            wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode")
+                ?: settings.getStrictString("wallpaper_surface_mode")
+                ?: base.wallpaperSurfaceMode,
+            sortOrder = settings.getStrictString("sortOrder")
+                ?: settings.getStrictString("sort_order")
+                ?: base.sortOrder,
+            textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: base.textShadowEnabled,
+            showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: base.showCalendarEvent,
+            showAlarm = settings.getStrictBool("show_alarm") ?: base.showAlarm,
+            doubleTapToLockEnabled = settings.getStrictBool("double_tap_to_lock_enabled") ?: base.doubleTapToLockEnabled,
+            swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: base.swipeDownToNotificationsEnabled,
+            autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: base.autoShowKeyboard,
+            autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: base.autoLaunchApp,
+            secureWindow = settings.getStrictBool("secure_window") ?: base.secureWindow,
+            rotationLocked = settings.getStrictBool("rotation_locked") ?: base.rotationLocked,
         )
     }
 

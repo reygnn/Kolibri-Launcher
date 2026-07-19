@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -299,13 +300,8 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         return colors.distinct()
     }
 
-    private fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int {
-        val typedValue = TypedValue()
-        if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
-            return typedValue.data
-        }
-        return Color.MAGENTA // Fallback
-    }
+    private fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int =
+        context.resolveThemeColor(attrRes, Color.MAGENTA)
 
     override fun onDestroyView() {
         // 1. Manuelle Referenzen auf Views löschen

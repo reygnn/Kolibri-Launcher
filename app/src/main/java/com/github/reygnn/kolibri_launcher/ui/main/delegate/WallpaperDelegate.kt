@@ -556,17 +556,28 @@ class WallpaperDelegate(
     // MULTI-LAYER: TRANSFORMS
     // ===========================================
 
+    /**
+     * Applies [transform] to the layer at [layerIndex], mirrors the result
+     * into [_wallpaperState] and persists it — the shared body of the
+     * single-layer mutate-and-save operations.
+     */
+    private fun mutateLayerAndPersist(
+        errorMessage: String,
+        layerIndex: Int,
+        transform: (WallpaperLayerState) -> WallpaperLayerState,
+    ) = scope.launchSafe(errorMessage) {
+        val newState = _wallpaperState.value.withUpdatedLayer(layerIndex, transform)
+        _wallpaperState.value = newState
+        saveWallpaperStateUseCase(newState)
+    }
+
     fun onSaveLayerTransform(
         layerIndex: Int,
         scale: Float,
         translateX: Float,
         translateY: Float
-    ) = scope.launchSafe("Error saving layer transform") {
-        val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-            it.copy(scale = scale, translateX = translateX, translateY = translateY)
-        }
-        _wallpaperState.value = newState
-        saveWallpaperStateUseCase(newState)
+    ) = mutateLayerAndPersist("Error saving layer transform", layerIndex) {
+        it.copy(scale = scale, translateX = translateX, translateY = translateY)
     }
 
     fun onSaveAllLayerTransforms(
@@ -587,30 +598,18 @@ class WallpaperDelegate(
     // ===========================================
 
     fun onSetLayerAlpha(layerIndex: Int, alpha: Float) =
-        scope.launchSafe("Error setting layer alpha") {
-            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                it.copy(alpha = alpha.coerceIn(0f, 1f))
-            }
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
+        mutateLayerAndPersist("Error setting layer alpha", layerIndex) {
+            it.copy(alpha = alpha.coerceIn(0f, 1f))
         }
 
     fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) =
-        scope.launchSafe("Error setting layer blend mode") {
-            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                it.copy(blendModeName = blendModeName)
-            }
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
+        mutateLayerAndPersist("Error setting layer blend mode", layerIndex) {
+            it.copy(blendModeName = blendModeName)
         }
 
     fun onSetLayerVisibility(layerIndex: Int, isVisible: Boolean) =
-        scope.launchSafe("Error setting layer visibility") {
-            val newState = _wallpaperState.value.withUpdatedLayer(layerIndex) {
-                it.copy(isVisible = isVisible)
-            }
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
+        mutateLayerAndPersist("Error setting layer visibility", layerIndex) {
+            it.copy(isVisible = isVisible)
         }
 
     // ===========================================

@@ -46,6 +46,7 @@ import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
+import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -604,18 +605,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
-    fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int {
-        try {
-            val typedValue = TypedValue()
-            if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
-                return typedValue.data
-            }
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to resolve theme color attribute: $attrRes")
-        }
-        // Fallback, wenn die Farbe nicht gefunden werden konnte
-        return ContextCompat.getColor(context, android.R.color.black)
-    }
+    fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int =
+        context.resolveThemeColor(attrRes, ContextCompat.getColor(context, android.R.color.black))
 
     fun openUrlInCustomTab(context: Context, url: String) {
         try {
