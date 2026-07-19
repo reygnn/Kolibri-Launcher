@@ -18,16 +18,21 @@
 
 ## Umsetzungsstand (2026-07-19)
 
-**Alle 38 Findings abgearbeitet** über 11 Commits (`ec43d8d` … `d9cc66e`),
+**Alle 38 Findings abgearbeitet** über 12 Commits (`ec43d8d` … `76f6142`),
 jeder Batch mit voller Testsuite + `checkConventions`/`checkRule13` grün.
 Reihenfolge: atomarer Favorites/HiddenApps-Fix → Quick-Win-Deletions →
 Doc-Drift → Dead-Code → `context`-Param-Entfernung (5 Repos) →
-CancellationException-Disziplin → Rename-50-Zeichen-Cap → Dedup/Efficiency.
+CancellationException-Disziplin → Rename-50-Zeichen-Cap → Dedup/Efficiency →
+`onDraw`-Matrix-Reuse.
 
-**Bewusst NICHT umgesetzt** (Risiko > Wert ohne Testabdeckung):
+Die `ZoomableImageView.onDraw`-Matrix-Allokation pro Frame (Efficiency) wurde
+nachgezogen (`76f6142`): allokationsfreie `buildMatrixInto` /
+`getTransformedBoundsInto`, abgesichert durch einen Robolectric-Äquivalenz-
+Test (`WallpaperLayerMatrixTest`) — der Grund für das ursprüngliche Auslassen
+(ungetesteter Rendering-Pfad) war damit auflösbar.
 
-- **`ZoomableImageView.onDraw` Matrix-Allokation pro Frame** (Efficiency) —
-  ausgelassen: Rendering-Pfad ohne Test, nur Edit-Mode, „modest impact".
+**Zwei Teilentscheidungen bewusst konservativ** (Verhaltensrisiko ohne Test):
+
 - **`ZoomableImageView.ZOOM_OUT_MULTIPLIER`** — Docs an den ausgelieferten
   Wert `0.05f` angeglichen, statt ihn auf `0.25f` zu ändern (würde das
   Rauszoom-Limit einschränken, keine Tests). Falls `0.25f` die Design-
