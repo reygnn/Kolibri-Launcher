@@ -27,9 +27,9 @@ import javax.inject.Inject
  * crash-safety pattern: a single failing repository doesn't blank the
  * entire context menu — the user still sees the unaffected entries.
  *
- * Labels are emitted as `@StringRes` ids (see [AppContextMenuAction.LauncherAction]).
- * The Adapter resolves them to user-visible strings at bind time, which
- * keeps this whole code path JVM-testable.
+ * Labels are emitted as `LauncherActionLabel` sealed identifiers (see
+ * [AppContextMenuAction.LauncherAction]); the Adapter maps each to an
+ * `R.string` at bind time, which keeps this whole code path JVM-testable.
  */
 class BuildAppContextMenuUseCase @Inject constructor(
     private val shortcutRepository: ShortcutRepository,

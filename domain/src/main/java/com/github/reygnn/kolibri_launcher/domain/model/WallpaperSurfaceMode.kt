@@ -3,10 +3,10 @@ package com.github.reygnn.kolibri_launcher.domain.model
 /**
  * User-facing setting for the AppDrawer surface style.
  *
- * - [AUTO] follows a wallpaper-luminance classification (set up by
- *   `ResolveWallpaperSurfaceUseCase`). The classifier itself ships in
- *   the follow-up commit; until then, [AUTO] resolves to [DARK] —
- *   regression-safe, matches the pre-feature behaviour.
+ * - [AUTO] follows a wallpaper-luminance classification resolved by
+ *   `ResolveWallpaperSurfaceUseCase` (backed by `ClassifyWallpaperUseCase`).
+ *   [DARK] is used only as the fallback when neither the wallpaper nor the
+ *   system-colour signal is available.
  * - [LIGHT] / [DARK] are explicit overrides that ignore the wallpaper
  *   signal entirely.
  */

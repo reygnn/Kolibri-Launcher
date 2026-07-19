@@ -159,8 +159,8 @@ class UsageExportRepositoryImpl @Inject constructor(
                 return UsageImportResult.InvalidFormat
             }
 
-            // Phase 3: Version Check (akzeptiere 1.0.0 und 1.1.0)
-            if (version != USAGE_EXPORT_VERSION && version != "1.0.0") {
+            // Phase 3: version check — only USAGE_EXPORT_VERSION (1.0.0) is supported
+            if (version != USAGE_EXPORT_VERSION) {
                 return UsageImportResult.UnsupportedVersion(version)
             }
 

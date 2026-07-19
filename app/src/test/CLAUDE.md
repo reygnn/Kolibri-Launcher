@@ -49,7 +49,7 @@ für alle Repository-Interfaces abfängt. Namens-Schema:
 
 ### Status je Repository
 
-Alle 16 Repository-Interfaces sind behandelt — 12 mit Contract-Pair,
+Alle 17 Repository-Interfaces sind behandelt — 13 mit Contract-Pair,
 4 mit ADR-only-Begründung:
 
 | Interface              | Contract | Impl-CT | Kommentar |
@@ -65,10 +65,11 @@ Alle 16 Repository-Interfaces sind behandelt — 12 mit Contract-Pair,
 | CustomNamesRepository  |    ✓     |    ✓    | — |
 | InstalledAppsStateRepository |  ✓ |    ✓    | — |
 | ScreenLockRepository   |    ✓     |    ✓    | — |
+| FabPositionRepository  |    ✓     |    ✓    | — |
 | BackupRepository       |    ✓     |    —    | Fake-only (Uri + ContentResolver) |
 | TimeBasedEventsRepository | ADR only |  —   | System-API (AlarmManager + Calendar); ImplTest deckt Logik via MockK ab |
 | ShortcutRepository     | ADR only |    —    | System-API (LauncherApps); ImplTest deckt Logik via MockK ab |
-| ResetRepository        | ADR only |    —    | Komposition (orchestriert 11 Purgeable-Repos); ImplTest deckt Koordination ab |
+| ResetRepository        | ADR only |    —    | Komposition (orchestriert 12 Purgeable-Repos); ImplTest deckt Koordination ab |
 | UsageExportRepository  | ADR only |    —    | Mixed: pure JSON + Uri-File-I/O; 5 Spec-Files decken Format / Time / I/O / Adversarial ab |
 
 Note: "Impl-CT" = Impl-Contract-Test, NOT generic ImplTest. Reguläre

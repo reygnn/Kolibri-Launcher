@@ -23,7 +23,7 @@ package com.github.reygnn.kolibri_launcher.data
  *
  * 1. **It is a composition repository, not a data repository.**
  *    [com.github.reygnn.kolibri_launcher.data.ResetRepositoryImpl] holds no
- *    state. Its behavior is entirely "iterate over 11 child repositories,
+ *    state. Its behavior is entirely "iterate over 12 child repositories,
  *    call `Purgeable.purgeRepository()` on each, aggregate the success
  *    flag." There is no interface invariant to pin — `resetUserData`
  *    returning `true` only tells the caller "no purge threw"; `false` only

@@ -67,11 +67,9 @@ object CrashReportLimiter {
     private val lock = Any()
 
     /**
-     * Initialize the limiter with application context.
-     * Should be called once during app startup.
-     */
-    /**
-     * Async initialization to avoid StrictMode violations on startup.
+     * Initialize the limiter with application context. Should be called once
+     * during app startup. Initialization runs asynchronously to avoid
+     * StrictMode violations on the main thread.
      */
     fun init(context: Context) {
         try {
