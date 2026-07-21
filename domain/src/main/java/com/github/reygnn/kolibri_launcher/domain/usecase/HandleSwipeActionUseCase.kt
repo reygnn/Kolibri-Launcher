@@ -23,10 +23,12 @@ class HandleSwipeActionUseCase @Inject constructor(
     }
 
     suspend operator fun invoke(slot: SwipeSlot): Result {
-        val componentName = if (slot == SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) {
-            swipeActionsRepository.swipeLeftAppFlow.first()
-        } else {
-            swipeActionsRepository.swipeRightAppFlow.first()
+        val componentName = when (slot) {
+            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> swipeActionsRepository.swipeLeftAppFlow.first()
+            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> swipeActionsRepository.swipeRightAppFlow.first()
+            // NONE is never passed by GestureDelegate; handle it explicitly
+            // instead of letting an else funnel it into the right-swipe flow.
+            SwipeSlot.NONE -> return Result.NoAction
         }
 
         if (componentName == null) {
