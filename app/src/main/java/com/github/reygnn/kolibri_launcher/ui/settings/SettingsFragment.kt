@@ -46,6 +46,7 @@ import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.google.android.material.checkbox.MaterialCheckBox
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -94,6 +95,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     lateinit var settingsRepository: SettingsRepository
 
     // 1. Deklaration für die Preference
+    // Tracked so onDestroyView can dismiss the currently-open dialog
+    // (calendar-permission rationale / factory-reset) — otherwise a rotation
+    // with it open leaks its window.
+    private var currentDialog: AlertDialog? = null
+
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
@@ -973,7 +979,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
 
                 shouldShowRequestPermissionRationale(CALENDAR_PERMISSION) -> {
-                    MaterialAlertDialogBuilder(requireContext())
+                    currentDialog?.dismiss()
+                    currentDialog = MaterialAlertDialogBuilder(requireContext())
                         .setTitle(R.string.calendar_permission_title)
                         .setMessage(R.string.calendar_permission_rationale)
                         .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -1018,7 +1025,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 R.id.checkbox_include_usage_data
             )
 
-            MaterialAlertDialogBuilder(requireContext())
+            currentDialog?.dismiss()
+            currentDialog = MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.factory_reset_dialog_title)
                 // 3. Setze das View statt einer Message
                 .setView(dialogView)
@@ -1053,6 +1061,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         autoLaunchAppSwitchPreference = null
         secureWindowSwitchPreference = null
         rotationLockedSwitchPreference = null
+
+        currentDialog?.dismiss()
+        currentDialog = null
 
         super.onDestroyView()
     }

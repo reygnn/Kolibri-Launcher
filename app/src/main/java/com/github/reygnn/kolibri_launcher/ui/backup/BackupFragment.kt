@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -43,6 +44,10 @@ class BackupFragment : Fragment() {
 
     private var _binding: FragmentBackupBinding? = null
     private val binding get() = _binding!!
+
+    // Tracked so onDestroyView can dismiss it — otherwise a rotation with the
+    // import-options dialog open leaks its window.
+    private var currentDialog: AlertDialog? = null
 
     private val viewModel: BackupViewModel by viewModels()
 
@@ -205,7 +210,8 @@ class BackupFragment : Fragment() {
                 }
 
                 // 4. Dialog anzeigen
-                MaterialAlertDialogBuilder(requireContext())
+                currentDialog?.dismiss()
+                currentDialog = MaterialAlertDialogBuilder(requireContext())
                     .setTitle(R.string.import_options_title)
                     .setView(dialogBinding.root)
                     .setPositiveButton(R.string.import_button) { _, _ ->
@@ -392,6 +398,8 @@ class BackupFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        currentDialog?.dismiss()
+        currentDialog = null
         super.onDestroyView()
         _binding = null
     }
