@@ -67,7 +67,7 @@
 
 [versions]
 # Build & Kotlin
-agp = "9.2.1"  # Mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x). Coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
+agp = "9.3.0"  # Mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x). Coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
 kotlin = "2.3.21"  # Mega-bundle lift 2026-05-15: 2.2.21 → 2.3.21 as foundation for KSP2 + AGP 9 + Hilt 2.59. kotlin-test must match exactly. Held at 2.3.x on the SDK-37 lift (2026-07-18): KSP2 has no 2.4.x release yet (latest 2.3.10), and ksp must track the Kotlin minor line.
 ksp = "2.3.8"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags (no `<kotlin>-<ksp>` schema). 2.3.8 is the current latest stable on the 2.3.x line.
 
