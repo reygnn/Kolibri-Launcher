@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -29,6 +30,10 @@ class UsageExportFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: UsageExportViewModel by viewModels()
+
+    // Tracked so onDestroyView can dismiss it — otherwise a rotation with the
+    // import-mode dialog open leaks its window.
+    private var currentDialog: AlertDialog? = null
 
     private val exportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument(AppConstants.MIME_TYPE_JSON)
@@ -85,7 +90,8 @@ class UsageExportFragment : Fragment() {
         try {
             if (!isAdded) return
 
-            MaterialAlertDialogBuilder(requireContext())
+            currentDialog?.dismiss()
+            currentDialog = MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.usage_import_mode_title)
                 .setMessage(R.string.usage_import_mode_message)
                 .setPositiveButton(R.string.usage_import_merge) { _, _ ->
@@ -106,7 +112,7 @@ class UsageExportFragment : Fragment() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     try {
-                        viewModel.uiEvent.collect { event ->
+                        viewModel.event.collect { event ->
                             if (!isAdded || isDetached) return@collect
                             handleUiEvent(event)
                         }
@@ -196,6 +202,8 @@ class UsageExportFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        currentDialog?.dismiss()
+        currentDialog = null
         _binding = null
         super.onDestroyView()
     }

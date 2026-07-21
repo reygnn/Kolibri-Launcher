@@ -35,7 +35,7 @@ class UsageExportViewModelTest {
     fun setup() {
         exportUseCase = mockk()
         importUseCase = mockk()
-        viewModel = UsageExportViewModel(exportUseCase, importUseCase)
+        viewModel = UsageExportViewModel(exportUseCase, importUseCase, mainDispatcherRule.testDispatcher)
     }
 
     // ========== EXPORT TESTS ==========
@@ -50,7 +50,7 @@ class UsageExportViewModelTest {
         // sonst startet der Collector zu spät und verpasst Events.
         val events = mutableListOf<UsageExportUiEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiEvent.toList(events)
+            viewModel.event.toList(events)
         }
 
         // Act
@@ -72,7 +72,7 @@ class UsageExportViewModelTest {
 
         val events = mutableListOf<UsageExportUiEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiEvent.toList(events)
+            viewModel.event.toList(events)
         }
 
         // Act
@@ -97,7 +97,7 @@ class UsageExportViewModelTest {
 
         val events = mutableListOf<UsageExportUiEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiEvent.toList(events)
+            viewModel.event.toList(events)
         }
 
         // Act
@@ -120,7 +120,7 @@ class UsageExportViewModelTest {
 
         val events = mutableListOf<UsageExportUiEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiEvent.toList(events)
+            viewModel.event.toList(events)
         }
 
         // Act
@@ -139,7 +139,7 @@ class UsageExportViewModelTest {
 
         val events = mutableListOf<UsageExportUiEvent>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiEvent.toList(events)
+            viewModel.event.toList(events)
         }
 
         // Act
