@@ -13,7 +13,8 @@
  * `refactor/cycle-elimination-data-to-ui` (commits 5e0d9b3, 9f9b3d2,
  * 695dd52) before this split landed.
  *
- * Hilt: declares modules (RepositoryModule, DataStoreModule, AppUpdateModule).
+ * Hilt: declares modules (RepositoryModule, DataStoreModule). AppUpdateModule
+ * lives in :app, not here.
  * The `ksp(libs.hilt.compiler)` invocation here generates the per-module
  * aggregating class that :app's @HiltAndroidApp picks up at link time.
  *

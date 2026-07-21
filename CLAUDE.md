@@ -21,7 +21,9 @@ testing reference.
 ## Stack
 
 - Kotlin 2.3.21, Android Views + ViewBinding (**no Compose**), Material 3
-- Min SDK 36 / Target 36 / Compile 36 — **Android 16 only**, no compatibility shims
+- Min SDK 36 (Android 16); Target 37 / Compile 37 (Android 17) — lifted
+  2026-07-18 for `core-ktx 1.19.0`, pinned in `gradle/libs.versions.toml`. No
+  compatibility shims.
 - JDK 21 (Robolectric requires it for SDK 36)
 - MVVM + Clean Architecture, **DI via Hilt 2.60.1** (KSP2, kapt-free)
 - Persistence: Jetpack DataStore Preferences (no SharedPreferences)
@@ -56,8 +58,11 @@ code (e.g. `WallpaperRepositoryImplTest`).
 ## Architecture
 
 Three Gradle modules since the §9.2 split (2026-05-03). Production code is
-split across `:domain`, `:data`, and `:app`; all tests live in `:app/src/test/`
-for now.
+split across `:domain`, `:data`, and `:app`. Tests are split too: repository
+contracts + fakes in `domain/src/testFixtures/`, domain unit + fake-contract
+tests in `domain/src/test/`, impl-contract tests in `data/src/test/`, and
+ViewModel/UI tests (plus Robolectric fragment tests in `app/src/testDebug/`)
+in `:app`.
 
 ```
 :domain  (Pure-Kotlin JVM module — `kotlin("jvm")`, no Android SDK)
@@ -193,7 +198,7 @@ activities.
    (Hilt 2.60.1, ACRA 5.13.1, fragment-ktx 1.8.9, JUnit 4.13.2,
    materialVersion 1.14.0, kotlinTestVersion 2.3.21, coreTestingVersion 2.2.0).
    These markers are not suggestions — violating them breaks builds or tests.
-   `minSdk = compileSdk = targetSdk = 36` is also fixed.
+   `minSdk = 36`, `compileSdk = targetSdk = 37` are also fixed.
 
 7. **`KolibriLauncherApp` is multi-layer crash-safe by design.** The style
    (catching `Throwable` instead of `Exception`, the coroutine

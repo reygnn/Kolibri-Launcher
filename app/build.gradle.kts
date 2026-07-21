@@ -11,8 +11,9 @@ import java.util.Properties
  * DO NOT CHANGE / OK to upgrade) sit next to the versions in the Catalog.
  * ⚠️ Ignoring these markers causes build failures! ⚠️
  *
- * minSdk=36 and compileSdk=36 are DELIBERATELY set this way (Android 16)!
- * Do NOT change these values without explicit instruction!
+ * minSdk=36 (Android 16); compileSdk=targetSdk=37 (Android 17, lifted
+ * 2026-07-18 for core-ktx 1.19.0 — see gradle/libs.versions.toml).
+ * These values are DELIBERATE — do NOT change without explicit instruction!
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
