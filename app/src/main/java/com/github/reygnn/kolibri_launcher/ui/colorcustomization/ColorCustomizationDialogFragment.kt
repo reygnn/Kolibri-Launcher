@@ -31,7 +31,8 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurface
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.collectLatest
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -99,24 +100,29 @@ class ColorCustomizationDialogFragment : DialogFragment() {
      * choosable colours.
      */
     private fun observeWallpaperSurface() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            resolveWallpaperSurfaceUseCase().collectLatest { classification ->
-                if (_binding == null) return@collectLatest
-                val color = ContextCompat.getColor(
-                    requireContext(),
-                    when (classification) {
-                        LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                        LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                    },
-                )
-                val fg = ResolvedBackground.SolidColor(color).foregroundColor()
-                binding.root.backgroundTintList = ColorStateList.valueOf(color)
-                binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
-                // Sweep only the label-bearing siblings of the swatch
-                // containers; the swatch containers themselves stay
-                // untouched so colour previews keep their real colours.
-                applyForegroundColorToLabels(binding.root, fg)
-            }
+        // collectOnStarted (repeatOnLifecycle STARTED) rather than a raw
+        // lifecycleScope.launch, so the flow doesn't keep running while the
+        // dialog is only STOPPED — matching the rest of the codebase.
+        collectOnStarted(
+            flow = resolveWallpaperSurfaceUseCase(),
+            errorTag = "wallpaperSurface",
+            coroutineContext = Dispatchers.Main,
+        ) { classification ->
+            if (_binding == null) return@collectOnStarted
+            val color = ContextCompat.getColor(
+                requireContext(),
+                when (classification) {
+                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
+                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
+                },
+            )
+            val fg = ResolvedBackground.SolidColor(color).foregroundColor()
+            binding.root.backgroundTintList = ColorStateList.valueOf(color)
+            binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
+            // Sweep only the label-bearing siblings of the swatch
+            // containers; the swatch containers themselves stay
+            // untouched so colour previews keep their real colours.
+            applyForegroundColorToLabels(binding.root, fg)
         }
     }
 
@@ -245,12 +251,13 @@ class ColorCustomizationDialogFragment : DialogFragment() {
      * Startet die Beobachtung beider Farb-Flows.
      */
     private fun observeChanges() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.uiColorsState.collect { colorsState ->
-                // Aktualisiere beide Paletten basierend auf dem State
-                updateSelectedSwatchUI(colorsState.textColor, textSwatchViews)
-                updateSelectedSwatchUI(colorsState.chipBackgroundColor, chipBgSwatchViews)
-            }
+        collectOnStarted(
+            flow = viewModel.uiColorsState,
+            errorTag = "colorChanges",
+            coroutineContext = Dispatchers.Main,
+        ) { colorsState ->
+            updateSelectedSwatchUI(colorsState.textColor, textSwatchViews)
+            updateSelectedSwatchUI(colorsState.chipBackgroundColor, chipBgSwatchViews)
         }
     }
 
