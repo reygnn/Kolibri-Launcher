@@ -40,6 +40,7 @@ class HiddenAppsViewModel @Inject constructor(
     private val allAppsMasterList = MutableStateFlow<List<AppInfo>>(emptyList())
     private var initialHiddenComponents: Set<String> = emptySet()
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
+    private var isInitialized = false
 
     init {
         launchSafe {
@@ -79,8 +80,17 @@ class HiddenAppsViewModel @Inject constructor(
 
     /**
      * Kicks off the initial data loading for the ViewModel.
+     *
+     * Guarded against config-change re-entry: the Activity calls this
+     * unconditionally in onCreate, but the ViewModel is retained across
+     * rotation. Without the guard a re-run would reset selectedComponents to
+     * the persisted set and silently drop the user's uncommitted toggles.
+     * Same pattern as OnboardingViewModel.loadInitialData().
      */
     fun initialize() {
+        if (isInitialized) return
+        isInitialized = true
+
         launchSafe {
             try {
                 // GetInstalledAppsUseCase exposes a WhileSubscribed StateFlow

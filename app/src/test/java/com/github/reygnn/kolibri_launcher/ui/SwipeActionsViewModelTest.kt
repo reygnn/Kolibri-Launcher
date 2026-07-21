@@ -92,6 +92,27 @@ class SwipeActionsViewModelTest {
     }
 
     @Test
+    fun `initialize - re-invocation after config change preserves uncommitted assignment`() = runTest {
+        // setup() defaults both persisted slots to null.
+        viewModel.initialize()
+        advanceUntilIdle()
+
+        // User assigns App A to the (default) LEFT slot — in-memory only;
+        // persistence happens in onDoneClicked, which is never called here.
+        viewModel.onAppSelected(appA)
+        advanceUntilIdle()
+        assertEquals(appA, viewModel.uiState.value.appForLeft)
+
+        // Config change (rotation): the Activity re-creates and calls initialize()
+        // again on the RETAINED ViewModel. Without the isInitialized guard this
+        // would overwrite the slot with the persisted null and drop the assignment.
+        viewModel.initialize()
+        advanceUntilIdle()
+
+        assertEquals(appA, viewModel.uiState.value.appForLeft)
+    }
+
+    @Test
     fun `initialize - handles loading error gracefully`() = runTest {
         // Arrange
         every { getInstalledAppsUseCase() } returns flow { throw IOException("Load failed") }

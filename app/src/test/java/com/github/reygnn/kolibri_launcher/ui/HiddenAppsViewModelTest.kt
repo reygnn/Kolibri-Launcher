@@ -97,6 +97,32 @@ class HiddenAppsViewModelTest {
     }
 
     @Test
+    fun `initialize - re-invocation after config change preserves uncommitted toggles`() = runTest {
+        fakeInstalledApps.installedApps = testApps
+        fakeVisibility.hiddenApps = setOf(app2.componentName)
+        setupViewModel()
+
+        viewModel.initialize()
+        advanceUntilIdle()
+
+        // User hides app1 in-memory only — persistence happens in onDoneClicked,
+        // which is never called here.
+        viewModel.onAppToggled(app1)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+
+        // Config change (rotation): the Activity re-creates and calls initialize()
+        // again on the RETAINED ViewModel. Without the isInitialized guard this
+        // would reset selectedComponents to the persisted set and drop the toggle.
+        viewModel.initialize()
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+    }
+
+    @Test
     fun `onAppToggled - adds app to selection`() = runTest {
         fakeInstalledApps.installedApps = testApps
         setupViewModel()

@@ -46,6 +46,7 @@ class SwipeActionsViewModel @Inject constructor(
     // Die ComponentNames der zugewiesenen Apps
     private val swipeLeftComponent = MutableStateFlow<String?>(null)
     private val swipeRightComponent = MutableStateFlow<String?>(null)
+    private var isInitialized = false
 
     init {
         launchSafe {
@@ -96,8 +97,17 @@ class SwipeActionsViewModel @Inject constructor(
 
     /**
      * Startet das Laden der Daten. Wird von der Activity aufgerufen.
+     *
+     * Guarded against config-change re-entry: the Activity calls this
+     * unconditionally in onCreate, but the ViewModel is retained across
+     * rotation. Without the guard a re-run would overwrite the in-memory
+     * slot assignments with the persisted ones, silently dropping the user's
+     * uncommitted changes. Same pattern as OnboardingViewModel.loadInitialData().
      */
     internal fun initialize() {
+        if (isInitialized) return
+        isInitialized = true
+
         launchSafe {
             try {
                 // Cold-path race: GetInstalledAppsUseCase emits a
