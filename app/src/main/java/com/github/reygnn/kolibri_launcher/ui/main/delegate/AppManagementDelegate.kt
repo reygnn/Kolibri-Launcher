@@ -85,9 +85,6 @@ class AppManagementDelegate(
         .map { it.sortOrder }
         .asLiveData(scope.coroutineScope.coroutineContext)
 
-    private val _maxFavoritesOnHome = MutableStateFlow(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
-    val maxFavoritesOnHome: StateFlow<Int> = _maxFavoritesOnHome.asStateFlow()
-
     val appDrawerSearchQuery: StateFlow<String> =
         savedStateHandle.getStateFlow(AppConstants.KEY_SEARCH_QUERY, "")
 
@@ -143,7 +140,11 @@ class AppManagementDelegate(
         errorMessage = "Error toggling favorite for ${app.packageName}",
         defaultErrorToast = R.string.error_generic
     ) {
-        val currentMax = maxFavoritesOnHome.value
+        // Static home-favorites cap. The former dynamic "fits-on-screen" value
+        // (fed via LauncherViewModel.onHomeViewMeasured) was intentionally
+        // dropped when favorites moved to a scrollable RecyclerView (SplitScreen
+        // refactor). The same constant is enforced in GetFavoriteAppsUseCase.
+        val currentMax = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
         when (val result = toggleFavoriteUseCase(app, currentMax)) {
             is ToggleFavoriteUseCase.Result.Success -> {
                 val message = context.getString(result.toStringResId(), app.displayName)

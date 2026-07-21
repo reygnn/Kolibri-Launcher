@@ -254,7 +254,6 @@ class LauncherViewModel @Inject constructor(
     val favoriteAppsState: StateFlow<UiState<FavoriteAppsResult>> get() = appDelegate.favoriteAppsState
     val drawerApps: LiveData<List<AppInfo>> get() = appDelegate.drawerApps
     val sortOrder: LiveData<SortOrder> get() = appDelegate.sortOrder
-    val maxFavoritesOnHome: StateFlow<Int> get() = appDelegate.maxFavoritesOnHome
     val appDrawerSearchQuery: StateFlow<String> get() = appDelegate.appDrawerSearchQuery
 
     val uiColorsState: StateFlow<UiColorsState> get() = themingDelegate.uiColorsState

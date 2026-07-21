@@ -346,13 +346,6 @@ class LauncherViewModelContractTest {
         assertEquals(1, (state as UiState.Success).data.apps.size)
     }
 
-    @Test
-    fun `HomeFragment - maxFavoritesOnHome has valid default`() = runTest {
-        val vm = createViewModel()
-
-        assertTrue(vm.maxFavoritesOnHome.value > 0)
-    }
-
     // =====================================================================
     // CONTRACT 3: HomeFragment triggers app launch
     // "Fragment calls onAppClicked → receives LaunchApp event → starts activity"

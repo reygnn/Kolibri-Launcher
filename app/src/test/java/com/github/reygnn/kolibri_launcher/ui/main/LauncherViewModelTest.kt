@@ -747,7 +747,6 @@ class LauncherViewModelTest {
         vm.isWallpaperEditMode.value
         vm.isLockingInProgress.value
         vm.appDrawerSearchQuery.value
-        vm.maxFavoritesOnHome.value
 
         assertTrue(true)
     }

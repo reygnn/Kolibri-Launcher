@@ -1463,16 +1463,6 @@ class MonolithicLauncherViewModelTest {
     }
 
     @Test
-    fun `maxFavoritesOnHome - has correct default value`() = runTest {
-        setupViewModel()
-
-        viewModel.maxFavoritesOnHome.test {
-            val value = awaitItem()
-            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, value)
-        }
-    }
-
-    @Test
     fun `refreshDynamicUiData - updates time but preserves battery state`() = runTest {
         // 1. Arrange: Wir simulieren einen System-Intent mit 88% Akku
         val batteryIntent = mockk<Intent>()

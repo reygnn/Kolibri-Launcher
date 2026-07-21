@@ -183,12 +183,6 @@ class AppManagementDelegateTest {
     }
 
     @Test
-    fun `initial maxFavoritesOnHome is default`() {
-        val delegate = createDelegate()
-        assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, delegate.maxFavoritesOnHome.value)
-    }
-
-    @Test
     fun `initial appDrawerSearchQuery is empty`() {
         val delegate = createDelegate()
         assertEquals("", delegate.appDrawerSearchQuery.value)
