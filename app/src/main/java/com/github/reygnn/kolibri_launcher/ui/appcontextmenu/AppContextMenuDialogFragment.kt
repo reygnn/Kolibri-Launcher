@@ -480,6 +480,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         try {
             currentDialog?.dismiss()
             currentDialog = null
+            _binding?.contextMenuItemsRecyclerView?.adapter = null
             _binding = null
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error in onDestroyView")

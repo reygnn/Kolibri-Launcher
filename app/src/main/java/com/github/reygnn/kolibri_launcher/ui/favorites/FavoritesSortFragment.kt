@@ -249,6 +249,14 @@ class FavoritesSortFragment : Fragment() {
         (activity as? AppCompatActivity)?.supportActionBar?.title =
             getString(R.string.settings_title)
 
+        // Detach the RecyclerView plumbing so the destroyed view tree isn't
+        // retained (matches AppDrawerFragment.onDestroyView): detach the
+        // ItemTouchHelper, null the adapter, drop the field references.
+        itemTouchHelper?.attachToRecyclerView(null)
+        _binding?.recyclerView?.adapter = null
+        adapter = null
+        itemTouchHelper = null
+
         _binding = null
         super.onDestroyView()
     }
