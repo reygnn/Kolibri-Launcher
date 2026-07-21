@@ -953,16 +953,18 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private fun confirmRemoveWallpaper() {
-        // Structural teardown-race guard before .show().
-        if (isFinishing || isDestroyed) return
-        MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
+        // Route through showDialog so the dialog is tracked in currentDialog
+        // and dismissed in onDestroy — otherwise a config change / finish while
+        // it is open leaks its window. showDialog also carries the
+        // finishing/destroyed teardown-race guard.
+        val builder = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.wallpaper_remove))
             .setMessage(getString(R.string.wallpaper_remove_confirm))
             .setPositiveButton(getString(R.string.wallpaper_remove_yes)) { _, _ ->
                 viewModel.onClearWallpaper()
             }
             .setNegativeButton(getString(R.string.cancel), null)
-            .show()
+        showDialog(builder)
     }
 
     private fun showColorCustomizationDialog() {
