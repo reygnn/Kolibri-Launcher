@@ -103,6 +103,13 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
     private lateinit var menuContext: MenuContext
     private var hasUsageData: Boolean = false
 
+    // CRASH-SAFE: true only once onCreate has parsed every required argument.
+    // If parsing fails, onCreate calls dismiss() — but that removal is a
+    // follow-up transaction, so this lifecycle pass still runs onCreateView /
+    // onViewCreated. The flag lets onViewCreated bail before dereferencing the
+    // uninitialized lateinit appInfo / menuContext.
+    private var argsValid = false
+
     // CRASH-SAFE: Track current dialog
     private var currentDialog: AlertDialog? = null
 
@@ -133,6 +140,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                 ?: MenuContext.HOME_SCREEN
 
             hasUsageData = requireArguments().getBoolean(ARG_HAS_USAGE_DATA, false)
+            argsValid = true
         } catch (e: Throwable) {
             // Outer Catchall kept: Bundle parsing surface (requireArguments,
             // getParcelable, MenuContext.valueOf) at the system-callback
@@ -178,6 +186,15 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Argument parsing failed in onCreate (malformed/missing ARG_APP_INFO,
+        // e.g. a corrupt process-death restore): dismiss() was already
+        // scheduled, but the Fragment still drives this transition through
+        // onViewCreated. Bail before touching the uninitialized lateinit
+        // appInfo/menuContext (here and in loadActions()), which would throw
+        // UninitializedPropertyAccessException and crash instead of dismissing
+        // cleanly. Restores the class's CRASH-SAFE contract.
+        if (!argsValid) return
 
         binding.appNameText.text = appInfo.displayName
 
