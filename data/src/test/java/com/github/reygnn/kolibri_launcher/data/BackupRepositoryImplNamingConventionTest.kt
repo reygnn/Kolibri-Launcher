@@ -288,7 +288,10 @@ class BackupRepositoryImplNamingConventionTest {
     }
 
     @Test
-    fun `import - when both camelCase and snake_case present - last value wins`() = runTest {
+    fun `import - when both camelCase and snake_case present - camelCase canonical wins`() = runTest {
+        // Synthetic case (a real backup never carries both keys). The strict
+        // path reads the canonical camelCase key first, with snake_case only as
+        // a legacy alias (AUDIT-3 #3), so the camelCase value wins.
         val json = """
         {
             "version": "1.0.0",
@@ -304,7 +307,7 @@ class BackupRepositoryImplNamingConventionTest {
         val result = backupManager.importFromJson(json, ImportOptions(importThemeSettings = true))
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-222)
+        assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111)
     }
 
     @Test

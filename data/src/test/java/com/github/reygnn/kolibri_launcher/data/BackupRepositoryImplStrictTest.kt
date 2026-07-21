@@ -274,4 +274,44 @@ class BackupRepositoryImplStrictTest {
         val favorites = favoritesRepo.favoriteComponentsFlow.first()
         assertThat(favorites).contains(validApp)
     }
+
+    /**
+     * TEST: camelCase scalar recovery on the strict-parsing path (AUDIT-3 #3)
+     *
+     * The app serializes with kotlinx and no @SerialName, so real backups use
+     * camelCase keys. When the kotlinx primary path throws (here forced via a
+     * string timestamp) the org.json strict-recovery path takes over. Before
+     * the fix that path looked up snake_case keys only, so every scalar setting
+     * in a real (camelCase) backup silently reset to its default. This asserts
+     * the camelCase scalars are recovered on the strict path.
+     */
+    @Test
+    fun `importFromJson strict fallback recovers camelCase scalar settings`() = runTest(testDispatcher) {
+        // camelCase settings (the app's real encodeToString output); timestamp
+        // is a string to force the org.json strict path.
+        val camelCaseJson = """
+            {
+              "version": "1.0.0",
+              "timestamp": "BREAK_ME",
+              "settings": {
+                "textColor": -65536,
+                "isFontBold": true,
+                "favoriteComponents": []
+              }
+            }
+        """.trimIndent()
+
+        val options = ImportOptions(
+            importThemeSettings = true,
+            importPowerUserSettings = true
+        )
+
+        // WHEN
+        val result = backupManager.importFromJson(camelCaseJson, options)
+
+        // THEN — both scalars survive the strict path instead of resetting.
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(settingsRepo.textColorFlow.first()).isEqualTo(-65536)
+        assertThat(settingsRepo.isFontBoldStateFlow.first()).isTrue()
+    }
 }

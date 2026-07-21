@@ -422,7 +422,10 @@ class BackupRepositoryImplWallpaperTest {
     }
 
     @Test
-    fun `importFromJson - mixed case wallpaper keys - last value wins`() = runTest {
+    fun `importFromJson - mixed case wallpaper keys - camelCase canonical wins`() = runTest {
+        // Synthetic case (a real backup never carries both keys). The strict
+        // path reads the canonical camelCase key first, with snake_case only as
+        // a legacy alias (AUDIT-3 #3), so the camelCase value wins.
         val jsonWithMixedCase = """
             {
                 "version": "1.0.0",
@@ -441,7 +444,7 @@ class BackupRepositoryImplWallpaperTest {
         val result = backupManager.importFromJson(jsonWithMixedCase, ImportOptions(importThemeSettings = true))
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeWallpaperRepo.currentState.scale).isEqualTo(2.5f)
+        assertThat(fakeWallpaperRepo.currentState.scale).isEqualTo(1.0f)
     }
 
     // ========================================================================

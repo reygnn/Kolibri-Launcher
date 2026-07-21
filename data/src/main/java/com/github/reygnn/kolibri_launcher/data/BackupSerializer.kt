@@ -324,37 +324,31 @@ class BackupSerializer @Inject constructor() {
     private fun extractStrictSettings(settings: JSONObject, base: LauncherSettings): LauncherSettings {
         val strictLayers = parseWallpaperLayersFromJson(settings)
         return base.copy(
-            swipeLeftApp = settings.getStrictString("swipe_left_app") ?: base.swipeLeftApp,
-            swipeRightApp = settings.getStrictString("swipe_right_app") ?: base.swipeRightApp,
-            textColor = settings.getStrictInt("text_color") ?: base.textColor,
-            chipBackgroundColor = settings.getStrictInt("chip_bg_color") ?: base.chipBackgroundColor,
-            layoutScale = settings.getStrictFloat("layout_scale") ?: base.layoutScale,
-            verticalPaddingScale = settings.getStrictFloat("vertical_padding_scale") ?: base.verticalPaddingScale,
-            contentTopMarginScale = settings.getStrictFloat("top_margin_scale") ?: base.contentTopMarginScale,
-            wallpaperUri = settings.getStrictString("wallpaper_uri") ?: base.wallpaperUri,
-            wallpaperScale = settings.getStrictFloat("wallpaper_scale") ?: base.wallpaperScale,
-            wallpaperTranslateX = settings.getStrictFloat("wallpaper_translate_x") ?: base.wallpaperTranslateX,
-            wallpaperTranslateY = settings.getStrictFloat("wallpaper_translate_y") ?: base.wallpaperTranslateY,
+            swipeLeftApp = settings.getStrictString("swipeLeftApp", "swipe_left_app") ?: base.swipeLeftApp,
+            swipeRightApp = settings.getStrictString("swipeRightApp", "swipe_right_app") ?: base.swipeRightApp,
+            textColor = settings.getStrictInt("textColor", "text_color") ?: base.textColor,
+            chipBackgroundColor = settings.getStrictInt("chipBackgroundColor", "chip_bg_color") ?: base.chipBackgroundColor,
+            layoutScale = settings.getStrictFloat("layoutScale", "layout_scale") ?: base.layoutScale,
+            verticalPaddingScale = settings.getStrictFloat("verticalPaddingScale", "vertical_padding_scale") ?: base.verticalPaddingScale,
+            contentTopMarginScale = settings.getStrictFloat("contentTopMarginScale", "top_margin_scale") ?: base.contentTopMarginScale,
+            wallpaperUri = settings.getStrictString("wallpaperUri", "wallpaper_uri") ?: base.wallpaperUri,
+            wallpaperScale = settings.getStrictFloat("wallpaperScale", "wallpaper_scale") ?: base.wallpaperScale,
+            wallpaperTranslateX = settings.getStrictFloat("wallpaperTranslateX", "wallpaper_translate_x") ?: base.wallpaperTranslateX,
+            wallpaperTranslateY = settings.getStrictFloat("wallpaperTranslateY", "wallpaper_translate_y") ?: base.wallpaperTranslateY,
             wallpaperLayers = strictLayers ?: base.wallpaperLayers,
-            isFontBold = settings.getStrictBool("is_font_bold") ?: base.isFontBold,
-            favoritesAlignment = settings.getStrictString("favoritesAlignment")
-                ?: settings.getStrictString("favorites_alignment")
-                ?: base.favoritesAlignment,
-            wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode")
-                ?: settings.getStrictString("wallpaper_surface_mode")
-                ?: base.wallpaperSurfaceMode,
-            sortOrder = settings.getStrictString("sortOrder")
-                ?: settings.getStrictString("sort_order")
-                ?: base.sortOrder,
-            textShadowEnabled = settings.getStrictBool("text_shadow_enabled") ?: base.textShadowEnabled,
-            showCalendarEvent = settings.getStrictBool("show_calendar_event") ?: base.showCalendarEvent,
-            showAlarm = settings.getStrictBool("show_alarm") ?: base.showAlarm,
-            doubleTapToLockEnabled = settings.getStrictBool("double_tap_to_lock_enabled") ?: base.doubleTapToLockEnabled,
-            swipeDownToNotificationsEnabled = settings.getStrictBool("swipe_down_to_notifications_enabled") ?: base.swipeDownToNotificationsEnabled,
-            autoShowKeyboard = settings.getStrictBool("auto_show_keyboard") ?: base.autoShowKeyboard,
-            autoLaunchApp = settings.getStrictBool("auto_launch_app") ?: base.autoLaunchApp,
-            secureWindow = settings.getStrictBool("secure_window") ?: base.secureWindow,
-            rotationLocked = settings.getStrictBool("rotation_locked") ?: base.rotationLocked,
+            isFontBold = settings.getStrictBool("isFontBold", "is_font_bold") ?: base.isFontBold,
+            favoritesAlignment = settings.getStrictString("favoritesAlignment", "favorites_alignment") ?: base.favoritesAlignment,
+            wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode", "wallpaper_surface_mode") ?: base.wallpaperSurfaceMode,
+            sortOrder = settings.getStrictString("sortOrder", "sort_order") ?: base.sortOrder,
+            textShadowEnabled = settings.getStrictBool("textShadowEnabled", "text_shadow_enabled") ?: base.textShadowEnabled,
+            showCalendarEvent = settings.getStrictBool("showCalendarEvent", "show_calendar_event") ?: base.showCalendarEvent,
+            showAlarm = settings.getStrictBool("showAlarm", "show_alarm") ?: base.showAlarm,
+            doubleTapToLockEnabled = settings.getStrictBool("doubleTapToLockEnabled", "double_tap_to_lock_enabled") ?: base.doubleTapToLockEnabled,
+            swipeDownToNotificationsEnabled = settings.getStrictBool("swipeDownToNotificationsEnabled", "swipe_down_to_notifications_enabled") ?: base.swipeDownToNotificationsEnabled,
+            autoShowKeyboard = settings.getStrictBool("autoShowKeyboard", "auto_show_keyboard") ?: base.autoShowKeyboard,
+            autoLaunchApp = settings.getStrictBool("autoLaunchApp", "auto_launch_app") ?: base.autoLaunchApp,
+            secureWindow = settings.getStrictBool("secureWindow", "secure_window") ?: base.secureWindow,
+            rotationLocked = settings.getStrictBool("rotationLocked", "rotation_locked") ?: base.rotationLocked,
         )
     }
 
@@ -536,32 +530,48 @@ class BackupSerializer @Inject constructor() {
     // STRICT PARSING HELPERS (JSONObject extensions)
     // ===========================================
 
-    private fun JSONObject.getStrictString(key: String): String? {
-        if (!this.has(key) || this.isNull(key)) return null
-        return try { this.getString(key) } catch (e: JSONException) { null }
+    // Each getter accepts multiple candidate keys tried in order. The app
+    // writes camelCase (kotlinx property names, no @SerialName), so the strict
+    // recovery path must read camelCase first; the snake_case alias is kept for
+    // hand-edited / legacy backups, mirroring the @JsonNames read aliases in
+    // BackupData. A present-but-wrong-type value falls through to the next key.
+    private fun JSONObject.getStrictString(vararg keys: String): String? {
+        for (key in keys) {
+            if (!this.has(key) || this.isNull(key)) continue
+            try { return this.getString(key) } catch (e: JSONException) { /* try next alias */ }
+        }
+        return null
     }
 
-    private fun JSONObject.getStrictInt(key: String): Int? {
-        if (!this.has(key) || this.isNull(key)) return null
-        return try { this.getLong(key).toInt() } catch (e: JSONException) { null }
+    private fun JSONObject.getStrictInt(vararg keys: String): Int? {
+        for (key in keys) {
+            if (!this.has(key) || this.isNull(key)) continue
+            try { return this.getLong(key).toInt() } catch (e: JSONException) { /* try next alias */ }
+        }
+        return null
     }
 
-    private fun JSONObject.getStrictFloat(key: String): Float? {
-        if (!this.has(key) || this.isNull(key)) return null
-        return try {
-            val doubleVal = this.getDouble(key)
-            if (!doubleVal.isFinite()) {
-                Timber.w("Rejected non-finite float for $key: $doubleVal")
-                null
-            } else {
-                doubleVal.toFloat()
-            }
-        } catch (e: JSONException) { null }
+    private fun JSONObject.getStrictFloat(vararg keys: String): Float? {
+        for (key in keys) {
+            if (!this.has(key) || this.isNull(key)) continue
+            try {
+                val doubleVal = this.getDouble(key)
+                if (!doubleVal.isFinite()) {
+                    Timber.w("Rejected non-finite float for $key: $doubleVal")
+                    continue
+                }
+                return doubleVal.toFloat()
+            } catch (e: JSONException) { /* try next alias */ }
+        }
+        return null
     }
 
-    private fun JSONObject.getStrictBool(key: String): Boolean? {
-        if (!this.has(key) || this.isNull(key)) return null
-        return try { this.getBoolean(key) } catch (e: JSONException) { null }
+    private fun JSONObject.getStrictBool(vararg keys: String): Boolean? {
+        for (key in keys) {
+            if (!this.has(key) || this.isNull(key)) continue
+            try { return this.getBoolean(key) } catch (e: JSONException) { /* try next alias */ }
+        }
+        return null
     }
 
     private fun JSONObject.getStrictStringList(key: String): List<String> {
