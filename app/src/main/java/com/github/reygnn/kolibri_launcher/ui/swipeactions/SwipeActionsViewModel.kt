@@ -121,11 +121,16 @@ class SwipeActionsViewModel @Inject constructor(
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
                 }?.sortedBy { it.displayName.lowercase() }
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in SwipeActionsViewModel")
-                allAppsMasterList.value = allApps
 
-                // Lade die aktuell gespeicherten Zuweisungen via UseCases
-                swipeLeftComponent.value = getSwipeLeftAppUseCase().first()
-                swipeRightComponent.value = getSwipeRightAppUseCase().first()
+                // Load the stored slot assignments BEFORE publishing the master
+                // list, then assign all three without a suspend point between
+                // them, so the init-block combine collector never emits a
+                // transient "full list, no assignments" state (sub-frame flash).
+                val left = getSwipeLeftAppUseCase().first()
+                val right = getSwipeRightAppUseCase().first()
+                allAppsMasterList.value = allApps
+                swipeLeftComponent.value = left
+                swipeRightComponent.value = right
 
             } catch (e: CancellationException) {
                 throw e

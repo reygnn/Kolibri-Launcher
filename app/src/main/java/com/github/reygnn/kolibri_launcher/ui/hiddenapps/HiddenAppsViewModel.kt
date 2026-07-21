@@ -104,10 +104,15 @@ class HiddenAppsViewModel @Inject constructor(
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
                 }?.sortedBy { it.displayName.lowercase() }
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in HiddenAppsViewModel")
-                allAppsMasterList.value = allApps
 
-                initialHiddenComponents = getHiddenAppsUseCase().first()
-                selectedComponents.value = initialHiddenComponents
+                // Load the selection BEFORE publishing the master list, then
+                // assign both without a suspend point between them, so the
+                // init-block combine collector never emits a transient
+                // "full list, empty selection" state (sub-frame flash).
+                val hidden = getHiddenAppsUseCase().first()
+                initialHiddenComponents = hidden
+                allAppsMasterList.value = allApps
+                selectedComponents.value = hidden
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
