@@ -41,7 +41,7 @@ import org.junit.Test
  *     (siehe TESTING_CONVENTIONS.kt).
  *
  * NICHT IM CONTRACT:
- *   `FavoritesRepositoryImpl` erzwingt `AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME`
+ *   `FavoritesRepositoryImpl` erzwingt `AppConstants.MAX_FAVORITES_ON_HOME`
  *   als Package-Limit. Der Fake tut das nicht. Das ist (a) Business-Regel des
  *   konkreten Managers und (b) 500 Adds pro Test wären unverhältnismäßig —
  *   daher getestet in `FavoritesRepositoryImplTest` direkt, nicht hier.

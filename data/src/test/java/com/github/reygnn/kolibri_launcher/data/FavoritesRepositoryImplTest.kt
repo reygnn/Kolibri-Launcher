@@ -79,7 +79,7 @@ class FavoritesRepositoryImplTest {
         runTest {
             val fakeDataStore = FakeDataStore()
             val fullSet =
-                (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }
+                (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }
                     .toSet()
             fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
             val favoritesRepositoryImpl = FavoritesRepositoryImpl(
@@ -92,7 +92,7 @@ class FavoritesRepositoryImplTest {
 
             Assert.assertFalse(result)
             val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-            Assert.assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, savedFavorites?.size)
+            Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, savedFavorites?.size)
         }
 
     @Test
@@ -139,7 +139,7 @@ class FavoritesRepositoryImplTest {
         runTest {
             val fakeDataStore = FakeDataStore()
             val fullSet =
-                (1..AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME).map { "com.app$it/Component" }
+                (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }
                     .toSet()
             fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
             val favoritesRepositoryImpl = FavoritesRepositoryImpl(
@@ -153,7 +153,7 @@ class FavoritesRepositoryImplTest {
             Assert.assertTrue(result)
             val savedFavorites = fakeDataStore.data.first()[favoritesKey]
             Assert.assertEquals(
-                AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME + 1,
+                AppConstants.MAX_FAVORITES_ON_HOME + 1,
                 savedFavorites?.size
             )
         }

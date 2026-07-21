@@ -135,8 +135,8 @@ class OnboardingViewModel @Inject constructor(
             if (currentSelection.contains(component)) {
                 selectedComponents.value = currentSelection - component
             } else {
-                if (currentSelection.size >= AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
-                    sendOnboardingEvent(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME))
+                if (currentSelection.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
+                    sendOnboardingEvent(OnboardingEvent.ShowLimitReachedToast(AppConstants.MAX_FAVORITES_ON_HOME))
                 } else {
                     selectedComponents.value = currentSelection + component
                 }

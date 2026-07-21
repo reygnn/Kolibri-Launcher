@@ -171,7 +171,7 @@ object AppConstants {
     const val MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024L  // 10 MB
     const val MAX_PREVIEW_SIZE_BYTES = 1 * 1024 * 1024L  // 1 MB
     const val MAX_ARRAY_ELEMENTS = 512
-    const val MAX_FALLBACK_FAVORITES_ON_HOME = 500  // muss weniger sein als MAX_ARRAY_ELEMENTS
+    const val MAX_FAVORITES_ON_HOME = 500  // must stay below MAX_ARRAY_ELEMENTS
 
     // File System Constants
     const val SCHEME_CONTENT = "content"

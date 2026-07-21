@@ -72,9 +72,9 @@ import javax.inject.Singleton
  * - Simple serialization/deserialization with JSONArray
  *
  * **Size Limit Protection:**
- * Enforces `MAX_ORDER_LIST_SIZE` (50 components) calculated as:
+ * Enforces `MAX_ORDER_LIST_SIZE` (3002 components) calculated as:
  * ```
- * MAX_FAVORITES_ON_HOME (8 packages) × 6 avg components per package + 2 buffer = 50
+ * MAX_FAVORITES_ON_HOME (500 packages) × 6 avg components per package + 2 buffer = 3002
  * ```
  * Prevents:
  * - Excessive storage usage from bugs
@@ -140,18 +140,18 @@ open class FavoritesOrderRepositoryImpl private constructor(
 
     companion object {
         /**
-         * Maximale Größe der Order-Liste als Sicherheits-Limit.
+         * Maximum size of the order list as a safety limit.
          *
-         * Berechnung: MAX_FAVORITES_ON_HOME (8 Packages) × durchschnittlich 6 Komponenten
-         * pro Package ≈ 48 Komponenten, plus kleiner Sicherheits-Puffer.
+         * Calculation: MAX_FAVORITES_ON_HOME (500 packages) × 6 avg components
+         * per package + 2 buffer = 3002 components.
          *
-         * Verhindert bei Bugs: übermässigen Storage-Verbrauch, Performance-Probleme
-         * beim JSON-Parsing und Memory-Issues bei versehentlich riesigen Listen.
+         * Guards against bugs causing: excessive storage use, JSON-parsing
+         * performance degradation, and memory issues from accidentally huge lists.
          */
         private const val AVG_COMPONENTS_PER_PACKAGE = 6
         private const val SAFETY_BUFFER = 2
         private const val MAX_ORDER_LIST_SIZE =
-            AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
+            AppConstants.MAX_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
 
 
         @VisibleForTesting

@@ -117,7 +117,7 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = successState.data
-            val expectedFallbackSize = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME.coerceAtMostSafe(allApps.size)
+            val expectedFallbackSize = AppConstants.MAX_FAVORITES_ON_HOME.coerceAtMostSafe(allApps.size)
 
             assertEquals(expectedFallbackSize, result.apps.size)
             assertEquals("App A", result.apps[0].displayName)
@@ -291,7 +291,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - with very large favorites list - handles efficiently`() = runTest {
-        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
         val exceededCount = limit + 1
         val largeFavoritesList = (1..exceededCount).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
@@ -310,7 +310,7 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = successState.data
-            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
+            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 
@@ -377,7 +377,7 @@ class GetFavoriteAppsUseCaseTest {
 
     @Test
     fun `favoriteApps - when fallback size exceeds MAX_FAVORITES - limits correctly`() = runTest {
-        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
         val exceededCount = limit + 1
         val manyApps = (1..exceededCount).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
@@ -396,7 +396,7 @@ class GetFavoriteAppsUseCaseTest {
 
             val result = successState.data
             assertTrue(result.isFallback)
-            assertEquals(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME, result.apps.size)
+            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
         }
     }
 }

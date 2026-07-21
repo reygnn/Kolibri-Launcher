@@ -144,7 +144,7 @@ class AppManagementDelegate(
         // (fed via LauncherViewModel.onHomeViewMeasured) was intentionally
         // dropped when favorites moved to a scrollable RecyclerView (SplitScreen
         // refactor). The same constant is enforced in GetFavoriteAppsUseCase.
-        val currentMax = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val currentMax = AppConstants.MAX_FAVORITES_ON_HOME
         when (val result = toggleFavoriteUseCase(app, currentMax)) {
             is ToggleFavoriteUseCase.Result.Success -> {
                 val message = context.getString(result.toStringResId(), app.displayName)

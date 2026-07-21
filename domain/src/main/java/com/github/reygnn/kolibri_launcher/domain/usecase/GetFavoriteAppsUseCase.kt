@@ -121,7 +121,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
             favoriteApps.sortedBy { it.displayName.lowercase() }
         }
 
-        val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+        val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FAVORITES_ON_HOME)
 
         return if (limitedOrderedFavorites.isNotEmpty()) {
             KolibriLog.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
@@ -155,6 +155,6 @@ class GetFavoriteAppsUseCase @Inject constructor(
         return rawApps
             .filter { !hiddenApps.contains(it.componentName) }
             .sortedBy { it.displayName.lowercase() }
-            .take(AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+            .take(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 }

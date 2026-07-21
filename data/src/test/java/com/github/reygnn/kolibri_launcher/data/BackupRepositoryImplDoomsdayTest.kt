@@ -659,7 +659,7 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - exceeds package limit - returns LimitExceeded`() = runTest {
         // 1. Wir definieren das Ziel basierend auf der Konstante (+1 um das Limit zu sprengen)
-        val limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
         val exceededCount = limit + 1
 
         // 2. Wir generieren dynamisch genau so viele Apps, wie nötig sind

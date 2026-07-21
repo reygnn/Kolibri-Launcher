@@ -213,10 +213,10 @@ class BackupDataAssembler @Inject constructor(
             val uniquePackages = validFavorites
                 .mapTo(HashSet()) { it.split('/')[0] }
 
-            if (uniquePackages.size > AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) {
+            if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
                 return ImportResult.LimitExceeded(
                     packageCount = uniquePackages.size,
-                    limit = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME,
+                    limit = AppConstants.MAX_FAVORITES_ON_HOME,
                 )
             }
 

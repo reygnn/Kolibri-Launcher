@@ -402,7 +402,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onToggleFavorite - when not favorite - calls UseCase and shows toast`() = runTest {
         // Mocke das ERGEBNIS des UseCase
-        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
+        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) } returns
                 ToggleFavoriteUseCase.Result.Success.Added
 
         setupViewModel()
@@ -416,7 +416,7 @@ class MonolithicLauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
         }
         // Überprüfe den UseCase
-        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
+        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
     }
 
     @Test
@@ -426,9 +426,9 @@ class MonolithicLauncherViewModelTest {
             coEvery {
                 toggleFavoriteUseCase.invoke(
                     app1,
-                    AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME
+                    AppConstants.MAX_FAVORITES_ON_HOME
                 )
-            } returns ToggleFavoriteUseCase.Result.Error.LimitReached(maxFavorites = AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME)
+            } returns ToggleFavoriteUseCase.Result.Error.LimitReached(maxFavorites = AppConstants.MAX_FAVORITES_ON_HOME)
 
             setupViewModel()
             advanceUntilIdle()
@@ -441,7 +441,7 @@ class MonolithicLauncherViewModelTest {
                 assertTrue(event is UiEvent.ShowToastFromString)
             }
             // Überprüfe den UseCase
-            coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
+            coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
         }
 
     @Test
@@ -767,7 +767,7 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `onToggleFavorite - when already favorite - removes from favorites`() = runTest {
         // Mocke das ERGEBNIS des UseCase für "Remove"
-        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) } returns
+        coEvery { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) } returns
                 ToggleFavoriteUseCase.Result.Success.Removed
 
         setupViewModel()
@@ -781,7 +781,7 @@ class MonolithicLauncherViewModelTest {
             assertTrue(event is UiEvent.ShowToastFromString)
             // Optional: Prüfe dass die Message "removed" enthält
         }
-        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FALLBACK_FAVORITES_ON_HOME) }
+        coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
     }
 
     @Test
