@@ -465,7 +465,7 @@ class FavoritesOrderRepositoryImplTest {
     }
 
     @Test
-    fun `removeComponentFromOrder - when component not in list - returns true and does nothing`() =
+    fun `removeComponentFromOrder - when component not in list - returns true and leaves order unchanged`() =
         runTest {
             val fakeDataStore = FakeDataStore()
             val initialOrder = listOf("com.a/a")
@@ -485,9 +485,13 @@ class FavoritesOrderRepositoryImplTest {
             // Act
             val result = manager.removeComponentFromOrder("com.z/z")
 
-            // Assert
+            // Assert: idempotent. Since AUDIT-3 #9 the removal is a single
+            // atomic edit{} transaction (read-modify-write inside the same
+            // transaction), so one write runs even when nothing matches — but
+            // the persisted order is left unchanged.
             Assert.assertTrue(result)
-            Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+            Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+            Assert.assertEquals(initialOrder, manager.favoriteComponentsOrderFlow.first())
         }
 
     // ========== MISSING LIMIT & PURGE TESTS ==========

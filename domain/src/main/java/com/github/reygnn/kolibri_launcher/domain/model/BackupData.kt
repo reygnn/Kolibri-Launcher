@@ -55,7 +55,10 @@ data class WallpaperLayerBackup(
 ) {
     fun toLayerState(): WallpaperLayerState {
         return WallpaperLayerState(
-            id = id ?: "layer_${System.currentTimeMillis()}_restored",
+            // Use newId() (atomic-counter suffix) rather than a bare
+            // timestamp so a multi-layer legacy backup with all-null ids
+            // restored in the same millisecond can't collide.
+            id = id ?: WallpaperLayerState.newId(),
             imageUri = imageUri?.takeIf { it.isNotEmpty() },
             scale = scale,
             translateX = translateX,

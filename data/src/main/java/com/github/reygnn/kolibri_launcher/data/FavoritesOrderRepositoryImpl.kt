@@ -184,25 +184,7 @@ open class FavoritesOrderRepositoryImpl private constructor(
                     throw e
                 }
             }
-            .map { preferences ->
-                val orderString = preferences[PreferencesKeys.ORDER_LIST]
-                if (orderString.isNullOrBlank()) {
-                    emptyList()
-                } else {
-                    try {
-                        val jsonArray = JSONArray(orderString)
-                        // Mit Limit für Sicherheit
-                        val size = jsonArray.length().coerceAtMostSafe(MAX_ORDER_LIST_SIZE)
-                        List(size) { i -> jsonArray.getString(i) }
-                    } catch (e: JSONException) {
-                        TimberWrapper.silentError(e, "Error parsing favorites order JSON")
-                        emptyList()
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Unexpected error parsing order")
-                        emptyList()
-                    }
-                }
-            }
+            .map { preferences -> parseOrderString(preferences[PreferencesKeys.ORDER_LIST]) }
             .let { flow ->
                 if (externalScope != null) {
                     flow.shareIn(
@@ -214,6 +196,26 @@ open class FavoritesOrderRepositoryImpl private constructor(
                     flow
                 }
             }
+    }
+
+    /**
+     * Parses the persisted JSON order string into a bounded component list.
+     * Shared by the read flow and the atomic [removeComponentFromOrder] so
+     * both agree on parsing + the MAX_ORDER_LIST_SIZE ceiling.
+     */
+    private fun parseOrderString(orderString: String?): List<String> {
+        if (orderString.isNullOrBlank()) return emptyList()
+        return try {
+            val jsonArray = JSONArray(orderString)
+            val size = jsonArray.length().coerceAtMostSafe(MAX_ORDER_LIST_SIZE)
+            List(size) { i -> jsonArray.getString(i) }
+        } catch (e: JSONException) {
+            TimberWrapper.silentError(e, "Error parsing favorites order JSON")
+            emptyList()
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Unexpected error parsing order")
+            emptyList()
+        }
     }
 
     override suspend fun saveOrder(orderedComponentNames: List<String>): Boolean {
@@ -286,14 +288,21 @@ open class FavoritesOrderRepositoryImpl private constructor(
 
     open suspend fun removeComponentFromOrder(componentName: String): Boolean {
         return try {
-            val currentOrder = favoriteComponentsOrderFlow.first().toMutableList()
-
-            if (currentOrder.remove(componentName)) {
-                saveOrder(currentOrder)
-            } else {
-                true // Bereits nicht vorhanden
+            // Read-modify-write inside a single edit{} transaction so a
+            // concurrent saveOrder can't wedge a stale snapshot between the
+            // read and the write — the same race FavoritesRepositoryImpl and
+            // HiddenAppsRepositoryImpl deliberately pull into edit{}. (The
+            // previous version read favoriteComponentsOrderFlow.first()
+            // outside the transaction.)
+            dataStore.edit { preferences ->
+                val currentOrder =
+                    parseOrderString(preferences[PreferencesKeys.ORDER_LIST]).toMutableList()
+                if (currentOrder.remove(componentName)) {
+                    val limitedList = currentOrder.take(MAX_ORDER_LIST_SIZE)
+                    preferences[PreferencesKeys.ORDER_LIST] = JSONArray(limitedList).toString()
+                }
             }
-
+            true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
