@@ -223,10 +223,15 @@ class FavoritesSortViewModelTest {
     fun `onResetToOriginal restores the captured initial order, persists, emits reset toast`() =
         runTest(mainDispatcherRule.testDispatcher) {
             viewModel.setInitialApps(initialOrder)
-            viewModel.onMoved(listOf(mail, browser, camera))
-            advanceUntilIdle()
 
             viewModel.event.test {
+                // Subscribe first, then drive the moves: the event Channel
+                // buffers and delivers every event, so onMoved's
+                // FavoritesOrderChanged is consumed here rather than dropped.
+                viewModel.onMoved(listOf(mail, browser, camera))
+                advanceUntilIdle()
+                assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
+
                 viewModel.onResetToOriginal()
                 advanceUntilIdle()
 

@@ -117,15 +117,19 @@ class BaseViewModelTest {
     }
 
     @Test
-    fun `event SharedFlow has no replay - late subscribers miss events`() = runTest {
+    fun `event emitted with no active collector is buffered for the next subscriber`() = runTest {
         val vm = createViewModel()
 
-        // Send event before anyone subscribes
+        // Send an event before anyone subscribes — models a nav/toast event
+        // fired right after a suspending use-case while the STARTED-scoped
+        // collector is torn down during a config change.
         vm.testSendEvent(UiEvent.ShowAppDrawer)
 
-        // Late subscriber should NOT receive the event
+        // The Channel buffers it, so a late subscriber still receives it
+        // instead of silently missing it (AUDIT-3 #7). A replay=0
+        // MutableSharedFlow dropped it here.
         vm.event.test {
-            expectNoEvents()
+            assertEquals(UiEvent.ShowAppDrawer, awaitItem())
         }
     }
 

@@ -6,9 +6,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -30,9 +30,16 @@ abstract class BaseViewModel<E>(
     private val mainDispatcher: CoroutineDispatcher
 ) : ViewModel(), BaseViewModelInterface<E> {
 
-    // Event channel for one-time UI events
-    private val _event = MutableSharedFlow<E>()
-    override val event: SharedFlow<E> = _event.asSharedFlow()
+    // Event channel for one-time UI events. A Channel — not a replay=0
+    // MutableSharedFlow — so an event emitted while no collector is active
+    // (e.g. a nav event fired right after a suspending use-case, during the
+    // window a config change has torn down the STARTED-scoped collector) is
+    // buffered and delivered to the next collector instead of being dropped.
+    // Single-consumer by design: each ViewModel's event is collected by
+    // exactly one lifecycle-scoped collector. Unlike replay=1 it does not
+    // re-deliver past events to a collector that re-subscribes on rotation.
+    private val _event = Channel<E>(Channel.BUFFERED)
+    override val event: Flow<E> = _event.receiveAsFlow()
 
     /**
      * Sends an event to the UI layer. Failures during emission are
@@ -40,7 +47,7 @@ abstract class BaseViewModel<E>(
      */
     protected suspend fun sendEvent(event: E) {
         try {
-            _event.emit(event)
+            _event.send(event)
         } catch (e: CancellationException) {
             throw e  // Coroutine control flow - must re-throw
         } catch (e: Throwable) {
