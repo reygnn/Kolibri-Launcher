@@ -72,11 +72,10 @@ import javax.inject.Singleton
  * - Simple serialization/deserialization with JSONArray
  *
  * **Size Limit Protection:**
- * Enforces `MAX_ORDER_LIST_SIZE` (3002 components) calculated as:
- * ```
- * MAX_FAVORITES_ON_HOME (500 packages) × 6 avg components per package + 2 buffer = 3002
- * ```
- * Prevents:
+ * Enforces `MAX_ORDER_LIST_SIZE`, a defensive ceiling of 3002 entries derived
+ * from the favorites cap (`MAX_FAVORITES_ON_HOME` × `AVG_COMPONENTS_PER_PACKAGE`
+ * + `SAFETY_BUFFER`). Not an expected size — real favorite counts are far lower;
+ * it only guards against bugs producing runaway lists:
  * - Excessive storage usage from bugs
  * - Performance degradation in JSON parsing
  * - Memory issues from accidentally huge lists
@@ -142,11 +141,12 @@ open class FavoritesOrderRepositoryImpl private constructor(
         /**
          * Maximum size of the order list as a safety limit.
          *
-         * Calculation: MAX_FAVORITES_ON_HOME (500 packages) × 6 avg components
-         * per package + 2 buffer = 3002 components.
-         *
-         * Guards against bugs causing: excessive storage use, JSON-parsing
-         * performance degradation, and memory issues from accidentally huge lists.
+         * Defensive upper bound derived from the favorites cap: at most
+         * MAX_FAVORITES_ON_HOME (500) favorited packages, allowing up to
+         * AVG_COMPONENTS_PER_PACKAGE (6) component entries each, plus a small
+         * buffer — i.e. 500 × 6 + 2 = 3002 entries. Not an expected size (real
+         * favorite counts are far lower); purely a ceiling that guards against
+         * bugs producing runaway lists (storage bloat, JSON-parse cost, OOM).
          */
         private const val AVG_COMPONENTS_PER_PACKAGE = 6
         private const val SAFETY_BUFFER = 2
