@@ -195,7 +195,11 @@ class BackupRepositoryImpl @Inject constructor(
      */
     private fun writeZipBackup(uri: Uri, backupData: BackupData) {
         val imageEntries = mutableListOf<Pair<String, File>>() // (zipEntryName, localFile)
-        val dedupSet = mutableSetOf<String>()
+        // Maps an already-written file to its ZIP entry name so layers sharing
+        // the same underlying file reuse that entry instead of stamping a
+        // fresh layer_N.img that never gets written (an orphan reference the
+        // importer can't resolve).
+        val entryByPath = mutableMapOf<String, String>()
 
         // Multi-layer: each layer gets a filename
         val layersWithFileNames = backupData.settings.wallpaperLayers.mapIndexed { index, layer ->
@@ -203,9 +207,10 @@ class BackupRepositoryImpl @Inject constructor(
             if (imageUriStr != null) {
                 val file = resolveToLocalFile(imageUriStr)
                 if (file != null && file.exists()) {
-                    val entryName = "wallpapers/layer_$index.img"
-                    if (dedupSet.add(file.absolutePath)) {
-                        imageEntries.add(entryName to file)
+                    val entryName = entryByPath.getOrPut(file.absolutePath) {
+                        val name = "wallpapers/layer_$index.img"
+                        imageEntries.add(name to file)
+                        name
                     }
                     layer.copy(imageFileName = entryName)
                 } else {
@@ -224,7 +229,7 @@ class BackupRepositoryImpl @Inject constructor(
             val file = resolveToLocalFile(singleUri)
             if (file != null && file.exists()) {
                 singleLayerFileName = "wallpapers/single.img"
-                if (dedupSet.add(file.absolutePath)) {
+                if (entryByPath.put(file.absolutePath, singleLayerFileName) == null) {
                     imageEntries.add(singleLayerFileName to file)
                 }
             }
