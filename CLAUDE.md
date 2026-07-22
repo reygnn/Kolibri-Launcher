@@ -441,7 +441,7 @@ Kotlin or XML.
 ## Versioning
 
 `versionName` and `versionCode` live in `app/build.gradle.kts`. The GitHub
-release tags mirror `versionName` exactly. Currently 0.99.98 / code 118.
+release tags mirror `versionName` exactly. Currently 0.99.100 / code 120.
 The `uploadProguardMapping` task fires automatically after `assembleRelease`
 or `bundleRelease` and pushes the mapping to ACRA.
 
