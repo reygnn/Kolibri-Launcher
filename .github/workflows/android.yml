@@ -47,16 +47,15 @@ jobs:
         with:
           name: lint-results
           path: app/build/reports/lint-results-debug.html
+          retention-days: 14
 
+      # Build the debug APK as a packaging gate (catches manifest/resource/
+      # assembly errors the unit tests don't). The APK is intentionally NOT
+      # uploaded as an artifact — releases ship via local `bundleRelease` +
+      # install-aab.sh, so a CI debug APK was never downloaded and just
+      # filled the Actions storage quota (~2.8 GB of stale app-debug copies).
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload test results
         if: always()
@@ -64,3 +63,4 @@ jobs:
         with:
           name: test-results
           path: app/build/test-results/
+          retention-days: 14
