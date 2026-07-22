@@ -1968,6 +1968,50 @@ am gleichen Mechanismus hängen.
 
 ---
 
+## 23. (offen) Tote ACRA-Consent-Keys im `settingsDataStore` bei Bestands-Installs
+
+**Aufgedeckt 2026-07-22** im Review des AUDIT-4-#2-Fixes. Mit dem
+Backup-Fix wurde der ACRA-Consent bewusst in einen eigenen, vom
+Auto-Backup ausgenommenen DataStore (`acra_consent.preferences_pb`,
+`AppConstants.CONSENT_DATASTORE_NAME`) ausgelagert — **ohne** Migration
+(Entscheidung: einmaliger Consent-Reset statt Wieder-Einführung der
+gelöschten Migrations-Maschinerie auf dem Bootstrap-Pfad).
+
+**Was übrig bleibt:** Installs, die vor dem Split schon einen Consent
+gesetzt hatten, behalten die alten Keys `acra_has_consent` /
+`acra_has_asked` als **tote Keys** im `settingsDataStore`
+(`kolibri_settings.preferences_pb`). Da genau diese Datei jetzt gesichert
+wird, wandern die toten Keys beim Cloud-Restore / Gerätewechsel *innerhalb*
+von `kolibri_settings` mit.
+
+**Warum das heute harmlos ist:** `CrashReportConsentStore` liest den
+Consent ausschließlich aus dem `consentDataStore` (nicht gesichert,
+startet leer → `hasConsent` = false). Die toten Keys im Settings-Store
+hat kein Leser mehr; die Zustimmung wandert effektiv nicht mit. Reine
+Daten-Hygiene, kein user-sichtbarer Effekt.
+
+**Einzige theoretische Falle:** Würde künftig versehentlich wieder
+`HAS_CONSENT_KEY` aus dem `settingsDataStore` gelesen (z.B. ein
+zurückgedrehter Import-Pfad), könnte der mitgesicherte tote Key die
+Zustimmung „wiederbeleben".
+
+**Mögliche Lösungen, in aufsteigendem Aufwand:**
+
+1. Nichts tun — bewusster Trade-off, dokumentiert (dieser Eintrag + KDoc
+   in `CrashReportConsentStore` / `DataStoreModule`). Ein aktives Cleanup
+   wäre genau die vermiedene Migration.
+2. Idempotenter Cleanup-`remove` der beiden Keys aus `settingsDataStore`
+   beim nächsten `saveConsent`-Schreibvorgang — kein Bootstrap-Read-Pfad,
+   kein `runBlocking`, ~2 Zeilen. Räumt die Keys über die Zeit organisch
+   weg, ohne Migrations-Klasse.
+3. `purgeRepository()` entfernt sie zusätzlich (greift aber nur bei Reset).
+
+**Empfehlung:** Variante 1 (belassen), solange die toten Keys nicht
+konkret stören. Variante 2 ist der günstigste echte Cleanup, falls
+gewünscht.
+
+---
+
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
 - Keine Test-Referenz — siehe `app/src/test/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.
