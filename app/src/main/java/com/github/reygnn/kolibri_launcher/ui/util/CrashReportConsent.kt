@@ -34,14 +34,18 @@ object CrashReportConsent {
      *
      * @param context Activity context, required to show a dialog.
      * @param onResult Callback delivering the consent result.
+     * @return the shown [AlertDialog], or `null` if no dialog was shown
+     *   (consent already asked, non-Activity context, or a show error).
+     *   Callers should track the returned dialog and dismiss it on
+     *   `onDestroyView`/`onDestroy` so a config change can't leak its window.
      */
-    suspend fun showConsentDialog(context: Context, onResult: (Boolean) -> Unit) {
+    suspend fun showConsentDialog(context: Context, onResult: (Boolean) -> Unit): AlertDialog? {
         if (CrashReportConsentStore.hasAsked(context)) {
             onResult(CrashReportConsentStore.hasConsent(context))
-            return
+            return null
         }
 
-        forceShowConsentDialog(context, onResult)
+        return forceShowConsentDialog(context, onResult)
     }
 
     /**
@@ -50,13 +54,17 @@ object CrashReportConsent {
      *
      * @param context Activity context.
      * @param onResult Callback delivering the new consent result.
+     * @return the shown [AlertDialog], or `null` if it could not be shown
+     *   (non-Activity context or a show error). The caller owns the
+     *   returned instance and must dismiss it on teardown to avoid a
+     *   leaked window on config change.
      */
-    suspend fun forceShowConsentDialog(context: Context, onResult: (Boolean) -> Unit) {
-        withContext(Dispatchers.Main) {
+    suspend fun forceShowConsentDialog(context: Context, onResult: (Boolean) -> Unit): AlertDialog? {
+        return withContext(Dispatchers.Main) {
             if (context !is android.app.Activity) {
                 Timber.e("Cannot show dialog: Context is not an Activity (is ${context::class.java.simpleName})")
                 onResult(false)
-                return@withContext
+                return@withContext null
             }
 
             try {
@@ -96,11 +104,13 @@ object CrashReportConsent {
                     movementMethod = LinkMovementMethod.getInstance()
                 }
 
+                dialog
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Error showing consent dialog")
                 onResult(false)
+                null
             }
         }
     }

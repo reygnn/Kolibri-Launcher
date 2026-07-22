@@ -96,8 +96,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     // 1. Deklaration für die Preference
     // Tracked so onDestroyView can dismiss the currently-open dialog
-    // (calendar-permission rationale / factory-reset) — otherwise a rotation
-    // with it open leaks its window.
+    // (calendar-permission rationale / factory-reset / forced crash-report
+    // consent) — otherwise a rotation with it open leaks its window.
     private var currentDialog: AlertDialog? = null
 
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
@@ -530,7 +530,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     val activityContext = activity ?: return@launch
 
                     try {
-                        CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
+                        // Track the forced-consent dialog like the other
+                        // dialogs here so onDestroyView dismisses it — otherwise
+                        // a rotation with it open leaks its window (it is
+                        // setCancelable(false), so it stays up). AUDIT-3 #12.
+                        currentDialog?.dismiss()
+                        currentDialog = CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
                             // Hier aktualisieren wir ACRA sofort nach der Entscheidung des Benutzers
                             ACRA.errorReporter.setEnabled(userGaveConsent)
                             Timber.i("User consent for crash reports manually changed to: $userGaveConsent")

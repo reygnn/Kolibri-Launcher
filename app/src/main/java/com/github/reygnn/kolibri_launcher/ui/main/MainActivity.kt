@@ -521,11 +521,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private suspend fun checkAndShowCrashReportConsent() {
-        CrashReportConsent.showConsentDialog(this) { userGaveConsent ->
+        val consentDialog = CrashReportConsent.showConsentDialog(this) { userGaveConsent ->
             lifecycleScope.launch(mainActivityExceptionHandler) {
                 ACRA.errorReporter.setEnabled(userGaveConsent)
                 Timber.i("User consent for crash reports is set to: $userGaveConsent")
             }
+        }
+        // Track so onDestroy dismisses it. The consent dialog is
+        // setCancelable(false), so a config change with it open would
+        // otherwise leak its window. null = already asked (no dialog shown),
+        // so don't clobber currentDialog in that case.
+        if (consentDialog != null) {
+            currentDialog?.dismiss()
+            currentDialog = consentDialog
         }
     }
 
