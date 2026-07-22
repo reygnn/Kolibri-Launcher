@@ -260,6 +260,21 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
+    fun `purgeRepository resets wallpaperSurfaceMode to default`() = runTest {
+        val repo = createRepository()
+        val nonDefault = WallpaperSurfaceMode.entries
+            .first { it != AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE }
+        repo.setWallpaperSurfaceMode(nonDefault)
+
+        repo.purgeRepository()
+
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE,
+            repo.wallpaperSurfaceModeFlow.first()
+        )
+    }
+
+    @Test
     fun `purgeRepository resets favoritesAlignment to default`() = runTest {
         val repo = createRepository()
         val nonDefault = FavoritesAlignment.entries

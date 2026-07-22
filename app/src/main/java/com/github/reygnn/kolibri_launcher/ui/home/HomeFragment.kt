@@ -1572,6 +1572,13 @@ class HomeFragment : Fragment() {
         binding.wallpaperView.onActiveLayerChanged = null
         binding.wallpaperView.onLayerTapped = null
 
+        // Detach the fragment-lifetime favoritesAdapter from the view being
+        // destroyed. Without this, the discarded RecyclerView's data observer
+        // stays registered on the long-lived adapter and leaks the RecyclerView
+        // (and its themed context) on every Home<->AppDrawer round trip — the
+        // same teardown every sibling RecyclerView host already does.
+        binding.favoritesRecyclerView.adapter = null
+
         // 4. Null out the wallpaper-edit controller — before _binding is gone,
         // so the controller's binding references are still valid if it does
         // any tear-down work of its own. Currently it only holds closures on

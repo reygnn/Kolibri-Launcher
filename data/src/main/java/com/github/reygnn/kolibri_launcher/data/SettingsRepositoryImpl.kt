@@ -334,6 +334,9 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
             preferences.remove(PreferenceKeys.SECURE_WINDOW)
             preferences.remove(PreferenceKeys.ROTATION_LOCKED)
+            // APP_DRAWER_MODE backs wallpaperSurfaceMode (legacy key name);
+            // it is a user-facing setting and must reset like the rest.
+            preferences.remove(PreferenceKeys.APP_DRAWER_MODE)
 
             // WICHTIG: Onboarding Status wird NICHT gelöscht
             // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)

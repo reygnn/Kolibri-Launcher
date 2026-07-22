@@ -70,13 +70,13 @@ Memory-Creep auf einem langlebigen Launcher-Prozess).
 
 | # | Severity | Datei | Kategorie | Kurz |
 |---|----------|-------|-----------|------|
-| 1 | 🟡 Medium | `data/.../SettingsRepositoryImpl.kt:318` | correctness | `purgeRepository()` vergisst `APP_DRAWER_MODE` → `wallpaperSurfaceMode` überlebt den Reset |
+| 1 ✅ | 🟡 Medium | `data/.../SettingsRepositoryImpl.kt:318` | correctness | `purgeRepository()` vergisst `APP_DRAWER_MODE` → `wallpaperSurfaceMode` überlebt den Reset — **gefixt** |
 | 2 ✅ | 🟡 Medium | `app/src/main/res/xml/data_extraction_rules.xml` + `backup_rules.xml` | backup-round-trip | Auto-Backup includiert nur `sharedpref` → gesamter DataStore (aller Nutzerzustand) wird nicht gesichert — **gefixt** |
-| 3 | 🟢 Low | `app/.../ui/home/HomeFragment.kt:1548` | resource-leak | `onDestroyView` nullt `favoritesRecyclerView.adapter` nicht → RecyclerView-Leak pro Home↔Drawer-Wechsel |
+| 3 ✅ | 🟢 Low | `app/.../ui/home/HomeFragment.kt:1548` | resource-leak | `onDestroyView` nullt `favoritesRecyclerView.adapter` nicht → RecyclerView-Leak pro Home↔Drawer-Wechsel — **gefixt** |
 
 ---
 
-## #1 — `purgeRepository()` setzt `wallpaperSurfaceMode` nicht zurück · 🟡 Medium
+## #1 — `purgeRepository()` setzt `wallpaperSurfaceMode` nicht zurück · 🟡 Medium · ✅ GEFIXT
 
 **Datei:** `data/src/main/java/com/github/reygnn/kolibri_launcher/data/SettingsRepositoryImpl.kt:318–341`
 **Kategorie:** correctness / reset-Pfad
@@ -118,10 +118,13 @@ AUTO behebbar. Aber ein Werksreset, der still ein persistentes Setting
 zurücklässt und dabei dem dokumentierten Contract widerspricht, ist ein
 Korrektheitsdefekt. **Medium.**
 
-**Fix-Richtung (nicht angewandt):** `preferences.remove(PreferenceKeys.APP_DRAWER_MODE)`
-in `purgeRepository()` ergänzen **und** einen purge-reset-Contract-Test
-für `wallpaperSurfaceMode` nachziehen (sonst fällt die nächste solche
-Auslassung wieder durch).
+**Auflösung (angewandt, Branch `fix/audit4-purge-and-leak`):**
+`preferences.remove(PreferenceKeys.APP_DRAWER_MODE)` in `purgeRepository()`
+ergänzt **und** die Test-Lücke geschlossen: neuer Contract-Test
+`purgeRepository resets wallpaperSurfaceMode to default` in
+`SettingsRepositoryContract`. Er lief gegen Fake **und** Impl grün — womit
+der Fix negativ-verifiziert ist (die Impl-Variante wäre vor dem Fix rot
+gewesen, Rule-2/3-Mechanismus greift jetzt).
 
 ---
 
@@ -177,7 +180,7 @@ erneut). Siehe Resolution-Notiz oben.
 
 ---
 
-## #3 — `HomeFragment.onDestroyView` nullt den RecyclerView-Adapter nicht · 🟢 Low
+## #3 — `HomeFragment.onDestroyView` nullt den RecyclerView-Adapter nicht · 🟢 Low · ✅ GEFIXT
 
 **Datei:** `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt:1548–1583`
 **Kategorie:** resource-leak
@@ -222,9 +225,12 @@ Host im Code nullt seinen Adapter im Teardown (`AppDrawerFragment`,
 Findings — eine echte, un-gefixte Auslassung, keine dokumentierte
 Ausnahme.
 
-**Fix-Richtung (nicht angewandt):** In `onDestroyView`
-`_binding?.favoritesRecyclerView?.adapter = null` ergänzen (analog zu
-allen Geschwister-Hosts), vor `_binding = null`.
+**Auflösung (angewandt, Branch `fix/audit4-purge-and-leak`):** In
+`onDestroyView` `binding.favoritesRecyclerView.adapter = null` ergänzt
+(vor dem `_binding = null`, `binding.`-Non-null-Form konsistent mit den
+umliegenden Wallpaper-Callback-Zeilen) — analog zu allen Geschwister-
+Hosts. Kein Test: reine View-Teardown-Mechanik ohne JVM-testbare Logik
+(Rule 10); Absicherung durch das etablierte Muster + Review.
 
 ---
 
