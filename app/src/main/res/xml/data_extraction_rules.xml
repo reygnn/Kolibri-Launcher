@@ -3,28 +3,30 @@
   Android 12+ cloud-backup / device-transfer rules (the active mechanism
   on minSdk 36).
 
-  An explicit <include> switches Auto Backup from "back up everything" to
-  an allowlist, so ONLY what is listed here travels to a new device.
+  Strategy: back up the WHOLE app DataStore directory, then exclude exactly
+  the one file that must NOT travel. This keeps the settings DataStore (and
+  any future DataStore we add) backed up by default — the opposite of the
+  over-narrow allowlist that caused AUDIT-4 #2 — while the sensitive file
+  is opted out explicitly.
 
-  We include exactly the settings DataStore file, which holds all user
-  configuration (favorites, hidden apps, custom names, swipe actions,
-  layout/color, wallpaper, ...). The path must stay in sync with
-  AppConstants.SETTINGS_DATASTORE_NAME ("kolibri_settings"); DataStore
-  Preferences stores it at files/datastore/<name>.preferences_pb.
+  Excluded:
+    - datastore/acra_consent.preferences_pb — ACRA consent must stay
+      privacy-by-default; a restored install re-asks (Rule 8). The filename
+      mirrors AppConstants.CONSENT_DATASTORE_NAME and is drift-guarded by
+      BackupRulesSsotTest (the XML can't reference the constant directly —
+      the backup framework parses this file statically).
 
-  Deliberately NOT included:
-    - datastore/acra_consent.preferences_pb — ACRA consent must not travel
-      (privacy-by-default; a restored install re-asks). See
-      AppConstants.CONSENT_DATASTORE_NAME.
-    - the "sharedpref" domain — the only SP file is the ephemeral ACRA
-      rate-limiter (acra_report_limiter); a fresh device should start with
-      no rate-limit history.
+  Not covered (allowlist off for it): the "sharedpref" domain — the only SP
+  file is the ephemeral ACRA rate-limiter (acra_report_limiter); a fresh
+  device should start with no rate-limit history.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="file" path="datastore/kolibri_settings.preferences_pb" />
+        <include domain="file" path="datastore/" />
+        <exclude domain="file" path="datastore/acra_consent.preferences_pb" />
     </cloud-backup>
     <device-transfer>
-        <include domain="file" path="datastore/kolibri_settings.preferences_pb" />
+        <include domain="file" path="datastore/" />
+        <exclude domain="file" path="datastore/acra_consent.preferences_pb" />
     </device-transfer>
 </data-extraction-rules>
