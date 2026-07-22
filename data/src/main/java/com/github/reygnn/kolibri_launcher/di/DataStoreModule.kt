@@ -30,6 +30,25 @@ internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDat
     name = AppConstants.SETTINGS_DATASTORE_NAME
 )
 
+/**
+ * Separate DataStore<Preferences> holding ONLY the ACRA crash-report
+ * consent state ([com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore]).
+ *
+ * Deliberately a second file rather than a key in [settingsDataStore]:
+ * Android Auto Backup includes the settings DataStore (so user config
+ * travels to a new device) but must NOT carry the consent flag — a
+ * restored install starts privacy-by-default and re-asks. Backup rules
+ * exclude at file granularity, so the consent needs its own file. There
+ * is intentionally NO migration from the old settings-store keys: a
+ * pre-existing install's consent simply resets once (privacy-safe) and
+ * the dialog re-appears. Same `internal` visibility and bootstrap
+ * rationale as [settingsDataStore] (read from
+ * `KolibriLauncherApp.attachBaseContext` before Hilt).
+ */
+internal val Context.consentDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = AppConstants.CONSENT_DATASTORE_NAME
+)
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DataStoreModule {

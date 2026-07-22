@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy full-backup rules (fullBackupContent, only used on Android <= 11;
+  inert on this app's minSdk 36 but kept for completeness). Mirrors
+  data_extraction_rules.xml: include exactly the settings DataStore file,
+  exclude the ACRA consent store and the ephemeral SP rate-limiter.
+
+  Path must stay in sync with AppConstants.SETTINGS_DATASTORE_NAME.
+-->
 <full-backup-content>
-    <include domain="sharedpref" path="." />
-    <exclude domain="sharedpref" path="temp_prefs.xml" />
+    <include domain="file" path="datastore/kolibri_settings.preferences_pb" />
 </full-backup-content>

@@ -92,6 +92,20 @@ object AppConstants {
 
     const val SETTINGS_DATASTORE_NAME = "kolibri_settings"
 
+    /**
+     * Separate DataStore file for ACRA crash-report consent state.
+     *
+     * Kept apart from [SETTINGS_DATASTORE_NAME] on purpose: the settings
+     * DataStore is included in Android Auto Backup / device-transfer (so
+     * user config travels to a new device), but the crash-report consent
+     * must NOT travel — a restored install starts privacy-by-default and
+     * re-asks. Auto-backup rules operate at file granularity, so the
+     * consent needs its own file to be excludable. See
+     * `res/xml/data_extraction_rules.xml` + `res/xml/backup_rules.xml`,
+     * which include only the settings DataStore file by name.
+     */
+    const val CONSENT_DATASTORE_NAME = "acra_consent"
+
     // App Usage Tracking Constants
     /**
      * Zerfallskonstante für zeitgewichtete Nutzungsstatistik.
