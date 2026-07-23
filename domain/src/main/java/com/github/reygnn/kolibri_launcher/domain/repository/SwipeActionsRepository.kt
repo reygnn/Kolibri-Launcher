@@ -29,4 +29,15 @@ interface SwipeActionsRepository : Purgeable {
      * oder `null`, um die Zuweisung für diesen Slot zu löschen.
      */
     suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?)
+
+    /**
+     * Removes any slot assignment whose componentName is not in
+     * [installedComponentNames] (app uninstalled). Called after every
+     * successful app load from
+     * [com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase],
+     * analogous to [FavoritesRepository.cleanupFavoriteComponents]. The
+     * empty-installed guard lives at the caller (guard on an empty app list),
+     * so a cold start does not wipe assignments.
+     */
+    suspend fun cleanupSwipeActions(installedComponentNames: List<String>)
 }

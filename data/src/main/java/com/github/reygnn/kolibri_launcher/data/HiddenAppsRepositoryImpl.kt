@@ -209,6 +209,28 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun cleanupHiddenComponents(installedComponentNames: List<String>) {
+        try {
+            dataStore.edit { preferences ->
+                val currentHidden = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
+                if (currentHidden.isEmpty()) return@edit
+
+                val installedSet = installedComponentNames.toSet()
+                val cleaned = currentHidden.intersect(installedSet)
+
+                if (cleaned.size < currentHidden.size) {
+                    // Log only the count, never componentNames (PII).
+                    Timber.w("Removed ${currentHidden.size - cleaned.size} orphaned hidden components")
+                    preferences[PreferencesKeys.HIDDEN_COMPONENTS] = cleaned
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {  // Throwable statt Exception
+            TimberWrapper.silentError(e, "Failed to cleanup hidden components, keeping current state")
+        }
+    }
+
     override suspend fun purgeRepository() {
         dataStore.safePurge("HiddenAppsRepositoryImpl") { preferences ->
             preferences[PreferencesKeys.HIDDEN_COMPONENTS] = emptySet()

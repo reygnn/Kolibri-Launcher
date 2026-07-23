@@ -173,16 +173,16 @@ class HandleSwipeActionUseCaseTest {
     // =========================================================================
     // The launch path NEVER mutates the assignment (TODO §24).
     //
-    // Uninstall cleanup is event-driven via ClearSwipeActionsForPackageUseCase
-    // (invoked from PackageUpdateReceiver), NOT inferred here from list
-    // absence. These tests pin that this use case only launches-or-no-ops,
-    // whether the app is genuinely uninstalled or the list simply is not
-    // loaded yet (cold-start window). This is the behaviour that closes the
-    // AUDIT-5 cold-start data-loss for good.
+    // Uninstall cleanup is done by the load-time orphan sweep in
+    // ObserveInstalledAppsUseCase, NOT inferred here from list absence. These
+    // tests pin that this use case only launches-or-no-ops, whether the app is
+    // genuinely uninstalled or the list simply is not loaded yet (cold-start
+    // window). This is the behaviour that closes the AUDIT-5 cold-start
+    // data-loss for good.
     // =========================================================================
 
     @Test
-    fun `invoke does NOT clear swipe action on genuine uninstall (cleanup is event-driven)`() = runTest {
+    fun `invoke does NOT clear swipe action on genuine uninstall (cleanup runs on app load)`() = runTest {
         // Arrange: loaded, non-empty list without the assigned app.
         installedAppsStateRepository.updateApps(listOf(testApp2))
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"

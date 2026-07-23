@@ -33,6 +33,12 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
         }
     }
 
+    override suspend fun cleanupSwipeActions(installedComponentNames: List<String>) {
+        val installedSet = installedComponentNames.toSet()
+        swipeLeftApp?.let { if (it !in installedSet) swipeLeftApp = null }
+        swipeRightApp?.let { if (it !in installedSet) swipeRightApp = null }
+    }
+
     override suspend fun purgeRepository() {
         swipeLeftApp = null
         swipeRightApp = null

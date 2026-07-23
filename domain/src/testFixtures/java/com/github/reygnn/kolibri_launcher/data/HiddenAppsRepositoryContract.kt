@@ -277,6 +277,49 @@ abstract class HiddenAppsRepositoryContract {
         assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
     }
 
+    // ---------- cleanupHiddenComponents ----------
+
+    @Test
+    fun `cleanupHiddenComponents keeps only components in installed list`() = runTest {
+        val repo = createRepository()
+        repo.hideComponent(compA)
+        repo.hideComponent(compB)
+        repo.hideComponent(compC)
+
+        repo.cleanupHiddenComponents(listOf(compA, compC))
+
+        assertEquals(setOf(compA, compC), repo.hiddenAppsFlow.first())
+    }
+
+    @Test
+    fun `cleanupHiddenComponents with all installed changes nothing`() = runTest {
+        val repo = createRepository()
+        repo.hideComponent(compA)
+        repo.hideComponent(compB)
+
+        repo.cleanupHiddenComponents(listOf(compA, compB, compC))
+
+        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
+    }
+
+    @Test
+    fun `cleanupHiddenComponents with empty installed list clears hidden set`() = runTest {
+        val repo = createRepository()
+        repo.hideComponent(compA)
+        repo.hideComponent(compB)
+
+        repo.cleanupHiddenComponents(emptyList())
+
+        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+    }
+
+    @Test
+    fun `cleanupHiddenComponents on empty repository stays empty`() = runTest {
+        val repo = createRepository()
+        repo.cleanupHiddenComponents(listOf(compA, compB))
+        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+    }
+
     // ---------- purgeRepository ----------
 
     @Test

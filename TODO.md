@@ -2014,25 +2014,45 @@ gewünscht.
 
 ## 24. (erledigt 2026-07-23) Swipe-App-Cleanup lebt im Lese-/Launch-Pfad statt event-getrieben
 
-**Umgesetzt 2026-07-23** auf Branch `refactor/swipe-cleanup-event-driven`.
-Der Cleanup ist raus aus dem Lese-/Launch-Pfad:
+**Umgesetzt 2026-07-23** auf Branch `refactor/swipe-cleanup-event-driven`,
+in zwei Stufen. Endstand: **Load-Time-Orphan-Sweep** — der Cleanup läuft
+nach jedem erfolgreichen App-Load, gebündelt mit dem bereits existierenden
+Favoriten-Cleanup in `ObserveInstalledAppsUseCase`.
 
-- Neuer `ClearSwipeActionsForPackageUseCase` (`:domain/usecase/`) — cleart
-  je Slot, dessen `substringBefore('/')` dem entfernten Paket entspricht
-  (exakte Gleichheit, kein Prefix-False-Positive). 8 JVM-Tests.
-- `PackageUpdateReceiver` ruft ihn bei `ACTION_PACKAGE_REMOVED` **und
-  `!EXTRA_REPLACING`** via Hilt-EntryPoint auf — der Replacing-Guard
-  verhindert, dass ein App-*Update* (REMOVED→ADDED) die Zuweisung löscht
-  (das wäre ein neuer Datenverlust gewesen).
-- `HandleSwipeActionUseCase` ist jetzt reines launch-or-no-op, mutiert nie
-  mehr persistenten State. Damit entfiel auch das `hasLoadedApps()`-Gate.
-- `hasLoadedApps()` war danach tote API (nur der Swipe-Use-Case nutzte es)
-  → aus Interface + Impl + Fake + 4 Contract-Tests entfernt.
+- `HandleSwipeActionUseCase` ist reines launch-or-no-op, mutiert nie mehr
+  persistenten State. Das alte `else`-Clear ist weg, ebenso das
+  `hasLoadedApps()`-Gate (danach tote API → aus Interface + Impl + Fake +
+  4 Contract-Tests entfernt).
+- Neue `cleanupX(installed…)`-Methoden auf `SwipeActionsRepository`,
+  `HiddenAppsRepository`, `CustomNamesRepository` (Interface + Impl + Fake +
+  je 4 Contract-Tests), exakt nach der `FavoritesRepository.cleanupFavorite\
+  Components`-Blaupause. Custom-Names werden gegen **Paketnamen** abgeglichen
+  (paket-basiert), die anderen gegen componentNames. Logs enthalten nur
+  Counts/Slot, nie componentName/Paket (PII, s. Review #2).
+- `ObserveInstalledAppsUseCase` ruft die drei neuen Cleanups neben dem
+  Favoriten-Cleanup auf, **hinter** dem `realApps.isEmpty()`-Cold-Start-Guard
+  (leerer Load → kein Sweep). Jeder Store eigenständig `try/catch`-guarded.
 
-Die Ratelogik „uninstalled vs. not loaded" ist damit ganz weg — der
-Receiver clears präzise auf das echte Uninstall-Event. §25 bleibt offen
-(siehe unten): das Fenster ist geschrumpft, aber ein Swipe kann den
-Receiver immer noch schlagen.
+**Warum Load-Time statt event-getrieben (die entscheidende Einsicht):** Ein
+Uninstall-bei-lebendem-Prozess triggert über `AppUpdateSignal → refreshApps
+→ reload` genau diesen Load-Pfad, ein Uninstall-bei-totem-Prozess wird beim
+nächsten Start abgedeckt. Der Sweep deckt also **beide** Fälle ab und ist
+strikt allgemeiner als der zuerst gebaute event-getriebene Ansatz. Er
+braucht **kein `EXTRA_REPLACING`-Gate** (bei einem Update ist die App
+installiert → nicht verwaist → nicht gelöscht). Damit ist auch Review-#3
+(untestbares Gate) gegenstandslos.
+
+**Verworfene Zwischenstufe:** Ein event-getriebener
+`ClearSwipeActionsForPackageUseCase`, den der `PackageUpdateReceiver` bei
+`ACTION_PACKAGE_REMOVED && !EXTRA_REPLACING` aufrief. Deckte den
+Prozess-tot-Uninstall (#1) nicht ab und war swipe-spezifisch (#4). Vom
+Load-Time-Sweep vollständig subsumiert und wieder entfernt (Receiver +
+EntryPoint zurück auf `main`-Stand).
+
+Damit erledigt: **#1** (Prozess-tot-Uninstall wird beim nächsten Load
+gereinigt), **#4** (generalisiert über Swipe/Hidden/CustomNames; Favoriten
+hatten es schon), **#3** (Gate existiert nicht mehr). §25 siehe unten —
+weitgehend entschärft.
 
 **Historischer Kontext (Aufdeckung).**
 **Aufgedeckt 2026-07-23** im Review der AUDIT-5-Swipe-Härtung
@@ -2106,11 +2126,16 @@ unabhängig von §24 lösbar:
 `ActivityNotFound` graceful abgefangen wird — dann ist §25 evtl. schon
 teilweise gedeckt.
 
-**Update 2026-07-23:** §24 ist erledigt (event-getriebener Cleanup). Das
-hat §25s Fenster geschrumpft — sobald der `PackageUpdateReceiver` die
-Entfernung verarbeitet hat, ist die Swipe-Zuweisung `null` und es gibt
-gar keinen Launch-Versuch mehr. §25 bleibt nur noch für die Race zwischen
-Uninstall und Receiver-Verarbeitung (Swipe schlägt den Receiver) offen.
+**Update 2026-07-23:** §24 ist erledigt (Load-Time-Orphan-Sweep, siehe
+oben). Das hat §25s Fenster stark geschrumpft: der Sweep läuft nach jedem
+Load — inklusive des Reloads, den der Uninstall-Broadcast selbst auslöst —
+und cleart die Swipe-Zuweisung, bevor der Nutzer erneut swipen kann. Der
+tote-componentName-Launch bleibt nur noch für die enge Race möglich, in
+der der Swipe zwischen Uninstall und Sweep-Abschluss fällt UND der
+`getCurrentApps()`-Cache die App noch listet. Kein Datenverlust, sehr
+enges Fenster. Die saubere Restlösung wäre weiterhin, den
+`ActivityNotFoundException` an der Start-Stelle abzufangen (Sketch 1) —
+das ist unabhängig vom Sweep und die einzige vollständige Absicherung.
 
 ---
 

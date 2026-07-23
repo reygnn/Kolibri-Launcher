@@ -268,6 +268,34 @@ class CustomNamesRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun cleanupCustomNames(installedPackageNames: List<String>) {
+        try {
+            val installedSet = installedPackageNames.toSet()
+            dataStore.edit { preferences ->
+                // Custom names are keyed "name_<packageName>". Remove entries
+                // whose package is no longer installed. Snapshot the orphan keys
+                // first, then remove — no concurrent modification of asMap().
+                val orphanKeys = preferences.asMap().keys.filter { key ->
+                    key.name.startsWith(AppConstants.KEY_NAME_PREFIX) &&
+                        key.name.removePrefix(AppConstants.KEY_NAME_PREFIX) !in installedSet
+                }
+                if (orphanKeys.isNotEmpty()) {
+                    // Log only the count, never package names (PII).
+                    Timber.w("Removed ${orphanKeys.size} orphaned custom names")
+                    orphanKeys.forEach { preferences.remove(it) }
+                }
+            }
+            // Intentionally NO triggerCustomNameUpdate(): this runs inside the
+            // app-load pipeline; emitting an update here would re-trigger a
+            // reload and loop. The removed names are for uninstalled packages,
+            // so no currently-visible app name is affected.
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to cleanup custom names, keeping current state")
+        }
+    }
+
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->

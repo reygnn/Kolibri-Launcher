@@ -49,11 +49,11 @@ class HandleSwipeActionUseCase @Inject constructor(
             // getCurrentApps() can return a stale last-known-good cache and the
             // cold-start window can precede the first load, so "absent" is an
             // unreliable uninstall signal on the launch path (it caused the
-            // AUDIT-5 data-loss). Uninstall cleanup is handled event-driven by
-            // [ClearSwipeActionsForPackageUseCase], invoked from the
-            // package-removed broadcast (see PackageUpdateReceiver, TODO §24).
+            // AUDIT-5 data-loss). Orphan cleanup runs on the load path instead
+            // (ObserveInstalledAppsUseCase reconciles swipe assignments against
+            // the freshly loaded list after every successful load, TODO §24).
             // Here we only launch-or-no-op and never mutate persisted state.
-            KolibriLog.w("App for swipe $slot not in current list: $componentName. No-op (cleanup is event-driven).")
+            KolibriLog.w("App for swipe $slot not in current list: $componentName. No-op (cleanup runs on app load).")
             Result.NoAction
         }
     }

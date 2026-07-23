@@ -3,9 +3,12 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -19,7 +22,10 @@ import javax.inject.Inject
 class ObserveInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val favoritesRepository: FavoritesRepository
+    private val favoritesRepository: FavoritesRepository,
+    private val swipeActionsRepository: SwipeActionsRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository,
+    private val customNamesRepository: CustomNamesRepository
 ) {
 
     /**
@@ -82,12 +88,34 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                             return@collect
                         }
 
-                        // Geschäftslogik: Favoriten aufräumen
+                        // Reconcile the component-bound stores against the
+                        // freshly loaded list. This also covers apps uninstalled
+                        // while the process was dead (whose PACKAGE_REMOVED
+                        // broadcast the receiver missed) — the sweep runs on the
+                        // next load. Each store is guarded independently so one
+                        // failure can't skip the others. The empty-input guard
+                        // lives above (realApps.isEmpty()).
                         val allValidComponentNames = realApps.map { it.componentName }
                         try {
                             favoritesRepository.cleanupFavoriteComponents(allValidComponentNames)
                         } catch (cleanupError: Throwable) {
                             TimberWrapper.silentError(cleanupError, "Error cleaning up favorites")
+                        }
+                        try {
+                            swipeActionsRepository.cleanupSwipeActions(allValidComponentNames)
+                        } catch (cleanupError: Throwable) {
+                            TimberWrapper.silentError(cleanupError, "Error cleaning up swipe actions")
+                        }
+                        try {
+                            hiddenAppsRepository.cleanupHiddenComponents(allValidComponentNames)
+                        } catch (cleanupError: Throwable) {
+                            TimberWrapper.silentError(cleanupError, "Error cleaning up hidden components")
+                        }
+                        try {
+                            val allValidPackageNames = realApps.map { it.packageName }
+                            customNamesRepository.cleanupCustomNames(allValidPackageNames)
+                        } catch (cleanupError: Throwable) {
+                            TimberWrapper.silentError(cleanupError, "Error cleaning up custom names")
                         }
 
                         // Wichtig: Den zentralen State aktualisieren

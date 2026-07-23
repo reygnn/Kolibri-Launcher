@@ -18,10 +18,6 @@ class PackageUpdateReceiver : BroadcastReceiver() {
 
     companion object {
         private const val SIGNAL_TIMEOUT_MS = 3000L
-
-        // Sentinel for a package broadcast that arrived without a data URI —
-        // we can send the reload signal but must not act on the package name.
-        private const val UNKNOWN_PACKAGE = "unknown"
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -60,7 +56,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
     fun handleReceive(context: Context, intent: Intent, onFinish: () -> Unit) {
         try {
             val action = intent.action
-            val packageName = intent.data?.schemeSpecificPart ?: UNKNOWN_PACKAGE
+            val packageName = intent.data?.schemeSpecificPart ?: "unknown"
 
             // Log a stable hash of the package name rather than the raw value.
             // Raw package names are PII (e.g. "com.gambling.bigwin") and
@@ -85,21 +81,12 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             // Relevante Action erkannt
             Timber.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
 
-            // A genuine uninstall (not an app update). During an update the
-            // system fires ACTION_PACKAGE_REMOVED with EXTRA_REPLACING=true
-            // followed by ACTION_PACKAGE_ADDED for the same package — treating
-            // that as an uninstall would wipe the user's swipe assignment on
-            // every update. Only a non-replacing removal triggers reconcile.
-            // Short-circuit keeps getBooleanExtra off the ADDED path.
-            val isUninstall = action == Intent.ACTION_PACKAGE_REMOVED &&
-                !intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
-
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
             scope.launch {
                 try {
                     withTimeout(SIGNAL_TIMEOUT_MS) {
-                        processPackageUpdate(context, packageName, isUninstall, onFinish)
+                        processPackageUpdate(context, onFinish)
                     }
                 } catch (e: CancellationException) {
                     Timber.d("[KOLIBRI] Coroutine was cancelled")
@@ -116,12 +103,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun processPackageUpdate(
-        context: Context,
-        packageName: String,
-        isUninstall: Boolean,
-        onFinish: () -> Unit
-    ) {
+    private suspend fun processPackageUpdate(context: Context, onFinish: () -> Unit) {
         try {
             val appContext = context.applicationContext ?: context
 
@@ -148,20 +130,6 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "[KOLIBRI] Failed to send update signal")
-            }
-
-            // On a genuine uninstall, clear any swipe assignment that pointed
-            // at the removed package (TODO §24 — cleanup is event-driven, no
-            // longer inferred on the swipe-launch path). Independent of the
-            // reload signal above: a failure here must not skip that.
-            if (isUninstall && packageName != UNKNOWN_PACKAGE) {
-                try {
-                    hiltEntryPoint.getClearSwipeActionsForPackageUseCase().invoke(packageName)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "[KOLIBRI] Failed to reconcile swipe actions for removed package")
-                }
             }
 
         } catch (e: CancellationException) {

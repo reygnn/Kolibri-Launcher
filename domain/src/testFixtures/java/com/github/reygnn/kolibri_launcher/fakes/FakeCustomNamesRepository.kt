@@ -81,6 +81,13 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         return true
     }
 
+    override suspend fun cleanupCustomNames(installedPackageNames: List<String>) {
+        val installedSet = installedPackageNames.toSet()
+        // Custom names are keyed by package; drop entries for uninstalled
+        // packages. No trigger — mirrors the impl's load-time no-trigger path.
+        customNames.keys.retainAll { it in installedSet }
+    }
+
     override suspend fun purgeRepository() {
         customNames.clear()
         onUpdateTrigger = null

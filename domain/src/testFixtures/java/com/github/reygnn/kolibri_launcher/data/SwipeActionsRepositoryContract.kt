@@ -207,6 +207,52 @@ abstract class SwipeActionsRepositoryContract {
 
     // ---------- purgeRepository ----------
 
+    // ---------- cleanupSwipeActions ----------
+
+    @Test
+    fun `cleanupSwipeActions clears a slot whose app is not installed`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
+
+        repo.cleanupSwipeActions(listOf(appB)) // appA uninstalled
+
+        assertNull(repo.swipeLeftAppFlow.first())
+        assertEquals(appB, repo.swipeRightAppFlow.first())
+    }
+
+    @Test
+    fun `cleanupSwipeActions keeps both slots when both installed`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
+
+        repo.cleanupSwipeActions(listOf(appA, appB))
+
+        assertEquals(appA, repo.swipeLeftAppFlow.first())
+        assertEquals(appB, repo.swipeRightAppFlow.first())
+    }
+
+    @Test
+    fun `cleanupSwipeActions with empty installed list clears both slots`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
+
+        repo.cleanupSwipeActions(emptyList())
+
+        assertNull(repo.swipeLeftAppFlow.first())
+        assertNull(repo.swipeRightAppFlow.first())
+    }
+
+    @Test
+    fun `cleanupSwipeActions on fresh repository is a no-op`() = runTest {
+        val repo = createRepository()
+        repo.cleanupSwipeActions(listOf(appA))
+        assertNull(repo.swipeLeftAppFlow.first())
+        assertNull(repo.swipeRightAppFlow.first())
+    }
+
     @Test
     fun `purgeRepository clears both slots`() = runTest {
         val repo = createRepository()

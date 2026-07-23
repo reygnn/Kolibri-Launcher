@@ -8,8 +8,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsReposit
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +34,9 @@ class ObserveInstalledAppsUseCaseTest {
     private lateinit var installedAppsRepository: FakeInstalledAppsRepository
     private lateinit var installedAppsStateRepository: FakeInstalledAppsStateRepository
     private lateinit var favoritesRepository: TestFakeFavoritesRepository
+    private lateinit var swipeActionsRepository: FakeSwipeActionsRepository
+    private lateinit var hiddenAppsRepository: FakeHiddenAppsRepository
+    private lateinit var customNamesRepository: FakeCustomNamesRepository
     private lateinit var useCase: ObserveInstalledAppsUseCase
 
     private val testApps = listOf(
@@ -44,10 +50,16 @@ class ObserveInstalledAppsUseCaseTest {
         installedAppsRepository = FakeInstalledAppsRepository()
         installedAppsStateRepository = FakeInstalledAppsStateRepository()
         favoritesRepository = TestFakeFavoritesRepository()
+        swipeActionsRepository = FakeSwipeActionsRepository()
+        hiddenAppsRepository = FakeHiddenAppsRepository()
+        customNamesRepository = FakeCustomNamesRepository()
         useCase = ObserveInstalledAppsUseCase(
             installedAppsRepository,
             installedAppsStateRepository,
-            favoritesRepository
+            favoritesRepository,
+            swipeActionsRepository,
+            hiddenAppsRepository,
+            customNamesRepository
         )
     }
 
@@ -140,6 +152,59 @@ class ObserveInstalledAppsUseCaseTest {
     }
 
     // =========================================================================
+    // Load-time reconciliation of swipe / hidden / custom names (TODO §24)
+    // =========================================================================
+
+    @Test
+    fun `invoke reconciles swipe hidden and custom names against loaded apps`() = runTest {
+        // Arrange: one valid assignment (present in testApps) + one orphan each.
+        val validComponent = testApps[0].componentName // com.app1/com.app1.Main
+        val orphanComponent = "com.gone/com.gone.Main"
+        val validPackage = testApps[0].packageName      // com.app1
+        val orphanPackage = "com.gone"
+
+        swipeActionsRepository.swipeLeftApp = orphanComponent
+        swipeActionsRepository.swipeRightApp = validComponent
+        hiddenAppsRepository.hiddenApps = setOf(validComponent, orphanComponent)
+        customNamesRepository.setCustomNameForPackage(validPackage, "Keep")
+        customNamesRepository.setCustomNameForPackage(orphanPackage, "Drop")
+
+        installedAppsRepository.installedApps = testApps
+
+        // Act
+        useCase().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Assert: orphans gone, valid entries kept.
+        assertThat(swipeActionsRepository.swipeLeftApp).isNull()
+        assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(validComponent)
+        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(validComponent)
+        assertThat(customNamesRepository.getAllCustomNames().keys).containsExactly(validPackage)
+    }
+
+    @Test
+    fun `invoke does not reconcile swipe hidden custom names when app list is empty`() = runTest {
+        // Cold-start guard: an empty load must NOT wipe assignments.
+        swipeActionsRepository.swipeLeftApp = "com.gone/com.gone.Main"
+        hiddenAppsRepository.hiddenApps = setOf("com.gone/com.gone.Main")
+        customNamesRepository.setCustomNameForPackage("com.gone", "Drop")
+
+        installedAppsRepository.installedApps = emptyList()
+
+        useCase().test {
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Untouched — the empty-list guard skips all cleanup.
+        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo("com.gone/com.gone.Main")
+        assertThat(hiddenAppsRepository.hiddenApps).containsExactly("com.gone/com.gone.Main")
+        assertThat(customNamesRepository.getAllCustomNames().keys).containsExactly("com.gone")
+    }
+
+    // =========================================================================
     // Fehler mit Cache
     // =========================================================================
 
@@ -155,7 +220,10 @@ class ObserveInstalledAppsUseCaseTest {
         val useCaseWithError = ObserveInstalledAppsUseCase(
             errorRepository,
             installedAppsStateRepository,
-            favoritesRepository
+            favoritesRepository,
+            swipeActionsRepository,
+            hiddenAppsRepository,
+            customNamesRepository
         )
 
         // Act & Assert
@@ -180,7 +248,10 @@ class ObserveInstalledAppsUseCaseTest {
         val useCaseWithError = ObserveInstalledAppsUseCase(
             errorRepository,
             installedAppsStateRepository,
-            favoritesRepository
+            favoritesRepository,
+            swipeActionsRepository,
+            hiddenAppsRepository,
+            customNamesRepository
         )
 
         // Act & Assert
@@ -214,6 +285,9 @@ class ObserveInstalledAppsUseCaseTest {
             errorRepository,
             installedAppsStateRepository,
             favoritesRepository,
+            swipeActionsRepository,
+            hiddenAppsRepository,
+            customNamesRepository,
         )
 
         val firstStart = testScheduler.currentTime

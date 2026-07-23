@@ -41,6 +41,11 @@ class FakeHiddenAppsRepository : HiddenAppsRepository {
         hiddenApps = (hiddenApps + componentsToHide) - componentsToShow
     }
 
+    override suspend fun cleanupHiddenComponents(installedComponentNames: List<String>) {
+        if (hiddenApps.isEmpty()) return
+        hiddenApps = hiddenApps.intersect(installedComponentNames.toSet())
+    }
+
     override suspend fun purgeRepository() {
         hiddenApps = emptySet()
     }

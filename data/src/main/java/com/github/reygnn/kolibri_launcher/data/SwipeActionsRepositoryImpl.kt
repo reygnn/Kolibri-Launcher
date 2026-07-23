@@ -166,6 +166,31 @@ open class SwipeActionsRepositoryImpl private constructor(
         }
     }
 
+    override suspend fun cleanupSwipeActions(installedComponentNames: List<String>) {
+        try {
+            val installedSet = installedComponentNames.toSet()
+            dataStore.edit { preferences ->
+                // Remove each slot whose target is no longer installed. Log only
+                // the slot, never the componentName (PII), and never crash — on
+                // failure the current state is kept.
+                val left = preferences[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT]
+                if (left != null && left !in installedSet) {
+                    preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
+                    Timber.w("Removed orphaned LEFT swipe action")
+                }
+                val right = preferences[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT]
+                if (right != null && right !in installedSet) {
+                    preferences.remove(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
+                    Timber.w("Removed orphaned RIGHT swipe action")
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to cleanup swipe actions, keeping current state")
+        }
+    }
+
     override suspend fun purgeRepository() {
         dataStore.safePurge("SwipeActionsRepositoryImpl") { preferences ->
             preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
