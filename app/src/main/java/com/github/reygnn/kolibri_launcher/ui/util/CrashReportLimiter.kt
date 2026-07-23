@@ -100,6 +100,12 @@ object CrashReportLimiter {
      */
     fun shouldSendReport(exception: Throwable): Boolean {
         return try {
+            // Reports already deduplicated upstream opt out of the cooldown
+            // entirely — no prefs read/write, always send. See [UnthrottledReport].
+            if (exception is UnthrottledReport) {
+                return true
+            }
+
             val preferences = prefs
             if (preferences == null) {
                 Timber.w("CrashReportLimiter not initialized - allowing report")
@@ -137,31 +143,24 @@ object CrashReportLimiter {
 
     /**
      * Generate a unique key for an exception type.
-     *
-     * Exceptions implementing [CustomReportKey] supply their own dedup
-     * identity (see that interface for why). Everything else is keyed by
-     * class name and the first relevant stack trace element.
+     * Uses exception class name and first relevant stack trace element.
      */
     private fun generateReportKey(exception: Throwable): String {
         return try {
-            if (exception is CustomReportKey) {
-                "report_${exception.reportKey}"
+            val className = exception::class.simpleName ?: "UnknownException"
+
+            // Find first stack trace element from app package
+            val relevantTrace = exception.stackTrace
+                .firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
+                ?: exception.stackTrace.firstOrNull()
+
+            val location = if (relevantTrace != null) {
+                "${relevantTrace.className}.${relevantTrace.methodName}:${relevantTrace.lineNumber}"
             } else {
-                val className = exception::class.simpleName ?: "UnknownException"
-
-                // Find first stack trace element from app package
-                val relevantTrace = exception.stackTrace
-                    .firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
-                    ?: exception.stackTrace.firstOrNull()
-
-                val location = if (relevantTrace != null) {
-                    "${relevantTrace.className}.${relevantTrace.methodName}:${relevantTrace.lineNumber}"
-                } else {
-                    "unknown_location"
-                }
-
-                "report_${className}_${location.hashCode()}"
+                "unknown_location"
             }
+
+            "report_${className}_${location.hashCode()}"
         } catch (e: Throwable) {
             // Fallback to simple key if anything fails
             "report_${exception::class.simpleName}_${exception.message?.hashCode() ?: 0}"
@@ -236,20 +235,17 @@ object CrashReportLimiter {
 }
 
 /**
- * Opt-in hook for exceptions that must supply their own dedup identity to
- * [CrashReportLimiter].
+ * Marker for exceptions whose reports are already deduplicated upstream and
+ * therefore opt out of [CrashReportLimiter]'s 24h per-type cooldown.
  *
- * The default key ([CrashReportLimiter.generateReportKey]) is
- * `class-simple-name + first app-package stack frame`. That is wrong for
- * *synthetic* exceptions that share one class and one construction site:
- * the post-mortem ANR carrier is always `AnrException` thrown from the same
- * line, so every genuinely-distinct hang would hash to the same key and
- * collapse under a single 24h cooldown bucket — only the first ANR since the
- * last launch would ever leave the device.
- *
- * Implementors return a stable per-signature key instead, so distinct events
- * each report while identical repeats still dedup within the cooldown window.
+ * The cooldown exists to throttle *live* exceptions that re-fire repeatedly
+ * within a session — keyed by class + throw-site. It is the wrong tool for a
+ * source that already guarantees at-most-once delivery: the post-mortem ANR
+ * carrier is forwarded via `AnrReporter`, whose persisted watermark hands each
+ * `ApplicationExitInfo` record to ACRA exactly once ever (and AEI keeps only a
+ * bounded number of records). Because every ANR shares one class and one
+ * throw-site, running them through the cooldown would collapse genuinely
+ * distinct hangs under a single key and drop all but the first — so they
+ * bypass it instead. No prefs entry is written for a bypassed report.
  */
-interface CustomReportKey {
-    val reportKey: String
-}
+interface UnthrottledReport

@@ -27,7 +27,7 @@ import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
-import com.github.reygnn.kolibri_launcher.ui.util.CustomReportKey
+import com.github.reygnn.kolibri_launcher.ui.util.UnthrottledReport
 import com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
@@ -448,10 +448,11 @@ class KolibriLauncherApp : Application() {
      * exchange for richer system thread dumps + zero background overhead +
      * no unmaintained dependency).
      *
-     * The ACRA dedup limiter from [CrashReportLimiter] still applies —
-     * if the *same* hang recurs, only the first within the 24h cooldown
-     * window leaves the device. Distinct hangs are keyed separately (see
-     * [AnrException] / [CustomReportKey]) so each one still reports.
+     * Dedup is handled entirely by [AnrReporter]'s watermark — each
+     * `ApplicationExitInfo` record is forwarded exactly once, ever. ANRs opt
+     * out of [CrashReportLimiter]'s per-type cooldown via [UnthrottledReport]
+     * (see [AnrException]), so distinct hangs each report and nothing is
+     * collapsed under a shared class+site key.
      *
      * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
      * Application is on the crash-handling-infrastructure exception list.
@@ -463,21 +464,16 @@ class KolibriLauncherApp : Application() {
                     val description = report.description.ifBlank { "ANR" }
                     val synthetic = AnrException(
                         message = "$description\n\n${report.threadDump.orEmpty()}",
-                        // Per-hang dedup identity. Every AnrException shares one
-                        // class and one throw-site, so the limiter's default
-                        // class+frame key would collapse ALL ANRs under one
-                        // bucket and drop every distinct hang after the first.
-                        // Keying on the thread dump (falling back to the
-                        // description) gives distinct hangs distinct keys — each
-                        // reports — while an identical repeat still dedups.
-                        reportKey = "anr_${(report.threadDump?.ifBlank { null } ?: description).hashCode()}",
                     )
                     // Single delivery path. `Timber.e` routes through AcraTree,
-                    // which is the ONLY place CrashReportLimiter is consulted
-                    // before handing the report to ACRA via handleSilentException.
-                    // An additional explicit `ACRA.errorReporter.handleException`
-                    // here would bypass the limiter and double-send the first ANR —
-                    // contradicting the dedup guarantee documented above. Rule 9:
+                    // which forwards to ACRA via handleSilentException. ANRs are
+                    // already deduplicated by AnrReporter's watermark (each AEI
+                    // record forwarded exactly once, ever), so AnrException opts
+                    // out of CrashReportLimiter's cooldown via UnthrottledReport
+                    // instead of being keyed by its (identical for every ANR)
+                    // class + throw-site, which would collapse distinct hangs. An
+                    // additional explicit `ACRA.errorReporter.handleException`
+                    // here would double-send the report — don't add one. Rule 9:
                     // plain Timber.e (crash-handling-infrastructure exception).
                     Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
                 }
@@ -493,16 +489,12 @@ class KolibriLauncherApp : Application() {
      * `reportPendingAnrsAsync` — not the ANR site, which lives in the
      * `message` (system-supplied multi-thread dump).
      *
-     * Because that stack trace and the class name are identical for every
-     * ANR, it supplies its own [CustomReportKey] so [CrashReportLimiter]
-     * deduplicates by hang signature (see [reportKey]) rather than
-     * collapsing all ANRs — real and distinct alike — into one cooldown
-     * bucket.
+     * Implements [UnthrottledReport]: ANRs are already deduplicated by
+     * [AnrReporter]'s watermark, so they opt out of [CrashReportLimiter]'s
+     * per-type cooldown instead of being keyed by their (identical for every
+     * ANR) class + throw-site, which would collapse distinct hangs.
      */
-    private class AnrException(
-        message: String,
-        override val reportKey: String,
-    ) : RuntimeException(message), CustomReportKey
+    private class AnrException(message: String) : RuntimeException(message), UnthrottledReport
 
     /**
      * Self-defense companion to [AnrReporter]: starts the
