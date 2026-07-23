@@ -26,14 +26,22 @@ class ClearSwipeActionsForPackageUseCase @Inject constructor(
     suspend operator fun invoke(packageName: String) {
         if (packageName.isBlank()) return
 
-        if (belongsToPackage(swipeActionsRepository.swipeLeftAppFlow.first(), packageName)) {
-            KolibriLog.w("Clearing LEFT swipe action: package '$packageName' was removed.")
-            swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
-        }
+        // Log a stable hash, never the raw package name — raw package names are
+        // PII (e.g. "com.gambling.bigwin") and must not reach logcat, not even
+        // at WARN. Same rationale and formula as PackageUpdateReceiver, so the
+        // two log lines stay correlatable for one uninstall.
+        val packageHash = packageName.hashCode().toString(16)
 
-        if (belongsToPackage(swipeActionsRepository.swipeRightAppFlow.first(), packageName)) {
-            KolibriLog.w("Clearing RIGHT swipe action: package '$packageName' was removed.")
-            swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
+        val slots = listOf(
+            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT to swipeActionsRepository.swipeLeftAppFlow,
+            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT to swipeActionsRepository.swipeRightAppFlow
+        )
+
+        for ((slot, flow) in slots) {
+            if (belongsToPackage(flow.first(), packageName)) {
+                KolibriLog.w("Clearing $slot swipe action: package (hash $packageHash) was removed.")
+                swipeActionsRepository.setSwipeAction(slot, null)
+            }
         }
     }
 
