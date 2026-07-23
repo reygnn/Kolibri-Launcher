@@ -17,9 +17,9 @@ import org.junit.Test
  *
  * Siehe [FavoritesRepositoryContract] für Hintergrund und Konventionen.
  *
- * Das [InstalledAppsStateRepository]-Interface sieht trivial aus (drei Methoden,
- * ein StateFlow), aber es hat ein wichtiges Pattern, das **vertraglich
- * festgehalten werden muss**:
+ * The [InstalledAppsStateRepository] interface looks trivial (a handful of
+ * methods, one StateFlow), but it carries one important pattern that **must
+ * be pinned down by contract**:
  *
  * **LAST KNOWN GOOD CACHING:**
  *   `getCurrentApps()` muss bei leerem aktuellen State auf die letzte

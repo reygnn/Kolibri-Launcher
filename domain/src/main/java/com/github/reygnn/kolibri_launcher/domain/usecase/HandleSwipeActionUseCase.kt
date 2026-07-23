@@ -36,6 +36,23 @@ class HandleSwipeActionUseCase @Inject constructor(
             return Result.NoAction
         }
 
+        // Gate on "apps loaded" BEFORE reading the list, so the decision never
+        // straddles two independent reads of repository state. If we looked the
+        // app up first and only then consulted a separate loaded-signal, a
+        // concurrent app-load landing in between could flip us from "not found
+        // in an empty list" to "loaded" and wrongly clear a valid assignment.
+        // Checking loaded first closes that gap: once it is true the
+        // last-known-good cache is non-empty, so getCurrentApps() cannot be
+        // empty and a subsequent miss genuinely means the app is gone.
+        if (!installedAppsStateRepository.hasLoadedApps()) {
+            // Cold-start window before the first successful load. We cannot tell
+            // "uninstalled" from "not loaded here", so we must NOT clear the
+            // assignment — doing so would silently wipe a valid swipe app just
+            // because the user swiped before apps finished loading.
+            KolibriLog.w("App for swipe $slot not resolved yet (apps not loaded): $componentName. Keeping setting.")
+            return Result.NoAction
+        }
+
         val appToLaunch = installedAppsStateRepository.getCurrentApps().find {
             it.componentName == componentName
         }
@@ -44,14 +61,6 @@ class HandleSwipeActionUseCase @Inject constructor(
             recordAppLaunchUseCase(appToLaunch)
             refreshAppsUseCase()
             Result.LaunchApp(appToLaunch)
-        } else if (!installedAppsStateRepository.hasLoadedApps()) {
-            // The app list is not loaded yet (cold-start window before the
-            // first successful load). We cannot tell "uninstalled" from "not
-            // loaded here", so we must NOT clear the assignment — doing so
-            // would silently wipe a valid swipe app just because the user
-            // swiped before apps finished loading. Keep the setting and no-op.
-            KolibriLog.w("App for swipe $slot not resolved yet (apps not loaded): $componentName. Keeping setting.")
-            Result.NoAction
         } else {
             // The app list is loaded but does not contain the assignment, so
             // the app is genuinely gone (uninstalled). Clear the stale setting.
