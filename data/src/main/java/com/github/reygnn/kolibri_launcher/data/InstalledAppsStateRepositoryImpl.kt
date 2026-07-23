@@ -84,6 +84,14 @@ class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStat
         }
     }
 
+    override fun hasLoadedApps(): Boolean {
+        // "Loaded" == a non-empty list is available now or was cached from a
+        // prior successful load. Equivalent to getCurrentApps().isNotEmpty(),
+        // but exposed as an explicit signal so callers don't couple to the
+        // ifEmpty-fallback semantics above.
+        return _rawAppsFlow.value.isNotEmpty() || lastSuccessfulAppList.isNotEmpty()
+    }
+
     override suspend fun purgeRepository() {
         // NICHTS TUN!
         // Der StateManager hält nur den aktuellen State der installierten Apps.

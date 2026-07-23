@@ -26,6 +26,9 @@ class FakeInstalledAppsStateRepository : InstalledAppsStateRepository, Purgeable
         }
     }
 
+    override fun hasLoadedApps(): Boolean =
+        stateFlow.value.isNotEmpty() || lastSuccessfulAppList.isNotEmpty()
+
     override suspend fun purgeRepository() {
         stateFlow.value = emptyList(); lastSuccessfulAppList = emptyList()
     }

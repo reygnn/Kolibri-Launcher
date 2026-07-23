@@ -137,24 +137,31 @@ object CrashReportLimiter {
 
     /**
      * Generate a unique key for an exception type.
-     * Uses exception class name and first relevant stack trace element.
+     *
+     * Exceptions implementing [CustomReportKey] supply their own dedup
+     * identity (see that interface for why). Everything else is keyed by
+     * class name and the first relevant stack trace element.
      */
     private fun generateReportKey(exception: Throwable): String {
         return try {
-            val className = exception::class.simpleName ?: "UnknownException"
-
-            // Find first stack trace element from app package
-            val relevantTrace = exception.stackTrace
-                .firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
-                ?: exception.stackTrace.firstOrNull()
-
-            val location = if (relevantTrace != null) {
-                "${relevantTrace.className}.${relevantTrace.methodName}:${relevantTrace.lineNumber}"
+            if (exception is CustomReportKey) {
+                "report_${exception.reportKey}"
             } else {
-                "unknown_location"
-            }
+                val className = exception::class.simpleName ?: "UnknownException"
 
-            "report_${className}_${location.hashCode()}"
+                // Find first stack trace element from app package
+                val relevantTrace = exception.stackTrace
+                    .firstOrNull { it.className.contains("com.github.reygnn.kolibri_launcher") }
+                    ?: exception.stackTrace.firstOrNull()
+
+                val location = if (relevantTrace != null) {
+                    "${relevantTrace.className}.${relevantTrace.methodName}:${relevantTrace.lineNumber}"
+                } else {
+                    "unknown_location"
+                }
+
+                "report_${className}_${location.hashCode()}"
+            }
         } catch (e: Throwable) {
             // Fallback to simple key if anything fails
             "report_${exception::class.simpleName}_${exception.message?.hashCode() ?: 0}"
@@ -226,4 +233,23 @@ object CrashReportLimiter {
         }
     }
 
+}
+
+/**
+ * Opt-in hook for exceptions that must supply their own dedup identity to
+ * [CrashReportLimiter].
+ *
+ * The default key ([CrashReportLimiter.generateReportKey]) is
+ * `class-simple-name + first app-package stack frame`. That is wrong for
+ * *synthetic* exceptions that share one class and one construction site:
+ * the post-mortem ANR carrier is always `AnrException` thrown from the same
+ * line, so every genuinely-distinct hang would hash to the same key and
+ * collapse under a single 24h cooldown bucket — only the first ANR since the
+ * last launch would ever leave the device.
+ *
+ * Implementors return a stable per-signature key instead, so distinct events
+ * each report while identical repeats still dedup within the cooldown window.
+ */
+interface CustomReportKey {
+    val reportKey: String
 }

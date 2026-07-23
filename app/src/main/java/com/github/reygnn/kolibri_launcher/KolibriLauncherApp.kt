@@ -27,6 +27,7 @@ import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
+import com.github.reygnn.kolibri_launcher.ui.util.CustomReportKey
 import com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
@@ -448,8 +449,9 @@ class KolibriLauncherApp : Application() {
      * no unmaintained dependency).
      *
      * The ACRA dedup limiter from [CrashReportLimiter] still applies —
-     * if a recurring ANR floods the same exception type, only the first
-     * within the 24h cooldown window actually leaves the device.
+     * if the *same* hang recurs, only the first within the 24h cooldown
+     * window leaves the device. Distinct hangs are keyed separately (see
+     * [AnrException] / [CustomReportKey]) so each one still reports.
      *
      * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
      * Application is on the crash-handling-infrastructure exception list.
@@ -461,13 +463,20 @@ class KolibriLauncherApp : Application() {
                     val description = report.description.ifBlank { "ANR" }
                     val synthetic = AnrException(
                         message = "$description\n\n${report.threadDump.orEmpty()}",
+                        // Per-hang dedup identity. Every AnrException shares one
+                        // class and one throw-site, so the limiter's default
+                        // class+frame key would collapse ALL ANRs under one
+                        // bucket and drop every distinct hang after the first.
+                        // Keying on the thread dump (falling back to the
+                        // description) gives distinct hangs distinct keys — each
+                        // reports — while an identical repeat still dedups.
+                        reportKey = "anr_${(report.threadDump?.ifBlank { null } ?: description).hashCode()}",
                     )
                     // Single delivery path. `Timber.e` routes through AcraTree,
                     // which is the ONLY place CrashReportLimiter is consulted
-                    // (per-type 24h cooldown) before handing the report to
-                    // ACRA via handleSilentException. An additional explicit
-                    // `ACRA.errorReporter.handleException(synthetic)` here would
-                    // bypass the limiter and double-send the first ANR —
+                    // before handing the report to ACRA via handleSilentException.
+                    // An additional explicit `ACRA.errorReporter.handleException`
+                    // here would bypass the limiter and double-send the first ANR —
                     // contradicting the dedup guarantee documented above. Rule 9:
                     // plain Timber.e (crash-handling-infrastructure exception).
                     Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
@@ -482,11 +491,18 @@ class KolibriLauncherApp : Application() {
      * Marker exception type used solely to carry a post-mortem ANR report
      * into ACRA. Its stack trace is the *current* point in
      * `reportPendingAnrsAsync` — not the ANR site, which lives in the
-     * `message` (system-supplied multi-thread dump). Distinct subclass so
-     * [CrashReportLimiter]'s per-type cooldown buckets ANRs separately
-     * from real exceptions.
+     * `message` (system-supplied multi-thread dump).
+     *
+     * Because that stack trace and the class name are identical for every
+     * ANR, it supplies its own [CustomReportKey] so [CrashReportLimiter]
+     * deduplicates by hang signature (see [reportKey]) rather than
+     * collapsing all ANRs — real and distinct alike — into one cooldown
+     * bucket.
      */
-    private class AnrException(message: String) : RuntimeException(message)
+    private class AnrException(
+        message: String,
+        override val reportKey: String,
+    ) : RuntimeException(message), CustomReportKey
 
     /**
      * Self-defense companion to [AnrReporter]: starts the
