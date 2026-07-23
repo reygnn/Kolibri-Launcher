@@ -36,7 +36,8 @@ class HandleSwipeActionUseCase @Inject constructor(
             return Result.NoAction
         }
 
-        val appToLaunch = installedAppsStateRepository.getCurrentApps().find {
+        val currentApps = installedAppsStateRepository.getCurrentApps()
+        val appToLaunch = currentApps.find {
             it.componentName == componentName
         }
 
@@ -44,7 +45,18 @@ class HandleSwipeActionUseCase @Inject constructor(
             recordAppLaunchUseCase(appToLaunch)
             refreshAppsUseCase()
             Result.LaunchApp(appToLaunch)
+        } else if (currentApps.isEmpty()) {
+            // The app list is not loaded yet (cold-start window before the
+            // first successful load; getCurrentApps() falls back to an empty
+            // cache). We cannot tell "uninstalled" from "not loaded here", so
+            // we must NOT clear the assignment — doing so would silently wipe
+            // a valid swipe app just because the user swiped before apps
+            // finished loading. Keep the setting and no-op.
+            KolibriLog.w("App for swipe $slot not resolved yet (app list empty): $componentName. Keeping setting.")
+            Result.NoAction
         } else {
+            // The app list is loaded but does not contain the assignment, so
+            // the app is genuinely gone (uninstalled). Clear the stale setting.
             KolibriLog.w("App for swipe $slot not found: $componentName. Clearing setting.")
             swipeActionsRepository.setSwipeAction(slot, null)
             Result.NoAction

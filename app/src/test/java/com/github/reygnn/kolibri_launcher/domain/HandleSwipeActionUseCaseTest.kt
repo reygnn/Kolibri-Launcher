@@ -158,8 +158,9 @@ class HandleSwipeActionUseCaseTest {
 
     @Test
     fun `invoke returns NoAction when assigned app not installed`() = runTest {
-        // Arrange: App zugewiesen, aber nicht in installedApps
-        installedAppsStateRepository.updateApps(emptyList())
+        // Arrange: app assigned but absent from the loaded, non-empty app
+        // list -> genuine uninstall.
+        installedAppsStateRepository.updateApps(listOf(testApp2))
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
@@ -171,8 +172,8 @@ class HandleSwipeActionUseCaseTest {
 
     @Test
     fun `invoke clears LEFT swipe action when app not installed`() = runTest {
-        // Arrange
-        installedAppsStateRepository.updateApps(emptyList())
+        // Arrange: loaded, non-empty list without the assigned app.
+        installedAppsStateRepository.updateApps(listOf(testApp2))
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
@@ -184,8 +185,8 @@ class HandleSwipeActionUseCaseTest {
 
     @Test
     fun `invoke clears RIGHT swipe action when app not installed`() = runTest {
-        // Arrange
-        installedAppsStateRepository.updateApps(emptyList())
+        // Arrange: loaded, non-empty list without the assigned app.
+        installedAppsStateRepository.updateApps(listOf(testApp))
         swipeActionsRepository.swipeRightApp = "com.uninstalled/com.uninstalled.Main"
 
         // Act
@@ -193,5 +194,49 @@ class HandleSwipeActionUseCaseTest {
 
         // Assert
         assertThat(swipeActionsRepository.swipeRightApp).isNull()
+    }
+
+    // =========================================================================
+    // NoAction - app list not loaded yet (cold-start window, AUDIT-5 #1)
+    // =========================================================================
+
+    @Test
+    fun `invoke returns NoAction when app list not loaded yet`() = runTest {
+        // Arrange: empty list = cold start before the first successful load.
+        installedAppsStateRepository.updateApps(emptyList())
+        swipeActionsRepository.swipeLeftApp = testApp.componentName
+
+        // Act
+        val result = useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+
+        // Assert
+        assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
+    }
+
+    @Test
+    fun `invoke does NOT clear LEFT swipe action when app list not loaded yet`() = runTest {
+        // Arrange: empty list; the assigned app must NOT be cleared just
+        // because the user swiped before the first app load.
+        installedAppsStateRepository.updateApps(emptyList())
+        swipeActionsRepository.swipeLeftApp = testApp.componentName
+
+        // Act
+        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+
+        // Assert
+        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(testApp.componentName)
+    }
+
+    @Test
+    fun `invoke does NOT clear RIGHT swipe action when app list not loaded yet`() = runTest {
+        // Arrange
+        installedAppsStateRepository.updateApps(emptyList())
+        swipeActionsRepository.swipeRightApp = testApp2.componentName
+
+        // Act
+        useCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
+
+        // Assert
+        assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(testApp2.componentName)
     }
 }

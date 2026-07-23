@@ -367,6 +367,19 @@ class HomeFragment : Fragment() {
     // LIFECYCLE
     // ===========================================
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // registerForActivityResult must run before the fragment reaches
+        // STARTED and exactly once per fragment instance. onViewCreated runs
+        // again on every Home<->AppDrawer view recreation, so registering the
+        // launcher there accumulated a fresh registration (callback +
+        // LifecycleObserver, keyed fragment_<who>_rq#N) per round trip — they
+        // are only removed on the fragment's own ON_DESTROY, not on view
+        // teardown. onCreate runs once per fragment instance, so the launcher
+        // is registered once. (AUDIT-5 #2.)
+        registerLayerImagePicker()
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -415,14 +428,16 @@ class HomeFragment : Fragment() {
             rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
         )
 
-        registerLayerImagePicker()
         observeViewModel()
         observeLayoutChanges()
     }
 
     /**
-     * Registriert den ActivityResultLauncher für die Layer-Bildauswahl.
-     * Muss VOR onStart() aufgerufen werden (Fragment-Lifecycle Requirement).
+     * Registers the ActivityResultLauncher for the layer image picker.
+     * Called from [onCreate] — exactly once per fragment instance and before
+     * onStart() (Fragment lifecycle requirement). Do NOT call it from
+     * [onViewCreated]: that runs again on every view recreation and would
+     * accumulate one registration per Home<->AppDrawer round trip.
      */
     private fun registerLayerImagePicker() {
         layerPickerLauncher = registerForActivityResult(

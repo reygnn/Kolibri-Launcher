@@ -462,12 +462,15 @@ class KolibriLauncherApp : Application() {
                     val synthetic = AnrException(
                         message = "$description\n\n${report.threadDump.orEmpty()}",
                     )
+                    // Single delivery path. `Timber.e` routes through AcraTree,
+                    // which is the ONLY place CrashReportLimiter is consulted
+                    // (per-type 24h cooldown) before handing the report to
+                    // ACRA via handleSilentException. An additional explicit
+                    // `ACRA.errorReporter.handleException(synthetic)` here would
+                    // bypass the limiter and double-send the first ANR —
+                    // contradicting the dedup guarantee documented above. Rule 9:
+                    // plain Timber.e (crash-handling-infrastructure exception).
                     Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
-                    try {
-                        ACRA.errorReporter.handleException(synthetic)
-                    } catch (e: Throwable) {
-                        Timber.e(e, "Failed to forward ANR to ACRA")
-                    }
                 }
             } catch (e: Throwable) {
                 Timber.e(e, "Error walking pending ANRs")
