@@ -2012,6 +2012,108 @@ gewünscht.
 
 ---
 
+## 24. (erledigt 2026-07-23) Swipe-App-Cleanup lebt im Lese-/Launch-Pfad statt event-getrieben
+
+**Umgesetzt 2026-07-23** auf Branch `refactor/swipe-cleanup-event-driven`.
+Der Cleanup ist raus aus dem Lese-/Launch-Pfad:
+
+- Neuer `ClearSwipeActionsForPackageUseCase` (`:domain/usecase/`) — cleart
+  je Slot, dessen `substringBefore('/')` dem entfernten Paket entspricht
+  (exakte Gleichheit, kein Prefix-False-Positive). 8 JVM-Tests.
+- `PackageUpdateReceiver` ruft ihn bei `ACTION_PACKAGE_REMOVED` **und
+  `!EXTRA_REPLACING`** via Hilt-EntryPoint auf — der Replacing-Guard
+  verhindert, dass ein App-*Update* (REMOVED→ADDED) die Zuweisung löscht
+  (das wäre ein neuer Datenverlust gewesen).
+- `HandleSwipeActionUseCase` ist jetzt reines launch-or-no-op, mutiert nie
+  mehr persistenten State. Damit entfiel auch das `hasLoadedApps()`-Gate.
+- `hasLoadedApps()` war danach tote API (nur der Swipe-Use-Case nutzte es)
+  → aus Interface + Impl + Fake + 4 Contract-Tests entfernt.
+
+Die Ratelogik „uninstalled vs. not loaded" ist damit ganz weg — der
+Receiver clears präzise auf das echte Uninstall-Event. §25 bleibt offen
+(siehe unten): das Fenster ist geschrumpft, aber ein Swipe kann den
+Receiver immer noch schlagen.
+
+**Historischer Kontext (Aufdeckung).**
+**Aufgedeckt 2026-07-23** im Review der AUDIT-5-Swipe-Härtung
+(`a47760d → bffa25e → 27ce121`). Der Cold-Start-Datenverlust ist
+gefixt und die aktuelle Fassung ist korrekt (die Monotonie von
+`InstalledAppsStateRepositoryImpl.lastSuccessfulAppList` — nur in
+`updateApps` bei nicht-leerer Liste gesetzt, nie zurückgesetzt,
+`purgeRepository` macht „NICHTS TUN" — macht das loaded-first-Gate
+wasserdicht). Das ist ein **Architektur-Cleanup, kein Bugfix.**
+
+**Wo.** `domain/.../usecase/HandleSwipeActionUseCase.kt:64-69` — der
+`else`-Zweig löscht die persistierte Swipe-Zuweisung
+(`setSwipeAction(slot, null)`), wenn die zugewiesene App nicht in
+`getCurrentApps()` gefunden wird. Diese *Reconciliation* („App weg →
+Einstellung aufräumen") hängt faul im **Lese-/Launch-Pfad** und muss
+deshalb überhaupt erst raten: „deinstalliert" vs. „noch nicht
+geladen". Genau dieses Rate-Problem erzwang das `hasLoadedApps()`-Gate
+und die drei Härtungs-Iterationen.
+
+**Sauberere Struktur.** Es existiert bereits ein
+`data/.../PackageUpdateReceiver.kt`, der auf `ACTION_PACKAGE_REMOVED`
+feuert (aktuell nur `sendUpdateSignal()` → App-Reload). Würde die
+Swipe-Bereinigung *von diesem Event* getrieben, verschwände das
+Rate-Spiel komplett: man löscht präzise dann, wenn wirklich
+deinstalliert wurde, und `HandleSwipeActionUseCase` würde nur noch
+*launch-or-noop*, ohne je persistenten State zu mutieren. Betrifft
+sinngemäß auch andere komponentenname-gebundene Settings (Favoriten,
+Custom Names) — die könnten am selben Receiver-Pfad reconciliaten.
+
+**Trigger.** Kein Handlungsdruck — die aktuelle Fassung ist korrekt.
+Angehen, wenn (a) §25 (toten componentName launchen) real stört und
+man beide zusammen lösen will, oder (b) ein weiteres
+komponentenname-gebundenes Setting dieselbe „uninstalled vs. not
+loaded"-Ratelogik bräuchte und die Duplikation den Umbau rechtfertigt.
+Eigener `refactor/`-Branch, kein Review-Fix.
+
+---
+
+## 25. (offen) Swipe auf frisch deinstallierte App startet toten componentName
+
+**Aufgedeckt 2026-07-23**, dieselbe Review wie §24. Die *Umkehrung*
+der in AUDIT-5 behobenen Kante, und mit ihr strukturell verwandt.
+
+**Wo.** `HandleSwipeActionUseCase.kt:56-63` sucht die Swipe-App in
+`getCurrentApps()`. Weil `InstalledAppsStateRepositoryImpl.getCurrentApps()`
+(`data/.../InstalledAppsStateRepositoryImpl.kt:80-85`) bei leerem
+Live-Flow auf den `lastSuccessfulAppList`-Cache zurückfällt, kann eine
+*tatsächlich* deinstallierte App kurz nach dem Uninstall (vor dem
+Reload) noch im Cache stehen → sie wird „gefunden" → `Result.LaunchApp`
+mit totem componentName → `ActivityNotFoundException` beim Start,
+statt dass der `else`-Cleanup greift.
+
+**Warum minor.** Kein Datenverlust; enges Zeitfenster (Uninstall →
+Swipe vor dem Reload). Bewusst der Preis des „Resilience Buffer"-
+Designs von `getCurrentApps()`. Zeigt aber, dass der Clear-Zweig
+sowieso nur best-effort ist — was §24s Argument stützt.
+
+**Sketch.** Root ist der **Launch-Pfad**, nicht der Cleanup-Ort, also
+unabhängig von §24 lösbar:
+
+1. `ActivityNotFoundException` an der Start-Stelle (Consumer von
+   `Result.LaunchApp`) abfangen und *dann* reconciliaten (clear +
+   Reload triggern). Der Fehlschlag *ist* das verlässlichste
+   „deinstalliert"-Signal — verlässlicher als jede Cache-Inspektion.
+   Kleinste, ehrlichste Lösung.
+2. Vor dem Start gegen den live `PackageManager` re-validieren statt
+   gegen den Cache.
+
+**Vor dem Angehen prüfen:** wo `Result.LaunchApp` konsumiert wird
+(GestureDelegate / HomeFragment) und ob dort heute schon ein
+`ActivityNotFound` graceful abgefangen wird — dann ist §25 evtl. schon
+teilweise gedeckt.
+
+**Update 2026-07-23:** §24 ist erledigt (event-getriebener Cleanup). Das
+hat §25s Fenster geschrumpft — sobald der `PackageUpdateReceiver` die
+Entfernung verarbeitet hat, ist die Swipe-Zuweisung `null` und es gibt
+gar keinen Launch-Versuch mehr. §25 bleibt nur noch für die Race zwischen
+Uninstall und Receiver-Verarbeitung (Swipe schlägt den Receiver) offen.
+
+---
+
 - Keine Architektur-Beschreibung — siehe `README.md` und `CLAUDE.md`.
 - Keine Test-Referenz — siehe `app/src/test/CLAUDE.md` und
   `TESTING_CONVENTIONS.kt`.

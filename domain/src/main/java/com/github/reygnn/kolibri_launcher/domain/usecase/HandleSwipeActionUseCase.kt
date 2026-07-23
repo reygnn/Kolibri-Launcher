@@ -36,23 +36,6 @@ class HandleSwipeActionUseCase @Inject constructor(
             return Result.NoAction
         }
 
-        // Gate on "apps loaded" BEFORE reading the list, so the decision never
-        // straddles two independent reads of repository state. If we looked the
-        // app up first and only then consulted a separate loaded-signal, a
-        // concurrent app-load landing in between could flip us from "not found
-        // in an empty list" to "loaded" and wrongly clear a valid assignment.
-        // Checking loaded first closes that gap: once it is true the
-        // last-known-good cache is non-empty, so getCurrentApps() cannot be
-        // empty and a subsequent miss genuinely means the app is gone.
-        if (!installedAppsStateRepository.hasLoadedApps()) {
-            // Cold-start window before the first successful load. We cannot tell
-            // "uninstalled" from "not loaded here", so we must NOT clear the
-            // assignment — doing so would silently wipe a valid swipe app just
-            // because the user swiped before apps finished loading.
-            KolibriLog.w("App for swipe $slot not resolved yet (apps not loaded): $componentName. Keeping setting.")
-            return Result.NoAction
-        }
-
         val appToLaunch = installedAppsStateRepository.getCurrentApps().find {
             it.componentName == componentName
         }
@@ -62,10 +45,15 @@ class HandleSwipeActionUseCase @Inject constructor(
             refreshAppsUseCase()
             Result.LaunchApp(appToLaunch)
         } else {
-            // The app list is loaded but does not contain the assignment, so
-            // the app is genuinely gone (uninstalled). Clear the stale setting.
-            KolibriLog.w("App for swipe $slot not found: $componentName. Clearing setting.")
-            swipeActionsRepository.setSwipeAction(slot, null)
+            // App not in the current list. We do NOT clear the assignment here:
+            // getCurrentApps() can return a stale last-known-good cache and the
+            // cold-start window can precede the first load, so "absent" is an
+            // unreliable uninstall signal on the launch path (it caused the
+            // AUDIT-5 data-loss). Uninstall cleanup is handled event-driven by
+            // [ClearSwipeActionsForPackageUseCase], invoked from the
+            // package-removed broadcast (see PackageUpdateReceiver, TODO §24).
+            // Here we only launch-or-no-op and never mutate persisted state.
+            KolibriLog.w("App for swipe $slot not in current list: $componentName. No-op (cleanup is event-driven).")
             Result.NoAction
         }
     }

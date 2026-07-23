@@ -168,37 +168,4 @@ abstract class InstalledAppsStateRepositoryContract {
         // Kein Last Known Good vorhanden → leere Liste.
         assertEquals(emptyList<AppInfo>(), repo.getCurrentApps())
     }
-
-    // ---------- hasLoadedApps — explicit "list ever loaded" signal ----------
-
-    @Test
-    fun `fresh repository has not loaded apps`() {
-        // Cold-start window: no successful load has happened yet.
-        val repo = createRepository()
-        assertEquals(false, repo.hasLoadedApps())
-    }
-
-    @Test
-    fun `hasLoadedApps is true after a non-empty update`() {
-        val repo = createRepository()
-        repo.updateApps(listOf(appA, appB))
-        assertEquals(true, repo.hasLoadedApps())
-    }
-
-    @Test
-    fun `hasLoadedApps stays true after a later empty update`() {
-        // A transient empty update must not flip the signal back to "not
-        // loaded" — the last-known-good state still counts as loaded.
-        val repo = createRepository()
-        repo.updateApps(listOf(appA))
-        repo.updateApps(emptyList())
-        assertEquals(true, repo.hasLoadedApps())
-    }
-
-    @Test
-    fun `hasLoadedApps stays false when only empty updates arrive`() {
-        val repo = createRepository()
-        repo.updateApps(emptyList())
-        assertEquals(false, repo.hasLoadedApps())
-    }
 }

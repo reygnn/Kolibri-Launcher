@@ -106,9 +106,34 @@ class PackageUpdateReceiverTest {
     @Test
     fun `handleReceive - with package removed action - processes correctly`() = runTest {
         every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
+        // Genuine uninstall (not an app update).
+        every { intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) } returns false
 
         val mockUri = mockk<Uri>()
         every { mockUri.schemeSpecificPart } returns "com.old.app"
+        every { intent.data } returns mockUri
+
+        var finishCalled = false
+
+        receiver.handleReceive(context, intent) { finishCalled = true }
+
+        advanceUntilIdle()
+
+        Assert.assertTrue(finishCalled)
+    }
+
+    @Test
+    fun `handleReceive - with package removed during update (replacing) - finishes`() = runTest {
+        // App update: REMOVED carries EXTRA_REPLACING=true and is followed by
+        // ADDED. This must not be treated as an uninstall (would wipe swipe
+        // assignments). At the receiver level we can only assert the graceful
+        // finish; the skip-reconcile decision is verified by inspection and the
+        // ClearSwipeActionsForPackageUseCase tests cover the matching logic.
+        every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
+        every { intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) } returns true
+
+        val mockUri = mockk<Uri>()
+        every { mockUri.schemeSpecificPart } returns "com.updated.app"
         every { intent.data } returns mockUri
 
         var finishCalled = false

@@ -153,7 +153,7 @@ class HandleSwipeActionUseCaseTest {
     }
 
     // =========================================================================
-    // NoAction - App nicht mehr installiert
+    // NoAction - App nicht mehr installiert (loaded list without the app)
     // =========================================================================
 
     @Test
@@ -170,8 +170,19 @@ class HandleSwipeActionUseCaseTest {
         assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
     }
 
+    // =========================================================================
+    // The launch path NEVER mutates the assignment (TODO §24).
+    //
+    // Uninstall cleanup is event-driven via ClearSwipeActionsForPackageUseCase
+    // (invoked from PackageUpdateReceiver), NOT inferred here from list
+    // absence. These tests pin that this use case only launches-or-no-ops,
+    // whether the app is genuinely uninstalled or the list simply is not
+    // loaded yet (cold-start window). This is the behaviour that closes the
+    // AUDIT-5 cold-start data-loss for good.
+    // =========================================================================
+
     @Test
-    fun `invoke clears LEFT swipe action when app not installed`() = runTest {
+    fun `invoke does NOT clear swipe action on genuine uninstall (cleanup is event-driven)`() = runTest {
         // Arrange: loaded, non-empty list without the assigned app.
         installedAppsStateRepository.updateApps(listOf(testApp2))
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
@@ -179,26 +190,10 @@ class HandleSwipeActionUseCaseTest {
         // Act
         useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
-        // Assert
-        assertThat(swipeActionsRepository.swipeLeftApp).isNull()
+        // Assert: setting untouched — the package-removed receiver clears it.
+        assertThat(swipeActionsRepository.swipeLeftApp)
+            .isEqualTo("com.uninstalled/com.uninstalled.Main")
     }
-
-    @Test
-    fun `invoke clears RIGHT swipe action when app not installed`() = runTest {
-        // Arrange: loaded, non-empty list without the assigned app.
-        installedAppsStateRepository.updateApps(listOf(testApp))
-        swipeActionsRepository.swipeRightApp = "com.uninstalled/com.uninstalled.Main"
-
-        // Act
-        useCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
-
-        // Assert
-        assertThat(swipeActionsRepository.swipeRightApp).isNull()
-    }
-
-    // =========================================================================
-    // NoAction - app list not loaded yet (cold-start window, AUDIT-5 #1)
-    // =========================================================================
 
     @Test
     fun `invoke returns NoAction when app list not loaded yet`() = runTest {
