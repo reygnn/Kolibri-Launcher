@@ -327,6 +327,7 @@
     <string name="layout_favorites_alignment_end">Right</string>
     <string name="secure_window_title">Secure Window Mode</string>
 <string name="secure_window_summary">Prevents screenshots and screen recording. Also fixes the issue where an outdated time is briefly displayed when unlocking the device.</string>
+    <string name="secure_window_screenshots_disabled">Screenshots disabled</string>
 
 <!-- Usage Export -->
 <string name="usage_export_title">Usage Profile Backup &amp; Restore</string>

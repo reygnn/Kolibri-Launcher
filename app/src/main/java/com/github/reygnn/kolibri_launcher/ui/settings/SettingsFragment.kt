@@ -246,7 +246,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                     // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
                     if (shouldEnable) {
-                        Toast.makeText(requireContext(), "Screenshots disabled", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.secure_window_screenshots_disabled),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
                 true
