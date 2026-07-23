@@ -216,16 +216,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
     override suspend fun getAllCustomNames(): Map<String, String> {
         return try {
             val preferences = dataStore.data.first()
-            val customNames = mutableMapOf<String, String>()
-
-            preferences.asMap().forEach { (key, value) ->
-                val keyName = key.name
-                if (keyName.startsWith(AppConstants.KEY_NAME_PREFIX) && value is String) {
-                    // Extrahiere packageName aus "name_com.example.app"
-                    val packageName = keyName.removePrefix(AppConstants.KEY_NAME_PREFIX)
-                    customNames[packageName] = value
-                }
-            }
+            val customNames = preferences.customNameKeys().mapNotNull { key ->
+                (preferences[key] as? String)?.let { value -> key.customNamePackage() to value }
+            }.toMap()
 
             Timber.d("Retrieved ${customNames.size} custom app names")
             customNames
@@ -272,13 +265,11 @@ class CustomNamesRepositoryImpl @Inject constructor(
         try {
             val installedSet = installedPackageNames.toSet()
             dataStore.edit { preferences ->
-                // Custom names are keyed "name_<packageName>". Remove entries
-                // whose package is no longer installed. Snapshot the orphan keys
-                // first, then remove — no concurrent modification of asMap().
-                val orphanKeys = preferences.asMap().keys.filter { key ->
-                    key.name.startsWith(AppConstants.KEY_NAME_PREFIX) &&
-                        key.name.removePrefix(AppConstants.KEY_NAME_PREFIX) !in installedSet
-                }
+                // Remove entries whose package is no longer installed. Snapshot
+                // the orphan keys first, then remove — no concurrent
+                // modification of the underlying map.
+                val orphanKeys = preferences.customNameKeys()
+                    .filter { it.customNamePackage() !in installedSet }
                 if (orphanKeys.isNotEmpty()) {
                     // Log only the count, never package names (PII).
                     Timber.w("Removed ${orphanKeys.size} orphaned custom names")
@@ -299,13 +290,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->
-                val keysToRemove = preferences.asMap().keys
-                    .filter { key ->
-                        key.name.startsWith(AppConstants.KEY_NAME_PREFIX)
-                    }
-                keysToRemove.forEach { key ->
-                    preferences.remove(key)
-                }
+                preferences.customNameKeys().forEach { preferences.remove(it) }
             }
             triggerCustomNameUpdate()
         } catch (e: CancellationException) {
@@ -314,4 +299,18 @@ class CustomNamesRepositoryImpl @Inject constructor(
             TimberWrapper.silentError(e, "Failed to purge CustomNamesRepositoryImpl repository")
         }
     }
+
+    /**
+     * All DataStore keys holding a custom name, i.e. those with the
+     * [AppConstants.KEY_NAME_PREFIX] prefix ("name_<packageName>"). Single
+     * source of the key convention, shared by read/cleanup/purge so the prefix
+     * scheme lives in one place. Works on both a read snapshot and the
+     * [androidx.datastore.preferences.core.MutablePreferences] inside `edit`.
+     */
+    private fun Preferences.customNameKeys(): List<Preferences.Key<*>> =
+        asMap().keys.filter { it.name.startsWith(AppConstants.KEY_NAME_PREFIX) }
+
+    /** The package name encoded in a `name_<packageName>` key. */
+    private fun Preferences.Key<*>.customNamePackage(): String =
+        name.removePrefix(AppConstants.KEY_NAME_PREFIX)
 }

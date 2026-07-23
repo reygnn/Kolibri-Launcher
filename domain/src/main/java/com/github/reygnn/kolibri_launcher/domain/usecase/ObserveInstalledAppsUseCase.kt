@@ -92,30 +92,31 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                         // freshly loaded list. This also covers apps uninstalled
                         // while the process was dead (whose PACKAGE_REMOVED
                         // broadcast the receiver missed) — the sweep runs on the
-                        // next load. Each store is guarded independently so one
-                        // failure can't skip the others. The empty-input guard
-                        // lives above (realApps.isEmpty()).
+                        // next load. Each store is guarded independently
+                        // (runCleanup) so one failure can't skip the others. The
+                        // empty-input guard lives above (realApps.isEmpty()).
+                        //
+                        // These are four separate cleanup calls by design, one
+                        // per repository. They are NOT batched into a single
+                        // DataStore transaction on purpose: each store owns its
+                        // keys behind its own repository interface, and merging
+                        // the writes would break that boundary. Cost is bounded —
+                        // DataStore.edit skips the disk write when nothing
+                        // changed, so the steady state (no orphans) is four cheap
+                        // in-memory reads. Don't "optimize" this into one edit.
                         val allValidComponentNames = realApps.map { it.componentName }
-                        try {
+                        val allValidPackageNames = realApps.map { it.packageName }
+                        runCleanup("favorites") {
                             favoritesRepository.cleanupFavoriteComponents(allValidComponentNames)
-                        } catch (cleanupError: Throwable) {
-                            TimberWrapper.silentError(cleanupError, "Error cleaning up favorites")
                         }
-                        try {
+                        runCleanup("swipe actions") {
                             swipeActionsRepository.cleanupSwipeActions(allValidComponentNames)
-                        } catch (cleanupError: Throwable) {
-                            TimberWrapper.silentError(cleanupError, "Error cleaning up swipe actions")
                         }
-                        try {
+                        runCleanup("hidden components") {
                             hiddenAppsRepository.cleanupHiddenComponents(allValidComponentNames)
-                        } catch (cleanupError: Throwable) {
-                            TimberWrapper.silentError(cleanupError, "Error cleaning up hidden components")
                         }
-                        try {
-                            val allValidPackageNames = realApps.map { it.packageName }
+                        runCleanup("custom names") {
                             customNamesRepository.cleanupCustomNames(allValidPackageNames)
-                        } catch (cleanupError: Throwable) {
-                            TimberWrapper.silentError(cleanupError, "Error cleaning up custom names")
                         }
 
                         // Wichtig: Den zentralen State aktualisieren
@@ -137,6 +138,22 @@ class ObserveInstalledAppsUseCase @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "CRITICAL: Error in ObserveInstalledAppsUseCase")
+        }
+    }
+
+    /**
+     * Runs one post-load store reconciliation, isolating its failure so the
+     * other stores still run. CancellationException is rethrown (never
+     * swallowed) so a cancelled load propagates promptly instead of falling
+     * through to the state update and Success emit.
+     */
+    private suspend fun runCleanup(label: String, cleanup: suspend () -> Unit) {
+        try {
+            cleanup()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error cleaning up $label")
         }
     }
 }

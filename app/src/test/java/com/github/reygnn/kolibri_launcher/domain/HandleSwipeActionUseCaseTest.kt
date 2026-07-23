@@ -190,7 +190,8 @@ class HandleSwipeActionUseCaseTest {
         // Act
         useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
-        // Assert: setting untouched — the package-removed receiver clears it.
+        // Assert: setting untouched — the load-time orphan sweep in
+        // ObserveInstalledAppsUseCase clears it, not this use case.
         assertThat(swipeActionsRepository.swipeLeftApp)
             .isEqualTo("com.uninstalled/com.uninstalled.Main")
     }
