@@ -247,5 +247,19 @@ object CrashReportLimiter {
  * throw-site, running them through the cooldown would collapse genuinely
  * distinct hangs under a single key and drop all but the first — so they
  * bypass it instead. No prefs entry is written for a bypassed report.
+ *
+ * ## Do not route ANRs back through the cooldown
+ *
+ * Two earlier shapes were tried and are strictly worse — a future audit
+ * should not re-introduce either:
+ *   1. Additionally calling `ACRA.errorReporter.handleException` explicitly
+ *      double-sends every ANR (the cooldown never sees the explicit path).
+ *   2. Giving each ANR a content-derived cooldown key is a no-op: thread
+ *      dumps vary per occurrence, so keys are effectively unique and nothing
+ *      ever dedups — an obfuscated version of this bypass with misleading
+ *      docs.
+ * The `AnrReporter` watermark is the real, sufficient dedup; this bypass is
+ * intentional and flood-safe (AEI record count is bounded, each forwarded
+ * once ever).
  */
 interface UnthrottledReport
