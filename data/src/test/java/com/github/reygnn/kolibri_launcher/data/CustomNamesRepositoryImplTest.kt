@@ -235,6 +235,23 @@ class CustomNamesRepositoryImplTest {
     }
 
     @Test
+    fun `cleanupCustomNames - removes orphans but does NOT trigger update`() = runTest {
+        val validKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.installed")
+        val orphanKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
+        fakeDataStore.setInitialData(preferencesOf(validKey to "Keep", orphanKey to "Drop"))
+
+        customNamesManager.cleanupCustomNames(listOf("com.installed"))
+
+        // Orphan gone, valid kept.
+        Assert.assertEquals(mapOf("com.installed" to "Keep"), customNamesManager.getAllCustomNames())
+        // Must NOT emit: cleanup runs inside the app-load pipeline, so a trigger
+        // would re-enter the reload path (loop / churn). Guards the impl's
+        // deliberate no-trigger comment. (Strict mock: an accidental emit would
+        // also fail here for lack of a stub.)
+        coVerify(exactly = 0) { appsUpdateTrigger.emit(Unit) }
+    }
+
+    @Test
     fun `purgeRepository - removes keys and triggers update`() = runTest {
         coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
 

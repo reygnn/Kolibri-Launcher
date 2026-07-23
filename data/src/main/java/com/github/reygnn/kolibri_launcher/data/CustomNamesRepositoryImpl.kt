@@ -216,8 +216,10 @@ class CustomNamesRepositoryImpl @Inject constructor(
     override suspend fun getAllCustomNames(): Map<String, String> {
         return try {
             val preferences = dataStore.data.first()
-            val customNames = preferences.customNameKeys().mapNotNull { key ->
-                (preferences[key] as? String)?.let { value -> key.customNamePackage() to value }
+            // Single pass over the snapshot: read key + value together instead
+            // of re-fetching each value via preferences[key].
+            val customNames = preferences.asMap().entries.mapNotNull { (key, value) ->
+                if (key.isCustomNameKey() && value is String) key.customNamePackage() to value else null
             }.toMap()
 
             Timber.d("Retrieved ${customNames.size} custom app names")
@@ -301,16 +303,22 @@ class CustomNamesRepositoryImpl @Inject constructor(
     }
 
     /**
-     * All DataStore keys holding a custom name, i.e. those with the
-     * [AppConstants.KEY_NAME_PREFIX] prefix ("name_<packageName>"). Single
-     * source of the key convention, shared by read/cleanup/purge so the prefix
-     * scheme lives in one place. Works on both a read snapshot and the
-     * [androidx.datastore.preferences.core.MutablePreferences] inside `edit`.
+     * True for a DataStore key that holds a custom name, i.e. carries the
+     * [AppConstants.KEY_NAME_PREFIX] prefix ("name_<packageName>"). The single
+     * definition of the key convention, shared by read/cleanup/purge.
      */
-    private fun Preferences.customNameKeys(): List<Preferences.Key<*>> =
-        asMap().keys.filter { it.name.startsWith(AppConstants.KEY_NAME_PREFIX) }
+    private fun Preferences.Key<*>.isCustomNameKey(): Boolean =
+        name.startsWith(AppConstants.KEY_NAME_PREFIX)
 
     /** The package name encoded in a `name_<packageName>` key. */
     private fun Preferences.Key<*>.customNamePackage(): String =
         name.removePrefix(AppConstants.KEY_NAME_PREFIX)
+
+    /**
+     * All keys holding a custom name. Shared by cleanup/purge. Works on both a
+     * read snapshot and the
+     * [androidx.datastore.preferences.core.MutablePreferences] inside `edit`.
+     */
+    private fun Preferences.customNameKeys(): List<Preferences.Key<*>> =
+        asMap().keys.filter { it.isCustomNameKey() }
 }
