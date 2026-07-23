@@ -43,7 +43,7 @@ object AppModule {
      */
     @Provides
     @Singleton
-    fun provideAppLauncher(): AppLauncher = AppLauncherImpl()
+    fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
 
     /**
      * The app's `versionName` from :app's BuildConfig, exposed for injection
