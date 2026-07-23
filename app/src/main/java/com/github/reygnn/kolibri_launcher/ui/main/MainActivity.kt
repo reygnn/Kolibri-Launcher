@@ -1,19 +1,14 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
-import android.app.ActivityOptions
-import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
-import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.os.Process
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.Settings
@@ -268,6 +263,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     lateinit var settingsRepository: SettingsRepository
     @Inject
     lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
+    @Inject
+    lateinit var appLauncher: AppLauncher
 
     /**
      * Latest wallpaper-surface classification emitted by
@@ -812,53 +809,40 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             Timber.d("[LAUNCH] Starting launch for: ${appInfo.displayName}")
         }
 
-        try {
-            val launcherApps = getSystemService(LAUNCHER_APPS_SERVICE) as? LauncherApps
-            if (launcherApps == null) {
-                TimberWrapper.silentError("[LAUNCH] LauncherApps service is null!")
+        // The LauncherApps / ActivityOptions runtime glue now lives behind
+        // [AppLauncher]; this method only reacts to the typed result. The
+        // former inline triple-catch moved into AppLauncherImpl.
+        val result = appLauncher.launch(this, appInfo)
+        when (result) {
+            is AppLaunchResult.Launched -> {
+                if (BuildConfig.DEBUG) {
+                    Timber.d("[LAUNCH] Success: ${appInfo.displayName}")
+                }
+            }
+            is AppLaunchResult.ComponentGone -> {
+                TimberWrapper.silentError("[LAUNCH] Component gone: ${appInfo.displayName}")
+                Toast.makeText(this, getString(R.string.error_app_not_available), Toast.LENGTH_SHORT).show()
+            }
+            is AppLaunchResult.PermissionDenied -> {
+                TimberWrapper.silentError("[LAUNCH] Permission denied: ${appInfo.displayName}")
                 Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
-                return
             }
-
-            val componentName = ComponentName(appInfo.packageName, appInfo.className)
-            val userHandle = Process.myUserHandle()
-            val options = ActivityOptions.makeCustomAnimation(
-                this,
-                R.anim.app_open_enter,
-                R.anim.app_open_exit
-            )
-
-            launcherApps.startMainActivity(componentName, userHandle, null, options.toBundle())
-
-            if (BuildConfig.DEBUG) {
-                Timber.d("[LAUNCH] Success: ${appInfo.displayName}")
+            is AppLaunchResult.Failed -> {
+                TimberWrapper.silentError(result.cause, "[LAUNCH] Exception: ${appInfo.displayName}")
+                Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
             }
+        }
 
-        } catch (e: ActivityNotFoundException) {
-            // Triple-catch kept (Expected error, four-category frame):
-            // launching another package's main activity has three
-            // distinct expected failure modes — package gone since
-            // resolution (ActivityNotFoundException), permission denied
-            // (SecurityException), and a Throwable umbrella for the rest.
-            // Each Toast targets the right user-visible recovery.
-            TimberWrapper.silentError(e, "[LAUNCH] ActivityNotFoundException: ${appInfo.displayName}")
-            Toast.makeText(this, getString(R.string.error_app_not_available), Toast.LENGTH_SHORT).show()
-            // A failed startMainActivity is the definitive "this component is
-            // gone" signal — more reliable than any cache inspection. Kick an
-            // app-list refresh so the load-time orphan sweep (ObserveInstalled
-            // AppsUseCase) reconciles any stale assignment pointing at it
-            // (swipe / favorite / hidden / custom name), TODO §25. Only on
-            // ActivityNotFound: SecurityException/other don't imply the app is
-            // uninstalled, so they must not trigger a reconcile.
+        // A failed launch of a resolved component is the definitive "this app
+        // is gone" signal — more reliable than any cache inspection. Kick an
+        // app-list refresh so the load-time orphan sweep (ObserveInstalled-
+        // AppsUseCase) reconciles any stale assignment pointing at it (swipe /
+        // favorite / hidden / custom name), TODO §25. Gated on the typed
+        // result: only ComponentGone reconciles — PermissionDenied and other
+        // failures don't imply an uninstall (see AppLaunchResult.shouldReconcile,
+        // pinned by AppLaunchResultTest).
+        if (result.shouldReconcile) {
             viewModel.refreshInstalledApps()
-        } catch (e: SecurityException) {
-            TimberWrapper.silentError(e, "[LAUNCH] SecurityException: ${appInfo.displayName}")
-            Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
-        } catch (e: Throwable) {
-            // Throwable arm of the Triple-catch kept above (four-category
-            // frame): generic umbrella for unexpected launch failures.
-            TimberWrapper.silentError(e, "[LAUNCH] Exception: ${appInfo.displayName}")
-            Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
         }
     }
 

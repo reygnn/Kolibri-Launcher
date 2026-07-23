@@ -4,6 +4,8 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.content.pm.PackageManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
+import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides
@@ -33,6 +35,15 @@ object AppModule {
     fun provideWallpaperManager(@ApplicationContext context: Context): WallpaperManager {
         return WallpaperManager.getInstance(context)
     }
+
+    /**
+     * The app-launch seam. Behind an interface so tests can supply a fake that
+     * returns a chosen [com.github.reygnn.kolibri_launcher.ui.main.AppLaunchResult]
+     * without the real `LauncherApps` (see [AppLauncher] KDoc).
+     */
+    @Provides
+    @Singleton
+    fun provideAppLauncher(): AppLauncher = AppLauncherImpl()
 
     /**
      * The app's `versionName` from :app's BuildConfig, exposed for injection

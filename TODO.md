@@ -2101,16 +2101,28 @@ Launch-Pfad fängt `ActivityNotFoundException` längst ab
 `error_app_not_available`, kein Crash). §25 war also nie ein Absturz,
 sondern eine fehlende *Selbstheilung*.
 
-**Fix (Sketch 1, minimal):** Im `ActivityNotFoundException`-Zweig von
-`launchApp` wird jetzt `viewModel.refreshInstalledApps()` aufgerufen. Ein
-fehlgeschlagenes `startMainActivity` ist das *definitive* „diese Komponente
-ist weg"-Signal (verlässlicher als jede Cache-Inspektion) → der Reload löst
-den §24-Load-Time-Sweep aus, der jede verwaiste Zuweisung (Swipe, Favorit,
-Hidden, Custom Name) auf die gerade tote App räumt. **Nur** bei
-ActivityNotFound: `SecurityException`/Sonstiges implizieren keinen
-Uninstall und dürfen keinen Reconcile triggern. Damit ist die enge Race
-(Swipe zwischen Uninstall und Sweep-Abschluss, App noch im Cache)
-vollständig geschlossen — der eine Fehlversuch heilt sich selbst.
+**Fix (Sketch 1):** Ein fehlgeschlagenes `startMainActivity` ist das
+*definitive* „diese Komponente ist weg"-Signal (verlässlicher als jede
+Cache-Inspektion) → ein Reload löst den §24-Load-Time-Sweep aus, der jede
+verwaiste Zuweisung (Swipe, Favorit, Hidden, Custom Name) auf die tote App
+räumt. **Nur** bei ActivityNotFound: `SecurityException`/Sonstiges
+implizieren keinen Uninstall und dürfen keinen Reconcile triggern. Damit ist
+die enge Race (Swipe zwischen Uninstall und Sweep-Abschluss, App noch im
+Cache) geschlossen — der eine Fehlversuch heilt sich selbst.
+
+**Umgesetzt als injectable Seam (Code-Review-Guard):** Der Launch liegt jetzt
+hinter `AppLauncher` (`ui/main/AppLauncher` + `AppLauncherImpl`, Hilt-`@Provides`
+in `AppModule`), der die `LauncherApps`/`ActivityOptions`-Runtime kapselt und
+das Ergebnis als typisiertes `AppLaunchResult` zurückgibt
+(`Launched` / `ComponentGone` / `PermissionDenied` / `Failed`). `MainActivity.
+launchApp` reagiert nur noch auf das Result (Toast + `if (result.shouldReconcile)
+refreshInstalledApps()`). Die Reconcile-Entscheidung sitzt als
+`AppLaunchResult.shouldReconcile` (nur `ComponentGone` == true) und ist per
+reinem JVM-Test `AppLaunchResultTest` gepinnt — Robolectric konnte den Pfad
+nicht testen, weil dessen `ShadowLauncherApps` kein `startMainActivity`
+implementiert (echter Launch wirft dort nie `ActivityNotFound`). Nebeneffekt:
+MainActivitys inline Triple-Catch ist weg (in `AppLauncherImpl` gewandert),
+ein Broad-Catch weniger im whitelisted File.
 
 Sketch 2 (live `PackageManager`-Revalidierung vor jedem Start) wurde
 verworfen: teurer, und der Fehlschlag liefert dasselbe Signal ohnehin
