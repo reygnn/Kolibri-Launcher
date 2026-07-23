@@ -2091,8 +2091,32 @@ Eigener `refactor/`-Branch, kein Review-Fix.
 
 ---
 
-## 25. (offen) Swipe auf frisch deinstallierte App startet toten componentName
+## 25. (erledigt 2026-07-23) Swipe auf frisch deinstallierte App startet toten componentName
 
+**Umgesetzt 2026-07-23** auf Branch `fix/launch-failure-reconcile`.
+
+**Befund bei der Umsetzung:** Der eigentliche *Crash* war nie einer — der
+Launch-Pfad fängt `ActivityNotFoundException` längst ab
+(`MainActivity.launchApp`, ~Zeile 837: silentError + Toast
+`error_app_not_available`, kein Crash). §25 war also nie ein Absturz,
+sondern eine fehlende *Selbstheilung*.
+
+**Fix (Sketch 1, minimal):** Im `ActivityNotFoundException`-Zweig von
+`launchApp` wird jetzt `viewModel.refreshInstalledApps()` aufgerufen. Ein
+fehlgeschlagenes `startMainActivity` ist das *definitive* „diese Komponente
+ist weg"-Signal (verlässlicher als jede Cache-Inspektion) → der Reload löst
+den §24-Load-Time-Sweep aus, der jede verwaiste Zuweisung (Swipe, Favorit,
+Hidden, Custom Name) auf die gerade tote App räumt. **Nur** bei
+ActivityNotFound: `SecurityException`/Sonstiges implizieren keinen
+Uninstall und dürfen keinen Reconcile triggern. Damit ist die enge Race
+(Swipe zwischen Uninstall und Sweep-Abschluss, App noch im Cache)
+vollständig geschlossen — der eine Fehlversuch heilt sich selbst.
+
+Sketch 2 (live `PackageManager`-Revalidierung vor jedem Start) wurde
+verworfen: teurer, und der Fehlschlag liefert dasselbe Signal ohnehin
+zuverlässig.
+
+**Historischer Kontext (Aufdeckung).**
 **Aufgedeckt 2026-07-23**, dieselbe Review wie §24. Die *Umkehrung*
 der in AUDIT-5 behobenen Kante, und mit ihr strukturell verwandt.
 

@@ -843,6 +843,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             // Each Toast targets the right user-visible recovery.
             TimberWrapper.silentError(e, "[LAUNCH] ActivityNotFoundException: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_app_not_available), Toast.LENGTH_SHORT).show()
+            // A failed startMainActivity is the definitive "this component is
+            // gone" signal — more reliable than any cache inspection. Kick an
+            // app-list refresh so the load-time orphan sweep (ObserveInstalled
+            // AppsUseCase) reconciles any stale assignment pointing at it
+            // (swipe / favorite / hidden / custom name), TODO §25. Only on
+            // ActivityNotFound: SecurityException/other don't imply the app is
+            // uninstalled, so they must not trigger a reconcile.
+            viewModel.refreshInstalledApps()
         } catch (e: SecurityException) {
             TimberWrapper.silentError(e, "[LAUNCH] SecurityException: ${appInfo.displayName}")
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
