@@ -8,8 +8,9 @@
 #   - DO NOT DOWNGRADE = do not lower version (breaks build or tests)
 #   - OK to upgrade    = safe to raise version on the next pass
 #
-# minSdk = compileSdk = targetSdk = 36 (Android 16) are intentional and live
-# in `app/build.gradle.kts`, not in this catalog. Same for the jvmToolchain
+# minSdk = 36 (Android 16), compileSdk = targetSdk = 37 (Android 17, lifted
+# 2026-07-18 for core-ktx 1.19.0) are intentional and live in
+# `app/build.gradle.kts`, not in this catalog. Same for the jvmToolchain
 # (21) and the AndroidX Test runner / executor settings.
 #
 # Cross-cutting constraints to keep in mind when bumping anything:

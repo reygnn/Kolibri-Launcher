@@ -82,8 +82,13 @@ in `:app`.
                           PackageUpdateReceiver
   data/service/           ShortcutLauncherServiceImpl
   di/RepositoryModule     @Binds for every repository interface
-  di/DataStoreModule      single Preferences DataStore + the internal
-                          Context.settingsDataStore extension
+  di/DataStoreModule      two Preferences DataStores + their internal
+                          Context.settingsDataStore / .consentDataStore
+                          extensions. Only settingsDataStore is Hilt-
+                          provided; consentDataStore is a separate store
+                          (own backing file) so ACRA consent stays
+                          privacy-by-default and out of Auto Backup, read
+                          via its extension on the pre-Hilt bootstrap path.
 
 :app     (Android Application, depends on :domain + :data)
   ui/                     features: home, appdrawer, settings, onboarding,
@@ -151,9 +156,13 @@ activities.
 2. **Contract-test triple per repository.** `XyzRepositoryContract` (abstract,
    `@Test` methods) + `FakeXyzRepositoryContractTest` +
    `XyzRepositoryImplContractTest`. If fake and impl drift, the contract
-   catches it. Exceptions (system-API impls like `BackupRepository`,
-   `InstalledAppsRepository`, `TimeBasedEventsRepository`) are justified in
-   the corresponding contract KDoc. Details: `app/src/test/CLAUDE.md`.
+   catches it. Exceptions (system-API impls, composition repos, and
+   repos whose fake would be tautological — currently `BackupRepository`,
+   `InstalledAppsRepository`, `TimeBasedEventsRepository`, `ResetRepository`,
+   `ShortcutRepository`, `UsageExportRepository`; not an exhaustive list)
+   are justified per-repo in the corresponding contract KDoc under a
+   "NO CONTRACT TEST (ADR)" note, and each still carries impl-level test
+   coverage. Details: `app/src/test/CLAUDE.md`.
 
 3. **When a contract test goes red, the impl wins.** Align the fake to
    the impl, not the other way around — impl behavior is production
