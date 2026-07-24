@@ -204,6 +204,44 @@ ACRA-nicht-initialisiert-Failsafe-Catch. Kein Lock, kein Executor, keine
 Companion. Die theoretische Telemetrie-Metadaten-Race wird bewusst als
 **nicht behebenswert** akzeptiert.
 
+### Follow-up (2026-07-24) — doch sauber gelöst, per Carrier-Exception · Commit `0f2e4a4` · ✅
+
+Das „nicht behebenswert" galt für die beiden *additiven* Ansätze (Lock,
+Executor). Ein späterer Blick in die **echten `acra-core`-5.13.1-Sources**
+hat die Lage neu geordnet:
+
+- `initAcra { reportContent = … }` listet **kein** `ReportField.CUSTOM_DATA`,
+  und `BaseReportFieldCollector.shouldCollect` gated hart auf
+  `config.reportContent.contains(field)`. Der `CustomDataCollector` lief also
+  **nie** → `log_priority`/`log_tag`/`log_message` erreichten den Server
+  überhaupt nicht. Die Race war damit nicht nur *Low*, sondern **folgenlos** —
+  und dahinter steckte ein *echter* latenter Bug: der komplette Timber-Log-
+  Kontext fehlte in **allen** Reports.
+- `ErrorReporter` bietet **keinen** öffentlichen per-Report-CustomData-Kanal
+  (der `ReportBuilder` ist intern). Der einzige nur-öffentliche saubere Weg,
+  per-Report-Daten zu transportieren, ist, sie **in die gemeldete Exception zu
+  falten**.
+
+Der Fix (Option B) faltet Log-Kontext + CancellationException-Diagnose in eine
+per-Report **Carrier-Exception** (`LoggedThrowable`), die das Original als
+`cause` hält und im *bereits kollektierten* `STACK_TRACE` landet. Per-Report by
+construction → **kein Shared-State, kein Lock, kein Executor**. Die Formatier-
+Logik ist eine pure, Android-freie Funktion in `:domain/core`
+(`buildAcraReportThrowable`, Rule 10) mit JVM-Test.
+
+**Warum das mit Lehre #6 und Rule 7 vereinbar ist:** Es ist ein
+*Subtraktions*-Refactor — er **entfernt** Maschinerie (die drei
+`putCustomData`, den `UnhandledCancellationException`-Sonderfall) statt welche
+hinzuzufügen. Genau das Gegenteil der Churn-Spirale von Lock/Executor, und
+damit in der „trivial-und-sicher"-Kategorie, die Lehre #6 ausdrücklich zulässt
+— zumal es zusätzlich den latenten Datenverlust behebt.
+
+*Tradeoff:* Der Top-Level-Exception-Typ im Report ist jetzt `LoggedThrowable`;
+der echte Typ + Trace stehen unter „Caused by:". Bewusst gewählt gegenüber
+Option A (Custom Collector mit ServiceLoader-Registrierung + `CUSTOM_DATA` im
+`reportContent` — mehr Maschinerie, nur nötig wenn getrennte Report-Felder
+server-seitig echten Mehrwert bringen).
+
 ---
 
 ## Muster & Lehren
