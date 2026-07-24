@@ -274,7 +274,7 @@ class BackupSerializer @Inject constructor() {
         val version = if (root.has("version") && !root.isNull("version")) {
             root.getString("version")
         } else {
-            "1.0.0"
+            AppConstants.BACKUP_VERSION
         }
         val timestamp = root.optLong("timestamp", System.currentTimeMillis())
 

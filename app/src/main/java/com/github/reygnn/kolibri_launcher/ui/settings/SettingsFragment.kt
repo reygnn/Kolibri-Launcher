@@ -11,7 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.AttrRes
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
@@ -618,17 +617,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
-    fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int =
-        context.resolveThemeColor(attrRes, ContextCompat.getColor(context, android.R.color.black))
-
     fun openUrlInCustomTab(context: Context, url: String) {
         try {
             val builder = CustomTabsIntent.Builder()
             val colorSchemeParams = CustomTabColorSchemeParams.Builder()
                 .setToolbarColor(
-                    getThemeColor(
-                        context,
-                        com.google.android.material.R.attr.colorSurface
+                    context.resolveThemeColor(
+                        com.google.android.material.R.attr.colorSurface,
+                        ContextCompat.getColor(context, android.R.color.black),
                     )
                 )
                 .build()

@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
@@ -15,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -210,7 +210,7 @@ class FavoritesSortFragment : Fragment() {
 
     private fun handleEvent(event: UiEvent) {
         when (event) {
-            is UiEvent.ShowToast -> showToast(getString(event.messageResId))
+            is UiEvent.ShowToast -> showToastSafe(getString(event.messageResId))
             is UiEvent.FavoritesOrderChanged -> {
                 try {
                     setFragmentResult(
@@ -227,21 +227,6 @@ class FavoritesSortFragment : Fragment() {
             else -> {
                 // Unreachable for events emitted by FavoritesSortViewModel.
             }
-        }
-    }
-
-    private fun showToast(message: String) {
-        try {
-            if (isAdded && !isDetached) {
-                context?.let { ctx ->
-                    Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Throwable) {
-            // EXTERNAL: Toast.makeText / .show() do IPC and have been
-            // observed to throw on Samsung devices (see BaseActivity.
-            // showToastSafe for the same pattern).
-            TimberWrapper.silentError(e, "Error showing toast")
         }
     }
 

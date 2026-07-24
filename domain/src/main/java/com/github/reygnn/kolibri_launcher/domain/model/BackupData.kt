@@ -6,6 +6,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable
 data class BackupData(
+    // Keep in sync with AppConstants.BACKUP_VERSION — a const cannot be
+    // referenced across the @Serializable default here. BackupDataAssembler
+    // always sets version explicitly, so this default only applies to
+    // hand-constructed instances.
     val version: String = "1.0.0",
     val timestamp: Long = 0L,
     val appVersion: String = "",

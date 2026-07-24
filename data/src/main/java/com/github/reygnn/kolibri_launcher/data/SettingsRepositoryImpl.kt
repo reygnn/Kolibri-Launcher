@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.toEnumOrNull
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
@@ -103,16 +104,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val sortOrderFlow: Flow<SortOrder> = dataStore.data.safeData
         .map { preferences ->
-            val sortName = preferences[PreferenceKeys.SORT_ORDER_KEY]
-            // Default ist TIME_WEIGHTED_USAGE
-            if (sortName == null) return@map AppConstants.DEFAULT_SORT_ORDER
-
-            try {
-                SortOrder.valueOf(sortName)
-            } catch (e: Throwable) {
-                // Fallback bei Parsing-Fehler
-                AppConstants.DEFAULT_SORT_ORDER
-            }
+            // Default is TIME_WEIGHTED_USAGE; unknown/missing name falls back to it
+            preferences[PreferenceKeys.SORT_ORDER_KEY].toEnumOrNull<SortOrder>()
+                ?: AppConstants.DEFAULT_SORT_ORDER
         }
 
     override suspend fun setSortOrder(sortOrder: SortOrder) {
@@ -250,13 +244,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val favoritesAlignmentFlow: Flow<FavoritesAlignment> = dataStore.data.safeData
         .map { preferences ->
-            val name = preferences[PreferenceKeys.FAVORITES_ALIGNMENT]
-                ?: return@map AppConstants.DEFAULT_FAVORITES_ALIGNMENT
-            try {
-                FavoritesAlignment.valueOf(name)
-            } catch (e: Throwable) {
-                AppConstants.DEFAULT_FAVORITES_ALIGNMENT
-            }
+            preferences[PreferenceKeys.FAVORITES_ALIGNMENT].toEnumOrNull<FavoritesAlignment>()
+                ?: AppConstants.DEFAULT_FAVORITES_ALIGNMENT
         }
 
     override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) {
@@ -265,13 +254,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> = dataStore.data.safeData
         .map { preferences ->
-            val name = preferences[PreferenceKeys.APP_DRAWER_MODE]
-                ?: return@map AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
-            try {
-                WallpaperSurfaceMode.valueOf(name)
-            } catch (e: Throwable) {
-                AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
-            }
+            preferences[PreferenceKeys.APP_DRAWER_MODE].toEnumOrNull<WallpaperSurfaceMode>()
+                ?: AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
         }
 
     override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) {

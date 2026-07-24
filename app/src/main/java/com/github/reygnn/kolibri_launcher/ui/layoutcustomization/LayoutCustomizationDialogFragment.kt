@@ -11,7 +11,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -28,6 +27,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
+import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -348,12 +348,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
      * selected button gets the inverted (high-contrast) treatment.
      */
     private fun applyForegroundColorRecursive(root: ViewGroup, color: Int) {
-        for (i in 0 until root.childCount) {
-            val child = root.getChildAt(i)
-            if (child is MaterialButtonToggleGroup) continue
-            if (child is TextView) child.setTextColor(color)
-            if (child is ViewGroup) applyForegroundColorRecursive(child, color)
-        }
+        root.tintTextViews(color) { child -> child is MaterialButtonToggleGroup }
     }
 
     /**

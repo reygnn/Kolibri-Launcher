@@ -1,10 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.colorcustomization
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
+import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -13,8 +13,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.TextView
-import androidx.annotation.AttrRes
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
@@ -136,12 +134,9 @@ class ColorCustomizationDialogFragment : DialogFragment() {
      * that ever add a text label inside a swatch.
      */
     private fun applyForegroundColorToLabels(root: ViewGroup, color: Int) {
-        for (i in 0 until root.childCount) {
-            val child = root.getChildAt(i)
-            if (child.id == R.id.color_palette_container ||
-                child.id == R.id.chip_bg_palette_container) continue
-            if (child is TextView) child.setTextColor(color)
-            if (child is ViewGroup) applyForegroundColorToLabels(child, color)
+        root.tintTextViews(color) { child ->
+            child.id == R.id.color_palette_container ||
+                child.id == R.id.chip_bg_palette_container
         }
     }
 
@@ -292,7 +287,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         )
 
         themeColors.forEach { colorAttr ->
-            colors.add(getThemeColor(requireContext(), colorAttr))
+            colors.add(requireContext().resolveThemeColor(colorAttr, Color.MAGENTA))
         }
 
         // 3. Standardfarben
@@ -301,9 +296,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
         return colors.distinct()
     }
-
-    private fun getThemeColor(context: Context, @AttrRes attrRes: Int): Int =
-        context.resolveThemeColor(attrRes, Color.MAGENTA)
 
     override fun onDestroyView() {
         // 1. Manuelle Referenzen auf Views löschen
