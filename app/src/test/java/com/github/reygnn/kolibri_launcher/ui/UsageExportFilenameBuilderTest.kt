@@ -81,6 +81,16 @@ class UsageExportFilenameBuilderTest {
     }
 
     @Test
+    fun `filename year stays Gregorian under a Buddhist-calendar locale (th_TH)`() = withUtcTimeZone {
+        // th_TH defaults to the Buddhist calendar on the JDK (2024 -> 2567).
+        // The builder must force Gregorian so the machine filename never
+        // carries an era year. Without the fix this asserts "2567".
+        val millis = utcMillis(2024, 3, 15, 10, 30, 45)
+        val builder = UsageExportFilenameBuilder(clock = { millis }, locale = Locale.of("th", "TH"))
+        assertEquals("kolibri_usage_2024-03-15_103045.json", builder.build())
+    }
+
+    @Test
     fun `builder reads clock on every build (does not cache)`() = withUtcTimeZone {
         var current = utcMillis(2024, 1, 1, 0, 0, 0)
         val builder = UsageExportFilenameBuilder(clock = { current }, locale = Locale.US)

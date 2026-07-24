@@ -3,7 +3,9 @@ package com.github.reygnn.kolibri_launcher.ui.backup
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.GregorianCalendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * PURE LOGIC - Backup Filename Builder
@@ -22,10 +24,17 @@ class BackupFilenameBuilder(
     private val locale: Locale = Locale.getDefault(),
 ) {
     fun build(): String {
-        val timestamp = SimpleDateFormat(
+        val formatter = SimpleDateFormat(
             AppConstants.DATE_FORMAT_BACKUP_FILENAME,
             locale,
-        ).format(Date(clock()))
+        ).apply {
+            // Force a proleptic-Gregorian calendar so the numeric `yyyy` field
+            // never switches to a locale-specific era (Thai Buddhist th_TH ->
+            // 2569, Japanese imperial ja_JP_JP). A machine filename must stay
+            // calendar-invariant regardless of the device's default locale.
+            calendar = GregorianCalendar(TimeZone.getDefault(), Locale.ROOT)
+        }
+        val timestamp = formatter.format(Date(clock()))
         return "${AppConstants.BACKUP_FILE_PREFIX}$timestamp${AppConstants.BACKUP_FILE_EXTENSION}"
     }
 }
