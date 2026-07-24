@@ -543,6 +543,37 @@ class WallpaperDelegateTest {
     }
 
     @Test
+    fun `onRemoveWallpaperLayer applies the removal synchronously`() = runTest {
+        // Structural guarantee (AUDIT-6 addendum): a mutation's read-modify-write
+        // of _wallpaperState runs through the synchronous applyState critical
+        // section, so the new state is visible IMMEDIATELY — with no suspension
+        // point in between for a concurrent mutation to clobber. Uses real
+        // WallpaperState objects (not mocks) so the transition is genuine, and
+        // asserts BEFORE advanceUntilIdle. The reverted deleteFile -> IO change
+        // would have deferred this write into a coroutine and failed here.
+        val realState = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///a.jpg", label = "Layer 1"),
+                WallpaperLayerState(imageUri = "file:///b.jpg", label = "Layer 2"),
+            )
+        )
+        val stateFlow = MutableStateFlow(realState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        // Not in edit mode → immediate delete + synchronous state write.
+        delegate.onRemoveWallpaperLayer(0)
+
+        // No advanceUntilIdle: the removal must already be reflected in state.
+        assertEquals(1, delegate.wallpaperState.value.layerCount)
+        assertEquals("file:///b.jpg", delegate.wallpaperState.value.layers[0].imageUri)
+    }
+
+    @Test
     fun `onRemoveWallpaperLayer when last layer removed persists empty state`() = runTest {
         // Under the unified remove path, the delegate never calls
         // clearWallpaperUseCase from onRemoveWallpaperLayer — it simply

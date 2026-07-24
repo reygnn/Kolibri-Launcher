@@ -98,8 +98,16 @@
  *   generation — it keeps state, so a resuming add is applied normally (appended to
  *   the committed state). Never bypass this re-check, and never bump the generation on
  *   Commit — synchronous restore only protects the read path, not a resuming add.
+ * - Never suspend between reading and writing [_wallpaperState]. Every mutation
+ *   is expressed as a pure `Mutation` and applied through the synchronous
+ *   `applyState` critical section (see STATE MUTATION CORE below); suspending
+ *   work — the file copy, the DataStore persist — is placed strictly BEFORE or
+ *   AFTER it, never in the middle. The reverted `deleteFile -> withContext(IO)`
+ *   change (AUDIT-6 addendum) violated exactly this and reintroduced a
+ *   lost-update race; the structure now makes that class of bug unrepresentable.
  *
  * **Regression Guards:**
+ * - `onRemoveWallpaperLayer applies the removal synchronously`
  * - `onAddWallpaperLayer resuming after cancel discards the layer and deletes its file`
  * - `onAddWallpaperLayer resuming after commit still persists the layer`
  * - `onAddWallpaperLayer resuming within the same session still persists the layer`
@@ -336,6 +344,77 @@ class WallpaperDelegate(
     }
 
     // ===========================================
+    // STATE MUTATION CORE  (functional core / imperative shell)
+    // ===========================================
+    //
+    // Every wallpaper-state change is expressed as a pure [Mutation] value —
+    // the resulting state plus any file side-effects — computed WITHOUT touching
+    // the world. [applyState] is then the single place that writes
+    // [_wallpaperState] and the edit-session bookkeeping, and it is SYNCHRONOUS
+    // and non-suspending by construction: there is no way to await between
+    // reading `.value` and writing it back, so a mutation's read-modify-write
+    // can never be split by a suspension point and clobbered by a concurrent
+    // mutation on the single-threaded main dispatcher.
+    //
+    // This is the structural guard the AUDIT-6 addendum is about: the reverted
+    // `deleteFile -> withContext(IO)` change inserted a suspend point INTO such a
+    // read-modify-write and reintroduced a lost-update race. With the transition
+    // pre-computed as data, that class of bug is gone by construction. The only
+    // suspension left is the file copy in [onAddWallpaperLayer] (BEFORE the
+    // transition, re-validated via [editRollbackGeneration]) and the persist
+    // epilogue in [persist] (AFTER the atomic write).
+
+    /**
+     * Pure description of a single state change: the resulting [newState] plus
+     * the file side-effects it implies. No I/O, no suspension — built by the
+     * caller, executed by [applyState] + [persist].
+     */
+    private data class Mutation(
+        val newState: WallpaperState,
+        /** Internal files to delete now (outside an edit session). */
+        val deleteNow: List<String> = emptyList(),
+        /** Removed-layer URIs whose physical deletion is deferred until commit. */
+        val deferToCommit: List<String> = emptyList(),
+        /** Added-layer URIs to clean up if the session is cancelled. */
+        val trackForCancel: List<String> = emptyList(),
+        /** Layer id to focus (activate) after the imminent view rebuild, if any. */
+        val focusLayerId: String? = null,
+    )
+
+    /**
+     * THE synchronous critical section. Applies [m] to [_wallpaperState] and the
+     * edit-session bookkeeping atomically. Non-suspending by construction: the
+     * read-modify-write that produced [m] and this write cannot be interleaved
+     * by another main-dispatcher coroutine.
+     *
+     * The state write happens LAST so that consumers reacting to the state
+     * emission already see the focus hint and bookkeeping in place.
+     */
+    private fun applyState(m: Mutation) {
+        m.focusLayerId?.let { _pendingFocusLayerId.value = it }
+        pendingRemovalsOnCommit.addAll(m.deferToCommit)
+        pendingRemovalsOnCancel.addAll(m.trackForCancel)
+        _wallpaperState.value = m.newState
+    }
+
+    /** Persist epilogue — runs AFTER the atomic [applyState] write. */
+    private suspend fun persist(m: Mutation) {
+        saveWallpaperStateUseCase(m.newState)
+        // deleteFile is internally guarded (never throws), so no wrapper here.
+        m.deleteNow.forEach { wallpaperFileManager.deleteFile(it) }
+    }
+
+    /**
+     * Synchronous apply + scheduled persist. For the non-suspending mutations
+     * (remove, swap, layer properties, batch transforms): the state transition
+     * lands immediately and the DataStore write is fired off afterwards.
+     */
+    private fun commit(errorMessage: String, m: Mutation) {
+        applyState(m)
+        scope.launchSafe(errorMessage) { persist(m) }
+    }
+
+    // ===========================================
     // SINGLE-LAYER WALLPAPER
     // ===========================================
 
@@ -508,24 +587,17 @@ class WallpaperDelegate(
                 TimberWrapper.silentError("Failed to copy layer image to internal storage")
                 return@launchSafe
             }
+            val internalUriString = internalUri.toString()
 
-            // The edit session was rolled back during the copy (the user hit
-            // Cancel mid-copy). Persisting now would revive a layer onto the
-            // already-restored state and race the snapshot save. Discard the
-            // add and clean up its orphaned file instead.
+            // From here to applyState there is NO suspension: the rollback
+            // re-check and the state write are atomic. If the edit session was
+            // rolled back during the copy (the user hit Cancel mid-copy),
+            // persisting now would revive a layer onto the already-restored
+            // state and race the snapshot save. Discard the add and clean up its
+            // orphaned file instead.
             if (editRollbackGeneration != rollbackGenAtStart) {
-                try {
-                    wallpaperFileManager.deleteFile(internalUri.toString())
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error deleting orphaned layer file after edit rollback")
-                }
+                wallpaperFileManager.deleteFile(internalUriString)
                 return@launchSafe
-            }
-
-            // While in edit mode, track this file so its orphan copy on
-            // disk gets cleaned up if the user cancels the session.
-            if (_isWallpaperEditMode.value) {
-                pendingRemovalsOnCancel.add(internalUri.toString())
             }
 
             val current = _wallpaperState.value
@@ -539,22 +611,22 @@ class WallpaperDelegate(
 
             // Auto-label: pick the lowest unused "Layer N" number so that
             // after a delete+add cycle we don't get "Layer 3" twice.
-            val resolvedLabel = label ?: nextFreeAutoLabel(base)
-
             val newLayer = WallpaperLayerState(
-                imageUri = internalUri.toString(),
-                label = resolvedLabel
+                imageUri = internalUriString,
+                label = label ?: nextFreeAutoLabel(base)
             )
 
-            val newState = base.withAddedLayer(newLayer)
-
-            // Signal to the view that this new layer should be focused
-            // (selected as active) after the imminent rebuild. Consumer
-            // calls consumePendingFocusLayerId() after applying.
-            _pendingFocusLayerId.value = newLayer.id
-
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
+            val mutation = Mutation(
+                newState = base.withAddedLayer(newLayer),
+                // While in edit mode, track this file so its orphan copy on disk
+                // gets cleaned up if the user cancels the session.
+                trackForCancel = if (_isWallpaperEditMode.value) listOf(internalUriString) else emptyList(),
+                // Signal the view to focus (activate) the new layer after the
+                // imminent rebuild. Consumer calls consumePendingFocusLayerId().
+                focusLayerId = newLayer.id,
+            )
+            applyState(mutation)
+            persist(mutation)
         }
     }
 
@@ -571,38 +643,33 @@ class WallpaperDelegate(
         return "Layer $n"
     }
 
-    fun onRemoveWallpaperLayer(layerIndex: Int) =
-        scope.launchSafe("Error removing wallpaper layer") {
-            val current = _wallpaperState.value
-            val layerUri = current.getLayer(layerIndex)?.imageUri
+    fun onRemoveWallpaperLayer(layerIndex: Int) {
+        val current = _wallpaperState.value
+        val layerUri = current.getLayer(layerIndex)?.imageUri
+        val inEdit = _isWallpaperEditMode.value
 
-            // In edit mode: defer the physical delete until commit so that
-            // a cancel can restore the snapshot including the file on disk.
-            // Outside edit mode: delete immediately as before.
-            if (layerUri != null) {
-                if (_isWallpaperEditMode.value) {
-                    pendingRemovalsOnCommit.add(layerUri)
-                } else {
-                    wallpaperFileManager.deleteFile(layerUri)
-                }
-            }
-
-            val newState = current.withRemovedLayer(layerIndex)
-
-            // Unified persist path: set in-memory + persist. WallpaperRepositoryImpl's
-            // saveWallpaperState handles the "no wallpaper" case by wiping all
-            // keys, so we don't need a separate clearWallpaperUseCase call here.
-            // (That avoids a brief UI flicker when the last layer is removed.)
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
-        }
+        // In edit mode: defer the physical delete until commit so that a cancel
+        // can restore the snapshot including the file on disk. Outside edit mode:
+        // delete immediately (in the persist epilogue).
+        //
+        // Unified persist path: WallpaperRepositoryImpl.saveWallpaperState handles
+        // the "no wallpaper" case by wiping all keys, so removing the last layer
+        // needs no separate clearWallpaperUseCase call (avoids a brief UI flicker).
+        commit(
+            errorMessage = "Error removing wallpaper layer",
+            m = Mutation(
+                newState = current.withRemovedLayer(layerIndex),
+                deleteNow = if (!inEdit && layerUri != null) listOf(layerUri) else emptyList(),
+                deferToCommit = if (inEdit && layerUri != null) listOf(layerUri) else emptyList(),
+            )
+        )
+    }
 
     fun onSwapWallpaperLayers(indexA: Int, indexB: Int) =
-        scope.launchSafe("Error swapping wallpaper layers") {
-            val newState = _wallpaperState.value.withSwappedLayers(indexA, indexB)
-            _wallpaperState.value = newState
-            saveWallpaperStateUseCase(newState)
-        }
+        commit(
+            "Error swapping wallpaper layers",
+            Mutation(_wallpaperState.value.withSwappedLayers(indexA, indexB))
+        )
 
     // ===========================================
     // MULTI-LAYER: TRANSFORMS
@@ -617,11 +684,10 @@ class WallpaperDelegate(
         errorMessage: String,
         layerIndex: Int,
         transform: (WallpaperLayerState) -> WallpaperLayerState,
-    ) = scope.launchSafe(errorMessage) {
-        val newState = _wallpaperState.value.withUpdatedLayer(layerIndex, transform)
-        _wallpaperState.value = newState
-        saveWallpaperStateUseCase(newState)
-    }
+    ) = commit(
+        errorMessage,
+        Mutation(_wallpaperState.value.withUpdatedLayer(layerIndex, transform))
+    )
 
     fun onSaveLayerTransform(
         layerIndex: Int,
@@ -634,15 +700,14 @@ class WallpaperDelegate(
 
     fun onSaveAllLayerTransforms(
         transforms: List<Triple<Float, Float, Float>>
-    ) = scope.launchSafe("Error saving all layer transforms") {
+    ) {
         var state = _wallpaperState.value
         transforms.forEachIndexed { index, (scale, tx, ty) ->
             state = state.withUpdatedLayer(index) {
                 it.copy(scale = scale, translateX = tx, translateY = ty)
             }
         }
-        _wallpaperState.value = state
-        saveWallpaperStateUseCase(state)
+        commit("Error saving all layer transforms", Mutation(state))
     }
 
     // ===========================================
