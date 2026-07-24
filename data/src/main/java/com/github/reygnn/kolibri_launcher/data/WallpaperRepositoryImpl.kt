@@ -5,7 +5,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -14,13 +13,11 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -74,15 +71,8 @@ class WallpaperRepositoryImpl @Inject constructor(
     // READ: Flow<WallpaperState>
     // ===========================================
 
-    override val wallpaperState: Flow<WallpaperState> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                TimberWrapper.silentError(exception, "Error reading wallpaper preferences")
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
-        }
+    override val wallpaperState: Flow<WallpaperState> =
+        dataStore.safeReadFlow("Error reading wallpaper preferences")
         .map { preferences ->
             try {
                 parseWallpaperState(preferences)

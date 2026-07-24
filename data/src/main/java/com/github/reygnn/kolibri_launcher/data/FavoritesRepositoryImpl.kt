@@ -4,7 +4,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -13,12 +12,8 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,7 +36,8 @@ import javax.inject.Singleton
  *
  * **Architecture: Hot Shared Flow with Dual Constructor Pattern**
  *
- * This manager uses a sophisticated Flow setup optimized for production and testing:
+ * This manager uses a sophisticated Flow setup optimized for production and testing;
+ * the shared read/share plumbing lives in [SharedDataStoreFlowRepository]:
  *
  * **Production (Primary Constructor):**
  * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
@@ -100,11 +96,14 @@ import javax.inject.Singleton
  * @see CustomNamesRepositoryImpl for contrast with event-based architecture
  */
 @Singleton
-class FavoritesRepositoryImpl : FavoritesRepository {
-
-    private val dataStore: DataStore<Preferences>
-    private val externalScope: CoroutineScope?
-    override val favoriteComponentsFlow: Flow<Set<String>>
+class FavoritesRepositoryImpl
+@VisibleForTesting
+constructor(
+    dataStore: DataStore<Preferences>,
+    externalScope: CoroutineScope?,
+    sharingStrategy: SharingStarted,
+) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
+    FavoritesRepository {
 
     private object PreferencesKeys {
         val FAVORITES = stringSetPreferencesKey("favorites_components_set")
@@ -123,45 +122,10 @@ class FavoritesRepositoryImpl : FavoritesRepository {
         sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )
 
-    /**
-     * Sekundärer, interner Konstruktor für Tests.
-     */
-    @VisibleForTesting
-    constructor(
-        dataStore: DataStore<Preferences>,
-        externalScope: CoroutineScope?,
-        sharingStrategy: SharingStarted
-    ) {
-        this.dataStore = dataStore
-        this.externalScope = externalScope
-        this.favoriteComponentsFlow = initializeFlow(sharingStrategy)
-    }
-
-    private fun initializeFlow(sharingStrategy: SharingStarted): Flow<Set<String>> {
-        return dataStore.data
-            .catch { e ->
-                if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading favorites preferences")
-                    emit(emptyPreferences())
-                } else {
-                    throw e
-                }
-            }
-            .map { preferences ->
-                preferences[PreferencesKeys.FAVORITES] ?: emptySet()
-            }
-            .let { flow ->
-                if (externalScope != null) {
-                    flow.shareIn(
-                        scope = externalScope,
-                        started = sharingStrategy,
-                        replay = 1
-                    )
-                } else {
-                    flow
-                }
-            }
-    }
+    override val favoriteComponentsFlow: Flow<Set<String>> =
+        sharedReadFlow("Error reading favorites preferences") { preferences ->
+            preferences[PreferencesKeys.FAVORITES] ?: emptySet()
+        }
 
     override suspend fun toggleFavoriteComponent(componentName: String): Boolean {
         return try {

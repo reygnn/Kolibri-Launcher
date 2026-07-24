@@ -72,18 +72,22 @@ class SettingsRepositoryImpl @Inject constructor(
      * Schützt vor DataStore-Korruption beim Lesen.
      * Falls die Datei kaputt ist, wird ein leeres Preferences-Objekt emittiert,
      * was dazu führt, dass unten alle Defaults greifen.
+     *
+     * Deliberately broader than the shared [safeReadFlow] policy: settings reads
+     * must also survive corrupted-type reads (`ClassCastException`) and other
+     * read `RuntimeException`s by falling back to defaults — see the "doomsday"
+     * tests. Only [CancellationException] is re-thrown; the previous
+     * `if (e is Exception)` form wrongly swallowed it (the real AUDIT-7 #1 bug —
+     * the broad recovery itself is intended, not drift).
      */
     private val Flow<Preferences>.safeData: Flow<Preferences>
         get() = this.catch { e ->
-            if (e is Exception) {
-                TimberWrapper.silentError(
-                    e,
-                    "SafeDataStore: Fallback to empty prefs due to read error"
-                )
-                emit(emptyPreferences())
-            } else {
-                throw e
-            }
+            if (e is CancellationException) throw e
+            TimberWrapper.silentError(
+                e,
+                "SettingsRepository: read error, falling back to empty prefs"
+            )
+            emit(emptyPreferences())
         }
 
     /**

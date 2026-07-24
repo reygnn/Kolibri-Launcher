@@ -4,7 +4,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -14,11 +13,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,10 +48,11 @@ import javax.inject.Singleton
  */
 @Singleton
 open class SwipeActionsRepositoryImpl private constructor(
-    private val dataStore: DataStore<Preferences>,
-    @param:ApplicationScope private val externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted
-) : SwipeActionsRepository {
+    dataStore: DataStore<Preferences>,
+    externalScope: CoroutineScope?,
+    sharingStrategy: SharingStarted,
+) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
+    SwipeActionsRepository {
 
     /**
      * Interne Definition der DataStore-Schlüssel, spezifisch für diesen Manager.
@@ -94,47 +90,20 @@ open class SwipeActionsRepositoryImpl private constructor(
     )
 
     /**
-     * Helper-Funktion, um das `shareIn`-Muster für beide Flows zu erstellen.
+     * Builds the hot, shared flow for a single swipe-slot key.
      */
-    private fun createSwipeActionFlow(
-        key: Preferences.Key<String>,
-        strategy: SharingStarted
-    ): Flow<String?> {
-        return dataStore.data
-            .catch { e ->
-                if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading swipe action key: ${key.name}")
-                    emit(emptyPreferences())
-                } else {
-                    throw e
-                }
-            }
-            .map { preferences ->
-                // Gibt den String-Wert oder null zurück, wenn nicht vorhanden.
-                // Das `?` bei `String?` im Interface passt hier perfekt.
-                preferences[key]
-            }
-            .let { flow ->
-                // Teile den Flow nur, wenn ein externalScope vorhanden ist (d.h. nicht im Test)
-                if (externalScope != null) {
-                    flow.shareIn(
-                        scope = externalScope,
-                        started = strategy,
-                        replay = 1
-                    )
-                } else {
-                    flow
-                }
-            }
-    }
+    private fun swipeActionFlow(key: Preferences.Key<String>): Flow<String?> =
+        sharedReadFlow("Error reading swipe action key: ${key.name}") { preferences ->
+            // Returns the stored String, or null when the slot is unset — which
+            // is exactly what the `String?` interface type expects.
+            preferences[key]
+        }
 
-    override val swipeLeftAppFlow: Flow<String?> = createSwipeActionFlow(
-        PreferencesKeys.SWIPE_LEFT_APP_COMPONENT, sharingStrategy
-    )
+    override val swipeLeftAppFlow: Flow<String?> =
+        swipeActionFlow(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
 
-    override val swipeRightAppFlow: Flow<String?> = createSwipeActionFlow(
-        PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT, sharingStrategy
-    )
+    override val swipeRightAppFlow: Flow<String?> =
+        swipeActionFlow(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
 
     override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
         val key = when (slot) {

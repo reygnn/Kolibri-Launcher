@@ -3,16 +3,13 @@ package com.github.reygnn.kolibri_launcher.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -100,15 +97,7 @@ class HiddenAppsRepositoryImpl @Inject constructor(
     }
 
     override val hiddenAppsFlow: Flow<Set<String>>
-        get() = dataStore.data
-            .catch { e ->
-                if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading hidden components preferences")
-                    emit(emptyPreferences())
-                } else {
-                    throw e
-                }
-            }
+        get() = dataStore.safeReadFlow("Error reading hidden components preferences")
             .map { preferences ->
                 preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
             }

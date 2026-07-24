@@ -4,7 +4,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
@@ -15,10 +14,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,16 +29,17 @@ import javax.inject.Singleton
  * out-of-range protection — see [FabPosition] for why clamping is the
  * consumer's job.
  *
- * Sharing follows the [SwipeActionsRepositoryImpl] template: `shareIn`
- * with `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)` in production, raw
- * flow when [externalScope] is `null` (test path).
+ * Read/share plumbing comes from [SharedDataStoreFlowRepository]: `shareIn`
+ * with `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)` in production, raw flow
+ * when [externalScope] is `null` (test path).
  */
 @Singleton
 open class FabPositionRepositoryImpl private constructor(
-    private val dataStore: DataStore<Preferences>,
-    @param:ApplicationScope private val externalScope: CoroutineScope?,
+    dataStore: DataStore<Preferences>,
+    externalScope: CoroutineScope?,
     sharingStrategy: SharingStarted,
-) : FabPositionRepository {
+) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
+    FabPositionRepository {
 
     private object PreferencesKeys {
         val FAB_X_FRACTION = floatPreferencesKey("wallpaper_edit_fab_x_fraction")
@@ -70,34 +66,15 @@ open class FabPositionRepositoryImpl private constructor(
         sharingStrategy = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
     )
 
-    override val fabPositionFlow: Flow<FabPosition> = run {
-        val source = dataStore.data
-            .catch { e ->
-                if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading FAB position preferences")
-                    emit(emptyPreferences())
-                } else {
-                    throw e
-                }
-            }
-            .map { preferences ->
-                FabPosition(
-                    xFraction = preferences[PreferencesKeys.FAB_X_FRACTION]
-                        ?: FabPosition.DEFAULT.xFraction,
-                    yFraction = preferences[PreferencesKeys.FAB_Y_FRACTION]
-                        ?: FabPosition.DEFAULT.yFraction,
-                )
-            }
-        if (externalScope != null) {
-            source.shareIn(
-                scope = externalScope,
-                started = sharingStrategy,
-                replay = 1,
+    override val fabPositionFlow: Flow<FabPosition> =
+        sharedReadFlow("Error reading FAB position preferences") { preferences ->
+            FabPosition(
+                xFraction = preferences[PreferencesKeys.FAB_X_FRACTION]
+                    ?: FabPosition.DEFAULT.xFraction,
+                yFraction = preferences[PreferencesKeys.FAB_Y_FRACTION]
+                    ?: FabPosition.DEFAULT.yFraction,
             )
-        } else {
-            source
         }
-    }
 
     override suspend fun saveFabPosition(position: FabPosition) {
         try {

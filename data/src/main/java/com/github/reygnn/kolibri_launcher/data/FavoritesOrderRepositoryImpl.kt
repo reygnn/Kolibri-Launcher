@@ -4,7 +4,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -15,14 +14,9 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 import org.json.JSONArray
 import org.json.JSONException
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,7 +38,8 @@ import javax.inject.Singleton
  *
  * **Architecture: Hot Shared Flow with Factory Pattern**
  *
- * Similar to `FavoritesRepositoryImpl`, this uses a sophisticated dual-constructor pattern:
+ * Similar to `FavoritesRepositoryImpl`, this uses a sophisticated dual-constructor pattern;
+ * the shared read/share plumbing lives in [SharedDataStoreFlowRepository]:
  *
  * **Production (Primary Constructor via @Inject):**
  * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
@@ -126,12 +121,16 @@ import javax.inject.Singleton
  */
 @Singleton
 open class FavoritesOrderRepositoryImpl private constructor(
-    private val dataStore: DataStore<Preferences>,
-    @param:ApplicationScope private val externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted
-) : FavoritesOrderRepository {
+    dataStore: DataStore<Preferences>,
+    externalScope: CoroutineScope?,
+    sharingStrategy: SharingStarted,
+) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
+    FavoritesOrderRepository {
 
-    override val favoriteComponentsOrderFlow: Flow<List<String>> = initializeFlow(sharingStrategy)
+    override val favoriteComponentsOrderFlow: Flow<List<String>> =
+        sharedReadFlow("Error reading favorites order") { preferences ->
+            parseOrderString(preferences[PreferencesKeys.ORDER_LIST])
+        }
 
     private object PreferencesKeys {
         val ORDER_LIST = stringPreferencesKey("favorites_order_components_list_json")
@@ -173,30 +172,6 @@ open class FavoritesOrderRepositoryImpl private constructor(
         externalScope = externalScope,
         sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
     )
-
-    private fun initializeFlow(sharingStrategy: SharingStarted): Flow<List<String>> {
-        return dataStore.data
-            .catch { e ->
-                if (e is IOException) {
-                    TimberWrapper.silentError(e, "Error reading favorites order")
-                    emit(emptyPreferences())
-                } else {
-                    throw e
-                }
-            }
-            .map { preferences -> parseOrderString(preferences[PreferencesKeys.ORDER_LIST]) }
-            .let { flow ->
-                if (externalScope != null) {
-                    flow.shareIn(
-                        scope = externalScope,
-                        started = sharingStrategy,
-                        replay = 1
-                    )
-                } else {
-                    flow
-                }
-            }
-    }
 
     /**
      * Parses the persisted JSON order string into a bounded component list.
