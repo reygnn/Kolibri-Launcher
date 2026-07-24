@@ -292,7 +292,7 @@ class WallpaperViewBinder(
          * view-free so it can be unit-tested directly.
          */
         @VisibleForTesting
-        fun remapUpdatesToAddedLayers(
+        internal fun remapUpdatesToAddedLayers(
             plannedLayers: List<LayerLoadSpec>,
             updates: List<LayerPropertyUpdate>,
             addedLayerIds: List<String>,
