@@ -13,8 +13,9 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
  * - the rare `Throwable` that Toast IPC can raise is swallowed and routed
  *   through [TimberWrapper.silentError] instead of escaping.
  *
- * `BaseActivity.showToastSafe` and the [Fragment] overload below both delegate
- * here, so Activity and Fragment toasts get identical platform handling.
+ * `BaseActivity`'s toast calls resolve here via its `Context` receiver, and the
+ * [Fragment] overload below delegates here too, so Activity and Fragment toasts
+ * get identical platform handling.
  */
 fun Context.showToastSafe(message: String, duration: Int = Toast.LENGTH_SHORT) {
     try {
