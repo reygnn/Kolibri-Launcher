@@ -1,16 +1,15 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable
 data class BackupData(
-    // Keep in sync with AppConstants.BACKUP_VERSION — a const cannot be
-    // referenced across the @Serializable default here. BackupDataAssembler
-    // always sets version explicitly, so this default only applies to
-    // hand-constructed instances.
-    val version: String = "1.0.0",
+    // Single source of truth for the backup schema version. BackupDataAssembler
+    // sets this explicitly; the default only applies to hand-constructed instances.
+    val version: String = AppConstants.BACKUP_VERSION,
     val timestamp: Long = 0L,
     val appVersion: String = "",
     val settings: LauncherSettings
