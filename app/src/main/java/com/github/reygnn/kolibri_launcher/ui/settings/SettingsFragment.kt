@@ -44,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
+import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
 import com.google.android.material.checkbox.MaterialCheckBox
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -133,27 +134,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             // "Ich weiss, dass das schlecht ist, aber die Library lässt mir keine Wahl!"
 
-            /** Workaround for an internal issue in the AndroidX Preference library:
-             ** setPreferencesFromResource triggers a synchronous disk read on the main thread.
-             ** We cannot offload this to a background dispatcher because it also initializes
-             ** View objects, which must be done on the main thread. **/
-
-            // 1. Alte Policy merken
-            val oldPolicy = android.os.StrictMode.getThreadPolicy()
-
-            // 2. Disk Reads erlauben (nur für diesen Thread und Moment)
-            android.os.StrictMode.setThreadPolicy(
-                android.os.StrictMode.ThreadPolicy.Builder(oldPolicy)
-                    .permitDiskReads()
-                    .build()
-            )
-
-            try {
-                // 3. Hier passiert der Zugriff auf die XML/Disk
+            // Workaround for an internal issue in the AndroidX Preference library:
+            // setPreferencesFromResource triggers a synchronous disk read on the main
+            // thread. We cannot offload it to a background dispatcher because it also
+            // initializes View objects, which must happen on the main thread. Relax
+            // StrictMode for the duration (DEBUG-only; see withRelaxedStrictMode).
+            withRelaxedStrictMode {
                 setPreferencesFromResource(R.xml.preferences, rootKey)
-            } finally {
-                // 4. WICHTIG: Alte Policy wiederherstellen, egal was passiert
-                android.os.StrictMode.setThreadPolicy(oldPolicy)
             }
 
             setupPreferenceListeners()

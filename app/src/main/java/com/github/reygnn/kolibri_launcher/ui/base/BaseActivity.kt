@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.base
 
 import android.os.Bundle
-import android.os.StrictMode
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
@@ -13,6 +12,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorData
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorEventBus
 import com.github.reygnn.kolibri_launcher.ui.util.Event
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
@@ -196,39 +196,8 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         }
     }
 
-    /**
-     * Shows a toast with additional error handling.
-     * Even Toast.makeText can throw exceptions in rare cases.
-     *
-     * Includes workaround for Samsung devices triggering StrictMode DiskRead violations
-     * during Toast IPC calls.
-     */
-    private fun showToastSafe(message: String, duration: Int) {
-        try {
-            // Samsung workaround: Temporarily allow disk reads on main thread
-            // because Samsung checks 'isSpeg' and EDM policies via IPC/DB on UI thread.
-            runWithStrictModeDisabled {
-                Toast.makeText(this, message, duration).show()
-            }
-        } catch (e: Throwable) {
-            // §9.15-Sweep: Toast.makeText IPC at system-callback boundary,
-            // widened to Throwable for consistency with the rest of the
-            // crash-safety pipeline.
-            TimberWrapper.silentError(e, "Error showing toast")
-        }
-    }
-
-    /**
-     * Executes the block with StrictMode disabled (LAX policy) and restores
-     * the original policy afterwards.
-     */
-    private inline fun <T> runWithStrictModeDisabled(block: () -> T): T {
-        val oldPolicy = StrictMode.getThreadPolicy()
-        StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX)
-        try {
-            return block()
-        } finally {
-            StrictMode.setThreadPolicy(oldPolicy)
-        }
-    }
+    // Toasts go through the shared Context.showToastSafe extension (ui/util):
+    // the calls above resolve to it via this Activity's Context receiver. It
+    // owns the Samsung StrictMode workaround + the Throwable catch, shared with
+    // the Fragment overload so both paths behave identically.
 }
