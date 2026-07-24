@@ -27,15 +27,16 @@ import kotlinx.coroutines.flow.map
  *
  * @property dataStore the backing preferences store, exposed to subclasses
  *   for their `edit`/`safePurge` write paths.
- * @property externalScope application scope for hot sharing; `null` in tests
- *   turns [sharedReadFlow] into a cold flow (see [shareInOrRaw]).
- * @property sharingStrategy the `WhileSubscribed`/`Eagerly`/… strategy passed
- *   through to `shareIn`.
+ * @param externalScope application scope for hot sharing; `null` in tests
+ *   turns [sharedReadFlow] into a cold flow (see [shareInOrRaw]). Private —
+ *   the sharing decision stays encapsulated in [sharedReadFlow].
+ * @param sharingStrategy the `WhileSubscribed`/`Eagerly`/… strategy passed
+ *   through to `shareIn`. Private for the same reason as [externalScope].
  */
 abstract class SharedDataStoreFlowRepository(
     protected val dataStore: DataStore<Preferences>,
-    protected val externalScope: CoroutineScope?,
-    protected val sharingStrategy: SharingStarted,
+    private val externalScope: CoroutineScope?,
+    private val sharingStrategy: SharingStarted,
 ) {
 
     /**

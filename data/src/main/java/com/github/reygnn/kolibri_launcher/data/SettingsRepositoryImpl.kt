@@ -76,13 +76,16 @@ class SettingsRepositoryImpl @Inject constructor(
      * Deliberately broader than the shared [safeReadFlow] policy: settings reads
      * must also survive corrupted-type reads (`ClassCastException`) and other
      * read `RuntimeException`s by falling back to defaults — see the "doomsday"
-     * tests. Only [CancellationException] is re-thrown; the previous
-     * `if (e is Exception)` form wrongly swallowed it (the real AUDIT-7 #1 bug —
-     * the broad recovery itself is intended, not drift).
+     * tests. The recovery is scoped to [Exception]: [CancellationException] and
+     * non-Exception [Throwable]s (e.g. `OutOfMemoryError`) are re-thrown so
+     * cancellation and fatal `Error`s still propagate, matching the pre-AUDIT-7
+     * behaviour. The real AUDIT-7 #1 bug was only that the previous
+     * `if (e is Exception)` form also swallowed `CancellationException`; the
+     * broad Exception recovery itself is intended, not drift.
      */
     private val Flow<Preferences>.safeData: Flow<Preferences>
         get() = this.catch { e ->
-            if (e is CancellationException) throw e
+            if (e is CancellationException || e !is Exception) throw e
             TimberWrapper.silentError(
                 e,
                 "SettingsRepository: read error, falling back to empty prefs"

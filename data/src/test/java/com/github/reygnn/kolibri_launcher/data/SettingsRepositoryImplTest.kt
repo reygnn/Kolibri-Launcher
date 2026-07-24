@@ -489,6 +489,23 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun `doomsday - fatal Error during read is re-thrown, not swallowed`() = runTest {
+        // safeData recovers Exceptions to defaults, but non-Exception Throwables
+        // (fatal Errors like OOM) must propagate — swallowing them and emitting
+        // empty prefs would mask a fatal condition. Guards the AUDIT-7 #1 fix.
+        val mockDataStore = mockk<DataStore<Preferences>>()
+        every { mockDataStore.data } returns flow {
+            throw OutOfMemoryError("simulated OOM during settings read")
+        }
+
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+
+        assertFailsWith<OutOfMemoryError> {
+            doomsdayManager.sortOrderFlow.first()
+        }
+    }
+
+    @Test
     fun `doomsday - rapid concurrent toggles - consistency check`() = runTest {
         repeat(100) { i ->
             settingsManager.setShowAlarm(i % 2 == 0)
