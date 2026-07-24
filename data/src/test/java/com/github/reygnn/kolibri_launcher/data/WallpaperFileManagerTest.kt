@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -193,7 +192,7 @@ class WallpaperFileManagerTest {
     // ===========================================
 
     @Test
-    fun `deleteFile only touches internal URIs`() = runTest {
+    fun `deleteFile only touches internal URIs`() {
         val external: Uri = mockk {
             every { scheme } returns "content"
             every { path } returns "/foo/bar"
@@ -203,7 +202,7 @@ class WallpaperFileManagerTest {
     }
 
     @Test
-    fun `deleteFile removes an internal file`() = runTest {
+    fun `deleteFile removes an internal file`() {
         val f = createFileWithAge("wp_to_delete", ageMillis = 120_000L)
         assertTrue(f.exists())
 

@@ -462,7 +462,7 @@ class WallpaperDelegateTest {
         )
         coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         // …and its orphaned file is cleaned up.
-        coVerify { wallpaperFileManager.deleteFile(internalUriString) }
+        verify { wallpaperFileManager.deleteFile(internalUriString) }
     }
 
     @Test
@@ -488,7 +488,7 @@ class WallpaperDelegateTest {
         )
         assertTrue(delegate.wallpaperState.value.isMultiLayer)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
 
     @Test
@@ -505,7 +505,7 @@ class WallpaperDelegateTest {
         assertTrue(delegate.wallpaperState.value.hasWallpaper)
         assertTrue(delegate.wallpaperState.value.isMultiLayer)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
 
     // ===========================================
@@ -538,7 +538,7 @@ class WallpaperDelegateTest {
         delegate.onRemoveWallpaperLayer(0)
         advanceUntilIdle()
 
-        coVerify { wallpaperFileManager.deleteFile(layerUri) }
+        verify { wallpaperFileManager.deleteFile(layerUri) }
         coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 
@@ -773,8 +773,8 @@ class WallpaperDelegateTest {
 
         // State was updated & persisted, but the physical file must NOT
         // be deleted yet — Cancel must still be able to restore it.
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
         coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 
@@ -805,7 +805,7 @@ class WallpaperDelegateTest {
         delegate.onRemoveWallpaperLayer(0)
         advanceUntilIdle()
 
-        coVerify { wallpaperFileManager.deleteFile(layerUri) }
+        verify { wallpaperFileManager.deleteFile(layerUri) }
     }
 
     @Test
@@ -835,14 +835,14 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Pre-commit: still not deleted
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
 
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
 
         // Post-commit: deferred file deletion executed
-        coVerify { wallpaperFileManager.deleteFile(layerUri) }
+        verify { wallpaperFileManager.deleteFile(layerUri) }
     }
 
     @Test
@@ -873,7 +873,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // File must survive — the restored snapshot still references it
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(layerUri) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(layerUri) }
     }
 
     @Test
@@ -968,14 +968,14 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Still in session → no cleanup yet
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
 
         delegate.onCancelWallpaperEditMode()
         advanceUntilIdle()
 
         // On cancel the orphan file gets cleaned up
-        coVerify { wallpaperFileManager.deleteFile(addedLayerUriString) }
+        verify { wallpaperFileManager.deleteFile(addedLayerUriString) }
     }
 
     @Test
@@ -1004,8 +1004,8 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // The added layer is kept → its backing file must stay on disk
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
-        coVerify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
     }
 
     @Test
