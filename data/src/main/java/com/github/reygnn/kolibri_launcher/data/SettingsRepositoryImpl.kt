@@ -107,199 +107,144 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    // --- ACCESSOR HELPERS ---
+    // Every typed setting getter is `safeData.map { it[KEY] ?: DEFAULT }` and
+    // every setter is `safeEdit { it[KEY] = value }`. These fold the ~19
+    // near-identical getter/setter pairs (AUDIT-7 #3) so each setting below
+    // reads as one line; only key + default differ.
+
+    private fun boolFlow(key: Preferences.Key<Boolean>, default: Boolean): Flow<Boolean> =
+        dataStore.data.safeData.map { it[key] ?: default }
+
+    private fun intFlow(key: Preferences.Key<Int>, default: Int): Flow<Int> =
+        dataStore.data.safeData.map { it[key] ?: default }
+
+    private fun floatFlow(key: Preferences.Key<Float>, default: Float): Flow<Float> =
+        dataStore.data.safeData.map { it[key] ?: default }
+
+    private inline fun <reified T : Enum<T>> enumFlow(
+        key: Preferences.Key<String>,
+        default: T,
+    ): Flow<T> = dataStore.data.safeData.map { it[key].toEnumOrNull<T>() ?: default }
+
+    private suspend fun <V : Any> putValue(key: Preferences.Key<V>, value: V) =
+        safeEdit { it[key] = value }
+
     // --- IMPLEMENTATION ---
 
-    override val sortOrderFlow: Flow<SortOrder> = dataStore.data.safeData
-        .map { preferences ->
-            // Default is TIME_WEIGHTED_USAGE; unknown/missing name falls back to it
-            preferences[PreferenceKeys.SORT_ORDER_KEY].toEnumOrNull<SortOrder>()
-                ?: AppConstants.DEFAULT_SORT_ORDER
-        }
+    override val sortOrderFlow: Flow<SortOrder> =
+        enumFlow(PreferenceKeys.SORT_ORDER_KEY, AppConstants.DEFAULT_SORT_ORDER)
 
-    override suspend fun setSortOrder(sortOrder: SortOrder) {
-        safeEdit { it[PreferenceKeys.SORT_ORDER_KEY] = sortOrder.name }
-    }
+    override suspend fun setSortOrder(sortOrder: SortOrder) =
+        putValue(PreferenceKeys.SORT_ORDER_KEY, sortOrder.name)
 
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED]
-                ?: AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK
-        }
+    override val doubleTapToLockEnabledFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED, AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
 
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED] = isEnabled }
-    }
+    override suspend fun setDoubleTapToLock(isEnabled: Boolean) =
+        putValue(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED, isEnabled)
 
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED]
-                ?: AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS
-        }
+    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED, AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
 
-    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED] = isEnabled }
-    }
+    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) =
+        putValue(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED, isEnabled)
 
-    override val onboardingCompletedFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.ONBOARDING_COMPLETED] ?: false
-        }
+    override val onboardingCompletedFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.ONBOARDING_COMPLETED, false)
 
-    override suspend fun setOnboardingCompleted() {
-        safeEdit { it[PreferenceKeys.ONBOARDING_COMPLETED] = true }
-    }
+    override suspend fun setOnboardingCompleted() =
+        putValue(PreferenceKeys.ONBOARDING_COMPLETED, true)
 
-    override val textShadowEnabledFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.TEXT_SHADOW_ENABLED]
-                ?: AppConstants.DEFAULT_TEXT_SHADOW_ENABLED
-        }
+    override val textShadowEnabledFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.TEXT_SHADOW_ENABLED, AppConstants.DEFAULT_TEXT_SHADOW_ENABLED)
 
-    override suspend fun setTextShadowEnabled(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.TEXT_SHADOW_ENABLED] = isEnabled }
-    }
+    override suspend fun setTextShadowEnabled(isEnabled: Boolean) =
+        putValue(PreferenceKeys.TEXT_SHADOW_ENABLED, isEnabled)
 
-    override val textColorFlow: Flow<Int> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.TEXT_COLOR]
-                ?: AppConstants.DEFAULT_TEXT_COLOR
-        }
+    override val textColorFlow: Flow<Int> =
+        intFlow(PreferenceKeys.TEXT_COLOR, AppConstants.DEFAULT_TEXT_COLOR)
 
-    override suspend fun setTextColor(color: Int) {
-        safeEdit { it[PreferenceKeys.TEXT_COLOR] = color }
-    }
+    override suspend fun setTextColor(color: Int) =
+        putValue(PreferenceKeys.TEXT_COLOR, color)
 
-    override val chipBackgroundColorFlow: Flow<Int> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.CHIP_BACKGROUND_COLOR]
-                ?: AppConstants.DEFAULT_CHIP_BG_COLOR
-        }
+    override val chipBackgroundColorFlow: Flow<Int> =
+        intFlow(PreferenceKeys.CHIP_BACKGROUND_COLOR, AppConstants.DEFAULT_CHIP_BG_COLOR)
 
-    override suspend fun setChipBackgroundColor(color: Int) {
-        safeEdit { it[PreferenceKeys.CHIP_BACKGROUND_COLOR] = color }
-    }
+    override suspend fun setChipBackgroundColor(color: Int) =
+        putValue(PreferenceKeys.CHIP_BACKGROUND_COLOR, color)
 
-    override val showCalendarEventFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.SHOW_CALENDAR_EVENT]
-                ?: AppConstants.DEFAULT_SHOW_CALENDAR
-        }
+    override val showCalendarEventFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.SHOW_CALENDAR_EVENT, AppConstants.DEFAULT_SHOW_CALENDAR)
 
-    override suspend fun setShowCalendarEvent(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.SHOW_CALENDAR_EVENT] = isEnabled }
-    }
+    override suspend fun setShowCalendarEvent(isEnabled: Boolean) =
+        putValue(PreferenceKeys.SHOW_CALENDAR_EVENT, isEnabled)
 
-    override val showAlarmFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.SHOW_ALARM]
-                ?: AppConstants.DEFAULT_SHOW_ALARM
-        }
+    override val showAlarmFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.SHOW_ALARM, AppConstants.DEFAULT_SHOW_ALARM)
 
-    override suspend fun setShowAlarm(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.SHOW_ALARM] = isEnabled }
-    }
+    override suspend fun setShowAlarm(isEnabled: Boolean) =
+        putValue(PreferenceKeys.SHOW_ALARM, isEnabled)
 
-    override val autoShowKeyboardFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.AUTO_SHOW_KEYBOARD]
-                ?: AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
-        }
+    override val autoShowKeyboardFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.AUTO_SHOW_KEYBOARD, AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
 
-    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.AUTO_SHOW_KEYBOARD] = isEnabled }
-    }
+    override suspend fun setAutoShowKeyboard(isEnabled: Boolean) =
+        putValue(PreferenceKeys.AUTO_SHOW_KEYBOARD, isEnabled)
 
-    override val autoLaunchAppFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.AUTO_LAUNCH_APP]
-                ?: AppConstants.DEFAULT_AUTO_LAUNCH_APP
-        }
+    override val autoLaunchAppFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.AUTO_LAUNCH_APP, AppConstants.DEFAULT_AUTO_LAUNCH_APP)
 
-    override suspend fun setAutoLaunchApp(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.AUTO_LAUNCH_APP] = isEnabled }
-    }
+    override suspend fun setAutoLaunchApp(isEnabled: Boolean) =
+        putValue(PreferenceKeys.AUTO_LAUNCH_APP, isEnabled)
 
-    override val layoutScaleStateFlow: Flow<Float> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.LAYOUT_SCALE]
-                ?: AppConstants.DEFAULT_LAYOUT_SCALE
-        }
+    override val layoutScaleStateFlow: Flow<Float> =
+        floatFlow(PreferenceKeys.LAYOUT_SCALE, AppConstants.DEFAULT_LAYOUT_SCALE)
 
-    override suspend fun setLayoutScale(scale: Float) {
-        safeEdit { it[PreferenceKeys.LAYOUT_SCALE] = scale }
-    }
+    override suspend fun setLayoutScale(scale: Float) =
+        putValue(PreferenceKeys.LAYOUT_SCALE, scale)
 
-    override val verticalPaddingStateFlow: Flow<Float> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.VERTICAL_PADDING_SCALE]
-                ?: AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
-        }
+    override val verticalPaddingStateFlow: Flow<Float> =
+        floatFlow(PreferenceKeys.VERTICAL_PADDING_SCALE, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
 
-    override suspend fun setVerticalPadding(scale: Float) {
-        safeEdit { it[PreferenceKeys.VERTICAL_PADDING_SCALE] = scale }
-    }
+    override suspend fun setVerticalPadding(scale: Float) =
+        putValue(PreferenceKeys.VERTICAL_PADDING_SCALE, scale)
 
-    override val isFontBoldStateFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.IS_FONT_BOLD]
-                ?: AppConstants.DEFAULT_FONT_BOLD
-        }
+    override val isFontBoldStateFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.IS_FONT_BOLD, AppConstants.DEFAULT_FONT_BOLD)
 
-    override suspend fun setFontBold(isBold: Boolean) {
-        safeEdit { it[PreferenceKeys.IS_FONT_BOLD] = isBold }
-    }
+    override suspend fun setFontBold(isBold: Boolean) =
+        putValue(PreferenceKeys.IS_FONT_BOLD, isBold)
 
-    override val favoritesAlignmentFlow: Flow<FavoritesAlignment> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.FAVORITES_ALIGNMENT].toEnumOrNull<FavoritesAlignment>()
-                ?: AppConstants.DEFAULT_FAVORITES_ALIGNMENT
-        }
+    override val favoritesAlignmentFlow: Flow<FavoritesAlignment> =
+        enumFlow(PreferenceKeys.FAVORITES_ALIGNMENT, AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
 
-    override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) {
-        safeEdit { it[PreferenceKeys.FAVORITES_ALIGNMENT] = alignment.name }
-    }
+    override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) =
+        putValue(PreferenceKeys.FAVORITES_ALIGNMENT, alignment.name)
 
-    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.APP_DRAWER_MODE].toEnumOrNull<WallpaperSurfaceMode>()
-                ?: AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
-        }
+    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> =
+        enumFlow(PreferenceKeys.APP_DRAWER_MODE, AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE)
 
-    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) {
-        safeEdit { it[PreferenceKeys.APP_DRAWER_MODE] = mode.name }
-    }
+    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) =
+        putValue(PreferenceKeys.APP_DRAWER_MODE, mode.name)
 
-    override val contentTopMarginScaleFlow: Flow<Float> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE]
-                ?: AppConstants.DEFAULT_TOP_MARGIN
-        }
+    override val contentTopMarginScaleFlow: Flow<Float> =
+        floatFlow(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE, AppConstants.DEFAULT_TOP_MARGIN)
 
-    override suspend fun setContentTopMarginScale(scale: Float) {
-        safeEdit { it[PreferenceKeys.CONTENT_TOP_MARGIN_SCALE] = scale }
-    }
+    override suspend fun setContentTopMarginScale(scale: Float) =
+        putValue(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE, scale)
 
-    override val secureWindowFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.SECURE_WINDOW]
-                ?: AppConstants.DEFAULT_SECURE_WINDOW
-        }
+    override val secureWindowFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.SECURE_WINDOW, AppConstants.DEFAULT_SECURE_WINDOW)
 
-    override suspend fun setSecureWindow(isEnabled: Boolean) {
-        safeEdit {
-            it[PreferenceKeys.SECURE_WINDOW] = isEnabled
-        }
-    }
+    override suspend fun setSecureWindow(isEnabled: Boolean) =
+        putValue(PreferenceKeys.SECURE_WINDOW, isEnabled)
 
-    override val rotationLockedFlow: Flow<Boolean> = dataStore.data.safeData
-        .map { preferences ->
-            preferences[PreferenceKeys.ROTATION_LOCKED]
-                ?: AppConstants.DEFAULT_ROTATION_LOCKED
-        }
+    override val rotationLockedFlow: Flow<Boolean> =
+        boolFlow(PreferenceKeys.ROTATION_LOCKED, AppConstants.DEFAULT_ROTATION_LOCKED)
 
-    override suspend fun setRotationLocked(isEnabled: Boolean) {
-        safeEdit { it[PreferenceKeys.ROTATION_LOCKED] = isEnabled }
-    }
+    override suspend fun setRotationLocked(isEnabled: Boolean) =
+        putValue(PreferenceKeys.ROTATION_LOCKED, isEnabled)
 
     /**
      * Setzt die Einstellungen auf Werkzustand zurück, indem die Keys gelöscht werden.
