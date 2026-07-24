@@ -89,16 +89,19 @@
  *   tracking is fragile and makes the cancel path slower.
  * - Never make Cancel's state-restore asynchronous. The fragment's immediate read
  *   depends on synchronicity.
- * - A layer add is bound to the session it started in. [onAddWallpaperLayer] copies
+ * - A layer add must survive a Commit but not a Cancel. [onAddWallpaperLayer] copies
  *   the picked file on a suspending IO hop that releases the main dispatcher, so a
- *   synchronous Cancel/Commit can slip in mid-copy. The add captures [editSessionToken]
- *   before the copy and re-checks it after; if the token moved, the session it belonged
- *   to is gone, so the add discards itself (deletes its orphan file, persists nothing)
- *   instead of reviving a layer onto the restored/committed state. Never bypass this
- *   re-check — synchronous restore only protects the read path, not a resuming add.
+ *   synchronous Cancel can restore the snapshot mid-copy. The add captures
+ *   [editRollbackGeneration] before the copy and re-checks it after; if a rollback
+ *   happened, the add discards itself (deletes its orphan file, persists nothing)
+ *   instead of reviving a layer onto the restored state. Commit does NOT bump the
+ *   generation — it keeps state, so a resuming add is applied normally (appended to
+ *   the committed state). Never bypass this re-check, and never bump the generation on
+ *   Commit — synchronous restore only protects the read path, not a resuming add.
  *
  * **Regression Guards:**
  * - `onAddWallpaperLayer resuming after cancel discards the layer and deletes its file`
+ * - `onAddWallpaperLayer resuming after commit still persists the layer`
  * - `onAddWallpaperLayer resuming within the same session still persists the layer`
  * - `onCancelWallpaperEditMode restores snapshot state synchronously`
  * - `onCancelWallpaperEditMode does not delete deferred-remove files`
@@ -227,18 +230,21 @@ class WallpaperDelegate(
     private var editSnapshot: WallpaperState? = null
 
     /**
-     * Monotonic token bumped on every edit-session boundary (enter,
-     * commit, cancel). [onAddWallpaperLayer] captures it before its
-     * suspending file copy and re-checks it after: `copyToInternal` hops
-     * to `Dispatchers.IO` and releases the single-threaded main
-     * dispatcher, so a synchronous Cancel/Commit can end the session
-     * mid-copy. An add that resumes across a boundary must NOT persist its
-     * layer onto the restored/committed state — it belongs to a session
-     * that no longer exists. See the ARCHITECTURAL NOTE above; this closes
-     * the gap it left open (synchronous restore is only guaranteed against
-     * the read path, not against a suspended add resuming later).
+     * Monotonic counter bumped ONLY when an edit session is rolled back
+     * ([onCancelWallpaperEditMode]). [onAddWallpaperLayer] captures it
+     * before its suspending file copy and re-checks it after:
+     * `copyToInternal` hops to `Dispatchers.IO` and releases the
+     * single-threaded main dispatcher, so a synchronous Cancel can restore
+     * the snapshot mid-copy. An add that resumes across a rollback must NOT
+     * persist its layer — that would revive it onto the restored state and
+     * race the snapshot save (the bug this guards).
+     *
+     * Only Cancel bumps this, deliberately: Commit keeps the current state
+     * and does NOT restore, so an add resuming after a Commit is applied
+     * normally (appended to the committed state and persisted) — exactly
+     * the pre-guard behavior. See the ARCHITECTURAL NOTE above.
      */
-    private var editSessionToken = 0L
+    private var editRollbackGeneration = 0L
 
     /**
      * URIs of layers removed during the current edit session.
@@ -393,7 +399,6 @@ class WallpaperDelegate(
      * or [onCancelWallpaperEditMode] (roll back all changes).
      */
     fun onEnterWallpaperEditMode() {
-        editSessionToken++
         editSnapshot = _wallpaperState.value
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
@@ -406,7 +411,6 @@ class WallpaperDelegate(
      * is discarded, and in-memory state stays as-is (already persisted).
      */
     fun onCommitWallpaperEditMode() {
-        editSessionToken++
         val filesToDelete = pendingRemovalsOnCommit.toSet()
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
@@ -439,7 +443,7 @@ class WallpaperDelegate(
      * - Files of layers added during the session are deleted.
      */
     fun onCancelWallpaperEditMode() {
-        editSessionToken++
+        editRollbackGeneration++
         val snapshot = editSnapshot
         val filesToDelete = pendingRemovalsOnCancel.toSet()
 
@@ -490,12 +494,13 @@ class WallpaperDelegate(
     // ===========================================
 
     fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) {
-        // Capture the session token synchronously, at invocation time: this
-        // add belongs to whichever edit session is active right now. The
-        // copy below hops to Dispatchers.IO and releases the main
-        // dispatcher, so a synchronous Cancel/Commit can end that session
+        // Capture the rollback generation synchronously, at invocation time.
+        // The copy below hops to Dispatchers.IO and releases the main
+        // dispatcher, so a synchronous Cancel can restore the snapshot
         // before the add resumes — the re-check inside guards against it.
-        val tokenAtStart = editSessionToken
+        // A Commit does NOT restore state, so it deliberately does not bump
+        // the generation: an add resuming after Commit is applied normally.
+        val rollbackGenAtStart = editRollbackGeneration
 
         scope.launchSafe("Error adding wallpaper layer") {
             val internalUri = wallpaperFileManager.copyToInternal(imageUri)
@@ -504,16 +509,15 @@ class WallpaperDelegate(
                 return@launchSafe
             }
 
-            // The session this add belongs to ended during the copy (the
-            // user hit Cancel/Commit mid-copy). Persisting now would revive
-            // a layer onto the already-restored/committed state and race the
-            // session's own save. Discard the add and clean up its orphaned
-            // file instead.
-            if (editSessionToken != tokenAtStart) {
+            // The edit session was rolled back during the copy (the user hit
+            // Cancel mid-copy). Persisting now would revive a layer onto the
+            // already-restored state and race the snapshot save. Discard the
+            // add and clean up its orphaned file instead.
+            if (editRollbackGeneration != rollbackGenAtStart) {
                 try {
                     wallpaperFileManager.deleteFile(internalUri.toString())
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error deleting orphaned layer file after session change")
+                    TimberWrapper.silentError(e, "Error deleting orphaned layer file after edit rollback")
                 }
                 return@launchSafe
             }

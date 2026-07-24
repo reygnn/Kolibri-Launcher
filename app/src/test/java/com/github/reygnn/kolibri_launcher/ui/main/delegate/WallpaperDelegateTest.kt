@@ -466,6 +466,32 @@ class WallpaperDelegateTest {
     }
 
     @Test
+    fun `onAddWallpaperLayer resuming after commit still persists the layer`() = runTest {
+        // AUDIT-6 review #1: Commit KEEPS the current state (no restore), so an
+        // add whose copy finishes just after Commit must still be applied — not
+        // discarded like the Cancel case. Only a rollback (Cancel) may drop it.
+        val delegate = createDelegate(scope = lazyDelegateScope())
+        delegate.onEnterWallpaperEditMode()
+
+        // Add is dispatched but not yet run (lazy dispatcher).
+        delegate.onAddWallpaperLayer(testUri)
+        // User commits before the add's work runs — keeps changes, no restore.
+        delegate.onCommitWallpaperEditMode()
+        assertFalse(delegate.isWallpaperEditMode.value)
+
+        // The add now runs after the commit and must persist its layer.
+        advanceUntilIdle()
+
+        assertTrue(
+            "add resuming after commit must persist its layer",
+            delegate.wallpaperState.value.hasWallpaper
+        )
+        assertTrue(delegate.wallpaperState.value.isMultiLayer)
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
+    }
+
+    @Test
     fun `onAddWallpaperLayer resuming within the same session still persists the layer`() = runTest {
         // Guard must not over-fire: an add that runs without any intervening
         // session boundary still persists its layer as before.
