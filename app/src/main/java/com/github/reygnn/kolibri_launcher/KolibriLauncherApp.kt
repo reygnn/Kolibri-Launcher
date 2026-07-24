@@ -593,28 +593,46 @@ class KolibriLauncherApp : Application() {
 
         private fun reportErrorToAcra(priority: Int, tag: String?, message: String, t: Throwable) {
             try {
-                // Serialize the put-then-handle sequence. putCustomData mutates
-                // the PROCESS-GLOBAL errorReporter map that handleSilentException
-                // snapshots when it builds the report. The type-based
-                // CrashReportLimiter lets two DIFFERENT exception types through
-                // concurrently, so without this lock a report on thread A could
-                // go out carrying thread B's log_tag/log_message/log_priority.
-                // Telemetry accuracy only — the stacktrace is per-call and
-                // unaffected. Dedicated lock, not the limiter's, to avoid
-                // coupling two unrelated critical sections.
-                synchronized(customDataLock) {
-                    // First set custom data
-                    ACRA.errorReporter.putCustomData("log_priority", priority.toString())
-                    ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
-                    ACRA.errorReporter.putCustomData("log_message", message)
+                // Offload the put-then-handle sequence onto a dedicated
+                // single-threaded executor. Two effects, one mechanism:
+                //  (1) Serialization. putCustomData mutates the PROCESS-GLOBAL
+                //      errorReporter map that handleSilentException snapshots
+                //      when it builds the report; the type-based
+                //      CrashReportLimiter lets two DIFFERENT exception types
+                //      through concurrently. Running every report on ONE
+                //      thread keeps each report's put+handle atomic, so reports
+                //      can't swap their log_tag/log_message/log_priority — no
+                //      lock needed.
+                //  (2) No caller stall. handleSilentException assembles the
+                //      report on the calling thread; that thread could be the
+                //      main thread (any Timber.w/e). Enqueuing means the caller
+                //      returns immediately instead of blocking on ACRA's
+                //      collection. These are silent, non-fatal telemetry
+                //      reports — async is fine; fatal crashes go through the
+                //      global handler, not this tree.
+                reportExecutor.execute {
+                    try {
+                        // First set custom data
+                        ACRA.errorReporter.putCustomData("log_priority", priority.toString())
+                        ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
+                        ACRA.errorReporter.putCustomData("log_message", message)
 
-                    // Then submit the exception
-                    ACRA.errorReporter.handleSilentException(t)
+                        // Then submit the exception
+                        ACRA.errorReporter.handleSilentException(t)
+                    } catch (e: Throwable) {
+                        // Failsafe if ACRA is not initialized or crashes
+                        try {
+                            Log.e("AcraTree", "Failed to report exception to ACRA", e)
+                        } catch (ignored: Throwable) {
+                            // Even fallback logging can fail
+                        }
+                    }
                 }
             } catch (e: Throwable) {
-                // Failsafe if ACRA is not initialized or crashes
+                // Enqueue itself failed (e.g. executor rejected) — never let
+                // the logging path throw. Plain Log.e per Rule 9 (crash infra).
                 try {
-                    Log.e("AcraTree", "Failed to report exception to ACRA", e)
+                    Log.e("AcraTree", "Failed to enqueue ACRA report", e)
                 } catch (ignored: Throwable) {
                     // Even fallback logging can fail
                 }
@@ -623,11 +641,16 @@ class KolibriLauncherApp : Application() {
 
         companion object {
             /**
-             * Guards the put-custom-data + handleSilentException sequence in
-             * [reportErrorToAcra] against interleaving from concurrent reports.
-             * Process-wide (the errorReporter it protects is a singleton).
+             * Single-threaded, daemon executor that serializes ACRA report
+             * submission off the calling thread. Single thread → each
+             * report's put-custom-data + handleSilentException runs atomically
+             * without a lock; daemon → never blocks process shutdown. See
+             * [reportErrorToAcra] for why.
              */
-            private val customDataLock = Any()
+            private val reportExecutor: java.util.concurrent.ExecutorService =
+                java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+                    Thread(runnable, "acra-report").apply { isDaemon = true }
+                }
         }
     }
 }
