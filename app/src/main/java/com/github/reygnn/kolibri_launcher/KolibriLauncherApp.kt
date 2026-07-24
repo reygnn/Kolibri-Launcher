@@ -22,6 +22,7 @@ import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.buildAcraReportThrowable
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
@@ -553,16 +554,20 @@ class KolibriLauncherApp : Application() {
      * incorrectly logs it as an error.
      *
      * THE SOLUTION:
-     * This tree identifies when a `CancellationException` is being logged. It wraps the
-     * original exception inside a custom `UnhandledCancellationException`. Creating a new
-     * exception at this moment FORCES the JVM to generate a fresh stack trace, pointing
-     * directly to the problematic `catch` block.
+     * Every forwarded log is wrapped in a per-report carrier (a `LoggedThrowable`, built by
+     * [buildAcraReportThrowable]) that folds the Timber log context (priority/tag/message)
+     * into its own message and keeps the original throwable as the cause. Constructing a
+     * fresh throwable here FORCES the JVM to generate a stack trace down the Timber call
+     * chain, which for a `CancellationException` points directly at the offending `catch`.
      *
-     * This turns a useless report (an exception with no trace) into an actionable one.
+     * WHY A CARRIER, NOT `putCustomData`:
+     * The context used to be written to `ACRA.errorReporter`'s PROCESS-GLOBAL custom-data
+     * map before `handleSilentException`, so concurrent reports could swap each other's
+     * metadata (AUDIT-6 #4) — and since `reportContent` omits `ReportField.CUSTOM_DATA`,
+     * that data never reached the server anyway. The carrier is per-report by construction
+     * (no shared state, no lock, no executor) and lands in the collected `STACK_TRACE`.
      */
     private class AcraTree : Timber.Tree() {
-
-        class UnhandledCancellationException(message: String, cause: Throwable) : RuntimeException(message, cause)
 
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             // Only send warnings and errors with exceptions to ACRA
@@ -579,27 +584,17 @@ class KolibriLauncherApp : Application() {
                 return
             }
 
-            // If it's a CancellationException, wrap it in our diagnostic exception
-            if (t is java.util.concurrent.CancellationException) {
-                val diagnosticException = UnhandledCancellationException(
-                    "DIAGNOSIS: CancellationException was improperly caught as an error.", t
-                )
-                reportErrorToAcra(priority, tag, message, diagnosticException)
-            } else {
-                // For all other errors, maintain normal behavior
-                reportErrorToAcra(priority, tag, message, t)
-            }
+            reportErrorToAcra(priority, tag, message, t)
         }
 
         private fun reportErrorToAcra(priority: Int, tag: String?, message: String, t: Throwable) {
             try {
-                // First set custom data
-                ACRA.errorReporter.putCustomData("log_priority", priority.toString())
-                ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
-                ACRA.errorReporter.putCustomData("log_message", message)
-
-                // Then submit the exception
-                ACRA.errorReporter.handleSilentException(t)
+                // Fold the log context + CancellationException diagnosis into a per-report
+                // carrier throwable (no process-global custom-data map — see class KDoc and
+                // buildAcraReportThrowable). The original throwable rides along as the cause.
+                ACRA.errorReporter.handleSilentException(
+                    buildAcraReportThrowable(priority, tag, message, t)
+                )
             } catch (e: Throwable) {
                 // Failsafe if ACRA is not initialized or crashes
                 try {
