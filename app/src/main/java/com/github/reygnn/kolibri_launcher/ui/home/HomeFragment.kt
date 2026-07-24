@@ -136,7 +136,7 @@ import javax.inject.Inject
  *   LayerButtonsState       — layer-edit button visibility / enabled / alpha
  *   SnapIconResolver        — drawable selection for the four snap buttons
  *   DoubleClickDetector     — threshold detection with an injected clock
- *   FilenameBuilder         — export filenames (backup + usage) with injected clock / locale
+ *   FilenameBuilder         — export filenames (backup + usage) with injected clock
  *   ImportOptionsUiState    — dialog checkbox state from BackupPreview
  *   MissingAppsFormatter    — truncation / overflow of the missing-apps list
  *   ImportSuccessMessage    — sealed success-message selection
