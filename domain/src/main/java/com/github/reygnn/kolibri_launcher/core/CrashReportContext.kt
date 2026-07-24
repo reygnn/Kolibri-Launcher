@@ -27,11 +27,16 @@ import java.util.concurrent.CancellationException
  */
 
 /** Carrier exception whose message carries the Timber log context. */
-class LoggedThrowable(message: String, cause: Throwable) : RuntimeException(message, cause)
+internal class LoggedThrowable(message: String, cause: Throwable) : RuntimeException(message, cause)
 
 /**
  * Wraps [cause] in a [LoggedThrowable] whose message encodes the logcat-style
- * context `"[<level>/<tag>] <message>"`.
+ * context `"[<level>/<tag>] <cause-type>: <message>"`.
+ *
+ * The original exception's simple class name is included because the report's
+ * top-level type is now always `LoggedThrowable`; keeping the real type in the
+ * message keeps ACRA reports groupable/filterable by error type server-side
+ * (its full trace still rides along under "Caused by:").
  *
  * A [CancellationException] cause gets an extra diagnostic note: it is
  * control-flow, not a real error, so logging it as one points at a faulty
@@ -45,7 +50,8 @@ fun buildAcraReportThrowable(
     message: String,
     cause: Throwable,
 ): Throwable {
-    val header = "[${priorityLabel(priority)}/${tag ?: "Unknown"}] $message"
+    val causeType = cause::class.simpleName ?: "Throwable"
+    val header = "[${priorityLabel(priority)}/${tag ?: "Unknown"}] $causeType: $message"
     val fullMessage = if (cause is CancellationException) {
         "$header — DIAGNOSIS: CancellationException improperly caught and logged as an error."
     } else {
@@ -54,13 +60,20 @@ fun buildAcraReportThrowable(
     return LoggedThrowable(fullMessage, cause)
 }
 
-/** Maps an `android.util.Log` priority to its single-letter logcat label. */
+/**
+ * Maps an `android.util.Log` priority to its single-letter logcat label.
+ *
+ * The literals mirror `android.util.Log`, which `:domain` cannot import as a
+ * pure-Kotlin module, so each is pinned to its constant below. `AcraTree` only
+ * forwards WARN+ (V/D/I are unreachable via that path), but the helper is kept
+ * deliberately general.
+ */
 private fun priorityLabel(priority: Int): String = when (priority) {
-    2 -> "V"
-    3 -> "D"
-    4 -> "I"
-    5 -> "W"
-    6 -> "E"
-    7 -> "A"
+    2 -> "V" // Log.VERBOSE
+    3 -> "D" // Log.DEBUG
+    4 -> "I" // Log.INFO
+    5 -> "W" // Log.WARN
+    6 -> "E" // Log.ERROR
+    7 -> "A" // Log.ASSERT
     else -> priority.toString()
 }

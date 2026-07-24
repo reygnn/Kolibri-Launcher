@@ -25,21 +25,32 @@ class CrashReportContextTest {
     }
 
     @Test
-    fun `message encodes logcat-style priority label, tag and message`() {
+    fun `message encodes logcat-style priority label, tag, cause type and message`() {
         val result = buildAcraReportThrowable(6, "MyTag", "save failed", IOException())
-        assertEquals("[E/MyTag] save failed", result.message)
+        assertEquals("[E/MyTag] IOException: save failed", result.message)
+    }
+
+    @Test
+    fun `header carries the original exception type for server-side grouping`() {
+        // Top-level report type is always LoggedThrowable, so the real type must
+        // survive in the message to stay groupable/filterable server-side.
+        val result = buildAcraReportThrowable(6, "T", "boom", IllegalStateException("x"))
+        assertTrue(
+            "message must name the original exception type",
+            result.message!!.contains("IllegalStateException")
+        )
     }
 
     @Test
     fun `null tag falls back to Unknown`() {
         val result = buildAcraReportThrowable(5, null, "hmm", IOException())
-        assertEquals("[W/Unknown] hmm", result.message)
+        assertEquals("[W/Unknown] IOException: hmm", result.message)
     }
 
     @Test
     fun `unknown priority falls back to its numeric value`() {
         val result = buildAcraReportThrowable(99, "T", "x", IOException())
-        assertEquals("[99/T] x", result.message)
+        assertEquals("[99/T] IOException: x", result.message)
     }
 
     @Test
