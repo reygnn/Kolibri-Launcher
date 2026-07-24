@@ -499,15 +499,9 @@ class WallpaperDelegate(
         if (filesToDelete.isEmpty()) return
 
         scope.launchSafe("Error committing wallpaper edit") {
-            // Per-file catch kept: one failed delete must not abort the
-            // batch and leave subsequent orphan files behind.
-            filesToDelete.forEach { uri ->
-                try {
-                    wallpaperFileManager.deleteFile(uri)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error deleting pending layer file")
-                }
-            }
+            // deleteFile is internally guarded (never throws), so a bad delete
+            // can't abort the batch — no per-file wrapper needed (Rule 11).
+            filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
         }
     }
 
@@ -543,14 +537,8 @@ class WallpaperDelegate(
             if (snapshot != null) {
                 saveWallpaperStateUseCase(snapshot)
             }
-            // Per-file catch kept (same reason as commit-path).
-            filesToDelete.forEach { uri ->
-                try {
-                    wallpaperFileManager.deleteFile(uri)
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error deleting canceled layer file")
-                }
-            }
+            // deleteFile is internally guarded (never throws) — no wrapper (Rule 11).
+            filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
         }
     }
 
