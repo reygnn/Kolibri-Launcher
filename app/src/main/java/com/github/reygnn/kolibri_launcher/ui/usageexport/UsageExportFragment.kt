@@ -20,8 +20,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 @AndroidEntryPoint
 class UsageExportFragment : Fragment() {
@@ -66,9 +64,7 @@ class UsageExportFragment : Fragment() {
     private fun setupButtons() {
         binding.buttonExport.setOnClickListener {
             try {
-                val timestamp = LocalDateTime.now()
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"))
-                val filename = "kolibri_usage_$timestamp.json"
+                val filename = UsageExportFilenameBuilder().build()
                 exportLauncher.launch(filename)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching export picker")

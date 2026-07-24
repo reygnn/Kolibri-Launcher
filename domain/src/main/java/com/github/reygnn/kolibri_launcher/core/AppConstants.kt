@@ -173,9 +173,12 @@ object AppConstants {
     const val MIME_TYPE_ZIP = "application/zip"
     const val BACKUP_FILE_PREFIX = "kolibri_backup_"
     const val BACKUP_FILE_EXTENSION = ".zip"
+    const val USAGE_EXPORT_FILE_PREFIX = "kolibri_usage_"
+    const val USAGE_EXPORT_FILE_EXTENSION = ".json"
 
     // Date Formats
     const val DATE_FORMAT_BACKUP_FILENAME = "yyyyMMdd_HHmmss"
+    const val DATE_FORMAT_USAGE_EXPORT_FILENAME = "yyyy-MM-dd_HHmmss"
     const val DATE_FORMAT_DISPLAY = "dd.MM.yyyy HH:mm"
 
     // UI Limits

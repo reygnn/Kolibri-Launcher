@@ -16,6 +16,14 @@ import org.robolectric.RobolectricTestRunner
  *   RuntimeException. Robolectric stellt eine funktionierende `Uri`-Implementierung
  *   bereit. Der Fake selbst berührt `Uri` nicht — die Annotation ist nur wegen der
  *   Test-Daten im Contract nötig, nicht wegen des Fakes.
+ *
+ * WHY THIS LIVES IN data/src/test/ (not domain/src/test/ like the other 11
+ * fake-contract-tests):
+ *   The Robolectric dependency above forces the location. `:domain` is a
+ *   pure-Kotlin JVM module (`kotlin("jvm")`) with no Android SDK on its test
+ *   classpath, so it cannot host a Robolectric runner. This test therefore
+ *   sits alongside [WallpaperRepositoryImplContractTest] in the Android `:data`
+ *   module. The off-pattern location is structurally required, not a drift.
  */
 @RunWith(RobolectricTestRunner::class)
 class FakeWallpaperRepositoryContractTest : WallpaperRepositoryContract() {

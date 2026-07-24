@@ -231,7 +231,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
                 autoIcon.isVisible = true
                 val backgroundColor = requireContext().getColor(R.color.material_dynamic_neutral90)
                 cardView.setCardBackgroundColor(backgroundColor)
-                val iconTintColor = getContrastingColor(backgroundColor)
+                val iconTintColor = ResolvedBackground.SolidColor(backgroundColor).foregroundColor()
                 autoIcon.imageTintList = ColorStateList.valueOf(iconTintColor)
             } else { // Echter Farbknopf
                 autoIcon.isVisible = false
@@ -275,11 +275,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
                 cardView.strokeColor = deselectedColorValue.defaultColor
             }
         }
-    }
-
-    private fun getContrastingColor(backgroundColor: Int): Int {
-        val luminance = Color.luminance(backgroundColor)
-        return if (luminance > 0.5) Color.BLACK else Color.WHITE
     }
 
     private fun getAvailableColors(): List<Int> {
