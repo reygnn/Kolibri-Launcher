@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentUsageExportBinding
+import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -64,7 +65,7 @@ class UsageExportFragment : Fragment() {
     private fun setupButtons() {
         binding.buttonExport.setOnClickListener {
             try {
-                val filename = UsageExportFilenameBuilder().build()
+                val filename = FilenameBuilder.forUsageExport().build()
                 exportLauncher.launch(filename)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching export picker")

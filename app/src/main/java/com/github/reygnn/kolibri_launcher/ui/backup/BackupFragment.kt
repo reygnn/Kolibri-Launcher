@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -111,7 +112,7 @@ class BackupFragment : Fragment() {
         observeBackupState()
     }
 
-    private val backupFilenameBuilder = BackupFilenameBuilder()
+    private val backupFilenameBuilder = FilenameBuilder.forBackup()
 
     private fun setupClickListeners() {
         binding.buttonExportBackup.setOnClickListener {
