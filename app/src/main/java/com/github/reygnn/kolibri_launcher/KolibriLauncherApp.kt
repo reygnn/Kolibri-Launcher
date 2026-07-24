@@ -593,13 +593,24 @@ class KolibriLauncherApp : Application() {
 
         private fun reportErrorToAcra(priority: Int, tag: String?, message: String, t: Throwable) {
             try {
-                // First set custom data
-                ACRA.errorReporter.putCustomData("log_priority", priority.toString())
-                ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
-                ACRA.errorReporter.putCustomData("log_message", message)
+                // Serialize the put-then-handle sequence. putCustomData mutates
+                // the PROCESS-GLOBAL errorReporter map that handleSilentException
+                // snapshots when it builds the report. The type-based
+                // CrashReportLimiter lets two DIFFERENT exception types through
+                // concurrently, so without this lock a report on thread A could
+                // go out carrying thread B's log_tag/log_message/log_priority.
+                // Telemetry accuracy only — the stacktrace is per-call and
+                // unaffected. Dedicated lock, not the limiter's, to avoid
+                // coupling two unrelated critical sections.
+                synchronized(customDataLock) {
+                    // First set custom data
+                    ACRA.errorReporter.putCustomData("log_priority", priority.toString())
+                    ACRA.errorReporter.putCustomData("log_tag", tag ?: "Unknown")
+                    ACRA.errorReporter.putCustomData("log_message", message)
 
-                // Then submit the exception
-                ACRA.errorReporter.handleSilentException(t)
+                    // Then submit the exception
+                    ACRA.errorReporter.handleSilentException(t)
+                }
             } catch (e: Throwable) {
                 // Failsafe if ACRA is not initialized or crashes
                 try {
@@ -608,6 +619,15 @@ class KolibriLauncherApp : Application() {
                     // Even fallback logging can fail
                 }
             }
+        }
+
+        companion object {
+            /**
+             * Guards the put-custom-data + handleSilentException sequence in
+             * [reportErrorToAcra] against interleaving from concurrent reports.
+             * Process-wide (the errorReporter it protects is a singleton).
+             */
+            private val customDataLock = Any()
         }
     }
 }
