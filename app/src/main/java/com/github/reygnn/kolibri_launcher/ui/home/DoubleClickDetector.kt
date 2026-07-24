@@ -37,7 +37,10 @@ class DoubleClickDetector(
     fun registerClick(): Boolean {
         val now = clock()
         val isDoubleClick = (now - lastClickTime) < thresholdMillis
-        lastClickTime = now
+        // On a hit, reset the pairing so the SAME click can't also serve as
+        // the first half of another pair — otherwise a fast triple-tap fires
+        // twice (N rapid taps → N-1 hits). A miss starts a fresh pair from now.
+        lastClickTime = if (isDoubleClick) 0L else now
         return isDoubleClick
     }
 }

@@ -84,19 +84,34 @@ class DoubleClickDetectorTest {
     }
 
     @Test
-    fun `three rapid clicks - second and third both register as double click`() {
-        // Dokumentiertes Verhalten: Nach einem erkannten Double-Click bleibt
-        // lastClickTime gesetzt, ein dritter schneller Klick zählt erneut als DC.
-        // Entspricht dem Verhalten des ursprünglichen DoubleClickListeners.
-        // Falls jemand die Semantik versehentlich ändert (z.B. Reset nach DC),
-        // schlägt dieser Test fehl - bewusst als Regression-Guard.
+    fun `three rapid clicks fire the double click exactly once`() {
+        // AUDIT-6 #3 regression guard. A detected double-click resets the
+        // pairing, so the second tap's timestamp cannot ALSO seed a pair with
+        // the third tap. Without the reset a fast triple-tap fired twice
+        // (N rapid taps → N-1 hits), double-emitting the open-app action on
+        // clock/date/battery double-tap.
         val detector = DoubleClickDetector(thresholdMillis = 300L, clock = clock)
         fakeTime = 1_000L
         assertFalse(detector.registerClick())
         fakeTime = 1_100L
         assertTrue(detector.registerClick())
         fakeTime = 1_200L
+        assertFalse("third rapid tap must NOT re-fire the double click", detector.registerClick())
+    }
+
+    @Test
+    fun `four rapid clicks fire on the second and fourth tap`() {
+        // After the reset, a fresh pair starts: tap3 becomes the new "first",
+        // tap4 completes the second pair. N rapid taps → floor(N/2) hits.
+        val detector = DoubleClickDetector(thresholdMillis = 300L, clock = clock)
+        fakeTime = 1_000L
+        assertFalse(detector.registerClick())
+        fakeTime = 1_100L
         assertTrue(detector.registerClick())
+        fakeTime = 1_200L
+        assertFalse(detector.registerClick())
+        fakeTime = 1_300L
+        assertTrue("fourth tap completes the second pair", detector.registerClick())
     }
 
     // ========== DEFAULTS ==========
