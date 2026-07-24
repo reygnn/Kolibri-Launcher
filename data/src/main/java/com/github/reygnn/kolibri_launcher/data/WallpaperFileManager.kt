@@ -144,11 +144,15 @@ class WallpaperFileManager @Inject constructor(
     /**
      * Löscht eine interne Wallpaper-Datei.
      * Ignoriert URIs die nicht auf unseren internen Speicher zeigen.
+     *
+     * Runs on [Dispatchers.IO] — same as [copyToInternal] — so callers on
+     * the main dispatcher (the wallpaper edit-session paths) don't perform
+     * blocking file IO on the UI thread.
      */
-    fun deleteFile(uri: Uri) {
-        if (!isInternalUri(uri)) return
+    suspend fun deleteFile(uri: Uri) = withContext(Dispatchers.IO) {
+        if (!isInternalUri(uri)) return@withContext
         try {
-            val path = uri.path ?: return
+            val path = uri.path ?: return@withContext
             val file = File(path)
             if (file.exists() && file.delete()) {
                 Timber.d("Deleted wallpaper file: ${file.name}")
@@ -159,7 +163,7 @@ class WallpaperFileManager @Inject constructor(
     }
 
     /** String overload — see [fileExists] for the rationale. */
-    fun deleteFile(uriString: String) = deleteFile(uriString.toUri())
+    suspend fun deleteFile(uriString: String) = deleteFile(uriString.toUri())
 
     /**
      * Löscht ALLE Wallpaper-Dateien im internen Speicher.
