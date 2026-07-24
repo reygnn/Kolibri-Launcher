@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -279,8 +279,11 @@ activities.
    reports any bare `Timber.e(` outside the exception list, so a new
    crash-infra file added here also needs an entry in
    `tools/check-conventions.sh`. Same task also catches Rule 12, the
-   data/ Manager-naming drift, and the Rule-11 annotation discipline
-   in whitelisted files (see Rule 11 below); see TODO.md §7 for the
+   data/ Manager-naming drift, the Rule-11 annotation discipline
+   in whitelisted files (see Rule 11 below), and Toast routing (bare
+   `Toast.makeText(` outside `ui/util/ToastSafe.kt` — every user-facing
+   toast must go through `showToastSafe`, which owns the Samsung
+   StrictMode relax + the Throwable catch); see TODO.md §7 for the
    full list of automated checks.
 
 10. **Testable logic lives outside Android-runtime classes.** Activities,

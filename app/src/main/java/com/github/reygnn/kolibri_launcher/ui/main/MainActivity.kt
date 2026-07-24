@@ -13,7 +13,6 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.Settings
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
@@ -38,6 +37,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -351,7 +351,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             // touches ContentResolver. Toast gives the user a recovery
             // signal; without the catch they would get nothing.
             TimberWrapper.silentError(e, "Error handling wallpaper picker result")
-            Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+            showToastSafe(R.string.error_generic)
         }
     }
 
@@ -711,7 +711,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         // so the user-visible "no calendar app" recovery
                         // would be lost.
                         TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
-                        Toast.makeText(this, getString(R.string.error_no_calendar_app), Toast.LENGTH_SHORT).show()
+                        showToastSafe(R.string.error_no_calendar_app)
                     }
                 }
 
@@ -767,7 +767,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         // Catchall would lose the user-visible Toast
                         // recovery.
                         TimberWrapper.silentError(e, "Error launching wallpaper picker")
-                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+                        showToastSafe(R.string.error_generic)
                     }
                 }
 
@@ -821,15 +821,15 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             }
             is AppLaunchResult.ComponentGone -> {
                 TimberWrapper.silentError("[LAUNCH] Component gone: ${appInfo.displayName}")
-                Toast.makeText(this, getString(R.string.error_app_not_available), Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.error_app_not_available)
             }
             is AppLaunchResult.PermissionDenied -> {
                 TimberWrapper.silentError("[LAUNCH] Permission denied: ${appInfo.displayName}")
-                Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.error_generic)
             }
             is AppLaunchResult.Failed -> {
                 TimberWrapper.silentError(result.cause, "[LAUNCH] Exception: ${appInfo.displayName}")
-                Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.error_generic)
             }
         }
 
@@ -1015,7 +1015,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
             }
 
-            Toast.makeText(this, getString(R.string.error_activity_not_found), Toast.LENGTH_SHORT).show()
+            showToastSafe(R.string.error_activity_not_found)
         }
     }
 

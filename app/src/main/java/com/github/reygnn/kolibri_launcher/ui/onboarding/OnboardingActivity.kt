@@ -18,6 +18,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -236,10 +237,9 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     }
 
     override fun handleSpecificEvent(event: OnboardingEvent) {
-        // Toast.makeText/show is wrapped because Toast IPC has been observed
-        // to throw on Samsung devices under certain conditions (see
-        // BaseActivity.showToastSafe for context). Keeping the per-Toast
-        // catch here mirrors that defensiveness.
+        // Toasts route through showToastSafe (ui/util), which owns the Samsung
+        // StrictMode relax + the Throwable catch (Toast IPC has been observed to
+        // throw on Samsung), shared with every other toast in the app.
         when (event) {
             is OnboardingEvent.NavigateToMain -> {
                 if (launchMode == LaunchMode.INITIAL_SETUP) {
@@ -249,19 +249,10 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 }
             }
             is OnboardingEvent.ShowError -> {
-                try {
-                    Toast.makeText(this@OnboardingActivity, event.message, Toast.LENGTH_LONG).show()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing error toast")
-                }
+                showToastSafe(event.message, Toast.LENGTH_LONG)
             }
             is OnboardingEvent.ShowLimitReachedToast -> {
-                try {
-                    val message = getString(R.string.favorites_limit_reached, event.limit)
-                    Toast.makeText(this@OnboardingActivity, message, Toast.LENGTH_SHORT).show()
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error showing limit toast")
-                }
+                showToastSafe(getString(R.string.favorites_limit_reached, event.limit))
             }
         }
     }

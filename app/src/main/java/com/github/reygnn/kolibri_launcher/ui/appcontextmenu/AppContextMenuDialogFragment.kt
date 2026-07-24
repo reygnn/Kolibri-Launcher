@@ -7,7 +7,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.Toast
 import android.view.Window
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -32,6 +31,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurface
 import com.github.reygnn.kolibri_launcher.ui.customnames.RenameDecision
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -395,11 +395,9 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
                                     dismiss()
                                 }
                                 is RenameDecision.TooLong ->
-                                    Toast.makeText(
-                                        ctx,
-                                        getString(R.string.error_name_too_long, decision.maxLength),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    ctx.showToastSafe(
+                                        getString(R.string.error_name_too_long, decision.maxLength)
+                                    )
                             }
                         } catch (e: CancellationException) {
                             throw e

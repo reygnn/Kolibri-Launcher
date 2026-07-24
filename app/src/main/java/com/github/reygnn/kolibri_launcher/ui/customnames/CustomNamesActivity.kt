@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
@@ -21,6 +20,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -271,13 +271,9 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
     }
 
     private fun showError(message: String) {
-        // Defensive Toast — Samsung IPC has been observed to throw
-        // (see BaseActivity.showToastSafe).
-        try {
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error showing toast")
-        }
+        // Routes through the shared showToastSafe (ui/util): Samsung StrictMode
+        // relax + Throwable catch live there, not open-coded per call site.
+        showToastSafe(message)
     }
 
     /**

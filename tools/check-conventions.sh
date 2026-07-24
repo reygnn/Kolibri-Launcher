@@ -101,6 +101,36 @@ if [ -n "$rule12_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Toast routing — every user-facing toast goes through `Context/Fragment.
+# showToastSafe` (ui/util/ToastSafe.kt), which owns the Samsung StrictMode
+# relax + the Throwable catch. A bare `Toast.makeText(` (or the rare direct
+# `Toast(` constructor) anywhere else silently re-forks that platform
+# handling — exactly the drift the de56192 unification removed and this
+# sweep finished.
+#
+# Allowed file: ToastSafe.kt itself (the sole legitimate `Toast.makeText`
+# owner). Its KDoc mentions `Toast.makeText(...)` too — same allow entry
+# covers it. StrictModeUtil.kt's KDoc names `Toast.makeText` in backticks
+# with no trailing `(`, so the pattern never matches it.
+#
+# Genuine future exceptions (e.g. a toast that must NOT gain the internal
+# silentError because it sits inside a crash-safety net — Rule 9's
+# transitive form): add the file basename to `toast_allowed_files` with a
+# one-line justification, mirroring the Rule 9 exception list.
+# ─────────────────────────────────────────────────────────────────────────────
+toast_allowed_files='ToastSafe\.kt'
+
+toast_hits=$(
+  grep -rnE '\bToast\.makeText\(|\bToast\(' "${src_roots[@]}" --include='*.kt' \
+    | grep -vE "/($toast_allowed_files):" \
+    || true
+)
+
+if [ -n "$toast_hits" ]; then
+  report "Toast routing — bare \`Toast.makeText(\` outside \`ToastSafe.kt\` (use \`showToastSafe\`)" "$toast_hits"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Naming — production classes in `data/` use `*RepositoryImpl` since
 # commit 0f9e7be. One intentional exception documented in
 # app/src/test/CLAUDE.md "Namens-Historie":

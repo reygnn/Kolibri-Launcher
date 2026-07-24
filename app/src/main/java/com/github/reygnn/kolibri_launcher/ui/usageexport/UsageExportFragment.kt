@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentUsageExportBinding
 import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -69,7 +70,7 @@ class UsageExportFragment : Fragment() {
                 exportLauncher.launch(filename)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching export picker")
-                Toast.makeText(requireContext(), R.string.usage_export_error, Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.usage_export_error)
             }
         }
 
@@ -78,7 +79,7 @@ class UsageExportFragment : Fragment() {
                 importLauncher.launch(arrayOf(AppConstants.MIME_TYPE_JSON))
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error launching import picker")
-                Toast.makeText(requireContext(), R.string.usage_import_error, Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.usage_import_error)
             }
         }
     }
@@ -142,55 +143,42 @@ class UsageExportFragment : Fragment() {
         try {
             when (event) {
                 is UsageExportUiEvent.ExportSuccess -> {
-                    Toast.makeText(
-                        requireContext(),
-                        R.string.usage_export_success,
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    showToastSafe(R.string.usage_export_success)
                 }
 
                 is UsageExportUiEvent.ExportError -> {
-                    Toast.makeText(
-                        requireContext(),
+                    showToastSafe(
                         getString(R.string.usage_export_failed, event.message),
                         Toast.LENGTH_LONG
-                    ).show()
+                    )
                 }
 
                 is UsageExportUiEvent.ImportSuccess -> {
-                    Toast.makeText(
-                        requireContext(),
+                    showToastSafe(
                         getString(
                             R.string.usage_import_success,
                             event.packagesImported,
                             event.timestampsImported
-                        ),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                        )
+                    )
                 }
 
                 is UsageExportUiEvent.ImportError -> {
-                    Toast.makeText(
-                        requireContext(),
+                    showToastSafe(
                         getString(R.string.usage_import_failed, event.message),
                         Toast.LENGTH_LONG
-                    ).show()
+                    )
                 }
 
                 is UsageExportUiEvent.InvalidFormat -> {
-                    Toast.makeText(
-                        requireContext(),
-                        R.string.usage_import_invalid_format,
-                        Toast.LENGTH_LONG
-                    ).show()
+                    showToastSafe(R.string.usage_import_invalid_format, Toast.LENGTH_LONG)
                 }
 
                 is UsageExportUiEvent.UnsupportedVersion -> {
-                    Toast.makeText(
-                        requireContext(),
+                    showToastSafe(
                         getString(R.string.usage_import_unsupported_version, event.version),
                         Toast.LENGTH_LONG
-                    ).show()
+                    )
                 }
             }
         } catch (e: Throwable) {

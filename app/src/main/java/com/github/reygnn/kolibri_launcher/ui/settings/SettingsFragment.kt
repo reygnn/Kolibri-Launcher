@@ -44,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
 import com.google.android.material.checkbox.MaterialCheckBox
 import androidx.appcompat.app.AlertDialog
@@ -122,11 +123,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             } else {
                 // Nutzer hat abgelehnt. Zeige Feedback.
-                Toast.makeText(
-                    requireContext(),
-                    R.string.calendar_permission_denied_toast,
-                    Toast.LENGTH_SHORT
-                ).show()
+                showToastSafe(R.string.calendar_permission_denied_toast)
             }
         }
 
@@ -232,11 +229,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                     // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
                     if (shouldEnable) {
-                        Toast.makeText(
-                            requireContext(),
-                            getString(R.string.secure_window_screenshots_disabled),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        showToastSafe(R.string.secure_window_screenshots_disabled)
                     }
                 }
                 true
@@ -536,8 +529,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             } else {
                                 getString(R.string.toast_crash_reports_disabled)
                             }
-                            Toast.makeText(activityContext, feedbackMessage, Toast.LENGTH_SHORT)
-                                .show()
+                            activityContext.showToastSafe(feedbackMessage)
 
                             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                                 updateCrashReportSummary()
@@ -565,11 +557,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>(AppConstants.PrefKeys.RESET_ACRA_TIMER)?.setOnPreferenceClickListener {
             try {
                 CrashReportLimiter.resetAllLimits()
-                Toast.makeText(
-                    requireContext(),
-                    R.string.toast_acra_timer_reset,
-                    Toast.LENGTH_SHORT,
-                ).show()
+                showToastSafe(R.string.toast_acra_timer_reset)
                 true
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error resetting ACRA cooldown timer")
@@ -585,11 +573,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             // attached, so it travels straight to ACRA's global
             // UncaughtExceptionHandler — the exact path a real user crash
             // takes.
-            Toast.makeText(
-                requireContext(),
-                R.string.toast_throwing_test_exception,
-                Toast.LENGTH_LONG,
-            ).show()
+            showToastSafe(R.string.toast_throwing_test_exception, Toast.LENGTH_LONG)
             Thread {
                 try {
                     Thread.sleep(800)
