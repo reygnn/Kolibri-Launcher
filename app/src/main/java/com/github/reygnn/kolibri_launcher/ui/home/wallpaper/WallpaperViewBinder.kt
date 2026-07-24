@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 import android.graphics.Bitmap
 import android.net.Uri
 import android.view.View
+import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
@@ -192,6 +193,14 @@ class WallpaperViewBinder(
     ) {
         view.clearLayers()
 
+        // Track which specs actually made it into the view. A bitmap that
+        // fails to load is skipped (`continue`), which shifts every
+        // following layer's position down by one. The updates in
+        // plan.updates are indexed against the ORIGINAL spec positions, so
+        // they must be remapped onto the surviving layers' real positions
+        // before they are applied — see remapUpdatesToAddedLayers.
+        val addedLayerIds = ArrayList<String>(plan.layers.size)
+
         for (spec in plan.layers) {
             try {
                 val bitmap = bitmapLoader.load(spec.imageUri) ?: continue
@@ -204,6 +213,7 @@ class WallpaperViewBinder(
                     sourceUri = spec.imageUri,
                     id = spec.id
                 )
+                addedLayerIds.add(spec.id)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading layer ${spec.id}")
             }
@@ -222,8 +232,11 @@ class WallpaperViewBinder(
         }
 
         // Transforms and properties are applied after the view has had a
-        // chance to measure — same pattern as the original code.
-        applyUpdates(view, plan.updates, onRebuildComplete)
+        // chance to measure — same pattern as the original code. The
+        // updates are remapped onto the actually-added layers first, so a
+        // skipped load can't scramble the property assignment.
+        val effectiveUpdates = remapUpdatesToAddedLayers(plan.layers, plan.updates, addedLayerIds)
+        applyUpdates(view, effectiveUpdates, onRebuildComplete)
     }
 
     private fun applyUpdates(
@@ -253,6 +266,47 @@ class WallpaperViewBinder(
                 onRebuildComplete?.invoke()
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error applying layer updates")
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Remap [updates] — whose `layerIndex` is expressed against the
+         * planned layer positions in [plannedLayers] — onto the actual
+         * positions of the layers that were successfully added to the
+         * view, given by [addedLayerIds] in add order.
+         *
+         * [WallpaperViewDiff] builds `loadSpecs` (→ [plannedLayers]) and
+         * `updates` over the SAME image-bearing layers in the same order,
+         * so `updates[i].layerIndex == i` addresses `plannedLayers[i]`.
+         * When [applyFullRebuild] skips a spec whose bitmap fails to load,
+         * every following layer shifts down while the updates still point
+         * at the original indices — the "scrambled wallpaper on load
+         * failure" class the [RebuildPlan] identity-diff was written
+         * against, re-entered through the load-error path.
+         *
+         * This rewrites each surviving update's `layerIndex` to its
+         * layer's real post-rebuild position (matched by stable id) and
+         * drops updates whose layer never made it into the view. Pure and
+         * view-free so it can be unit-tested directly.
+         */
+        @VisibleForTesting
+        fun remapUpdatesToAddedLayers(
+            plannedLayers: List<LayerLoadSpec>,
+            updates: List<LayerPropertyUpdate>,
+            addedLayerIds: List<String>,
+        ): List<LayerPropertyUpdate> {
+            // Fast path: every layer loaded, positions already aligned.
+            if (addedLayerIds.size == plannedLayers.size) return updates
+
+            val positionById = HashMap<String, Int>(addedLayerIds.size)
+            addedLayerIds.forEachIndexed { position, id -> positionById[id] = position }
+
+            return updates.mapNotNull { update ->
+                val id = plannedLayers.getOrNull(update.layerIndex)?.id ?: return@mapNotNull null
+                val newPosition = positionById[id] ?: return@mapNotNull null
+                if (newPosition == update.layerIndex) update else update.copy(layerIndex = newPosition)
             }
         }
     }
