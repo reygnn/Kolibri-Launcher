@@ -52,7 +52,7 @@ Priorisierung:
 | 1 | DataStore „safe read flow" in 8 Repos dupliziert | DRY | 🔴 Hoch (~100 LOC) | Niedrig |
 | 2 | Flow-Repo Konstruktor/Factory-Gerüst in 4 Repos | DRY | 🟠 (~70 LOC) | Niedrig |
 | 3 | `SettingsRepositoryImpl` ~19 Getter/Setter-Paare | DRY | 🟠 (~120 LOC) | Niedrig |
-| 4 | Backup-Feldnamen an 4 Stellen gelistet | SSOT | 🟠 (Drift-Risiko) | Mittel |
+| 4 | Backup-Feldnamen an 4 Stellen gelistet | SSOT | ✅ weitgehend abgedeckt (AUDIT-2/-3) — s. Note bei #4 | — |
 | 5 | `BACKUP_VERSION "1.0.0"` an 3+ Stellen hardcodiert | SSOT | 🟡 | Niedrig |
 | 6 | Vier „App-Auswahl"-Activities teilen Gerüst | DRY | 🟠 (~250–350 LOC) | Mittel |
 | 7 | `ZoomableImageView` Single-/Multi-Layer-Pfad doppelt | DRY | 🟠 (groß) | **Hoch** |
@@ -158,6 +158,36 @@ Typisierte Helfer `boolFlow(key, default)` / `intFlow` / `floatFlow` +
 ---
 
 ## #4 — SSOT: Backup-Feldnamen / snake_case-Aliasse an 4 Stellen · 🟠
+
+> **⚠️ Cross-Reference / weitgehend Wiederentdeckung (nachgetragen 2026-07-24):**
+> Dieser Fund überschneidet sich stark mit bereits abgearbeiteten Audits — die
+> „Abgrenzung zu bestehenden Audits" oben hat ihn übersehen. Konkret:
+>
+> - **AUDIT-2** (A~19) hat die 3–4-fach-Duplikation des Strict-Parse-Pfads
+>   geflaggt und die Faltung von `parseStrictly` + `mergeWithStrictValues` in
+>   **ein** `extractStrictSettings(json, base)` empfohlen → **umgesetzt** (steht
+>   heute so im Code). AUDIT-2 stufte `validateJsonTypes` dabei ausdrücklich als
+>   *„type-grouped for a different purpose, not cleanly foldable"* ein — also
+>   bewusst **nicht** Teil der Feldliste-Konsolidierung.
+> - **AUDIT-3 #3** hat die camelCase/snake-Asymmetrie als **echten
+>   Korrektheits-Bug** gefunden (Strict-Fallback las nur snake_case, App schreibt
+>   camelCase → Skalar-Settings fielen still auf Default). **RESOLUTION
+>   2026-07-21:** Strict-Path liest jetzt camelCase-first (+ snake als Alias),
+>   Bug gefixt. **Explizite Scope-Entscheidung:** *„`validateJsonTypes` bleibt
+>   unangetastet (recover-vs-reject ist eine eigene Frage)"*.
+>
+> Die im Befund unten als Beleg genannte Drift (`validateJsonTypes` prüft
+> int/float/bool nur unter snake_case und ist damit gegen aktuelle camelCase-
+> Backups ein No-Op) ist somit **kein neuer Fund**, sondern die bereits
+> **bewusst akzeptierte** Disposition aus AUDIT-3 #3.
+>
+> **Verbleibend** ist nur die reine DRY-Idee (eine Feld-Deskriptor-Tabelle für
+> `@JsonNames` + beide Validatoren) — und die hat AUDIT-2 schon als nicht sauber
+> faltbar eingestuft. Der Backup-Pfad ist zudem mit Vorwärts-/Rückwärts-Unit-
+> Tests (Round-Trip alt+neu, malformed-Rejection) abgedeckt, die eine echte
+> Regression aus dieser Restduplikation fangen würden. **Disposition: nicht als
+> eigener Refactor verfolgen** — Korrektheitskern gefixt (AUDIT-3), Haupt-DRY
+> erledigt (AUDIT-2), Rest bewusst akzeptiert bzw. low-value.
 
 ### Befund
 Das Wissen „Feld X heißt im JSON Y mit Legacy-Alias Y_snake" lebt in vier
@@ -380,8 +410,11 @@ Branch, nie direkt auf `main`.
    `SharedDataStoreFlowRepository`-Basis ist der Enabler für beide, ~100+
    LOC weg, drift-fester Lesepfad analog zu `safePurge`. Größter
    Wert/Risiko-Quotient.
-2. **#5 + #4** (`refactor/backup-ssot`): höchstes SSOT-Risiko in der
-   Backup-Pipeline; #5 ist ein Quick-Win, #4 der drift-kritische Teil.
+2. ~~**#5 + #4** (`refactor/backup-ssot`)~~ — #5 erledigt; **#4 entfällt**:
+   weitgehend Wiederentdeckung von AUDIT-2 (`extractStrictSettings` gefaltet)
+   und AUDIT-3 #3 (camelCase/snake-Bug gefixt, `validateJsonTypes` bewusst
+   belassen). Siehe Cross-Reference-Note bei #4. Backup-Pfad ist vorwärts/
+   rückwärts unit-getestet.
 3. **#3** (`refactor/settings-repo-accessors`): größte Einzeldatei-Kompression,
    reine DRY.
 4. **#6** (`refactor/app-selection-base`): UI-Gerüst-Faltung.
