@@ -3,8 +3,11 @@ package com.github.reygnn.kolibri_launcher.ui.util
 import android.os.StrictMode
 
 /**
- * Runs [block] with a relaxed (LAX) StrictMode thread policy and restores the
- * previous policy afterwards.
+ * Runs [block] with disk reads permitted in the StrictMode thread policy and
+ * restores the previous policy afterwards. Only disk reads are relaxed — every
+ * other StrictMode check (disk writes, custom slow calls, network, …) stays
+ * armed, so a genuine main-thread violation inside [block] still surfaces in
+ * DEBUG instead of being silently swallowed.
  *
  * Purpose: suppress the benign StrictMode DiskRead violations Samsung raises via
  * on-UI-thread IPC/DB reads inside otherwise innocuous framework calls
@@ -18,7 +21,11 @@ import android.os.StrictMode
  */
 inline fun <T> withRelaxedStrictMode(block: () -> T): T {
     val oldPolicy = StrictMode.getThreadPolicy()
-    StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX)
+    StrictMode.setThreadPolicy(
+        StrictMode.ThreadPolicy.Builder(oldPolicy)
+            .permitDiskReads()
+            .build()
+    )
     return try {
         block()
     } finally {
