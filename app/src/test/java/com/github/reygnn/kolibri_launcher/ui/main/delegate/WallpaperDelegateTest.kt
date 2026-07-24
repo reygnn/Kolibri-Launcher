@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -97,6 +98,24 @@ class WallpaperDelegateTest {
         mainDispatcher = mainDispatcherRule.testDispatcher,
         eventSender = { event -> sentEvents.add(event) }
     )
+
+    /**
+     * A delegate scope backed by a LAZY [StandardTestDispatcher] (vs. the
+     * eager [io.mockk.mockk]-friendly Unconfined default). Launched
+     * coroutines are queued until [advanceUntilIdle], which lets a test
+     * interleave a synchronous session boundary (Cancel/Commit) between a
+     * dispatched `onAddWallpaperLayer` and the moment its body actually
+     * runs — the ordering AUDIT-6 #2 is about. Must be called from inside
+     * `runTest` so it shares the test scheduler.
+     */
+    private fun kotlinx.coroutines.test.TestScope.lazyDelegateScope(): DelegateScope {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        return DelegateScope(
+            coroutineScope = CoroutineScope(dispatcher + SupervisorJob()),
+            mainDispatcher = dispatcher,
+            eventSender = { event -> sentEvents.add(event) }
+        )
+    }
 
     private fun createDelegate(
         observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = this.observeWallpaperStateUseCase,
@@ -412,6 +431,55 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(any()) }
+    }
+
+    @Test
+    fun `onAddWallpaperLayer resuming after cancel discards the layer and deletes its file`() = runTest {
+        // AUDIT-6 #2: copyToInternal hops to Dispatchers.IO and releases the
+        // main dispatcher, so a synchronous Cancel can end the session before
+        // the add finishes. Modeled here with a lazy (StandardTestDispatcher)
+        // delegate scope: the add is scheduled while the session is active,
+        // then Cancel runs and moves the session token, then the add runs. It
+        // must NOT persist its layer onto the restored state.
+        val delegate = createDelegate(scope = lazyDelegateScope())
+        delegate.onEnterWallpaperEditMode()
+
+        // Add is dispatched but not yet run (lazy dispatcher).
+        delegate.onAddWallpaperLayer(testUri)
+        assertTrue(delegate.isWallpaperEditMode.value)
+
+        // User cancels before the add's work runs — synchronous session teardown.
+        delegate.onCancelWallpaperEditMode()
+        assertFalse(delegate.isWallpaperEditMode.value)
+
+        // The add now runs across the closed session boundary.
+        advanceUntilIdle()
+
+        // The cancelled layer must not be persisted…
+        assertFalse(
+            "add from a closed session must not persist a layer",
+            delegate.wallpaperState.value.hasWallpaper
+        )
+        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
+        // …and its orphaned file is cleaned up.
+        verify { wallpaperFileManager.deleteFile(internalUriString) }
+    }
+
+    @Test
+    fun `onAddWallpaperLayer resuming within the same session still persists the layer`() = runTest {
+        // Guard must not over-fire: an add that runs without any intervening
+        // session boundary still persists its layer as before.
+        val delegate = createDelegate(scope = lazyDelegateScope())
+        delegate.onEnterWallpaperEditMode()
+
+        delegate.onAddWallpaperLayer(testUri)
+        // No session boundary crosses before the add runs.
+        advanceUntilIdle()
+
+        assertTrue(delegate.wallpaperState.value.hasWallpaper)
+        assertTrue(delegate.wallpaperState.value.isMultiLayer)
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
 
     // ===========================================

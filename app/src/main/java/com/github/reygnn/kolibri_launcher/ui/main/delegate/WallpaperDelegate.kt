@@ -89,8 +89,17 @@
  *   tracking is fragile and makes the cancel path slower.
  * - Never make Cancel's state-restore asynchronous. The fragment's immediate read
  *   depends on synchronicity.
+ * - A layer add is bound to the session it started in. [onAddWallpaperLayer] copies
+ *   the picked file on a suspending IO hop that releases the main dispatcher, so a
+ *   synchronous Cancel/Commit can slip in mid-copy. The add captures [editSessionToken]
+ *   before the copy and re-checks it after; if the token moved, the session it belonged
+ *   to is gone, so the add discards itself (deletes its orphan file, persists nothing)
+ *   instead of reviving a layer onto the restored/committed state. Never bypass this
+ *   re-check — synchronous restore only protects the read path, not a resuming add.
  *
  * **Regression Guards:**
+ * - `onAddWallpaperLayer resuming after cancel discards the layer and deletes its file`
+ * - `onAddWallpaperLayer resuming within the same session still persists the layer`
  * - `onCancelWallpaperEditMode restores snapshot state synchronously`
  * - `onCancelWallpaperEditMode does not delete deferred-remove files`
  * - `onCancelWallpaperEditMode deletes files added during edit mode`
@@ -216,6 +225,20 @@ class WallpaperDelegate(
      * null when not in an edit session.
      */
     private var editSnapshot: WallpaperState? = null
+
+    /**
+     * Monotonic token bumped on every edit-session boundary (enter,
+     * commit, cancel). [onAddWallpaperLayer] captures it before its
+     * suspending file copy and re-checks it after: `copyToInternal` hops
+     * to `Dispatchers.IO` and releases the single-threaded main
+     * dispatcher, so a synchronous Cancel/Commit can end the session
+     * mid-copy. An add that resumes across a boundary must NOT persist its
+     * layer onto the restored/committed state — it belongs to a session
+     * that no longer exists. See the ARCHITECTURAL NOTE above; this closes
+     * the gap it left open (synchronous restore is only guaranteed against
+     * the read path, not against a suspended add resuming later).
+     */
+    private var editSessionToken = 0L
 
     /**
      * URIs of layers removed during the current edit session.
@@ -370,6 +393,7 @@ class WallpaperDelegate(
      * or [onCancelWallpaperEditMode] (roll back all changes).
      */
     fun onEnterWallpaperEditMode() {
+        editSessionToken++
         editSnapshot = _wallpaperState.value
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
@@ -382,6 +406,7 @@ class WallpaperDelegate(
      * is discarded, and in-memory state stays as-is (already persisted).
      */
     fun onCommitWallpaperEditMode() {
+        editSessionToken++
         val filesToDelete = pendingRemovalsOnCommit.toSet()
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
@@ -414,6 +439,7 @@ class WallpaperDelegate(
      * - Files of layers added during the session are deleted.
      */
     fun onCancelWallpaperEditMode() {
+        editSessionToken++
         val snapshot = editSnapshot
         val filesToDelete = pendingRemovalsOnCancel.toSet()
 
@@ -463,11 +489,32 @@ class WallpaperDelegate(
     // MULTI-LAYER: MANAGEMENT
     // ===========================================
 
-    fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) =
+    fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) {
+        // Capture the session token synchronously, at invocation time: this
+        // add belongs to whichever edit session is active right now. The
+        // copy below hops to Dispatchers.IO and releases the main
+        // dispatcher, so a synchronous Cancel/Commit can end that session
+        // before the add resumes — the re-check inside guards against it.
+        val tokenAtStart = editSessionToken
+
         scope.launchSafe("Error adding wallpaper layer") {
             val internalUri = wallpaperFileManager.copyToInternal(imageUri)
             if (internalUri == null) {
                 TimberWrapper.silentError("Failed to copy layer image to internal storage")
+                return@launchSafe
+            }
+
+            // The session this add belongs to ended during the copy (the
+            // user hit Cancel/Commit mid-copy). Persisting now would revive
+            // a layer onto the already-restored/committed state and race the
+            // session's own save. Discard the add and clean up its orphaned
+            // file instead.
+            if (editSessionToken != tokenAtStart) {
+                try {
+                    wallpaperFileManager.deleteFile(internalUri.toString())
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error deleting orphaned layer file after session change")
+                }
                 return@launchSafe
             }
 
@@ -505,6 +552,7 @@ class WallpaperDelegate(
             _wallpaperState.value = newState
             saveWallpaperStateUseCase(newState)
         }
+    }
 
     /**
      * Findet die kleinste freie Nummer N, so dass "Layer N" noch nicht im
