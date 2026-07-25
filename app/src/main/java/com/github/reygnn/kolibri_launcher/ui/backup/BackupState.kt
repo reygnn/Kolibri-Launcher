@@ -8,7 +8,7 @@ sealed class BackupState {
         val importedCount: Int,
         val skippedCount: Int,
         val missingApps: Set<String>,
-        val droppedWallpaperLayers: Int = 0
+        val droppedWallpaperLayers: Int
     ) : BackupState()
     data class LimitExceeded(
         val packageCount: Int,
