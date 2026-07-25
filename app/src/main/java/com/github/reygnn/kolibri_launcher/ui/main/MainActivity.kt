@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.ArrayAdapter
@@ -850,8 +851,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
         val names = apps.map { it.displayName }
         // Custom row layout (item_recent_app) so font size + spacing match the
-        // app drawer; ArrayAdapter binds each name into its TextView.
-        val adapter = ArrayAdapter(this, R.layout.item_recent_app, R.id.recent_app_name, names)
+        // app drawer. The adapter MUST inflate rows with the wallpaper-aware
+        // dialog theme (same overlay the dialog window uses) — otherwise
+        // item_recent_app's ?attr/colorOnSurface resolves against the Activity
+        // theme (system day/night) and the text can go invisible when wallpaper
+        // luminance and system mode diverge.
+        val rowContext = ContextThemeWrapper(this, wallpaperAwareDialogStyle())
+        val adapter = ArrayAdapter(rowContext, R.layout.item_recent_app, R.id.recent_app_name, names)
         val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.recent_apps_title))
             .setAdapter(adapter) { _, which -> viewModel.onAppClicked(apps[which]) }

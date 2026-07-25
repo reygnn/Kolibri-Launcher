@@ -7,6 +7,13 @@
     <dimen name="spacing_medium">8dp</dimen>
     <dimen name="spacing_large">16dp</dimen>
     <dimen name="spacing_xlarge">48dp</dimen>
+
+    <!-- App-list row metrics shared by the app drawer (item_app_drawer) and
+         the swipe-down recent-apps dialog (item_recent_app), so the two
+         "matching" lists stay in lockstep instead of drifting. -->
+    <dimen name="app_row_text_size">18sp</dimen>
+    <dimen name="app_row_padding_horizontal">16dp</dimen>
+    <dimen name="app_row_padding_vertical">12dp</dimen>
     <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
     <dimen name="touch_target_padding">6dp</dimen>
     <dimen name="split_screen_border_width">2dp</dimen>
