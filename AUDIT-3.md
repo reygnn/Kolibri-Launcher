@@ -179,6 +179,14 @@ akzeptieren, passend zu `@JsonNames`).
 > vorher wirft (Type-Mismatch / fehlendes `settings` / struktureller
 > JSON-Defekt) — der Happy-Path ist verlustfrei.
 
+> **↻ Re-verifiziert 2026-07-25 (AUDIT-8 #1) — RESOLVED.** Fix in `b67c5b8`:
+> `extractStrictSettings` liest jetzt camelCase-first Kandidaten-Paare
+> (`getStrictString("swipeLeftApp", "swipe_left_app")` etc.,
+> `BackupSerializer.kt:324-353`, `vararg`-Helfer `:538-575`); Regressionstest
+> `BackupRepositoryImplStrictTest.kt:289`. Zusätzlich schreibt jeder
+> Strict-Read als `… ?: base.<field>` — ein Null-Read fällt auf den
+> kotlinx-Wert zurück, nie auf den Typ-Default. Im aktuellen Code verlustfrei.
+
 ### 4. `maxFavoritesOnHome` — kein Writer (statisches Limit, Intent-Klärung nötig)
 
 - **`app/.../ui/main/delegate/AppManagementDelegate.kt:88`** (Deklaration,
@@ -286,6 +294,14 @@ vorhandenen Eintrag mappen statt einen neuen zu vergeben.
 > für den zweiten Layer, während `layer.copy(imageFileName = entryName)` (`:210`)
 > ihn trotzdem stempelt → verwaister ZIP-Verweis.
 
+> **↻ Re-verifiziert 2026-07-25 (AUDIT-8 #2) — RESOLVED.** Fix in `646e913`:
+> Entry-Namen werden nur noch innerhalb `entryByPath.getOrPut(file.absolutePath)`
+> (`BackupRepositoryImpl.kt:210-214`) gemeinsam mit ihrem `imageEntries.add`
+> vergeben — geteilte Dateien reusen einen realen Eintrag, kein
+> `layer_N.img` ohne Bytes mehr. Der Multi-Layer-Pfad war bis dahin von
+> keinem Test abgedeckt; jetzt geschlossen durch
+> `BackupRoundTripMultiLayerWallpaperTest.saveAndLoad_layersSharingOneImage_bothSurvive`.
+
 ---
 
 ## 🟢 Low / Aufräumen
@@ -303,6 +319,14 @@ vorhandenen Eintrag mappen statt einen neuen zu vergeben.
     prozessweit-eindeutige Invariante von `WallpaperLayerState.newId()`.
     Mutation-Helper keyen auf Index (contained), aber ID-basierte DiffUtil/stable
     IDs würden kollabieren. **Fix:** Atomic-Counter-Suffix wie in `newId()`.
+
+    > **↻ Re-verifiziert 2026-07-25 (AUDIT-8 #2) — RESOLVED.** Fix in
+    > `65bd54d`: `toLayerState()` nutzt `id ?: WallpaperLayerState.newId()`
+    > (`BackupData.kt:59-74`), und `newId()` hängt an `currentTimeMillis()`
+    > einen prozessweit monotonen `AtomicLong`-Suffix (`WallpaperState.kt:44-51`)
+    > — eindeutig selbst bei N Layern in derselben Millisekunde.
+    > Multi-Layer-Restore jetzt durch `BackupRoundTripMultiLayerWallpaperTest`
+    > abgedeckt.
 
 11. **Sub-Frame-Flash** in **`app/.../ui/hiddenapps/HiddenAppsViewModel.kt:97-100`**
     und identisch **`SwipeActionsViewModel.kt:114-118`** — `initialize()` setzt
