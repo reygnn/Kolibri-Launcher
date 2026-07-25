@@ -249,14 +249,17 @@ class SettingsRepositoryImpl @Inject constructor(
             // it is a user-facing setting and must reset like the rest.
             preferences.remove(PreferenceKeys.APP_DRAWER_MODE)
 
-            // Legacy orphan: the double-tap-to-lock feature was removed, and
-            // with it PreferenceKeys.DOUBLE_TAP_TO_LOCK. A pre-removal install
-            // may still carry the persisted value, so clear it by literal key
-            // once here — otherwise a "reset all settings" would leave it
-            // behind forever. The key is never read anymore; this only keeps
+            // Legacy orphans: the double-tap-to-lock, swipe-down-to-notifications
+            // and secure-window features were removed along with their
+            // PrefKeys, so a pre-removal install may still carry the persisted
+            // values with no live key to remove them by. Clear them by literal
+            // key once here — otherwise a "reset all settings" would leave them
+            // behind forever. The keys are never read anymore; this only keeps
             // purge a complete wipe. Safe to delete once no install predates
-            // the feature removal.
+            // the feature removals.
             preferences.remove(booleanPreferencesKey("double_tap_to_lock_enabled"))
+            preferences.remove(booleanPreferencesKey("swipe_down_to_notifications_enabled"))
+            preferences.remove(booleanPreferencesKey("secure_window"))
 
             // WICHTIG: Onboarding Status wird NICHT gelöscht
             // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)

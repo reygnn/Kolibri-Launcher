@@ -11,7 +11,6 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
-import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels

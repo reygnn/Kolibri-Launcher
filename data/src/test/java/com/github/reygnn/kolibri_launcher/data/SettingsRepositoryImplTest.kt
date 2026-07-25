@@ -388,16 +388,24 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - clears legacy orphaned double_tap_to_lock_enabled key`() = runTest {
-        // The double-tap-to-lock feature was removed; a pre-removal install may
-        // still carry the persisted key. purgeRepository must clear it by
+    fun `purgeRepository - clears legacy orphaned keys of removed features`() = runTest {
+        // The double-tap-to-lock, swipe-down-to-notifications and secure-window
+        // features were removed along with their PrefKeys; a pre-removal install
+        // may still carry the persisted keys. purgeRepository must clear them by
         // literal name so "reset all settings" stays a complete wipe.
-        val legacyKey = booleanPreferencesKey("double_tap_to_lock_enabled")
-        fakeDataStore.edit { it[legacyKey] = true }
+        val legacyKeys = listOf(
+            booleanPreferencesKey("double_tap_to_lock_enabled"),
+            booleanPreferencesKey("swipe_down_to_notifications_enabled"),
+            booleanPreferencesKey("secure_window"),
+        )
+        fakeDataStore.edit { prefs -> legacyKeys.forEach { prefs[it] = true } }
 
         settingsManager.purgeRepository()
 
-        assertFalse(fakeDataStore.data.first().contains(legacyKey))
+        val remaining = fakeDataStore.data.first()
+        legacyKeys.forEach { key ->
+            assertFalse("Legacy key $key should be cleared by purge", remaining.contains(key))
+        }
     }
 
     // ========================================================================
