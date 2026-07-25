@@ -62,7 +62,8 @@ probably find one.
   optional via Settings.
 - Swipe-up to the app drawer; swipe-down inside the drawer to dismiss.
 - Long-press any app for system shortcuts (LauncherApps API).
-- Double-tap to lock screen (optional, requires accessibility service).
+- Swipe-down on the home screen to open the notification panel
+  (optional, requires accessibility service).
 - Two configurable swipe-from-edge actions (left / right).
 
 ### App drawer
@@ -223,10 +224,9 @@ the repo root and intentionally git-ignored:
   be fixed in app code.
 - [`ACCEPTED_LIMITATIONS.md`](ACCEPTED_LIMITATIONS.md) — intentional
   UX trade-offs that fall out of architectural decisions (e.g. the
-  residual wallpaper pop-in on double-tap-to-lock, accepted to keep
-  the AccessibilityService model that's required for banking-app
-  compatibility). Each entry carries the rationale and a re-evaluation
-  trigger.
+  AppDrawer AUTO-mode classifier not compositing multi-layer
+  wallpapers before picking a light/dark surface). Each entry carries
+  the rationale and a re-evaluation trigger.
 
 ## Contributing
 

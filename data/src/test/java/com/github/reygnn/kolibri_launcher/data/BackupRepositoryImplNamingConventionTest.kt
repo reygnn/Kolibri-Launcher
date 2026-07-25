@@ -80,7 +80,6 @@ class BackupRepositoryImplNamingConventionTest {
         fakeSettingsRepo.setChipBackgroundColor(-654321)
         fakeSettingsRepo.setTextShadowEnabled(true)
         fakeSettingsRepo.setLayoutScale(1.5f)
-        fakeSettingsRepo.setDoubleTapToLockEnabled(true)
         fakeSettingsRepo.setSwipeDownToNotificationsEnabled(false)
 
         val json = backupManager.exportToJson()
@@ -90,7 +89,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(json).contains("\"chipBackgroundColor\":")
         assertThat(json).contains("\"textShadowEnabled\":")
         assertThat(json).contains("\"layoutScale\":")
-        assertThat(json).contains("\"doubleTapToLockEnabled\":")
         assertThat(json).contains("\"swipeDownToNotificationsEnabled\":")
 
         // Verify snake_case is NOT used
@@ -98,7 +96,6 @@ class BackupRepositoryImplNamingConventionTest {
         assertThat(json).doesNotContain("\"chip_bg_color\":")
         assertThat(json).doesNotContain("\"text_shadow_enabled\":")
         assertThat(json).doesNotContain("\"layout_scale\":")
-        assertThat(json).doesNotContain("\"double_tap_to_lock_enabled\":")
         assertThat(json).doesNotContain("\"swipe_down_to_notifications_enabled\":")
     }
 

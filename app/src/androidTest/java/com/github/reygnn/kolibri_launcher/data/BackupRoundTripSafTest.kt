@@ -97,10 +97,6 @@ class BackupRoundTripSafTest {
         favorites.addFavoriteComponent(componentB)
         hidden.hideComponent(componentB) // app can be both favorite and hidden
         customNames.setCustomNameForPackage(packageA, "α")
-        // Settings: any boolean flag whose default is the opposite of what
-        // we set here. doubleTapToLock falls under importQualityOfLife,
-        // which defaults to true in ImportOptions().
-        settings.setDoubleTapToLock(true)
         // favoritesAlignment rides under importThemeSettings (Phase 7).
         // Default is START; we pick a non-default to make restore visible.
         settings.setFavoritesAlignment(FavoritesAlignment.CENTER)
@@ -117,7 +113,6 @@ class BackupRoundTripSafTest {
         favorites.purgeRepository()
         hidden.purgeRepository()
         customNames.purgeRepository()
-        settings.setDoubleTapToLock(false)
         settings.setFavoritesAlignment(FavoritesAlignment.START)
 
         assertThat(favorites.favoriteComponentsFlow.first()).isEmpty()
@@ -132,7 +127,6 @@ class BackupRoundTripSafTest {
         assertThat(favorites.favoriteComponentsFlow.first()).containsExactly(componentA, componentB)
         assertThat(hidden.hiddenAppsFlow.first()).contains(componentB)
         assertThat(customNames.getAllCustomNames()[packageA]).isEqualTo("α")
-        assertThat(settings.doubleTapToLockEnabledFlow.first()).isTrue()
         assertThat(settings.favoritesAlignmentFlow.first()).isEqualTo(FavoritesAlignment.CENTER)
     }
 

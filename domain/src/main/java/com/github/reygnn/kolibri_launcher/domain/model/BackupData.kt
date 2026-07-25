@@ -165,8 +165,6 @@ data class LauncherSettings(
     val showCalendarEvent: Boolean? = null,
     @JsonNames("show_alarm")
     val showAlarm: Boolean? = null,
-    @JsonNames("double_tap_to_lock_enabled")
-    val doubleTapToLockEnabled: Boolean? = null,
     @JsonNames("swipe_down_to_notifications_enabled")
     val swipeDownToNotificationsEnabled: Boolean? = null,
     @JsonNames("auto_show_keyboard")

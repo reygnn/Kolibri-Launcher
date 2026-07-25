@@ -48,7 +48,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
@@ -81,7 +80,6 @@ import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -101,7 +99,6 @@ class LauncherViewModel @Inject constructor(
     getDrawerAppsUseCase: GetDrawerAppsUseCase,
     hideAppUseCase: HideAppUseCase,
     toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    requestLockUseCase: RequestLockUseCase,
     requestNotificationsUseCase: RequestNotificationsUseCase,
     recordAppLaunchUseCase: RecordAppLaunchUseCase,
     refreshAppsUseCase: RefreshAppsUseCase,
@@ -185,7 +182,6 @@ class LauncherViewModel @Inject constructor(
     )
 
     private val gestureDelegate = GestureDelegate(
-        requestLockUseCase = requestLockUseCase,
         requestNotificationsUseCase = requestNotificationsUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope
@@ -272,13 +268,6 @@ class LauncherViewModel @Inject constructor(
 
     fun consumePendingFocusLayerId() = wallpaperDelegate.consumePendingFocusLayerId()
 
-    val isLockingInProgress: StateFlow<Boolean> get() = gestureDelegate.isLockingInProgress
-    val showLockOverlay: StateFlow<Boolean> get() = gestureDelegate.showLockOverlay
-    val lockPaintTrigger: SharedFlow<Unit> get() = gestureDelegate.lockPaintTrigger
-
-    fun dismissLockOverlay() = gestureDelegate.dismissLockOverlay()
-    fun executeLockAfterOverlayPaint() = gestureDelegate.executeLockAfterOverlayPaint()
-
     // ===========================================
     // APP LIFECYCLE OBSERVER
     // ===========================================
@@ -349,7 +338,6 @@ class LauncherViewModel @Inject constructor(
     fun onSwipeFromRightToLeft() = gestureDelegate.onSwipeFromRightToLeft()
     fun onSwipeFromLeftToRight() = gestureDelegate.onSwipeFromLeftToRight()
     fun onLongPress() = gestureDelegate.onLongPress()
-    fun onDoubleTapToLock() = gestureDelegate.onDoubleTapToLock()
     fun onTimeDoubleClick() = gestureDelegate.onTimeDoubleClick()
     fun onDateDoubleClick() = gestureDelegate.onDateDoubleClick()
     fun onBatteryDoubleClick() = gestureDelegate.onBatteryDoubleClick()

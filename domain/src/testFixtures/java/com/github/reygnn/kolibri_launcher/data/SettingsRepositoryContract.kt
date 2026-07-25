@@ -68,15 +68,6 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun `fresh repository emits default doubleTapToLock`() = runTest {
-        val repo = createRepository()
-        assertEquals(
-            AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK,
-            repo.doubleTapToLockEnabledFlow.first()
-        )
-    }
-
-    @Test
     fun `fresh repository emits default textColor`() = runTest {
         val repo = createRepository()
         assertEquals(AppConstants.DEFAULT_TEXT_COLOR, repo.textColorFlow.first())
@@ -131,14 +122,6 @@ abstract class SettingsRepositoryContract {
         val newValue = SortOrder.entries.first { it != AppConstants.DEFAULT_SORT_ORDER }
         repo.setSortOrder(newValue)
         assertEquals(newValue, repo.sortOrderFlow.first())
-    }
-
-    @Test
-    fun `setDoubleTapToLock reflects in flow`() = runTest {
-        val repo = createRepository()
-        val flipped = !AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK
-        repo.setDoubleTapToLock(flipped)
-        assertEquals(flipped, repo.doubleTapToLockEnabledFlow.first())
     }
 
     @Test
@@ -232,14 +215,14 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `purgeRepository resets feature toggles to defaults`() = runTest {
         val repo = createRepository()
-        repo.setDoubleTapToLock(!AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
+        repo.setSwipeDownToNotifications(!AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
         repo.setAutoShowKeyboard(!AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
 
         repo.purgeRepository()
 
         assertEquals(
-            AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK,
-            repo.doubleTapToLockEnabledFlow.first()
+            AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS,
+            repo.swipeDownToNotificationsEnabledFlow.first()
         )
         assertEquals(
             AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD,

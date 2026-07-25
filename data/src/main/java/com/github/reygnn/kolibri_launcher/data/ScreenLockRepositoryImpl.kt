@@ -13,8 +13,6 @@ import javax.inject.Singleton
 class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
     private val _isAvailable = MutableStateFlow(false)
     override val isLockingAvailableFlow = _isAvailable.asStateFlow()
-    private val _lockRequest = MutableSharedFlow<Unit>()
-    override val lockRequestFlow = _lockRequest.asSharedFlow()
     private val _openNotificationsRequest = MutableSharedFlow<Unit>()
     override val openNotificationsRequestFlow = _openNotificationsRequest.asSharedFlow()
 
@@ -24,18 +22,6 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
     override fun setServiceState(isAvailable: Boolean) {
         _isAvailable.value = isAvailable
         Timber.d("Screen lock service state changed: available=$isAvailable")
-    }
-
-    /**
-     * Wird vom ViewModel aufgerufen, um eine Sperre anzufordern.
-     */
-    override suspend fun requestLock() {
-        if (_isAvailable.value) {
-            _lockRequest.emit(Unit)
-            Timber.d("Screen lock requested")
-        } else {
-            Timber.w("Screen lock requested but service is not available")
-        }
     }
 
     /**
@@ -55,7 +41,7 @@ class ScreenLockRepositoryImpl @Inject constructor() : ScreenLockRepository {
         // NICHTS TUN!
         // Der ScreenLockRepositoryImpl hält nur flüchtigen Runtime-State:
         // - isLockingAvailableFlow: Ob der Accessibility Service verbunden ist
-        // - lockRequestFlow/openNotificationsRequestFlow: Event-Streams für Anfragen
+        // - openNotificationsRequestFlow: event stream for requests
         //
         // Es werden keine User-Einstellungen oder persistierte Daten gespeichert.
         // Der Service-State wird bei jedem App-Start neu ermittelt.

@@ -23,17 +23,8 @@ class FakeScreenLockRepository : ScreenLockRepository, Purgeable {
 
     override val isLockingAvailableFlow = MutableStateFlow(true)
 
-    private val lockRequest = MutableSharedFlow<Unit>()
-    override val lockRequestFlow: Flow<Unit> = lockRequest
-
     private val openNotificationsRequest = MutableSharedFlow<Unit>()
     override val openNotificationsRequestFlow: Flow<Unit> = openNotificationsRequest
-
-    override suspend fun requestLock() {
-        if (isLockingAvailableFlow.value) {
-            lockRequest.emit(Unit)
-        }
-    }
 
     override suspend fun requestOpenNotifications() {
         if (isLockingAvailableFlow.value) {

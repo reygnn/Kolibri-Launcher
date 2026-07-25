@@ -334,8 +334,8 @@ unten bleiben als Audit-Trail erhalten.
   1993 Zeilen (-17), 39 catches (31 `Throwable`). Größter Single-Region-
   Schnitt bisher: 11 Catches und 9 Throwable raus. `setupGestures` outer
   entfernt (synchroner Init in `onViewCreated`), drei innere Catches in
-  `createGestureListener`-Overrides (`onLongPress` / `onDoubleTap` /
-  `onFling`) entfernt — Programmer-Error-Swallows um fire-and-forget
+  `createGestureListener`-Overrides (`onLongPress` / `onFling`)
+  entfernt — Programmer-Error-Swallows um fire-and-forget
   viewModel-Calls + pure-Kotlin `swipeAnalyzer.analyze`. Throws funnel
   jetzt durch den **erhaltenen** outer-Catch in `setOnTouchListener`
   (system-callback boundary; Android-Input-Dispatcher invoked us — HOME-
@@ -644,6 +644,9 @@ Punkte strukturelle Projekte — keine Sweeps mehr im engeren Sinn:
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
 - [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
   Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
+  Bedient seit dem Entfernen von Double-Tap-to-Lock nur noch den
+  Notifications-Pfad (`performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)`);
+  der Lock-Pfad ist weg.
 - [x] ~~**`MainActivity.mainActivityExceptionHandler` Bug-Hint** — der
   nested Catch um `silentError + if(DEBUG) throw` hebt die Rule-9-
   DEBUG-throw-Semantik lokal auf.~~ Gefixt 2026-05-03 in commit
@@ -870,11 +873,6 @@ File-Erstellung. Bestehende Tests haben ihn nicht gepinnt: alle 7 Tests testen
   Plus Survey-Tabelle aller 12 time-basierten Sites im Repo mit
   Pin-Status (`✓` = explizit gepinnt, `✗` = nur kontraktuelles
   Vertrauen ohne Drift-Backstop).
-- `GestureDelegateTest` neuer Test `TIME-PIN` für
-  `LOCK_GESTURE_BLOCK_DURATION_MS` — der pre-existing-Test hat nur
-  `advanceUntilIdle()` gemacht, was bei Konstanten-Drift still grün
-  geblieben wäre. Der neue Test asserted Boundary - 1 ms (Flag noch
-  gesetzt) und Boundary + 1 ms (Flag gecleart).
 - Reference-Test `ObserveInstalledAppsUseCaseTest` →
   „retry counter resets between invocations on IOException backoff"
   bleibt der Lehr-Test für das `currentTime`-Snapshot-Pattern.

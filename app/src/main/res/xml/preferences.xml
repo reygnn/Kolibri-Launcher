@@ -91,13 +91,6 @@
         app:iconSpaceReserved="false">
 
         <SwitchPreferenceCompat
-            android:key="double_tap_to_lock_enabled"
-            android:title="@string/double_tap_to_lock_title"
-            android:summary="@string/double_tap_to_lock_summary"
-            android:defaultValue="false"
-            app:iconSpaceReserved="false" />
-            
-        <SwitchPreferenceCompat
             android:key="swipe_down_to_notifications_enabled"
             android:title="@string/swipe_down_to_notifications_title"
             android:summary="@string/swipe_down_to_notifications_summary"

@@ -74,28 +74,6 @@ class ScreenLockRepositoryImplTest {
         }
     }
 
-    // ========== requestLock — Basisverhalten ==========
-
-    @Test
-    fun `requestLock - when service is available - emits lock request`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-        }
-    }
-
-    @Test
-    fun `requestLock - when service is NOT available - does NOT emit lock request`() = runTest {
-        screenLockManager.setServiceState(false)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            expectNoEvents()
-        }
-    }
-
     // ========== Crash-Resistance ==========
 
     @Test
@@ -135,48 +113,6 @@ class ScreenLockRepositoryImplTest {
     }
 
     @Test
-    fun `requestLock - called multiple times when available - emits multiple events`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-        }
-    }
-
-    @Test
-    fun `requestLock - called when service becomes unavailable - stops emitting`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-
-            // Service becomes unavailable
-            screenLockManager.setServiceState(false)
-
-            // Request should not emit
-            screenLockManager.requestLock()
-            expectNoEvents()
-        }
-    }
-
-    @Test
-    fun `requestLock - before service state is ever set - does not emit`() = runTest {
-        // Don't call setServiceState at all
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            expectNoEvents()
-        }
-    }
-
-    @Test
     fun `isLockingAvailableFlow - multiple collectors - all receive updates`() = runTest {
         screenLockManager.isLockingAvailableFlow.test {
             assertEquals(false, awaitItem())
@@ -195,22 +131,6 @@ class ScreenLockRepositoryImplTest {
     }
 
     @Test
-    fun `lockRequestFlow - multiple collectors - all receive events`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.lockRequestFlow.test {
-                screenLockManager.requestLock()
-
-                // Both should receive
-                assertEquals(Unit, awaitItem())
-            }
-
-            assertEquals(Unit, awaitItem())
-        }
-    }
-
-    @Test
     fun `setServiceState - alternating true false - emits correctly`() = runTest {
         screenLockManager.isLockingAvailableFlow.test {
             assertEquals(false, awaitItem())
@@ -220,43 +140,6 @@ class ScreenLockRepositoryImplTest {
                 screenLockManager.setServiceState(newState)
                 assertEquals(newState, awaitItem())
             }
-        }
-    }
-
-    @Test
-    fun `requestLock - rapid requests when available - all emit`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            // 100 rapid requests
-            repeat(100) {
-                screenLockManager.requestLock()
-            }
-
-            // All should emit
-            repeat(100) {
-                assertEquals(Unit, awaitItem())
-            }
-        }
-    }
-
-    @Test
-    fun `requestLock - interleaved with service state changes - handles correctly`() = runTest {
-        screenLockManager.lockRequestFlow.test {
-            // Service available
-            screenLockManager.setServiceState(true)
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-
-            // Service unavailable
-            screenLockManager.setServiceState(false)
-            screenLockManager.requestLock()
-            expectNoEvents()
-
-            // Service available again
-            screenLockManager.setServiceState(true)
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
         }
     }
 
@@ -275,22 +158,6 @@ class ScreenLockRepositoryImplTest {
                 assertEquals(true, awaitItem())
             }
         }
-
-    @Test
-    fun `lockRequestFlow - collector cancelled - does not affect other collectors`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            awaitItem()
-            cancel()
-        }
-
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.requestLock()
-            assertEquals(Unit, awaitItem())
-        }
-    }
 
     // ========== Open Notifications ==========
 
@@ -314,22 +181,6 @@ class ScreenLockRepositoryImplTest {
                 expectNoEvents()
             }
         }
-
-    @Test
-    fun `requestOpenNotifications - triggers correct flow and NOT lock flow`() = runTest {
-        screenLockManager.setServiceState(true)
-
-        // Wir hören auf BEIDE Flows um sicherzustellen, dass keine Verwechslung vorliegt
-        screenLockManager.lockRequestFlow.test {
-            screenLockManager.openNotificationsRequestFlow.test {
-
-                screenLockManager.requestOpenNotifications()
-
-                assertEquals(Unit, awaitItem()) // Notification flow should emit
-                expectNoEvents() // Lock flow should stay silent
-            }
-        }
-    }
 
     // ========== purgeRepository ==========
 

@@ -12,9 +12,9 @@ import com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds
 import com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer
 
 /**
- * Container that detects the five home-screen gestures (four
- * directional swipes, double-tap, long-press) anywhere within its
- * children and forwards them to per-gesture nullable callbacks.
+ * Container that detects the home-screen gestures (four directional
+ * swipes and long-press) anywhere within its children and forwards
+ * them to per-gesture nullable callbacks.
  *
  * Same architectural pattern as [com.github.reygnn.kolibri_launcher.ui.appdrawer.SwipeDownDismissLayout]
  * (the proven AppDrawer variant). Directional swipes go through
@@ -23,10 +23,10 @@ import com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer
  * `requestDisallowInterceptTouchEvent(true)` mid-gesture, which
  * silently disables `onInterceptTouchEvent` and `OnTouchListener` on
  * the parent. `dispatchTouchEvent` is the only entry point that
- * fires unconditionally on the parent. Tap-based gestures (double-tap
- * and long-press) come from an embedded [GestureDetector] that runs
- * in parallel — taps stay below `touchSlop`, so scroll never claims
- * them and the GestureDetector path works.
+ * fires unconditionally on the parent. The long-press gesture comes
+ * from an embedded [GestureDetector] that runs in parallel — taps
+ * stay below `touchSlop`, so scroll never claims them and the
+ * GestureDetector path works.
  *
  * VELOCITY-BASED, NOT SCROLL-POSITION-BASED:
  *
@@ -39,9 +39,9 @@ import com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer
  * Each callback is null by default. The host fragment wires the
  * gestures it cares about and can null individual callbacks at
  * runtime. The wallpaper-edit-mode case is the motivating example:
- * the four swipe callbacks plus [onDoubleTap] are nulled out while
- * the mode is active, but [onLongPress] stays wired (it's how the
- * user exits the mode). A swipe-result that maps to a null callback
+ * the four swipe callbacks are nulled out while the mode is active,
+ * but [onLongPress] stays wired (it's how the user exits the mode).
+ * A swipe-result that maps to a null callback
  * is treated as IGNORED — the analyzer fires, the wrapper just
  * doesn't dispatch.
  */
@@ -59,7 +59,6 @@ class HomeGestureLayout @JvmOverloads constructor(
     var onSwipeDown: (() -> Unit)? = null
     var onSwipeLeft: (() -> Unit)? = null
     var onSwipeRight: (() -> Unit)? = null
-    var onDoubleTap: (() -> Unit)? = null
     var onLongPress: (() -> Unit)? = null
 
     // ===========================================
@@ -105,8 +104,8 @@ class HomeGestureLayout @JvmOverloads constructor(
      * date / battery TextViews → double-click-to-launch). Used to
      * suppress the wrapper's own [tapDetector] there; otherwise both
      * detectors fire in parallel and the user sees the wrapper's
-     * action (lock / customization-options dialog) layered on top of
-     * the child's intended action.
+     * customization-options dialog layered on top of the child's
+     * intended action.
      *
      * Computed via a manual hit-test in [hasOwnTouchPipelineDescendantAt],
      * NOT from `super.dispatchTouchEvent`'s consumed signal: the
@@ -119,18 +118,13 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var childClaimedDown = false
 
     // ===========================================
-    // EMBEDDED TAP DETECTOR (double-tap + long-press)
+    // EMBEDDED TAP DETECTOR (long-press)
     // ===========================================
 
     private val tapDetector = GestureDetector(
         context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
-
-            override fun onDoubleTap(e: MotionEvent): Boolean {
-                onDoubleTap?.invoke()
-                return true
-            }
 
             override fun onLongPress(e: MotionEvent) {
                 onLongPress?.invoke()
@@ -235,7 +229,7 @@ class HomeGestureLayout @JvmOverloads constructor(
         // → app-context-menu) and clickable (clock / date / battery
         // TextViews → double-click-to-launch). Running the wrapper's
         // tapDetector in parallel with either would double-fire (the
-        // child's action plus the wrapper's lock / customization
+        // child's action plus the wrapper's customization
         // dialog). For every other surface — empty space beside a
         // short favorite, the empty area below the favorites list,
         // the wallpaper background — there is no own-pipeline

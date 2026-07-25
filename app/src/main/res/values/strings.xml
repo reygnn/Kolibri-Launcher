@@ -18,7 +18,7 @@
     <string name="wallpaper_background">Background wallpaper</string>
     
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Allows Kolibri-Launcher to lock your screen</string>
+    <string name="accessibility_service_description">Allows Kolibri-Launcher to open the notification panel</string>
 
     <!-- HomeFragment Error Messages -->
 
@@ -69,7 +69,7 @@
 
     <!-- For Accessibility Service Dialog in ScreenLockManager -->
     <string name="accessibility_service_title">Permission Required</string>
-<string name="accessibility_service_explanation">Kolibri Launcher needs the Accessibility Service to enable the following features:\n\n• Lock screen with double tap\n• Open notification panel with swipe down\n\nThis service is used exclusively for these functions and does not collect any data.</string>
+<string name="accessibility_service_explanation">Kolibri Launcher needs the Accessibility Service to enable the following feature:\n\n• Open notification panel with swipe down\n\nThis service is used exclusively for this function and does not collect any data.</string>
     <string name="go_to_settings">Go to Settings</string>
 
     <string name="time_placeholder" translatable="false">12:34</string>
@@ -124,8 +124,6 @@
 
     <!-- NEW -->
     <string name="category_gestures_title">Gestures</string>
-    <string name="double_tap_to_lock_title">Double Tap to Lock</string>
-    <string name="double_tap_to_lock_summary">Lock the screen by double tapping an empty space</string>
 
     <string name="category_system_title">System</string>
     <string name="accessibility_title">Accessibility</string>
@@ -134,8 +132,6 @@
     <string name="app_info_summary">Launcher settings and permissions</string>
 
     <string name="welcome_toast_fallback_favorites">Welcome! Choose favorites in app drawer. Until then, we\'ll show suggested apps.</string>
-
-    <string name="toast_enable_double_tap_to_lock">Double tap to lock is disabled. Please enable it in settings.</string>
 
     <string name="usage_data_reset_success">Sorting for %1$s reset</string>
 

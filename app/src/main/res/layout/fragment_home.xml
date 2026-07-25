@@ -175,30 +175,4 @@
 
     </FrameLayout>
 
-    <!--
-      Layer 3: Lock-transition overlay.
-
-      Full-screen black, visibility driven by
-      LauncherViewModel.showLockOverlay. Masks the activity content
-      during the GLOBAL_ACTION_LOCK_SCREEN transition so the
-      system's keyguard fade-in crossfades from homescreen wallpaper
-      to lockscreen wallpaper rather than from launcher content.
-
-      Full design rationale (including the alternative dismissal
-      timings that were tried and rejected) lives on
-      GestureDelegate.onDoubleTapToLock's KDoc.
-
-      A high `elevation` keeps the overlay above siblings
-      (wallpaperEditOverlay etc.) reliably; FrameLayout child order
-      alone is enough on most OEMs but elevation is the belt-and-
-      suspenders form.
-    -->
-    <View
-        android:id="@+id/lockTransitionOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@android:color/black"
-        android:elevation="100dp"
-        android:visibility="gone" />
-
 </FrameLayout>

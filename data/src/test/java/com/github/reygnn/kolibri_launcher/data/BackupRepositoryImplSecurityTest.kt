@@ -316,15 +316,6 @@ class BackupRepositoryImplSecurityTest {
     }
 
     @Test
-    fun `attack - string false instead of boolean - should reject`() = runTest {
-        val maliciousJson = validBackupJson(extras = "\"double_tap_to_lock_enabled\": \"false\"")
-
-        val result = backupManager.importFromJson(maliciousJson, ImportOptions())
-
-        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
-    }
-
-    @Test
     fun `attack - number array in favoriteComponents instead of strings - should reject or handle`() = runTest {
         val maliciousJson = """
             {
@@ -1064,7 +1055,6 @@ class BackupRepositoryImplSecurityTest {
                     "textShadowEnabled": null,
                     "showCalendarEvent": null,
                     "showAlarm": null,
-                    "doubleTapToLockEnabled": null,
                     "swipeDownToNotificationsEnabled": null,
                     "autoShowKeyboard": null,
                     "autoLaunchApp": null

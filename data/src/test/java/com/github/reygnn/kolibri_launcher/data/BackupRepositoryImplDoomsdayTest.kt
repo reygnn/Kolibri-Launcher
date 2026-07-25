@@ -115,14 +115,12 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - only gesture settings - imports only gestures`() = runTest {
-        fakeSettingsRepo.doubleTap = false
         fakeSettingsRepo.swipeDown = false
         fakeSettingsRepo.color = Color.BLACK
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = Color.RED,
-            doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true
         )
         val jsonString = json.encodeToString(backup)
@@ -140,7 +138,6 @@ class BackupRepositoryImplDoomsdayTest {
         val result = backupManager.importFromJson(jsonString, options)
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
         Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
         Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
@@ -151,14 +148,12 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
-        fakeSettingsRepo.doubleTap = false
         fakeSettingsRepo.swipeDown = false
 
         val backup = createTestBackup(
             textColor = Color.GREEN,
             chipBackgroundColor = Color.MAGENTA,
             textShadowEnabled = false,
-            doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true
         )
         val jsonString = json.encodeToString(backup)
@@ -179,7 +174,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
-        Truth.assertThat(fakeSettingsRepo.doubleTap).isFalse()
         Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
@@ -288,7 +282,6 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo.color = Color.RED
         fakeSettingsRepo.chipBgColor = Color.GREEN
         fakeSettingsRepo.shadow = false
-        fakeSettingsRepo.doubleTap = true
         fakeSettingsRepo.swipeDown = true
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
@@ -305,7 +298,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(backup.settings.textColor).isEqualTo(Color.RED)
         Truth.assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
         Truth.assertThat(backup.settings.textShadowEnabled).isFalse()
-        Truth.assertThat(backup.settings.doubleTapToLockEnabled).isTrue()
         Truth.assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
         Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
         Truth.assertThat(backup.settings.autoLaunchApp).isTrue()
@@ -860,7 +852,6 @@ class BackupRepositoryImplDoomsdayTest {
             textColor = Color.YELLOW,
             chipBackgroundColor = Color.RED,
             textShadowEnabled = false,
-            doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
             autoLaunchApp = true
@@ -882,7 +873,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
-        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
         Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
@@ -914,12 +904,10 @@ class BackupRepositoryImplDoomsdayTest {
 
     @Test
     fun `importFromJson - old backup without gesture keys - does not change gestures`() = runTest {
-        fakeSettingsRepo.doubleTap = true
         fakeSettingsRepo.swipeDown = false
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
-            doubleTapToLockEnabled = null,
             swipeDownToNotificationsEnabled = null
         )
         val oldBackupJson = json.encodeToString(backup)
@@ -929,7 +917,6 @@ class BackupRepositoryImplDoomsdayTest {
         val result = backupManager.importFromJson(oldBackupJson, options)
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.doubleTap).isTrue()
         Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
@@ -1129,14 +1116,11 @@ class BackupRepositoryImplDoomsdayTest {
         // Erwartung: Theme wird übernommen, fehlende neue Keys werden ignoriert/auf Standard gesetzt.
 
         fakeSettingsRepo.color = Color.BLACK
-        fakeSettingsRepo.doubleTap = false // Gesture Setting (sollte ignoriert werden)
 
         val backup = createTestBackup(
             appVersion = "0.5.0", // Ältere Version
             textColor = Color.RED,
-            chipBackgroundColor = Color.YELLOW,
-            // Ein Setting, das NICHT Theme ist, um Isolation zu testen
-            doubleTapToLockEnabled = true
+            chipBackgroundColor = Color.YELLOW
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1154,9 +1138,6 @@ class BackupRepositoryImplDoomsdayTest {
         // Check: Theme wurde übernommen
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.YELLOW)
-
-        // Check: Anderes Setting wurde NICHT übernommen (Isolation)
-        Truth.assertThat(fakeSettingsRepo.doubleTap).isFalse()
     }
 
     @Test
@@ -1752,7 +1733,6 @@ class BackupRepositoryImplDoomsdayTest {
         contentTopMarginScale: Float? = null,
         showCalendarEvent: Boolean? = null,
         showAlarm: Boolean? = null,
-        doubleTapToLockEnabled: Boolean? = null,
         swipeDownToNotificationsEnabled: Boolean? = null,
         autoShowKeyboard: Boolean? = null,
         autoLaunchApp: Boolean? = null
@@ -1777,7 +1757,6 @@ class BackupRepositoryImplDoomsdayTest {
                 contentTopMarginScale = contentTopMarginScale,
                 showCalendarEvent = showCalendarEvent,
                 showAlarm = showAlarm,
-                doubleTapToLockEnabled = doubleTapToLockEnabled,
                 swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,
                 autoLaunchApp = autoLaunchApp

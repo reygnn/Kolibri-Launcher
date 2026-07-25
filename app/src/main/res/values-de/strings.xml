@@ -18,7 +18,7 @@
     <string name="wallpaper_background">Hintergrundbild</string>
     
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Ermöglicht Kolibri-Launcher die Bildschirmsperre</string>
+    <string name="accessibility_service_description">Ermöglicht Kolibri-Launcher das Öffnen des Benachrichtigungsfelds</string>
 
     <!-- HomeFragment Error Messages -->
 
@@ -69,7 +69,7 @@
 
     <!-- Für den Barrierefreiheits-Dialog im ScreenLockManager -->
     <string name="accessibility_service_title">Berechtigung erforderlich</string>
-<string name="accessibility_service_explanation">Kolibri Launcher benötigt den Eingabehilfendienst für folgende Funktionen:\n\n• Bildschirm mit Doppeltipp sperren\n• Benachrichtigungsfeld mit Wischen öffnen\n\nDieser Dienst wird ausschließlich für diese Funktionen verwendet und sammelt keine Daten.</string>
+<string name="accessibility_service_explanation">Kolibri Launcher benötigt den Eingabehilfendienst für folgende Funktion:\n\n• Benachrichtigungsfeld mit Wischen öffnen\n\nDieser Dienst wird ausschließlich für diese Funktion verwendet und sammelt keine Daten.</string>
     <string name="go_to_settings">Zu den Einstellungen</string>
 
     <string name="date_placeholder">Lade Datum…</string>
@@ -103,8 +103,6 @@
     </string-array>
 
     <string name="category_gestures_title">Gesten</string>
-    <string name="double_tap_to_lock_title">Doppeltippen zum Sperren</string>
-    <string name="double_tap_to_lock_summary">Sperrt den Bildschirm durch doppeltes Tippen auf einen leeren Bereich</string>
 
     <string name="category_system_title">System</string>
     <string name="accessibility_title">Bedienungshilfen</string>
@@ -113,8 +111,6 @@
     <string name="app_info_summary">Launcher-Einstellungen und Berechtigungen</string>
 
     <string name="welcome_toast_fallback_favorites">Willkommen! Wählen Sie Ihre Favoriten im App Drawer aus. Bis dahin zeigen wir Ihnen einige Apps zum Start.</string>
-
-    <string name="toast_enable_double_tap_to_lock">Doppeltipp zum Sperren ist deaktiviert. Du kannst die Funktion in den Launcher-Einstellungen aktivieren.</string>
 
     <string name="usage_data_reset_success">Sortierung für %1$s zurückgesetzt</string>
 

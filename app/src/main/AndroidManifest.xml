@@ -121,7 +121,7 @@
 
         </activity>
 
-        <!-- Accessibility Service für Screen Lock -->
+        <!-- Accessibility Service für das Öffnen des Benachrichtigungsfelds (Swipe-down) -->
         <service
             android:name=".ui.util.ScreenLockAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

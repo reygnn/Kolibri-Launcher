@@ -18,7 +18,7 @@ wrapper that:
 
 - Lets favorites use the full vertical screen height in all cases, even
   when there are more favorites than fit on screen.
-- Detects all five home gestures (4 swipes + double-tap + long-press)
+- Detects all home gestures (4 swipes + long-press)
   anywhere on the screen via velocity discrimination, exactly mirroring
   the proven `SwipeDownDismissLayout` pattern in the AppDrawer.
 - Lets slow drags pass through to the underlying `ScrollView` so normal
@@ -146,8 +146,7 @@ Already extracted from HomeFragment per Rule 10. Methods:
 - `onSwipeFromRightToLeft()` / `onSwipeFromLeftToRight()` → call
   `HandleSwipeActionUseCase(SwipeSlot.X)` and emit `UiEvent.LaunchApp`.
 
-`viewModel.onLongPress()` and `viewModel.onDoubleTapToLock()` route
-through their own use cases (settings open / display lock).
+`viewModel.onLongPress()` routes through its own use case (settings open).
 
 **This entire backend stays intact.** The migration only changes how
 touches are detected and routed to these methods.
@@ -361,8 +360,7 @@ mapping):
 | 2 | Swipe down | `viewModel.onFlingDown()` → `GestureDelegate.onFlingDown()` | Open notifications via accessibility service |
 | 3 | Swipe right (left→right finger motion) | `viewModel.onSwipeFromLeftToRight()` | Launch configured swipe-app |
 | 4 | Swipe left (right→left finger motion) | `viewModel.onSwipeFromRightToLeft()` | Launch configured swipe-app |
-| 5a | Double tap | `viewModel.onDoubleTapToLock()` | Display lock via accessibility |
-| 5b | Long press | `viewModel.onLongPress()` (or wallpaper edit-mode exit, conditional) | Open settings (default) |
+| 5 | Long press | `viewModel.onLongPress()` (or wallpaper edit-mode exit, conditional) | Open settings (default) |
 
 The **wallpaper edit-mode** carve-out for long-press is a special
 case worth preserving: when `viewModel.isWallpaperEditMode.value == true`,
@@ -513,38 +511,14 @@ File: `app/src/main/res/layout/fragment_home.xml`.
   binding.homeGestureRoot.onSwipeDown   = { viewModel.onFlingDown() }
   binding.homeGestureRoot.onSwipeLeft   = { viewModel.onSwipeFromRightToLeft() }
   binding.homeGestureRoot.onSwipeRight  = { viewModel.onSwipeFromLeftToRight() }
-  binding.homeGestureRoot.onDoubleTap   = { viewModel.onDoubleTapToLock() }
   binding.homeGestureRoot.onLongPress   = {
       if (viewModel.isWallpaperEditMode.value) viewModel.onSetWallpaperEditMode(false)
       else viewModel.onLongPress()
   }
   ```
-- The locking-in-progress short-circuit currently in
-  `GestureDetector.onFling` (HomeFragment.kt:1445–1448) moves into
-  `viewModel.onFling*` methods themselves: each method's first line
-  becomes `if (isLockingInProgress) return` (decision, see §8). Per
-  Rule 10 — JVM-testable, centralizes the gate, future call sites
-  (e.g. hardware button) inherit it. Verify the actual flag name
-  (`isLockingInProgress` or whichever) when implementing.
 
 **Implementation notes (2026-05-07):**
 
-- **Locking-in-progress gate landed in `GestureDelegate`, not
-  `LauncherViewModel`.** The ViewModel methods (`onFlingUp` /
-  `onFlingDown` / `onSwipeFromRightToLeft` /
-  `onSwipeFromLeftToRight`) are pure pass-through one-liners
-  delegating to `GestureDelegate`. Adding the gate at the
-  pass-through layer would have meant 4 redundant ViewModel-side
-  reads of a flag that already lives on the delegate.
-  `GestureDelegate` already exposes `_isLockingInProgress`
-  internally (it's where the lock animation is awaited via
-  `delay(LOCK_GESTURE_BLOCK_DURATION_MS)`), so the gate sits next
-  to its source of truth: `if (_isLockingInProgress.value)
-  return@launchSafe` as the first line of each of the four
-  directional handlers. Honors the spirit of decision 6 (Rule 10
-  — JVM-testable, centralized) without the extra plumbing.
-  Long-press and double-tap stay unguarded, mirroring the original
-  `createGestureListener.onFling`-only check.
 - **Step-2-and-Step-3 collapsed into one commit.** The original
   Step 7 plan in §6 already grouped XML and HomeFragment wiring
   together. Doing them sequentially would have created an

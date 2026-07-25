@@ -421,29 +421,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        // Double Tap to Lock
-        val doubleTapPreference =
-            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
-        doubleTapPreference?.setOnPreferenceChangeListener { _, newValue ->
-            try {
-                if (newValue is Boolean) {
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        try {
-                            settingsRepository.setDoubleTapToLock(newValue)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(e, "Error setting double tap to lock")
-                        }
-                    }
-                }
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in double tap preference change")
-                false
-            }
-        }
-
         // App Drawer Mode (Auto / Light / Dark)
         val wallpaperSurfaceModePreference =
             findPreference<ListPreference>(AppConstants.PrefKeys.APP_DRAWER_MODE)
@@ -694,20 +671,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
-                // Observer für Double Tap Setting
-                launch {
-                    try {
-                        settingsRepository.doubleTapToLockEnabledFlow.collect { isChecked ->
-                            if (!isAdded || isDetached) return@collect
-                            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)?.isChecked =
-                                isChecked
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in double tap flow collection")
-                    }
-                }
 
                 // Observer for AppDrawer Mode Setting
                 launch {

@@ -43,7 +43,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsU
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
@@ -169,7 +168,6 @@ class MonolithicLauncherViewModelTest {
     private val getDrawerAppsUseCase: GetDrawerAppsUseCase = mockk(relaxed = true)
     private val hideAppUseCase: HideAppUseCase = mockk(relaxed = true)
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase = mockk(relaxed = true)
-    private val requestLockUseCase: RequestLockUseCase = mockk(relaxed = true)
     private val requestNotificationsUseCase: RequestNotificationsUseCase = mockk(relaxed = true)
     private val recordAppLaunchUseCase: RecordAppLaunchUseCase = mockk(relaxed = true)
     private val refreshAppsUseCase: RefreshAppsUseCase = mockk(relaxed = true)
@@ -252,7 +250,6 @@ class MonolithicLauncherViewModelTest {
             getDrawerAppsUseCase,
             hideAppUseCase,
             toggleFavoriteUseCase,
-            requestLockUseCase,
             requestNotificationsUseCase,
             recordAppLaunchUseCase,
             refreshAppsUseCase,
@@ -498,72 +495,6 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         coVerify { toggleSortOrderUseCase.invoke() }
-    }
-
-    @Test
-    fun `onDoubleTapToLock - when enabled and available - calls UseCase`() = runTest {
-        // Mocke das ERGEBNIS des UseCase
-        coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.Success
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        // Production sequence: HomeFragment's OneShotPreDrawListener
-        // is what bridges onDoubleTapToLock to executeLockAfterOverlayPaint
-        // in real life. In a unit test there is no view, so we call
-        // both halves explicitly. See GestureDelegate.onDoubleTapToLock
-        // KDoc, "The two-channel split".
-        viewModel.onDoubleTapToLock()
-        viewModel.executeLockAfterOverlayPaint()
-        advanceUntilIdle()
-
-        coVerify { requestLockUseCase.invoke() }
-    }
-
-    @Test
-    fun `onDoubleTapToLock - when enabled but not available - shows accessibility dialog`() =
-        runTest {
-            // Mocke das ERGEBNIS des UseCase
-            coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.ErrorAccessibility
-
-            setupViewModel()
-            advanceUntilIdle()
-
-            viewModel.event.test {
-                viewModel.onDoubleTapToLock()
-                viewModel.executeLockAfterOverlayPaint()
-                advanceUntilIdle()
-
-                val event = awaitItem()
-                assertTrue(event is UiEvent.ShowAccessibilityDialog)
-            }
-            coVerify { requestLockUseCase.invoke() }
-        }
-
-    @Test
-    fun `onDoubleTapToLock - when disabled - shows enable toast once`() = runTest {
-        // Mocke das ERGEBNIS des UseCase
-        coEvery { requestLockUseCase.invoke() } returns RequestLockUseCase.Result.ErrorDisabled
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoubleTapToLock()
-            viewModel.executeLockAfterOverlayPaint()
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.toast_enable_double_tap_to_lock, event.messageResId)
-
-            // Second call should not emit event (Logik ist im VM)
-            viewModel.onDoubleTapToLock()
-            viewModel.executeLockAfterOverlayPaint()
-            advanceUntilIdle()
-            expectNoEvents()
-        }
-        coVerify(exactly = 2) { requestLockUseCase.invoke() }
     }
 
     // --- Tests, die gleich bleiben (da sie keine Repos/UseCases aufrufen) ---
@@ -1235,30 +1166,6 @@ class MonolithicLauncherViewModelTest {
         // Beide Aufrufe sollten passiert sein
         coVerify { recordAppLaunchUseCase.invoke(app1) }
         coVerify { refreshAppsUseCase.invoke() }
-    }
-
-    @Test
-    fun `onDoubleTapToLock - shows toast only once despite multiple calls`() = runTest {
-        coEvery { requestLockUseCase.invoke() } returns
-                RequestLockUseCase.Result.ErrorDisabled
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onDoubleTapToLock()
-            viewModel.executeLockAfterOverlayPaint()
-            advanceUntilIdle()
-            awaitItem() // First toast
-
-            repeat(3) {
-                viewModel.onDoubleTapToLock()
-                viewModel.executeLockAfterOverlayPaint()
-            }
-            advanceUntilIdle()
-
-            expectNoEvents() // Keine weiteren Toasts!
-        }
     }
 
     @Test

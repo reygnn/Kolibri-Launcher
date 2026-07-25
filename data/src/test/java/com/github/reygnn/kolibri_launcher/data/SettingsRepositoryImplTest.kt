@@ -41,7 +41,6 @@ class SettingsRepositoryImplTest {
     private val context: Context = mockk(relaxed = true)
 
     private val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
-    private val DOUBLE_TAP_TO_LOCK_ENABLED = booleanPreferencesKey("double_tap_to_lock_enabled")
     private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     private val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     private val SHOW_ALARM = booleanPreferencesKey("show_alarm")
@@ -102,19 +101,6 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `doubleTapToLockEnabledFlow - when no value is set - returns default false`() = runTest {
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
-    }
-
-    @Test
-    fun `setDoubleTapToLock - correctly saves true`() = runTest {
-        settingsManager.setDoubleTapToLock(true)
-
-        val savedValue = fakeDataStore.data.first()[DOUBLE_TAP_TO_LOCK_ENABLED]
-        assertTrue(savedValue ?: false)
-    }
-
-    @Test
     fun `onboardingCompletedFlow - when no value is set - returns default false`() = runTest {
         assertFalse(settingsManager.onboardingCompletedFlow.first())
     }
@@ -160,24 +146,6 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `setDoubleTapToLock - when DataStore edit fails - does not crash`() = runTest {
-        fakeDataStore.makeEditFail()
-
-        settingsManager.setDoubleTapToLock(true)
-
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
-    }
-
-    @Test
-    fun `setDoubleTapToLock - when CancellationException - propagates it`() = runTest {
-        fakeDataStore.makeCancellable()
-
-        assertFailsWith<CancellationException> {
-            settingsManager.setDoubleTapToLock(false)
-        }
-    }
-
-    @Test
     fun `setOnboardingCompleted - when DataStore edit fails - does not crash`() = runTest {
         fakeDataStore.makeEditFail()
 
@@ -203,13 +171,6 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `doubleTapToLockEnabledFlow - when DataStore read fails - returns default false`() = runTest {
-        fakeDataStore.makeReadFail()
-
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
-    }
-
-    @Test
     fun `onboardingCompletedFlow - when DataStore read fails - returns default false`() = runTest {
         fakeDataStore.makeReadFail()
 
@@ -230,29 +191,11 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `setDoubleTapToLock - toggling multiple times - works correctly`() = runTest {
-        settingsManager.doubleTapToLockEnabledFlow.test {
-            Assert.assertEquals(false, awaitItem())
-
-            settingsManager.setDoubleTapToLock(true)
-            Assert.assertEquals(true, awaitItem())
-
-            settingsManager.setDoubleTapToLock(false)
-            Assert.assertEquals(false, awaitItem())
-
-            settingsManager.setDoubleTapToLock(true)
-            Assert.assertEquals(true, awaitItem())
-        }
-    }
-
-    @Test
     fun `multiple flows - all work independently`() = runTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
-        settingsManager.setDoubleTapToLock(false)
         settingsManager.setOnboardingCompleted()
 
         Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertTrue(settingsManager.onboardingCompletedFlow.first())
     }
 
@@ -356,12 +299,10 @@ class SettingsRepositoryImplTest {
     @Test
     fun `multiple settings - showAlarm works with other settings`() = runTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
-        settingsManager.setDoubleTapToLock(false)
         settingsManager.setShowCalendarEvent(true)
         settingsManager.setShowAlarm(false)
 
         Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertTrue(settingsManager.showCalendarEventFlow.first())
         assertFalse(settingsManager.showAlarmFlow.first())
     }
@@ -445,13 +386,11 @@ class SettingsRepositoryImplTest {
     @Test
     fun `purgeRepository - clears all settings keys`() = runTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
-        settingsManager.setDoubleTapToLock(true)
         settingsManager.setShowAlarm(true)
 
         settingsManager.purgeRepository()
 
         Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
-        assertFalse(settingsManager.doubleTapToLockEnabledFlow.first())
         assertFalse(settingsManager.showAlarmFlow.first())
     }
 

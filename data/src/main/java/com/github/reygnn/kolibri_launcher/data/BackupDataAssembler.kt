@@ -96,7 +96,6 @@ class BackupDataAssembler @Inject constructor(
 
         val showCalendarEvent = settingsRepository.showCalendarEventFlow.first()
         val showAlarm = settingsRepository.showAlarmFlow.first()
-        val doubleTapToLockEnabled = settingsRepository.doubleTapToLockEnabledFlow.first()
         val swipeDownToNotificationsEnabled = settingsRepository.swipeDownToNotificationsEnabledFlow.first()
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
@@ -149,7 +148,6 @@ class BackupDataAssembler @Inject constructor(
             wallpaperLayers = wallpaperLayers,
             showCalendarEvent = showCalendarEvent,
             showAlarm = showAlarm,
-            doubleTapToLockEnabled = doubleTapToLockEnabled,
             swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
@@ -289,7 +287,6 @@ class BackupDataAssembler @Inject constructor(
 
         // ===== PHASE 6: Import Gesture Settings =====
         if (options.importGestureSettings) {
-            backup.settings.doubleTapToLockEnabled?.let { settingsRepository.setDoubleTapToLock(it) }
             backup.settings.swipeDownToNotificationsEnabled?.let { settingsRepository.setSwipeDownToNotifications(it) }
         }
 

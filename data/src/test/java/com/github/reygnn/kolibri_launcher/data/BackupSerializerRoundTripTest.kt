@@ -92,7 +92,6 @@ class BackupSerializerRoundTripTest {
             ),
             showCalendarEvent = true,
             showAlarm = true,
-            doubleTapToLockEnabled = true,
             swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
             autoLaunchApp = true,
@@ -126,9 +125,7 @@ class BackupSerializerRoundTripTest {
 
         assertThat(json).contains("\"swipeLeftApp\":")
         assertThat(json).contains("\"chipBackgroundColor\":")
-        assertThat(json).contains("\"doubleTapToLockEnabled\":")
         assertThat(json).doesNotContain("\"swipe_left_app\":")
         assertThat(json).doesNotContain("\"chip_bg_color\":")
-        assertThat(json).doesNotContain("\"double_tap_to_lock_enabled\":")
     }
 }

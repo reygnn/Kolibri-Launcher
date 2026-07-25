@@ -40,8 +40,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
-        val DOUBLE_TAP_TO_LOCK_ENABLED =
-            booleanPreferencesKey(AppConstants.PrefKeys.DOUBLE_TAP_TO_LOCK)
         val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED =
             booleanPreferencesKey(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.TEXT_SHADOW_ENABLED)
@@ -138,12 +136,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSortOrder(sortOrder: SortOrder) =
         putValue(PreferenceKeys.SORT_ORDER_KEY, sortOrder.name)
-
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> =
-        valueFlow(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED, AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
-
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) =
-        putValue(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED, isEnabled)
 
     override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> =
         valueFlow(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED, AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
@@ -255,7 +247,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun purgeRepository() {
         safeEdit { preferences ->
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
-            preferences.remove(PreferenceKeys.DOUBLE_TAP_TO_LOCK_ENABLED)
             preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)

@@ -17,7 +17,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * AccessibilityService for screen-lock and notification-drawer actions.
+ * AccessibilityService for the notification-drawer action (swipe-down).
  *
  * **Crash-safety profile (§9.15 sweep, 2026-05-08):** every catch in this
  * file is now `Throwable`-broad. The file is end-to-end system-callback
@@ -51,39 +51,6 @@ class ScreenLockAccessibilityService : AccessibilityService() {
                 screenLockRepository.setServiceState(true)
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error setting service state to true")
-            }
-
-            serviceScope.launch {
-                try {
-                    screenLockRepository.lockRequestFlow
-                        .catch { e ->
-                            TimberWrapper.silentError(e, "Error in lockRequestFlow, stopping collection")
-                            // Flow stoppt bei Fehler, aber Service läuft weiter
-                        }
-                        .collect { request ->
-                            try {
-                                Timber.d("Lock request received, performing global action.")
-                                val success = try {
-                                    performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-                                } catch (e: Throwable) {
-                                    TimberWrapper.silentError(e, "Error performing lock screen action")
-                                    false
-                                }
-
-                                if (!success) {
-                                    Timber.w("Failed to lock screen - action not successful")
-                                }
-                            } catch (e: Throwable) {
-                                TimberWrapper.silentError(e, "Error processing lock request")
-                                // Einzelner Fehler darf nicht die Collection stoppen
-                            }
-                        }
-                } catch (e: CancellationException) {
-                    Timber.d("Lock request collection cancelled")
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Critical error in lock request coroutine")
-                }
             }
 
             serviceScope.launch {

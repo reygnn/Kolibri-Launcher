@@ -183,6 +183,30 @@ iteration.
 
 ---
 
+## 2026-07 — Double-tap-to-lock removed
+
+Double-tap-to-lock was dropped in July 2026. The feature let two taps
+on the home screen lock the device via `AccessibilityService` +
+`GLOBAL_ACTION_LOCK_SCREEN` — the only path a non-privileged launcher
+has on Android 14+. Because that route slides the keyguard window in
+*before* the display dims, a device with a different lockscreen than
+homescreen wallpaper saw a brief pop-in of the lockscreen wallpaper on
+the way to black. Months of mitigation (a paint-synced black overlay,
+three rejected dismissal timings, a `OneShotPreDrawListener` frame
+sync) reduced it from "every tap" to "occasional" but could never
+close it: the keyguard is a system window the app cannot mask, and the
+clean fix (`PowerManager#goToSleep`) needs platform/`DEVICE_POWER`
+privileges that would break Play Integrity and banking apps. The
+residual pop-in lived as `ACCEPTED_LIMITATIONS.md` §1 until the
+feature itself was removed — for a perfectionist maintainer the
+occasional wrong-wallpaper flash was worse than not having the gesture
+at all, and the hardware power button already delivers exactly the
+flash-free "black → off" the gesture could not. The AccessibilityService
+stays: it still drives swipe-down-to-open-notifications, which shares
+the same `ScreenLockRepository` availability plumbing.
+
+---
+
 ## Coda — Ash's review as the unconscious target
 
 The fictional Ash review at the top of [REVIEWS.md](REVIEWS.md) was

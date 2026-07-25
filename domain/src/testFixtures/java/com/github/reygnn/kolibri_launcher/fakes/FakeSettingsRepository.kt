@@ -61,7 +61,6 @@ class FakeSettingsRepository : SettingsRepository {
     // Feature Toggles Defaults
     private val calendarFlow = MutableStateFlow(AppConstants.DEFAULT_SHOW_CALENDAR)
     private val alarmFlow = MutableStateFlow(AppConstants.DEFAULT_SHOW_ALARM)
-    private val doubleTapFlow = MutableStateFlow(AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK)
     private val swipeDownFlow = MutableStateFlow(AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
     private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
@@ -111,10 +110,6 @@ class FakeSettingsRepository : SettingsRepository {
         get() = alarmFlow.value
         set(value) { alarmFlow.value = value }
 
-    var doubleTap: Boolean
-        get() = doubleTapFlow.value
-        set(value) { doubleTapFlow.value = value }
-
     var swipeDown: Boolean
         get() = swipeDownFlow.value
         set(value) { swipeDownFlow.value = value }
@@ -148,7 +143,6 @@ class FakeSettingsRepository : SettingsRepository {
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
     override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
     override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
-    override val doubleTapToLockEnabledFlow: Flow<Boolean> = doubleTapFlow
     override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> = swipeDownFlow
     override val showCalendarEventFlow: Flow<Boolean> = calendarFlow
     override val showAlarmFlow: Flow<Boolean> = alarmFlow
@@ -185,10 +179,6 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setContentTopMarginScale(scale: Float) {
         contentTopMargin = scale
-    }
-
-    override suspend fun setDoubleTapToLock(isEnabled: Boolean) {
-        doubleTap = isEnabled
     }
 
     override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) {
@@ -240,7 +230,6 @@ class FakeSettingsRepository : SettingsRepository {
 
         showCalendar = AppConstants.DEFAULT_SHOW_CALENDAR
         showAlarm = AppConstants.DEFAULT_SHOW_ALARM
-        doubleTap = AppConstants.DEFAULT_DOUBLE_TAP_TO_LOCK
         swipeDown = AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS
         autoShowKeyboard = AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
@@ -256,10 +245,6 @@ class FakeSettingsRepository : SettingsRepository {
     }
 
     // HELPER
-
-    fun setDoubleTapToLockEnabled(enabled: Boolean) {
-        doubleTap = enabled
-    }
 
     fun setSwipeDownToNotificationsEnabled(enabled: Boolean) {
         swipeDown = enabled

@@ -397,12 +397,11 @@ framework or Samsung modifications (OneUI `IdsController`, Knox
 
 `ACCEPTED_LIMITATIONS.md` is the sister doc for *intentional* UX or
 behavioural limitations that are direct consequences of an architectural
-decision (e.g., the residual wallpaper pop-in on double-tap-to-lock that
-falls out of the AccessibilityService model the launcher uses to stay
-banking-app-compatible). Each entry carries the rationale and a
-re-evaluation trigger. Before "fixing" a perceived UX bug that touches
-locking, accessibility, or the home/keyguard boundary, cross-check
-`ACCEPTED_LIMITATIONS.md`.
+decision (e.g., the AppDrawer AUTO-mode classifier not compositing
+multi-layer wallpapers before choosing a light/dark surface). Each entry
+carries the rationale and a re-evaluation trigger. Before "fixing" a
+perceived UX bug that touches accessibility, wallpaper classification, or
+the home/keyguard boundary, cross-check `ACCEPTED_LIMITATIONS.md`.
 
 ---
 

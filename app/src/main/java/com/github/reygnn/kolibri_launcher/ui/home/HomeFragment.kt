@@ -18,7 +18,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.activity.OnBackPressedCallback
-import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -572,35 +571,6 @@ class HomeFragment : Fragment() {
             wallpaperEditController?.applyFabPosition(position)
         }
 
-        // Observer 9: Lock-transition overlay (dismiss path). Drives
-        // lockTransitionOverlay's visibility off the StateFlow. The
-        // *paint-before-lock* path is handled by Observer 10, which
-        // sets visibility synchronously to avoid depending on this
-        // collector's order. Full rationale on
-        // GestureDelegate.onDoubleTapToLock's KDoc, "The two-channel
-        // split".
-        collectOnStarted(
-            flow = viewModel.showLockOverlay,
-            errorTag = "lock transition",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { show ->
-            if (_binding == null) return@collectOnStarted
-            binding.lockTransitionOverlay.isVisible = show
-        }
-
-        // Observer 10: Lock paint trigger (paint-before-lock path).
-        // Runs the OneShotPreDrawListener that synchronizes the lock
-        // IPC with the overlay's first frame, so the overlay reaches
-        // SurfaceFlinger before the keyguard surface does. Full
-        // rationale on GestureDelegate.onDoubleTapToLock's KDoc.
-        collectOnStarted(
-            flow = viewModel.lockPaintTrigger,
-            errorTag = "lock paint trigger",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) {
-            scheduleLockAfterOverlayPaint()
-        }
-
     }
 
     private fun observeLayoutChanges() {
@@ -1149,10 +1119,9 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Sets the four swipe callbacks plus the double-tap callback on
-     * [HomeGestureLayout]. Called once during initial wiring and again
-     * each time the user leaves wallpaper-edit mode (see
-     * [applyWallpaperEditModeToGestures]).
+     * Sets the four swipe callbacks on [HomeGestureLayout]. Called once
+     * during initial wiring and again each time the user leaves
+     * wallpaper-edit mode (see [applyWallpaperEditModeToGestures]).
      */
     private fun wireDirectionalGestureCallbacks() {
         if (_binding == null) return
@@ -1161,15 +1130,13 @@ class HomeFragment : Fragment() {
         gestures.onSwipeDown = { viewModel.onFlingDown() }
         gestures.onSwipeLeft = { viewModel.onSwipeFromRightToLeft() }
         gestures.onSwipeRight = { viewModel.onSwipeFromLeftToRight() }
-        gestures.onDoubleTap = { viewModel.onDoubleTapToLock() }
     }
 
     /**
      * Toggles the wrapper's directional gesture callbacks based on
-     * wallpaper-edit mode. In edit mode the four swipes plus
-     * double-tap are nulled out so the user can drag wallpaper
-     * layers around without accidentally launching apps or locking
-     * the screen. The long-press callback is left untouched — its
+     * wallpaper-edit mode. In edit mode the four swipes are nulled out
+     * so the user can drag wallpaper layers around without accidentally
+     * launching apps. The long-press callback is left untouched — its
      * body branches internally on `isWallpaperEditMode.value`, so
      * the same wired callback handles both "exit edit mode" and
      * "open customization-options dialog".
@@ -1182,7 +1149,6 @@ class HomeFragment : Fragment() {
             gestures.onSwipeDown = null
             gestures.onSwipeLeft = null
             gestures.onSwipeRight = null
-            gestures.onDoubleTap = null
         } else {
             wireDirectionalGestureCallbacks()
         }
@@ -1507,49 +1473,6 @@ class HomeFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         showStatusBar()
-        // Dismissal point for the lock-transition overlay. Rationale
-        // (and the rejected alternatives) lives on
-        // GestureDelegate.onDoubleTapToLock's KDoc.
-        viewModel.dismissLockOverlay()
-    }
-
-    /**
-     * Synchronizes the lock IPC with the lock-transition overlay's
-     * first frame. Sets the overlay visible, attaches a
-     * OneShotPreDrawListener (which fires inside the frame
-     * pipeline, after layout), and arms a postDelayed fallback in
-     * case the listener never fires. Both paths route through the
-     * same idempotent `trigger` Runnable, so whichever wins the
-     * race calls `executeLockAfterOverlayPaint` exactly once. Full
-     * rationale on GestureDelegate.onDoubleTapToLock's KDoc.
-     *
-     * If `_binding` is null (fragment view destroyed mid-flight),
-     * fall back to triggering the use-case directly so the
-     * delegate's locking flags get reset rather than stuck — the
-     * frame-sync benefit is moot when there is no view to paint.
-     */
-    private fun scheduleLockAfterOverlayPaint() {
-        val view = _binding?.lockTransitionOverlay ?: run {
-            viewModel.executeLockAfterOverlayPaint()
-            return
-        }
-
-        // Synchronously set visibility here, NOT via Observer 9.
-        // The two collectors (Observer 9 / Observer 10) run on
-        // separate launch blocks and the order between them is not
-        // guaranteed within a single dispatch tick. By setting
-        // visibility here, the listener attached below sees a
-        // VISIBLE view regardless of Observer 9's timing.
-        view.isVisible = true
-
-        var triggered = false
-        val trigger = Runnable {
-            if (triggered) return@Runnable
-            triggered = true
-            viewModel.executeLockAfterOverlayPaint()
-        }
-        OneShotPreDrawListener.add(view) { trigger.run() }
-        view.postDelayed(trigger, AppConstants.LOCK_OVERLAY_PAINT_FALLBACK_MS)
     }
 
     private fun getInsetsController(): WindowInsetsControllerCompat? {

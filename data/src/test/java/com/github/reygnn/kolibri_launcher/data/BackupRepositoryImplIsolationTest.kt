@@ -82,7 +82,6 @@ class BackupRepositoryImplIsolationTest {
     private val baselineBold = false
     private val baselineMargin = 0.0f
 
-    private val baselineDoubleTap = false
     private val baselineSwipeDown = false
 
     private val baselineCalendar = false
@@ -108,7 +107,6 @@ class BackupRepositoryImplIsolationTest {
     private val targetBold = true
     private val targetMargin = 0.5f
 
-    private val targetDoubleTap = true
     private val targetSwipeDown = true
 
     private val targetCalendar = true
@@ -178,7 +176,6 @@ class BackupRepositoryImplIsolationTest {
         fakeSettingsRepo.isFontBold = baselineBold
         fakeSettingsRepo.contentTopMargin = baselineMargin
 
-        fakeSettingsRepo.doubleTap = baselineDoubleTap
         fakeSettingsRepo.swipeDown = baselineSwipeDown
 
         fakeSettingsRepo.showCalendar = baselineCalendar
@@ -205,7 +202,6 @@ class BackupRepositoryImplIsolationTest {
             contentTopMarginScale = targetMargin,
             showCalendarEvent = targetCalendar,
             showAlarm = targetAlarm,
-            doubleTapToLockEnabled = targetDoubleTap,
             swipeDownToNotificationsEnabled = targetSwipeDown,
             autoShowKeyboard = targetAutoKeyboard,
             autoLaunchApp = targetAutoLaunch
@@ -389,7 +385,6 @@ class BackupRepositoryImplIsolationTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         // CHANGED:
-        assertThat(fakeSettingsRepo.doubleTap).isEqualTo(targetDoubleTap)
         assertThat(fakeSettingsRepo.swipeDown).isEqualTo(targetSwipeDown)
 
         // UNCHANGED:
@@ -515,7 +510,6 @@ class BackupRepositoryImplIsolationTest {
     }
 
     private fun assertGesturesUnchanged() {
-        assertThat(fakeSettingsRepo.doubleTap).isEqualTo(baselineDoubleTap)
         assertThat(fakeSettingsRepo.swipeDown).isEqualTo(baselineSwipeDown)
     }
 

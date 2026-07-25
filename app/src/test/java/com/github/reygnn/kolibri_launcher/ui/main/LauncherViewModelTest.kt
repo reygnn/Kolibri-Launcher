@@ -31,7 +31,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestLockUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
@@ -96,7 +95,6 @@ class LauncherViewModelTest {
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
     private lateinit var refreshAppsUseCase: RefreshAppsUseCase
     private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
-    private lateinit var requestLockUseCase: RequestLockUseCase
     private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
@@ -156,7 +154,6 @@ class LauncherViewModelTest {
         recordAppLaunchUseCase = mockk(relaxed = true)
         refreshAppsUseCase = mockk(relaxed = true)
         resetAppUsageUseCase = mockk(relaxed = true)
-        requestLockUseCase = mockk(relaxed = true)
         requestNotificationsUseCase = mockk(relaxed = true)
         handleSwipeActionUseCase = mockk(relaxed = true)
 
@@ -224,7 +221,6 @@ class LauncherViewModelTest {
         getDrawerAppsUseCase = getDrawerAppsUseCase,
         hideAppUseCase = hideAppUseCase,
         toggleFavoriteUseCase = toggleFavoriteUseCase,
-        requestLockUseCase = requestLockUseCase,
         requestNotificationsUseCase = requestNotificationsUseCase,
         recordAppLaunchUseCase = recordAppLaunchUseCase,
         refreshAppsUseCase = refreshAppsUseCase,
@@ -512,13 +508,6 @@ class LauncherViewModelTest {
         collectorJob.cancel()
     }
 
-    @Test
-    fun `isLockingInProgress is initially false`() = runTest {
-        val vm = createViewModel()
-
-        assertFalse(vm.isLockingInProgress.value)
-    }
-
     // ===========================================
     // DELEGATION: THEMING
     // ===========================================
@@ -745,7 +734,6 @@ class LauncherViewModelTest {
         vm.contentTopMarginState.value
         vm.wallpaperState.value
         vm.isWallpaperEditMode.value
-        vm.isLockingInProgress.value
         vm.appDrawerSearchQuery.value
 
         assertTrue(true)

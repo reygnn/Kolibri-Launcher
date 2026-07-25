@@ -19,19 +19,20 @@ import org.junit.Test
  *
  * Siehe [FavoritesRepositoryContract] für Hintergrund und Konventionen.
  *
- * Das [ScreenLockRepository]-Interface kombiniert State (
- * [ScreenLockRepository.isLockingAvailableFlow]) und zwei Event-Streams
- * ([ScreenLockRepository.lockRequestFlow], [ScreenLockRepository.openNotificationsRequestFlow]).
- * Beide Implementierungen benutzen `MutableSharedFlow<Unit>` ohne Buffer für
- * die Events — `emit` hängt also wenn kein Subscriber zuhört. Tests benutzen
- * deshalb durchgängig Turbine, um vor dem Emit einen Collector aufzubauen.
+ * The [ScreenLockRepository] interface combines state
+ * ([ScreenLockRepository.isLockingAvailableFlow]) with one event stream
+ * ([ScreenLockRepository.openNotificationsRequestFlow]).
+ * Both implementations use a `MutableSharedFlow<Unit>` without a buffer
+ * for the event — `emit` therefore suspends when no subscriber is
+ * listening. Tests consistently use Turbine to build a collector before
+ * emitting.
  *
- * KERN-VERTRAGS-PROPERTY:
- *   `requestLock()` und `requestOpenNotifications()` emittieren NUR, wenn der
- *   Service via `setServiceState(true)` als verfügbar gemeldet wurde. Das ist
- *   eine Sicherheits-Eigenschaft des Interfaces: ohne aktiven Accessibility-
- *   Service darf gar nicht erst der Versuch unternommen werden, ein Lock zu
- *   triggern. Beide Implementierungen halten das ein.
+ * CORE CONTRACT PROPERTY:
+ *   `requestOpenNotifications()` emits ONLY when the service has been
+ *   reported available via `setServiceState(true)`. This is a safety
+ *   property of the interface: without an active accessibility service
+ *   no attempt to open the notification panel may even be started. Both
+ *   implementations honor this.
  *
  * NICHT IM CONTRACT — bewusste Drifts:
  *
@@ -89,69 +90,7 @@ abstract class ScreenLockRepositoryContract {
         assertTrue(repo.isLockingAvailableFlow.value)
     }
 
-    // ---------- requestLock — emittiert nur wenn available ----------
-
-    @Test
-    fun `requestLock emits when service is available`() = runTest {
-        val repo = createRepository()
-        repo.setServiceState(true)
-
-        repo.lockRequestFlow.test {
-            repo.requestLock()
-            // awaitItem() würde bei nicht-emittiertem Event hängen → Test-Fail.
-            // Da wir Unit emittieren, prüfen wir, dass _irgendetwas_ kommt.
-            assertEquals(Unit, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `requestLock does not emit when service is unavailable`() = runTest {
-        val repo = createRepository()
-        repo.setServiceState(false)
-
-        repo.lockRequestFlow.test {
-            repo.requestLock()
-            // expectNoEvents bestätigt: keine Emission.
-            expectNoEvents()
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `requestLock multiple times when available emits multiple events`() = runTest {
-        val repo = createRepository()
-        repo.setServiceState(true)
-
-        repo.lockRequestFlow.test {
-            repo.requestLock()
-            assertEquals(Unit, awaitItem())
-            repo.requestLock()
-            assertEquals(Unit, awaitItem())
-            repo.requestLock()
-            assertEquals(Unit, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `requestLock stops emitting when service becomes unavailable mid-stream`() = runTest {
-        val repo = createRepository()
-        repo.setServiceState(true)
-
-        repo.lockRequestFlow.test {
-            repo.requestLock()
-            assertEquals(Unit, awaitItem())
-
-            repo.setServiceState(false)
-
-            repo.requestLock()
-            expectNoEvents()
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    // ---------- requestOpenNotifications — Spiegel von requestLock ----------
+    // ---------- requestOpenNotifications — emittiert nur wenn available ----------
 
     @Test
     fun `requestOpenNotifications emits when service is available`() = runTest {
@@ -177,31 +116,33 @@ abstract class ScreenLockRepositoryContract {
         }
     }
 
-    // ---------- Stream-Unabhängigkeit ----------
-
-    /**
-     * Vertrags-Eigenschaft: lockRequest und openNotificationsRequest sind
-     * separate Event-Streams. requestLock darf nicht in
-     * openNotificationsRequestFlow emittieren und umgekehrt.
-     */
     @Test
-    fun `requestLock does not emit on openNotificationsRequestFlow`() = runTest {
+    fun `requestOpenNotifications multiple times when available emits multiple events`() = runTest {
         val repo = createRepository()
         repo.setServiceState(true)
 
         repo.openNotificationsRequestFlow.test {
-            repo.requestLock()
-            expectNoEvents()
+            repo.requestOpenNotifications()
+            assertEquals(Unit, awaitItem())
+            repo.requestOpenNotifications()
+            assertEquals(Unit, awaitItem())
+            repo.requestOpenNotifications()
+            assertEquals(Unit, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `requestOpenNotifications does not emit on lockRequestFlow`() = runTest {
+    fun `requestOpenNotifications stops emitting when service becomes unavailable mid-stream`() = runTest {
         val repo = createRepository()
         repo.setServiceState(true)
 
-        repo.lockRequestFlow.test {
+        repo.openNotificationsRequestFlow.test {
+            repo.requestOpenNotifications()
+            assertEquals(Unit, awaitItem())
+
+            repo.setServiceState(false)
+
             repo.requestOpenNotifications()
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()

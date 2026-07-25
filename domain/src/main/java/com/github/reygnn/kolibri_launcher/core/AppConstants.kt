@@ -12,35 +12,6 @@ object AppConstants {
 
     // UI Constants
     const val DOUBLE_CLICK_THRESHOLD = 300L
-    const val LOCK_GESTURE_BLOCK_DURATION_MS = 1000L
-
-    /**
-     * Watchdog after which `GestureDelegate.onDoubleTapToLock` force-
-     * dismisses the lock-transition overlay if `HomeFragment.onPause`
-     * never fires (Success returned but the system silently failed
-     * to lock — service unbinding race etc.). Generous on purpose so
-     * we never compete with the normal onPause-driven dismissal on
-     * the success path; only the abnormal path benefits.
-     *
-     * 3 × `LOCK_GESTURE_BLOCK_DURATION_MS` is well past the keyguard
-     * slide-in window (~600 ms on Pixel 9a), so on the normal path
-     * the overlay is already dismissed by onPause when this fires
-     * and the assignment is a no-op.
-     */
-    const val LOCK_OVERLAY_WATCHDOG_DURATION_MS = 3 * LOCK_GESTURE_BLOCK_DURATION_MS
-
-    /**
-     * Fallback timeout in `HomeFragment.scheduleLockAfterOverlayPaint`
-     * for the OneShotPreDrawListener that synchronizes the lock-IPC
-     * with the overlay's first frame. If the listener never fires
-     * (view detached mid-flight, layout pass skipped, exotic OEM
-     * edge case), the fallback runs the trigger anyway so the lock
-     * goes through. 100 ms is well past one VSync at any refresh
-     * rate (16.7 ms @ 60 Hz, 8.3 ms @ 120 Hz) so it can't fire
-     * before the legitimate Pre-Draw on the normal path.
-     */
-    const val LOCK_OVERLAY_PAINT_FALLBACK_MS = 100L
-
 
     // Text Shadow Constants (verwendet in HomeFragment)
     const val SHADOW_RADIUS_TIME = 4f      // Für grosse Zeit-Anzeige
@@ -227,7 +198,6 @@ object AppConstants {
         const val AUTO_LAUNCH_APP = "auto_launch_app"
 
         // Gestures
-        const val DOUBLE_TAP_TO_LOCK = "double_tap_to_lock_enabled"
         const val SWIPE_DOWN_TO_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
 
         // Keys, die nur für Klicks/Intents im Fragment genutzt werden (kein DataStore Value)
@@ -262,7 +232,6 @@ object AppConstants {
 
     const val DEFAULT_SHOW_CALENDAR = false
     const val DEFAULT_SHOW_ALARM = false
-    const val DEFAULT_DOUBLE_TAP_TO_LOCK = false
     const val DEFAULT_SWIPE_DOWN_NOTIFICATIONS = false
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
