@@ -8,4 +8,4 @@
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="100"
     android:packageNames=""
-    android:settingsActivity="com.github.reygnn.bblauncher.SettingsActivity" />
+    android:settingsActivity="com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity" />

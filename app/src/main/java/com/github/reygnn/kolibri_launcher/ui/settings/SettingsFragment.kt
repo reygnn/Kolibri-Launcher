@@ -671,7 +671,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
-
                 // Observer for AppDrawer Mode Setting
                 launch {
                     try {

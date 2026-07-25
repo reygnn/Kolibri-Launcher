@@ -394,6 +394,19 @@ class SettingsRepositoryImplTest {
         assertFalse(settingsManager.showAlarmFlow.first())
     }
 
+    @Test
+    fun `purgeRepository - clears legacy orphaned double_tap_to_lock_enabled key`() = runTest {
+        // The double-tap-to-lock feature was removed; a pre-removal install may
+        // still carry the persisted key. purgeRepository must clear it by
+        // literal name so "reset all settings" stays a complete wipe.
+        val legacyKey = booleanPreferencesKey("double_tap_to_lock_enabled")
+        fakeDataStore.edit { it[legacyKey] = true }
+
+        settingsManager.purgeRepository()
+
+        assertFalse(fakeDataStore.data.first().contains(legacyKey))
+    }
+
     // ========================================================================
     // DOOMSDAY TESTS
     // ========================================================================
