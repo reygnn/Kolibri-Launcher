@@ -97,6 +97,8 @@
     </string-array>
 
     <string name="category_gestures_title">Gesten</string>
+    <string name="recent_apps_title">Zuletzt geöffnet</string>
+    <string name="recent_apps_empty">Noch keine kürzlich geöffneten Apps</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App-Informationen</string>

@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -31,12 +32,14 @@ class GestureDelegateTest {
     private val sentEvents = mutableListOf<UiEvent>()
 
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
+    private lateinit var getRecentAppsUseCase: GetRecentAppsUseCase
 
     @Before
     fun setUp() {
         sentEvents.clear()
 
         handleSwipeActionUseCase = mockk(relaxed = true)
+        getRecentAppsUseCase = mockk(relaxed = true)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -46,9 +49,23 @@ class GestureDelegateTest {
     )
 
     private fun createDelegate() = GestureDelegate(
+        getRecentAppsUseCase = getRecentAppsUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
+
+    @Test
+    fun `onSwipeDown emits ShowRecentApps with the recent apps`() = runTest(mainDispatcherRule.testDispatcher) {
+        val recent = listOf(AppInfo("A", "A", "pkg.a", "cls.a"))
+        coEvery { getRecentAppsUseCase() } returns recent
+        val delegate = createDelegate()
+
+        delegate.onSwipeDown()
+        advanceUntilIdle()
+
+        assertEquals(1, sentEvents.size)
+        assertEquals(UiEvent.ShowRecentApps(recent), sentEvents.first())
+    }
 
     // ===========================================
     // FLING UP

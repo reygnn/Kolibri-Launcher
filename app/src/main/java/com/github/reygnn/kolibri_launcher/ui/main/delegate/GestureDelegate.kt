@@ -9,16 +9,18 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
 /**
  * Delegate responsible for all gesture handling:
- * fling up, swipe left/right, long press,
+ * fling up, swipe down (recent apps), swipe left/right, long press,
  * and double-click on clock/date/battery.
  */
 class GestureDelegate(
+    private val getRecentAppsUseCase: GetRecentAppsUseCase,
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase,
     private val scope: DelegateScope
 ) {
@@ -27,6 +29,14 @@ class GestureDelegate(
 
     fun onFlingUp() = scope.launchSafe("Error on fling up") {
         scope.sendEvent(UiEvent.ShowAppDrawer)
+    }
+
+    // --- Swipe down: recent apps ---
+
+    fun onSwipeDown() = scope.launchSafe("Error on swipe down") {
+        // Fixed at 8 (the use case's default). MainActivity decides how to
+        // present an empty list (fresh install / after a usage reset).
+        scope.sendEvent(UiEvent.ShowRecentApps(getRecentAppsUseCase()))
     }
 
     // --- Swipe ---

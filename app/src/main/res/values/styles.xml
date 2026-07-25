@@ -89,12 +89,12 @@
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <style name="Theme.App.LockScreenActivity" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:backgroundDimEnabled">false</item>
+    <!-- Enter/exit for the swipe-down recent-apps dialog: slides in from the
+         top edge so it reads as "pulled down". Applied in
+         MainActivity.showRecentAppsDialog via window.setWindowAnimations. -->
+    <style name="DialogAnimationFromTop">
+        <item name="android:windowEnterAnimation">@anim/recent_apps_enter</item>
+        <item name="android:windowExitAnimation">@anim/recent_apps_exit</item>
     </style>
 
 </resources>

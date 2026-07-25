@@ -162,6 +162,40 @@ class AppUsageRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getRecentlyLaunchedPackages(limit: Int): List<String> {
+        if (limit <= 0) return emptyList()
+
+        return try {
+            val allUsagePreferences = dataStore.data
+                .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+                .first()
+
+            val currentTime = System.currentTimeMillis()
+
+            allUsagePreferences.asMap()
+                .mapNotNull { (key, value) ->
+                    if (!key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)) return@mapNotNull null
+                    @Suppress("UNCHECKED_CAST")
+                    val timestamps = (value as? Set<String>) ?: return@mapNotNull null
+                    val lastLaunch = timestamps
+                        .mapNotNull { it.toLongOrNull() }
+                        .filter { isValidTimestamp(it, currentTime) }
+                        .maxOrNull()
+                        ?: return@mapNotNull null
+                    val packageName = key.name.removePrefix(AppConstants.KEY_USAGE_PREFIX)
+                    packageName to lastLaunch
+                }
+                .sortedByDescending { it.second }
+                .take(limit)
+                .map { it.first }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error reading recently launched packages")
+            emptyList()
+        }
+    }
+
     /**
      * Berechnet den zeitgewichteten Score mit Safe-Math-Operations
      */

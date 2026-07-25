@@ -153,6 +153,7 @@ class LauncherViewModelSecurityTest {
             showAppUseCase = mockk(relaxed = true),
             toggleSortOrderUseCase = toggleSortOrderUseCase,
             handleSwipeActionUseCase = handleSwipeActionUseCase,
+            getRecentAppsUseCase = mockk(relaxed = true),
             observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
             observeUiColorsUseCase = observeUiColorsUseCase,
             setTextColorUseCase = setTextColorUseCase,

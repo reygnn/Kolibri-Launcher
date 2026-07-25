@@ -118,6 +118,8 @@
 
     <!-- NEW -->
     <string name="category_gestures_title">Gestures</string>
+    <string name="recent_apps_title">Recent apps</string>
+    <string name="recent_apps_empty">No recently opened apps yet</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App Information</string>

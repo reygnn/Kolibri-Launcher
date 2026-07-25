@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Row for the swipe-down recent-apps dialog. Font size (18sp) and padding
+  (16dp horizontal / 12dp vertical) mirror item_app_drawer.xml so the list
+  reads like the app drawer. Text colour follows the wallpaper-aware dialog
+  surface via ?attr/colorOnSurface — the drawer applies its equivalent
+  colour at runtime, so we can't reuse its layout (hardcoded white) here.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/recent_app_name"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:background="?attr/selectableItemBackground"
+    android:textSize="18sp"
+    android:textColor="?attr/colorOnSurface" />

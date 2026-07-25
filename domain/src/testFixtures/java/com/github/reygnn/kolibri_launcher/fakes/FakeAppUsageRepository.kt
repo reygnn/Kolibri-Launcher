@@ -26,6 +26,14 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
         return launchedPackages.contains(packageName)
     }
 
+    override suspend fun getRecentlyLaunchedPackages(limit: Int): List<String> {
+        if (limit <= 0) return emptyList()
+        // Launches are appended, so the most recent are at the end;
+        // reverse + distinct keeps each package once at its most-recent
+        // position, mirroring the impl's per-package recency ordering.
+        return launchedPackages.asReversed().distinct().take(limit)
+    }
+
     override suspend fun purgeRepository() {
         launchedPackages.clear()
     }

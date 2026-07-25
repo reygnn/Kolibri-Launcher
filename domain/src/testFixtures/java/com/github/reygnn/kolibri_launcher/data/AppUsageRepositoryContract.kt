@@ -237,6 +237,65 @@ abstract class AppUsageRepositoryContract {
         assertEquals(input.toSet(), output.toSet())
     }
 
+    // ---------- getRecentlyLaunchedPackages ----------
+    //
+    // Strict recency ORDER is timing-dependent (System.currentTimeMillis on
+    // the impl → ties within a fast test), same reason the sort order isn't
+    // contract-tested. So here only the timing-independent properties both
+    // implementations guarantee are checked; deterministic order is pinned in
+    // GetRecentAppsUseCaseTest against the fake.
+
+    @Test
+    fun `getRecentlyLaunchedPackages returns the recorded packages`() = runTest {
+        val repo = createRepository()
+        repo.recordPackageLaunch(pkgA)
+        repo.recordPackageLaunch(pkgB)
+        assertEquals(setOf(pkgA, pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
+    }
+
+    @Test
+    fun `getRecentlyLaunchedPackages lists each package once despite repeat launches`() = runTest {
+        val repo = createRepository()
+        repo.recordPackageLaunch(pkgA)
+        repo.recordPackageLaunch(pkgA)
+        repo.recordPackageLaunch(pkgB)
+        val recent = repo.getRecentlyLaunchedPackages(10)
+        assertEquals(2, recent.size)
+        assertEquals(setOf(pkgA, pkgB), recent.toSet())
+    }
+
+    @Test
+    fun `getRecentlyLaunchedPackages caps at the limit`() = runTest {
+        val repo = createRepository()
+        repo.recordPackageLaunch(pkgA)
+        repo.recordPackageLaunch(pkgB)
+        repo.recordPackageLaunch(pkgC)
+        assertEquals(2, repo.getRecentlyLaunchedPackages(2).size)
+    }
+
+    @Test
+    fun `getRecentlyLaunchedPackages with non-positive limit returns empty`() = runTest {
+        val repo = createRepository()
+        repo.recordPackageLaunch(pkgA)
+        assertTrue(repo.getRecentlyLaunchedPackages(0).isEmpty())
+        assertTrue(repo.getRecentlyLaunchedPackages(-1).isEmpty())
+    }
+
+    @Test
+    fun `getRecentlyLaunchedPackages on fresh repository is empty`() = runTest {
+        val repo = createRepository()
+        assertTrue(repo.getRecentlyLaunchedPackages(10).isEmpty())
+    }
+
+    @Test
+    fun `getRecentlyLaunchedPackages excludes a removed package`() = runTest {
+        val repo = createRepository()
+        repo.recordPackageLaunch(pkgA)
+        repo.recordPackageLaunch(pkgB)
+        repo.removeUsageDataForPackage(pkgA)
+        assertEquals(setOf(pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
+    }
+
     // ---------- purgeRepository ----------
 
     @Test

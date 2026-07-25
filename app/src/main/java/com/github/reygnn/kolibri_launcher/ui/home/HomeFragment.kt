@@ -1119,16 +1119,16 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Sets the three wired swipe callbacks (up, left, right) on
-     * [HomeGestureLayout]. Called once during initial wiring and again
-     * each time the user leaves wallpaper-edit mode (see
-     * [applyWallpaperEditModeToGestures]). Swipe-down is intentionally
-     * unwired — it no longer maps to an action.
+     * Sets the four directional swipe callbacks on [HomeGestureLayout]
+     * (up = app drawer, down = recent apps, left/right = swipe actions).
+     * Called once during initial wiring and again each time the user
+     * leaves wallpaper-edit mode (see [applyWallpaperEditModeToGestures]).
      */
     private fun wireDirectionalGestureCallbacks() {
         if (_binding == null) return
         val gestures = binding.homeGestureRoot
         gestures.onSwipeUp = { viewModel.onFlingUp() }
+        gestures.onSwipeDown = { viewModel.onSwipeDown() }
         gestures.onSwipeLeft = { viewModel.onSwipeFromRightToLeft() }
         gestures.onSwipeRight = { viewModel.onSwipeFromLeftToRight() }
     }
@@ -1147,6 +1147,7 @@ class HomeFragment : Fragment() {
         val gestures = binding.homeGestureRoot
         if (isEditMode) {
             gestures.onSwipeUp = null
+            gestures.onSwipeDown = null
             gestures.onSwipeLeft = null
             gestures.onSwipeRight = null
         } else {

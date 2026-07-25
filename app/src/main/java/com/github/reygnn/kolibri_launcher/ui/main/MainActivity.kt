@@ -11,7 +11,9 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.view.Gravity
 import android.view.WindowManager
+import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
@@ -705,6 +707,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     startActivitySafely(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
                 }
 
+                is UiEvent.ShowRecentApps -> {
+                    showRecentAppsDialog(event.apps)
+                }
+
                 is UiEvent.LaunchApp -> {
                     val action = AppLaunchAction.decide(
                         currentDestinationId = navController?.currentDestination?.id,
@@ -826,6 +832,50 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (result.shouldReconcile) {
             viewModel.refreshInstalledApps()
         }
+    }
+
+    /**
+     * Recent-apps dialog for the swipe-down gesture. Anchored to the top of
+     * the screen with a slide-from-top animation so it reads as "pulled down".
+     * Tapping an entry routes through [LauncherViewModel.onAppClicked], which
+     * launches AND records the launch — so the recency list updates itself.
+     * An empty list (fresh install / after a usage reset) shows a short toast
+     * instead of an empty dialog.
+     */
+    private fun showRecentAppsDialog(apps: List<AppInfo>) {
+        if (isFinishing || isDestroyed) return
+        if (apps.isEmpty()) {
+            showToastSafe(R.string.recent_apps_empty)
+            return
+        }
+        val names = apps.map { it.displayName }
+        // Custom row layout (item_recent_app) so font size + spacing match the
+        // app drawer; ArrayAdapter binds each name into its TextView.
+        val adapter = ArrayAdapter(this, R.layout.item_recent_app, R.id.recent_app_name, names)
+        val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
+            .setTitle(getString(R.string.recent_apps_title))
+            .setAdapter(adapter) { _, which -> viewModel.onAppClicked(apps[which]) }
+            .create()
+        dialog.window?.let { w ->
+            w.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+            w.setWindowAnimations(R.style.DialogAnimationFromTop)
+            // Dim the home screen behind the dialog.
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            w.setDimAmount(0.55f)
+            // Blur behind (Android 12+; always compiled in on this min=36 app).
+            // isCrossWindowBlurEnabled is false when the system disabled blur
+            // (power saver / "reduce transparency") — then it's a no-op and the
+            // dim alone carries the effect.
+            if (windowManager.isCrossWindowBlurEnabled) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                w.attributes = w.attributes.apply {
+                    blurBehindRadius = (32 * resources.displayMetrics.density).toInt()
+                }
+            }
+        }
+        currentDialog?.dismiss()
+        currentDialog = dialog
+        dialog.show()
     }
 
     private fun showDialog(builder: MaterialAlertDialogBuilder) {

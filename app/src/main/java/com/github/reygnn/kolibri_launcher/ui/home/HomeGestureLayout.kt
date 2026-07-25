@@ -56,12 +56,6 @@ class HomeGestureLayout @JvmOverloads constructor(
     // ===========================================
 
     var onSwipeUp: (() -> Unit)? = null
-    // Intentionally part of the directional API but currently unwired by the
-    // host: swipe-down on the home screen maps to no action since the
-    // notification-shade gesture was removed. The analyzer still resolves a
-    // DOWN result to this (always-null) callback, which is then IGNORED — the
-    // property is kept for symmetry so re-adding a swipe-down action is a
-    // one-line wiring change, not a re-plumb.
     var onSwipeDown: (() -> Unit)? = null
     var onSwipeLeft: (() -> Unit)? = null
     var onSwipeRight: (() -> Unit)? = null
