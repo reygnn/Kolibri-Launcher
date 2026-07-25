@@ -133,7 +133,6 @@ class LauncherViewModelDoomsdayTest {
         getDrawerAppsUseCase = getDrawerAppsUseCase,
         hideAppUseCase = mockk(relaxed = true),
         toggleFavoriteUseCase = mockk(relaxed = true),
-        requestNotificationsUseCase = mockk(relaxed = true),
         recordAppLaunchUseCase = recordAppLaunchUseCase,
         refreshAppsUseCase = refreshAppsUseCase,
         resetAppUsageUseCase = mockk(relaxed = true),

@@ -38,7 +38,7 @@ class PreviewBackupUseCaseTest {
         val expectedPreview = BackupPreview(
             version = "1.0", timestamp = 123456L, favoriteCount = 5, orderCount = 5,
             hiddenCount = 0, customNamesCount = 0, hasSwipeLeft = false, hasSwipeRight = false,
-            hasThemeSettings = true, hasWallpaper = false, hasGestureSettings = false,
+            hasThemeSettings = true, hasWallpaper = false,
             hasTimeBasedEvents = false, hasQualityOfLife = false, hasPowerUserSettings = false
         )
 

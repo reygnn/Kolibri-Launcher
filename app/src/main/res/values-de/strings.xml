@@ -18,7 +18,6 @@
     <string name="wallpaper_background">Hintergrundbild</string>
     
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Ermöglicht Kolibri-Launcher das Öffnen des Benachrichtigungsfelds</string>
 
     <!-- HomeFragment Error Messages -->
 
@@ -43,7 +42,6 @@
 
     <!-- Error Messages for Settings -->
     <string name="error_app_info_open">App-Info konnte nicht geöffnet werden</string>
-    <string name="error_accessibility_settings_open">Accessibility-Einstellungen konnten nicht geöffnet werden</string>
 
     <!-- Hidden Apps Dialog -->
     <string name="hidden_apps_title">Versteckte Apps</string>
@@ -67,10 +65,6 @@
     <string name="wallpaper_settings_fallback">Wallpaper-Einstellungen geöffnet</string>
     <string name="error_wallpaper_settings_open">Fehler beim Öffnen der Wallpaper-Einstellungen</string>
 
-    <!-- Für den Barrierefreiheits-Dialog im ScreenLockManager -->
-    <string name="accessibility_service_title">Berechtigung erforderlich</string>
-<string name="accessibility_service_explanation">Kolibri Launcher benötigt den Eingabehilfendienst für folgende Funktion:\n\n• Benachrichtigungsfeld mit Wischen öffnen\n\nDieser Dienst wird ausschließlich für diese Funktion verwendet und sammelt keine Daten.</string>
-    <string name="go_to_settings">Zu den Einstellungen</string>
 
     <string name="date_placeholder">Lade Datum…</string>
 
@@ -105,8 +99,6 @@
     <string name="category_gestures_title">Gesten</string>
 
     <string name="category_system_title">System</string>
-    <string name="accessibility_title">Bedienungshilfen</string>
-    <string name="accessibility_summary">Bedienungshilfen-Einstellungen öffnen</string>
     <string name="app_info_title">App-Informationen</string>
     <string name="app_info_summary">Launcher-Einstellungen und Berechtigungen</string>
 
@@ -253,7 +245,6 @@
 <string name="import_no_options_selected">Bitte wähle mindestens eine Import-Option</string>
 <string name="import_option_swipe_actions">Swipe-Gesten (%d)</string>
 <string name="import_option_theme">Theme &amp; Farben</string>
-<string name="import_option_gestures">Gesten-Einstellungen</string>
 
 <string name="show_calendar_event_title">Nächsten Kalendertermin anzeigen</string>
 <string name="show_calendar_event_summary">Zeigt den nächsten Termin auf dem Startbildschirm an. Erfordert Kalenderberechtigung.</string>
@@ -263,11 +254,7 @@
 <string name="chip_background_color">Termin-Hintergrund</string>
         <string name="show_alarm_title">Alarme anzeigen</string>
     <string name="show_alarm_summary">Nächsten Alarm auf dem Startbildschirm anzeigen</string>
-    
-    <string name="swipe_down_to_notifications_title">Wisch nach unten für Benachrichtigungen</string>
-<string name="swipe_down_to_notifications_summary">Öffnet die Benachrichtigungsleiste mit einem Wisch nach unten</string>
 
-<string name="toast_enable_swipe_down_to_notifications">Wisch-Geste ist deaktiviert. In den Einstellungen aktivieren.</string>
 <string name="import_option_time_events">Zeitbasierte Events (Kalender &amp; Wecker)</string>
 <string name="backup_import_success_settings_only">Einstellungen erfolgreich importiert</string>
 

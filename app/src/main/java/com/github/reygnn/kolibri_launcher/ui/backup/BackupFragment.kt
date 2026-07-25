@@ -193,10 +193,6 @@ class BackupFragment : Fragment() {
                     checkboxImportThemeSettings.isVisible = uiState.themeSettings.visible
                     checkboxImportThemeSettings.isChecked = uiState.themeSettings.checked
 
-                    checkboxImportGestureSettings.text = getString(R.string.import_option_gestures)
-                    checkboxImportGestureSettings.isVisible = uiState.gestureSettings.visible
-                    checkboxImportGestureSettings.isChecked = uiState.gestureSettings.checked
-
                     checkboxImportTimeBasedEvents.text = getString(R.string.import_option_time_events)
                     checkboxImportTimeBasedEvents.isVisible = uiState.timeBasedEvents.visible
                     checkboxImportTimeBasedEvents.isChecked = uiState.timeBasedEvents.checked
@@ -223,7 +219,6 @@ class BackupFragment : Fragment() {
                             importCustomNames = dialogBinding.checkboxImportCustomNames.isChecked,
                             importSwipeActions = dialogBinding.checkboxImportSwipeActions.isChecked,
                             importThemeSettings = dialogBinding.checkboxImportThemeSettings.isChecked,
-                            importGestureSettings = dialogBinding.checkboxImportGestureSettings.isChecked,
                             importTimeBasedEvents = dialogBinding.checkboxImportTimeBasedEvents.isChecked,
                             importQualityOfLife = dialogBinding.checkboxImportQualityOfLife.isChecked,
                             importPowerUserSettings = dialogBinding.checkboxImportPowerUserSettings.isChecked

@@ -421,7 +421,6 @@ package com.github.reygnn.kolibri_launcher
  *   als Contract-Bug interpretiert.
  *
  *   Beispiele (siehe jeweiliges KDoc):
- *     - ScreenLockRepositoryContract: initial isLockingAvailable true vs false
  *     - InstalledAppsStateRepositoryContract: purgeRepository No-Op vs Reset
  *     - WallpaperRepositoryContract: scale ohne imageUri, non-file URI scheme
  *
@@ -451,7 +450,7 @@ package com.github.reygnn.kolibri_launcher
  * ============================================================================
  *
  * Das Problem:
- *   Einige Manager (z.B. CustomNamesRepositoryImpl, ScreenLockRepositoryImpl) benutzen
+ *   Einige Manager (z.B. CustomNamesRepositoryImpl) benutzen
  *   `MutableSharedFlow<Unit>` für Event-Streams. In Produktion wird dieser
  *   SharedFlow von einem Konsumenten (InstalledAppsRepositoryImpl, etc.)
  *   permanent collected — `emit` geht immer durch, weil der Buffer sofort
@@ -492,8 +491,6 @@ package com.github.reygnn.kolibri_launcher
  *
  *    Das funktioniert weil `test { }` synchron einen Collector attached,
  *    bevor `doAction` aufgerufen wird. Der Buffer-Overflow tritt nicht ein.
- *
- *    Referenz: ScreenLockRepositoryContract.kt, ScreenLockRepositoryImplTest.kt
  *
  * ANTI-PATTERN:
  * ✗ val trigger = MutableSharedFlow<Unit>()   // hängt beim ersten emit!

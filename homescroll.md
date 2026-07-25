@@ -351,16 +351,24 @@ existing `AppDrawerSwipeDismissTest`; copy it as-is.
 
 ## 5. Gesture inventory
 
-Five user-facing gestures on the home screen (numbered for test
+Four user-facing gestures on the home screen (numbered for test
 mapping):
 
 | # | Gesture | Backend call | Effect |
 |---|---|---|---|
 | 1 | Swipe up | `viewModel.onFlingUp()` → `GestureDelegate.onFlingUp()` | Open AppDrawer |
-| 2 | Swipe down | `viewModel.onFlingDown()` → `GestureDelegate.onFlingDown()` | Open notifications via accessibility service |
-| 3 | Swipe right (left→right finger motion) | `viewModel.onSwipeFromLeftToRight()` | Launch configured swipe-app |
-| 4 | Swipe left (right→left finger motion) | `viewModel.onSwipeFromRightToLeft()` | Launch configured swipe-app |
-| 5 | Long press | `viewModel.onLongPress()` (or wallpaper edit-mode exit, conditional) | Open settings (default) |
+| 2 | Swipe right (left→right finger motion) | `viewModel.onSwipeFromLeftToRight()` | Launch configured swipe-app |
+| 3 | Swipe left (right→left finger motion) | `viewModel.onSwipeFromRightToLeft()` | Launch configured swipe-app |
+| 4 | Long press | `viewModel.onLongPress()` (or wallpaper edit-mode exit, conditional) | Open settings (default) |
+
+Swipe **down** is no longer a home gesture: the accessibility-service
+subsystem that backed it (swipe-down → open notifications) has been
+removed entirely, along with `onFlingDown()`, `RequestNotificationsUseCase`,
+and `ScreenLockAccessibilityService`. The wrapper still discriminates a
+downward swipe physically, but no callback is wired to it, so it is a
+no-op on the home screen. (The AppDrawer's own `SwipeDownDismissLayout`
+— swipe-down *inside* the drawer to dismiss — is a separate class and is
+unaffected.)
 
 The **wallpaper edit-mode** carve-out for long-press is a special
 case worth preserving: when `viewModel.isWallpaperEditMode.value == true`,
@@ -1150,7 +1158,6 @@ Code:
 - `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/NonInterceptingScrollView.kt`
 - `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/SwipeGestureAnalyzer.kt`
 - `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/GestureDelegate.kt`
-- `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/util/ScreenLockAccessibilityService.kt`
 - `app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/SwipeDownDismissLayout.kt`
 - `app/src/main/res/layout/fragment_home.xml`
 

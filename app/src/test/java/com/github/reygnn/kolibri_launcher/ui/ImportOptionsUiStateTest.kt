@@ -28,7 +28,6 @@ class ImportOptionsUiStateTest {
         hasThemeSettings = true,
         hasWallpaper = false,
         wallpaperLayerCount = 0,
-        hasGestureSettings = true,
         hasTimeBasedEvents = true,
         hasQualityOfLife = true,
         hasPowerUserSettings = true,
@@ -47,7 +46,6 @@ class ImportOptionsUiStateTest {
         hasThemeSettings = false,
         hasWallpaper = false,
         wallpaperLayerCount = 0,
-        hasGestureSettings = false,
         hasTimeBasedEvents = false,
         hasQualityOfLife = false,
         hasPowerUserSettings = false,
@@ -162,12 +160,6 @@ class ImportOptionsUiStateTest {
     }
 
     @Test
-    fun `gestureSettings follows hasGestureSettings`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasGestureSettings = true)).gestureSettings.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasGestureSettings = false)).gestureSettings.visible)
-    }
-
-    @Test
     fun `timeBasedEvents follows hasTimeBasedEvents`() {
         assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = true)).timeBasedEvents.visible)
         assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = false)).timeBasedEvents.visible)
@@ -196,7 +188,6 @@ class ImportOptionsUiStateTest {
         assertFalse(state.customNames.visible)
         assertFalse(state.swipeActions.visible)
         assertFalse(state.themeSettings.visible)
-        assertFalse(state.gestureSettings.visible)
         assertFalse(state.timeBasedEvents.visible)
         assertFalse(state.qualityOfLife.visible)
         assertFalse(state.powerUserSettings.visible)
@@ -211,7 +202,6 @@ class ImportOptionsUiStateTest {
         assertTrue(state.customNames.visible)
         assertTrue(state.swipeActions.visible)
         assertTrue(state.themeSettings.visible)
-        assertTrue(state.gestureSettings.visible)
         assertTrue(state.timeBasedEvents.visible)
         assertTrue(state.qualityOfLife.visible)
         assertTrue(state.powerUserSettings.visible)
@@ -228,7 +218,6 @@ class ImportOptionsUiStateTest {
             "customNames" to state.customNames,
             "swipeActions" to state.swipeActions,
             "themeSettings" to state.themeSettings,
-            "gestureSettings" to state.gestureSettings,
             "timeBasedEvents" to state.timeBasedEvents,
             "qualityOfLife" to state.qualityOfLife,
             "powerUserSettings" to state.powerUserSettings,

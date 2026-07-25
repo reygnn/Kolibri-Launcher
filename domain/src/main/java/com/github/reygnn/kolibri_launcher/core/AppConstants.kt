@@ -197,9 +197,6 @@ object AppConstants {
         const val AUTO_SHOW_KEYBOARD = "auto_show_keyboard_drawer"
         const val AUTO_LAUNCH_APP = "auto_launch_app"
 
-        // Gestures
-        const val SWIPE_DOWN_TO_NOTIFICATIONS = "swipe_down_to_notifications_enabled"
-
         // Keys, die nur für Klicks/Intents im Fragment genutzt werden (kein DataStore Value)
         const val SYSTEM_WALLPAPER = "system_wallpaper"
         const val EDIT_FAVORITES = "edit_favorites"
@@ -210,7 +207,6 @@ object AppConstants {
         const val USAGE_EXPORT = "usage_export"
         const val FACTORY_RESET = "factory_reset"
         const val APP_INFO = "app_info"
-        const val ACCESSIBILITY = "accessibility"
         const val SET_DEFAULT_LAUNCHER = "set_default_launcher"
         const val SWIPE_ACTIONS = "swipe_actions"
         const val CRASH_REPORTS = "crash_reports"
@@ -232,7 +228,6 @@ object AppConstants {
 
     const val DEFAULT_SHOW_CALENDAR = false
     const val DEFAULT_SHOW_ALARM = false
-    const val DEFAULT_SWIPE_DOWN_NOTIFICATIONS = false
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
     const val DEFAULT_SECURE_WINDOW = false

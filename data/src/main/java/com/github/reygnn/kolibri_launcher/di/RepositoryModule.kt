@@ -10,7 +10,6 @@ import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.ResetRepositoryImpl
-import com.github.reygnn.kolibri_launcher.data.ScreenLockRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.SettingsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.ShortcutRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepositoryImpl
@@ -29,7 +28,6 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
@@ -79,10 +77,6 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindInstalledAppsStateRepository(impl: InstalledAppsStateRepositoryImpl): InstalledAppsStateRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindScreenLockRepository(impl: ScreenLockRepositoryImpl): ScreenLockRepository
 
     @Binds
     @Singleton

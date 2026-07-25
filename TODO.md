@@ -593,8 +593,6 @@ Reviewer den entfernten Mustercode nicht reflexartig wieder einfügt.
   überwiegend echte EXTERNAL I/O. Verifiziert 2026-05-02.
 - **`KolibriLauncherApp` (~16)** — Rule-7-Whitelist, **bleibt
   unangetastet**.
-- **`ScreenLockAccessibilityService` (16)** — AccessibilityService,
-  schwer zu testen. Mögliche zukünftige Welle.
 - **`CrashReportLimiter` (8)** — als 2. Rule-5-Exception dokumentiert
   (sync API constraint von ACRA-Handler), bleibt.
 - **`CrashReportConsent` (5)** — Coroutine-Boundary + EXTERNAL.
@@ -642,11 +640,6 @@ Punkte strukturelle Projekte — keine Sweeps mehr im engeren Sinn:
 - [ ] **HomeFragment LIFECYCLE-Restructure** — größeres eigenes Projekt,
   nicht als Sweep. Sollte erst angegangen werden, wenn die vier
   Pure-Logic-Extraktionen aus dem File-Header-KDoc finalisiert sind.
-- [ ] **`ScreenLockAccessibilityService` (~16)** — Service-Test-
-  Strategie unklar; wenn Pattern etabliert, ist hier Lohn drin.
-  Bedient seit dem Entfernen von Double-Tap-to-Lock nur noch den
-  Notifications-Pfad (`performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)`);
-  der Lock-Pfad ist weg.
 - [x] ~~**`MainActivity.mainActivityExceptionHandler` Bug-Hint** — der
   nested Catch um `silentError + if(DEBUG) throw` hebt die Rule-9-
   DEBUG-throw-Semantik lokal auf.~~ Gefixt 2026-05-03 in commit
@@ -1573,7 +1566,7 @@ Alle 32 Files aus `app/src/test/java/.../data/` sind nach
   als auch `WallpaperRepositoryImplContractTest` (jetzt in `:data:test`)
   ihren gemeinsamen Eltern-Contract über `:domain/testFixtures/`.
 
-**32 migrierte Files:**
+**30 migrierte Files:**
 
 - **Pure-JVM (16):** `FavoritesRepositoryImpl*Test` (3 inkl. ShareIn +
   Contract), `SettingsRepositoryImpl*Test` (2), `HiddenAppsRepositoryImpl*Test`
@@ -1581,13 +1574,13 @@ Alle 32 Files aus `app/src/test/java/.../data/` sind nach
   (2), `SwipeActionsRepositoryImplContractTest`, `AppUsageRepositoryImpl*Test`
   (2), `UsageExportRepositoryImplFormatSpec` / `*TimeLordSpec` /
   `*XenomorphSpec` / `UsageExportRepositoryImplTest`.
-- **Robolectric (15 inkl. Helper):** `BackupRepositoryImpl*Test` (9 Files
+- **Robolectric (13 inkl. Helper):** `BackupRepositoryImpl*Test` (9 Files
   + `BackupRepositoryImplTestFactory`), `WallpaperRepositoryImpl*Test`
   (2 inkl. Contract-Test), `FakeWallpaperRepositoryContractTest`,
   `UsageExportRepositoryImplDoomsdaySpec`,
   `WallpaperFileManagerTest`, plus die kleinen Files `InstalledAppsRepositoryImplTest`,
   `InstalledAppsStateRepositoryImpl*Test` (2), `PackageUpdateReceiverTest`,
-  `ResetRepositoryImplTest`, `ScreenLockRepositoryImpl*Test` (2),
+  `ResetRepositoryImplTest`,
   `ShortcutRepositoryImplTest`, `TimeBasedEventsRepositoryImplTest`.
 
 **Test-Time-Win:**

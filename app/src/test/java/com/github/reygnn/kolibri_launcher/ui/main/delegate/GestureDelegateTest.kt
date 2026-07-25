@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -31,14 +30,12 @@ class GestureDelegateTest {
 
     private val sentEvents = mutableListOf<UiEvent>()
 
-    private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
 
     @Before
     fun setUp() {
         sentEvents.clear()
 
-        requestNotificationsUseCase = mockk(relaxed = true)
         handleSwipeActionUseCase = mockk(relaxed = true)
     }
 
@@ -49,7 +46,6 @@ class GestureDelegateTest {
     )
 
     private fun createDelegate() = GestureDelegate(
-        requestNotificationsUseCase = requestNotificationsUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
@@ -67,70 +63,6 @@ class GestureDelegateTest {
 
         assertEquals(1, sentEvents.size)
         assertEquals(UiEvent.ShowAppDrawer, sentEvents.first())
-    }
-
-    // ===========================================
-    // FLING DOWN - NOTIFICATIONS
-    // ===========================================
-
-    @Test
-    fun `onFlingDown does nothing on success`() = runTest {
-        coEvery { requestNotificationsUseCase() } returns RequestNotificationsUseCase.Result.Success
-
-        val delegate = createDelegate()
-
-        delegate.onFlingDown()
-        advanceUntilIdle()
-
-        assertTrue(sentEvents.isEmpty())
-    }
-
-    @Test
-    fun `onFlingDown shows accessibility dialog on ErrorAccessibility`() = runTest {
-        coEvery { requestNotificationsUseCase() } returns RequestNotificationsUseCase.Result.ErrorAccessibility
-
-        val delegate = createDelegate()
-
-        delegate.onFlingDown()
-        advanceUntilIdle()
-
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.ShowAccessibilityDialog, sentEvents.first())
-    }
-
-    @Test
-    fun `onFlingDown shows toast on ErrorDisabled first time only`() = runTest {
-        coEvery { requestNotificationsUseCase() } returns RequestNotificationsUseCase.Result.ErrorDisabled
-
-        val delegate = createDelegate()
-
-        // First call: toast shown
-        delegate.onFlingDown()
-        advanceUntilIdle()
-
-        assertEquals(1, sentEvents.size)
-        assertTrue(sentEvents.first() is UiEvent.ShowToast)
-
-        sentEvents.clear()
-
-        // Second call: no toast
-        delegate.onFlingDown()
-        advanceUntilIdle()
-
-        assertTrue(sentEvents.isEmpty())
-    }
-
-    @Test
-    fun `onFlingDown shows generic error toast on ErrorGeneric`() = runTest {
-        coEvery { requestNotificationsUseCase() } returns RequestNotificationsUseCase.Result.ErrorGeneric
-
-        val delegate = createDelegate()
-
-        delegate.onFlingDown()
-        advanceUntilIdle()
-
-        assertEquals(1, sentEvents.size)
-        assertTrue(sentEvents.first() is UiEvent.ShowToast)
     }
 
     // ===========================================

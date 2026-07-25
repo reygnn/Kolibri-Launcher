@@ -58,7 +58,6 @@ class BackupRepositoryImplMalformedTest {
         importCustomNames = true,
         importSwipeActions = true,
         importThemeSettings = true,
-        importGestureSettings = true,
         importTimeBasedEvents = true,
         importQualityOfLife = true,
         importPowerUserSettings = true

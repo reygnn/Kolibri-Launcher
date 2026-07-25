@@ -40,8 +40,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
-        val SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED =
-            booleanPreferencesKey(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
         val TEXT_SHADOW_ENABLED = booleanPreferencesKey(AppConstants.PrefKeys.TEXT_SHADOW_ENABLED)
         val IS_FONT_BOLD = booleanPreferencesKey(AppConstants.PrefKeys.IS_FONT_BOLD)
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
@@ -136,12 +134,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSortOrder(sortOrder: SortOrder) =
         putValue(PreferenceKeys.SORT_ORDER_KEY, sortOrder.name)
-
-    override val swipeDownToNotificationsEnabledFlow: Flow<Boolean> =
-        valueFlow(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED, AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
-
-    override suspend fun setSwipeDownToNotifications(isEnabled: Boolean) =
-        putValue(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED, isEnabled)
 
     override val onboardingCompletedFlow: Flow<Boolean> =
         valueFlow(PreferenceKeys.ONBOARDING_COMPLETED, false)
@@ -247,7 +239,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun purgeRepository() {
         safeEdit { preferences ->
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
-            preferences.remove(PreferenceKeys.SWIPE_DOWN_TO_NOTIFICATIONS_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)
             preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)

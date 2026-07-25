@@ -62,8 +62,6 @@ probably find one.
   optional via Settings.
 - Swipe-up to the app drawer; swipe-down inside the drawer to dismiss.
 - Long-press any app for system shortcuts (LauncherApps API).
-- Swipe-down on the home screen to open the notification panel
-  (optional, requires accessibility service).
 - Two configurable swipe-from-edge actions (left / right).
 
 ### App drawer

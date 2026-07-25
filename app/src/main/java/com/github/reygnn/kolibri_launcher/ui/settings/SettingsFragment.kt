@@ -75,8 +75,8 @@ import javax.inject.Inject
  *
  * 2026-05-02 follow-up sweep: listener bodies that only call a sub-method
  * with its own try/catch (`openSystemWallpaperPicker`,
- * `showFactoryResetDialog`, `openAccessibilitySettings`,
- * `openDefaultLauncherSettings`) need no additional outer catch.
+ * `showFactoryResetDialog`, `openDefaultLauncherSettings`) need no
+ * additional outer catch.
  * Listeners with `viewLifecycleOwner` access or direct system-API calls
  * (`startActivity`, `parentFragmentManager`) keep their inner catch
  * (lifecycle-race protection).
@@ -409,12 +409,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // Accessibility — openAccessibilitySettings has its own try/catch.
-        findPreference<Preference>(AppConstants.PrefKeys.ACCESSIBILITY)?.setOnPreferenceClickListener {
-            openAccessibilitySettings()
-            true
-        }
-
         // Default Launcher — openDefaultLauncherSettings has its own try/catch.
         findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
             openDefaultLauncherSettings()
@@ -443,32 +437,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
             true
-        }
-
-        // Swipe Down for Notifications
-        val swipeDownPreference =
-            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)
-        swipeDownPreference?.setOnPreferenceChangeListener { _, newValue ->
-            try {
-                if (newValue is Boolean) {
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        try {
-                            settingsRepository.setSwipeDownToNotifications(newValue)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            TimberWrapper.silentError(
-                                e,
-                                "Error setting swipe down to notifications"
-                            )
-                        }
-                    }
-                }
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in swipe down preference change")
-                false
-            }
         }
 
         // Swipe Actions
@@ -686,21 +654,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
-                // Observer für Swipe Down to Notifications Setting
-                launch {
-                    try {
-                        settingsRepository.swipeDownToNotificationsEnabledFlow.collect { isChecked ->
-                            if (!isAdded || isDetached) return@collect
-                            findPreference<SwitchPreferenceCompat>(AppConstants.PrefKeys.SWIPE_DOWN_TO_NOTIFICATIONS)?.isChecked =
-                                isChecked
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in swipe down flow collection")
-                    }
-                }
-
                 // Observer für show Keyboard Setting
                 launch {
                     try {
@@ -850,14 +803,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             viewModel.onWallpaperSettingsFallback()
         } catch (e: Throwable) {
             viewModel.onErrorOpeningWallpaperSettings(e)
-        }
-    }
-
-    private fun openAccessibilitySettings() {
-        try {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        } catch (e: Throwable) {
-            viewModel.onErrorOpeningAccessibilitySettings(e)
         }
     }
 

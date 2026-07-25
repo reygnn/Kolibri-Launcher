@@ -228,7 +228,6 @@ class BackupViewModelTest {
                 hasThemeSettings = true,
                 hasWallpaper = true,
                 wallpaperLayerCount = 0,
-                hasGestureSettings = true,
                 hasTimeBasedEvents = false,
                 hasQualityOfLife = true,
                 hasPowerUserSettings = true
@@ -302,7 +301,6 @@ class BackupViewModelTest {
             true,
             false,
             0,
-            false,
             false,
             false,
             false

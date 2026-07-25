@@ -121,22 +121,6 @@
 
         </activity>
 
-        <!-- Accessibility Service für das Öffnen des Benachrichtigungsfelds (Swipe-down) -->
-        <service
-            android:name=".ui.util.ScreenLockAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false"
-            android:enabled="true">
-
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
         <!-- File Provider für Image Sharing (falls benötigt) -->
         <!--
         <provider

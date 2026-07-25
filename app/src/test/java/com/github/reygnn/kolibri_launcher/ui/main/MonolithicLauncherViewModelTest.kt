@@ -43,7 +43,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsU
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
@@ -168,7 +167,6 @@ class MonolithicLauncherViewModelTest {
     private val getDrawerAppsUseCase: GetDrawerAppsUseCase = mockk(relaxed = true)
     private val hideAppUseCase: HideAppUseCase = mockk(relaxed = true)
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase = mockk(relaxed = true)
-    private val requestNotificationsUseCase: RequestNotificationsUseCase = mockk(relaxed = true)
     private val recordAppLaunchUseCase: RecordAppLaunchUseCase = mockk(relaxed = true)
     private val refreshAppsUseCase: RefreshAppsUseCase = mockk(relaxed = true)
     private val resetAppUsageUseCase: ResetAppUsageUseCase = mockk(relaxed = true)
@@ -250,7 +248,6 @@ class MonolithicLauncherViewModelTest {
             getDrawerAppsUseCase,
             hideAppUseCase,
             toggleFavoriteUseCase,
-            requestNotificationsUseCase,
             recordAppLaunchUseCase,
             refreshAppsUseCase,
             resetAppUsageUseCase,
@@ -904,47 +901,6 @@ class MonolithicLauncherViewModelTest {
     }
 
     @Test
-    fun `onFlingDown - when UseCase returns ErrorDisabled - shows toast once`() = runTest {
-        coEvery { requestNotificationsUseCase.invoke() } returns
-                RequestNotificationsUseCase.Result.ErrorDisabled
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onFlingDown()
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.toast_enable_swipe_down_to_notifications, event.messageResId)
-
-            // Second call should not emit event (ViewModel-Logik)
-            viewModel.onFlingDown()
-            advanceUntilIdle()
-            expectNoEvents()
-        }
-        coVerify(exactly = 2) { requestNotificationsUseCase.invoke() }
-    }
-
-    @Test
-    fun `onFlingDown - when UseCase returns ErrorAccessibility - shows dialog`() = runTest {
-        coEvery { requestNotificationsUseCase.invoke() } returns
-                RequestNotificationsUseCase.Result.ErrorAccessibility
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onFlingDown()
-            advanceUntilIdle()
-
-            val event = awaitItem()
-            assertTrue(event is UiEvent.ShowAccessibilityDialog)
-        }
-    }
-
-    @Test
     fun `onAppClicked - called rapidly multiple times - handles gracefully`() = runTest {
         setupViewModel()
         advanceUntilIdle()
@@ -1166,26 +1122,6 @@ class MonolithicLauncherViewModelTest {
         // Beide Aufrufe sollten passiert sein
         coVerify { recordAppLaunchUseCase.invoke(app1) }
         coVerify { refreshAppsUseCase.invoke() }
-    }
-
-    @Test
-    fun `onFlingDown - shows toast only once despite multiple calls`() = runTest {
-        coEvery { requestNotificationsUseCase.invoke() } returns
-                RequestNotificationsUseCase.Result.ErrorDisabled
-
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.event.test {
-            viewModel.onFlingDown()
-            advanceUntilIdle()
-            awaitItem() // First toast
-
-            repeat(5) { viewModel.onFlingDown() }
-            advanceUntilIdle()
-
-            expectNoEvents() // Keine weiteren Toasts!
-        }
     }
 
     @Test

@@ -16,7 +16,6 @@ sealed class UiEvent {
     object OpenClock : UiEvent()
     object OpenCalendar : UiEvent()
     object OpenBatterySettings : UiEvent()
-    object ShowAccessibilityDialog : UiEvent()
     data class LaunchApp(val app: AppInfo) : UiEvent()
     object RefreshAppDrawer : UiEvent()
     data object ShowCustomizationOptions : UiEvent()

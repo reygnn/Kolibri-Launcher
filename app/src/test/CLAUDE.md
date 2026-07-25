@@ -49,7 +49,7 @@ für alle Repository-Interfaces abfängt. Namens-Schema:
 
 ### Status je Repository
 
-Alle 17 Repository-Interfaces sind behandelt — 13 mit Contract-Pair,
+Alle 16 Repository-Interfaces sind behandelt — 12 mit Contract-Pair,
 4 mit ADR-only-Begründung:
 
 | Interface              | Contract | Impl-CT | Kommentar |
@@ -64,7 +64,6 @@ Alle 17 Repository-Interfaces sind behandelt — 13 mit Contract-Pair,
 | WallpaperRepository    |    ✓     |    ✓    | Robolectric (Uri) |
 | CustomNamesRepository  |    ✓     |    ✓    | — |
 | InstalledAppsStateRepository |  ✓ |    ✓    | — |
-| ScreenLockRepository   |    ✓     |    ✓    | — |
 | FabPositionRepository  |    ✓     |    ✓    | — |
 | BackupRepository       |    ✓     |    —    | Fake-only (Uri + ContentResolver) |
 | TimeBasedEventsRepository | ADR only |  —   | System-API (AlarmManager + Calendar); ImplTest deckt Logik via MockK ab |
@@ -125,9 +124,6 @@ Bewusst weggelassene Verhaltensweisen sind in den jeweiligen KDocs der
 Contracts unter "NICHT IM CONTRACT — bewusste Drifts" dokumentiert. Ein
 paar prominente Beispiele:
 
-- **`ScreenLockRepository`**: Fake-Default `isLockingAvailable = true`
-  vs. Impl-Default `false`. Bewusst, weil Tests sonst in jedem
-  `@Before` `setServiceState(true)` rufen müssten.
 - **`InstalledAppsStateRepository`**: `purgeRepository` ist bei der Impl
   explizit No-Op (System-Daten), beim Fake ein echter Reset
   (Test-Isolation).

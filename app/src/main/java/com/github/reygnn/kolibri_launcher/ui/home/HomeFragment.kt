@@ -1119,26 +1119,27 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Sets the four swipe callbacks on [HomeGestureLayout]. Called once
-     * during initial wiring and again each time the user leaves
-     * wallpaper-edit mode (see [applyWallpaperEditModeToGestures]).
+     * Sets the three wired swipe callbacks (up, left, right) on
+     * [HomeGestureLayout]. Called once during initial wiring and again
+     * each time the user leaves wallpaper-edit mode (see
+     * [applyWallpaperEditModeToGestures]). Swipe-down is intentionally
+     * unwired — it no longer maps to an action.
      */
     private fun wireDirectionalGestureCallbacks() {
         if (_binding == null) return
         val gestures = binding.homeGestureRoot
         gestures.onSwipeUp = { viewModel.onFlingUp() }
-        gestures.onSwipeDown = { viewModel.onFlingDown() }
         gestures.onSwipeLeft = { viewModel.onSwipeFromRightToLeft() }
         gestures.onSwipeRight = { viewModel.onSwipeFromLeftToRight() }
     }
 
     /**
      * Toggles the wrapper's directional gesture callbacks based on
-     * wallpaper-edit mode. In edit mode the four swipes are nulled out
-     * so the user can drag wallpaper layers around without accidentally
-     * launching apps. The long-press callback is left untouched — its
-     * body branches internally on `isWallpaperEditMode.value`, so
-     * the same wired callback handles both "exit edit mode" and
+     * wallpaper-edit mode. In edit mode the swipe callbacks are nulled
+     * out so the user can drag wallpaper layers around without
+     * accidentally launching apps. The long-press callback is left
+     * untouched — its body branches internally on `isWallpaperEditMode.value`,
+     * so the same wired callback handles both "exit edit mode" and
      * "open customization-options dialog".
      */
     private fun applyWallpaperEditModeToGestures(isEditMode: Boolean) {
@@ -1146,7 +1147,6 @@ class HomeFragment : Fragment() {
         val gestures = binding.homeGestureRoot
         if (isEditMode) {
             gestures.onSwipeUp = null
-            gestures.onSwipeDown = null
             gestures.onSwipeLeft = null
             gestures.onSwipeRight = null
         } else {

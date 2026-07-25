@@ -23,9 +23,6 @@
 # Keep ALLE eigenen Klassen mit allen Methoden und Feldern
 -keep class com.github.reygnn.kolibri_launcher.** { *; }
 
-# Keep all accessibility services in general
--keep class * extends android.accessibilityservice.AccessibilityService { *; }
-
 # Annotation processing (compile-time only, not needed at runtime)
 -dontwarn javax.annotation.processing.AbstractProcessor
 -dontwarn javax.annotation.processing.SupportedOptions

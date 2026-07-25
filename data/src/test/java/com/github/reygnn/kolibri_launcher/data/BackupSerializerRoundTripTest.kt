@@ -92,7 +92,6 @@ class BackupSerializerRoundTripTest {
             ),
             showCalendarEvent = true,
             showAlarm = true,
-            swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
             autoLaunchApp = true,
             sortOrder = "ALPHABETICAL",

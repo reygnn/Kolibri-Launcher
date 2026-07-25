@@ -48,7 +48,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
@@ -99,7 +98,6 @@ class LauncherViewModel @Inject constructor(
     getDrawerAppsUseCase: GetDrawerAppsUseCase,
     hideAppUseCase: HideAppUseCase,
     toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    requestNotificationsUseCase: RequestNotificationsUseCase,
     recordAppLaunchUseCase: RecordAppLaunchUseCase,
     refreshAppsUseCase: RefreshAppsUseCase,
     resetAppUsageUseCase: ResetAppUsageUseCase,
@@ -182,7 +180,6 @@ class LauncherViewModel @Inject constructor(
     )
 
     private val gestureDelegate = GestureDelegate(
-        requestNotificationsUseCase = requestNotificationsUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope
     )
@@ -334,7 +331,6 @@ class LauncherViewModel @Inject constructor(
     // ===========================================
 
     fun onFlingUp() = gestureDelegate.onFlingUp()
-    fun onFlingDown() = gestureDelegate.onFlingDown()
     fun onSwipeFromRightToLeft() = gestureDelegate.onSwipeFromRightToLeft()
     fun onSwipeFromLeftToRight() = gestureDelegate.onSwipeFromLeftToRight()
     fun onLongPress() = gestureDelegate.onLongPress()

@@ -950,7 +950,6 @@ class BackupRepositoryImplSecurityTest {
             importHiddenApps = false,
             importCustomNames = false,
             importSwipeActions = false,
-            importGestureSettings = false,
             importThemeSettings = false,
             importTimeBasedEvents = false,
             importQualityOfLife = false,
@@ -971,7 +970,6 @@ class BackupRepositoryImplSecurityTest {
             importHiddenApps = false,
             importCustomNames = false,
             importSwipeActions = false,
-            importGestureSettings = false,
             importThemeSettings = false,
             importTimeBasedEvents = false,
             importQualityOfLife = false,
@@ -1055,7 +1053,6 @@ class BackupRepositoryImplSecurityTest {
                     "textShadowEnabled": null,
                     "showCalendarEvent": null,
                     "showAlarm": null,
-                    "swipeDownToNotificationsEnabled": null,
                     "autoShowKeyboard": null,
                     "autoLaunchApp": null
                 }

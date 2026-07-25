@@ -36,7 +36,6 @@ data class ImportOptionsUiState(
     /** Anzahl belegter Swipe-Slots (0, 1 oder 2) - für den Checkbox-Label-Placeholder. */
     val swipeActionCount: Int,
     val themeSettings: CheckboxSpec,
-    val gestureSettings: CheckboxSpec,
     val timeBasedEvents: CheckboxSpec,
     val qualityOfLife: CheckboxSpec,
     val powerUserSettings: CheckboxSpec,
@@ -54,7 +53,6 @@ data class ImportOptionsUiState(
                 swipeActions = CheckboxSpec.visibleIf(swipeCount > 0),
                 swipeActionCount = swipeCount,
                 themeSettings = CheckboxSpec.visibleIf(preview.hasThemeSettings),
-                gestureSettings = CheckboxSpec.visibleIf(preview.hasGestureSettings),
                 timeBasedEvents = CheckboxSpec.visibleIf(preview.hasTimeBasedEvents),
                 qualityOfLife = CheckboxSpec.visibleIf(preview.hasQualityOfLife),
                 powerUserSettings = CheckboxSpec.visibleIf(preview.hasPowerUserSettings),

@@ -7,7 +7,6 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
@@ -40,7 +39,6 @@ class ResetRepositoryImplTest {
     @MockK(relaxUnitFun = true) private lateinit var wallpaperRepository: WallpaperRepository
     @MockK(relaxUnitFun = true) private lateinit var fabPositionRepository: FabPositionRepository
     @MockK(relaxUnitFun = true) private lateinit var settingsRepository: SettingsRepository
-    @MockK(relaxUnitFun = true) private lateinit var screenLockRepository: ScreenLockRepository
     @MockK(relaxUnitFun = true) private lateinit var installedAppsStateRepository: InstalledAppsStateRepository
     @MockK(relaxUnitFun = true) private lateinit var timeBasedEventsRepository: TimeBasedEventsRepository
 
@@ -59,7 +57,6 @@ class ResetRepositoryImplTest {
             wallpaperRepository,
             fabPositionRepository,
             settingsRepository,
-            screenLockRepository,
             installedAppsStateRepository,
             timeBasedEventsRepository
         )
@@ -81,7 +78,6 @@ class ResetRepositoryImplTest {
         coVerify { wallpaperRepository.purgeRepository() }
         coVerify { fabPositionRepository.purgeRepository() }
         coVerify { installedAppsStateRepository.purgeRepository() }
-        coVerify { screenLockRepository.purgeRepository() }
         coVerify { timeBasedEventsRepository.purgeRepository() }
 
         // AppUsage und Settings dürfen hier NICHT angefasst werden

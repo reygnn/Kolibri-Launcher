@@ -35,7 +35,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
@@ -121,7 +120,6 @@ class LauncherViewModelContractTest {
     private lateinit var showAppUseCase: ShowAppUseCase
     private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
     private lateinit var toggleSortOrderUseCase: ToggleSortOrderUseCase
-    private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var setTextColorUseCase: SetTextColorUseCase
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
@@ -156,7 +154,6 @@ class LauncherViewModelContractTest {
         showAppUseCase = mockk(relaxed = true)
         resetAppUsageUseCase = mockk(relaxed = true)
         toggleSortOrderUseCase = mockk(relaxed = true)
-        requestNotificationsUseCase = mockk(relaxed = true)
         handleSwipeActionUseCase = mockk(relaxed = true)
         setTextColorUseCase = mockk(relaxed = true)
         setTextShadowEnabledUseCase = mockk(relaxed = true)
@@ -225,7 +222,6 @@ class LauncherViewModelContractTest {
             getDrawerAppsUseCase = getDrawerAppsUseCase,
             hideAppUseCase = hideAppUseCase,
             toggleFavoriteUseCase = toggleFavoriteUseCase,
-            requestNotificationsUseCase = requestNotificationsUseCase,
             recordAppLaunchUseCase = recordAppLaunchUseCase,
             refreshAppsUseCase = refreshAppsUseCase,
             resetAppUsageUseCase = resetAppUsageUseCase,

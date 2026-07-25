@@ -10,7 +10,6 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.ScreenLockRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
@@ -40,7 +39,6 @@ class ResetRepositoryImpl @Inject constructor(
     private val settingsRepository: SettingsRepository, // has purgeRepository
 
     // Other repositories
-    private val screenLockRepository: ScreenLockRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val timeBasedEventsRepository: TimeBasedEventsRepository // no purgeRepository needed
 ) : ResetRepository {
@@ -81,7 +79,6 @@ class ResetRepositoryImpl @Inject constructor(
                 "wallpaper" to wallpaperRepository,
                 "wallpaper-edit fab position" to fabPositionRepository,
                 "installed apps state" to installedAppsStateRepository,
-                "screen lock" to screenLockRepository,
                 "time-based events" to timeBasedEventsRepository,
             ),
         )

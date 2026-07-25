@@ -162,7 +162,7 @@ import javax.inject.Inject
  *
  *   5. Standalone helper outer catches —
  *      `showColorCustomizationDialog`, `showLayoutCustomizationDialog`,
- *      `openSettingsActivity`, `showAccessibilityDialog` and `showDialog`
+ *      `openSettingsActivity` and `showDialog`
  *      are all called from `handleSpecificEvent` whose Catchall already
  *      covers them. Outer catches removed.
  *
@@ -754,10 +754,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     launchApp(action.app)
                 }
 
-                is UiEvent.ShowAccessibilityDialog -> {
-                    showAccessibilityDialog()
-                }
-
                 is UiEvent.OpenWallpaperPicker -> {
                     try {
                         WallpaperImagePicker.launch(wallpaperPickerLauncher)
@@ -867,18 +863,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     private fun wallpaperAwareDialogStyle(): Int = when (currentSurfaceClassification) {
         LuminanceClassification.LIGHT -> R.style.CustomAlertDialog_Light
         LuminanceClassification.DARK -> R.style.CustomAlertDialog_Dark
-    }
-
-    private fun showAccessibilityDialog() {
-        val builder = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
-            .setTitle(getString(R.string.accessibility_service_title))
-            .setMessage(getString(R.string.accessibility_service_explanation))
-            .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
-                startActivitySafely(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-            .setNegativeButton(getString(R.string.cancel), null)
-
-        showDialog(builder)
     }
 
     private fun showCustomizationOptionsDialog() {

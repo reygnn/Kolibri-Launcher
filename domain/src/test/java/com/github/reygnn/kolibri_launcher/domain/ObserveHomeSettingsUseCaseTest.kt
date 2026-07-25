@@ -35,17 +35,14 @@ class ObserveHomeSettingsUseCaseTest {
     @Test
     fun `invoke - combines flows into HomeSettings correctly`() = runTest {
         val sortOrderFlow = MutableStateFlow(SortOrder.ALPHABETICAL)
-        val swipeDownFlow = MutableStateFlow(false)
         val autoLaunchFlow = MutableStateFlow(true)
 
         every { settingsRepository.sortOrderFlow } returns sortOrderFlow
-        every { settingsRepository.swipeDownToNotificationsEnabledFlow } returns swipeDownFlow
         every { settingsRepository.autoLaunchAppFlow } returns autoLaunchFlow
 
         useCase().test {
             val initialResult = awaitItem()
             assertEquals(SortOrder.ALPHABETICAL, initialResult.sortOrder)
-            assertEquals(false, initialResult.swipeDownToNotificationsEnabled)
             assertEquals(true, initialResult.autoLaunchApp)
 
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE

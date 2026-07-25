@@ -82,8 +82,6 @@ class BackupRepositoryImplIsolationTest {
     private val baselineBold = false
     private val baselineMargin = 0.0f
 
-    private val baselineSwipeDown = false
-
     private val baselineCalendar = false
     private val baselineAlarm = false
 
@@ -106,8 +104,6 @@ class BackupRepositoryImplIsolationTest {
     private val targetPadding = 0.5f
     private val targetBold = true
     private val targetMargin = 0.5f
-
-    private val targetSwipeDown = true
 
     private val targetCalendar = true
     private val targetAlarm = true
@@ -176,8 +172,6 @@ class BackupRepositoryImplIsolationTest {
         fakeSettingsRepo.isFontBold = baselineBold
         fakeSettingsRepo.contentTopMargin = baselineMargin
 
-        fakeSettingsRepo.swipeDown = baselineSwipeDown
-
         fakeSettingsRepo.showCalendar = baselineCalendar
         fakeSettingsRepo.showAlarm = baselineAlarm
 
@@ -202,7 +196,6 @@ class BackupRepositoryImplIsolationTest {
             contentTopMarginScale = targetMargin,
             showCalendarEvent = targetCalendar,
             showAlarm = targetAlarm,
-            swipeDownToNotificationsEnabled = targetSwipeDown,
             autoShowKeyboard = targetAutoKeyboard,
             autoLaunchApp = targetAutoLaunch
         )
@@ -236,7 +229,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -258,7 +250,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -280,7 +271,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -301,7 +291,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -323,7 +312,6 @@ class BackupRepositoryImplIsolationTest {
         assertHiddenUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -345,7 +333,6 @@ class BackupRepositoryImplIsolationTest {
         assertHiddenUnchanged()
         assertNamesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -372,28 +359,6 @@ class BackupRepositoryImplIsolationTest {
         assertHiddenUnchanged()
         assertNamesUnchanged()
         assertSwipesUnchanged()
-        assertGesturesUnchanged()
-        assertTimeEventsUnchanged()
-        assertQoLUnchanged()
-    }
-
-    @Test
-    fun `ISOLATION 7 - Gesture Settings`() = runTest {
-        // FIX: Nutze Helper
-        val options = createIsolationOptions(importGestureSettings = true)
-        val result = backupManager.importFromJson(createTargetBackupJson(), options)
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-
-        // CHANGED:
-        assertThat(fakeSettingsRepo.swipeDown).isEqualTo(targetSwipeDown)
-
-        // UNCHANGED:
-        assertFavoritesUnchanged()
-        assertOrderUnchanged()
-        assertHiddenUnchanged()
-        assertNamesUnchanged()
-        assertSwipesUnchanged()
-        assertThemeUnchanged()
         assertTimeEventsUnchanged()
         assertQoLUnchanged()
     }
@@ -416,7 +381,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertQoLUnchanged()
     }
 
@@ -438,7 +402,6 @@ class BackupRepositoryImplIsolationTest {
         assertNamesUnchanged()
         assertSwipesUnchanged()
         assertThemeUnchanged()
-        assertGesturesUnchanged()
         assertTimeEventsUnchanged()
     }
 
@@ -453,7 +416,6 @@ class BackupRepositoryImplIsolationTest {
         importCustomNames: Boolean = false,
         importSwipeActions: Boolean = false,
         importThemeSettings: Boolean = false,
-        importGestureSettings: Boolean = false,
         importTimeBasedEvents: Boolean = false,
         importQualityOfLife: Boolean = false,
         importPowerUserSettings: Boolean = false
@@ -465,7 +427,6 @@ class BackupRepositoryImplIsolationTest {
             importCustomNames = importCustomNames,
             importSwipeActions = importSwipeActions,
             importThemeSettings = importThemeSettings,
-            importGestureSettings = importGestureSettings,
             importTimeBasedEvents = importTimeBasedEvents,
             importQualityOfLife = importQualityOfLife,
             importPowerUserSettings = importPowerUserSettings
@@ -507,10 +468,6 @@ class BackupRepositoryImplIsolationTest {
         assertThat(fakeSettingsRepo.verticalPadding).isEqualTo(baselinePadding)
         assertThat(fakeSettingsRepo.isFontBold).isEqualTo(baselineBold)
         assertThat(fakeSettingsRepo.contentTopMargin).isEqualTo(baselineMargin)
-    }
-
-    private fun assertGesturesUnchanged() {
-        assertThat(fakeSettingsRepo.swipeDown).isEqualTo(baselineSwipeDown)
     }
 
     private fun assertTimeEventsUnchanged() {

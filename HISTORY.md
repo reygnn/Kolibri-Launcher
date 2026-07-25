@@ -201,9 +201,34 @@ residual pop-in lived as `ACCEPTED_LIMITATIONS.md` §1 until the
 feature itself was removed — for a perfectionist maintainer the
 occasional wrong-wallpaper flash was worse than not having the gesture
 at all, and the hardware power button already delivers exactly the
-flash-free "black → off" the gesture could not. The AccessibilityService
-stays: it still drives swipe-down-to-open-notifications, which shares
-the same `ScreenLockRepository` availability plumbing.
+flash-free "black → off" the gesture could not. Removing double-tap-to-lock
+left the `AccessibilityService` driving only one thing —
+swipe-down-to-open-notifications — through a pile of now-misnamed
+`ScreenLock*` plumbing.
+
+---
+
+## 2026-07 — The AccessibilityService removed entirely
+
+A follow-up review asked the obvious next question: what still hangs on
+the service? Exactly one feature — swipe-down-on-home to open the
+notification shade — reached through `RequestNotificationsUseCase`,
+`ScreenLockRepository`, and `performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)`.
+Weighed against the cost — a scary, hard-to-grant accessibility
+permission, OEM accessibility StrictMode noise, and a whole subsystem of
+`ScreenLock*`/`isLockingAvailable` names that no longer had anything to
+do with locking — the feature did not earn its keep. It was removed too,
+and with it the last reason for the launcher to be an
+`AccessibilityService` at all: the service class, its config, the
+`ScreenLockRepository` interface, `RequestNotificationsUseCase`, the
+swipe-down setting, the "enable accessibility" dialog and Settings entry,
+and the backup "gesture settings" category all went. Deleting is cleaner
+than renaming here — Android prunes the now-orphaned accessibility grant
+as a no-op, so no user is left on a half-broken feature. The launcher no
+longer requests any accessibility capability. (A stale
+`settingsActivity="com.github.reygnn.bblauncher.SettingsActivity"` —
+copy-pasted years ago from a sibling project — was found and fixed on the
+way out, then deleted with the rest.)
 
 ---
 

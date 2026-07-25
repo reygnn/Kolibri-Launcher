@@ -88,13 +88,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onErrorOpeningAccessibilitySettings(e: Throwable) {
-        launchSafe {
-            sendEvent(UiEvent.ShowToast(R.string.error_accessibility_settings_open))
-            TimberWrapper.silentError(e, "Error opening accessibility settings")
-        }
-    }
-
     fun onErrorOpeningDefaultLauncherSettings(e: Throwable) {
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.error_default_launcher_settings_open))

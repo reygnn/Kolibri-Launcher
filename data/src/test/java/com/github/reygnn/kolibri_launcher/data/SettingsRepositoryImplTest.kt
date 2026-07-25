@@ -310,13 +310,6 @@ class SettingsRepositoryImplTest {
     // ========== GESTURE & AUTO TESTS ==========
 
     @Test
-    fun `swipeDownToNotificationsEnabledFlow - defaults to false and updates correctly`() = runTest {
-        assertFalse(settingsManager.swipeDownToNotificationsEnabledFlow.first())
-        settingsManager.setSwipeDownToNotifications(true)
-        assertTrue(settingsManager.swipeDownToNotificationsEnabledFlow.first())
-    }
-
-    @Test
     fun `autoShowKeyboardFlow - defaults to false and updates correctly`() = runTest {
         assertFalse(settingsManager.autoShowKeyboardFlow.first())
         settingsManager.setAutoShowKeyboard(true)

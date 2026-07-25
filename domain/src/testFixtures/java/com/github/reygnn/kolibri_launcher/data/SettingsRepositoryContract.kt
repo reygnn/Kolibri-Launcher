@@ -215,15 +215,10 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `purgeRepository resets feature toggles to defaults`() = runTest {
         val repo = createRepository()
-        repo.setSwipeDownToNotifications(!AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS)
         repo.setAutoShowKeyboard(!AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
 
         repo.purgeRepository()
 
-        assertEquals(
-            AppConstants.DEFAULT_SWIPE_DOWN_NOTIFICATIONS,
-            repo.swipeDownToNotificationsEnabledFlow.first()
-        )
         assertEquals(
             AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD,
             repo.autoShowKeyboardFlow.first()

@@ -18,7 +18,6 @@
     <string name="wallpaper_background">Background wallpaper</string>
     
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Allows Kolibri-Launcher to open the notification panel</string>
 
     <!-- HomeFragment Error Messages -->
 
@@ -43,7 +42,6 @@
 
     <!-- Error Messages for Settings -->
     <string name="error_app_info_open">App info could not be opened</string>
-    <string name="error_accessibility_settings_open">Accessibility settings could not be opened</string>
 
     <!-- Hidden Apps Dialog -->
     <string name="hidden_apps_title">Hidden Apps</string>
@@ -67,10 +65,6 @@
     <string name="wallpaper_settings_fallback">Wallpaper settings opened</string>
     <string name="error_wallpaper_settings_open">Error opening wallpaper settings</string>
 
-    <!-- For Accessibility Service Dialog in ScreenLockManager -->
-    <string name="accessibility_service_title">Permission Required</string>
-<string name="accessibility_service_explanation">Kolibri Launcher needs the Accessibility Service to enable the following feature:\n\n• Open notification panel with swipe down\n\nThis service is used exclusively for this function and does not collect any data.</string>
-    <string name="go_to_settings">Go to Settings</string>
 
     <string name="time_placeholder" translatable="false">12:34</string>
     <string name="date_placeholder">Loading date…</string>
@@ -126,8 +120,6 @@
     <string name="category_gestures_title">Gestures</string>
 
     <string name="category_system_title">System</string>
-    <string name="accessibility_title">Accessibility</string>
-    <string name="accessibility_summary">Open accessibility settings</string>
     <string name="app_info_title">App Information</string>
     <string name="app_info_summary">Launcher settings and permissions</string>
 
@@ -276,7 +268,6 @@
 <string name="import_no_options_selected">Please select at least one import option</string>
 <string name="import_option_swipe_actions">Swipe actions (%d)</string>
 <string name="import_option_theme">Theme &amp; Colors</string>
-<string name="import_option_gestures">Gesture Settings</string>
 
 <string name="show_calendar_event_title">Show next calendar event</string>
 <string name="show_calendar_event_summary">Displays the next event on the home screen. Requires calendar permission.</string>
@@ -287,11 +278,6 @@
 <string name="chip_background_color">Event Background</string>
     <string name="show_alarm_title">Show alarms</string>
     <string name="show_alarm_summary">Display next alarm on home screen</string>
-    
-    <string name="swipe_down_to_notifications_title">Swipe down for notifications</string>
-    <string name="swipe_down_to_notifications_summary">Open the notification panel with a downward swipe</string>
-    
-    <string name="toast_enable_swipe_down_to_notifications">Swipe gesture is disabled. Enable it in Settings.</string>
     <string name="import_option_time_events">Time-Based Events (Calendar &amp; Alarm)</string>
     <string name="backup_import_success_settings_only">Settings successfully imported</string>
     

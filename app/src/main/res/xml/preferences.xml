@@ -90,13 +90,6 @@
         android:title="@string/category_gestures_title"
         app:iconSpaceReserved="false">
 
-        <SwitchPreferenceCompat
-            android:key="swipe_down_to_notifications_enabled"
-            android:title="@string/swipe_down_to_notifications_title"
-            android:summary="@string/swipe_down_to_notifications_summary"
-            android:defaultValue="false"
-            app:iconSpaceReserved="false" />
-
             <Preference
             android:key="swipe_actions"
             android:title="@string/settings_swipe_actions_title"
@@ -133,13 +126,6 @@
             android:key="set_default_launcher"
             android:title="@string/set_default_launcher_title"
             android:summary="@string/set_default_launcher_summary"
-            app:iconSpaceReserved="false" />
-
-        <!-- Accessibility -->
-        <Preference
-            android:key="accessibility"
-            android:title="@string/accessibility_title"
-            android:summary="@string/accessibility_summary"
             app:iconSpaceReserved="false" />
 
         <!-- App Info -->

@@ -172,7 +172,6 @@ class BackupSerializer @Inject constructor() {
             wallpaperLayerCount = if (hasMultiLayer) backup.settings.wallpaperLayers.size else 0,
             hasTimeBasedEvents = backup.settings.showCalendarEvent != null ||
                 backup.settings.showAlarm != null,
-            hasGestureSettings = backup.settings.swipeDownToNotificationsEnabled != null,
             hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
                 backup.settings.autoLaunchApp != null ||
                 backup.settings.sortOrder != null,
@@ -342,7 +341,6 @@ class BackupSerializer @Inject constructor() {
             textShadowEnabled = settings.getStrictBool("textShadowEnabled", "text_shadow_enabled") ?: base.textShadowEnabled,
             showCalendarEvent = settings.getStrictBool("showCalendarEvent", "show_calendar_event") ?: base.showCalendarEvent,
             showAlarm = settings.getStrictBool("showAlarm", "show_alarm") ?: base.showAlarm,
-            swipeDownToNotificationsEnabled = settings.getStrictBool("swipeDownToNotificationsEnabled", "swipe_down_to_notifications_enabled") ?: base.swipeDownToNotificationsEnabled,
             autoShowKeyboard = settings.getStrictBool("autoShowKeyboard", "auto_show_keyboard") ?: base.autoShowKeyboard,
             autoLaunchApp = settings.getStrictBool("autoLaunchApp", "auto_launch_app") ?: base.autoLaunchApp,
             secureWindow = settings.getStrictBool("secureWindow", "secure_window") ?: base.secureWindow,
@@ -396,7 +394,6 @@ class BackupSerializer @Inject constructor() {
 
             val boolFields = listOf(
                 "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
-                "swipe_down_to_notifications_enabled",
                 "auto_show_keyboard", "auto_launch_app", "secure_window", "rotation_locked",
             )
             for (field in boolFields) {

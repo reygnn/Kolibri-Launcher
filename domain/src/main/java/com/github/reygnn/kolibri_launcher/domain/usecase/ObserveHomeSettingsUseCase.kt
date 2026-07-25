@@ -12,12 +12,10 @@ class ObserveHomeSettingsUseCase @Inject constructor(
     operator fun invoke(): Flow<HomeSettings> {
         return combine(
             settingsRepository.sortOrderFlow,
-            settingsRepository.swipeDownToNotificationsEnabledFlow,
             settingsRepository.autoLaunchAppFlow
-        ) { sortOrder, swipeDown, autoLaunch ->
+        ) { sortOrder, autoLaunch ->
             HomeSettings(
                 sortOrder = sortOrder,
-                swipeDownToNotificationsEnabled = swipeDown,
                 autoLaunchApp = autoLaunch
             )
         }

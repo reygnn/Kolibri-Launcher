@@ -68,7 +68,7 @@ in `:app`.
 :domain  (Pure-Kotlin JVM module — `kotlin("jvm")`, no Android SDK)
   core/                   AppConstants, ColorMath, KolibriLog, TimberWrapper,
                           AppUpdateSignal, Qualifiers, CoerceExtensions
-  domain/repository/      interfaces (FavoritesRepository, …) — 20 of them
+  domain/repository/      interfaces (FavoritesRepository, …) — 19 of them
   domain/usecase/         ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
   domain/model/           data classes (AppInfo, HomeSettings, UiState,
                           AppContextMenuAction + LauncherActionLabel,

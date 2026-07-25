@@ -31,7 +31,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
@@ -95,7 +94,6 @@ class LauncherViewModelTest {
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
     private lateinit var refreshAppsUseCase: RefreshAppsUseCase
     private lateinit var resetAppUsageUseCase: ResetAppUsageUseCase
-    private lateinit var requestNotificationsUseCase: RequestNotificationsUseCase
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
     private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
@@ -154,7 +152,6 @@ class LauncherViewModelTest {
         recordAppLaunchUseCase = mockk(relaxed = true)
         refreshAppsUseCase = mockk(relaxed = true)
         resetAppUsageUseCase = mockk(relaxed = true)
-        requestNotificationsUseCase = mockk(relaxed = true)
         handleSwipeActionUseCase = mockk(relaxed = true)
 
         observeTimeBasedEventsUseCase = mockk(relaxed = true)
@@ -221,7 +218,6 @@ class LauncherViewModelTest {
         getDrawerAppsUseCase = getDrawerAppsUseCase,
         hideAppUseCase = hideAppUseCase,
         toggleFavoriteUseCase = toggleFavoriteUseCase,
-        requestNotificationsUseCase = requestNotificationsUseCase,
         recordAppLaunchUseCase = recordAppLaunchUseCase,
         refreshAppsUseCase = refreshAppsUseCase,
         resetAppUsageUseCase = resetAppUsageUseCase,

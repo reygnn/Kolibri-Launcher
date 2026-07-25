@@ -147,7 +147,6 @@ class LauncherViewModelSecurityTest {
             getDrawerAppsUseCase = mockk(relaxed = true),
             hideAppUseCase = hideAppUseCase,
             toggleFavoriteUseCase = toggleFavoriteUseCase,
-            requestNotificationsUseCase = mockk(relaxed = true),
             recordAppLaunchUseCase = recordAppLaunchUseCase,
             refreshAppsUseCase = refreshAppsUseCase,
             resetAppUsageUseCase = mockk(relaxed = true),

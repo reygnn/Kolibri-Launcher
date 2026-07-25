@@ -165,8 +165,6 @@ data class LauncherSettings(
     val showCalendarEvent: Boolean? = null,
     @JsonNames("show_alarm")
     val showAlarm: Boolean? = null,
-    @JsonNames("swipe_down_to_notifications_enabled")
-    val swipeDownToNotificationsEnabled: Boolean? = null,
     @JsonNames("auto_show_keyboard")
     val autoShowKeyboard: Boolean? = null,
     @JsonNames("auto_launch_app")
@@ -194,7 +192,6 @@ data class ImportOptions(
     val importCustomNames: Boolean = true,
     val importSwipeActions: Boolean = true,
     val importThemeSettings: Boolean = true,
-    val importGestureSettings: Boolean = true,
     val importTimeBasedEvents: Boolean = true,
     val importQualityOfLife: Boolean = true,
     val importPowerUserSettings: Boolean = true
@@ -206,7 +203,6 @@ data class ImportOptions(
                 !importCustomNames &&
                 !importSwipeActions &&
                 !importThemeSettings &&
-                !importGestureSettings &&
                 !importTimeBasedEvents &&
                 !importQualityOfLife &&
                 !importPowerUserSettings
@@ -224,7 +220,6 @@ data class BackupPreview(
     val hasThemeSettings: Boolean,
     val hasWallpaper: Boolean,
     val wallpaperLayerCount: Int = 0,
-    val hasGestureSettings: Boolean,
     val hasTimeBasedEvents: Boolean,
     val hasQualityOfLife: Boolean,
     val hasPowerUserSettings: Boolean

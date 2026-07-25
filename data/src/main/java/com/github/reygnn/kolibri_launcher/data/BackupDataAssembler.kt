@@ -96,7 +96,6 @@ class BackupDataAssembler @Inject constructor(
 
         val showCalendarEvent = settingsRepository.showCalendarEventFlow.first()
         val showAlarm = settingsRepository.showAlarmFlow.first()
-        val swipeDownToNotificationsEnabled = settingsRepository.swipeDownToNotificationsEnabledFlow.first()
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
         val sortOrder = settingsRepository.sortOrderFlow.first()
@@ -148,7 +147,6 @@ class BackupDataAssembler @Inject constructor(
             wallpaperLayers = wallpaperLayers,
             showCalendarEvent = showCalendarEvent,
             showAlarm = showAlarm,
-            swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
             sortOrder = sortOrder.name,
@@ -283,11 +281,6 @@ class BackupDataAssembler @Inject constructor(
                 }
             }
             if (swipeImportedCount > 0) Timber.i("Imported swipe actions")
-        }
-
-        // ===== PHASE 6: Import Gesture Settings =====
-        if (options.importGestureSettings) {
-            backup.settings.swipeDownToNotificationsEnabled?.let { settingsRepository.setSwipeDownToNotifications(it) }
         }
 
         // ===== PHASE 7: Import Theme Settings (incl. wallpaper) =====

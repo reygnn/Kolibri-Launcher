@@ -114,47 +114,15 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - only gesture settings - imports only gestures`() = runTest {
-        fakeSettingsRepo.swipeDown = false
-        fakeSettingsRepo.color = Color.BLACK
-
-        val backup = createTestBackup(
-            favorites = setOf("com.app1/com.app1.MainActivity"),
-            textColor = Color.RED,
-            swipeDownToNotificationsEnabled = true
-        )
-        val jsonString = json.encodeToString(backup)
-
-        val options = ImportOptions(
-            importFavorites = false,
-            importOrder = false,
-            importHiddenApps = false,
-            importCustomNames = false,
-            importSwipeActions = false,
-            importThemeSettings = false,
-            importGestureSettings = true
-        )
-
-        val result = backupManager.importFromJson(jsonString, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
-        Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLACK)
-        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
-    }
-
-    @Test
-    fun `importFromJson - only theme settings - imports only theme not gestures`() = runTest {
+    fun `importFromJson - only theme settings - imports only theme`() = runTest {
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
-        fakeSettingsRepo.swipeDown = false
 
         val backup = createTestBackup(
             textColor = Color.GREEN,
             chipBackgroundColor = Color.MAGENTA,
-            textShadowEnabled = false,
-            swipeDownToNotificationsEnabled = true
+            textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
 
@@ -164,8 +132,7 @@ class BackupRepositoryImplDoomsdayTest {
             importHiddenApps = false,
             importCustomNames = false,
             importSwipeActions = false,
-            importThemeSettings = true,
-            importGestureSettings = false
+            importThemeSettings = true
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -174,7 +141,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
-        Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
     @Test
@@ -282,7 +248,6 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSettingsRepo.color = Color.RED
         fakeSettingsRepo.chipBgColor = Color.GREEN
         fakeSettingsRepo.shadow = false
-        fakeSettingsRepo.swipeDown = true
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
 
@@ -298,7 +263,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(backup.settings.textColor).isEqualTo(Color.RED)
         Truth.assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
         Truth.assertThat(backup.settings.textShadowEnabled).isFalse()
-        Truth.assertThat(backup.settings.swipeDownToNotificationsEnabled).isTrue()
         Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
         Truth.assertThat(backup.settings.autoLaunchApp).isTrue()
     }
@@ -333,7 +297,6 @@ class BackupRepositoryImplDoomsdayTest {
             importSwipeActions = false,
             importThemeSettings = false,
             importTimeBasedEvents = false,
-            importGestureSettings = false,
             importQualityOfLife = false,
             importPowerUserSettings = false
         )
@@ -496,7 +459,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - only theme settings - imports only theme`() = runTest {
+    fun `importFromJson - only theme settings - does not import favorites`() = runTest {
         fakeSettingsRepo.color = Color.BLACK
         fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
@@ -852,7 +815,6 @@ class BackupRepositoryImplDoomsdayTest {
             textColor = Color.YELLOW,
             chipBackgroundColor = Color.RED,
             textShadowEnabled = false,
-            swipeDownToNotificationsEnabled = true,
             autoShowKeyboard = true,
             autoLaunchApp = true
         )
@@ -873,7 +835,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
-        Truth.assertThat(fakeSettingsRepo.swipeDown).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
     }
@@ -900,24 +861,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
         Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
-    }
-
-    @Test
-    fun `importFromJson - old backup without gesture keys - does not change gestures`() = runTest {
-        fakeSettingsRepo.swipeDown = false
-
-        val backup = createTestBackup(
-            favorites = setOf("com.app1/com.app1.MainActivity"),
-            swipeDownToNotificationsEnabled = null
-        )
-        val oldBackupJson = json.encodeToString(backup)
-
-        val options = ImportOptions(importGestureSettings = true)
-
-        val result = backupManager.importFromJson(oldBackupJson, options)
-
-        Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeSettingsRepo.swipeDown).isFalse()
     }
 
     // ========== EXPORT TESTS - AUTO SHOW KEYBOARD ==========
@@ -964,7 +907,6 @@ class BackupRepositoryImplDoomsdayTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
-            importGestureSettings = false,
             importTimeBasedEvents = false,
             importQualityOfLife = true
         )
@@ -1002,7 +944,6 @@ class BackupRepositoryImplDoomsdayTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
-            importGestureSettings = false,
             importTimeBasedEvents = false,
             importQualityOfLife = false
         )
@@ -1127,8 +1068,7 @@ class BackupRepositoryImplDoomsdayTest {
         val options = ImportOptions(
             importThemeSettings = true,
             // Alle anderen explizit false
-            importFavorites = false,
-            importGestureSettings = false
+            importFavorites = false
         )
 
         val result = backupManager.importFromJson(jsonString, options)
@@ -1733,7 +1673,6 @@ class BackupRepositoryImplDoomsdayTest {
         contentTopMarginScale: Float? = null,
         showCalendarEvent: Boolean? = null,
         showAlarm: Boolean? = null,
-        swipeDownToNotificationsEnabled: Boolean? = null,
         autoShowKeyboard: Boolean? = null,
         autoLaunchApp: Boolean? = null
     ): BackupData {
@@ -1757,7 +1696,6 @@ class BackupRepositoryImplDoomsdayTest {
                 contentTopMarginScale = contentTopMarginScale,
                 showCalendarEvent = showCalendarEvent,
                 showAlarm = showAlarm,
-                swipeDownToNotificationsEnabled = swipeDownToNotificationsEnabled,
                 autoShowKeyboard = autoShowKeyboard,
                 autoLaunchApp = autoLaunchApp
             )

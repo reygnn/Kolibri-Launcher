@@ -16,8 +16,8 @@
     <!-- Layer 1: Bestehender Content -->
     <!--
       Wrapped in HomeGestureLayout (since 2026-05-07) so that the
-      five home-screen gestures (4 directional swipes + double-tap +
-      long-press) are detected via dispatchTouchEvent at the parent
+      home-screen gestures (directional swipes + long-press) are
+      detected via dispatchTouchEvent at the parent
       level, while the favoritesRecyclerView inside still receives
       slow drags normally for scrolling. See homescroll.md and the
       class KDoc on HomeGestureLayout for the full rationale.

@@ -9,53 +9,24 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RequestNotificationsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
 /**
  * Delegate responsible for all gesture handling:
- * fling up/down, swipe left/right, long press,
+ * fling up, swipe left/right, long press,
  * and double-click on clock/date/battery.
  */
 class GestureDelegate(
-    private val requestNotificationsUseCase: RequestNotificationsUseCase,
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase,
     private val scope: DelegateScope
 ) {
-
-    // --- One-Time Toast Flags ---
-
-    private var enableSwipeDownToastShown = false
 
     // --- Fling ---
 
     fun onFlingUp() = scope.launchSafe("Error on fling up") {
         scope.sendEvent(UiEvent.ShowAppDrawer)
-    }
-
-    fun onFlingDown() = scope.launchSafe("Error on fling down") {
-        when (requestNotificationsUseCase()) {
-            is RequestNotificationsUseCase.Result.Success -> {
-            }
-
-            is RequestNotificationsUseCase.Result.ErrorAccessibility -> {
-                scope.sendEvent(UiEvent.ShowAccessibilityDialog)
-            }
-
-            is RequestNotificationsUseCase.Result.ErrorDisabled -> {
-                if (!enableSwipeDownToastShown) {
-                    enableSwipeDownToastShown = true
-                    scope.sendEvent(UiEvent.ShowToast(R.string.toast_enable_swipe_down_to_notifications))
-                }
-            }
-
-            is RequestNotificationsUseCase.Result.ErrorGeneric -> {
-                scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
-            }
-        }
     }
 
     // --- Swipe ---
