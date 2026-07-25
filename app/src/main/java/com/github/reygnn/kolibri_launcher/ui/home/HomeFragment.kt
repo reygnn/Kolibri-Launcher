@@ -875,6 +875,14 @@ class HomeFragment : Fragment() {
             // Items are programmatically constructed Buttons whose width
             // changes per text — fixed-size optimization would not apply.
             setHasFixedSize(false)
+            // No item animations: a restore (and any favorites reorder/add)
+            // fires several submitList() rounds as the underlying combine
+            // re-emits, so DefaultItemAnimator would play an add/move
+            // animation per inserted row — the visible "populating one by
+            // one" build-up. Matches every other RecyclerView in the app,
+            // which all disable the animator. Styling rebinds already
+            // suppress the cross-fade via STYLING_PAYLOAD in the adapter.
+            itemAnimator = null
         }
     }
 
