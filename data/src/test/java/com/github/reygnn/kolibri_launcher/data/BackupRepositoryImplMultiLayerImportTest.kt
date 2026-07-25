@@ -146,26 +146,29 @@ class BackupRepositoryImplMultiLayerImportTest {
     }
 
     @Test
-    fun `all-metadata-only layers - wallpaper is not restored`() = runTest {
+    fun `all-image-less-layer backup leaves the current wallpaper untouched`() = runTest {
+        // Build an all-image-less backup by exporting a metadata-only state…
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
                 WallpaperLayerState(imageUri = null, scale = 1.5f, label = "A"),
                 WallpaperLayerState(imageUri = null, scale = 2.5f, label = "B"),
             )
         )
-
         val json = backupManager.exportToJson()
+
+        // …then give the user a REAL wallpaper that the import must NOT wipe.
+        // The backup carries no actual image, so — like every other theme
+        // field's skip-on-null — the wallpaper is left alone (Review 0.99.114
+        // #1). Previously the unconditional clear silently wiped it.
+        val existing = WallpaperState(imageUri = "content://existing/wp", scale = 1.3f)
+        fakeWallpaperRepo.currentState = existing
+
         val result = backupManager.importFromJson(json, themeOnly)
 
-        // Import still succeeds overall; the wallpaper simply ends up cleared
-        // (Phase 7 clears, restore finds no valid layer, leaves it cleared).
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        // Neither layer referenced an image, so nothing was a lost image →
-        // dropped is 0 despite the wallpaper ending up empty.
+        // Nothing was a lost image → dropped 0, and the wallpaper is preserved.
         assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
-        val restored = fakeWallpaperRepo.currentState
-        assertThat(restored.isMultiLayer).isFalse()
-        assertThat(restored.hasWallpaper).isFalse()
+        assertThat(fakeWallpaperRepo.currentState).isEqualTo(existing)
     }
 
     @Test

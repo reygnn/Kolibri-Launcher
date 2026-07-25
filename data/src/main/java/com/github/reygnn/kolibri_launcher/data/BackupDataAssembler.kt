@@ -340,7 +340,11 @@ class BackupDataAssembler @Inject constructor(
             // importing a wallpaper-less backup would silently wipe the user's
             // wallpaper with no warning (dropped stays 0 — nothing was in the
             // backup to drop).
-            val backupHasWallpaper = backup.settings.wallpaperLayers.isNotEmpty() ||
+            // "Has a wallpaper" means an actual image to restore — a layer
+            // with a blank imageUri carries no image, so an all-image-less
+            // layer list must not trigger the clear (which would silently wipe
+            // the user's current wallpaper with dropped=0, i.e. no warning).
+            val backupHasWallpaper = backup.settings.wallpaperLayers.any { !it.imageUri.isNullOrBlank() } ||
                 !backup.settings.wallpaperUri.isNullOrBlank()
             if (backupHasWallpaper) {
                 // Reset only the DataStore state — files are overwritten by

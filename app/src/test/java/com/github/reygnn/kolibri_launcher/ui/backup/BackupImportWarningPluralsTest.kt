@@ -7,6 +7,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Robolectric smoke test for the AUDIT-8 #1 dropped-wallpaper warning
@@ -24,6 +25,10 @@ import org.robolectric.RobolectricTestRunner
  * added value over this test.
  */
 @RunWith(RobolectricTestRunner::class)
+// Pin the English (default) resources — the assertions below check English
+// strings, so the test must not depend on the host machine's default locale
+// (the maintainers run German locales, which would resolve values-de).
+@Config(qualifiers = "en")
 class BackupImportWarningPluralsTest {
 
     private val resources =

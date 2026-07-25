@@ -17,7 +17,6 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.test.runTest
@@ -86,7 +85,9 @@ class BackupRepositoryImplZipExportTest {
 
         every { context.contentResolver } returns contentResolver
         every { contentResolver.openOutputStream(any()) } returns zipBytes
-        coEvery { wallpaperFileManager.copyToInternal(any()) } answers { firstArg<Uri>() }
+        // Note: the export path (writeZipBackup) reads bytes via
+        // File.inputStream() and never calls copyToInternal — that is an
+        // import-side concern — so wallpaperFileManager needs no stubbing here.
 
         backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = FakeFavoritesRepository(),
@@ -150,6 +151,7 @@ class BackupRepositoryImplZipExportTest {
 
         val backup = json.decodeFromString<BackupData>(readBackupJson(bytes))
         // The URI is preserved in the JSON, but no file reference is stamped.
+        assertThat(backup.settings.wallpaperUri).isEqualTo("content://media/external/images/9")
         assertThat(backup.settings.wallpaperImageFileName).isNull()
     }
 
