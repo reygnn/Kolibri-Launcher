@@ -99,7 +99,6 @@ class BackupDataAssembler @Inject constructor(
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
         val sortOrder = settingsRepository.sortOrderFlow.first()
-        val secureWindow = settingsRepository.secureWindowFlow.first()
         val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
         // ===== Wallpaper: multi-layer export =====
@@ -150,7 +149,6 @@ class BackupDataAssembler @Inject constructor(
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
             sortOrder = sortOrder.name,
-            secureWindow = secureWindow,
             rotationLocked = rotationLocked,
         )
 
@@ -370,7 +368,6 @@ class BackupDataAssembler @Inject constructor(
 
         // ===== PHASE 10: Import Power-User Settings =====
         if (options.importPowerUserSettings) {
-            backup.settings.secureWindow?.let { settingsRepository.setSecureWindow(it) }
             backup.settings.rotationLocked?.let { settingsRepository.setRotationLocked(it) }
         }
 

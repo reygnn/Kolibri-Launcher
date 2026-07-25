@@ -179,8 +179,6 @@ data class LauncherSettings(
      */
     @JsonNames("sort_order")
     val sortOrder: String? = null,
-    @JsonNames("secure_window")
-    val secureWindow: Boolean? = null,
     @JsonNames("rotation_locked")
     val rotationLocked: Boolean? = null
 )

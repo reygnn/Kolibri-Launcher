@@ -53,9 +53,6 @@ interface SettingsRepository : Purgeable {
     val contentTopMarginScaleFlow: Flow<Float>
     suspend fun setContentTopMarginScale(scale: Float)
 
-    val secureWindowFlow: Flow<Boolean>
-    suspend fun setSecureWindow(isEnabled: Boolean)
-
     val rotationLockedFlow: Flow<Boolean>
     suspend fun setRotationLocked(isEnabled: Boolean)
 }

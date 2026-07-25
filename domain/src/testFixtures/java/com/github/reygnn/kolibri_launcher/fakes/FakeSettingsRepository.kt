@@ -63,7 +63,6 @@ class FakeSettingsRepository : SettingsRepository {
     private val alarmFlow = MutableStateFlow(AppConstants.DEFAULT_SHOW_ALARM)
     private val autoShowKeyboardFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     private val autoLaunchAppFlowState = MutableStateFlow(AppConstants.DEFAULT_AUTO_LAUNCH_APP)
-    private val secureWindowFlowState = MutableStateFlow(AppConstants.DEFAULT_SECURE_WINDOW)
 
     private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE) // Enum Default ist okay
     override val sortOrderFlow: Flow<SortOrder> = sortOrderState
@@ -125,10 +124,6 @@ class FakeSettingsRepository : SettingsRepository {
         get() = onboardingCompletedState.value
         private set(value) { onboardingCompletedState.value = value }
 
-    var secureWindow: Boolean
-        get() = secureWindowFlowState.value
-        set(value) { secureWindowFlowState.value = value }
-
     // --- Interface Implementation Flow Exports ---
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
@@ -142,7 +137,6 @@ class FakeSettingsRepository : SettingsRepository {
     override val showAlarmFlow: Flow<Boolean> = alarmFlow
     override val autoShowKeyboardFlow: Flow<Boolean> = autoShowKeyboardFlowState
     override val autoLaunchAppFlow: Flow<Boolean> = autoLaunchAppFlowState
-    override val secureWindowFlow: Flow<Boolean> = secureWindowFlowState
 
 
     // --- Interface Implementation Methods ---
@@ -199,10 +193,6 @@ class FakeSettingsRepository : SettingsRepository {
         onboardingCompletedState.value = true
     }
 
-    override suspend fun setSecureWindow(isEnabled: Boolean) {
-        secureWindow = isEnabled
-    }
-
     /**
      * Resets the repository to default values defined in AppConstants.
      */
@@ -224,8 +214,6 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
 
         sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
-
-        secureWindow = AppConstants.DEFAULT_SECURE_WINDOW
 
         favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
         wallpaperSurfaceModeState.value = AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE

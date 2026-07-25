@@ -176,15 +176,14 @@ import javax.inject.Inject
  *
  *   7. `onResume` narrowed try-block (deliberate behaviour change) —
  *      the previous catch wrapped both `registerReceiver` AND the
- *      `update*` calls (`updateSecureFlag`, `updateRotationLock`).
- *      A registerReceiver failure therefore skipped both updates as
- *      a side effect. The catch is now tight around `registerReceiver`
- *      only; the `update*` calls run unconditionally. Justification: the
- *      three concerns (wallpaper colours, FLAG_SECURE, rotation-lock)
+ *      `updateRotationLock` call. A registerReceiver failure therefore
+ *      skipped the update as a side effect. The catch is now tight around
+ *      `registerReceiver` only; `updateRotationLock` runs unconditionally.
+ *      Justification: the two concerns (wallpaper colours, rotation-lock)
  *      are independent of battery-receiver registration — losing the
- *      receiver should not also leave the screen in stale tint or
- *      with a stale FLAG_SECURE. Each `update*` has its own safety
- *      net downstream (internal catch / coroutine handler).
+ *      receiver should not also leave the screen in stale tint or a stale
+ *      rotation state. `updateRotationLock` has its own safety net
+ *      downstream (internal catch / coroutine handler).
  *
  *
  * DataStore-read fallback by inaction — explicit trade-off
@@ -562,23 +561,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             isReceiverRegistered = false
         }
 
-        // updateSecureFlag / updateRotationLock launch under the handler.
+        // updateRotationLock launches under the handler.
         // System-wallpaper colour hints flow continuously through
         // SystemWallpaperColorsSignal (wired in KolibriLauncherApp.onCreate)
         // — no onResume poll needed anymore.
-        updateSecureFlag()
         updateRotationLock()
-    }
-
-    private fun updateSecureFlag() {
-        lifecycleScope.launch(mainActivityExceptionHandler) {
-            val isSecure = settingsRepository.secureWindowFlow.first()
-            if (isSecure) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            }
-        }
     }
 
     private fun updateRotationLock() {

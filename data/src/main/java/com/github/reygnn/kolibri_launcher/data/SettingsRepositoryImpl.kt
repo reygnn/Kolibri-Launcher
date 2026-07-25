@@ -46,7 +46,6 @@ class SettingsRepositoryImpl @Inject constructor(
         val SHOW_ALARM = booleanPreferencesKey(AppConstants.PrefKeys.SHOW_ALARM)
         val AUTO_SHOW_KEYBOARD = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
         val AUTO_LAUNCH_APP = booleanPreferencesKey(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
-        val SECURE_WINDOW = booleanPreferencesKey(AppConstants.PrefKeys.SECURE_WINDOW)
         val ROTATION_LOCKED = booleanPreferencesKey(AppConstants.PrefKeys.ROTATION_LOCKED)
 
 
@@ -219,12 +218,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setContentTopMarginScale(scale: Float) =
         putValue(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE, scale)
 
-    override val secureWindowFlow: Flow<Boolean> =
-        valueFlow(PreferenceKeys.SECURE_WINDOW, AppConstants.DEFAULT_SECURE_WINDOW)
-
-    override suspend fun setSecureWindow(isEnabled: Boolean) =
-        putValue(PreferenceKeys.SECURE_WINDOW, isEnabled)
-
     override val rotationLockedFlow: Flow<Boolean> =
         valueFlow(PreferenceKeys.ROTATION_LOCKED, AppConstants.DEFAULT_ROTATION_LOCKED)
 
@@ -251,7 +244,6 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.SHOW_ALARM)
             preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
             preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
-            preferences.remove(PreferenceKeys.SECURE_WINDOW)
             preferences.remove(PreferenceKeys.ROTATION_LOCKED)
             // APP_DRAWER_MODE backs wallpaperSurfaceMode (legacy key name);
             // it is a user-facing setting and must reset like the rest.

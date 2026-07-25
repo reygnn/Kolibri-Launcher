@@ -286,9 +286,6 @@
     <string name="layout_favorites_alignment_start">Links</string>
     <string name="layout_favorites_alignment_center">Mitte</string>
     <string name="layout_favorites_alignment_end">Rechts</string>
-    <string name="secure_window_title">Sicherer Fenstermodus</string>
-<string name="secure_window_summary">Verhindert Screenshots und Bildschirmaufnahmen. Behebt zudem die Anzeige einer veralteten Uhrzeit beim Entsperren des Geräts.</string>
-    <string name="secure_window_screenshots_disabled">Screenshots deaktiviert</string>
 
 <!-- Usage Export -->
 <string name="pref_usage_export_summary">App-Nutzungsstatistiken exportieren &amp; importieren</string>

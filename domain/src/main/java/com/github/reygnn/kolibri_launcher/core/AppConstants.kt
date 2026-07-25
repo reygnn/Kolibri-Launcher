@@ -210,7 +210,6 @@ object AppConstants {
         const val SET_DEFAULT_LAUNCHER = "set_default_launcher"
         const val SWIPE_ACTIONS = "swipe_actions"
         const val CRASH_REPORTS = "crash_reports"
-        const val SECURE_WINDOW = "secure_window"
 
         // Developer commands (Settings → Entwickler-Befehle): test/diagnostic
         // shortcuts for ACRA crash-report verification. Visible in release
@@ -230,7 +229,6 @@ object AppConstants {
     const val DEFAULT_SHOW_ALARM = false
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
-    const val DEFAULT_SECURE_WINDOW = false
 
     // Chip Styling Constants
     const val CHIP_MAX_WIDTH_FACTOR = 0.80 // 80% der Bildschirmbreite

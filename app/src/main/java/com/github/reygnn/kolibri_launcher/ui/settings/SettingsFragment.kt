@@ -105,7 +105,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
-    private var secureWindowSwitchPreference: SwitchPreferenceCompat? = null
     private var rotationLockedSwitchPreference: SwitchPreferenceCompat? = null
 
     // 2. Companion Object für den Berechtigungs-String
@@ -215,26 +214,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 true
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
-                false
-            }
-        }
-
-        // Secure Window / Anti-Ghosting
-        secureWindowSwitchPreference = findPreference(AppConstants.PrefKeys.SECURE_WINDOW)
-        secureWindowSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
-            try {
-                val shouldEnable = newValue as? Boolean ?: false
-                viewLifecycleOwner.lifecycleScope.launch {
-                    settingsRepository.setSecureWindow(shouldEnable)
-
-                    // Optional: Toast Info, dass Screenshots jetzt deaktiviert sind
-                    if (shouldEnable) {
-                        showToastSafe(R.string.secure_window_screenshots_disabled)
-                    }
-                }
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in secure window change listener")
                 false
             }
         }
@@ -682,19 +661,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
 
 
-                // Observer für Secure Window Setting
-                launch {
-                    try {
-                        settingsRepository.secureWindowFlow.collect { isEnabled ->
-                            if (!isAdded || isDetached) return@collect
-                            secureWindowSwitchPreference?.isChecked = isEnabled
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        TimberWrapper.silentError(e, "Error in secure window flow collection")
-                    }
-                }
 
                 // Observer für Rotation Lock Setting
                 launch {
@@ -935,14 +901,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
         alarmSwitchPreference?.onPreferenceChangeListener = null
         autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
         autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
-        secureWindowSwitchPreference?.onPreferenceChangeListener = null
         rotationLockedSwitchPreference?.onPreferenceChangeListener = null
 
         calendarSwitchPreference = null
         alarmSwitchPreference = null
         autoKeyboardSwitchPreference = null
         autoLaunchAppSwitchPreference = null
-        secureWindowSwitchPreference = null
         rotationLockedSwitchPreference = null
 
         currentDialog?.dismiss()
