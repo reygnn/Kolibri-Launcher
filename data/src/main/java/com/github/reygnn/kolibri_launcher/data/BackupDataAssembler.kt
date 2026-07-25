@@ -334,12 +334,23 @@ class BackupDataAssembler @Inject constructor(
                 }
             }
 
-            // Reset only the DataStore state — files are overwritten by
-            // the restorer below via copyToInternal(). Orphaned old files
-            // get reaped because only files referenced by the new state
-            // are kept.
-            wallpaperRepository.clearWallpaper()
-            droppedWallpaperLayers = wallpaperRestorer.restoreFromBackup(backup.settings)
+            // Only touch the wallpaper when the backup actually carries one.
+            // Every other theme field above skips on null (?.let), leaving the
+            // user's current value; the wallpaper must behave the same way, or
+            // importing a wallpaper-less backup would silently wipe the user's
+            // wallpaper with no warning (dropped stays 0 — nothing was in the
+            // backup to drop).
+            val backupHasWallpaper = backup.settings.wallpaperLayers.isNotEmpty() ||
+                !backup.settings.wallpaperUri.isNullOrBlank()
+            if (backupHasWallpaper) {
+                // Reset only the DataStore state — files are overwritten by
+                // the restorer below via copyToInternal(). Orphaned old files
+                // get reaped because only files referenced by the new state
+                // are kept. (Safe to skip when there is nothing to restore:
+                // no new files means nothing to reap.)
+                wallpaperRepository.clearWallpaper()
+                droppedWallpaperLayers = wallpaperRestorer.restoreFromBackup(backup.settings)
+            }
         }
 
         // ===== PHASE 8: Import Time-Based Events =====

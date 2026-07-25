@@ -247,16 +247,18 @@ class BackupRepositoryImplWallpaperTest {
     }
 
     @Test
-    fun `importFromJson - without wallpaper in backup - clears existing wallpaper`() = runTest {
-        // BackupRepositoryImpl.importWallpaper() calls clearWallpaper() unconditionally
-        // before attempting to restore — so existing wallpaper is always cleared
-        // when importThemeSettings = true, even if the backup has no wallpaper URI.
-        fakeWallpaperRepo.currentState = WallpaperState(
+    fun `importFromJson - without wallpaper in backup - keeps existing wallpaper`() = runTest {
+        // A backup that carries NO wallpaper must not touch the user's current
+        // wallpaper — same skip-on-null semantics as every other theme field
+        // (Review 4813864 #2). Previously the wallpaper was cleared
+        // unconditionally, silently wiping it with no warning.
+        val existing = WallpaperState(
             imageUri = testWallpaperUri,
             scale = 1.2f,
             translateX = 10f,
             translateY = 20f
         )
+        fakeWallpaperRepo.currentState = existing
 
         val jsonWithoutWallpaper = """
             {
@@ -277,7 +279,8 @@ class BackupRepositoryImplWallpaperTest {
         )
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeWallpaperRepo.currentState).isEqualTo(WallpaperState.NONE)
+        assertThat(fakeWallpaperRepo.currentState).isEqualTo(existing)
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
     }
 
     @Test
