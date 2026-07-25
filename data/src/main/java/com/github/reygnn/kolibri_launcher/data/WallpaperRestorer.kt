@@ -18,5 +18,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
  * .WallpaperRepository] dependency stays in exactly one place.
  */
 internal interface WallpaperRestorer {
-    suspend fun restoreFromBackup(settings: LauncherSettings)
+    /**
+     * Applies the wallpaper portion of [settings] and returns the number of
+     * layers that were present in the backup but could not be restored
+     * (image no longer accessible). `0` on a clean restore.
+     */
+    suspend fun restoreFromBackup(settings: LauncherSettings): Int
 }

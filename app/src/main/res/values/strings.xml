@@ -257,6 +257,10 @@
 <string name="backup_invalid_format">Invalid backup format</string>
 <string name="backup_missing_apps">Missing apps</string>
 <string name="backup_and_more">and %1$d more</string>
+<plurals name="backup_import_wallpaper_layers_dropped">
+    <item quantity="one">%1$d wallpaper layer could not be restored (image no longer available)</item>
+    <item quantity="other">%1$d wallpaper layers could not be restored (images no longer available)</item>
+</plurals>
 <string name="backup_description">Export your favorites and settings or restore them from a backup.</string>
 <string name="backup_button_export">Export Settings</string>
 <string name="backup_button_import">Restore Settings</string>

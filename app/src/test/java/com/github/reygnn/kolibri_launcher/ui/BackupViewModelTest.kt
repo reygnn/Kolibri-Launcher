@@ -110,7 +110,8 @@ class BackupViewModelTest {
             fakeBackupRepository.importResult = ImportResult.Success(
                 importedCount = 5,
                 skippedCount = 2,
-                missingApps = setOf("com.missing/.MainActivity")
+                missingApps = setOf("com.missing/.MainActivity"),
+                droppedWallpaperLayers = 3
             )
 
             viewModel.backupState.test {
@@ -121,6 +122,7 @@ class BackupViewModelTest {
                 Truth.assertThat(successState.importedCount).isEqualTo(5)
                 Truth.assertThat(successState.skippedCount).isEqualTo(2)
                 Truth.assertThat(successState.missingApps).hasSize(1)
+                Truth.assertThat(successState.droppedWallpaperLayers).isEqualTo(3)
             }
         }
 

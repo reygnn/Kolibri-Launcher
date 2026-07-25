@@ -388,15 +388,17 @@ class BackupRepositoryImpl @Inject constructor(
     // WALLPAPER RESTORE (file-system side; called by Assembler)
     // ===========================================
 
-    private suspend fun restoreWallpaperFromBackup(settings: LauncherSettings) {
-        if (settings.wallpaperLayers.isNotEmpty()) {
+    /** @return number of wallpaper layers that could not be restored (0 = clean). */
+    private suspend fun restoreWallpaperFromBackup(settings: LauncherSettings): Int {
+        return if (settings.wallpaperLayers.isNotEmpty()) {
             importMultiLayerWallpaper(settings.wallpaperLayers)
         } else {
             importSingleLayerWallpaper(settings)
         }
     }
 
-    private suspend fun importMultiLayerWallpaper(layerBackups: List<WallpaperLayerBackup>) {
+    /** @return number of layers that were present but could not be restored. */
+    private suspend fun importMultiLayerWallpaper(layerBackups: List<WallpaperLayerBackup>): Int {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
 
         for ((index, layerBackup) in layerBackups.withIndex()) {
@@ -442,11 +444,13 @@ class BackupRepositoryImpl @Inject constructor(
         } else {
             Timber.w("No valid wallpaper layers found, wallpaper not restored")
         }
+        return layerBackups.size - validLayerStates.size
     }
 
-    private suspend fun importSingleLayerWallpaper(settings: LauncherSettings) {
+    /** @return 1 if a wallpaper was present but could not be restored, else 0. */
+    private suspend fun importSingleLayerWallpaper(settings: LauncherSettings): Int {
         val wallpaperUri = settings.wallpaperUri
-        if (wallpaperUri.isNullOrBlank()) return
+        if (wallpaperUri.isNullOrBlank()) return 0
 
         try {
             val sourceUri = wallpaperUri.toUri()
@@ -467,6 +471,7 @@ class BackupRepositoryImpl @Inject constructor(
                     )
                     assembler.saveWallpaperStateForRestore(wallpaperState)
                     Timber.i("Imported wallpaper settings (single-layer)")
+                    return 0
                 } else {
                     Timber.w("Failed to copy wallpaper to internal storage")
                 }
@@ -479,6 +484,9 @@ class BackupRepositoryImpl @Inject constructor(
             // large source bitmap. OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Failed to restore wallpaper")
         }
+        // A wallpaper was present in the backup but none of the paths above
+        // restored it (inaccessible URI, copy failure, or OOM).
+        return 1
     }
 
     // ===========================================

@@ -298,7 +298,7 @@ class BackupFragment : Fragment() {
                     )
                 }
 
-                showImportSuccess(message, state.missingApps)
+                showImportSuccess(message, state.missingApps, state.droppedWallpaperLayers)
                 viewModel.resetBackupState()
             }
             is BackupState.LimitExceeded -> {
@@ -355,14 +355,16 @@ class BackupFragment : Fragment() {
 
     private val missingAppsFormatter = MissingAppsFormatter()
 
-    private fun showImportSuccess(message: String, missingApps: Set<String>) {
+    private fun showImportSuccess(
+        message: String,
+        missingApps: Set<String>,
+        droppedWallpaperLayers: Int,
+    ) {
         _binding?.let {
             val formatted = missingAppsFormatter.format(missingApps)
-            val displayMessage = if (formatted.listText.isEmpty()) {
-                message
-            } else {
-                buildString {
-                    append(message)
+            val displayMessage = buildString {
+                append(message)
+                if (formatted.listText.isNotEmpty()) {
                     append("\n\n")
                     append(getString(R.string.backup_missing_apps))
                     append(":\n")
@@ -372,10 +374,26 @@ class BackupFragment : Fragment() {
                         append(getString(R.string.backup_and_more, formatted.overflowCount))
                     }
                 }
+                // A partial wallpaper restore (image no longer accessible) must
+                // never be silent — append a warning line, mirroring the
+                // missing-apps section above.
+                if (droppedWallpaperLayers > 0) {
+                    append("\n\n")
+                    append(
+                        resources.getQuantityString(
+                            R.plurals.backup_import_wallpaper_layers_dropped,
+                            droppedWallpaperLayers,
+                            droppedWallpaperLayers,
+                        )
+                    )
+                }
             }
 
             Snackbar.make(it.root, displayMessage, Snackbar.LENGTH_LONG).show()
-            Timber.i("Import success: $message, missing: ${missingApps.size}")
+            Timber.i(
+                "Import success: $message, missing: ${missingApps.size}, " +
+                    "droppedWallpaperLayers: $droppedWallpaperLayers"
+            )
         }
     }
 

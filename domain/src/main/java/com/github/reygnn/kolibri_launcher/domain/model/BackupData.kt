@@ -236,7 +236,16 @@ sealed class ImportResult {
     data class Success(
         val importedCount: Int,
         val skippedCount: Int,
-        val missingApps: Set<String>
+        val missingApps: Set<String>,
+        /**
+         * Number of wallpaper layers that were present in the backup but
+         * could not be restored (their image was no longer accessible — a
+         * `content://` source URI or a missing/corrupt ZIP entry). `0` on a
+         * clean restore. Surfaced to the user so a partial wallpaper restore
+         * is never silent. Defaults to `0` so pre-existing construction sites
+         * stay source-compatible.
+         */
+        val droppedWallpaperLayers: Int = 0,
     ) : ImportResult()
     data class UnsupportedVersion(val version: String) : ImportResult()
     data class LimitExceeded(val packageCount: Int, val limit: Int) : ImportResult()

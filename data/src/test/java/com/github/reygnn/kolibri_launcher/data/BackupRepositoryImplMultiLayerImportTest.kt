@@ -134,6 +134,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         val result = backupManager.importFromJson(json, themeOnly)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // The dropped layer is reported so the UI can warn the user (#1 UX).
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.isMultiLayer).isTrue()
         assertThat(restored.layers).hasSize(1)
@@ -156,6 +158,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         // Import still succeeds overall; the wallpaper simply ends up cleared
         // (Phase 7 clears, restore finds no valid layer, leaves it cleared).
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Both layers were present but neither restored → both reported dropped.
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(2)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.isMultiLayer).isFalse()
         assertThat(restored.hasWallpaper).isFalse()
@@ -177,6 +181,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         val result = backupManager.importFromJson(json, themeOnly)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Clean restore → nothing dropped.
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.layers).hasSize(2)
         assertThat(restored.layers.map { it.label }).containsExactly("First", "Second").inOrder()

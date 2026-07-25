@@ -294,6 +294,7 @@ class BackupDataAssembler @Inject constructor(
         }
 
         // ===== PHASE 7: Import Theme Settings (incl. wallpaper) =====
+        var droppedWallpaperLayers = 0
         if (options.importThemeSettings) {
             backup.settings.textColor?.let { settingsRepository.setTextColor(it) }
             backup.settings.chipBackgroundColor?.let { settingsRepository.setChipBackgroundColor(it) }
@@ -338,7 +339,7 @@ class BackupDataAssembler @Inject constructor(
             // get reaped because only files referenced by the new state
             // are kept.
             wallpaperRepository.clearWallpaper()
-            wallpaperRestorer.restoreFromBackup(backup.settings)
+            droppedWallpaperLayers = wallpaperRestorer.restoreFromBackup(backup.settings)
         }
 
         // ===== PHASE 8: Import Time-Based Events =====
@@ -372,6 +373,7 @@ class BackupDataAssembler @Inject constructor(
             importedCount = importedCount,
             skippedCount = skippedCount,
             missingApps = missingApps,
+            droppedWallpaperLayers = droppedWallpaperLayers,
         )
     }
 

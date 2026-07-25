@@ -66,7 +66,8 @@ class BackupViewModel @Inject constructor(
                         _backupState.value = BackupState.ImportSuccess(
                             importedCount = result.importedCount,
                             skippedCount = result.skippedCount,
-                            missingApps = result.missingApps
+                            missingApps = result.missingApps,
+                            droppedWallpaperLayers = result.droppedWallpaperLayers
                         )
                     }
                     is ImportResult.UnsupportedVersion -> {

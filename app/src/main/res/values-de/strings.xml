@@ -234,6 +234,10 @@
 <string name="backup_invalid_format">Ungültiges Backup-Format</string>
 <string name="backup_missing_apps">Fehlende Apps</string>
 <string name="backup_and_more">und %1$d weitere</string>
+<plurals name="backup_import_wallpaper_layers_dropped">
+    <item quantity="one">%1$d Wallpaper-Ebene konnte nicht wiederhergestellt werden (Bild nicht mehr verfügbar)</item>
+    <item quantity="other">%1$d Wallpaper-Ebenen konnten nicht wiederhergestellt werden (Bilder nicht mehr verfügbar)</item>
+</plurals>
 <string name="backup_description">Exportiere deine Favoriten und Einstellungen oder stelle sie aus einem Backup wieder her.</string>
 <string name="backup_button_export">Einstellungen exportieren</string>
 <string name="backup_button_import">Einstellungen wiederherstellen</string>
