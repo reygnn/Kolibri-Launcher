@@ -444,7 +444,13 @@ class BackupRepositoryImpl @Inject constructor(
         } else {
             Timber.w("No valid wallpaper layers found, wallpaper not restored")
         }
-        return layerBackups.size - validLayerStates.size
+        // Only layers that actually referenced an image but failed to restore
+        // count as "dropped" — a metadata-only layer (blank imageUri) never had
+        // an image, so it must not trigger the "image no longer available"
+        // warning. Every entry in validLayerStates came from a non-blank URI,
+        // so this difference is exactly the image-bearing layers that failed.
+        val layersWithImage = layerBackups.count { !it.imageUri.isNullOrBlank() }
+        return layersWithImage - validLayerStates.size
     }
 
     /** @return 1 if a wallpaper was present but could not be restored, else 0. */

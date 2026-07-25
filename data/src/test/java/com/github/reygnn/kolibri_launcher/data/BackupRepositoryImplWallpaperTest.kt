@@ -241,6 +241,9 @@ class BackupRepositoryImplWallpaperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeWallpaperRepo.currentState).isEqualTo(WallpaperState.NONE)
+        // A single-layer wallpaper WAS present in the backup but could not be
+        // restored → reported as one dropped layer so the UI warns (AUDIT-8 #1).
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
     }
 
     @Test

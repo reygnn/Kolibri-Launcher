@@ -134,8 +134,10 @@ class BackupRepositoryImplMultiLayerImportTest {
         val result = backupManager.importFromJson(json, themeOnly)
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        // The dropped layer is reported so the UI can warn the user (#1 UX).
-        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
+        // The skipped layer had NO image (metadata-only), so it is not counted
+        // as a lost image — dropped stays 0 and no "image no longer available"
+        // warning fires for it.
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.isMultiLayer).isTrue()
         assertThat(restored.layers).hasSize(1)
@@ -158,8 +160,9 @@ class BackupRepositoryImplMultiLayerImportTest {
         // Import still succeeds overall; the wallpaper simply ends up cleared
         // (Phase 7 clears, restore finds no valid layer, leaves it cleared).
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        // Both layers were present but neither restored → both reported dropped.
-        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(2)
+        // Neither layer referenced an image, so nothing was a lost image →
+        // dropped is 0 despite the wallpaper ending up empty.
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.isMultiLayer).isFalse()
         assertThat(restored.hasWallpaper).isFalse()
@@ -188,5 +191,31 @@ class BackupRepositoryImplMultiLayerImportTest {
         assertThat(restored.layers.map { it.label }).containsExactly("First", "Second").inOrder()
         assertThat(restored.layers[0].scale).isEqualTo(1.1f)
         assertThat(restored.layers[1].scale).isEqualTo(2.2f)
+    }
+
+    @Test
+    fun `image-bearing layer that is inaccessible counts as dropped`() = runTest {
+        // The real #1 UX case: a layer that HAD an image whose source is no
+        // longer reachable. Layer 0 restores; layer 1's URI reads as
+        // inaccessible → it is dropped AND reported (unlike a metadata-only
+        // layer, which is not).
+        every {
+            contentResolver.openInputStream(match { it.toString().contains("gone") })
+        } returns null
+
+        fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
+            listOf(
+                WallpaperLayerState(imageUri = "content://img/ok", label = "Kept"),
+                WallpaperLayerState(imageUri = "content://img/gone", label = "Lost"),
+            )
+        )
+
+        val json = backupManager.exportToJson()
+        val result = backupManager.importFromJson(json, themeOnly)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
+        val restored = fakeWallpaperRepo.currentState
+        assertThat(restored.layers.map { it.label }).containsExactly("Kept")
     }
 }
