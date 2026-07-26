@@ -119,6 +119,49 @@ class GestureDelegateTest {
         assertEquals(1, sentEvents.size)
     }
 
+    @Test
+    fun `onDoubleTap when enabled fires on every tap`() = runTest(mainDispatcherRule.testDispatcher) {
+        // The one-shot flag guards the hint, not the action. An enabled setting
+        // must forward the clipboard on every tap, or the second gesture would
+        // silently do nothing.
+        val delegate = delegateWithClipboard(enabled = true)
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(UiEvent.PerformClipboardAction, UiEvent.PerformClipboardAction),
+            sentEvents,
+        )
+    }
+
+    @Test
+    fun `onDoubleTap enabled after the hint was shown fires the clipboard action`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // User taps while off (sees the hint), flips the setting on, taps
+            // again. The setting is re-read freshly each time, and the one-shot
+            // hint flag must not suppress the now-enabled action.
+            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(false)
+            val delegate = createDelegate()
+
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(
+                    UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard),
+                    UiEvent.PerformClipboardAction,
+                ),
+                sentEvents,
+            )
+        }
+
     // ===========================================
     // FLING UP
     // ===========================================

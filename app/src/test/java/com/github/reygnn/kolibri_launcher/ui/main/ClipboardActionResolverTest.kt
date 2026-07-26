@@ -186,6 +186,15 @@ class ClipboardActionResolverTest {
         assertEquals(ClipboardAction.WebSearch("https://"), resolve("https://"))
     }
 
+    @Test
+    fun `a mixed-case scheme is still recognised as a url`() {
+        // Autocapitalise on a soft keyboard yields HTTP:// / Https://. The scheme
+        // regex is IGNORE_CASE, so these must open rather than fall through to a
+        // search; the scheme branch launches the text verbatim.
+        assertEquals(ClipboardAction.OpenUrl("HTTP://EXAMPLE.COM"), resolve("HTTP://EXAMPLE.COM"))
+        assertEquals(ClipboardAction.OpenUrl("Https://example.com/x"), resolve("Https://example.com/x"))
+    }
+
     // =====================================================================
     // ADVERSARIAL — the clipboard is attacker-controlled
     // =====================================================================
@@ -400,6 +409,18 @@ class ClipboardActionResolverTest {
     }
 
     @Test
+    fun `oversized url behind leading whitespace is searched, not opened truncated`() {
+        // Regression guard for the cap-then-trim off-by-one: leading whitespace
+        // used to eat the one char of headroom the over-length check depends on,
+        // so a 9000-char URL behind a newline measured "exactly at the limit"
+        // and got opened truncated. Trimming by index before the length check
+        // keeps it a search.
+        val longUrl = "\n  https://example.com/callback?token=" + "x".repeat(9000)
+        val result = resolve(longUrl)
+        assertTrue(result is ClipboardAction.WebSearch)
+    }
+
+    @Test
     fun `decimal number is not a url`() {
         assertEquals(ClipboardAction.WebSearch("3.14"), resolve("3.14"))
     }
@@ -431,5 +452,12 @@ class ClipboardActionResolverTest {
     @Test
     fun `blank clipboard resolves to null`() {
         assertNull(resolve("   "))
+    }
+
+    @Test
+    fun `empty clipboard resolves to null`() {
+        // Not null, not blank-with-spaces: the trim collapses start onto end and
+        // the empty result must never reach the classifier as a search for "".
+        assertNull(resolve(""))
     }
 }
