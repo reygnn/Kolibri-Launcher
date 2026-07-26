@@ -4,7 +4,7 @@
     <solid android:color="?attr/colorSurfaceContainer" />
 
     <corners
-        android:radius="28dp" />
+        android:radius="@dimen/dialog_corner_radius" />
 
 </shape>
 

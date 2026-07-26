@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="16dp"
-    app:cardCornerRadius="@dimen/split_screen_corner_radius"
+    app:cardCornerRadius="@dimen/dialog_corner_radius"
     app:cardElevation="8dp"
     app:cardBackgroundColor="?attr/colorSurface">
 
@@ -25,11 +25,10 @@
 
             <View
                 android:id="@+id/drag_handle"
-                android:layout_width="40dp"
-                android:layout_height="4dp"
+                android:layout_width="@dimen/drag_handle_touch_width"
+                android:layout_height="@dimen/drag_handle_touch_height"
                 android:layout_gravity="center_horizontal|top"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/shape_drag_handle"
+                android:background="@drawable/drag_handle"
                 android:backgroundTint="?attr/colorOnSurfaceVariant"
                 android:alpha="0.4" />
 

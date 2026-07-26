@@ -1,15 +1,14 @@
 package com.github.reygnn.kolibri_launcher.ui.colorcustomization
 
-import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.Color
 import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
+import com.github.reygnn.kolibri_launcher.ui.util.enableDialogDrag
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isVisible
@@ -67,7 +66,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         setupPalettes()
         observeChanges()
         observeWallpaperSurface()
-        setupDragListener()
+        enableDialogDrag(binding.dragHandle, binding.root)
     }
 
     /**
@@ -117,39 +116,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         root.tintTextViews(color) { child ->
             child.id == R.id.color_palette_container ||
                 child.id == R.id.chip_bg_palette_container
-        }
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupDragListener() {
-        val dragHandle = binding.dragHandle
-
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-
-        dragHandle.setOnTouchListener { v, event ->
-            // BESSER: Window hier holen
-            val currentWindow = dialog?.window ?: return@setOnTouchListener false
-            val layoutParams = currentWindow.attributes
-
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = layoutParams.x
-                    initialY = layoutParams.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
-                    layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
-                    currentWindow.attributes = layoutParams // Setzen
-                    true
-                }
-                else -> false
-            }
         }
     }
 

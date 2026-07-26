@@ -8,15 +8,14 @@
 
     <View
         android:id="@+id/drag_handle"
-        android:layout_width="48dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/drag_handle_touch_width"
+        android:layout_height="@dimen/drag_handle_touch_height"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="12dp"
-        android:background="?attr/colorOnSurfaceVariant"
-        android:alpha="0.4"
-        android:clickable="true"
-        android:focusable="true"/>
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/drag_handle"
+        android:backgroundTint="?attr/colorOnSurfaceVariant"
+        android:alpha="0.4" />
 
     <LinearLayout
         android:layout_width="match_parent"

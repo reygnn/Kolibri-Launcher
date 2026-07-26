@@ -1,12 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.layoutcustomization
 
-import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import com.google.android.material.button.MaterialButton
@@ -21,6 +19,7 @@ import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationB
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
+import com.github.reygnn.kolibri_launcher.ui.util.enableDialogDrag
 import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -73,7 +72,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         try {
             setupControls()
             observeViewModel()
-            setupDragListener()
+            enableDialogDrag(binding.dragHandle, binding.cardRoot)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to setup LayoutCustomizationDialog")
             dismissSafe()
@@ -380,53 +379,6 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         FavoritesAlignment.START -> R.id.btn_alignment_start
         FavoritesAlignment.CENTER -> R.id.btn_alignment_center
         FavoritesAlignment.END -> R.id.btn_alignment_end
-    }
-
-    // ==================== Drag Handling ====================
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupDragListener() {
-        val dragHandle = binding.dragHandle
-
-        var initialY = 0
-        var initialTouchY = 0f
-
-        dragHandle.setOnTouchListener { _, event ->
-            try {
-                val currentWindow = dialog?.window ?: return@setOnTouchListener false
-                val layoutParams = currentWindow.attributes
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        initialY = layoutParams.y
-                        initialTouchY = event.rawY
-
-                        // VISUELL: Transparenz
-                        animateDialogAlpha(0.5f)
-
-                        // TAKTIL: Kurzes "Tock"
-                        dragHandle.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        layoutParams.y = initialY - (event.rawY - initialTouchY).toInt()
-                        currentWindow.attributes = layoutParams
-                        true
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        // WICHTIG: Wenn losgelassen wird, wieder voll sichtbar machen
-                        animateDialogAlpha(1.0f)
-                        true
-                    }
-                    else -> false
-                }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error in drag handling")
-                // Fallback: Sicherstellen, dass Dialog sichtbar ist, falls was schiefgeht
-                animateDialogAlpha(1.0f)
-                false
-            }
-        }
     }
 
     // ==================== Safe Utilities ====================

@@ -44,4 +44,15 @@
     <dimen name="app_drawer_padding_horizontal">@dimen/spacing_large</dimen>
     <dimen name="app_drawer_padding_bottom">@dimen/spacing_large</dimen>
     <dimen name="chip_min_height">32dp</dimen>
+
+    <!-- =============================================================== -->
+    <!-- == BOTTOM-SHEET DIALOGS (colour / layout customisation)      == -->
+    <!-- =============================================================== -->
+    <!-- Shared corner radius so both draggable sheets round identically. -->
+    <dimen name="dialog_corner_radius">8dp</dimen>
+    <!-- Drag-handle touch area. The visible pill (drag_handle.xml) is inset
+         inside this, so the grab target is comfortable while the pill stays
+         thin. -->
+    <dimen name="drag_handle_touch_width">96dp</dimen>
+    <dimen name="drag_handle_touch_height">24dp</dimen>
 </resources>
