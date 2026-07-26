@@ -13,9 +13,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
@@ -34,35 +32,6 @@ class GestureDelegate(
     // --- One-Time Toast Flags ---
 
     private var enableClipboardToastShown = false
-
-    private val _doubleTapConsumesGesture = MutableStateFlow(false)
-
-    /**
-     * Whether a double tap currently has an action behind it, i.e. whether the
-     * clipboard setting is on.
-     *
-     * `HomeGestureLayout` needs this answer *synchronously*: it decides within
-     * the same ACTION_DOWN whether the double tap consumes the follow-on
-     * long-press and swipe, while the authoritative read is a suspend DataStore
-     * call that only returns later. Hence a continuously observed copy rather
-     * than a read at gesture time.
-     *
-     * It used to be a snapshot primed at construction and refreshed per tap,
-     * which left it one gesture stale after any settings change — so the first
-     * tap-tap-hold after enabling the feature showed the clipboard dialog and
-     * then had it torn down by the customization dialog. Observing the flow
-     * removes the window entirely; default `false` still applies until the
-     * first value arrives, which is the safe direction.
-     */
-    val doubleTapConsumesGesture: StateFlow<Boolean> = _doubleTapConsumesGesture.asStateFlow()
-
-    fun start() {
-        scope.launchSafe("Error observing double-tap clipboard setting") {
-            observeDoubleTapClipboardSettingUseCase().collect { isEnabled ->
-                _doubleTapConsumesGesture.value = isEnabled
-            }
-        }
-    }
 
     // --- Fling ---
 
@@ -119,17 +88,16 @@ class GestureDelegate(
      * `LauncherViewModel`): it survives configuration changes, but resets when
      * the Activity is really destroyed.
      *
-     * Reads the SAME [doubleTapConsumesGesture] value the touch layer uses to
-     * decide suppression, deliberately not a fresh DataStore read: two reads
-     * could disagree during the cold-start window (flow still at its `false`
-     * default while a fresh read already returns `true`), which would show the
-     * clipboard dialog AND fail to suppress the follow-on long-press — the very
-     * two-dialog collision this whole mechanism exists to prevent. One source,
-     * no divergence. Worst case at cold start is the safe direction: the hint
-     * shows once until the first emission lands.
+     * Reads the setting freshly here, and this is the ONLY reader of it: whether
+     * the double tap consumes the touch sequence no longer depends on the
+     * setting at all (a detected double tap always consumes — see
+     * `HomeGestureLayout`), so there is no second consumer this read must agree
+     * with, and no divergence window to design around. A stale read here at
+     * worst shows the hint one extra time or misses the clipboard action once;
+     * both self-correct on the next tap and neither can double up a dialog.
      */
     fun onDoubleTap() = scope.launchSafe("Error on double tap") {
-        if (_doubleTapConsumesGesture.value) {
+        if (observeDoubleTapClipboardSettingUseCase().first()) {
             scope.sendEvent(UiEvent.PerformClipboardAction)
         } else if (!enableClipboardToastShown) {
             enableClipboardToastShown = true

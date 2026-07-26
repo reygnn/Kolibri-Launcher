@@ -12,14 +12,11 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,13 +63,10 @@ class GestureDelegateTest {
         scope = createDelegateScope()
     )
 
-    /** Builds a delegate whose observed setting has already emitted [enabled]. */
-    private fun TestScope.startedDelegate(enabled: Boolean): GestureDelegate {
+    /** Builds a delegate whose clipboard setting reads back as [enabled]. */
+    private fun delegateWithClipboard(enabled: Boolean): GestureDelegate {
         every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(enabled)
-        return createDelegate().also {
-            it.start()
-            advanceUntilIdle()
-        }
+        return createDelegate()
     }
 
     @Test
@@ -90,7 +84,7 @@ class GestureDelegateTest {
 
     @Test
     fun `onDoubleTap when enabled emits PerformClipboardAction`() = runTest(mainDispatcherRule.testDispatcher) {
-        val delegate = startedDelegate(enabled = true)
+        val delegate = delegateWithClipboard(enabled = true)
 
         delegate.onDoubleTap()
         advanceUntilIdle()
@@ -99,34 +93,14 @@ class GestureDelegateTest {
     }
 
     @Test
-    fun `onDoubleTap when disabled never reads the clipboard`() = runTest(mainDispatcherRule.testDispatcher) {
-        val delegate = startedDelegate(enabled = false)
-
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-
-        // Points at the setting instead — crucially, no PerformClipboardAction.
-        assertEquals(
-            listOf(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard)),
-            sentEvents,
-        )
-    }
-
-    @Test
-    fun `onDoubleTap before the setting has emitted does not read the clipboard`() =
+    fun `onDoubleTap when disabled points at the setting, never the clipboard`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            // The cold-start divergence this fix closes: the action must read the
-            // same value as the suppression flag, so a not-yet-emitted flow can
-            // never fire PerformClipboardAction while the layout thinks the
-            // gesture was not consumed.
-            every { observeDoubleTapClipboardSettingUseCase() } returns emptyFlow()
-            val delegate = createDelegate()
-            delegate.start()
-            advanceUntilIdle()
+            val delegate = delegateWithClipboard(enabled = false)
 
             delegate.onDoubleTap()
             advanceUntilIdle()
 
+            // The hint — crucially, no PerformClipboardAction.
             assertEquals(
                 listOf(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard)),
                 sentEvents,
@@ -135,7 +109,7 @@ class GestureDelegateTest {
 
     @Test
     fun `onDoubleTap when disabled shows the hint only once`() = runTest(mainDispatcherRule.testDispatcher) {
-        val delegate = startedDelegate(enabled = false)
+        val delegate = delegateWithClipboard(enabled = false)
 
         delegate.onDoubleTap()
         advanceUntilIdle()
@@ -144,53 +118,6 @@ class GestureDelegateTest {
 
         assertEquals(1, sentEvents.size)
     }
-
-    // ===========================================
-    // GESTURE CONSUMPTION
-    // ===========================================
-    // HomeGestureLayout reads this to decide whether a double tap suppresses
-    // the follow-on long-press and swipe. It must never claim "consumed" while
-    // the setting is off, since the setting ships default-off and every user
-    // would otherwise lose their tap-tap-hold customization dialog.
-
-    @Test
-    fun `doubleTapConsumesGesture is false before start`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
-            val delegate = createDelegate()
-
-            assertEquals(false, delegate.doubleTapConsumesGesture.value)
-        }
-
-    @Test
-    fun `doubleTapConsumesGesture follows the observed setting`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
-            val delegate = createDelegate()
-
-            delegate.start()
-            advanceUntilIdle()
-
-            assertEquals(true, delegate.doubleTapConsumesGesture.value)
-        }
-
-    @Test
-    fun `doubleTapConsumesGesture tracks a later setting change without a tap`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            // The regression this replaces: a per-tap snapshot meant the FIRST
-            // gesture after toggling the setting still used the old value.
-            val setting = MutableStateFlow(false)
-            every { observeDoubleTapClipboardSettingUseCase() } returns setting
-            val delegate = createDelegate()
-            delegate.start()
-            advanceUntilIdle()
-            assertEquals(false, delegate.doubleTapConsumesGesture.value)
-
-            setting.value = true
-            advanceUntilIdle()
-
-            assertEquals(true, delegate.doubleTapConsumesGesture.value)
-        }
 
     // ===========================================
     // FLING UP

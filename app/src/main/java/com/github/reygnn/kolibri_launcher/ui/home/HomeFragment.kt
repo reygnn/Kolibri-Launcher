@@ -476,18 +476,6 @@ class HomeFragment : Fragment() {
         // violations against pure View-property writes / when-pattern
         // dispatch / state reads.
 
-        // Observer 0: does a double tap consume the gesture?
-        // Pushed into the layout from the observed setting rather than answered
-        // at dispatch time — a per-gesture snapshot was one gesture stale after
-        // any settings change, which cost the user their first tap-tap-hold.
-        collectOnStarted(
-            flow = viewModel.doubleTapConsumesGesture,
-            errorTag = "doubleTapConsumesGesture",
-            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { consumesGesture ->
-            _binding?.homeGestureRoot?.doubleTapConsumesGesture = consumesGesture
-        }
-
         // Observer 1: Favorites
         collectOnStarted(
             flow = viewModel.favoriteAppsState,

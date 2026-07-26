@@ -292,7 +292,6 @@ class LauncherViewModel @Inject constructor(
         themingDelegate.start()
         appDelegate.start(isTestMode = testMode.isEnabled)
         wallpaperDelegate.start()
-        gestureDelegate.start()
     }
 
     // ===========================================
@@ -339,9 +338,6 @@ class LauncherViewModel @Inject constructor(
     fun onFlingUp() = gestureDelegate.onFlingUp()
     fun onSwipeDown() = gestureDelegate.onSwipeDown()
     fun onDoubleTap() = gestureDelegate.onDoubleTap()
-
-    /** See [GestureDelegate.doubleTapConsumesGesture]. */
-    val doubleTapConsumesGesture: StateFlow<Boolean> get() = gestureDelegate.doubleTapConsumesGesture
     fun onSwipeFromRightToLeft() = gestureDelegate.onSwipeFromRightToLeft()
     fun onSwipeFromLeftToRight() = gestureDelegate.onSwipeFromLeftToRight()
     fun onLongPress() = gestureDelegate.onLongPress()

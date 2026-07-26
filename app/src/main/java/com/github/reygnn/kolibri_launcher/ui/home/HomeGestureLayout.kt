@@ -64,18 +64,6 @@ class HomeGestureLayout @JvmOverloads constructor(
     var onDoubleTap: (() -> Unit)? = null
     var onLongPress: (() -> Unit)? = null
 
-    /**
-     * Whether a double tap currently has an action behind it.
-     *
-     * Kept as plain state rather than folded into [onDoubleTap]'s signature, so
-     * all six gesture callbacks stay `(() -> Unit)?` and "inactive" keeps
-     * meaning one thing. The owner pushes the value in from the observed
-     * setting; `false` — the shipping default — means a double tap notifies its
-     * listener but does NOT consume the gesture, so the follow-on long-press
-     * and swipe still run. See [doubleTapFired].
-     */
-    var doubleTapConsumesGesture: Boolean = false
-
     // ===========================================
     // INTERNAL ANALYZER
     // ===========================================
@@ -133,7 +121,7 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var childClaimedDown = false
 
     /**
-     * Set when [onDoubleTap] CONSUMED the current gesture; suppresses BOTH
+     * Set when a wired double tap fired for the current gesture; suppresses BOTH
      * other consumers of that same touch sequence — [onLongPress] and the
      * directional-swipe dispatch.
      *
@@ -146,6 +134,16 @@ class HomeGestureLayout @JvmOverloads constructor(
      * "mutual exclusion is temporal" argument covers only swipe-vs-long-press
      * (~500 ms apart); double-tap shares an ACTION_DOWN with both, so it needs
      * an explicit gate.
+     *
+     * Detection IS consumption: a confirmed double tap is a committed gesture,
+     * so it owns the rest of the touch sequence regardless of what the app does
+     * with it. Whether the clipboard action is enabled is decided later and
+     * elsewhere ([GestureDelegate]); the touch layer deliberately knows nothing
+     * about it, which is what keeps a single setting from being interpreted in
+     * two places. The one modal exception is handled by the `onDoubleTap`
+     * null-check in the detector: in wallpaper-edit mode the double tap has no
+     * listener, so it does not consume and the long-press stays free as the
+     * EXIT gesture.
      *
      * Deliberately gesture-scoped (reset on every ACTION_DOWN, like
      * [triggered]) rather than the time-based delegate flag the removed
@@ -166,13 +164,12 @@ class HomeGestureLayout @JvmOverloads constructor(
             override fun onDown(e: MotionEvent): Boolean = true
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                // Latch ONLY when the tap actually consumes the gesture. Two
-                // ways it doesn't: no listener at all (wallpaper-edit mode,
-                // where onLongPress stays wired as the EXIT gesture), or the
-                // clipboard setting being off — which is every user until they
-                // turn it on, and who must keep their tap-tap-hold.
+                // A confirmed, wired double tap always consumes the gesture. The
+                // null-check is the only exception: in wallpaper-edit mode there
+                // is no listener, so we must NOT consume — the long-press is the
+                // EXIT gesture there and has to stay free.
                 val listener = onDoubleTap ?: return false
-                doubleTapFired = doubleTapConsumesGesture
+                doubleTapFired = true
                 listener.invoke()
                 return true
             }
