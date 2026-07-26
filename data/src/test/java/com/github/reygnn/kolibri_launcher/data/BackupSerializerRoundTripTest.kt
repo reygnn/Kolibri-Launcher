@@ -95,6 +95,7 @@ class BackupSerializerRoundTripTest {
             autoShowKeyboard = true,
             autoLaunchApp = true,
             sortOrder = "ALPHABETICAL",
+            doubleTapClipboardEnabled = true,
             rotationLocked = true,
         )
     }

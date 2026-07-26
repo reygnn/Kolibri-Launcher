@@ -311,6 +311,76 @@ class ClipboardActionResolverTest {
         }
     }
 
+    // =====================================================================
+    // LAUNCH SPEC — what each action actually fires
+    // =====================================================================
+    // These decisions used to live in MainActivity, out of reach of a JVM
+    // test — which is exactly where both authority-spoofing bugs hid.
+
+    @Test
+    fun `a phone number opens the dialer, never places a call`() {
+        // ACTION_CALL would need CALL_PHONE and would dial immediately. The
+        // whole feature is built on never doing that.
+        val spec = ClipboardAction.Dial("+41 79 123 45 67").launchSpec()
+        assertEquals("android.intent.action.DIAL", spec.intentAction)
+        assertEquals("tel:+41 79 123 45 67", spec.dataUri)
+        assertNull(spec.fallbackUri)
+    }
+
+    @Test
+    fun `a url opens with ACTION_VIEW and no fallback`() {
+        val spec = ClipboardAction.OpenUrl("https://example.org", "example.org").launchSpec()
+        assertEquals("android.intent.action.VIEW", spec.intentAction)
+        assertEquals("https://example.org", spec.dataUri)
+        assertNull(spec.queryExtra)
+    }
+
+    @Test
+    fun `an email composes rather than opening a browser`() {
+        val spec = ClipboardAction.Email("ulrich@kolibri.io").launchSpec()
+        assertEquals("android.intent.action.SENDTO", spec.intentAction)
+        assertEquals("mailto:ulrich@kolibri.io", spec.dataUri)
+    }
+
+    @Test
+    fun `a web search carries a query extra and a browser fallback`() {
+        // ACTION_WEB_SEARCH resolves to nothing on de-Googled ROMs, so this is
+        // the one action that must degrade to something every device can open.
+        val spec = ClipboardAction.WebSearch("kolibri launcher").launchSpec()
+        assertEquals("android.intent.action.WEB_SEARCH", spec.intentAction)
+        assertEquals("kolibri launcher", spec.queryExtra)
+        assertNull(spec.dataUri)
+        assertEquals("https://duckduckgo.com/?q=kolibri+launcher", spec.fallbackUri)
+    }
+
+    @Test
+    fun `the search fallback escapes query characters that would break the url`() {
+        val spec = ClipboardAction.WebSearch("a&b=c?d #e").launchSpec()
+        val query = spec.fallbackUri!!.substringAfter("?q=")
+        listOf("&", "=", "?", "#", " ").forEach {
+            assertFalse("unescaped '$it' in fallback query: $query", it in query)
+        }
+    }
+
+    @Test
+    fun `every action carries a confirm label and only one payload channel`() {
+        // The dialog needs a label for each; and dataUri/queryExtra are
+        // documented as mutually exclusive, so a future action cannot set both.
+        listOf(
+            ClipboardAction.OpenUrl("https://example.org"),
+            ClipboardAction.Email("a@b.io"),
+            ClipboardAction.Dial("+41791234567"),
+            ClipboardAction.WebSearch("x"),
+        ).forEach { action ->
+            val spec = action.launchSpec()
+            assertTrue("missing label for $action", spec.confirmLabel != 0)
+            assertTrue(
+                "both payload channels set for $action",
+                spec.dataUri == null || spec.queryExtra == null,
+            )
+        }
+    }
+
     // ---------- oversized clipboard ----------
 
     @Test

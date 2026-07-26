@@ -12,7 +12,11 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 
@@ -24,6 +28,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 class GestureDelegate(
     private val getRecentAppsUseCase: GetRecentAppsUseCase,
     private val getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase,
+    private val observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase,
     private val scope: DelegateScope
 ) {
@@ -32,31 +37,32 @@ class GestureDelegate(
 
     private var enableClipboardToastShown = false
 
+    private val _doubleTapConsumesGesture = MutableStateFlow(false)
+
     /**
      * Whether a double tap currently has an action behind it, i.e. whether the
-     * clipboard setting is on. `HomeGestureLayout` needs this answer
-     * *synchronously* — it must decide within the same ACTION_DOWN whether to
-     * suppress the follow-on long-press and swipe, and the authoritative read
-     * is a suspend DataStore call that only returns later.
+     * clipboard setting is on.
      *
-     * Getting it wrong in the "off" direction is the expensive case: the
-     * setting ships default-off, so every user would otherwise lose the
-     * tap-tap-hold customization dialog to a gesture that does nothing.
+     * `HomeGestureLayout` needs this answer *synchronously*: it decides within
+     * the same ACTION_DOWN whether the double tap consumes the follow-on
+     * long-press and swipe, while the authoritative read is a suspend DataStore
+     * call that only returns later. Hence a continuously observed copy rather
+     * than a read at gesture time.
      *
-     * Primed at construction and refreshed on every [onDoubleTap], so it is
-     * stale for at most one gesture after the setting is toggled in Settings
-     * — and only for the *suppression* decision. Which action runs always
-     * comes from the fresh read below, never from this snapshot.
-     *
-     * Main-thread confined: written from [scope]'s coroutines, read from the
-     * touch dispatch.
+     * It used to be a snapshot primed at construction and refreshed per tap,
+     * which left it one gesture stale after any settings change — so the first
+     * tap-tap-hold after enabling the feature showed the clipboard dialog and
+     * then had it torn down by the customization dialog. Observing the flow
+     * removes the window entirely; default `false` still applies until the
+     * first value arrives, which is the safe direction.
      */
-    var doubleTapConsumesGesture: Boolean = false
-        private set
+    val doubleTapConsumesGesture: StateFlow<Boolean> = _doubleTapConsumesGesture.asStateFlow()
 
-    init {
-        scope.launchSafe("Error priming double-tap clipboard setting") {
-            doubleTapConsumesGesture = getDoubleTapClipboardSettingUseCase()
+    fun start() {
+        scope.launchSafe("Error observing double-tap clipboard setting") {
+            observeDoubleTapClipboardSettingUseCase().collect { isEnabled ->
+                _doubleTapConsumesGesture.value = isEnabled
+            }
         }
     }
 
@@ -116,9 +122,7 @@ class GestureDelegate(
      * the Activity is really destroyed.
      */
     fun onDoubleTap() = scope.launchSafe("Error on double tap") {
-        val isEnabled = getDoubleTapClipboardSettingUseCase()
-        doubleTapConsumesGesture = isEnabled
-        if (isEnabled) {
+        if (getDoubleTapClipboardSettingUseCase()) {
             scope.sendEvent(UiEvent.PerformClipboardAction)
         } else if (!enableClipboardToastShown) {
             enableClipboardToastShown = true

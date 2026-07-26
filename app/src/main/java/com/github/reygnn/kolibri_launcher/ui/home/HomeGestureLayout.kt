@@ -61,14 +61,20 @@ class HomeGestureLayout @JvmOverloads constructor(
     var onSwipeDown: (() -> Unit)? = null
     var onSwipeLeft: (() -> Unit)? = null
     var onSwipeRight: (() -> Unit)? = null
-    /**
-     * Returns whether the double tap actually consumed the gesture. `false`
-     * means "I was notified but did nothing" (the clipboard setting is off),
-     * and the rest of the touch sequence — long-press, swipe — must stay
-     * available. See [doubleTapFired].
-     */
-    var onDoubleTap: (() -> Boolean)? = null
+    var onDoubleTap: (() -> Unit)? = null
     var onLongPress: (() -> Unit)? = null
+
+    /**
+     * Whether a double tap currently has an action behind it.
+     *
+     * Kept as plain state rather than folded into [onDoubleTap]'s signature, so
+     * all six gesture callbacks stay `(() -> Unit)?` and "inactive" keeps
+     * meaning one thing. The owner pushes the value in from the observed
+     * setting; `false` — the shipping default — means a double tap notifies its
+     * listener but does NOT consume the gesture, so the follow-on long-press
+     * and swipe still run. See [doubleTapFired].
+     */
+    var doubleTapConsumesGesture: Boolean = false
 
     // ===========================================
     // INTERNAL ANALYZER
@@ -160,14 +166,14 @@ class HomeGestureLayout @JvmOverloads constructor(
             override fun onDown(e: MotionEvent): Boolean = true
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                // Latch ONLY when the tap actually consumed the gesture. Two
+                // Latch ONLY when the tap actually consumes the gesture. Two
                 // ways it doesn't: no listener at all (wallpaper-edit mode,
-                // where onLongPress stays wired as the EXIT gesture), or a
-                // listener that reports back "notified, but did nothing"
-                // because the clipboard setting is off — which is every user
-                // until they turn it on.
+                // where onLongPress stays wired as the EXIT gesture), or the
+                // clipboard setting being off — which is every user until they
+                // turn it on, and who must keep their tap-tap-hold.
                 val listener = onDoubleTap ?: return false
-                doubleTapFired = listener.invoke()
+                doubleTapFired = doubleTapConsumesGesture
+                listener.invoke()
                 return true
             }
 

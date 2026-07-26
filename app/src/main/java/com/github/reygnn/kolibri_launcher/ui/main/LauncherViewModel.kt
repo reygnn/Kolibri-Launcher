@@ -40,6 +40,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -108,6 +109,7 @@ class LauncherViewModel @Inject constructor(
     handleSwipeActionUseCase: HandleSwipeActionUseCase,
     getRecentAppsUseCase: GetRecentAppsUseCase,
     getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase,
+    observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
     observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase,
     observeUiColorsUseCase: ObserveUiColorsUseCase,
     setTextColorUseCase: SetTextColorUseCase,
@@ -186,6 +188,7 @@ class LauncherViewModel @Inject constructor(
     private val gestureDelegate = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
         getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
+        observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope
     )
@@ -292,7 +295,7 @@ class LauncherViewModel @Inject constructor(
         themingDelegate.start()
         appDelegate.start(isTestMode = testMode.isEnabled)
         wallpaperDelegate.start()
-        // gestureDelegate und layoutDelegate brauchen kein start()
+        gestureDelegate.start()
     }
 
     // ===========================================
@@ -340,8 +343,8 @@ class LauncherViewModel @Inject constructor(
     fun onSwipeDown() = gestureDelegate.onSwipeDown()
     fun onDoubleTap() = gestureDelegate.onDoubleTap()
 
-    /** See [GestureDelegate.doubleTapConsumesGesture] — read synchronously from touch dispatch. */
-    val doubleTapConsumesGesture: Boolean get() = gestureDelegate.doubleTapConsumesGesture
+    /** See [GestureDelegate.doubleTapConsumesGesture]. */
+    val doubleTapConsumesGesture: StateFlow<Boolean> get() = gestureDelegate.doubleTapConsumesGesture
     fun onSwipeFromRightToLeft() = gestureDelegate.onSwipeFromRightToLeft()
     fun onSwipeFromLeftToRight() = gestureDelegate.onSwipeFromLeftToRight()
     fun onLongPress() = gestureDelegate.onLongPress()

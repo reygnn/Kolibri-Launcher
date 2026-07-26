@@ -9,7 +9,12 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.core.util.PatternsCompat
+import com.github.reygnn.kolibri_launcher.R
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * The action a home-screen double-tap should take for a given clipboard text.
@@ -55,6 +60,60 @@ sealed interface ClipboardAction {
     data class WebSearch(val query: String) : ClipboardAction {
         override val displayText: String get() = query
     }
+}
+
+/**
+ * What to launch for a [ClipboardAction], as plain data.
+ *
+ * Deliberately free of `Intent`: [MainActivity] assembles the Intent from this,
+ * which keeps the decisions — which action, which URI shape, which fallback,
+ * which button label — pinnable by a JVM test. The Activity is then only glue,
+ * per CLAUDE.md Rule 10. That matters here specifically: both authority-spoofing
+ * bugs this feature shipped with lived in the untested Activity-side seam.
+ *
+ * [dataUri] and [queryExtra] are mutually exclusive — an action either carries
+ * its payload as URI data or as a search-query extra.
+ */
+data class ClipboardLaunchSpec(
+    val intentAction: String,
+    val dataUri: String? = null,
+    val queryExtra: String? = null,
+    /** Opened with ACTION_VIEW when [intentAction] resolves to no handler. */
+    val fallbackUri: String? = null,
+    @StringRes val confirmLabel: Int,
+)
+
+/**
+ * One exhaustive `when` produces URI, fallback and button label together, so a
+ * fifth [ClipboardAction] cannot compile while silently losing its fallback or
+ * its label.
+ */
+fun ClipboardAction.launchSpec(): ClipboardLaunchSpec = when (this) {
+    is ClipboardAction.OpenUrl -> ClipboardLaunchSpec(
+        intentAction = Intent.ACTION_VIEW,
+        dataUri = url,
+        confirmLabel = R.string.clipboard_action_open,
+    )
+    is ClipboardAction.Email -> ClipboardLaunchSpec(
+        intentAction = Intent.ACTION_SENDTO,
+        dataUri = "mailto:$address",
+        confirmLabel = R.string.clipboard_action_email,
+    )
+    is ClipboardAction.Dial -> ClipboardLaunchSpec(
+        // ACTION_DIAL, never ACTION_CALL: the number is only ever pre-filled.
+        intentAction = Intent.ACTION_DIAL,
+        dataUri = "tel:$number",
+        confirmLabel = R.string.clipboard_action_dial,
+    )
+    // ACTION_WEB_SEARCH needs an app that declares it (typically the Google
+    // app) — absent on de-Googled ROMs, where the fallback URL opens in
+    // whatever browser exists instead of dead-ending.
+    is ClipboardAction.WebSearch -> ClipboardLaunchSpec(
+        intentAction = Intent.ACTION_WEB_SEARCH,
+        queryExtra = query,
+        fallbackUri = "https://duckduckgo.com/?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8),
+        confirmLabel = R.string.clipboard_action_search,
+    )
 }
 
 /**
@@ -125,13 +184,17 @@ object ClipboardActionResolver {
         }
         val text = raw.substring(start, end)
 
-        if (EMAIL_REGEX.matches(text)) return ClipboardAction.Email(text)
+        if (EMAIL_PATTERN.matcher(text).matches()) return ClipboardAction.Email(text)
         asUrl(text)?.let { return ClipboardAction.OpenUrl(url = it, source = text) }
         if (isDialablePhone(text)) return ClipboardAction.Dial(text)
         return ClipboardAction.WebSearch(text)
     }
 
-    private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+    // androidx's maintained grammar rather than a hand-rolled one, so email and
+    // URL classification in this file agree on what a host is. It is public API
+    // (no @RestrictTo), unlike AUTOLINK_WEB_URL. The previous local regex
+    // accepted `user@-example.com`, which this one rejects.
+    private val EMAIL_PATTERN = PatternsCompat.EMAIL_ADDRESS
 
     // The one scheme pair we are willing to launch. Anchored, so `javascript:`,
     // `data:`, `file:`, `intent:` and `content:` never reach ACTION_VIEW.

@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -10,7 +11,10 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +40,7 @@ class GestureDelegateTest {
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var getRecentAppsUseCase: GetRecentAppsUseCase
     private lateinit var getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase
+    private lateinit var observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase
 
     @Before
     fun setUp() {
@@ -44,6 +49,9 @@ class GestureDelegateTest {
         handleSwipeActionUseCase = mockk(relaxed = true)
         getRecentAppsUseCase = mockk(relaxed = true)
         getDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
+        observeDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
+        // Default: setting off. Tests that care override this.
+        every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(false)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -55,6 +63,7 @@ class GestureDelegateTest {
     private fun createDelegate() = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
         getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
+        observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
@@ -112,49 +121,50 @@ class GestureDelegateTest {
     }
 
     // ===========================================
-    // GESTURE CONSUMPTION SNAPSHOT
+    // GESTURE CONSUMPTION
     // ===========================================
-    // HomeGestureLayout reads this synchronously to decide whether to suppress
-    // the follow-on long-press and swipe. Reporting "consumed" while the
-    // setting is off would silently eat the customization dialog for every
-    // user, since the setting ships default-off.
+    // HomeGestureLayout reads this to decide whether a double tap suppresses
+    // the follow-on long-press and swipe. It must never claim "consumed" while
+    // the setting is off, since the setting ships default-off and every user
+    // would otherwise lose their tap-tap-hold customization dialog.
 
     @Test
-    fun `doubleTapConsumesGesture is primed at construction`() =
+    fun `doubleTapConsumesGesture is false before start`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { getDoubleTapClipboardSettingUseCase() } returns true
+            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
             val delegate = createDelegate()
 
-            advanceUntilIdle()
-
-            assertEquals(true, delegate.doubleTapConsumesGesture)
+            assertEquals(false, delegate.doubleTapConsumesGesture.value)
         }
 
     @Test
-    fun `doubleTapConsumesGesture stays false while the setting is off`() =
+    fun `doubleTapConsumesGesture follows the observed setting`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
             val delegate = createDelegate()
+
+            delegate.start()
             advanceUntilIdle()
 
-            delegate.onDoubleTap()
-            advanceUntilIdle()
-
-            assertEquals(false, delegate.doubleTapConsumesGesture)
+            assertEquals(true, delegate.doubleTapConsumesGesture.value)
         }
 
     @Test
-    fun `doubleTapConsumesGesture follows a setting change on the next tap`() =
+    fun `doubleTapConsumesGesture tracks a later setting change without a tap`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+            // The regression this replaces: a per-tap snapshot meant the FIRST
+            // gesture after toggling the setting still used the old value.
+            val setting = MutableStateFlow(false)
+            every { observeDoubleTapClipboardSettingUseCase() } returns setting
             val delegate = createDelegate()
+            delegate.start()
+            advanceUntilIdle()
+            assertEquals(false, delegate.doubleTapConsumesGesture.value)
+
+            setting.value = true
             advanceUntilIdle()
 
-            coEvery { getDoubleTapClipboardSettingUseCase() } returns true
-            delegate.onDoubleTap()
-            advanceUntilIdle()
-
-            assertEquals(true, delegate.doubleTapConsumesGesture)
+            assertEquals(true, delegate.doubleTapConsumesGesture.value)
         }
 
     // ===========================================

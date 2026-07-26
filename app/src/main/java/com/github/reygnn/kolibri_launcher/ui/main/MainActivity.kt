@@ -11,7 +11,6 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
@@ -23,7 +22,6 @@ import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.StringRes
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -890,45 +888,22 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
     }
 
-    /** Intent to run, its fallback, and the label of the confirming button. */
-    private data class ClipboardIntentSpec(
-        val intent: Intent,
-        val fallback: Intent?,
-        @StringRes val confirmLabel: Int,
-    )
-
     /**
-     * One exhaustive `when` produces intent + fallback + button label together,
-     * so adding a fifth [ClipboardAction] cannot compile while silently losing
-     * its fallback or label.
+     * Builds the Intent for a [ClipboardLaunchSpec]. Pure glue: every decision
+     * — action, URI shape, fallback, label — was already made in [launchSpec],
+     * where a JVM test can reach it.
      */
-    private fun specFor(action: ClipboardAction): ClipboardIntentSpec = when (action) {
+    private fun intentFor(spec: ClipboardLaunchSpec): Intent {
+        val intent = Intent(spec.intentAction)
         // normalizeScheme(): IntentFilter matches schemes CASE-SENSITIVELY, so
         // an autocapitalised `Https://…` resolves to no browser without this.
-        is ClipboardAction.OpenUrl -> ClipboardIntentSpec(
-            Intent(Intent.ACTION_VIEW, action.url.toUri().normalizeScheme()),
-            null,
-            R.string.clipboard_action_open,
-        )
-        is ClipboardAction.Email -> ClipboardIntentSpec(
-            Intent(Intent.ACTION_SENDTO, "mailto:${action.address}".toUri()),
-            null,
-            R.string.clipboard_action_email,
-        )
-        is ClipboardAction.Dial -> ClipboardIntentSpec(
-            Intent(Intent.ACTION_DIAL, "tel:${action.number}".toUri()),
-            null,
-            R.string.clipboard_action_dial,
-        )
-        // ACTION_WEB_SEARCH needs an app that declares it (typically the Google
-        // app) — absent on de-Googled ROMs, where the fallback URL opens in
-        // whatever browser exists instead of dead-ending.
-        is ClipboardAction.WebSearch -> ClipboardIntentSpec(
-            Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, action.query),
-            Intent(Intent.ACTION_VIEW, "https://duckduckgo.com/?q=${Uri.encode(action.query)}".toUri()),
-            R.string.clipboard_action_search,
-        )
+        spec.dataUri?.let { intent.data = it.toUri().normalizeScheme() }
+        spec.queryExtra?.let { intent.putExtra(SearchManager.QUERY, it) }
+        return intent
     }
+
+    private fun fallbackIntentFor(spec: ClipboardLaunchSpec): Intent? =
+        spec.fallbackUri?.let { Intent(Intent.ACTION_VIEW, it.toUri()) }
 
     /**
      * Shows one line of the copied text plus the proposed action, so nothing
@@ -942,8 +917,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
      * dismisses, which is the lighter gesture for the common "not now" case.
      */
     private fun showClipboardActionDialog(action: ClipboardAction) {
-        if (isFinishing || isDestroyed) return
-        val spec = specFor(action)
+        val spec = action.launchSpec()
 
         // Inflate against the DIALOG theme, not the Activity's. The layout's
         // ?attr/colorOnSurface would otherwise resolve against AppTheme, which
@@ -955,21 +929,41 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         val previewView = themedInflater.inflate(R.layout.dialog_clipboard_action, null)
         previewView.findViewById<TextView>(R.id.clipboardPreview).text = action.displayText
 
-        val dialog = MaterialAlertDialogBuilder(this, dialogStyle)
-            .setTitle(R.string.clipboard_action_title)
-            .setView(previewView)
-            .setNeutralButton(R.string.clipboard_action_share) { _, _ ->
-                shareClipboardText(action.displayText)
-            }
-            .setPositiveButton(spec.confirmLabel) { _, _ ->
-                startActivitySafely(spec.intent, spec.fallback)
-            }
-            .setOnDismissListener { if (currentDialog == it) currentDialog = null }
-            .create()
+        showDialog(
+            MaterialAlertDialogBuilder(this, dialogStyle)
+                .setTitle(R.string.clipboard_action_title)
+                .setView(previewView)
+                .setNeutralButton(R.string.clipboard_action_share) { _, _ ->
+                    runDialogAction("Error sharing clipboard text") {
+                        shareClipboardText(action.displayText)
+                    }
+                }
+                .setPositiveButton(spec.confirmLabel) { _, _ ->
+                    runDialogAction("Error launching clipboard action") {
+                        startActivitySafely(intentFor(spec), fallbackIntentFor(spec))
+                    }
+                },
+        )
+    }
 
-        currentDialog?.dismiss()
-        currentDialog = dialog
-        dialog.show()
+    /**
+     * Runs a dialog button's body behind a catch.
+     *
+     * A `DialogInterface.OnClickListener` is a system callback: it runs outside
+     * every coroutine safety net this Activity has, so an escaping throw takes
+     * the launcher down. `showCustomizationOptionsDialog` has guarded its item
+     * listener this way from the start; this is the same boundary, extracted so
+     * the two cannot drift.
+     */
+    private inline fun runDialogAction(message: String, body: () -> Unit) {
+        try {
+            body()
+        } catch (e: Throwable) {
+            // Catch kept (HOME-Activity-resilience boundary, four-category
+            // frame): see the KDoc above — a system click callback has no
+            // outer Catchall, so an unhandled throw here crashes the launcher.
+            TimberWrapper.silentError(e, message)
+        }
     }
 
     private fun shareClipboardText(text: String) {
@@ -1026,7 +1020,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         val adapter = ArrayAdapter(rowContext, R.layout.item_recent_app, R.id.recent_app_name, names)
         val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.recent_apps_title))
-            .setAdapter(adapter) { _, which -> viewModel.onAppClicked(apps[which]) }
+            .setAdapter(adapter) { _, which ->
+                runDialogAction("Error launching recent app") { viewModel.onAppClicked(apps[which]) }
+            }
+            // Same reference-clearing reason as showDialog; this one assigns
+            // currentDialog directly because it customizes the window.
+            .setOnDismissListener { if (currentDialog == it) currentDialog = null }
             .create()
         dialog.window?.let { w ->
             w.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
@@ -1056,6 +1055,13 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // the guard, no post-hoc catch is needed.
         if (isFinishing || isDestroyed) return
         currentDialog?.dismiss()
+        // Clear the reference on dismiss, so a dismissed dialog — and whatever
+        // its button lambdas captured, up to 8 KB of clipboard text in the
+        // clipboard case — is not retained until the next dialog happens to
+        // open. This Activity is HOME, so onDestroy effectively never runs.
+        // Callers that need their own dismiss logic assign currentDialog
+        // directly instead of going through here.
+        builder.setOnDismissListener { if (currentDialog == it) currentDialog = null }
         currentDialog = builder.show()
     }
 
@@ -1192,22 +1198,29 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             // settings) that may not exist on every ROM. The fallback-
             // intent branch + final Toast give the user a recovery
             // signal instead of a silent no-op.
-            TimberWrapper.silentError(e, getString(R.string.error_starting_intent, intent.toString()))
-
+            //
+            // ORDER MATTERS: recovery runs before any silentError. silentError
+            // rethrows in DEBUG (Rule 9), so logging first made the whole
+            // fallback branch below dead code in debug builds and let the throw
+            // escape into whatever system callback invoked us.
             if (fallbackIntent != null) {
                 try {
                     fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     startActivity(fallbackIntent)
+                    // Recovered — a missing optional handler on some ROM is not
+                    // a bug to be loud about, so no silentError on this path.
+                    Timber.w(e, "Primary intent failed, fallback succeeded: %s", intent)
                     return
                 } catch (fallbackError: Throwable) {
                     // Inner catch kept (Expected error, four-category
                     // frame): even the fallback intent can fail. The
-                    // outer Toast then handles the user-visible recovery.
-                    TimberWrapper.silentError(fallbackError, getString(R.string.error_fallback_intent_failed))
+                    // Toast below then handles the user-visible recovery.
+                    Timber.w(fallbackError, getString(R.string.error_fallback_intent_failed))
                 }
             }
 
             showToastSafe(R.string.error_activity_not_found)
+            TimberWrapper.silentError(e, getString(R.string.error_starting_intent, intent.toString()))
         }
     }
 

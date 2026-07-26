@@ -141,6 +141,7 @@ class LauncherViewModelDoomsdayTest {
         handleSwipeActionUseCase = mockk(relaxed = true),
         getRecentAppsUseCase = mockk(relaxed = true),
         getDoubleTapClipboardSettingUseCase = mockk(relaxed = true),
+        observeDoubleTapClipboardSettingUseCase = mockk(relaxed = true),
         observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
         observeUiColorsUseCase = observeUiColorsUseCase,
         setTextColorUseCase = mockk(relaxed = true),
