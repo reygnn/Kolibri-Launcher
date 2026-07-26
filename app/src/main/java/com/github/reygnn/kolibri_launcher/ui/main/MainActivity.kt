@@ -975,25 +975,20 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         )
     }
 
-    /** Clipboard text plus the source app's sensitivity flag. */
-    private data class ClipboardRead(val text: String?, val isSensitive: Boolean)
-
-    private fun readClipboard(): ClipboardRead {
-        val clip = getSystemService(ClipboardManager::class.java)?.primaryClip
-            ?: return ClipboardRead(null, isSensitive = false)
-        val isSensitive =
-            clip.description?.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true
-        if (isSensitive) return ClipboardRead(null, isSensitive = true)
-        // coerceToText hands back item.text outright for a plain-text clip, but
-        // reads a URI-backed one to EOF even though resolve() caps at 8 KB.
-        // Knowingly accepted — ACCEPTED_LIMITATIONS.md §2 explains why the
-        // obvious MIME pre-check would not help.
-        val text = clip.takeIf { it.itemCount > 0 }
-            ?.getItemAt(0)
-            ?.coerceToText(this)
-            ?.toString()
-        return ClipboardRead(text, isSensitive = false)
-    }
+    private fun readClipboard(): ClipboardRead =
+        ClipboardReader.read(
+            clip = getSystemService(ClipboardManager::class.java)?.primaryClip,
+            isSensitive = {
+                it.description?.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true
+            },
+            // coerceToText hands back item.text outright for a plain-text clip,
+            // but reads a URI-backed one to EOF even though resolve() caps at
+            // 8 KB. Knowingly accepted — ACCEPTED_LIMITATIONS.md §2 explains why
+            // the obvious MIME pre-check would not help.
+            coerceFirstItem = {
+                it.takeIf { clip -> clip.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)
+            },
+        )
 
     /**
      * Recent-apps dialog for the swipe-down gesture. Anchored to the top of
