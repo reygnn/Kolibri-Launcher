@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Drag-handle background: a thin rounded pill (shape_drag_handle) inset
-    inside a much larger touch area. The host View is sized to the outer
-    bounds (a comfortable grab target); the insets keep the visible pill
-    small and centred. Fixes the "where do I put my finger" problem where
-    the listener sat on a bare 4dp strip.
+    Drag-handle background: a thin rounded pill (shape_drag_handle) drawn at a
+    fixed size, centred inside a much larger touch area (the host View). The
+    View is sized to the touch dimens for a comfortable grab target; the pill
+    keeps its own size via the item's width/height + gravity, so the two are
+    decoupled — changing the touch area no longer distorts the pill. Fixes the
+    "where do I put my finger" problem where the listener sat on a bare 4dp
+    strip. The runtime backgroundTint propagates through the layer to the pill.
 -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/shape_drag_handle"
-    android:insetTop="10dp"
-    android:insetBottom="10dp"
-    android:insetLeft="28dp"
-    android:insetRight="28dp" />
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/shape_drag_handle"
+        android:gravity="center"
+        android:width="@dimen/drag_handle_pill_width"
+        android:height="@dimen/drag_handle_pill_height" />
+</layer-list>

@@ -50,9 +50,14 @@
     <!-- =============================================================== -->
     <!-- Shared corner radius so both draggable sheets round identically. -->
     <dimen name="dialog_corner_radius">8dp</dimen>
-    <!-- Drag-handle touch area. The visible pill (drag_handle.xml) is inset
-         inside this, so the grab target is comfortable while the pill stays
-         thin. -->
-    <dimen name="drag_handle_touch_width">96dp</dimen>
+    <!-- Drag-handle touch area: a comfortable grab target. Kept narrow enough
+         (72dp) that the centred handle doesn't collide with the end-aligned
+         Reset button in the layout dialog. -->
+    <dimen name="drag_handle_touch_width">72dp</dimen>
     <dimen name="drag_handle_touch_height">24dp</dimen>
+    <!-- Visible pill, drawn centred inside the touch area (drag_handle.xml).
+         Sized independently of the touch area, so the two can be tuned
+         separately. -->
+    <dimen name="drag_handle_pill_width">40dp</dimen>
+    <dimen name="drag_handle_pill_height">4dp</dimen>
 </resources>

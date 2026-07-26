@@ -20,6 +20,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
 import com.github.reygnn.kolibri_launcher.ui.util.enableDialogDrag
+import com.github.reygnn.kolibri_launcher.ui.util.fadeTo
 import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -211,18 +212,11 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     }
 
     /**
-     * Die eigentliche Animations-Logik.
-     * Nutzt ViewPropertyAnimator für Performance und Interpolator für "Smoothness".
+     * Fades the card in/out via the shared [fadeTo] helper. The binding guard
+     * matters because the slider callbacks can fire during teardown.
      */
     private fun animateDialogAlpha(targetAlpha: Float) {
-        // Sicherstellen, dass Binding existiert
-        _binding?.cardRoot?.animate()?.apply {
-            alpha(targetAlpha)
-            duration = 200
-            // Decelerate lässt es "weich" einrasten
-            interpolator = android.view.animation.DecelerateInterpolator()
-            start()
-        }
+        _binding?.cardRoot?.fadeTo(targetAlpha)
     }
 
     // ==================== ViewModel Observation ====================

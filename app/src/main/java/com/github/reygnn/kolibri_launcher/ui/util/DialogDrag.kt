@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import androidx.fragment.app.DialogFragment
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 
@@ -39,7 +38,14 @@ fun DialogFragment.enableDialogDrag(dragZone: View, contentRoot: View) {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.y = initialY - (event.rawY - initialTouchY).toInt()
+                    val proposed = initialY - (event.rawY - initialTouchY).toInt()
+                    // Clamp so the sheet can't be flung off-screen (past the top
+                    // or below the bottom edge) with no way back. maxUp keeps the
+                    // whole sheet visible: y beyond (screenHeight - sheetHeight)
+                    // would push its top edge above the screen.
+                    val maxUp = (resources.displayMetrics.heightPixels - contentRoot.height)
+                        .coerceAtLeast(0)
+                    params.y = proposed.coerceIn(0, maxUp)
                     window.attributes = params
                     true
                 }
@@ -56,12 +62,4 @@ fun DialogFragment.enableDialogDrag(dragZone: View, contentRoot: View) {
             false
         }
     }
-}
-
-private fun View.fadeTo(targetAlpha: Float) {
-    animate()
-        .alpha(targetAlpha)
-        .setDuration(200)
-        .setInterpolator(DecelerateInterpolator())
-        .start()
 }
