@@ -16,11 +16,11 @@ import javax.inject.Inject
 /**
  * Observes whether the double-tap clipboard action is enabled.
  *
- * The touch layer needs this answer *synchronously*, before a gesture is
- * dispatched, to decide whether the double tap consumes the follow-on
- * long-press and swipe — so the UI keeps a continuously updated copy rather
- * than reading DataStore per gesture. Both the suppression decision and the
- * action decision read that one copy, so they can never disagree.
+ * Read once per double tap by `GestureDelegate` to choose between performing
+ * the clipboard action and showing the enable-it hint. It is the ONLY reader:
+ * whether a double tap consumes the touch sequence no longer depends on this
+ * setting (a detected double tap always consumes — see `HomeGestureLayout`),
+ * so there is no second consumer this value must stay consistent with.
  */
 class ObserveDoubleTapClipboardSettingUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository
