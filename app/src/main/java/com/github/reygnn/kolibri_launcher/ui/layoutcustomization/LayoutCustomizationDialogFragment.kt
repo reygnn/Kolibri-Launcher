@@ -4,16 +4,13 @@ import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
-import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
-import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -23,6 +20,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
+import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
 import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -64,7 +62,7 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         try {
-            configureDialogWindow()
+            configureBottomSheetWindow(widthFraction = 0.95, yOffset = 150)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to configure dialog window")
         }
@@ -114,23 +112,6 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         }
     }
 
-    // ==================== Window Configuration ====================
-
-    private fun configureDialogWindow() {
-        dialog?.window?.let { window ->
-            window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
-
-            val displayMetrics = resources.displayMetrics
-            val width = (displayMetrics.widthPixels * 0.95).toInt()
-            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-            val params = window.attributes
-            params.y = 150
-            window.attributes = params
-        }
-    }
 
     // ==================== Controls Setup ====================
 

@@ -3,17 +3,15 @@ package com.github.reygnn.kolibri_launcher.ui.colorcustomization
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.Color
+import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
 import android.os.Bundle
 import android.util.TypedValue
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
-import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
@@ -58,19 +56,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.let { window ->
-            window.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
-
-            val displayMetrics = resources.displayMetrics
-            val width = (displayMetrics.widthPixels * 0.90).toInt()
-            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-            val params = window.attributes
-            params.y = 200
-            window.attributes = params
-        }
+        configureBottomSheetWindow(widthFraction = 0.90, yOffset = 200)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
