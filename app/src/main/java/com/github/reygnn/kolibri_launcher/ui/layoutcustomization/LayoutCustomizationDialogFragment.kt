@@ -11,7 +11,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import androidx.core.graphics.drawable.toDrawable
@@ -24,7 +23,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.DialogLayoutCustomizationBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
+import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
@@ -307,22 +306,16 @@ class LayoutCustomizationDialogFragment : DialogFragment() {
         viewLifecycleOwner.lifecycleScope.launchSafe("observe.wallpaperSurface") {
             resolveWallpaperSurfaceUseCase().collectLatest { classification ->
                 safeRun("apply.wallpaperSurface") {
-                    val color = ContextCompat.getColor(
-                        requireContext(),
-                        when (classification) {
-                            LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                            LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                        },
-                    )
-                    val inverseColor = ContextCompat.getColor(
-                        requireContext(),
-                        when (classification) {
-                            LuminanceClassification.LIGHT -> R.color.app_drawer_surface_dark
-                            LuminanceClassification.DARK -> R.color.app_drawer_surface_light
-                        },
-                    )
-                    val fg = ResolvedBackground.SolidColor(color).foregroundColor()
-                    val inverseFg = ResolvedBackground.SolidColor(inverseColor).foregroundColor()
+                    val inverseClassification = when (classification) {
+                        LuminanceClassification.LIGHT -> LuminanceClassification.DARK
+                        LuminanceClassification.DARK -> LuminanceClassification.LIGHT
+                    }
+                    val surface = classification.toSurface(requireContext())
+                    val inverseSurface = inverseClassification.toSurface(requireContext())
+                    val color = surface.color
+                    val inverseColor = inverseSurface.color
+                    val fg = surface.foregroundColor()
+                    val inverseFg = inverseSurface.foregroundColor()
                     binding.cardRoot.setCardBackgroundColor(color)
                     binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
                     applyForegroundColorRecursive(binding.cardRoot, fg)

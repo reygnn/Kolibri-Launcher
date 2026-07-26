@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.view.Window
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -24,7 +23,7 @@ import com.github.reygnn.kolibri_launcher.databinding.BottomSheetAppContextMenuB
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
+import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
@@ -220,7 +219,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         ) { classification ->
             if (_binding == null) return@collectOnStarted
             currentClassification = classification
-            val surface = resolveSurface(classification)
+            val surface = classification.toSurface(requireContext())
             val fg = surface.foregroundColor()
             binding.root.setBackgroundColor(surface.color)
             binding.appNameText.setTextColor(fg)
@@ -429,17 +428,6 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
-    private fun resolveSurface(classification: LuminanceClassification): ResolvedBackground.SolidColor =
-        ResolvedBackground.SolidColor(
-            color = ContextCompat.getColor(
-                requireContext(),
-                when (classification) {
-                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                },
-            ),
-        )
-
     /**
      * Programmatically tint an [AlertDialog] to follow the same
      * surface classification as the host sheet. Uses the cached
@@ -455,7 +443,7 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
      */
     private fun tintRenameDialog(dialog: AlertDialog, editText: EditText) {
         val classification = currentClassification ?: return
-        val surface = resolveSurface(classification)
+        val surface = classification.toSurface(requireContext())
         val fg = surface.foregroundColor()
         dialog.window?.decorView?.background?.setTint(surface.color)
         @Suppress("DEPRECATION")

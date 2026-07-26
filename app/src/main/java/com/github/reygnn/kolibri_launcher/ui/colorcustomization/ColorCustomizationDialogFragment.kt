@@ -13,7 +13,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
@@ -23,8 +22,8 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogColorCustomizationBinding
 import com.github.reygnn.kolibri_launcher.databinding.ItemColorSwatchBinding
-import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
+import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
@@ -107,14 +106,9 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             coroutineContext = Dispatchers.Main,
         ) { classification ->
             if (_binding == null) return@collectOnStarted
-            val color = ContextCompat.getColor(
-                requireContext(),
-                when (classification) {
-                    LuminanceClassification.LIGHT -> R.color.app_drawer_surface_light
-                    LuminanceClassification.DARK -> R.color.app_drawer_surface_dark
-                },
-            )
-            val fg = ResolvedBackground.SolidColor(color).foregroundColor()
+            val surface = classification.toSurface(requireContext())
+            val color = surface.color
+            val fg = surface.foregroundColor()
             binding.root.backgroundTintList = ColorStateList.valueOf(color)
             binding.dragHandle.backgroundTintList = ColorStateList.valueOf(fg)
             // Sweep only the label-bearing siblings of the swatch
