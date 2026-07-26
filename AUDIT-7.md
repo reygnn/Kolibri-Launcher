@@ -363,10 +363,18 @@ Extension `Fragment.showToastSafe(msg, duration)` in `ui/util`.
 > `DialogFragment.configureBottomSheetWindow(widthFraction, yOffset)` in
 > `ui/util/BottomSheetWindow.kt`. Die Werte (0.90/200 bzw. 0.95/150) bleiben
 > als Argumente pro Dialog — an die Content-Höhe getunt, nicht zufällig.
-> **Teil B (Drag-Listener) bewusst NICHT gefaltet:** die zwei Listener
-> differieren in Achse (2- vs 1-achsig), Y-Vorzeichen (`+` vs `-`, also
-> entgegengesetzte Drag-Semantik) und Haptik/Alpha-Feedback — eine
-> Angleichung wäre eine UX-/Verhaltensentscheidung, kein reines Extrahieren.
+>
+> **✅ RESOLUTION 2026-07-26 (Teil B — als Bugfix nachgezogen):** Die
+> Drag-Listener-Divergenz stellte sich als **Bug** heraus: der Farb-Dialog
+> zog 2-achsig mit invertiertem Y-Vorzeichen (`initialY + delta`), d. h.
+> Finger runter → Sheet hoch. Layout & Größe war korrekt (vertikal,
+> natürlich, + Haptik/Alpha). Beide teilen jetzt eine Quelle:
+> `DialogFragment.enableDialogDrag(dragZone, contentRoot)` in
+> `ui/util/DialogDrag.kt` (Branch `fix/color-dialog-drag`). Zusätzlich
+> angeglichen: Eckradius beider Sheets auf `@dimen/dialog_corner_radius`
+> (8dp) und der Drag-Handle auf eine gemeinsame Pille mit vergrößerter
+> 96×24dp-Touchzone (`drag_handle.xml`), da der Listener vorher auf einem
+> nackten 4dp-View saß (schlecht greifbar).
 
 
 `ColorCustomizationDialogFragment` (`onStart:62-77` + `setupDragListener:148-178`)
