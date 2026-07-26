@@ -83,6 +83,20 @@ geprüft wird.
 > jeder Maßnahme **zwingend gegen AUDIT-8 abgleichen** — dieser Fund könnte
 > denselben, bereits geschlossenen Pfad erneut melden oder eine übersehene
 > Rest-Lücke betreffen. Nur Code-Verifikation klärt das.
+>
+> **🔁 WIEDERKEHRENDER FEHLALARM.** Dieser camelCase/snake_case-Themenkomplex
+> wird von Audits **immer wieder** als vermeintlicher Bug gemeldet
+> (AUDIT-3 #3 → behoben, AUDIT-8 §#1 → bestätigt behoben, jetzt AUDIT-9 #1).
+> **Einschätzung des Maintainers:** der Code ist mit hoher Wahrscheinlichkeit
+> **korrekt, nicht kaputt** — die Backup-Pipeline ist sehr gründlich
+> unit-getestet (~259 `@Test`-Methoden laut AUDIT-8). Standardannahme daher:
+> **korrekt-aber-unterdokumentiert**, nicht defekt.
+>
+> **📌 AUFGABE (ab 2026-07-27):** Das Thema **endgültig geradeziehen** ODER
+> an der Codestelle festhalten, **WARUM** die Serialisierung so arbeitet
+> (App schreibt camelCase; `@JsonNames` ist read-alias-only für
+> snake_case-Legacy-Backups) — sodass künftige Audits diesen Pfad nicht
+> erneut als Bug melden. Ziel: die Wiederholungs-Schleife abstellen.
 
 ---
 
