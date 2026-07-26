@@ -10,7 +10,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
@@ -27,7 +26,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
  */
 class GestureDelegate(
     private val getRecentAppsUseCase: GetRecentAppsUseCase,
-    private val getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase,
     private val observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase,
     private val scope: DelegateScope
@@ -120,9 +118,18 @@ class GestureDelegate(
      * flag is instance state on this delegate, which lives on
      * `LauncherViewModel`): it survives configuration changes, but resets when
      * the Activity is really destroyed.
+     *
+     * Reads the SAME [doubleTapConsumesGesture] value the touch layer uses to
+     * decide suppression, deliberately not a fresh DataStore read: two reads
+     * could disagree during the cold-start window (flow still at its `false`
+     * default while a fresh read already returns `true`), which would show the
+     * clipboard dialog AND fail to suppress the follow-on long-press — the very
+     * two-dialog collision this whole mechanism exists to prevent. One source,
+     * no divergence. Worst case at cold start is the safe direction: the hint
+     * shows once until the first emission lands.
      */
     fun onDoubleTap() = scope.launchSafe("Error on double tap") {
-        if (getDoubleTapClipboardSettingUseCase()) {
+        if (_doubleTapConsumesGesture.value) {
             scope.sendEvent(UiEvent.PerformClipboardAction)
         } else if (!enableClipboardToastShown) {
             enableClipboardToastShown = true

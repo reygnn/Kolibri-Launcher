@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
@@ -14,11 +13,13 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,7 +40,6 @@ class GestureDelegateTest {
 
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var getRecentAppsUseCase: GetRecentAppsUseCase
-    private lateinit var getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase
     private lateinit var observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase
 
     @Before
@@ -48,7 +48,6 @@ class GestureDelegateTest {
 
         handleSwipeActionUseCase = mockk(relaxed = true)
         getRecentAppsUseCase = mockk(relaxed = true)
-        getDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
         observeDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
         // Default: setting off. Tests that care override this.
         every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(false)
@@ -62,11 +61,19 @@ class GestureDelegateTest {
 
     private fun createDelegate() = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
-        getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
         observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
+
+    /** Builds a delegate whose observed setting has already emitted [enabled]. */
+    private fun TestScope.startedDelegate(enabled: Boolean): GestureDelegate {
+        every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(enabled)
+        return createDelegate().also {
+            it.start()
+            advanceUntilIdle()
+        }
+    }
 
     @Test
     fun `onSwipeDown emits ShowRecentApps with the recent apps`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -83,8 +90,7 @@ class GestureDelegateTest {
 
     @Test
     fun `onDoubleTap when enabled emits PerformClipboardAction`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { getDoubleTapClipboardSettingUseCase() } returns true
-        val delegate = createDelegate()
+        val delegate = startedDelegate(enabled = true)
 
         delegate.onDoubleTap()
         advanceUntilIdle()
@@ -94,8 +100,7 @@ class GestureDelegateTest {
 
     @Test
     fun `onDoubleTap when disabled never reads the clipboard`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { getDoubleTapClipboardSettingUseCase() } returns false
-        val delegate = createDelegate()
+        val delegate = startedDelegate(enabled = false)
 
         delegate.onDoubleTap()
         advanceUntilIdle()
@@ -108,9 +113,29 @@ class GestureDelegateTest {
     }
 
     @Test
+    fun `onDoubleTap before the setting has emitted does not read the clipboard`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The cold-start divergence this fix closes: the action must read the
+            // same value as the suppression flag, so a not-yet-emitted flow can
+            // never fire PerformClipboardAction while the layout thinks the
+            // gesture was not consumed.
+            every { observeDoubleTapClipboardSettingUseCase() } returns emptyFlow()
+            val delegate = createDelegate()
+            delegate.start()
+            advanceUntilIdle()
+
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard)),
+                sentEvents,
+            )
+        }
+
+    @Test
     fun `onDoubleTap when disabled shows the hint only once`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { getDoubleTapClipboardSettingUseCase() } returns false
-        val delegate = createDelegate()
+        val delegate = startedDelegate(enabled = false)
 
         delegate.onDoubleTap()
         advanceUntilIdle()

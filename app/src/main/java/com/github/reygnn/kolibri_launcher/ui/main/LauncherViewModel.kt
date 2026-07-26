@@ -39,7 +39,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
@@ -108,7 +107,6 @@ class LauncherViewModel @Inject constructor(
     toggleSortOrderUseCase: ToggleSortOrderUseCase,
     handleSwipeActionUseCase: HandleSwipeActionUseCase,
     getRecentAppsUseCase: GetRecentAppsUseCase,
-    getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase,
     observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
     observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase,
     observeUiColorsUseCase: ObserveUiColorsUseCase,
@@ -187,7 +185,6 @@ class LauncherViewModel @Inject constructor(
 
     private val gestureDelegate = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
-        getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
         observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope

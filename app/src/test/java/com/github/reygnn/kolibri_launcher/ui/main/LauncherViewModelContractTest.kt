@@ -229,7 +229,6 @@ class LauncherViewModelContractTest {
             toggleSortOrderUseCase = toggleSortOrderUseCase,
             handleSwipeActionUseCase = handleSwipeActionUseCase,
             getRecentAppsUseCase = mockk(relaxed = true),
-            getDoubleTapClipboardSettingUseCase = mockk(relaxed = true),
             observeDoubleTapClipboardSettingUseCase = mockk(relaxed = true),
             observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
             observeUiColorsUseCase = observeUiColorsUseCase,

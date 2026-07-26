@@ -16,12 +16,11 @@ import javax.inject.Inject
 /**
  * Observes whether the double-tap clipboard action is enabled.
  *
- * The sibling [GetDoubleTapClipboardSettingUseCase] answers "is it on right
- * now?" for the moment a gesture actually fires. This one exists because the
- * touch layer needs the answer *synchronously*, before the gesture is
+ * The touch layer needs this answer *synchronously*, before a gesture is
  * dispatched, to decide whether the double tap consumes the follow-on
  * long-press and swipe — so the UI keeps a continuously updated copy rather
- * than a snapshot that is one gesture behind.
+ * than reading DataStore per gesture. Both the suppression decision and the
+ * action decision read that one copy, so they can never disagree.
  */
 class ObserveDoubleTapClipboardSettingUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository
