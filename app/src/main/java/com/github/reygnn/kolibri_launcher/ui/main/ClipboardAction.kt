@@ -69,15 +69,15 @@ sealed interface ClipboardAction {
  *    all look phone-shaped otherwise), separator-formatted numbers need ≥ 9
  *    digits, and a bare digit run needs ≥ 10 — so 2FA codes, OTPs, PINs and
  *    short amounts fall through to web search instead of the dialer.
- *  - **URL is validated end to end.** A scheme-prefixed string must be a whole
- *    URL with a non-empty authority and no whitespace, so `https://example.com
- *    is a great site` (share text) and a bare `https://` are NOT opened.
- *    Scheme-less input must be a real host per
- *    [PatternsCompat.AUTOLINK_WEB_URL] (androidx's maintained IANA TLD list —
- *    `DOMAIN_NAME` is the *relaxed* variant and accepts `report.txt`);
- *    `https://` is then prepended,
- *    otherwise ACTION_VIEW finds no browser. See [asUrl] for why that beats
- *    both a hand-kept TLD allowlist and a file-extension denylist.
+ *  - **The URL we validate is the URL we launch.** Only `http`/`https` are
+ *    ever opened, the authority is extracted the way a URI parser does it, and
+ *    userinfo is refused — so `paypal.com:x@evil.tld/login` is a search, not a
+ *    visit to evil.tld. Whitespace anywhere disqualifies the string, so
+ *    `https://example.com is a great site` (share text) stays a search, as does
+ *    a bare `https://`. Scheme-less input additionally needs a real IANA TLD
+ *    per [PatternsCompat.AUTOLINK_WEB_URL] before `https://` is prepended.
+ *    [asUrl] holds the full rationale; its invariant is the one thing to
+ *    preserve when touching that function.
  *  - **Email before URL**, so `user@host.tld` isn't mis-read as a domain.
  *  - **Everything else → web search.** Note this branch forwards the clipboard
  *    text to the user's search provider verbatim; it is safe with respect to
@@ -133,14 +133,9 @@ object ClipboardActionResolver {
 
     private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
 
-    // A COMPLETE http(s) URL: scheme, non-empty authority, no whitespace
-    // anywhere. Anchored end-to-end so trailing prose disqualifies the string.
-    // NOTE the authority is `[^\s/?#]` + `\S*` and NOT `[^\s/?#]+` + `\S*`:
-    // the character class is a subset of `\S`, so the `+` form makes every
-    // split point of the two quantifiers a distinct backtrack state — O(n²)
-    // on failure (measured ~116 ms at the 8192-char cap). Both forms accept
-    // exactly the same language; this one is linear.
-    private val SCHEME_URL_REGEX = Regex("^https?://[^\\s/?#]\\S*$", RegexOption.IGNORE_CASE)
+    // The one scheme pair we are willing to launch. Anchored, so `javascript:`,
+    // `data:`, `file:`, `intent:` and `content:` never reach ACTION_VIEW.
+    private val SCHEME_PREFIX_REGEX = Regex("^https?://", RegexOption.IGNORE_CASE)
 
     // Only phone-shaped characters (no letters); structure/length gate the rest.
     private val PHONE_CHARS_REGEX = Regex("^\\+?[0-9 ().\\-]+$")
@@ -148,62 +143,101 @@ object ClipboardActionResolver {
     /**
      * Returns the ready-to-launch URL, or null if [text] isn't one.
      *
-     * Host validity is delegated to [PatternsCompat.AUTOLINK_WEB_URL], the
-     * strict variant that only matches a real IANA TLD (verified: it rejects
-     * `report.txt`, `index.html`, `report.odt`, `song.flac`, `data.db` and
-     * accepts `bit.ly/3xYzQ`, `shop.swiss`, `docs.zip`, `nic.md` — note
-     * `DOMAIN_NAME` is the *relaxed* variant and matches `report.txt`).
-     * That beats both a hand-kept TLD allowlist (ages against ~1500 live TLDs,
-     * silently turning real links into searches) and a hand-kept file-extension
-     * denylist (which had `.zip`/`.mov`/`.md` blocked although all three are
-     * live TLDs, while letting `report.odt` through as a hostname).
-     * PatternsCompat is plain `java.util.regex`, so this stays JVM-testable.
+     * **The governing invariant: the authority that gets validated here must be
+     * the authority a URI parser will resolve when the string is launched.**
+     * An earlier revision validated `text.substringBefore(':')` and then
+     * launched the whole `text`, so `paypal.com:x@evil.tld/login` was checked
+     * as `paypal.com` and opened as `evil.tld`. Every guard below exists to
+     * keep the checked string and the launched string the same string; treat
+     * that as the property to preserve, not the individual guards.
      *
-     * The field carries `@RestrictTo(LIBRARY_GROUP_PREFIX)`, hence the
-     * `@Suppress` below. It is knowingly accepted: the strict IANA list is
-     * reachable through no other member — `DOMAIN_NAME` and `WEB_URL` are
-     * public but both build on the relaxed `TLD`. Should a future androidx
-     * bump drop the field, the result is a compile error rather than a silent
-     * behaviour change, and the version is pinned in `libs.versions.toml`.
+     * Both branches therefore share one authority extraction — everything up to
+     * the first `/`, `?` or `#` after the optional scheme — and both reject
+     * userinfo outright:
+     *  - **Userinfo is refused, always.** `user@host` in a URL is a spoofing
+     *    vector far more often than an intent (browsers strip or warn on it),
+     *    and a copied `https://user:pass@host/` is a credential the launcher
+     *    should not act on. Such input falls through to a web search, which the
+     *    dialog still shows before anything leaves the device.
+     *  - **A colon in the authority must introduce a numeric port.** Otherwise
+     *    the string is malformed and we do not guess: `example.com:` and
+     *    `javascript:alert(1)` are searches, `ratio.is:3` is a URL.
      *
-     * A numeric final label is rejected on purpose, so a bare IP address
-     * (`192.168.1.1`) stays a search rather than becoming a URL — note the
-     * pattern's own `STRICT_DOMAIN_NAME` would otherwise accept one, so that
-     * guard is load-bearing and not merely an early-out.
+     * Host *form* rules then differ by branch, mirroring how androidx itself
+     * splits `WEB_URL_WITH_PROTOCOL` from `WEB_URL_WITHOUT_PROTOCOL`:
+     *  - **With scheme**, the host is the user's business — `http://192.168.1.1`
+     *    (a router admin page) and `http://nas/share` must keep working, so no
+     *    TLD check applies once the authority is known to be clean.
+     *  - **Without scheme**, the final label must be a real IANA TLD per
+     *    [PatternsCompat.AUTOLINK_WEB_URL], or `report.txt` would become a
+     *    hostname. That beats both a hand-kept TLD allowlist (ages against
+     *    ~1500 live TLDs) and a file-extension denylist (which blocked
+     *    `.zip`/`.mov`/`.md` although all three are live TLDs). A numeric final
+     *    label is rejected so a bare `192.168.1.1` stays a search — the
+     *    pattern's own `STRICT_DOMAIN_NAME` would otherwise accept it, so that
+     *    guard is load-bearing.
      *
-     * Only the host is handed to the matcher, capped at [MAX_HOST_LENGTH] and
-     * lowercased. Both matter:
-     *  - **Capped**, because the pattern's ~1500-TLD alternation recurses per
-     *    dot-separated label. Matching the full 8192-char text let
-     *    `"a.".repeat(4090) + "zzzz"` cost ~42 ms and throw StackOverflowError
-     *    on a 1 MB stack — which is what coroutine workers get. A host can
-     *    never legally be longer than 253 chars, so nothing valid is lost.
-     *  - **Lowercased**, because `IANA_TOP_LEVEL_DOMAINS` is a lowercase-only
-     *    alternation and the pattern compiles with no flags, so `GOOGLE.COM`
-     *    would fail and fall through to a web search. The scheme branch has
-     *    handled autocapitalised input via IGNORE_CASE all along; this makes
-     *    the two symmetric.
-     * The path is no longer part of the match, which is fine: whitespace is
-     * already excluded above, and the string is launched as-is either way.
+     * Only the host reaches the matcher, capped at [MAX_HOST_LENGTH] and
+     * lowercased. Capped, because the ~1500-TLD alternation recurses per
+     * dot-separated label and the full 8192-char cap threw StackOverflowError
+     * on the 1 MB stacks coroutine workers get. Lowercased, because
+     * `IANA_TOP_LEVEL_DOMAINS` is a lowercase-only alternation compiled with no
+     * flags, so `GOOGLE.COM` would otherwise fall through to a search.
+     *
+     * [PatternsCompat.AUTOLINK_WEB_URL] carries `@RestrictTo(LIBRARY_GROUP_PREFIX)`,
+     * hence the `@Suppress`. Knowingly accepted: the strict IANA list is
+     * reachable through no other member — `DOMAIN_NAME` and `WEB_URL` are public
+     * but build on the relaxed `TLD`. A future androidx bump that drops the
+     * field yields a compile error, not a silent behaviour change, and the
+     * version is pinned in `libs.versions.toml`.
      *
      * Residual ambiguity is unavoidable: `install.sh` and `main.py` are valid
-     * domains AND common filenames, so they classify as URLs. The
-     * confirmation dialog is what makes that harmless — the user sees the
-     * proposed action before anything is launched.
+     * domains AND common filenames, so they classify as URLs. The confirmation
+     * dialog is what makes that harmless — but note the dialog is NOT a
+     * backstop for authority spoofing, since it previews one ellipsised line.
+     * That is why the rules above are structural rather than advisory.
      */
     @Suppress("RestrictedApi") // see the KDoc above for why AUTOLINK_WEB_URL is worth it
     private fun asUrl(text: String): String? {
-        if (SCHEME_URL_REGEX.matches(text)) return text
         if (text.any { it.isWhitespace() }) return null
 
-        val host = text.substringBefore('/').substringBefore('?')
-            .substringBefore('#').substringBefore(':')
+        val schemeLength = SCHEME_PREFIX_REGEX.find(text)?.value?.length
+        val afterScheme = if (schemeLength != null) text.substring(schemeLength) else text
+
+        val authority = afterScheme.substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+        val host = hostOf(authority) ?: return null
+
+        // Scheme present: the authority is clean, the host form is the user's call.
+        if (schemeLength != null) return text
+
         if (host.length > MAX_HOST_LENGTH) return null
         val finalLabel = host.substringAfterLast('.', "")
         if (finalLabel.length < 2 || !finalLabel.all { it.isLetter() }) return null
 
         val matches = PatternsCompat.AUTOLINK_WEB_URL.matcher(host.lowercase()).matches()
         return if (matches) "https://$text" else null
+    }
+
+    /**
+     * The host of an RFC 3986 authority, or null if we refuse to launch it.
+     *
+     * Refused: an empty authority, any userinfo (`@`), and a colon that does
+     * not introduce a numeric port. The last rule also disposes of IPv6
+     * literals (`[::1]`) and of non-http schemes that survived
+     * [SCHEME_PREFIX_REGEX], since neither leaves a digits-only tail.
+     */
+    private fun hostOf(authority: String): String? {
+        if (authority.isEmpty()) return null
+        if ('@' in authority) return null
+
+        val portSeparator = authority.lastIndexOf(':')
+        if (portSeparator < 0) return authority
+
+        val port = authority.substring(portSeparator + 1)
+        if (port.isEmpty() || !port.all { it.isDigit() }) return null
+        return authority.substring(0, portSeparator)
     }
 
     private fun isDialablePhone(text: String): Boolean {

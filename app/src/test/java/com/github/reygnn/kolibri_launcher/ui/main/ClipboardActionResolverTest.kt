@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -183,6 +184,131 @@ class ClipboardActionResolverTest {
     @Test
     fun `bare scheme without a host is searched, not opened`() {
         assertEquals(ClipboardAction.WebSearch("https://"), resolve("https://"))
+    }
+
+    // =====================================================================
+    // ADVERSARIAL — the clipboard is attacker-controlled
+    // =====================================================================
+    // Anything can be put on the clipboard by any app, or copied by a user
+    // off a phishing page. The invariant these tests defend is the one in
+    // asUrl's KDoc: THE AUTHORITY WE VALIDATE MUST BE THE AUTHORITY THAT
+    // GETS LAUNCHED. A regression here is not a wrong suggestion, it is the
+    // launcher opening a host the user did not see.
+    //
+    // The confirmation dialog is explicitly NOT the backstop: it renders one
+    // ellipsised line, which is exactly what userinfo spoofing defeats.
+
+    /** The URL the user would actually be sent to, or null if not an OpenUrl. */
+    private fun launchedUrl(text: String) = (resolve(text) as? ClipboardAction.OpenUrl)?.url
+
+    @Test
+    fun `userinfo spoof is never opened - scheme-less`() {
+        // host cut at ':' used to validate as paypal.com and launch evil.tld.
+        listOf(
+            "paypal.com:x@evil.tld/login",
+            "example.com:80@evil.com/x",
+            "example.com@evil.com/x",
+            "google.com:x@evil.tld",
+        ).forEach { assertNull("must not open: $it", launchedUrl(it)) }
+    }
+
+    @Test
+    fun `userinfo spoof is never opened - with scheme`() {
+        listOf(
+            "https://paypal.com@evil.tld",
+            "https://paypal.com:x@evil.tld/login",
+            "http://user:pass@evil.tld/",
+            "https://bank.example.com@192.0.2.1/",
+        ).forEach { assertNull("must not open: $it", launchedUrl(it)) }
+    }
+
+    @Test
+    fun `a copied credential url is not opened and stays local to the search branch`() {
+        // Refusing to launch it is the point; the dialog then shows the user
+        // what a search would forward, and dismissing costs one tap.
+        val credentials = "https://admin:hunter2@intranet.example.com/"
+        assertEquals(ClipboardAction.WebSearch(credentials), resolve(credentials))
+    }
+
+    @Test
+    fun `only http and https are ever launched`() {
+        listOf(
+            "javascript:alert(1)",
+            "data:text/html,<script>alert(1)</script>",
+            "file:///etc/passwd",
+            "content://com.example.provider/secret",
+            "intent://evil.tld#Intent;scheme=http;end",
+            "jar:http://evil.tld!/",
+            "ftp://files.example.com/pub",
+        ).forEach { assertNull("must not open: $it", launchedUrl(it)) }
+    }
+
+    @Test
+    fun `a colon in the authority must introduce a numeric port`() {
+        assertNull(launchedUrl("example.com:"))
+        assertNull(launchedUrl("example.com:notaport"))
+        assertNull(launchedUrl("example.com:80x"))
+        // A real port is fine.
+        assertEquals("https://ratio.is:3", launchedUrl("ratio.is:3"))
+        assertEquals("https://example.com:8080/x", launchedUrl("example.com:8080/x"))
+    }
+
+    @Test
+    fun `an empty authority is never opened`() {
+        listOf("https://", "http://", "https:///etc/passwd", "://example.com")
+            .forEach { assertNull("must not open: $it", launchedUrl(it)) }
+    }
+
+    @Test
+    fun `ipv6 literals are not opened scheme-less`() {
+        assertNull(launchedUrl("[::1]"))
+        assertNull(launchedUrl("[2001:db8::1]:8080"))
+    }
+
+    @Test
+    fun `whitespace anywhere disqualifies a url`() {
+        // Newlines and tabs are how a payload hides a second line in a clip.
+        listOf(
+            "https://example.com\n@evil.tld",
+            "https://example.com\t/path",
+            "google.com evil.tld",
+        ).forEach { assertNull("must not open: $it", launchedUrl(it)) }
+    }
+
+    @Test
+    fun `a scheme-prefixed url keeps working for hosts without a public tld`() {
+        // The scheme branch deliberately does NOT apply the TLD rule: router
+        // admin pages and intranet hosts are legitimate and must still open.
+        assertEquals("http://192.168.1.1/admin", launchedUrl("http://192.168.1.1/admin"))
+        assertEquals("http://nas/share", launchedUrl("http://nas/share"))
+        assertEquals("https://localhost:8080/x", launchedUrl("https://localhost:8080/x"))
+    }
+
+    @Test
+    fun `the launched url always starts with the authority that was validated`() {
+        // Property-style backstop: for every input we agree to open, the host
+        // that survives validation must be a prefix of the launched authority.
+        // This is what actually broke — a targeted test per exploit shape can
+        // always miss the next shape; this catches the class.
+        listOf(
+            "google.com", "bit.ly/3xYzQ", "github.com/reygnn", "EXAMPLE.COM",
+            "example.com:8080/x", "https://example.org/a/b?c=d",
+            "http://192.168.1.1/admin", "shop.swiss", "docs.zip",
+            "paypal.com:x@evil.tld/login", "https://paypal.com@evil.tld",
+            "javascript:alert(1)", "example.com:notaport", "[::1]",
+        ).forEach { input ->
+            val url = launchedUrl(input) ?: return@forEach
+            val authority = url.removePrefix("https://").removePrefix("http://")
+                .substringBefore('/').substringBefore('?').substringBefore('#')
+            assertFalse(
+                "launched authority of '$input' carries userinfo: $authority",
+                '@' in authority,
+            )
+            assertTrue(
+                "launched url '$url' does not contain the copied text '$input'",
+                url.contains(input.removePrefix("https://").removePrefix("http://")),
+            )
+        }
     }
 
     // ---------- oversized clipboard ----------
