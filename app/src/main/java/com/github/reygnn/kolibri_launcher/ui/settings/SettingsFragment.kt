@@ -103,6 +103,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private var calendarSwitchPreference: SwitchPreferenceCompat? = null
     private var alarmSwitchPreference: SwitchPreferenceCompat? = null
+    private var doubleTapClipboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
     private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
     private var rotationLockedSwitchPreference: SwitchPreferenceCompat? = null
@@ -186,6 +187,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 true
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in alarm change listener")
+                false
+            }
+        }
+
+        doubleTapClipboardSwitchPreference = findPreference(AppConstants.PrefKeys.DOUBLE_TAP_CLIPBOARD)
+        doubleTapClipboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setDoubleTapClipboard(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error in doubleTapClipboard change listener")
                 false
             }
         }
@@ -633,6 +648,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     }
                 }
 
+                // Observer for the double-tap clipboard-action setting
+                launch {
+                    try {
+                        settingsRepository.doubleTapClipboardEnabledFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            doubleTapClipboardSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in doubleTapClipboard flow collection")
+                    }
+                }
+
                 // Observer für show Keyboard Setting
                 launch {
                     try {
@@ -899,12 +928,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // CANT_THROW. super.onDestroyView() bleibt am Ende.
         calendarSwitchPreference?.onPreferenceChangeListener = null
         alarmSwitchPreference?.onPreferenceChangeListener = null
+        doubleTapClipboardSwitchPreference?.onPreferenceChangeListener = null
         autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
         autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
         rotationLockedSwitchPreference?.onPreferenceChangeListener = null
 
         calendarSwitchPreference = null
         alarmSwitchPreference = null
+        doubleTapClipboardSwitchPreference = null
         autoKeyboardSwitchPreference = null
         autoLaunchAppSwitchPreference = null
         rotationLockedSwitchPreference = null

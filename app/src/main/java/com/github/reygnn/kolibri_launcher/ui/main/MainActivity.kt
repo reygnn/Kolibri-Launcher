@@ -1,6 +1,9 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import android.app.SearchManager
 import android.content.BroadcastReceiver
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -8,16 +11,21 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.WindowManager
 import android.widget.ArrayAdapter
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.StringRes
 import androidx.core.graphics.drawable.toDrawable
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -44,8 +52,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.acra.ACRA
 import timber.log.Timber
 import javax.inject.Inject
@@ -712,6 +722,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     showRecentAppsDialog(event.apps)
                 }
 
+                is UiEvent.PerformClipboardAction -> {
+                    performClipboardAction()
+                }
+
                 is UiEvent.LaunchApp -> {
                     val action = AppLaunchAction.decide(
                         currentDestinationId = navController?.currentDestination?.id,
@@ -833,6 +847,158 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (result.shouldReconcile) {
             viewModel.refreshInstalledApps()
         }
+    }
+
+    /**
+     * Double-tap on the home screen: read the clipboard and do the obvious
+     * thing with it — open a URL, dial a number (DIAL only, never CALL),
+     * compose an email, or fall back to a web search. Classification is the
+     * pure [ClipboardActionResolver]; here we only map the result to an Intent
+     * and launch it via startActivitySafely. Empty clipboard → a short toast.
+     *
+     * The read runs on [Dispatchers.IO]: for a URI-backed clip (a file copied
+     * from a gallery / cloud provider) `coerceToText` opens the item through
+     * ContentResolver and reads the stream, i.e. a blocking binder call into a
+     * possibly cold foreign provider — not something to do on the UI thread of
+     * the HOME activity.
+     */
+    private fun performClipboardAction() {
+        lifecycleScope.launch(mainActivityExceptionHandler) {
+            // Both the read AND the classification run off the main thread:
+            // coerceToText can do a blocking ContentResolver round-trip, and
+            // the resolver runs several regexes over up to 8 KB. This is the
+            // HOME activity — a stall here is a frozen home screen.
+            val read = withContext(Dispatchers.IO) { readClipboard() }
+
+            // Never act on a clip the source app marked sensitive (password
+            // managers set this): the WebSearch fallback would otherwise hand
+            // a password to the user's search provider.
+            if (read.isSensitive) {
+                showToastSafe(R.string.clipboard_sensitive)
+                return@launch
+            }
+
+            val action = withContext(Dispatchers.Default) {
+                ClipboardActionResolver.resolve(read.text)
+            }
+            if (action == null) {
+                showToastSafe(R.string.clipboard_empty)
+                return@launch
+            }
+
+            showClipboardActionDialog(action)
+        }
+    }
+
+    /** Intent to run, its fallback, and the label of the confirming button. */
+    private data class ClipboardIntentSpec(
+        val intent: Intent,
+        val fallback: Intent?,
+        @StringRes val confirmLabel: Int,
+    )
+
+    /**
+     * One exhaustive `when` produces intent + fallback + button label together,
+     * so adding a fifth [ClipboardAction] cannot compile while silently losing
+     * its fallback or label.
+     */
+    private fun specFor(action: ClipboardAction): ClipboardIntentSpec = when (action) {
+        // normalizeScheme(): IntentFilter matches schemes CASE-SENSITIVELY, so
+        // an autocapitalised `Https://…` resolves to no browser without this.
+        is ClipboardAction.OpenUrl -> ClipboardIntentSpec(
+            Intent(Intent.ACTION_VIEW, action.url.toUri().normalizeScheme()),
+            null,
+            R.string.clipboard_action_open,
+        )
+        is ClipboardAction.Email -> ClipboardIntentSpec(
+            Intent(Intent.ACTION_SENDTO, "mailto:${action.address}".toUri()),
+            null,
+            R.string.clipboard_action_email,
+        )
+        is ClipboardAction.Dial -> ClipboardIntentSpec(
+            Intent(Intent.ACTION_DIAL, "tel:${action.number}".toUri()),
+            null,
+            R.string.clipboard_action_dial,
+        )
+        // ACTION_WEB_SEARCH needs an app that declares it (typically the Google
+        // app) — absent on de-Googled ROMs, where the fallback URL opens in
+        // whatever browser exists instead of dead-ending.
+        is ClipboardAction.WebSearch -> ClipboardIntentSpec(
+            Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, action.query),
+            Intent(Intent.ACTION_VIEW, "https://duckduckgo.com/?q=${Uri.encode(action.query)}".toUri()),
+            R.string.clipboard_action_search,
+        )
+    }
+
+    /**
+     * Shows one line of the copied text plus the proposed action, so nothing
+     * is launched — and nothing leaves the device — before the user has seen
+     * what it is. That is also what makes the classifier's unavoidable
+     * ambiguity harmless (`install.sh` is both a filename and a valid domain).
+     *
+     * "Share" is offered alongside because it is the one action that can never
+     * be wrong for arbitrary text, and unlike ACTION_WEB_SEARCH it always
+     * resolves. There is deliberately no Cancel button: tapping outside
+     * dismisses, which is the lighter gesture for the common "not now" case.
+     */
+    private fun showClipboardActionDialog(action: ClipboardAction) {
+        if (isFinishing || isDestroyed) return
+        val spec = specFor(action)
+
+        // Inflate against the DIALOG theme, not the Activity's. The layout's
+        // ?attr/colorOnSurface would otherwise resolve against AppTheme, which
+        // follows system night mode, while the dialog surface follows wallpaper
+        // luminance — light wallpaper plus system dark mode then paints the
+        // preview near-white on near-white. Same fix as showRecentAppsDialog.
+        val dialogStyle = wallpaperAwareDialogStyle()
+        val themedInflater = LayoutInflater.from(ContextThemeWrapper(this, dialogStyle))
+        val previewView = themedInflater.inflate(R.layout.dialog_clipboard_action, null)
+        previewView.findViewById<TextView>(R.id.clipboardPreview).text = action.displayText
+
+        val dialog = MaterialAlertDialogBuilder(this, dialogStyle)
+            .setTitle(R.string.clipboard_action_title)
+            .setView(previewView)
+            .setNeutralButton(R.string.clipboard_action_share) { _, _ ->
+                shareClipboardText(action.displayText)
+            }
+            .setPositiveButton(spec.confirmLabel) { _, _ ->
+                startActivitySafely(spec.intent, spec.fallback)
+            }
+            .setOnDismissListener { if (currentDialog == it) currentDialog = null }
+            .create()
+
+        currentDialog?.dismiss()
+        currentDialog = dialog
+        dialog.show()
+    }
+
+    private fun shareClipboardText(text: String) {
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, text)
+        startActivitySafely(
+            Intent.createChooser(send, getString(R.string.clipboard_action_share)),
+        )
+    }
+
+    /** Clipboard text plus the source app's sensitivity flag. */
+    private data class ClipboardRead(val text: String?, val isSensitive: Boolean)
+
+    private fun readClipboard(): ClipboardRead {
+        val clip = getSystemService(ClipboardManager::class.java)?.primaryClip
+            ?: return ClipboardRead(null, isSensitive = false)
+        val isSensitive =
+            clip.description?.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true
+        if (isSensitive) return ClipboardRead(null, isSensitive = true)
+        // coerceToText hands back item.text outright for a plain-text clip, but
+        // reads a URI-backed one to EOF even though resolve() caps at 8 KB.
+        // Knowingly accepted — ACCEPTED_LIMITATIONS.md §2 explains why the
+        // obvious MIME pre-check would not help.
+        val text = clip.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(this)
+            ?.toString()
+        return ClipboardRead(text, isSensitive = false)
     }
 
     /**

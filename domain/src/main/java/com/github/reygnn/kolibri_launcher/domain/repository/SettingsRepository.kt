@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.Flow
 // Das ist der Vertrag. Er sagt nur, WAS getan werden kann, nicht WIE.
 interface SettingsRepository : Purgeable {
     val sortOrderFlow: Flow<SortOrder>
+    val doubleTapClipboardEnabledFlow: Flow<Boolean>
 
     suspend fun setSortOrder(sortOrder: SortOrder)
+    suspend fun setDoubleTapClipboard(isEnabled: Boolean)
 
     val onboardingCompletedFlow: Flow<Boolean>
     suspend fun setOnboardingCompleted()

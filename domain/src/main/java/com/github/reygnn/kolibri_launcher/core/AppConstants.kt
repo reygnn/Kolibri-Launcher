@@ -197,6 +197,9 @@ object AppConstants {
         const val AUTO_SHOW_KEYBOARD = "auto_show_keyboard_drawer"
         const val AUTO_LAUNCH_APP = "auto_launch_app"
 
+        // Gestures
+        const val DOUBLE_TAP_CLIPBOARD = "double_tap_clipboard_enabled"
+
         // Keys, die nur für Klicks/Intents im Fragment genutzt werden (kein DataStore Value)
         const val SYSTEM_WALLPAPER = "system_wallpaper"
         const val EDIT_FAVORITES = "edit_favorites"
@@ -227,6 +230,13 @@ object AppConstants {
 
     const val DEFAULT_SHOW_CALENDAR = false
     const val DEFAULT_SHOW_ALARM = false
+
+    /**
+     * Double-tap-to-clipboard-action is OFF by default: the gesture reads the
+     * clipboard and can forward its content to a search provider, so it is
+     * opt-in rather than something an update silently switches on.
+     */
+    const val DEFAULT_DOUBLE_TAP_CLIPBOARD = false
     const val DEFAULT_AUTO_SHOW_KEYBOARD = false
     const val DEFAULT_AUTO_LAUNCH_APP = false
 

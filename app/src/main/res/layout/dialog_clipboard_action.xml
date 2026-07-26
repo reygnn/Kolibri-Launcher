@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Preview row for the double-tap clipboard-action dialog: exactly ONE line of
+  the copied text, ellipsised, so the user can see what they are about to act
+  on without the dialog growing to fit a pasted paragraph.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/clipboardPreview"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="@dimen/spacing_medium"
+    android:paddingBottom="@dimen/spacing_medium"
+    android:maxLines="1"
+    android:ellipsize="end"
+    android:textSize="16sp"
+    android:textColor="?attr/colorOnSurface" />

@@ -18,6 +18,7 @@ sealed class UiEvent {
     object OpenBatterySettings : UiEvent()
     data class LaunchApp(val app: AppInfo) : UiEvent()
     data class ShowRecentApps(val apps: List<AppInfo>) : UiEvent()
+    object PerformClipboardAction : UiEvent()
     object RefreshAppDrawer : UiEvent()
     data object ShowCustomizationOptions : UiEvent()
     data object ShowColorPickerDialog : UiEvent()

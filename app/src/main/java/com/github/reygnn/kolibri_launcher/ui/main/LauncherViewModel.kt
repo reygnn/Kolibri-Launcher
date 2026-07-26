@@ -39,6 +39,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -106,6 +107,7 @@ class LauncherViewModel @Inject constructor(
     toggleSortOrderUseCase: ToggleSortOrderUseCase,
     handleSwipeActionUseCase: HandleSwipeActionUseCase,
     getRecentAppsUseCase: GetRecentAppsUseCase,
+    getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase,
     observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase,
     observeUiColorsUseCase: ObserveUiColorsUseCase,
     setTextColorUseCase: SetTextColorUseCase,
@@ -183,6 +185,7 @@ class LauncherViewModel @Inject constructor(
 
     private val gestureDelegate = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
+        getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope
     )
@@ -335,6 +338,10 @@ class LauncherViewModel @Inject constructor(
 
     fun onFlingUp() = gestureDelegate.onFlingUp()
     fun onSwipeDown() = gestureDelegate.onSwipeDown()
+    fun onDoubleTap() = gestureDelegate.onDoubleTap()
+
+    /** See [GestureDelegate.doubleTapConsumesGesture] — read synchronously from touch dispatch. */
+    val doubleTapConsumesGesture: Boolean get() = gestureDelegate.doubleTapConsumesGesture
     fun onSwipeFromRightToLeft() = gestureDelegate.onSwipeFromRightToLeft()
     fun onSwipeFromLeftToRight() = gestureDelegate.onSwipeFromLeftToRight()
     fun onLongPress() = gestureDelegate.onLongPress()

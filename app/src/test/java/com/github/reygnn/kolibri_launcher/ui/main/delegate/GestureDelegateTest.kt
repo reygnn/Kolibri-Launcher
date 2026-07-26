@@ -1,6 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -33,6 +35,7 @@ class GestureDelegateTest {
 
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var getRecentAppsUseCase: GetRecentAppsUseCase
+    private lateinit var getDoubleTapClipboardSettingUseCase: GetDoubleTapClipboardSettingUseCase
 
     @Before
     fun setUp() {
@@ -40,6 +43,7 @@ class GestureDelegateTest {
 
         handleSwipeActionUseCase = mockk(relaxed = true)
         getRecentAppsUseCase = mockk(relaxed = true)
+        getDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -50,6 +54,7 @@ class GestureDelegateTest {
 
     private fun createDelegate() = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
+        getDoubleTapClipboardSettingUseCase = getDoubleTapClipboardSettingUseCase,
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
@@ -66,6 +71,91 @@ class GestureDelegateTest {
         assertEquals(1, sentEvents.size)
         assertEquals(UiEvent.ShowRecentApps(recent), sentEvents.first())
     }
+
+    @Test
+    fun `onDoubleTap when enabled emits PerformClipboardAction`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { getDoubleTapClipboardSettingUseCase() } returns true
+        val delegate = createDelegate()
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        assertEquals(listOf(UiEvent.PerformClipboardAction), sentEvents)
+    }
+
+    @Test
+    fun `onDoubleTap when disabled never reads the clipboard`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+        val delegate = createDelegate()
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        // Points at the setting instead — crucially, no PerformClipboardAction.
+        assertEquals(
+            listOf(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard)),
+            sentEvents,
+        )
+    }
+
+    @Test
+    fun `onDoubleTap when disabled shows the hint only once`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+        val delegate = createDelegate()
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        assertEquals(1, sentEvents.size)
+    }
+
+    // ===========================================
+    // GESTURE CONSUMPTION SNAPSHOT
+    // ===========================================
+    // HomeGestureLayout reads this synchronously to decide whether to suppress
+    // the follow-on long-press and swipe. Reporting "consumed" while the
+    // setting is off would silently eat the customization dialog for every
+    // user, since the setting ships default-off.
+
+    @Test
+    fun `doubleTapConsumesGesture is primed at construction`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getDoubleTapClipboardSettingUseCase() } returns true
+            val delegate = createDelegate()
+
+            advanceUntilIdle()
+
+            assertEquals(true, delegate.doubleTapConsumesGesture)
+        }
+
+    @Test
+    fun `doubleTapConsumesGesture stays false while the setting is off`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+            val delegate = createDelegate()
+            advanceUntilIdle()
+
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            assertEquals(false, delegate.doubleTapConsumesGesture)
+        }
+
+    @Test
+    fun `doubleTapConsumesGesture follows a setting change on the next tap`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            coEvery { getDoubleTapClipboardSettingUseCase() } returns false
+            val delegate = createDelegate()
+            advanceUntilIdle()
+
+            coEvery { getDoubleTapClipboardSettingUseCase() } returns true
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            assertEquals(true, delegate.doubleTapConsumesGesture)
+        }
 
     // ===========================================
     // FLING UP

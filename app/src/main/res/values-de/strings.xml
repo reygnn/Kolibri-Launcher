@@ -99,6 +99,17 @@
     <string name="category_gestures_title">Gesten</string>
     <string name="recent_apps_title">Zuletzt geöffnet</string>
     <string name="recent_apps_empty">Noch keine kürzlich geöffneten Apps</string>
+    <string name="clipboard_empty">Zwischenablage ist leer</string>
+    <string name="clipboard_sensitive">Geschützter Inhalt – keine Aktion ausgeführt</string>
+    <string name="clipboard_action_title">Zwischenablage</string>
+    <string name="clipboard_action_open">Öffnen</string>
+    <string name="clipboard_action_dial">Wählen</string>
+    <string name="clipboard_action_email">E-Mail</string>
+    <string name="clipboard_action_search">Suchen</string>
+    <string name="clipboard_action_share">Teilen</string>
+    <string name="double_tap_clipboard_title">Doppeltippen für Zwischenablage-Aktion</string>
+    <string name="double_tap_clipboard_summary">Doppeltippen auf den Startbildschirm öffnet einen kopierten Link, wählt eine kopierte Nummer oder sucht den kopierten Text. Liest die Zwischenablage, wenn du die Geste benutzt.</string>
+    <string name="toast_enable_double_tap_clipboard">Zwischenablage-Aktion ist deaktiviert. Du kannst sie in den Einstellungen aktivieren.</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App-Informationen</string>

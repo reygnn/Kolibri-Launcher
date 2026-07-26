@@ -90,6 +90,13 @@
         android:title="@string/category_gestures_title"
         app:iconSpaceReserved="false">
 
+        <SwitchPreferenceCompat
+            android:key="double_tap_clipboard_enabled"
+            android:title="@string/double_tap_clipboard_title"
+            android:summary="@string/double_tap_clipboard_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
             <Preference
             android:key="swipe_actions"
             android:title="@string/settings_swipe_actions_title"

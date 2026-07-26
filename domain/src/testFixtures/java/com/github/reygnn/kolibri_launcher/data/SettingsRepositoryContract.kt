@@ -67,6 +67,26 @@ abstract class SettingsRepositoryContract {
         assertEquals(AppConstants.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
     }
 
+    /**
+     * Safety-relevant default: the double-tap gesture reads the clipboard and
+     * can forward it to a search provider, so it must be OFF until the user
+     * opts in. Pinned in the contract (not just the impl) so neither
+     * implementation can drift to an enabled-by-default state.
+     */
+    @Test
+    fun `fresh repository has double-tap clipboard action disabled`() = runTest {
+        val repo = createRepository()
+        assertFalse(repo.doubleTapClipboardEnabledFlow.first())
+        assertFalse(AppConstants.DEFAULT_DOUBLE_TAP_CLIPBOARD)
+    }
+
+    @Test
+    fun `setDoubleTapClipboard reflects in flow`() = runTest {
+        val repo = createRepository()
+        repo.setDoubleTapClipboard(true)
+        assertTrue(repo.doubleTapClipboardEnabledFlow.first())
+    }
+
     @Test
     fun `fresh repository emits default textColor`() = runTest {
         val repo = createRepository()

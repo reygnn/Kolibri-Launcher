@@ -1083,13 +1083,10 @@ class HomeFragment : Fragment() {
 
     /**
      * Wires the [HomeGestureLayout] callbacks. The wrapper detects all
-     * five home-screen gestures (four directional swipes + double-tap
+     * six home-screen gestures (four directional swipes + double-tap
      * + long-press) anywhere on the home content via
      * `dispatchTouchEvent` and forwards each to its own per-gesture
-     * callback. The locking-in-progress short-circuit lives in
-     * [com.github.reygnn.kolibri_launcher.ui.main.delegate.GestureDelegate]
-     * — each `onFling*` and `onSwipeFrom*` method early-returns while
-     * a lock animation is playing.
+     * callback.
      *
      * The four directional swipes plus the double-tap are gated on
      * wallpaper-edit mode via a separate observer (see [observeViewModel]
@@ -1119,10 +1116,13 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Sets the four directional swipe callbacks on [HomeGestureLayout]
-     * (up = app drawer, down = recent apps, left/right = swipe actions).
-     * Called once during initial wiring and again each time the user
-     * leaves wallpaper-edit mode (see [applyWallpaperEditModeToGestures]).
+     * Sets the [HomeGestureLayout] callbacks that share the wallpaper-edit-mode
+     * lifecycle (nulled while editing): the four directional swipes (up = app
+     * drawer, down = recent apps, left/right = swipe actions) plus double-tap
+     * (clipboard action). Called once during initial wiring and again each
+     * time the user leaves wallpaper-edit mode (see
+     * [applyWallpaperEditModeToGestures]). Long-press is wired separately in
+     * [setupHomeGestures] because it must stay live in edit mode.
      */
     private fun wireDirectionalGestureCallbacks() {
         if (_binding == null) return
@@ -1131,6 +1131,13 @@ class HomeFragment : Fragment() {
         gestures.onSwipeDown = { viewModel.onSwipeDown() }
         gestures.onSwipeLeft = { viewModel.onSwipeFromRightToLeft() }
         gestures.onSwipeRight = { viewModel.onSwipeFromLeftToRight() }
+        gestures.onDoubleTap = {
+            // Snapshot BEFORE dispatching: the delegate refreshes it from the
+            // authoritative (suspending) read, which lands after this returns.
+            val consumesGesture = viewModel.doubleTapConsumesGesture
+            viewModel.onDoubleTap()
+            consumesGesture
+        }
     }
 
     /**
@@ -1150,6 +1157,7 @@ class HomeFragment : Fragment() {
             gestures.onSwipeDown = null
             gestures.onSwipeLeft = null
             gestures.onSwipeRight = null
+            gestures.onDoubleTap = null
         } else {
             wireDirectionalGestureCallbacks()
         }

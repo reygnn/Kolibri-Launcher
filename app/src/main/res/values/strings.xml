@@ -120,6 +120,17 @@
     <string name="category_gestures_title">Gestures</string>
     <string name="recent_apps_title">Recent apps</string>
     <string name="recent_apps_empty">No recently opened apps yet</string>
+    <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="clipboard_sensitive">Protected clipboard content — no action taken</string>
+    <string name="clipboard_action_title">Clipboard</string>
+    <string name="clipboard_action_open">Open</string>
+    <string name="clipboard_action_dial">Dial</string>
+    <string name="clipboard_action_email">Email</string>
+    <string name="clipboard_action_search">Search</string>
+    <string name="clipboard_action_share">Share</string>
+    <string name="double_tap_clipboard_title">Double tap for clipboard action</string>
+    <string name="double_tap_clipboard_summary">Double tap the home screen to open a copied link, dial a copied number, or search the copied text. Reads the clipboard when you use the gesture.</string>
+    <string name="toast_enable_double_tap_clipboard">Double-tap clipboard action is disabled. Enable it in Settings.</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App Information</string>

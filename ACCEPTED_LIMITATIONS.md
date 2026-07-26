@@ -78,3 +78,51 @@ Reopen this entry if any of the following changes:
 - Multi-layer alpha conventions in the codebase shift (e.g.,
   `layers[0]` becomes the *top* layer instead of the bottom by
   some refactor) — the alpha-gate semantics would need to follow.
+
+---
+
+## 2. Clipboard read pulls a URI-backed clip in whole
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Rare — needs a multi-megabyte, URI-backed `text/*` clip
+- **Affected:** `MainActivity.readClipboard` (double-tap clipboard action)
+
+### Explanation
+
+`readClipboard` calls `ClipData.Item.coerceToText`, and
+`ClipboardActionResolver.resolve` then discards everything past its
+8192-character cap. For the overwhelmingly common case that is free:
+`coerceToText` returns `item.text` immediately and no stream is ever
+opened. But when the clip is URI-backed and the provider serves it as
+`text/*`, the framework opens a typed asset FD and reads it to EOF into
+an unbounded `StringBuilder` — so copying a 20 MB log file in a file
+manager and then double-tapping allocates far more than the ~8 KB that
+survives, in the HOME process of all places.
+
+### Why it is accepted
+
+The obvious fix does not work. Pre-checking the MIME type and taking
+`item.text` for `text/plain` changes nothing, because that is already
+the fast path *inside* `coerceToText`; the allocating branch is exactly
+the fallback such a check would still route to. A real fix means opening
+`openTypedAssetFileDescriptor` ourselves and reading a bounded number of
+characters — i.e. re-implementing framework behaviour, including the
+`htmlText` and Intent-item cases `coerceToText` also covers, in the one
+process that must never crash.
+
+Against that: the read already runs on `Dispatchers.IO`, so there is no
+ANR exposure, only allocation. The trigger requires a clip that is
+simultaneously URI-backed, several megabytes, and text-typed — which is
+constructible but not something a launcher user stumbles into.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- An OOM or a slow double-tap is actually observed via ACRA with a large
+  clipboard item in the report.
+- `ClipData.Item` gains a bounded read in a future Android release, at
+  which point the fix becomes a one-liner.
+- The clipboard feature grows a second consumer that needs the full text
+  rather than a capped preview — the cap is what makes the whole read
+  wasteful today.

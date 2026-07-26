@@ -174,7 +174,8 @@ class BackupSerializer @Inject constructor() {
                 backup.settings.showAlarm != null,
             hasQualityOfLife = backup.settings.autoShowKeyboard != null ||
                 backup.settings.autoLaunchApp != null ||
-                backup.settings.sortOrder != null,
+                backup.settings.sortOrder != null ||
+                backup.settings.doubleTapClipboardEnabled != null,
             hasPowerUserSettings = backup.settings.rotationLocked != null,
         )
     }
@@ -342,6 +343,7 @@ class BackupSerializer @Inject constructor() {
             showAlarm = settings.getStrictBool("showAlarm", "show_alarm") ?: base.showAlarm,
             autoShowKeyboard = settings.getStrictBool("autoShowKeyboard", "auto_show_keyboard") ?: base.autoShowKeyboard,
             autoLaunchApp = settings.getStrictBool("autoLaunchApp", "auto_launch_app") ?: base.autoLaunchApp,
+            doubleTapClipboardEnabled = settings.getStrictBool("doubleTapClipboardEnabled", "double_tap_clipboard_enabled") ?: base.doubleTapClipboardEnabled,
             rotationLocked = settings.getStrictBool("rotationLocked", "rotation_locked") ?: base.rotationLocked,
         )
     }
@@ -392,7 +394,8 @@ class BackupSerializer @Inject constructor() {
 
             val boolFields = listOf(
                 "is_font_bold", "text_shadow_enabled", "show_calendar_event", "show_alarm",
-                "auto_show_keyboard", "auto_launch_app", "rotation_locked",
+                "auto_show_keyboard", "auto_launch_app", "double_tap_clipboard_enabled",
+                "rotation_locked",
             )
             for (field in boolFields) {
                 if (settings.has(field) && !settings.isNull(field)) {

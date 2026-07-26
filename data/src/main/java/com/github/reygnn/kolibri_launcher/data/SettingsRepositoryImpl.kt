@@ -35,6 +35,8 @@ class SettingsRepositoryImpl @Inject constructor(
     private object PreferenceKeys {
         // String Keys
         val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
+        val DOUBLE_TAP_CLIPBOARD =
+            booleanPreferencesKey(AppConstants.PrefKeys.DOUBLE_TAP_CLIPBOARD)
         val FAVORITES_ALIGNMENT = stringPreferencesKey(AppConstants.PrefKeys.FAVORITES_ALIGNMENT)
         val APP_DRAWER_MODE = stringPreferencesKey(AppConstants.PrefKeys.APP_DRAWER_MODE)
 
@@ -134,6 +136,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setSortOrder(sortOrder: SortOrder) =
         putValue(PreferenceKeys.SORT_ORDER_KEY, sortOrder.name)
 
+    override val doubleTapClipboardEnabledFlow: Flow<Boolean> =
+        valueFlow(PreferenceKeys.DOUBLE_TAP_CLIPBOARD, AppConstants.DEFAULT_DOUBLE_TAP_CLIPBOARD)
+
+    override suspend fun setDoubleTapClipboard(isEnabled: Boolean) =
+        putValue(PreferenceKeys.DOUBLE_TAP_CLIPBOARD, isEnabled)
+
     override val onboardingCompletedFlow: Flow<Boolean> =
         valueFlow(PreferenceKeys.ONBOARDING_COMPLETED, false)
 
@@ -232,6 +240,7 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun purgeRepository() {
         safeEdit { preferences ->
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+            preferences.remove(PreferenceKeys.DOUBLE_TAP_CLIPBOARD)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)
             preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
