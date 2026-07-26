@@ -294,6 +294,12 @@ Public-API-Stubs — **nicht** diese Single/Multi-Duplikation.)
 
 ## #8 — Wallpaper-Surface-Farbauflösung in 3 Dialog-Fragmenten kopiert · 🟡
 
+> **✅ RESOLUTION 2026-07-26:** Gefaltet zu `LuminanceClassification.toSurface(context)`
+> in `ui/util/WallpaperSurface.kt`. Long-Press-Menu, Color- und Layout-Dialog
+> teilen jetzt eine Surface-Definition; Layout leitet die Inverse über die
+> geflippte Classification aus derselben Quelle ab.
+
+
 `AppContextMenuDialogFragment.kt:434-443` (+ observe 216-235),
 `ColorCustomizationDialogFragment.kt:102-127`,
 `LayoutCustomizationDialogFragment.kt:307-337` re-implementieren jeweils
@@ -317,6 +323,19 @@ Skip-Prädikat (`id ==` vs `is MaterialButtonToggleGroup`). →
 
 ## #10 — Rename-Dialog-Builder (2×) · 🟢
 
+> **⏭️ NICHT VERFOLGT (Entscheidung 2026-07-26):** Beim genauen Lesen
+> divergieren die beiden Dialoge deutlich stärker als „gleiche Konstruktion":
+> Titel-String **und** -Argument (`originalName` vs `displayName`),
+> EditText-Config (`setSelection`+`inputType` vs nur `setHint`),
+> Positive-Label (`save` vs `rename`), Result-Routing (ViewModel via
+> `handleRename` vs Inline-Coroutine auf `customNamesRepository`), Post-Show
+> (Tastatur-Fokus vs Wallpaper-Tint+StatusBar-Mirror) und Negative-Button.
+> Die *Entscheidung* (`RenameDecision`) ist bereits geteilt; was übrig bleibt,
+> ist eine 6-Zeilen-Builder-Kette, deren treue Faltung ~6 Parameter bräuchte
+> und trotzdem jedem Caller EditText-Setup, Post-Show und Routing lässt —
+> ~10 LOC Netto bei leaky Abstraktion. Analog zu #12 Teil B belassen.
+
+
 `CustomNamesActivity.kt:202-262` und
 `AppContextMenuDialogFragment.kt:343-432`: beide bauen denselben
 `EditText`-seeded `MaterialAlertDialogBuilder` mit Routing über
@@ -339,6 +358,16 @@ Extension `Fragment.showToastSafe(msg, duration)` in `ui/util`.
 ---
 
 ## #12 — Bottom-Sheet-Dialog-Window-Setup (2×) · 🟢
+
+> **✅ RESOLUTION 2026-07-26 (Teil A):** Window-Setup gefaltet zu
+> `DialogFragment.configureBottomSheetWindow(widthFraction, yOffset)` in
+> `ui/util/BottomSheetWindow.kt`. Die Werte (0.90/200 bzw. 0.95/150) bleiben
+> als Argumente pro Dialog — an die Content-Höhe getunt, nicht zufällig.
+> **Teil B (Drag-Listener) bewusst NICHT gefaltet:** die zwei Listener
+> differieren in Achse (2- vs 1-achsig), Y-Vorzeichen (`+` vs `-`, also
+> entgegengesetzte Drag-Semantik) und Haptik/Alpha-Feedback — eine
+> Angleichung wäre eine UX-/Verhaltensentscheidung, kein reines Extrahieren.
+
 
 `ColorCustomizationDialogFragment` (`onStart:62-77` + `setupDragListener:148-178`)
 und `LayoutCustomizationDialogFragment` (`configureDialogWindow:120-134` +
