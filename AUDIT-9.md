@@ -381,6 +381,35 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 
 ---
 
+## Nachträglich beim #4-Fix gefunden (nicht Teil der 13, offen)
+
+### #N1 — `deleteFile` / `clearAll` machen synchrone Disk-IO auf dem Main-Thread · `WallpaperFileManager.kt:148/168`
+
+> **🔎 Beobachtung (2026-07-27, beim #4-Fix aufgetaucht — offen, niedrig).**
+> Beim adversarialen Review von #4 aufgefallen, aber **nicht durch #4
+> verursacht** (bestand vorher schon) und **nicht** vom #4-Finder gemeldet.
+> `WallpaperFileManager.deleteFile()` und `clearAll()` sind weder `suspend`
+> noch `withContext`-gewrappt; sie führen `File.delete()` / `File.exists()` /
+> `dir.listFiles()` synchron aus. Aufgerufen werden sie aus mehreren
+> `launchSafe`-Blöcken, die auf `mainDispatcher` starten: `persist` (nach dem
+> DataStore-Suspend zurück auf Main), `onCommitWallpaperEditMode`,
+> `onCancelWallpaperEditMode`, der `onAddWallpaperLayer`-Rollback und
+> `onClearWallpaper` → `clearAll`.
+>
+> **Dieselbe StrictMode-Klasse wie #4, aber deutlich geringere Severity:**
+> interner App-Speicher (lokales Dateisystem, µs–low-ms), **kein** Binder-IPC
+> in einen kalten Fremd-Provider. StrictMode-`DiskWriteViolation` in DEBUG
+> möglich, echtes ANR-Risiko praktisch nicht. `clearAll()` ist auf dem
+> Reset-Pfad bereits IO-gewrappt (#7-Fix), auf dem `onClearWallpaper`-Pfad
+> nicht.
+>
+> **Möglicher Fix (eigene Branch, wenn priorisiert):** `deleteFile`/`clearAll`
+> `suspend` + `withContext(ioDispatcher)`, oder die aufrufenden
+> `persist`/Commit/Cancel-Epiloge auf den IO-Dispatcher wechseln. Bewusst
+> **nicht** in die #4-Branch gezogen, um #4 isoliert revertierbar zu halten.
+
+---
+
 ## Methodik & Grenzen
 
 - **10 Finder-Agenten** parallel, je ein abgegrenzter Bereich; zwei davon
