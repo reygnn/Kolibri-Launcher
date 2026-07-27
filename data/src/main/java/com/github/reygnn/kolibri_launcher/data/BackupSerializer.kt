@@ -352,6 +352,25 @@ class BackupSerializer @Inject constructor() {
     // TYPE VALIDATION (rejects malformed-but-syntactic JSON)
     // ===========================================
 
+    /**
+     * Up-front structural gate over the raw JSON. The scalar int/float/bool
+     * lists below use **snake_case keys only** — by design, not by oversight.
+     *
+     * The app writes **camelCase** (kotlinx property names; `@JsonNames` are
+     * read-only aliases for legacy snake_case backups), so this validator does
+     * not reject a camelCase `Infinity` here. It does not need to: (1) the app
+     * can never *write* a non-finite value — `encodeToJsonString` throws
+     * (`allowSpecialFloatingPointValues = false`); and (2) a hand-crafted
+     * non-finite literal is rejected one layer down — decode throws and the
+     * strict fallback fails, so [parseBackupData] returns `null` and the whole
+     * import is refused. Finite-but-out-of-range values are clamped later by
+     * `coerceInSafe` at `BackupDataAssembler.kt:295`.
+     *
+     * This snake_case-only shape has been reported as a bug three times
+     * (AUDIT-3 #3, AUDIT-8 §#1, AUDIT-9 #1) and refuted each time. The full
+     * rationale + guarantee chain is pinned by
+     * `BackupSerializerNamingAndInfinityTest` — read that before "fixing" it.
+     */
     private fun validateJsonTypes(jsonString: String): Boolean {
         return try {
             val root = JSONObject(jsonString)

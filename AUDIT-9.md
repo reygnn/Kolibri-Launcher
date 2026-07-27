@@ -41,7 +41,7 @@ und ebenfalls unverifiziert.
 
 | # | Schweregrad | Bereich | Datei:Zeile | Kurzfassung |
 |---|---|---|---|---|
-| 1 | 🟠 medium | Backup | `BackupSerializer.kt:~365/376` | Typ-/Infinity-Validierung prüft nur snake_case-Keys, App schreibt camelCase |
+| 1 | ✅ REFUTED | Backup | `BackupSerializer.kt:~365/376` | Fehlalarm — gepinnt durch `BackupSerializerNamingAndInfinityTest` (Details bei #1 unten) |
 | 2 | 🟠 medium | Backup | `BackupDataAssembler.kt:226` | Import-Phase 2 liest Favoriten über laggenden WhileSubscribed-Cache |
 | 3 | 🟠 medium | Backup | `BackupRepositoryImpl.kt:250` | Nicht-atomares Überschreiben zerstört Backup bei Schreib-Fehler |
 | 4 | 🟠 medium | Nebenläufigkeit | `WallpaperDelegate.kt:421-437` | `ContentResolver.query()` synchron auf Main-Thread |
@@ -66,6 +66,27 @@ mit korrektem Timeout, kein `GlobalScope`/`runBlocking` im UI-Pfad.
 ## 🟠 Medium
 
 ### #1 — Backup-Typ-Validierung greift am Key-Format vorbei · `BackupSerializer.kt:~365/376`
+
+> **✅ RESOLUTION (2026-07-27): REFUTED — Fehlalarm, jetzt endgültig gepinnt.**
+> Verifiziert am Code + durch einen dedizierten Pinning-Test bestätigt. Die
+> *Beobachtung* stimmt (`validateJsonTypes` listet nur snake_case-Skalar-Keys,
+> App schreibt camelCase), ist aber **kein Bug**. Empirisch belegte Mechanik:
+> 1. App kann **nie** ein non-finites Float schreiben — `encodeToJsonString`
+>    wirft (`allowSpecialFloatingPointValues = false`).
+> 2. Ein handgebautes non-finites Literal (`1e309`) lässt `parseBackupData`
+>    das **gesamte** Backup ablehnen (`null` → Import-`Error`) — nicht die
+>    up-front-Validierung, sondern der Decode-Schritt ist das Gate. Infinity
+>    erreicht das Modell nie. *(Korrektur der früheren Annahme „getStrictFloat
+>    coerct das" — der Strict-Pfad läuft hier gar nicht, die ganze Parse
+>    schlägt fehl.)*
+> 3. Finite-aber-out-of-range-Werte (`9999.0`) laufen durch den Serializer und
+>    werden am Import-Rand von `coerceInSafe` (`BackupDataAssembler.kt:295`)
+>    geclampt.
+>
+> **Schleife abgestellt:** dokumentiert in der KDoc von
+> `BackupSerializer.validateJsonTypes` und gepinnt durch
+> `BackupSerializerNamingAndInfinityTest` (9 `@Test`, SSOT). Künftige Audits,
+> die diesen Pfad erneut melden: dort ist der Beweis.
 
 **Kategorie:** correctness / Datenverlust
 **Behauptung:** Die Typ-/Infinity-Validierung prüft nur `snake_case`-Keys für
