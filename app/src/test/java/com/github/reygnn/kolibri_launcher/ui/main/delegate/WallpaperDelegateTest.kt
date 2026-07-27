@@ -136,6 +136,24 @@ class WallpaperDelegateTest {
         scope = scope
     )
 
+    /**
+     * A [CoroutineDispatcher] that forwards to [backing] (a test dispatcher on
+     * the runTest scheduler) but counts how many blocks were dispatched through
+     * it. Used to prove that blocking disk I/O hops off the main dispatcher onto
+     * the injected io dispatcher (AUDIT-9 #4 / #N1): if a call is `withContext
+     * (ioDispatcher) { ... }`-wrapped, [count] increases; if it runs inline on
+     * main, it does not.
+     */
+    private class CountingDispatcher(private val backing: CoroutineDispatcher) : CoroutineDispatcher() {
+        var count = 0
+            private set
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            count++
+            backing.dispatch(context, block)
+        }
+    }
+
     // ===========================================
     // INITIAL STATE
     // ===========================================
@@ -254,22 +272,15 @@ class WallpaperDelegateTest {
         }
         every { contentResolver.query(any(), any(), any(), any(), any()) } returns cursor
 
-        var ioDispatches = 0
-        val backingIoDispatcher = StandardTestDispatcher(testScheduler)
-        val trackingIoDispatcher = object : CoroutineDispatcher() {
-            override fun dispatch(context: CoroutineContext, block: Runnable) {
-                ioDispatches++
-                backingIoDispatcher.dispatch(context, block)
-            }
-        }
-        val delegate = createDelegate(ioDispatcher = trackingIoDispatcher)
+        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
+        val delegate = createDelegate(ioDispatcher = io)
 
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
         assertTrue(
             "getDisplayName must dispatch its ContentResolver.query onto the io dispatcher",
-            ioDispatches > 0
+            io.count > 0
         )
         verify { contentResolver.query(any(), any(), any(), any(), any()) }
         assertTrue(sentEvents.filterIsInstance<UiEvent.ShowToastFromString>().isNotEmpty())
@@ -376,6 +387,25 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+    }
+
+    /**
+     * AUDIT-9 #N1 regression guard: `clearAll` does blocking file deletion and
+     * must run OFF the main dispatcher (the launchSafe block starts on it).
+     */
+    @Test
+    fun `onClearWallpaper deletes files off the main dispatcher`() = runTest {
+        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
+        val delegate = createDelegate(ioDispatcher = io)
+
+        delegate.onClearWallpaper()
+        advanceUntilIdle()
+
+        coVerify { wallpaperFileManager.clearAll() }
+        assertTrue(
+            "clearAll must run on the injected io dispatcher, not the main thread",
+            io.count > 0
+        )
     }
 
     // ===========================================
@@ -881,6 +911,47 @@ class WallpaperDelegateTest {
         verify { wallpaperFileManager.deleteFile(layerUri) }
     }
 
+    /**
+     * AUDIT-9 #N1 regression guard: `deleteFile` does blocking disk I/O and must
+     * run OFF the main dispatcher. We baseline the dispatch count after `start()`
+     * (which also hops `gcOrphans` onto the io dispatcher) and assert the remove
+     * pushes at least one more dispatch through it.
+     */
+    @Test
+    fun `onRemoveWallpaperLayer outside edit mode deletes file off the main dispatcher`() = runTest {
+        val layerUri = "file:///layer.jpg"
+        val layer: WallpaperLayerState = mockk {
+            every { imageUri } returns layerUri
+        }
+        val newState: WallpaperState = mockk {
+            every { layers } returns listOf(mockk())
+            every { hasWallpaper } returns true
+        }
+        val currentState: WallpaperState = mockk {
+            every { getLayer(0) } returns layer
+            every { withRemovedLayer(0) } returns newState
+        }
+
+        val stateFlow = MutableStateFlow(currentState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, ioDispatcher = io)
+        delegate.start()
+        advanceUntilIdle()
+        val countAfterStart = io.count
+
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        verify { wallpaperFileManager.deleteFile(layerUri) }
+        assertTrue(
+            "deleteFile must run on the injected io dispatcher, not the main thread",
+            io.count > countAfterStart
+        )
+    }
+
     @Test
     fun `onCommitWallpaperEditMode deletes deferred-remove files`() = runTest {
         val layerUri = "file:///layer.jpg"
@@ -1173,6 +1244,29 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         verify(exactly = 1) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
+    }
+
+    /**
+     * AUDIT-9 #N1 regression guard: `gcOrphans` does blocking disk I/O
+     * (listFiles + delete) and must run OFF the main dispatcher — the observe
+     * collect that triggers it runs on the main dispatcher.
+     */
+    @Test
+    fun `start runs gcOrphans off the main dispatcher`() = runTest {
+        val stateFlow = MutableStateFlow<WallpaperState>(WallpaperState.NONE)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, ioDispatcher = io)
+        delegate.start()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
+        assertTrue(
+            "gcOrphans must run on the injected io dispatcher, not the main thread",
+            io.count > 0
+        )
     }
 
     @Test

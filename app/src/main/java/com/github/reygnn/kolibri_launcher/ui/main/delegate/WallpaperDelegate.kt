@@ -140,6 +140,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -337,7 +338,13 @@ class WallpaperDelegate(
                 if (!gcHasRun && !_isWallpaperEditMode.value) {
                     gcHasRun = true
                     try {
-                        wallpaperFileManager.gcOrphans(state.referencedUris)
+                        // gcOrphans does blocking disk I/O (listFiles + delete);
+                        // hop off the main dispatcher (this collect runs on it).
+                        withContext(ioDispatcher) {
+                            wallpaperFileManager.gcOrphans(state.referencedUris)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Wallpaper orphan GC failed")
                     }
@@ -403,8 +410,13 @@ class WallpaperDelegate(
     /** Persist epilogue — runs AFTER the atomic [applyState] write. */
     private suspend fun persist(m: Mutation) {
         saveWallpaperStateUseCase(m.newState)
-        // deleteFile is internally guarded (never throws), so no wrapper here.
-        m.deleteNow.forEach { wallpaperFileManager.deleteFile(it) }
+        // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
+        // internally guarded (never throws), so no per-file try/catch is needed.
+        if (m.deleteNow.isNotEmpty()) {
+            withContext(ioDispatcher) {
+                m.deleteNow.forEach { wallpaperFileManager.deleteFile(it) }
+            }
+        }
     }
 
     /**
@@ -459,7 +471,8 @@ class WallpaperDelegate(
         errorMessage = "Error clearing wallpaper",
         defaultErrorToast = R.string.error_generic
     ) {
-        wallpaperFileManager.clearAll()
+        // clearAll does blocking disk I/O — hop off the main dispatcher.
+        withContext(ioDispatcher) { wallpaperFileManager.clearAll() }
         clearWallpaperUseCase()
         scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
     }
@@ -502,9 +515,12 @@ class WallpaperDelegate(
         if (filesToDelete.isEmpty()) return
 
         scope.launchSafe("Error committing wallpaper edit") {
-            // deleteFile is internally guarded (never throws), so a bad delete
-            // can't abort the batch — no per-file wrapper needed (Rule 11).
-            filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+            // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
+            // internally guarded (never throws), so a bad delete can't abort the
+            // batch and no per-file wrapper is needed (Rule 11).
+            withContext(ioDispatcher) {
+                filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+            }
         }
     }
 
@@ -540,8 +556,13 @@ class WallpaperDelegate(
             if (snapshot != null) {
                 saveWallpaperStateUseCase(snapshot)
             }
-            // deleteFile is internally guarded (never throws) — no wrapper (Rule 11).
-            filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+            // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
+            // internally guarded (never throws) — no per-file wrapper (Rule 11).
+            if (filesToDelete.isNotEmpty()) {
+                withContext(ioDispatcher) {
+                    filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+                }
+            }
         }
     }
 
@@ -587,7 +608,13 @@ class WallpaperDelegate(
             // state and race the snapshot save. Discard the add and clean up its
             // orphaned file instead.
             if (editRollbackGeneration != rollbackGenAtStart) {
-                wallpaperFileManager.deleteFile(internalUriString)
+                // Rollback branch: discard the add and clean up its orphan file.
+                // Suspending here is safe — this branch returns without touching
+                // _wallpaperState, so it never enters the atomic section below.
+                // deleteFile is blocking disk I/O → hop off the main dispatcher.
+                withContext(ioDispatcher) {
+                    wallpaperFileManager.deleteFile(internalUriString)
+                }
                 return@launchSafe
             }
 

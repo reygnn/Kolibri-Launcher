@@ -383,30 +383,42 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 
 ## Nachträglich beim #4-Fix gefunden (nicht Teil der 13, offen)
 
-### #N1 — `deleteFile` / `clearAll` machen synchrone Disk-IO auf dem Main-Thread · `WallpaperFileManager.kt:148/168`
+### #N1 — `deleteFile` / `clearAll` / `gcOrphans` machten synchrone Disk-IO auf dem Main-Thread · `WallpaperFileManager.kt:148/168/284`
 
-> **🔎 Beobachtung (2026-07-27, beim #4-Fix aufgetaucht — offen, niedrig).**
-> Beim adversarialen Review von #4 aufgefallen, aber **nicht durch #4
-> verursacht** (bestand vorher schon) und **nicht** vom #4-Finder gemeldet.
-> `WallpaperFileManager.deleteFile()` und `clearAll()` sind weder `suspend`
-> noch `withContext`-gewrappt; sie führen `File.delete()` / `File.exists()` /
-> `dir.listFiles()` synchron aus. Aufgerufen werden sie aus mehreren
+> **✅ RESOLUTION (2026-07-27): CONFIRMED → behoben.** Beim adversarialen
+> Review von #4 aufgefallen, **nicht durch #4 verursacht** (bestand vorher
+> schon) und **nicht** vom #4-Finder gemeldet.
+> `WallpaperFileManager`s disk-mutierende Methoden (`deleteFile()`,
+> `clearAll()`, `gcOrphans()`) sind weder `suspend`
+> noch `withContext`-gewrappt; sie führen `File.delete()` /
+> `dir.listFiles()` synchron aus. Aufgerufen wurden sie aus mehreren
 > `launchSafe`-Blöcken, die auf `mainDispatcher` starten: `persist` (nach dem
 > DataStore-Suspend zurück auf Main), `onCommitWallpaperEditMode`,
-> `onCancelWallpaperEditMode`, der `onAddWallpaperLayer`-Rollback und
-> `onClearWallpaper` → `clearAll`.
+> `onCancelWallpaperEditMode`, der `onAddWallpaperLayer`-Rollback,
+> `onClearWallpaper` → `clearAll` und der `start()`-Observe-Collect →
+> `gcOrphans`.
 >
-> **Dieselbe StrictMode-Klasse wie #4, aber deutlich geringere Severity:**
+> **Severity:** dieselbe StrictMode-Klasse wie #4, aber deutlich geringer —
 > interner App-Speicher (lokales Dateisystem, µs–low-ms), **kein** Binder-IPC
 > in einen kalten Fremd-Provider. StrictMode-`DiskWriteViolation` in DEBUG
-> möglich, echtes ANR-Risiko praktisch nicht. `clearAll()` ist auf dem
-> Reset-Pfad bereits IO-gewrappt (#7-Fix), auf dem `onClearWallpaper`-Pfad
-> nicht.
+> möglich, echtes ANR-Risiko praktisch nicht.
 >
-> **Möglicher Fix (eigene Branch, wenn priorisiert):** `deleteFile`/`clearAll`
-> `suspend` + `withContext(ioDispatcher)`, oder die aufrufenden
-> `persist`/Commit/Cancel-Epiloge auf den IO-Dispatcher wechseln. Bewusst
-> **nicht** in die #4-Branch gezogen, um #4 isoliert revertierbar zu halten.
+> **Fix:** Die sechs Main-Thread-Aufrufstellen im `WallpaperDelegate` sind
+> jetzt in `withContext(ioDispatcher)` gewrappt (derselbe injizierte
+> Dispatcher wie beim #4-Fix) — konsistent mit der bereits bestehenden
+> Konvention in `WallpaperRepositoryImpl.purgeRepository` (die `clearAll()`
+> schon am Call-Site IO-wrappte, #7-Fix). Bewusst **nicht** die
+> `WallpaperFileManager`-Signaturen auf `suspend` umgestellt, um den
+> Robolectric-Testsatz der Klasse (~12 synchrone `gcOrphans`/`deleteFile`-
+> Tests) nicht anfassen zu müssen. `gcOrphans` behält korrekte
+> Cancellation-Propagation (`catch(CancellationException){ throw e }`).
+> Gepinnt durch drei `WallpaperDelegateTest`-Guards (`onClearWallpaper …`,
+> `onRemoveWallpaperLayer … off the main dispatcher`, `start runs gcOrphans
+> off the main dispatcher`), die die Dispatches auf den injizierten
+> IO-Dispatcher zählen.
+>
+> _Hinweis:_ Der reine Read-Pfad `fileExists()` (im Observe/Parse-Flow) wurde
+> **nicht** angefasst — kein Teil von #N1, anderer Dispatcher-Kontext.
 
 ---
 
