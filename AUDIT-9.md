@@ -17,10 +17,12 @@
 wurde nachgeholt — jeder Fund wurde am aktuellen Code (Commit `626e4d63` ff.)
 gegengeprüft. Das **VERDIKT** (`CONFIRMED` / `PARTIAL` / `REFUTED`) steht jetzt
 in der Übersichtstabelle und als Notiz-Block direkt beim jeweiligen Fund.
-**Erledigt** sind bislang **#1** (REFUTED, gepinnt), **#7** (behoben) und
-**#4** (behoben — Main-Thread-Query → `withContext(ioDispatcher)`); alle
-anderen tragen ihr Verdikt, sind aber **noch offen** — die Verdikte sind
-kein „done"-Haken. Klar actionable und offen bleibt vor allem **#2**.
+**Erledigt** sind bislang **#1** (REFUTED, gepinnt), **#7** (behoben),
+**#4** (behoben — Main-Thread-Query → `withContext(ioDispatcher)`) und
+**#2** (behoben — Import-Order gegen die von Phase 1 geschriebene Menge statt
+gegen den laggenden Hot-Flow-Cache); alle anderen tragen ihr Verdikt, sind
+aber **noch offen** — die Verdikte sind kein „done"-Haken. Die verbleibenden
+CONFIRMED sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11, #12).
 
 > _Historischer Hinweis (Ursprungsfassung):_ Die Funde waren zunächst
 > **Behauptungen der Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung** —
@@ -50,7 +52,7 @@ und ebenfalls unverifiziert.
 | # | Schweregrad | Bereich | Datei:Zeile | Kurzfassung |
 |---|---|---|---|---|
 | 1 | ✅ REFUTED | Backup | `BackupSerializer.kt:~365/376` | Fehlalarm — gepinnt durch `BackupSerializerNamingAndInfinityTest` (Details bei #1 unten) |
-| 2 | 🟠 medium · CONFIRMED | Backup | `BackupDataAssembler.kt:226` | Import-Phase 2 liest Favoriten über laggenden WhileSubscribed-Cache |
+| 2 | ✅ behoben | Backup | `BackupDataAssembler.kt:226` | Import-Phase 2 las Favoriten über laggenden WhileSubscribed-Cache → Fix: Phase 2 nutzt die von Phase 1 geschriebene Menge (Details bei #2 unten) |
 | 3 | 🟠 medium · PARTIAL | Backup | `BackupRepositoryImpl.kt:250` | Nicht-atomares Überschreiben zerstört Backup bei Schreib-Fehler |
 | 4 | ✅ behoben | Nebenläufigkeit | `WallpaperDelegate.kt:421-437` | `ContentResolver.query()` lief synchron auf Main-Thread → Fix: `getDisplayName` in `withContext(ioDispatcher)` (Details bei #4 unten) |
 | 5 | 🟠 medium · PARTIAL | Nebenläufigkeit | `AppUpdateSignal.kt:17` | `MutableSharedFlow` ohne Buffer → Signal verloren |
@@ -131,17 +133,28 @@ geprüft wird.
 
 ### #2 — Import liest Favoriten über laggenden Hot-Flow-Cache · `BackupDataAssembler.kt:226`
 
-> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED.** Echter
-> latenter Produktionsbug. `favoriteComponentsFlow.first()` liest in Prod aus
-> einem `WhileSubscribed(replay=1)`-Cache, dessen Replay-Wert nach dem letzten
-> Subscriber ewig gehalten wird. Während des Imports ist Home nicht
-> subscribed, Phase-1-`edit()` aktualisiert den eingefrorenen Cache nicht →
-> `.first()` liefert den Stand vor dem Schreiben. Worst Case Restore auf
-> frischer Installation: Cache = `emptySet` → `saveOrder(emptyList())`
-> verwirft die komplette importierte Reihenfolge still. Tests greifen nicht
-> (Fake + `externalScope=null`-Impl liefern immer frische Cold-Flows). Der
-> Autor hat genau diese Falle für InstalledApps bei `:179-190` bereits
-> abgefangen — beim Favoriten-Re-Read fehlt der Guard.
+> **✅ RESOLUTION (2026-07-27): CONFIRMED → behoben.** Jedes Glied der Kette
+> am Code bestätigt: `favoriteComponentsFlow` ist in Prod ein
+> `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS=5000, replay=1)`-Hot-Share
+> (`FavoritesRepositoryImpl:122` → `DataStoreReadFlow.shareInOrRaw(replay=1)`);
+> einarmiges `WhileSubscribed` ⇒ `replayExpiration=MAX` ⇒ Replay-Wert wird nach
+> dem letzten Subscriber unbegrenzt gehalten. Phase-1-`saveFavoriteComponents`
+> (`edit()`) aktualisiert diesen eingefrorenen Cache nicht, solange kein
+> Collector aktiv ist (Import läuft aus der Settings/Backup-Activity, Home-
+> Fragment gestoppt) → `.first()` liefert den Stale-Replay-Wert. `saveOrder`
+> überschreibt bedingungslos → Worst Case frische Installation: Cache=`emptySet`
+> → `saveOrder(emptyList())` verwirft die importierte Reihenfolge still. Der
+> Autor hatte genau diese Falle für InstalledApps bei `:179-190` bereits
+> abgefangen — beim Favoriten-Re-Read fehlte der Guard.
+>
+> **Fix:** Phase 1 hält die geschriebene Menge in `importedFavorites`; Phase 2
+> filtert die Order gegen diese authoritative Menge statt gegen den Hot-Flow.
+> Nur wenn Favoriten *nicht* mitimportiert werden (kein Write in diesem Import,
+> Cache kann nicht laggen), liest Phase 2 noch aus dem Flow. Gepinnt durch
+> `BackupDataAssemblerImportOrderStaleCacheTest` (laggende Flow-Stub, die auf
+> dem Pre-Import-Wert bleibt; schlägt fehl, sobald Phase 2 dem Flow wieder
+> vertraut). Der bestehende `externalScope=null`-Testpfad konnte den Lag nie
+> reproduzieren (Cold-Flow, immer frisch).
 
 **Kategorie:** concurrency / Datenverlust
 **Behauptung:** Import-Phase 2 re-liest die Favoriten über einen
@@ -434,8 +447,10 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 - Zeilennummern beziehen sich auf Commit `626e4d63`.
 
 **Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #10, #11, #12 · PARTIAL #3,
-#5, #6, #9, #13 · REFUTED #1 · behoben #1, #4, #7. Offen & klar actionable
-bleibt **#2** (Stale-Cache verwirft Import-Reihenfolge); **#4**
-(Main-Thread-Query → `withContext(ioDispatcher)`) ist seit 2026-07-27 behoben.
-Die restlichen CONFIRMED sind Kosmetik/Nits oder Doc-Fixes (#8, #11), die
-PARTIALs überwiegend kein umzusetzender Defekt.
+#5, #6, #9, #13 · REFUTED #1 · behoben #1, #2, #4, #7. Das zuvor einzige
+offen & klar actionable **#2** (Stale-Cache verwirft Import-Reihenfolge) ist
+seit 2026-07-27 behoben (Phase 2 nutzt die von Phase 1 geschriebene Menge,
+gepinnt durch `BackupDataAssemblerImportOrderStaleCacheTest`); ebenso **#4**
+(Main-Thread-Query → `withContext(ioDispatcher)`). Die restlichen CONFIRMED
+sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11, #12), die PARTIALs überwiegend
+kein umzusetzender Defekt.

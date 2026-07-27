@@ -199,6 +199,18 @@ class BackupDataAssembler @Inject constructor(
         val missingApps = mutableSetOf<String>()
 
         // ===== PHASE 1: Import Favorites =====
+        // Holds the exact favorites set Phase 1 writes, so Phase 2 can filter
+        // the order against it WITHOUT re-reading favoriteComponentsFlow. In
+        // production that flow is a WhileSubscribed(replay = 1) hot share
+        // (FavoritesRepositoryImpl): while no UI collector is subscribed — and
+        // during an import from the Settings/Backup screen the Home fragment is
+        // stopped, so after FLOW_SHARING_TIMEOUT_MS nobody is — the retained
+        // replay value lags this Phase-1 edit(). A bare .first() would then see
+        // the pre-import favorites and Phase 2 would drop the freshly imported
+        // order (worst case: empty replay on a fresh restore → saveOrder(empty),
+        // silently discarding the whole imported order). AUDIT-9 #2 — same trap
+        // the InstalledApps prime above guards against.
+        var importedFavorites: Set<String>? = null
         if (options.importFavorites) {
             val validFavorites = backup.settings.favoriteComponents
                 .filterTo(HashSet()) { it in installedComponentsSet }
@@ -217,14 +229,20 @@ class BackupDataAssembler @Inject constructor(
             }
 
             favoritesRepository.saveFavoriteComponents(validFavorites.toList())
+            importedFavorites = validFavorites
             importedCount += validFavorites.size
             Timber.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
         }
 
         // ===== PHASE 2: Import Order =====
         if (options.importOrder) {
-            val currentFavorites = favoritesRepository.favoriteComponentsFlow.first()
-            val currentFavoritesSet = currentFavorites.toHashSet()
+            // Prefer the set Phase 1 just wrote (authoritative, no cache lag).
+            // Only when favorites weren't imported this run do we read the
+            // current favorites from the flow — that path performs no favorites
+            // write, so the replay cache cannot lag an in-import edit()
+            // (favorites otherwise only mutate from the subscribed Home path).
+            val currentFavoritesSet = importedFavorites
+                ?: favoritesRepository.favoriteComponentsFlow.first().toHashSet()
 
             val validOrder = backup.settings.favoritesOrder
                 .filter { it in currentFavoritesSet && it in installedComponentsSet }
