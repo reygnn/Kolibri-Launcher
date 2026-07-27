@@ -15,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -355,6 +356,18 @@ class WallpaperRepositoryImplTest {
         val prefs = dataStore.data.first()
         assertNull(prefs[KEY_WALLPAPER_URI])
         assertNull(prefs[KEY_LAYERS_JSON])
+    }
+
+    @Test
+    fun `purgeRepository also deletes on-disk wallpaper files`() = runTest {
+        // AUDIT-9 #7: a factory reset (which routes through purgeRepository)
+        // must clear the wallpaper image files too, not just the DataStore
+        // keys — otherwise orphaned files linger in filesDir/wallpapers/ until
+        // the next cold-start gcOrphans sweep. Pins the wiring to clearAll().
+        manager.purgeRepository()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { fileManager.clearAll() }
     }
 
     @Test

@@ -47,7 +47,7 @@ und ebenfalls unverifiziert.
 | 4 | 🟠 medium | Nebenläufigkeit | `WallpaperDelegate.kt:421-437` | `ContentResolver.query()` synchron auf Main-Thread |
 | 5 | 🟠 medium | Nebenläufigkeit | `AppUpdateSignal.kt:17` | `MutableSharedFlow` ohne Buffer → Signal verloren |
 | 6 | 🟡 low | Datenverlust | `UsageExportRepositoryImpl.kt:384` | Usage-Export überschreibt Zieldatei nicht-atomar |
-| 7 | 🟡 low | Konsistenz | `ResetRepositoryImpl.kt:79` | Reset löscht Wallpaper-Bilddateien nicht (nur DataStore) |
+| 7 | ✅ behoben | Konsistenz | `ResetRepositoryImpl.kt:79` | Reset löschte Wallpaper-Bilddateien nicht → Fix: `purgeRepository()` ruft jetzt `clearAll()` (Details bei #7 unten) |
 | 8 | 🟡 low | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor |
 | 9 | 🟡 low | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
 | 10 | 🟡 low | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Verschluckt Throws ohne Nutzer-Feedback |
@@ -190,6 +190,17 @@ erneuter Subscription → begrenzter Realimpact.
 (Export ist reproduzierbar).
 
 ### #7 — Reset löscht Wallpaper-Bilddateien nicht · `ResetRepositoryImpl.kt:79`
+
+> **✅ RESOLUTION (2026-07-27): CONFIRMED → behoben.** Es war ein echter
+> Code/Kommentar-Widerspruch: `WallpaperFileManager.clearAll()`'s KDoc nannte
+> Factory Reset als Aufrufer, aber der Reset-Pfad
+> (`ResetRepositoryImpl.purgeAll` → `WallpaperRepositoryImpl.purgeRepository`)
+> leerte nur den DataStore. `gcOrphans` räumt verwaiste Dateien nur beim
+> nächsten Kaltstart und mit 60-s-Cutoff — kein promptes Aufräumen. **Fix:**
+> `purgeRepository()` löscht jetzt zusätzlich die Bilddateien via
+> `clearAll()` (IO-gewrappt); der Code passt damit zum bestehenden KDoc.
+> Gepinnt durch `WallpaperRepositoryImplTest` → `purgeRepository also deletes
+> on-disk wallpaper files`.
 
 **Kategorie:** Konsistenz
 **Behauptung:** Der Daten-Reset leert nur den DataStore, lässt aber die

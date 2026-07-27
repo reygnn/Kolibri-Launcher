@@ -12,6 +12,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -290,6 +292,15 @@ class WallpaperRepositoryImpl @Inject constructor(
     override suspend fun purgeRepository() {
         dataStore.safePurge("WallpaperRepositoryImpl") { preferences ->
             removeAllKeys(preferences)
+        }
+        // Delete the on-disk wallpaper images as well, not just the DataStore
+        // keys. Otherwise a factory reset leaves orphaned files in
+        // filesDir/wallpapers/ until the next cold-start gcOrphans sweep (a
+        // 60s-cutoff, best-effort net — not a prompt guarantee). This is the
+        // Factory Reset caller clearAll()'s KDoc already documents. IO-wrapped
+        // because clearAll() does blocking file deletion.
+        withContext(Dispatchers.IO) {
+            wallpaperFileManager.clearAll()
         }
     }
 
