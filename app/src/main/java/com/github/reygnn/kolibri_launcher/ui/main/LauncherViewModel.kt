@@ -21,6 +21,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
@@ -137,6 +138,7 @@ class LauncherViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
+    @IoDispatcher ioDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -221,6 +223,7 @@ class LauncherViewModel @Inject constructor(
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
+        ioDispatcher = ioDispatcher,
         scope = delegateScope
     )
 

@@ -289,6 +289,7 @@ class MonolithicLauncherViewModelTest {
             SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
+            ioDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
         )
     }

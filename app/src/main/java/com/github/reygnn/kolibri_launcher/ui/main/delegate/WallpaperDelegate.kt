@@ -140,6 +140,8 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -168,6 +170,7 @@ class WallpaperDelegate(
     private val getFabPositionUseCase: GetFabPositionUseCase,
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val wallpaperFileManager: WallpaperFileManager,
+    private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
 
@@ -721,8 +724,17 @@ class WallpaperDelegate(
     // INTERNAL
     // ===========================================
 
-    private fun getDisplayName(uri: Uri): String? {
-        return try {
+    /**
+     * Resolves a content URI's display name. Runs on [ioDispatcher]
+     * because `ContentResolver.query` on a SAF/cloud `content://` URI is a
+     * binder IPC into a possibly-cold foreign provider — blocking it on the
+     * caller's main dispatcher risks a StrictMode DiskReadViolation and, in
+     * the worst case, a short freeze/ANR on the HOME activity. The caller
+     * ([onSetWallpaperImage]) launches on the main dispatcher, so this hop
+     * must live inside the method, not at the call site.
+     */
+    private suspend fun getDisplayName(uri: Uri): String? = withContext(ioDispatcher) {
+        try {
             context.contentResolver.query(
                 uri,
                 arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),

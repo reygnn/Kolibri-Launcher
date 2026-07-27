@@ -11,15 +11,23 @@
 
 ---
 
-## ⚠️ STATUS: UNVERIFIZIERT — zuerst prüfen, dann handeln
+## STATUS: VERIFIZIERT (2026-07-27) — Verdikte je Fund eingetragen
 
-**Diese Funde sind NICHT durch eine adversariale Verify-Phase gelaufen.**
-Die geplante zweite Stufe (jeder Fund wird von einem eigenen Agenten mit dem
-Auftrag „widerlege das" gegengeprüft) wurde bewusst übersprungen, um das
-Token-Budget zu schonen. Was hier steht, sind **Behauptungen der
-Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung**.
+**Update 2026-07-27:** Die ursprünglich übersprungene adversariale Verify-Phase
+wurde nachgeholt — jeder Fund wurde am aktuellen Code (Commit `626e4d63` ff.)
+gegengeprüft. Das **VERDIKT** (`CONFIRMED` / `PARTIAL` / `REFUTED`) steht jetzt
+in der Übersichtstabelle und als Notiz-Block direkt beim jeweiligen Fund.
+**Erledigt** sind bislang **#1** (REFUTED, gepinnt), **#7** (behoben) und
+**#4** (behoben — Main-Thread-Query → `withContext(ioDispatcher)`); alle
+anderen tragen ihr Verdikt, sind aber **noch offen** — die Verdikte sind
+kein „done"-Haken. Klar actionable und offen bleibt vor allem **#2**.
 
-**Konsequenz — vor jedem Fix gilt:**
+> _Historischer Hinweis (Ursprungsfassung):_ Die Funde waren zunächst
+> **Behauptungen der Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung** —
+> die Verify-Phase war aus Token-Budget-Gründen übersprungen. Das ist mit dem
+> Update oben erledigt.
+
+**Vor jedem Fix weiterhin gilt:**
 
 1. **Jeden einzelnen Fund am aktuellen Code selbst verifizieren.** Existiert
    der Code so? Ist das Fehlerszenario real erreichbar, oder durch Guards /
@@ -42,18 +50,18 @@ und ebenfalls unverifiziert.
 | # | Schweregrad | Bereich | Datei:Zeile | Kurzfassung |
 |---|---|---|---|---|
 | 1 | ✅ REFUTED | Backup | `BackupSerializer.kt:~365/376` | Fehlalarm — gepinnt durch `BackupSerializerNamingAndInfinityTest` (Details bei #1 unten) |
-| 2 | 🟠 medium | Backup | `BackupDataAssembler.kt:226` | Import-Phase 2 liest Favoriten über laggenden WhileSubscribed-Cache |
-| 3 | 🟠 medium | Backup | `BackupRepositoryImpl.kt:250` | Nicht-atomares Überschreiben zerstört Backup bei Schreib-Fehler |
-| 4 | 🟠 medium | Nebenläufigkeit | `WallpaperDelegate.kt:421-437` | `ContentResolver.query()` synchron auf Main-Thread |
-| 5 | 🟠 medium | Nebenläufigkeit | `AppUpdateSignal.kt:17` | `MutableSharedFlow` ohne Buffer → Signal verloren |
-| 6 | 🟡 low | Datenverlust | `UsageExportRepositoryImpl.kt:384` | Usage-Export überschreibt Zieldatei nicht-atomar |
+| 2 | 🟠 medium · CONFIRMED | Backup | `BackupDataAssembler.kt:226` | Import-Phase 2 liest Favoriten über laggenden WhileSubscribed-Cache |
+| 3 | 🟠 medium · PARTIAL | Backup | `BackupRepositoryImpl.kt:250` | Nicht-atomares Überschreiben zerstört Backup bei Schreib-Fehler |
+| 4 | ✅ behoben | Nebenläufigkeit | `WallpaperDelegate.kt:421-437` | `ContentResolver.query()` lief synchron auf Main-Thread → Fix: `getDisplayName` in `withContext(ioDispatcher)` (Details bei #4 unten) |
+| 5 | 🟠 medium · PARTIAL | Nebenläufigkeit | `AppUpdateSignal.kt:17` | `MutableSharedFlow` ohne Buffer → Signal verloren |
+| 6 | 🟡 low · PARTIAL | Datenverlust | `UsageExportRepositoryImpl.kt:384` | Usage-Export überschreibt Zieldatei nicht-atomar |
 | 7 | ✅ behoben | Konsistenz | `ResetRepositoryImpl.kt:79` | Reset löschte Wallpaper-Bilddateien nicht → Fix: `purgeRepository()` ruft jetzt `clearAll()` (Details bei #7 unten) |
-| 8 | 🟡 low | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor |
-| 9 | 🟡 low | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
-| 10 | 🟡 low | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Verschluckt Throws ohne Nutzer-Feedback |
-| 11 | 🟡 low | Nebenläufigkeit | `CrashReportConsent.kt:81/90` | Unstrukturierter `CoroutineScope(IO).launch` pro Klick |
-| 12 | 🟡 low | Korrektheit | `ZoomableImageView.kt:341` | `applyTransform` clampt Skalierung gegen veraltete Bounds |
-| 13 | 🟡 low | UX / Fehlerbehandlung | `AppManagementDelegate.kt:126-137` | Irreführender „Fehler beim Starten"-Toast bei erfolgreichem Launch |
+| 8 | 🟡 low · CONFIRMED | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor |
+| 9 | 🟡 low · PARTIAL | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
+| 10 | 🟡 low · CONFIRMED | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Verschluckt Throws ohne Nutzer-Feedback |
+| 11 | 🟡 low · CONFIRMED | Nebenläufigkeit | `CrashReportConsent.kt:81/90` | Unstrukturierter `CoroutineScope(IO).launch` pro Klick |
+| 12 | 🟡 low · CONFIRMED | Korrektheit | `ZoomableImageView.kt:341` | `applyTransform` clampt Skalierung gegen veraltete Bounds |
+| 13 | 🟡 low · PARTIAL | UX / Fehlerbehandlung | `AppManagementDelegate.kt:126-137` | Irreführender „Fehler beim Starten"-Toast bei erfolgreichem Launch |
 
 **Als sauber bewertet (0 Funde):** Domain-Logik & ColorMath ·
 AppDrawer/Adapter/DiffUtil · Architektur-Regeln (Modul-Grenzen, Rule 9/12,
@@ -123,6 +131,18 @@ geprüft wird.
 
 ### #2 — Import liest Favoriten über laggenden Hot-Flow-Cache · `BackupDataAssembler.kt:226`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED.** Echter
+> latenter Produktionsbug. `favoriteComponentsFlow.first()` liest in Prod aus
+> einem `WhileSubscribed(replay=1)`-Cache, dessen Replay-Wert nach dem letzten
+> Subscriber ewig gehalten wird. Während des Imports ist Home nicht
+> subscribed, Phase-1-`edit()` aktualisiert den eingefrorenen Cache nicht →
+> `.first()` liefert den Stand vor dem Schreiben. Worst Case Restore auf
+> frischer Installation: Cache = `emptySet` → `saveOrder(emptyList())`
+> verwirft die komplette importierte Reihenfolge still. Tests greifen nicht
+> (Fake + `externalScope=null`-Impl liefern immer frische Cold-Flows). Der
+> Autor hat genau diese Falle für InstalledApps bei `:179-190` bereits
+> abgefangen — beim Favoriten-Re-Read fehlt der Guard.
+
 **Kategorie:** concurrency / Datenverlust
 **Behauptung:** Import-Phase 2 re-liest die Favoriten über einen
 `WhileSubscribed`-Hot-Flow, dessen Replay-Cache dem Phase-1-Schreibvorgang
@@ -134,6 +154,16 @@ die gerade geschriebene Favoriten-**Reihenfolge** wird still verworfen.
 
 ### #3 — Nicht-atomares Überschreiben zerstört Backup · `BackupRepositoryImpl.kt:250`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): PARTIAL — kein klarer
+> Defekt.** Beobachtung stimmt (direkter `openOutputStream`-Write, kein
+> temp+rename), aber das Ziel ist ein per `CreateDocument` gewähltes
+> SAF-`content://`-Dokument — atomares temp+rename ist über beliebige
+> DocumentsProvider nicht portabel möglich, direktes Schreiben ist das
+> Standard-SAF-Muster. „Altes Backup zerstört" verlangt zudem, dass der Nutzer
+> bewusst eine bestehende Datei zum Überschreiben wählt UND der Write
+> mittendrin scheitert; Fehler werden als `BackupException` sichtbar (nicht
+> still). Randfall, kein umzusetzender Fix auf dem SAF-Pfad.
+
 **Kategorie:** Datenverlust
 **Behauptung:** Das vorhandene Backup wird nicht atomar (write-temp +
 rename) überschrieben.
@@ -144,6 +174,25 @@ unvollständig → kein gültiges Backup mehr vorhanden.
 ---
 
 ### #4 — `ContentResolver.query()` auf dem Main-Thread · `WallpaperDelegate.kt:421-437` (+ `getDisplayName` :724-736)
+
+> **✅ RESOLUTION (2026-07-27): CONFIRMED → behoben.** Jedes Glied der Kette
+> war bestätigt: `launchSafe` startet auf `mainDispatcher`;
+> `getDisplayName(imageUri)` war die erste Anweisung, noch vor dem einzigen
+> `withContext(IO)` in `copyToInternal`; `getDisplayName` rief
+> `contentResolver.query(...)` synchron ohne eigenen IO-Wechsel. Bei einer
+> SAF-/Cloud-`content://`-URI ist das ein blockierender Binder-IPC auf dem
+> Main-Thread der HOME-Activity → StrictMode/ANR-Risiko. Der `catch(Throwable)`
+> verhinderte nur den Crash, nicht das Blockieren.
+>
+> **Fix:** `getDisplayName` ist jetzt `suspend` und wrappt seinen Body in
+> `withContext(ioDispatcher)`. Der IO-Dispatcher wird per `@IoDispatcher`
+> injiziert (`WallpaperDelegate`-Konstruktor ← `LauncherViewModel` ←
+> `DispatcherModule`), damit Tests ihn deterministisch überschreiben können.
+> Der Multi-Layer-Pfad (`onAddWallpaperLayer`) war nie betroffen — er ruft
+> `getDisplayName` nicht. Gepinnt durch `WallpaperDelegateTest` →
+> `onSetWallpaperImage resolves display name off the main dispatcher` (zählt
+> die Dispatches auf den injizierten IO-Dispatcher; schlägt fehl, sobald der
+> Query wieder inline auf Main läuft).
 
 **Kategorie:** Nebenläufigkeit / StrictMode / ANR-Risiko
 **Behauptung:** `onSetWallpaperImage` läuft über `scope.launchSafe { … }`
@@ -161,6 +210,16 @@ Freeze/ANR. Inkonsistent zum Clipboard-Pfad, der `coerceToText` bewusst auf
 ---
 
 ### #5 — `MutableSharedFlow` ohne Buffer verliert Update-Signal · `AppUpdateSignal.kt:17`
+
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): PARTIAL — Mechanismus
+> real, aber mitigiert.** Der Signalverlust-Pfad existiert (Rendezvous-Flow,
+> `emit` suspendiert bei fehlendem Collector bis zum 3s-Timeout, wird
+> gecancelt). Aber Collector (`listenForAppUpdates()`) und Apps-Flow-Sub sind
+> im selben Scope lifecycle-gekoppelt: das Signal kann nur verloren gehen,
+> während der Collector fehlt — also genau dann, wenn die Apps-Flow
+> unsubscribed ist und ihr `onStart`-Requery beim nächsten Subscribe ohnehin
+> neu lädt. Kein Stale-/Missing-App-Defekt. `extraBufferCapacity = 1` bleibt
+> günstiges Konsistenz-Hardening, kein Muss.
 
 **Kategorie:** MutableSharedFlow ohne Buffer/Subscriber
 **Behauptung:** `MutableSharedFlow<Unit>()` mit `replay = 0` /
@@ -186,6 +245,12 @@ erneuter Subscription → begrenzter Realimpact.
 
 ### #6 — Usage-Export überschreibt Zieldatei nicht-atomar · `UsageExportRepositoryImpl.kt:384`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): PARTIAL — kein
+> actionable Defekt.** Direkter `openOutputStream`-Write auf eine
+> SAF-`content://`-URI, kein temp+rename — dieselbe SAF-Einschränkung wie #3
+> (atomarer Rename nicht portabel möglich), plus der Export ist trivial
+> reproduzierbar. Beobachtung korrekt, keine Maßnahme nötig.
+
 **Kategorie:** Datenverlust — dasselbe Muster wie #3, geringeres Gewicht
 (Export ist reproduzierbar).
 
@@ -208,6 +273,15 @@ Wallpaper-Bilddateien auf der Platte liegen → verwaiste Dateien.
 
 ### #8 — ANR-Watermark rückt trotz fehlgeschlagenem Send vor · `KolibriLauncherApp.kt:461-485` vs. `AnrReporter.kt:57-64`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED.** Alle drei
+> Glieder bestätigt: `markReported` läuft nur, wenn `handler(report)` normal
+> zurückkehrt; der Prod-Handler (`Timber.e` → `AcraTree.reportErrorToAcra`)
+> schluckt jeden `handleSilentException`-Fehler, kann also nie werfen; das
+> Klassen-KDoc verspricht dennoch Retry-bei-Fehler. Ergebnis: Watermark rückt
+> immer vor, die zugesicherte „transient ACRA failure doesn't permanently lose
+> ANRs"-Eigenschaft ist toter Code. **Leichter Fix:** entweder Handler werfen
+> lassen oder das KDoc korrigieren (Retry-Versprechen streichen).
+
 **Kategorie:** contract/implementation mismatch, Telemetrie-Verlust
 **Behauptung:** `AnrReporter.reportPendingAnrs` rückt die persistierte
 Watermark nur nach erfolgreichem `handler(report)` vor, und das KDoc
@@ -221,6 +295,16 @@ KDoc garantierte „retried next launch"-Behandlung greift nie.
 
 ### #9 — `shouldSend` berechnet, nie ausgewertet + Cooldown-Nebeneffekt · `KolibriLauncherApp.kt:363-366`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): PARTIAL — Dead Code
+> real, Schaden widerlegt.** `shouldSend` fließt nur in ein Log, nie in einen
+> Guard; der Default-Handler läuft bedingungslos (DEBUG-only, `:237`). ABER:
+> die echte Drosselung passiert in `AcraTree.log` (`:579`), erreicht über den
+> `Timber.e` bei `:360` derselben Invocation — der belegt den 24h-Slot schon,
+> bevor `:363` läuft. Dadurch liefert `:363` `false` und schreibt **nichts**
+> (Write ist an `shouldSend` geknüpft). Also **kein** stiller Cooldown-Verbrauch
+> und **keine** ungedrosselte Sendung. Übrig bleibt ein kosmetischer,
+> irreführender „blocked"-Log in DEBUG.
+
 **Kategorie:** dead/misleading logic + unbeabsichtigter Seiteneffekt
 **Behauptung:** `val shouldSend = CrashReportLimiter.shouldSendReport(...)`
 wird geloggt („Report blocked by spam protection"), aber nie ausgewertet —
@@ -233,10 +317,24 @@ nichts.
 
 ### #10 — Usage-Export-ViewModel verschluckt Throws · `UsageExportViewModel.kt:21`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED (nur
+> Import-Pfad).** `UsageExportViewModel` überschreibt `errorEvent` nicht, und
+> `ImportUsageFromFileUseCase` hat kein try/catch. Ein *unerwarteter* Throw aus
+> `loadFromFile` (Content-URI/JSON-Parsing) wird vom `launchSafe`-Netz gefangen,
+> geloggt, aber nie dem Nutzer gezeigt — Spinner stoppt ohne Success/Error.
+> Erwartete Fehler und alle Export-Fehler werden korrekt gemeldet; die Lücke
+> betrifft nur echte unerwartete Import-Throws.
+
 **Kategorie:** Fehlerbehandlung
 **Behauptung:** Verschluckt unerwartete Throws ohne Nutzer-Feedback.
 
 ### #11 — Unstrukturierter Scope pro Klick · `CrashReportConsent.kt:81/90`
+
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED als harmloser
+> struktureller Nit.** Das unreferenzierte `CoroutineScope(Dispatchers.IO)`
+> pro Klick existiert wie beschrieben, und `saveConsent` fängt intern ab (kein
+> uncaught Throw möglich). Echter Struktur-Verstoß, funktional harmlos — auf
+> dem Rule-9-Bootstrap-Pfad toleriert. Deckt sich mit der Selbst-Bewertung.
 
 **Kategorie:** launch ohne strukturierte Nebenläufigkeit
 **Behauptung:** Pro Button-Klick ein neuer, unreferenzierter
@@ -249,11 +347,27 @@ ideal.
 
 ### #12 — `applyTransform` clampt gegen veraltete Bounds · `ZoomableImageView.kt:341`
 
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED — mit
+> korrigierter Ursache.** Der veraltete Term ist NICHT die Bild-/View-Größe
+> (`updateSingleBaseScale()` bei `:340` frischt die korrekt auf), sondern der
+> current-*scale*-Term: die Bound-Getter lesen `_singleScale` bei `:341`, bevor
+> es zugewiesen wird. Beim Restore wird eine gespeicherte Skalierung über der
+> Vor-Restore-Decke (z. B. 8× bei `oldCurrent≈1.0`) still auf 5× gekappt.
+> **Fix:** `_singleScale = scale` vor dem `coerceIn` setzen.
+
 **Kategorie:** correctness
 **Behauptung:** Single-Layer `applyTransform` clampt die wiederhergestellte
 Skalierung gegen veraltete current-scale-Bounds.
 
 ### #13 — Irreführender Fehler-Toast bei erfolgreichem Launch · `AppManagementDelegate.kt:126-137`
+
+> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): PARTIAL.** Reihenfolge
+> und der irreführende `error_launching_app`-Toast bei einem Fehler der
+> *nachgelagerten* Use-Cases (`recordAppLaunchUseCase`/`refreshAppsUseCase`)
+> sind bestätigt und erreichbar. Aber „redundant im launchSafe-Netz" ist
+> falsch: dieser Aufruf übergibt kein `defaultErrorToast` (Default `null`), der
+> innere Catch ist also die *einzige* Quelle des Toasts — nur das
+> `silentError`-Logging ist doppelt.
 
 **Kategorie:** UX / Fehlerbehandlung (+ Rule-11-Doppelabsicherung)
 **Behauptung:** `onAppClicked` setzt zuerst `UiEvent.LaunchApp(app)` ab (App
@@ -271,12 +385,16 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 
 - **10 Finder-Agenten** parallel, je ein abgegrenzter Bereich; zwei davon
   querschnittlich (Coroutinen/Flow, Architektur-Regeln).
-- **Verify-Phase übersprungen** (Token-Budget) — daher der Status-Hinweis
-  oben. Ein vollständiger Lauf würde jeden Fund adversarial gegenprüfen und
-  Schweregrade korrigieren.
+- **Verify-Phase am 2026-07-27 nachgeholt** (ursprünglich aus Token-Budget
+  übersprungen). Jeder Fund wurde adversarial am Code gegengeprüft; die
+  Verdikte stehen oben in der Tabelle und beim jeweiligen Fund.
 - Die „0 Funde"-Bereiche bedeuten **„kein Finder-Agent hat hier etwas
   gemeldet"**, nicht „bewiesen fehlerfrei".
 - Zeilennummern beziehen sich auf Commit `626e4d63`.
 
-**Nächster sinnvoller Schritt:** Verifikation der medium-Funde (#1–#5),
-beginnend mit dem Backup-Cluster (#1–#3) und dem AUDIT-8-Abgleich für #1.
+**Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #10, #11, #12 · PARTIAL #3,
+#5, #6, #9, #13 · REFUTED #1 · behoben #1, #4, #7. Offen & klar actionable
+bleibt **#2** (Stale-Cache verwirft Import-Reihenfolge); **#4**
+(Main-Thread-Query → `withContext(ioDispatcher)`) ist seit 2026-07-27 behoben.
+Die restlichen CONFIRMED sind Kosmetik/Nits oder Doc-Fixes (#8, #11), die
+PARTIALs überwiegend kein umzusetzender Defekt.

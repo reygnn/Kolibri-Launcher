@@ -27,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -39,6 +40,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WallpaperDelegateTest {
@@ -119,6 +121,7 @@ class WallpaperDelegateTest {
 
     private fun createDelegate(
         observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = this.observeWallpaperStateUseCase,
+        ioDispatcher: CoroutineDispatcher = mainDispatcherRule.testDispatcher,
         scope: DelegateScope = createDelegateScope()
     ) = WallpaperDelegate(
         context = context,
@@ -129,6 +132,7 @@ class WallpaperDelegateTest {
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
+        ioDispatcher = ioDispatcher,
         scope = scope
     )
 
@@ -231,6 +235,44 @@ class WallpaperDelegateTest {
 
         val toastEvent = sentEvents.filterIsInstance<UiEvent.ShowToastFromString>().firstOrNull()
         assertTrue(toastEvent != null)
+    }
+
+    /**
+     * AUDIT-9 #4 regression guard: [WallpaperDelegate.getDisplayName] must
+     * resolve the DISPLAY_NAME via a `ContentResolver.query` hop OFF the main
+     * dispatcher — on a SAF/cloud `content://` URI that query is a blocking
+     * binder IPC that would otherwise stall the HOME activity's main thread.
+     * We prove the hop by routing the delegate's io work through a counting
+     * dispatcher and asserting the display-name query ran through it.
+     */
+    @Test
+    fun `onSetWallpaperImage resolves display name off the main dispatcher`() = runTest {
+        val cursor: Cursor = mockk {
+            every { moveToFirst() } returns true
+            every { getString(0) } returns "my_wallpaper.jpg"
+            every { close() } returns Unit
+        }
+        every { contentResolver.query(any(), any(), any(), any(), any()) } returns cursor
+
+        var ioDispatches = 0
+        val backingIoDispatcher = StandardTestDispatcher(testScheduler)
+        val trackingIoDispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                ioDispatches++
+                backingIoDispatcher.dispatch(context, block)
+            }
+        }
+        val delegate = createDelegate(ioDispatcher = trackingIoDispatcher)
+
+        delegate.onSetWallpaperImage(testUri)
+        advanceUntilIdle()
+
+        assertTrue(
+            "getDisplayName must dispatch its ContentResolver.query onto the io dispatcher",
+            ioDispatches > 0
+        )
+        verify { contentResolver.query(any(), any(), any(), any(), any()) }
+        assertTrue(sentEvents.filterIsInstance<UiEvent.ShowToastFromString>().isNotEmpty())
     }
 
     @Test

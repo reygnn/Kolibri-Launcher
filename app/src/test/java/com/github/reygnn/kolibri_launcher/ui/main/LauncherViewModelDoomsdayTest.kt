@@ -170,6 +170,7 @@ class LauncherViewModelDoomsdayTest {
         savedStateHandle = savedStateHandle,
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,
+        ioDispatcher = mainDispatcherRule.testDispatcher,
         testMode = TestMode(isEnabled = enableTestMode)
     )
 

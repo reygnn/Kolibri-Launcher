@@ -184,6 +184,7 @@ class LauncherViewModelSecurityTest {
             savedStateHandle = SavedStateHandle(),
             context = context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
+            ioDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = true)
         )
     }

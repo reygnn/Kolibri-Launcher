@@ -255,6 +255,7 @@ class LauncherViewModelTest {
         savedStateHandle = SavedStateHandle(),
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,
+        ioDispatcher = mainDispatcherRule.testDispatcher,
         testMode = testMode
     )
 
