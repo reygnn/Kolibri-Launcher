@@ -336,9 +336,20 @@ class ZoomableImageView @JvmOverloads constructor(
             layer.translateY = translateY
             invalidate()
         } else {
-            // Base Scale aktualisieren bevor wir clampen
+            // Refresh the cover base scale so subsequent gesture bounds
+            // (effectiveMin/MaxScale) are correct — it is NOT used to clamp the
+            // restore below.
             updateSingleBaseScale()
-            _singleScale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
+            // Restore honors the persisted zoom as-is. Do NOT clamp it against
+            // effectiveMin/MaxScale: those bounds are derived from the current
+            // scale, but the dynamic ceiling that permitted this value when it
+            // was created (it grows with the current scale) can't be re-derived
+            // here — clamping would silently cap a legitimately persisted high
+            // zoom (the #12 bug). The gesture path already bounds interactive
+            // input, so the only thing to guard here is corrupt persisted input
+            // (non-finite or non-positive) that would otherwise build a
+            // degenerate image matrix.
+            _singleScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE
             _singleTranslateX = translateX
             _singleTranslateY = translateY
             rebuildSingleMatrix()

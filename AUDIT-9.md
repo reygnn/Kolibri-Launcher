@@ -20,9 +20,10 @@ in der Übersichtstabelle und als Notiz-Block direkt beim jeweiligen Fund.
 **Erledigt** sind bislang **#1** (REFUTED, gepinnt), **#7** (behoben),
 **#4** (behoben — Main-Thread-Query → `withContext(ioDispatcher)`) und
 **#2** (behoben — Import-Order gegen die von Phase 1 geschriebene Menge statt
-gegen den laggenden Hot-Flow-Cache); alle anderen tragen ihr Verdikt, sind
-aber **noch offen** — die Verdikte sind kein „done"-Haken. Die verbleibenden
-CONFIRMED sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11, #12).
+gegen den laggenden Hot-Flow-Cache) und **#12** (behoben — `_singleScale` vor
+dem Restore-Clamp setzen); alle anderen tragen ihr Verdikt, sind aber **noch
+offen** — die Verdikte sind kein „done"-Haken. Die verbleibenden CONFIRMED sind
+Kosmetik/Nits oder Doc-Fixes (#8, #10, #11).
 
 > _Historischer Hinweis (Ursprungsfassung):_ Die Funde waren zunächst
 > **Behauptungen der Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung** —
@@ -62,7 +63,7 @@ und ebenfalls unverifiziert.
 | 9 | 🟡 low · PARTIAL | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
 | 10 | 🟡 low · CONFIRMED | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Verschluckt Throws ohne Nutzer-Feedback |
 | 11 | 🟡 low · CONFIRMED | Nebenläufigkeit | `CrashReportConsent.kt:81/90` | Unstrukturierter `CoroutineScope(IO).launch` pro Klick |
-| 12 | 🟡 low · CONFIRMED | Korrektheit | `ZoomableImageView.kt:341` | `applyTransform` clampt Skalierung gegen veraltete Bounds |
+| 12 | ✅ behoben | Korrektheit | `ZoomableImageView.kt:341` | Restore clampte Skalierung gegen die *Vor-Restore*-Skalierung → Fix: Restore nicht mehr magnitude-clampen, nur korrupte Werte sanitisieren (Details bei #12 unten) |
 | 13 | 🟡 low · PARTIAL | UX / Fehlerbehandlung | `AppManagementDelegate.kt:126-137` | Irreführender „Fehler beim Starten"-Toast bei erfolgreichem Launch |
 
 **Als sauber bewertet (0 Funde):** Domain-Logik & ColorMath ·
@@ -360,13 +361,36 @@ ideal.
 
 ### #12 — `applyTransform` clampt gegen veraltete Bounds · `ZoomableImageView.kt:341`
 
-> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED — mit
-> korrigierter Ursache.** Der veraltete Term ist NICHT die Bild-/View-Größe
-> (`updateSingleBaseScale()` bei `:340` frischt die korrekt auf), sondern der
-> current-*scale*-Term: die Bound-Getter lesen `_singleScale` bei `:341`, bevor
-> es zugewiesen wird. Beim Restore wird eine gespeicherte Skalierung über der
-> Vor-Restore-Decke (z. B. 8× bei `oldCurrent≈1.0`) still auf 5× gekappt.
-> **Fix:** `_singleScale = scale` vor dem `coerceIn` setzen.
+> **✅ RESOLUTION (2026-07-28): CONFIRMED → behoben.** Am Code verifiziert: der
+> veraltete Term ist NICHT die Bild-/View-Größe (`updateSingleBaseScale()` bei
+> `:340` frischt die korrekt auf), sondern der current-*scale*-Term: die
+> Bound-Getter (`effectiveMin/MaxScale`) lesen `_singleScale` als `currentScale`,
+> und die `coerceIn`-Argumente werden ausgewertet, *bevor* `:341` zuweist — also
+> noch gegen den Vor-Restore-Wert. Erreichbares Szenario: Wallpaper größer als
+> View (`baseScale < 1`), Vor-Restore `_singleScale ≈ 1.0` ⇒ `effectiveMaxScale =
+> maxOf(5.0, 1.0*3) = 5.0`; eine gespeicherte Skalierung > 5× (interaktiv
+> erreichbar, weil die Decke beim Reinzoomen inkrementell mitwächst) wird still
+> auf 5× gekappt. Nur der Single-Layer-Pfad ist live betroffen — der
+> Layer-Restore (`applyTransform(layerIndex, …)` `:613`) berechnet die Grenzen
+> aus `computeLayerBaseScale` und liest die aktuelle Skalierung nicht.
+>
+> **Fix (nach unabhängigem Review verfeinert):** Der Restore wird **nicht**
+> magnitude-geclampt. Grund: Ein persistierter Zoom (z. B. 8×) war legitim, aber
+> die dynamische Decke, die ihn erlaubte (sie wächst mit dem aktuellen Scale),
+> lässt sich beim Restore nicht rekonstruieren — Magnitude-Clamping und
+> Restore-Treue widersprechen sich also grundsätzlich. Der erste Ansatz
+> (`_singleScale = scale` vor `coerceIn`) hätte den `coerceIn` faktisch zum
+> No-op gemacht (Decke ≥ Wert für jeden positiven Input) und dabei still die
+> Schutzwirkung gegen korrupte persistierte Werte verloren (Infinity → NaN/Inf-
+> Matrix, negativ → negativer Scale). Stattdessen: den Gesten-Pfad die
+> interaktive Eingabe bounden lassen und beim Restore nur **sanitisieren** —
+> `_singleScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE`.
+> `updateSingleBaseScale()` bleibt (frischt `_singleBaseScale` für spätere
+> Gesten-Bounds). Gepinnt durch `ZoomableImageViewRestoreScaleRobolectricTest`
+> (3 `@Test`: legit 8× wird geehrt statt auf 5× gekappt; moderater In-Range-Zoom
+> unverändert; korrupte Werte — ±Inf/NaN/negativ/0 — fallen auf `DEFAULT_SCALE`
+> zurück). View-embedded Bounds (Layout-Maße + Drawable-Intrinsics) →
+> Robolectric statt JVM, per Rule 10.
 
 **Kategorie:** correctness
 **Behauptung:** Single-Layer `applyTransform` clampt die wiederhergestellte
@@ -447,10 +471,12 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 - Zeilennummern beziehen sich auf Commit `626e4d63`.
 
 **Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #10, #11, #12 · PARTIAL #3,
-#5, #6, #9, #13 · REFUTED #1 · behoben #1, #2, #4, #7. Das zuvor einzige
+#5, #6, #9, #13 · REFUTED #1 · behoben #1, #2, #4, #7, #12. Das zuvor einzige
 offen & klar actionable **#2** (Stale-Cache verwirft Import-Reihenfolge) ist
 seit 2026-07-27 behoben (Phase 2 nutzt die von Phase 1 geschriebene Menge,
 gepinnt durch `BackupDataAssemblerImportOrderStaleCacheTest`); ebenso **#4**
-(Main-Thread-Query → `withContext(ioDispatcher)`). Die restlichen CONFIRMED
-sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11, #12), die PARTIALs überwiegend
+(Main-Thread-Query → `withContext(ioDispatcher)`) und **#12** (Restore-Clamp
+gegen die Vor-Restore-Skalierung, gepinnt durch
+`ZoomableImageViewRestoreScaleRobolectricTest`). Die restlichen CONFIRMED
+sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11), die PARTIALs überwiegend
 kein umzusetzender Defekt.
