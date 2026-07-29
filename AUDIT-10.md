@@ -16,6 +16,20 @@
 > ergänzt — darunter **#6, der erste `high`-Fund dieses Reviews** (eine
 > echte Regression im Fehlerpfad des Consent-Dialogs). Die Zahlen #6/#7
 > hängen chronologisch hinten an, #6 ist aber der neue Top-Prioritätsfund.
+>
+> **Nachtrag 2026-07-29 (3. Lauf):** Ein dritter `/code-review`-Durchlauf
+> (gleicher Branch, gleiche Methode, HEAD `03ba81fe`) hat **keine neuen
+> Funde** ergeben — er hat unabhängig exakt dieselben sieben reproduziert.
+> Zugewinn: **#6 wurde diesmal direkt gegen den Quelltext verifiziert**
+> statt nur aus der Inline-Prüfung übernommen — die beiden Fehlerpfade
+> `CrashReportConsent.kt:49` (Nicht-Activity-Kontext) und `:85` (gefangene
+> `show()`-Exception) rufen belegt `onResult(false)`, und beide Aufrufer
+> (`MainActivity.kt:549`, `SettingsFragment.kt:466`) verdrahten `onResult`
+> nachweislich in `persistConsent`. Damit steigt #6 von „Selbsteinschätzung"
+> zu quellenverifiziert. Ebenfalls gegengeprüft und weiterhin sauber: nur
+> eine einzige `consentDataStore`-Extension (kein Doppel-Instanz-Risiko),
+> keine verwaisten Aufrufer der entfernten Store-Methoden, Contract-Test-
+> Tripel vollständig. Die übrigen sechs Schweregrade bleiben unverändert.
 
 ---
 
