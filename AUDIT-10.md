@@ -58,6 +58,18 @@
 > `high`-Regression **#6 nicht** reproduziert (blinder Fleck — der Fehlerpfad-
 > `onResult(false)` wurde nicht bis zur Persistenz verfolgt), was zeigt, dass
 > #6 subtil ist und der Mehr-Lauf-Ansatz trägt.
+>
+> **Nachtrag 2026-07-29 (6. Lauf):** Ein sechster `/code-review`-Durchlauf
+> (gleicher Branch, HEAD `fc1dc8cc`) hat **diese Datei bewusst zuerst gelesen**
+> und gezielt nach Funden **jenseits** der bisherigen elf gesucht. Ergebnis:
+> die `high`-Regression #6 sowie #1–#3 unabhängig reproduziert und **einen
+> bislang nicht erfassten** ergänzt: **#12** (`low`) — die Apply-Sequenz
+> `persistConsent(x)` → `ACRA.errorReporter.setEnabled(x)` → `Timber.i(…)` ist
+> in `MainActivity` und `SettingsFragment` identisch dupliziert. Der Controller
+> zentralisiert nur die Persistenz, nicht das Anwenden der Entscheidung →
+> Drift-Risiko bei künftigen Änderungen (z. B. `CrashReportLimiter`-Reset oder
+> geänderte Reihenfolge). Ergänzt #5 (dort der redundante `launch`-Wrapper an
+> *einer* Stelle) um die *zwischen* den Stellen liegende Duplizierung.
 
 ---
 
@@ -116,6 +128,7 @@ und **unverifiziert** (keine adversariale Verify-Phase gelaufen).
 | 9 | 🟡 low · PLAUSIBLE | robustness (Wurzel #6) | `CrashReportConsent.kt:53`–`88` | `try` trennt „angezeigt" nicht von „nicht anzeigbar": ein Throw **nach** erfolgreichem `show()` → `null`-Rückgabe (Dialog ungetrackt → geleaktes Fenster), sofortiges `onResult(false)` und ein **zweites** `onResult` beim späteren Button-Tap |
 | 10 | 🟡 low · CONFIRMED | doc-drift (trivial) | `CLAUDE.md` | Architektur-Inventar nach dem Refactor nicht nachgezogen: neues `CrashReportConsentRepository`, drei Use-Cases und `CrashReportConsentRepositoryImpl` fehlen; Bestandszahlen („19 of them", „~50 use cases") veraltet |
 | 11 | 🟡 low · PLAUSIBLE | correctness / robustness | `CrashReportConsentRepositoryImpl.kt:52` (via `CrashReportConsentController.kt:39`) | `setConsent()` verschluckt einen DataStore-`edit`-Fehler still → Consent wird nicht persistiert, obwohl ACRA in-memory schon umgeschaltet wurde; Session ≠ Store, ohne Nutzer-Feedback |
+| 12 | 🟡 low · PLAUSIBLE | simplification / reuse | `MainActivity.kt:546` · `SettingsFragment.kt:466` | Apply-Sequenz `persistConsent` → `ACRA.setEnabled` → `Timber.i` in beiden Aufrufern identisch dupliziert; Controller zentralisiert nur die Persistenz, nicht das Anwenden → Drift-Risiko |
 
 ---
 
@@ -363,6 +376,32 @@ Session/Store-Divergenz.
 **Bewertung:** Best-Effort-Telemetrie-Consent; seltener DataStore-Write-Fehler.
 Niedrigste Handlungsdringlichkeit — aber der einzige im unabhängigen 5. Lauf
 neu aufgetauchte Punkt, deshalb hier festgehalten.
+
+---
+
+## 🟡 Low (Nachtrag 6. Lauf)
+
+### #12 — Apply-Sequenz in MainActivity und SettingsFragment dupliziert · `MainActivity.kt:546` · `SettingsFragment.kt:466`
+
+**Kategorie:** simplification / reuse · **PLAUSIBLE**
+**Behauptung:** Das Tripel `crashReportConsentController.persistConsent(x)` →
+`ACRA.errorReporter.setEnabled(x)` → `Timber.i(…)` steht identisch in beiden
+Consent-Aufrufern. Der eingeführte `CrashReportConsentController` zentralisiert
+die **Persistenz** (`persistConsent` auf dem App-lifetime-Scope), nicht aber das
+**Anwenden** der Entscheidung — der ACRA-In-Memory-Toggle plus Log bleibt in
+`MainActivity.checkAndShowCrashReportConsent` (`:546`) und im
+`SettingsFragment`-Crash-Report-Handler (`:466`) doppelt ausgeschrieben.
+**Fehlerszenario:** Eine künftige Änderung am Anwenden einer getroffenen
+Zustimmung (z. B. ein `CrashReportLimiter.resetAllLimits()` beim Opt-in, oder
+den ACRA-Toggle bewusst **nach** erfolgreicher Persistenz zu ordnen) muss an
+zwei Stellen gepflegt werden und kann driften — genau die Klasse von Bug, die
+der Controller vermeiden sollte.
+**Abgrenzung:** #5 betrifft den redundanten `lifecycleScope.launch`-Wrapper an
+*einer* Stelle; #12 ist die Duplizierung *zwischen* MainActivity und
+SettingsFragment. **Bewertung:** Wartbarkeit, kein Laufzeitfehler. Niedrige
+Priorität. Optionaler Fix: eine `applyConsent(x)`-Methode auf dem Controller
+(oder einem UI-Helper), die Persistenz + ACRA-Toggle + Log kapselt; der
+In-Memory-ACRA-Seiteneffekt bleibt dabei bewusst app-seitig.
 
 ---
 
