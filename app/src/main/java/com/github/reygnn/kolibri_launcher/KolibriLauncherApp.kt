@@ -441,8 +441,11 @@ class KolibriLauncherApp : Application() {
      * Walks `ApplicationExitInfo` for any ANRs the system recorded since
      * the last app start, forwards each to ACRA via a synthetic exception
      * that carries the system-supplied multi-thread dump as its message,
-     * and advances [AnrReporter]'s persisted watermark per successful
-     * forward.
+     * and advances [AnrReporter]'s persisted watermark once the forward
+     * returns. Note the forward is best-effort: `AcraTree` swallows ACRA
+     * send failures (Rule 7/9), so the watermark advances even when a
+     * report never reaches ACRA — see [AnrReporter]'s "Best-effort
+     * delivery" KDoc for why that is intentional.
      *
      * Replaces the previous `ANRWatchDog(5000)` live-sampling approach.
      * See [AnrReporter] KDoc for the trade-off (soft-ANR loss accepted in

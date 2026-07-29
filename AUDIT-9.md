@@ -23,12 +23,14 @@ in der Übersichtstabelle und als Notiz-Block direkt beim jeweiligen Fund.
 gegen den laggenden Hot-Flow-Cache) und **#12** (behoben — `_singleScale` vor
 dem Restore-Clamp setzen); alle anderen tragen ihr Verdikt, sind aber **noch
 offen** — die Verdikte sind kein „done"-Haken. Die verbleibenden CONFIRMED sind
-Kosmetik/Nits oder Doc-Fixes (#8, #11).
+Kosmetik/Nits oder Doc-Fixes (#11).
 
 **Update 2026-07-29:** **#10** re-verifiziert → **REFUTED** (Fehlalarm; die
 ursprüngliche Verify-Kette brach vor `loadFromFile`s Catch-All ab, der jeden
 Throw auf `Error` → nutzersichtbares `ImportError`-Event mappt — Details bei
-#10 unten).
+#10 unten). **#8** gründlich re-verifiziert (CONFIRMED bestätigt) und per
+Doc-Fix erledigt — das überzogene Retry-Versprechen aus den ANR-KDocs
+gestrichen, „best-effort delivery" dokumentiert (Details bei #8 unten).
 
 > _Historischer Hinweis (Ursprungsfassung):_ Die Funde waren zunächst
 > **Behauptungen der Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung** —
@@ -64,7 +66,7 @@ und ebenfalls unverifiziert.
 | 5 | 🟠 medium · PARTIAL | Nebenläufigkeit | `AppUpdateSignal.kt:17` | `MutableSharedFlow` ohne Buffer → Signal verloren |
 | 6 | 🟡 low · PARTIAL | Datenverlust | `UsageExportRepositoryImpl.kt:384` | Usage-Export überschreibt Zieldatei nicht-atomar |
 | 7 | ✅ behoben | Konsistenz | `ResetRepositoryImpl.kt:79` | Reset löschte Wallpaper-Bilddateien nicht → Fix: `purgeRepository()` ruft jetzt `clearAll()` (Details bei #7 unten) |
-| 8 | 🟡 low · CONFIRMED | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor |
+| 8 | ✅ behoben (Doc) | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor → Fix: KDoc-Retry-Versprechen gestrichen, „best-effort" dokumentiert (Details bei #8 unten) |
 | 9 | 🟡 low · PARTIAL | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
 | 10 | ✅ REFUTED | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Fehlalarm — `loadFromFile`-Catch-All mappt jeden Throw auf `Error` → `ImportError`-Event (Details bei #10 unten) |
 | 11 | 🟡 low · CONFIRMED | Nebenläufigkeit | `CrashReportConsent.kt:81/90` | Unstrukturierter `CoroutineScope(IO).launch` pro Klick |
@@ -292,14 +294,29 @@ Wallpaper-Bilddateien auf der Platte liegen → verwaiste Dateien.
 
 ### #8 — ANR-Watermark rückt trotz fehlgeschlagenem Send vor · `KolibriLauncherApp.kt:461-485` vs. `AnrReporter.kt:57-64`
 
-> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED.** Alle drei
-> Glieder bestätigt: `markReported` läuft nur, wenn `handler(report)` normal
-> zurückkehrt; der Prod-Handler (`Timber.e` → `AcraTree.reportErrorToAcra`)
-> schluckt jeden `handleSilentException`-Fehler, kann also nie werfen; das
-> Klassen-KDoc verspricht dennoch Retry-bei-Fehler. Ergebnis: Watermark rückt
-> immer vor, die zugesicherte „transient ACRA failure doesn't permanently lose
-> ANRs"-Eigenschaft ist toter Code. **Leichter Fix:** entweder Handler werfen
-> lassen oder das KDoc korrigieren (Retry-Versprechen streichen).
+> **✅ RESOLUTION (2026-07-29): CONFIRMED → behoben (Doc-Fix).** Am Code
+> gründlich re-verifiziert, alle Glieder bestätigt: `markReported` läuft nur,
+> wenn `handler(report)` normal zurückkehrt (`AnrReporter.kt:85-88`); in Release
+> ist nur `AcraTree` gepflanzt (`KolibriLauncherApp.kt:230`; DebugTree/
+> ToastErrorTree sind DEBUG-gegatet, `:215-227`); `AcraTree.log` kann nicht
+> werfen — `shouldSendReport` liefert für `AnrException` (`UnthrottledReport`)
+> ein frühes `return true` und ist ohnehin try/catch-gewrappt
+> (`CrashReportLimiter.kt:105-106/:102-138`), und `reportErrorToAcra` wrappt
+> `handleSilentException` komplett in `catch(Throwable)` (`:590-606`). Ergebnis:
+> Handler kann bei ACRA-Fehler nie werfen → Watermark rückt immer vor → die
+> KDoc-Zusage „transient ACRA failure doesn't permanently lose ANRs" war toter
+> Code. (Einzige real Retry-auslösende Ausnahme: ein *ungeschluckter* Throw im
+> Handler-Body selbst, z. B. OOM beim Bau des synthetischen Reports — kein
+> ACRA-Send-Fehler.)
+>
+> **Fix (Doc, kein Code):** Das Schlucken in `reportErrorToAcra` ist bewusstes
+> Crash-Infra-Design (Rule 7/9 — Crash-Reporting darf nie selbst crashen);
+> den Handler werfen zu lassen, würde genau das verletzen. Also das
+> überzogene Retry-Versprechen aus den KDocs entfernt: `AnrReporter`s
+> „Dedup contract"-Abschnitt beschreibt jetzt explizit „Best-effort delivery —
+> the retry path does not cover ACRA failures", und `reportPendingAnrsAsync`s
+> KDoc verweist auf denselben best-effort-Charakter. Verhalten unverändert,
+> Dokumentation stimmt jetzt mit dem Code überein.
 
 **Kategorie:** contract/implementation mismatch, Telemetrie-Verlust
 **Behauptung:** `AnrReporter.reportPendingAnrs` rückt die persistierte
@@ -491,13 +508,15 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
 - Zeilennummern beziehen sich auf Commit `626e4d63`.
 
 **Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #11, #12 · PARTIAL #3,
-#5, #6, #9, #13 · REFUTED #1, #10 · behoben #1, #2, #4, #7, #12.
-(#10 am 2026-07-29 von CONFIRMED auf REFUTED korrigiert.) Das zuvor einzige
+#5, #6, #9, #13 · REFUTED #1, #10 · behoben #1, #2, #4, #7, #8, #12.
+(#10 am 2026-07-29 von CONFIRMED auf REFUTED korrigiert; #8 am 2026-07-29
+per Doc-Fix erledigt.) Das zuvor einzige
 offen & klar actionable **#2** (Stale-Cache verwirft Import-Reihenfolge) ist
 seit 2026-07-27 behoben (Phase 2 nutzt die von Phase 1 geschriebene Menge,
 gepinnt durch `BackupDataAssemblerImportOrderStaleCacheTest`); ebenso **#4**
 (Main-Thread-Query → `withContext(ioDispatcher)`) und **#12** (Restore-Clamp
 gegen die Vor-Restore-Skalierung, gepinnt durch
 `ZoomableImageViewRestoreScaleRobolectricTest`). Die restlichen CONFIRMED
-sind Kosmetik/Nits oder Doc-Fixes (#8, #11), die PARTIALs überwiegend
-kein umzusetzender Defekt. #10 wurde am 2026-07-29 auf REFUTED korrigiert.
+sind Kosmetik/Nits oder Doc-Fixes (#11; #8 am 2026-07-29 per Doc-Fix
+erledigt), die PARTIALs überwiegend kein umzusetzender Defekt. #10 wurde am
+2026-07-29 auf REFUTED korrigiert.

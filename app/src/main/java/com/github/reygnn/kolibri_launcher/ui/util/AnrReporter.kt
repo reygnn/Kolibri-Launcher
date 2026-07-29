@@ -57,11 +57,24 @@ import javax.inject.Singleton
  * ## Dedup contract
  *
  * `reportPendingAnrs` walks the historical exit reasons in chronological
- * order. After the [handler] returns *successfully* for a given report,
- * the watermark is advanced to that report's timestamp. If the handler
- * throws, the loop stops, the watermark stays where it was, and the next
- * launch will re-attempt the un-reported ANRs. This means a transient
- * ACRA failure doesn't permanently lose ANRs.
+ * order. After the [handler] returns for a given report, the watermark is
+ * advanced to that report's timestamp. If the handler *throws*, the loop
+ * stops, the watermark stays put, and the un-reported ANRs are retried on
+ * the next launch.
+ *
+ * **Best-effort delivery — the retry path does not cover ACRA failures.**
+ * The retry-on-throw mechanism only fires when the handler actually throws.
+ * The production handler (`Timber.e` -> `AcraTree.reportErrorToAcra` in
+ * [com.github.reygnn.kolibri_launcher.KolibriLauncherApp]) deliberately
+ * *swallows* any `handleSilentException` failure — crash reporting must
+ * never itself crash the app (CLAUDE.md Rule 7/9). So a failed ACRA send
+ * never reaches the handler boundary: the watermark advances anyway and
+ * that post-mortem ANR is dropped. This is an accepted trade-off — if ACRA
+ * is broken there are no reports to lose anyway. Do **not** make the
+ * handler rethrow to "recover" the ANR: that would defeat the crash-infra
+ * swallow it sits behind. The only path that currently triggers a retry is
+ * an unswallowed `Throwable` from the handler body itself (e.g. OOM while
+ * building the synthetic report), not an ACRA delivery failure.
  */
 @Singleton
 class AnrReporter @Inject constructor(
