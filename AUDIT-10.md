@@ -30,6 +30,19 @@
 > eine einzige `consentDataStore`-Extension (kein Doppel-Instanz-Risiko),
 > keine verwaisten Aufrufer der entfernten Store-Methoden, Contract-Test-
 > Tripel vollständig. Die übrigen sechs Schweregrade bleiben unverändert.
+>
+> **Nachtrag 2026-07-29 (4. Lauf):** Ein vierter `/code-review`-Durchlauf
+> (gleicher Branch, HEAD `f085c002`) hat gezielt nach Funden **jenseits** der
+> bisherigen sieben gesucht und **drei neue** ergänzt, alle `low`: **#8** —
+> die Rule-9-Grandfather-Begründung für `CrashReportConsent.kt` ist nach dem
+> Refactor veraltet (die Datei importiert `CrashReportConsentStore` nicht mehr,
+> liegt also nicht mehr auf dem Bootstrap-Pfad → die zwei `Timber.e` sollten
+> auf `silentError` migrieren); **#9** — der `try`-Block in
+> `forceShowConsentDialog` trennt „angezeigt" strukturell nicht von „nicht
+> anzeigbar" (der Kern hinter #6, mit eigenem Leak-/Doppel-`onResult`-Eckfall);
+> **#10** — triviale Doku-Drift in `CLAUDE.md` (Interface-/Use-Case-Bestand
+> nicht nachgezogen). Keiner der drei berührt die Top-Priorität #6; #8 und #9
+> lassen sich zusammen mit dem #6-Fix miterledigen.
 
 ---
 
@@ -84,6 +97,9 @@ und **unverifiziert** (keine adversariale Verify-Phase gelaufen).
 | 4 | 🟡 low · CONFIRMED | efficiency | `MainActivity.kt:538` | Zwei getrennte DataStore-Reads (`hasBeenAsked` + `currentConsent`) beim häufigsten Start |
 | 5 | 🟡 low · PLAUSIBLE | simplification | `MainActivity.kt:539` | Redundantes `lifecycleScope.launch` um das synchrone `ACRA.setEnabled` → kein Nebenläufigkeitsgewinn, Cancel-Fenster |
 | 7 | 🟡 low · CONFIRMED | test-coverage | `CrashReportConsentControllerTest.kt:40` | Test beweist den eigentlichen Zweck (Persist überlebt UI-Teardown) nicht — `persistConsent` wird ohne cancelbaren Caller-Scope aufgerufen; der Fehlerpfad aus #6 ist nirgends abgedeckt |
+| 8 | 🟡 low · CONFIRMED | conventions (Rule 9) | `CrashReportConsent.kt:48`/`:84` | Grandfather-Begründung veraltet: die Datei liegt nach dem Refactor nicht mehr auf dem Bootstrap-Pfad (kein Store-Import mehr) → die zwei `Timber.e` sollten auf `silentError` migrieren; das macht die #6-Fehlerpfade in DEBUG laut. CLAUDE.md Rule 9 („on the bootstrap path") ist ebenfalls falsch geworden |
+| 9 | 🟡 low · PLAUSIBLE | robustness (Wurzel #6) | `CrashReportConsent.kt:53`–`88` | `try` trennt „angezeigt" nicht von „nicht anzeigbar": ein Throw **nach** erfolgreichem `show()` → `null`-Rückgabe (Dialog ungetrackt → geleaktes Fenster), sofortiges `onResult(false)` und ein **zweites** `onResult` beim späteren Button-Tap |
+| 10 | 🟡 low · CONFIRMED | doc-drift (trivial) | `CLAUDE.md` | Architektur-Inventar nach dem Refactor nicht nachgezogen: neues `CrashReportConsentRepository`, drei Use-Cases und `CrashReportConsentRepositoryImpl` fehlen; Bestandszahlen („19 of them", „~50 use cases") veraltet |
 
 ---
 
@@ -236,6 +252,68 @@ unentdeckt. Zusätzlich ist die Fehlerpfad-Persistenz aus #6
 **Bewertung:** Test-Härte; kein Laufzeitfehler. Niedrige Priorität. Fix: einen
 eigenen `CoroutineScope` als Caller simulieren, ihn nach `persistConsent`
 canceln und zeigen, dass `setConsent` dennoch aufgerufen wird.
+
+---
+
+## 🟡 Low (Nachtrag 4. Lauf)
+
+### #8 — Rule-9-Grandfather für `CrashReportConsent.kt` ist nach dem Refactor veraltet · `CrashReportConsent.kt:48`/`:84`
+
+**Kategorie:** conventions (CLAUDE.md Rule 9) / altitude · **CONFIRMED**
+**Behauptung:** CLAUDE.md Rule 9 führt `CrashReportConsent.kt` in der Ausnahmeliste
+mit der Begründung, die Datei liege „on the bootstrap path" — „The store's reads
+happen via runBlocking in attachBaseContext before Hilt". Genau diese Kopplung hat
+der Refactor entfernt: `CrashReportConsent.kt` importiert `CrashReportConsentStore`
+**nicht mehr** (verifiziert: kein `data.`-Import), liest bzw. persistiert keinen
+Consent und ist jetzt ein reiner, post-Hilt laufender View-Concern. Die neue KDoc
+der Datei sagt es selbst: „the dialog's catches are **not** on the pre-Hilt
+bootstrap path (unlike the store)". Damit trägt die Grandfather-Begründung nicht
+mehr, und die beiden `Timber.e` (`:48` Nicht-Activity-Kontext, `:84` gefangene
+`show()`-Exception) fallen unter die Rule-9-Grundform → sollten auf
+`TimberWrapper.silentError` migrieren.
+**Nutzen / Zusammenhang mit #6:** Beide Zeilen sind exakt die Fehlerpfade aus #6,
+die still `onResult(false)` → `persistConsent(false)` auslösen. Als `silentError`
+wären sie in DEBUG **laut** und würden die #6-Regression (Anzeige-Versagen fälscht
+eine Ablehnung) schon während der Entwicklung sichtbar machen, statt sie nur zu
+loggen. Zusätzlich ist die CLAUDE.md-Rule-9-Ausnahmeliste jetzt sachlich falsch
+(„on the bootstrap path") und sollte nachgezogen werden.
+**Bewertung:** Konvention + Diagnosewert, kein Laufzeitfehler. Niedrige Priorität,
+aber deckungsgleich mit dem #6-Fix — beim Beheben von #6 mitnehmen.
+
+### #9 — `forceShowConsentDialog`-`try` trennt „angezeigt" nicht von „nicht anzeigbar" · `CrashReportConsent.kt:53`–`88`
+
+**Kategorie:** robustness / structural (Wurzel von #6) · **PLAUSIBLE**
+**Behauptung:** Der `try`-Block umschließt `HtmlCompat.fromHtml`, den Builder,
+`dialog.show()` **und** die Post-`show()`-UI-Manipulation
+(`findViewById(...).movementMethod`) gemeinsam; der `catch (Exception)` feuert
+pauschal `onResult(false)` und gibt `null` zurück, unterscheidet also nicht, ob der
+Dialog zum Zeitpunkt des Throws bereits sichtbar ist.
+**Fehlerszenario:** Wirft etwas **nach** einem erfolgreichen `dialog.show()` (der
+Post-show-Zweig ist praktisch der einzige Kandidat und damit unwahrscheinlich, aber
+die Struktur lässt es zu), dann steht der Dialog auf dem Schirm, während (a)
+`onResult(false)` sofort `hasAsked=true`/`consent=false` persistiert, (b) die
+Rückgabe `null` beim Aufrufer verhindert, dass `currentDialog` gesetzt wird → der
+sichtbare, `setCancelable(false)`-Dialog wird bei onDestroy/Config-Change **nicht**
+dismissed → geleaktes Fenster (genau das, was das Tracking verhindern soll), und
+(c) ein anschließender Button-Tap `onResult` ein **zweites** Mal feuert.
+**Bewertung:** Geringe Eintrittswahrscheinlichkeit, aber struktureller Kern hinter
+#6: solange „angezeigt + beantwortet" und „konnte nicht angezeigt werden" denselben
+`onResult`/Return teilen, bleibt jeder Anzeige-Teilfehler zweideutig. Der für #6
+vorgeschlagene Fix (separater Fehler-/`onDismiss`-Pfad ohne `onResult`/`persistConsent`)
+räumt diesen Eckfall gleich mit ab. Niedrige Priorität.
+
+### #10 — CLAUDE.md-Architektur-Inventar nach dem Refactor veraltet · `CLAUDE.md`
+
+**Kategorie:** doc-drift (trivial) · **CONFIRMED**
+**Behauptung:** Das neue Interface `CrashReportConsentRepository`, die drei
+Use-Cases (`GetCrashReportConsentUseCase` / `HasAskedCrashReportConsentUseCase` /
+`SetCrashReportConsentUseCase`) und `CrashReportConsentRepositoryImpl` erscheinen im
+Architektur-Abschnitt nicht; die Bestandszahlen stimmen nicht mehr
+(„domain/repository/ interfaces … — 19 of them", „~50 fine-grained use cases", und
+die `data/`-Dateiliste nennt nur `CrashReportConsentStore`, nicht den neuen Impl).
+**Bewertung:** Reiner Doku-Nit; „~50" ist ohnehin als ungefähr markiert, die
+konkrete „19" wandert mit. Optional beim nächsten CLAUDE.md-Touch nachziehen.
+Trivial — der schwächste Fund dieses Reviews.
 
 ---
 
