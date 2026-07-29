@@ -43,6 +43,21 @@
 > **#10** — triviale Doku-Drift in `CLAUDE.md` (Interface-/Use-Case-Bestand
 > nicht nachgezogen). Keiner der drei berührt die Top-Priorität #6; #8 und #9
 > lassen sich zusammen mit dem #6-Fix miterledigen.
+>
+> **Nachtrag 2026-07-29 (5. Lauf):** Ein fünfter `/code-review`-Durchlauf
+> (gleicher Branch, HEAD `bb38340c`, bewusst **ohne** vorheriges Lesen dieser
+> Datei, um eine unabhängige Gegenprobe zu erhalten) hat vier bekannte Funde
+> unabhängig reproduziert (#1 Summary-Race, #2 Read-Swallow, #3 Activity-Gate,
+> #4 Doppel-Read) und **einen bislang nicht erfassten** ergänzt: **#11**
+> (`low`) — der **Write**-Pfad `setConsent()` verschluckt einen DataStore-
+> `edit`-Fehler still (`silentError`), während ACRA in-memory bereits
+> umgeschaltet wurde → Session- und Persistenz-Zustand divergieren ohne
+> Nutzer-Feedback. Komplementär zu #2 (Read-Swallow) und Gegenrichtung zu #6
+> (dort wird ein *falscher* Wert *erfolgreich* geschrieben; hier wird *gar
+> nichts* geschrieben). Bemerkenswert: der unabhängige Lauf hat die
+> `high`-Regression **#6 nicht** reproduziert (blinder Fleck — der Fehlerpfad-
+> `onResult(false)` wurde nicht bis zur Persistenz verfolgt), was zeigt, dass
+> #6 subtil ist und der Mehr-Lauf-Ansatz trägt.
 
 ---
 
@@ -100,6 +115,7 @@ und **unverifiziert** (keine adversariale Verify-Phase gelaufen).
 | 8 | 🟡 low · CONFIRMED | conventions (Rule 9) | `CrashReportConsent.kt:48`/`:84` | Grandfather-Begründung veraltet: die Datei liegt nach dem Refactor nicht mehr auf dem Bootstrap-Pfad (kein Store-Import mehr) → die zwei `Timber.e` sollten auf `silentError` migrieren; das macht die #6-Fehlerpfade in DEBUG laut. CLAUDE.md Rule 9 („on the bootstrap path") ist ebenfalls falsch geworden |
 | 9 | 🟡 low · PLAUSIBLE | robustness (Wurzel #6) | `CrashReportConsent.kt:53`–`88` | `try` trennt „angezeigt" nicht von „nicht anzeigbar": ein Throw **nach** erfolgreichem `show()` → `null`-Rückgabe (Dialog ungetrackt → geleaktes Fenster), sofortiges `onResult(false)` und ein **zweites** `onResult` beim späteren Button-Tap |
 | 10 | 🟡 low · CONFIRMED | doc-drift (trivial) | `CLAUDE.md` | Architektur-Inventar nach dem Refactor nicht nachgezogen: neues `CrashReportConsentRepository`, drei Use-Cases und `CrashReportConsentRepositoryImpl` fehlen; Bestandszahlen („19 of them", „~50 use cases") veraltet |
+| 11 | 🟡 low · PLAUSIBLE | correctness / robustness | `CrashReportConsentRepositoryImpl.kt:52` (via `CrashReportConsentController.kt:39`) | `setConsent()` verschluckt einen DataStore-`edit`-Fehler still → Consent wird nicht persistiert, obwohl ACRA in-memory schon umgeschaltet wurde; Session ≠ Store, ohne Nutzer-Feedback |
 
 ---
 
@@ -314,6 +330,39 @@ die `data/`-Dateiliste nennt nur `CrashReportConsentStore`, nicht den neuen Impl
 **Bewertung:** Reiner Doku-Nit; „~50" ist ohnehin als ungefähr markiert, die
 konkrete „19" wandert mit. Optional beim nächsten CLAUDE.md-Touch nachziehen.
 Trivial — der schwächste Fund dieses Reviews.
+
+---
+
+## 🟡 Low (Nachtrag 5. Lauf)
+
+### #11 — `setConsent()`-Write-Fehler wird still verschluckt → Session- ≠ Persistenz-Zustand · `CrashReportConsentRepositoryImpl.kt:52` (via `CrashReportConsentController.kt:39`)
+
+**Kategorie:** correctness / robustness · **PLAUSIBLE**
+**Behauptung:** `CrashReportConsentRepositoryImpl.setConsent` fängt jede
+`Exception` um `dataStore.edit { … }` und meldet sie nur via
+`TimberWrapper.silentError` — der Aufruf kehrt normal zurück, „als ob"
+persistiert worden wäre. `persistConsent` (Controller, `applicationScope`)
+ist ohnehin fire-and-forget; die Aufrufer (`MainActivity` / `SettingsFragment`)
+setzen `ACRA.errorReporter.setEnabled(userGaveConsent)` aber **synchron und
+in-memory**. Schlägt der Write fehl, laufen beide Zustände auseinander.
+**Fehlerszenario:** Nutzer tippt Accept. ACRA wird für die laufende Session
+aktiviert. Der DataStore-`edit` wirft (Volllauf, korrupte Datei, IO). Der
+Fehler wird geloggt und verschluckt; `hasAsked`/`consent` bleiben ungesetzt.
+Beim nächsten Kaltstart liest der Bootstrap (`CrashReportConsentStore.hasConsent`)
+den alten/fehlenden Wert → ACRA startet **aus**, und `hasBeenAsked()` liefert
+`false` → der Dialog erscheint erneut. Der Nutzer hat zugestimmt, sieht die
+Zustimmung nächste Session aber nicht wieder — und wird nirgends über das
+Fehlschlagen informiert (der „enabled"-Toast erschien trotzdem).
+**Abgrenzung:** Das Swallow-to-`false` von #2 betrifft den **Read**-Pfad; hier
+ist es der **Write**-Pfad. Gegenrichtung zu #6: dort wird ein *falscher* Wert
+*erfolgreich* geschrieben (`hasAsked=true`), hier wird *gar nichts* geschrieben.
+Das Impl-Sad-Path-Verhalten ist bewusst getestet
+(`… when edit fails - does not crash and persists nothing`) — der Fund betrifft
+also nicht das „nicht crashen", sondern das fehlende Feedback + die
+Session/Store-Divergenz.
+**Bewertung:** Best-Effort-Telemetrie-Consent; seltener DataStore-Write-Fehler.
+Niedrigste Handlungsdringlichkeit — aber der einzige im unabhängigen 5. Lauf
+neu aufgetauchte Punkt, deshalb hier festgehalten.
 
 ---
 
