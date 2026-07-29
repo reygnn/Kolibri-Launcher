@@ -23,7 +23,12 @@ in der Übersichtstabelle und als Notiz-Block direkt beim jeweiligen Fund.
 gegen den laggenden Hot-Flow-Cache) und **#12** (behoben — `_singleScale` vor
 dem Restore-Clamp setzen); alle anderen tragen ihr Verdikt, sind aber **noch
 offen** — die Verdikte sind kein „done"-Haken. Die verbleibenden CONFIRMED sind
-Kosmetik/Nits oder Doc-Fixes (#8, #10, #11).
+Kosmetik/Nits oder Doc-Fixes (#8, #11).
+
+**Update 2026-07-29:** **#10** re-verifiziert → **REFUTED** (Fehlalarm; die
+ursprüngliche Verify-Kette brach vor `loadFromFile`s Catch-All ab, der jeden
+Throw auf `Error` → nutzersichtbares `ImportError`-Event mappt — Details bei
+#10 unten).
 
 > _Historischer Hinweis (Ursprungsfassung):_ Die Funde waren zunächst
 > **Behauptungen der Finder-Agenten mit Codebeleg, aber ohne Gegenprüfung** —
@@ -61,7 +66,7 @@ und ebenfalls unverifiziert.
 | 7 | ✅ behoben | Konsistenz | `ResetRepositoryImpl.kt:79` | Reset löschte Wallpaper-Bilddateien nicht → Fix: `purgeRepository()` ruft jetzt `clearAll()` (Details bei #7 unten) |
 | 8 | 🟡 low · CONFIRMED | Telemetrie | `KolibriLauncherApp.kt:461-485` | ANR-Watermark rückt auch bei fehlgeschlagenem Send vor |
 | 9 | 🟡 low · PARTIAL | Fehlerbehandlung | `KolibriLauncherApp.kt:363-366` | `shouldSend` berechnet, nie ausgewertet; verbrennt Cooldown |
-| 10 | 🟡 low · CONFIRMED | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Verschluckt Throws ohne Nutzer-Feedback |
+| 10 | ✅ REFUTED | Fehlerbehandlung | `UsageExportViewModel.kt:21` | Fehlalarm — `loadFromFile`-Catch-All mappt jeden Throw auf `Error` → `ImportError`-Event (Details bei #10 unten) |
 | 11 | 🟡 low · CONFIRMED | Nebenläufigkeit | `CrashReportConsent.kt:81/90` | Unstrukturierter `CoroutineScope(IO).launch` pro Klick |
 | 12 | ✅ behoben | Korrektheit | `ZoomableImageView.kt:341` | Restore clampte Skalierung gegen die *Vor-Restore*-Skalierung → Fix: Restore nicht mehr magnitude-clampen, nur korrupte Werte sanitisieren (Details bei #12 unten) |
 | 13 | 🟡 low · PARTIAL | UX / Fehlerbehandlung | `AppManagementDelegate.kt:126-137` | Irreführender „Fehler beim Starten"-Toast bei erfolgreichem Launch |
@@ -331,13 +336,28 @@ nichts.
 
 ### #10 — Usage-Export-ViewModel verschluckt Throws · `UsageExportViewModel.kt:21`
 
-> **🔎 VERDIKT (2026-07-27, verifiziert — noch offen): CONFIRMED (nur
-> Import-Pfad).** `UsageExportViewModel` überschreibt `errorEvent` nicht, und
-> `ImportUsageFromFileUseCase` hat kein try/catch. Ein *unerwarteter* Throw aus
-> `loadFromFile` (Content-URI/JSON-Parsing) wird vom `launchSafe`-Netz gefangen,
-> geloggt, aber nie dem Nutzer gezeigt — Spinner stoppt ohne Success/Error.
-> Erwartete Fehler und alle Export-Fehler werden korrekt gemeldet; die Lücke
-> betrifft nur echte unerwartete Import-Throws.
+> **✅ RESOLUTION (2026-07-29): REFUTED — Fehlalarm, Verify-Kette zu früh
+> abgebrochen.** Das ursprüngliche CONFIRMED stützte sich auf zwei korrekte,
+> aber unvollständige Beobachtungen: `UsageExportViewModel` überschreibt
+> `errorEvent` nicht (Default `null`, `BaseViewModel.kt:165`) und
+> `ImportUsageFromFileUseCase` hat kein try/catch (delegiert nur, `:15-17`).
+> Der Verify-Agent hat aber **nicht** in `loadFromFile` selbst hineingesehen:
+> `UsageExportRepositoryImpl.loadFromFile` (`:434-439`) hat einen Catch-All
+> `catch(CancellationException){throw} catch(Throwable){ silentError; return
+> UsageImportResult.Error("Load failed: …") }`; der JSON-Parsing-Pfad
+> `importFromJson` hat zusätzlich seinen eigenen `catch(Throwable)→Error`
+> (`:172-174`). Ein unerwarteter Throw kann `loadFromFile` also gar nicht als
+> Exception verlassen — er wird zu `Error`, und `handleImportResult` mappt das
+> auf `sendEvent(UsageExportUiEvent.ImportError(...))` (`:75-78`). **In Release
+> bekommt der Nutzer also immer Feedback** (Success / InvalidFormat /
+> UnsupportedVersion / Error).
+>
+> Der einzige „Swallow" ist DEBUG-only und **by design**: `silentError`
+> (`:437`) wirft in DEBUG erneut (`TimberWrapper.crashInDebug`, `:67-68`) —
+> der Throw eskaliert dann durch `launchSafe`→`handleError`→
+> `showErrorToastIfSupported()` = No-op (weil `errorEvent == null`), Spinner
+> stoppt, kein Toast. Das ist genau die gewollte Rule-9-Semantik („loud in
+> dev"), kein Production-Defekt. **Nichts umzusetzen.**
 
 **Kategorie:** Fehlerbehandlung
 **Behauptung:** Verschluckt unerwartete Throws ohne Nutzer-Feedback.
@@ -470,13 +490,14 @@ ist. Der innere try/catch liegt zudem redundant im vorhandenen
   gemeldet"**, nicht „bewiesen fehlerfrei".
 - Zeilennummern beziehen sich auf Commit `626e4d63`.
 
-**Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #10, #11, #12 · PARTIAL #3,
-#5, #6, #9, #13 · REFUTED #1 · behoben #1, #2, #4, #7, #12. Das zuvor einzige
+**Verifikations-Ergebnis:** CONFIRMED #2, #4, #8, #11, #12 · PARTIAL #3,
+#5, #6, #9, #13 · REFUTED #1, #10 · behoben #1, #2, #4, #7, #12.
+(#10 am 2026-07-29 von CONFIRMED auf REFUTED korrigiert.) Das zuvor einzige
 offen & klar actionable **#2** (Stale-Cache verwirft Import-Reihenfolge) ist
 seit 2026-07-27 behoben (Phase 2 nutzt die von Phase 1 geschriebene Menge,
 gepinnt durch `BackupDataAssemblerImportOrderStaleCacheTest`); ebenso **#4**
 (Main-Thread-Query → `withContext(ioDispatcher)`) und **#12** (Restore-Clamp
 gegen die Vor-Restore-Skalierung, gepinnt durch
 `ZoomableImageViewRestoreScaleRobolectricTest`). Die restlichen CONFIRMED
-sind Kosmetik/Nits oder Doc-Fixes (#8, #10, #11), die PARTIALs überwiegend
-kein umzusetzender Defekt.
+sind Kosmetik/Nits oder Doc-Fixes (#8, #11), die PARTIALs überwiegend
+kein umzusetzender Defekt. #10 wurde am 2026-07-29 auf REFUTED korrigiert.
