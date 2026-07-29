@@ -27,9 +27,10 @@ respektiert, das Contract-Test-Tripel (Contract + Fake- + Impl-Contract-Test)
 ist vollständig, Hilt-Qualifier-Idiome (`@param:ConsentDataStore`,
 `@param:ApplicationScope`) folgen dem Hausstil.
 
-Nur **zwei** kleinere Funde, beide **low**. Kein `critical`/`high`.
-Schweregrade sind Selbsteinschätzung des Reviews und **unverifiziert**
-(keine adversariale Verify-Phase gelaufen).
+**Fünf** kleinere Funde, alle **low**. Kein `critical`/`high`. Am ehesten
+handlungswürdig ist #1 (Stale-Summary), die restlichen vier sind
+vorbestehend-oder-kosmetisch. Schweregrade sind Selbsteinschätzung des Reviews
+und **unverifiziert** (keine adversariale Verify-Phase gelaufen).
 
 **Explizit als sauber bewertet / geprüft-und-verworfen:**
 
@@ -50,8 +51,11 @@ Schweregrade sind Selbsteinschätzung des Reviews und **unverifiziert**
 
 | # | Schweregrad | Kategorie | Datei:Zeile | Kurzfassung |
 |---|---|---|---|---|
-| 1 | 🟡 low · PLAUSIBLE | race-condition | `SettingsFragment.kt:480/567` | Settings-Summary liest Consent aus dem DataStore, während der Persist-Write auf einem anderen Scope noch läuft → evtl. Stale-Wert |
-| 2 | 🟡 low · CONFIRMED | efficiency | `MainActivity.kt:533-543` | Zwei DataStore-Reads + redundantes ACRA-Re-Affirm bei jedem Start (dupliziert den Bootstrap-Read) |
+| 1 | 🟡 low · CONFIRMED | race-condition | `SettingsFragment.kt:480` (Read `:567`) | Settings-Summary liest Consent aus dem DataStore, während der Persist-Write auf einem anderen Scope noch läuft → evtl. Stale-Wert |
+| 2 | 🟡 low · PLAUSIBLE | correctness | `CrashReportConsentRepositoryImpl.kt:40` | `read()` verschluckt jeden Read-Fehler zu `false` → kann ACRA für einen zustimmenden Nutzer transient deaktivieren / den Dialog erneut zeigen |
+| 3 | 🟡 low · PLAUSIBLE | altitude (Rule 10) | `MainActivity.kt:533` | Consent-Entscheidung (`if hasBeenAsked()`) liegt in der Activity statt im dafür eingeführten Controller → nicht JVM-getestet |
+| 4 | 🟡 low · CONFIRMED | efficiency | `MainActivity.kt:538` | Zwei getrennte DataStore-Reads (`hasBeenAsked` + `currentConsent`) beim häufigsten Start |
+| 5 | 🟡 low · PLAUSIBLE | simplification | `MainActivity.kt:539` | Redundantes `lifecycleScope.launch` um das synchrone `ACRA.setEnabled` → kein Nebenläufigkeitsgewinn, Cancel-Fenster |
 
 ---
 
@@ -78,22 +82,66 @@ Seiten laufen jetzt durch den in diesem Diff berührten Controller.)
 Summary aus dem gerade bekannten `userGaveConsent` setzen, statt neu aus dem
 Store zu lesen; oder den Persist awaiten, bevor die Summary aktualisiert wird.
 
-### #2 — Redundante DataStore-Reads + ACRA-Re-Affirm auf dem Startpfad · `MainActivity.kt:533-543`
+### #2 — `read()` verschluckt jeden Read-Fehler zu `false` · `CrashReportConsentRepositoryImpl.kt:40`
 
-**Kategorie:** efficiency / altitude
-**Behauptung:** Im „bereits beantwortet"-Zweig führt
-`checkAndShowCrashReportConsent` nacheinander `hasBeenAsked()` **und**
-`currentConsent()` aus — jeweils eine eigene `dataStore.data.first()`-Flow-
-Collection — und startet danach eine Coroutine, die
-`ACRA.errorReporter.setEnabled(consent)` aufruft.
+**Kategorie:** correctness / robustness
+**Behauptung:** `read()` fängt jede `Exception` und liefert `false`. Ein
+transienter DataStore-Read-Fehler meldet damit stumm „kein Consent / nicht
+gefragt" an das Startup-Gate und an das ACRA-Re-Affirm.
+**Fehlerszenario:** Bei einem Nutzer **mit** Consent führt ein transienter
+Fehler in `currentConsent()` (`MainActivity.kt:538`) zum Fallback `false` und
+`ACRA.errorReporter.setEnabled(false)` — Crash-Reporting, das der Bootstrap
+korrekt aktiviert hatte, wird für die gesamte Session deaktiviert. Analog
+liefert ein transienter Fehler von `hasBeenAsked()` (`:533`) `false` und der
+Dialog erscheint erneut, obwohl der Nutzer bereits geantwortet hat.
+**Bewertung:** Richtung ist privacy-safe und entspricht dem alten Verhalten,
+aber der Swallow-to-false macht den Inline-Kommentar „cheap re-affirm …
+covers a bootstrap read that failed" irreführend — das Re-Affirm kann einen
+korrekten enabled-Zustand aktiv **herabstufen**. Tritt nur bei (seltenem)
+DataStore-Read-Fehler auf. Niedrige Priorität.
+
+### #3 — Consent-Entscheidung liegt in der Activity, nicht im Controller · `MainActivity.kt:533`
+
+**Kategorie:** altitude (CLAUDE.md Rule 10)
+**Behauptung:** Die Entscheidung „schon gefragt → re-affirm, sonst Dialog
+zeigen" steht in `MainActivity.checkAndShowCrashReportConsent`, obwohl der
+`CrashReportConsentController` genau zur Koordination dieses Flows eingeführt
+wurde.
+**Fehlerszenario:** Rule 10 („state transitions, decisions belong in a
+ViewModel, use case, or helper"): der Zweig gehört in den Controller — z. B.
+ein `resolveConsentAction()`, das `ShowDialog` / `AffirmEnabled(consent)`
+zurückgibt —, damit er JVM-testbar ist. Aktuell sitzt die Entscheidung in
+einer Android-Runtime-Klasse ohne Unit-Coverage; die neuen Tests pinnen nur
+die dünne Delegation des Controllers, nicht das Gate selbst.
+**Bewertung:** Wartbarkeit/Testbarkeit, kein Laufzeitfehler. Niedrige Priorität.
+
+### #4 — Zwei getrennte DataStore-Reads im „bereits beantwortet"-Zweig · `MainActivity.kt:538`
+
+**Kategorie:** efficiency
+**Behauptung:** Der Zweig collectet den Consent-Store zweimal:
+`hasBeenAsked()` und danach `currentConsent()`, jeweils eine eigene
+`dataStore.data.first()`-Flow-Collection derselben Datei.
 **Fehlerszenario:** Beim häufigsten Start (der Nutzer hat schon geantwortet)
-zahlt jeder Kaltstart zwei redundante Consent-Store-Reads plus ein ACRA-Toggle,
-das `KolibriLauncherApp.attachBaseContext` bereits aus demselben gespeicherten
-Wert am Bootstrap gesetzt hat. Ein einzelner kombinierter Read (oder das
-Weglassen des Re-Affirm) würde genügen.
-**Bewertung:** Kein Korrektheitsfehler — der Kommentar an Ort und Stelle
-begründet das Re-Affirm bewusst als „covers a bootstrap read that failed".
-Nur Effizienz/Altitude auf einem Hot-Path (jeder Launch). Niedrige Priorität.
+zahlt jeder Kaltstart zwei volle Reads derselben Datei. Ein einzelner
+kombinierter Read (ein Repository-Call, der beide Flags liefert, oder ein
+wiederverwendeter Snapshot) würde die Startup-I/O halbieren.
+**Bewertung:** Reine Effizienz auf dem Startpfad. Niedrige Priorität.
+
+### #5 — Redundantes `lifecycleScope.launch` um synchrones `ACRA.setEnabled` · `MainActivity.kt:539`
+
+**Kategorie:** simplification
+**Behauptung:** Der „bereits beantwortet"-Zweig wickelt das synchrone
+`ACRA.errorReporter.setEnabled(consent)` + `Timber.i` in ein frisches
+`lifecycleScope.launch`, obwohl `checkAndShowCrashReportConsent` bereits eine
+`suspend`-Funktion unter `mainActivityExceptionHandler` ist.
+**Fehlerszenario:** Der zusätzliche Coroutine-Hop bringt keine Nebenläufigkeit
+(`setEnabled` ist synchron) und öffnet ein subtiles Fenster: wird
+`lifecycleScope` durch einen Config-Change zwischen `return` und dem Ablauf
+des `launch` gecancelt, läuft das Re-Affirm nie. Ein Inline-Aufruf (die
+Funktion ist bereits in einem supervidierten `suspend`-Kontext) ist einfacher
+und cancel-sicher.
+**Bewertung:** Cleanup; das Re-Affirm ist ohnehin nur belt-and-suspenders zum
+Bootstrap-Set. Niedrige Priorität.
 
 ---
 
