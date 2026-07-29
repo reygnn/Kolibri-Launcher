@@ -6,58 +6,41 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.text.HtmlCompat
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
  * UI-side helper for the ACRA crash-report consent dialog.
  *
- * Persistence (read/write of consent state) lives in
- * [CrashReportConsentStore] in the data layer. This object only owns
- * the AlertDialog and routes the user choice into the store.
+ * Pure view concern: it builds and shows the AlertDialog and reports the
+ * user's choice through [onResult]. It deliberately does NOT read or
+ * persist consent and owns NO coroutine scope of its own. The
+ * "already asked?" gate and the persistence both live in the caller via
+ * [CrashReportConsentController], which owns an app-lifetime scope and the
+ * consent use cases. (This removed the old detached
+ * `CoroutineScope(Dispatchers.IO).launch { saveConsent(...) }` per
+ * button click — AUDIT-9 #11.)
  *
  * Plain `Timber.e` here is grandfathered for now: the dialog's catches
  * are not on the pre-Hilt bootstrap path (unlike the store), so they
- * could migrate to `silentError`, but doing so is out of scope for
- * the data→ui cycle elimination that introduced this split.
+ * could migrate to `silentError`, but doing so is out of scope.
  */
 object CrashReportConsent {
 
     /**
-     * Shows the consent dialog if it has not been shown before.
-     * Otherwise, returns the stored consent state immediately.
+     * Shows the consent dialog. Reports the user's choice via [onResult]
+     * (`true` = accept, `false` = decline). Persistence and the ACRA
+     * enable/disable are the caller's responsibility.
      *
      * @param context Activity context, required to show a dialog.
      * @param onResult Callback delivering the consent result.
      * @return the shown [AlertDialog], or `null` if no dialog was shown
-     *   (consent already asked, non-Activity context, or a show error).
-     *   Callers should track the returned dialog and dismiss it on
-     *   `onDestroyView`/`onDestroy` so a config change can't leak its window.
-     */
-    suspend fun showConsentDialog(context: Context, onResult: (Boolean) -> Unit): AlertDialog? {
-        if (CrashReportConsentStore.hasAsked(context)) {
-            onResult(CrashReportConsentStore.hasConsent(context))
-            return null
-        }
-
-        return forceShowConsentDialog(context, onResult)
-    }
-
-    /**
-     * Forces the dialog regardless of previous interactions. Useful for
-     * letting the user revise their choice from the settings screen.
-     *
-     * @param context Activity context.
-     * @param onResult Callback delivering the new consent result.
-     * @return the shown [AlertDialog], or `null` if it could not be shown
-     *   (non-Activity context or a show error). The caller owns the
-     *   returned instance and must dismiss it on teardown to avoid a
-     *   leaked window on config change.
+     *   (non-Activity context or a show error). The dialog is
+     *   `setCancelable(false)`, so callers must track the returned instance
+     *   and dismiss it on `onDestroyView`/`onDestroy` to avoid leaking its
+     *   window across a config change.
      */
     suspend fun forceShowConsentDialog(context: Context, onResult: (Boolean) -> Unit): AlertDialog? {
         return withContext(Dispatchers.Main) {
@@ -77,20 +60,10 @@ object CrashReportConsent {
                     .setTitle(R.string.crash_report_dialog_title)
                     .setMessage(messageWithLink)
                     .setPositiveButton(R.string.crash_report_button_accept) { dialog, _ ->
-                        val appContext = context.applicationContext
-                        CoroutineScope(Dispatchers.IO).launch {
-                            CrashReportConsentStore.saveConsent(appContext, true)
-                        }
-
                         onResult(true)
                         dialog.dismiss()
                     }
                     .setNegativeButton(R.string.crash_report_button_decline) { dialog, _ ->
-                        val appContext = context.applicationContext
-                        CoroutineScope(Dispatchers.IO).launch {
-                            CrashReportConsentStore.saveConsent(appContext, false)
-                        }
-
                         onResult(false)
                         dialog.dismiss()
                     }

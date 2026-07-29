@@ -28,7 +28,6 @@ import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -42,6 +41,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
@@ -94,6 +94,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var crashReportConsentController: CrashReportConsentController
 
     // 1. Deklaration für die Preference
     // Tracked so onDestroyView can dismiss the currently-open dialog
@@ -458,7 +461,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         // setCancelable(false), so it stays up). AUDIT-3 #12.
                         currentDialog?.dismiss()
                         currentDialog = CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
-                            // Hier aktualisieren wir ACRA sofort nach der Entscheidung des Benutzers
+                            // Persist on the app-lifetime scope (structured;
+                            // replaces the dialog's old detached IO scope).
+                            crashReportConsentController.persistConsent(userGaveConsent)
+                            // ACRA's in-memory toggle stays here (app-layer side effect).
                             ACRA.errorReporter.setEnabled(userGaveConsent)
                             Timber.i("User consent for crash reports manually changed to: $userGaveConsent")
 
@@ -558,7 +564,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             try {
                 val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)
                     ?: return@withContext
-                val isEnabled = CrashReportConsentStore.hasConsent(requireContext())
+                val isEnabled = crashReportConsentController.currentConsent()
 
                 if (isEnabled) {
                     preference.summary = getString(R.string.crash_report_summary_enabled)

@@ -58,4 +58,18 @@ object DataStoreModule {
     fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.settingsDataStore
     }
+
+    /**
+     * The consent [consentDataStore], exposed to Hilt for the interactive
+     * (post-Hilt) path — `CrashReportConsentRepositoryImpl` injects it via
+     * [ConsentDataStore]. Same singleton the bootstrap `CrashReportConsentStore`
+     * reaches through the extension, so both see the same file. Qualified so it
+     * does not collide with the unqualified settings store above.
+     */
+    @Provides
+    @Singleton
+    @ConsentDataStore
+    fun provideConsentDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return context.consentDataStore
+    }
 }

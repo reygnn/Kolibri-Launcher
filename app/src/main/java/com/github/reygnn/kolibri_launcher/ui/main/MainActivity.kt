@@ -44,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -274,6 +275,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
     @Inject
     lateinit var appLauncher: AppLauncher
+    @Inject
+    lateinit var crashReportConsentController: CrashReportConsentController
 
     /**
      * Latest wallpaper-surface classification emitted by
@@ -527,7 +530,23 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private suspend fun checkAndShowCrashReportConsent() {
-        val consentDialog = CrashReportConsent.showConsentDialog(this) { userGaveConsent ->
+        if (crashReportConsentController.hasBeenAsked()) {
+            // Already answered on a previous launch. ACRA was set from the
+            // stored consent at bootstrap (attachBaseContext); re-affirm it
+            // here — cheap, and covers a bootstrap read that failed — without
+            // showing the dialog again.
+            val consent = crashReportConsentController.currentConsent()
+            lifecycleScope.launch(mainActivityExceptionHandler) {
+                ACRA.errorReporter.setEnabled(consent)
+                Timber.i("Crash-report consent already answered; ACRA enabled = $consent")
+            }
+            return
+        }
+
+        val consentDialog = CrashReportConsent.forceShowConsentDialog(this) { userGaveConsent ->
+            // Persist on the app-lifetime scope (structured concurrency;
+            // survives an immediate Activity teardown after the tap).
+            crashReportConsentController.persistConsent(userGaveConsent)
             lifecycleScope.launch(mainActivityExceptionHandler) {
                 ACRA.errorReporter.setEnabled(userGaveConsent)
                 Timber.i("User consent for crash reports is set to: $userGaveConsent")
@@ -535,8 +554,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
         // Track so onDestroy dismisses it. The consent dialog is
         // setCancelable(false), so a config change with it open would
-        // otherwise leak its window. null = already asked (no dialog shown),
-        // so don't clobber currentDialog in that case.
+        // otherwise leak its window. null = couldn't show, so don't clobber.
         if (consentDialog != null) {
             currentDialog?.dismiss()
             currentDialog = consentDialog
