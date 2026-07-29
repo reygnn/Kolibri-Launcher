@@ -87,14 +87,14 @@ respektiert, das Contract-Test-Tripel (Contract + Fake- + Impl-Contract-Test)
 ist vollständig, Hilt-Qualifier-Idiome (`@param:ConsentDataStore`,
 `@param:ApplicationScope`) folgen dem Hausstil.
 
-**Sieben** Funde: **einer `high`** (#6, im 2. Lauf ergänzt), **sechs `low`**.
+**Zwölf** Funde: **einer `high`** (#6, im 2. Lauf ergänzt), **elf `low`**.
 Kein `critical`. Klar handlungswürdig ist **#6**: der `onResult(false)`, den
 `forceShowConsentDialog` auch auf seinen **Fehlerpfaden** (Nicht-Activity-Kontext,
 gefangene `show()`-Exception) feuert, persistiert seit dem Refactor über den
 Controller `hasAsked=true` — ein einmaliges Anzeige-Versagen unterdrückt den
 Dialog dann **dauerhaft** und schreibt eine Ablehnung fest, die der Nutzer nie
 getroffen hat. Das ist eine Regression: vorher persistierte `onResult` nicht
-(der Write saß in den Button-Handlern). Die übrigen sechs sind
+(der Write saß in den Button-Handlern). Die übrigen elf sind
 vorbestehend-oder-kosmetisch. Schweregrade sind Selbsteinschätzung des Reviews
 und **unverifiziert** (keine adversariale Verify-Phase gelaufen).
 
