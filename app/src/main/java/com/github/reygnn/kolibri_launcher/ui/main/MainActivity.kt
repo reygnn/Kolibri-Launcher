@@ -55,7 +55,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.acra.ACRA
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -530,34 +529,32 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     private suspend fun checkAndShowCrashReportConsent() {
-        if (crashReportConsentController.hasBeenAsked()) {
-            // Already answered on a previous launch. ACRA was set from the
-            // stored consent at bootstrap (attachBaseContext); re-affirm it
-            // here — cheap, and covers a bootstrap read that failed — without
-            // showing the dialog again.
-            val consent = crashReportConsentController.currentConsent()
-            lifecycleScope.launch(mainActivityExceptionHandler) {
-                ACRA.errorReporter.setEnabled(consent)
-                Timber.i("Crash-report consent already answered; ACRA enabled = $consent")
+        when (val action = crashReportConsentController.resolveStartupAction()) {
+            is CrashReportConsentController.StartupAction.Reaffirm -> {
+                // Already answered on a previous launch. ACRA was set from the
+                // stored consent at bootstrap (attachBaseContext); re-affirm it
+                // here — cheap, and covers a bootstrap read that failed —
+                // without showing the dialog again. Synchronous: this runs
+                // under mainActivityExceptionHandler already, so no extra
+                // lifecycleScope.launch hop is needed (AUDIT-10 #5).
+                crashReportConsentController.reaffirmConsent(action.consent)
             }
-            return
-        }
 
-        val consentDialog = CrashReportConsent.forceShowConsentDialog(this) { userGaveConsent ->
-            // Persist on the app-lifetime scope (structured concurrency;
-            // survives an immediate Activity teardown after the tap).
-            crashReportConsentController.persistConsent(userGaveConsent)
-            lifecycleScope.launch(mainActivityExceptionHandler) {
-                ACRA.errorReporter.setEnabled(userGaveConsent)
-                Timber.i("User consent for crash reports is set to: $userGaveConsent")
+            CrashReportConsentController.StartupAction.ShowDialog -> {
+                val consentDialog = CrashReportConsent.forceShowConsentDialog(this) { userGaveConsent ->
+                    // Persist + apply the decision through the controller
+                    // (app-lifetime scope for the write; survives an immediate
+                    // Activity teardown after the tap). AUDIT-10 #12.
+                    crashReportConsentController.applyConsent(userGaveConsent)
+                }
+                // Track so onDestroy dismisses it. The consent dialog is
+                // setCancelable(false), so a config change with it open would
+                // otherwise leak its window. null = couldn't show, so don't clobber.
+                if (consentDialog != null) {
+                    currentDialog?.dismiss()
+                    currentDialog = consentDialog
+                }
             }
-        }
-        // Track so onDestroy dismisses it. The consent dialog is
-        // setCancelable(false), so a config change with it open would
-        // otherwise leak its window. null = couldn't show, so don't clobber.
-        if (consentDialog != null) {
-            currentDialog?.dismiss()
-            currentDialog = consentDialog
         }
     }
 

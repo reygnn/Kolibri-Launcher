@@ -55,7 +55,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.acra.ACRA
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -461,12 +460,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         // setCancelable(false), so it stays up). AUDIT-3 #12.
                         currentDialog?.dismiss()
                         currentDialog = CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
-                            // Persist on the app-lifetime scope (structured;
-                            // replaces the dialog's old detached IO scope).
-                            crashReportConsentController.persistConsent(userGaveConsent)
-                            // ACRA's in-memory toggle stays here (app-layer side effect).
-                            ACRA.errorReporter.setEnabled(userGaveConsent)
-                            Timber.i("User consent for crash reports manually changed to: $userGaveConsent")
+                            // Persist (on the app-lifetime scope) + apply to
+                            // ACRA through the controller — one source for the
+                            // sequence both callers used to duplicate
+                            // (AUDIT-10 #12).
+                            crashReportConsentController.applyConsent(userGaveConsent)
 
                             // Optional: Dem Nutzer Feedback geben
                             val feedbackMessage = if (userGaveConsent) {
@@ -476,9 +474,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             }
                             activityContext.showToastSafe(feedbackMessage)
 
-                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-                                updateCrashReportSummary()
-                            }
+                            // onResult runs on the main thread, so reflect the
+                            // just-made choice directly instead of re-reading
+                            // the store on a separate scope — which could race
+                            // the still-running persist write (AUDIT-10 #1).
+                            applyCrashReportSummary(userGaveConsent)
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -562,19 +562,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private suspend fun updateCrashReportSummary() {
         withContext(Dispatchers.Main) {
             try {
-                val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)
-                    ?: return@withContext
-                val isEnabled = crashReportConsentController.currentConsent()
-
-                if (isEnabled) {
-                    preference.summary = getString(R.string.crash_report_summary_enabled)
-                } else {
-                    preference.summary = getString(R.string.crash_report_summary_disabled)
-                }
+                // currentConsent() is a DataStore read (real I/O, can throw),
+                // which is what this catch is here for.
+                applyCrashReportSummary(crashReportConsentController.currentConsent())
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Could not update crash report summary")
             }
         }
+    }
+
+    /**
+     * Sets the crash-report preference summary from a known consent value —
+     * no store read. Must be called on the main thread.
+     */
+    private fun applyCrashReportSummary(isEnabled: Boolean) {
+        val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS) ?: return
+        preference.summary = getString(
+            if (isEnabled) {
+                R.string.crash_report_summary_enabled
+            } else {
+                R.string.crash_report_summary_disabled
+            }
+        )
     }
 
     private fun observeSettings() {

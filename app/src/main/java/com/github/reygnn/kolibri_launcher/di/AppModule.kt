@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggle
+import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggleImpl
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides
@@ -44,6 +46,15 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
+
+    /**
+     * The ACRA enable/disable seam. Behind an interface so
+     * [com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController]
+     * stays JVM-testable (see [CrashReportToggle] KDoc).
+     */
+    @Provides
+    @Singleton
+    fun provideCrashReportToggle(impl: CrashReportToggleImpl): CrashReportToggle = impl
 
     /**
      * The app's `versionName` from :app's BuildConfig, exposed for injection
