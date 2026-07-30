@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.ConsentDataStore
+import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -35,6 +36,21 @@ class CrashReportConsentRepositoryImpl @Inject constructor(
     override suspend fun hasConsent(): Boolean = read(CrashReportConsentStore.HAS_CONSENT_KEY, "consent")
 
     override suspend fun hasAsked(): Boolean = read(CrashReportConsentStore.HAS_ASKED_KEY, "has-asked")
+
+    override suspend fun readState(): CrashReportConsentState {
+        return try {
+            val prefs = dataStore.data.first()
+            CrashReportConsentState(
+                hasConsent = prefs[CrashReportConsentStore.HAS_CONSENT_KEY] ?: false,
+                hasAsked = prefs[CrashReportConsentStore.HAS_ASKED_KEY] ?: false,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TimberWrapper.silentError(e, "Failed to read crash-report consent state from DataStore")
+            CrashReportConsentState(hasConsent = false, hasAsked = false)
+        }
+    }
 
     private suspend fun read(key: Preferences.Key<Boolean>, label: String): Boolean {
         return try {

@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.HasAskedCrashReportConsentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCrashReportConsentUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -36,7 +36,7 @@ import javax.inject.Singleton
 class CrashReportConsentController @Inject constructor(
     @param:ApplicationScope private val applicationScope: CoroutineScope,
     private val getConsent: GetCrashReportConsentUseCase,
-    private val hasAsked: HasAskedCrashReportConsentUseCase,
+    private val getState: GetCrashReportConsentStateUseCase,
     private val setConsent: SetCrashReportConsentUseCase,
     private val crashReportToggle: CrashReportToggle,
 ) {
@@ -55,9 +55,15 @@ class CrashReportConsentController @Inject constructor(
      * carry the stored consent forward as [StartupAction.Reaffirm];
      * otherwise ask via [StartupAction.ShowDialog]. Lifting this decision
      * off the Activity keeps it unit-testable (AUDIT-10 #3).
+     *
+     * Reads both flags in one shot ([GetCrashReportConsentStateUseCase]),
+     * so the common "already answered" start pays a single store read
+     * instead of two (AUDIT-10 #4).
      */
-    suspend fun resolveStartupAction(): StartupAction =
-        if (hasBeenAsked()) StartupAction.Reaffirm(currentConsent()) else StartupAction.ShowDialog
+    suspend fun resolveStartupAction(): StartupAction {
+        val state = getState()
+        return if (state.hasAsked) StartupAction.Reaffirm(state.hasConsent) else StartupAction.ShowDialog
+    }
 
     /**
      * Applies a fresh user decision: persists it (on the app scope) and
@@ -89,9 +95,6 @@ class CrashReportConsentController @Inject constructor(
         applicationScope.launch { setConsent(consent) }
     }
 
-    /** Whether the consent dialog has already been answered once. */
-    suspend fun hasBeenAsked(): Boolean = hasAsked()
-
-    /** The current stored consent flag. */
+    /** The current stored consent flag (used to render the settings summary). */
     suspend fun currentConsent(): Boolean = getConsent()
 }

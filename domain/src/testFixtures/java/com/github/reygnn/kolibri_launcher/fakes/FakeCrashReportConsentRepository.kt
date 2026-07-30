@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
 
 /**
@@ -15,6 +16,9 @@ class FakeCrashReportConsentRepository : CrashReportConsentRepository {
     override suspend fun hasConsent(): Boolean = consent
 
     override suspend fun hasAsked(): Boolean = asked
+
+    override suspend fun readState(): CrashReportConsentState =
+        CrashReportConsentState(hasConsent = consent, hasAsked = asked)
 
     override suspend fun setConsent(consent: Boolean) {
         this.consent = consent

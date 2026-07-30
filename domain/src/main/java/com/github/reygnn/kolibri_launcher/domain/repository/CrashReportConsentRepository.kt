@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
+
 /**
  * Persistence contract for the ACRA crash-report consent state.
  *
@@ -26,6 +28,14 @@ interface CrashReportConsentRepository {
 
     /** Whether the consent dialog has been shown at least once already. */
     suspend fun hasAsked(): Boolean
+
+    /**
+     * Reads both flags in a single pass and returns them as a
+     * [CrashReportConsentState]. Prefer this over separate [hasConsent] +
+     * [hasAsked] calls on hot paths (launcher startup), where it avoids a
+     * second read of the same underlying store (AUDIT-10 #4).
+     */
+    suspend fun readState(): CrashReportConsentState
 
     /**
      * Records the user's consent choice and marks the dialog as asked.

@@ -53,6 +53,29 @@ class CrashReportConsentRepositoryImplTest {
     }
 
     @Test
+    fun `readState - when read fails - falls back to all-false state`() = runTest {
+        fakeDataStore.makeReadFail()
+
+        val state = repository.readState()
+
+        assertFalse(state.hasConsent)
+        assertFalse(state.hasAsked)
+    }
+
+    @Test
+    fun `readState - when read is cancelled - propagates CancellationException`() = runTest {
+        val cancellingStore = mockk<DataStore<Preferences>>()
+        every { cancellingStore.data } returns flow {
+            throw CancellationException("simulated read cancellation")
+        }
+        val repo = CrashReportConsentRepositoryImpl(cancellingStore)
+
+        assertFailsWith<CancellationException> {
+            repo.readState()
+        }
+    }
+
+    @Test
     fun `setConsent - when edit fails - does not crash and persists nothing`() = runTest {
         fakeDataStore.makeEditFail()
 
