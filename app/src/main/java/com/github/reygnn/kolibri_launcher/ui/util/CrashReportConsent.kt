@@ -6,10 +6,10 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.text.HtmlCompat
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 
 /**
  * UI-side helper for the ACRA crash-report consent dialog.
@@ -23,9 +23,11 @@ import timber.log.Timber
  * `CoroutineScope(Dispatchers.IO).launch { saveConsent(...) }` per
  * button click — AUDIT-9 #11.)
  *
- * Plain `Timber.e` here is grandfathered for now: the dialog's catches
- * are not on the pre-Hilt bootstrap path (unlike the store), so they
- * could migrate to `silentError`, but doing so is out of scope.
+ * Error logging uses `TimberWrapper.silentError`: the dialog's catches are
+ * NOT on the pre-Hilt bootstrap path (unlike the store), so the Rule 9
+ * grandfathering no longer applies. The throw-in-DEBUG semantic is
+ * desirable here — a dialog that fails to show is exactly the path that
+ * must not silently masquerade as a user decision (AUDIT-10 #6/#8).
  */
 object CrashReportConsent {
 
@@ -34,57 +36,72 @@ object CrashReportConsent {
      * (`true` = accept, `false` = decline). Persistence and the ACRA
      * enable/disable are the caller's responsibility.
      *
+     * [onResult] fires ONLY on a genuine user choice (an Accept/Decline
+     * button tap). A failure to show the dialog (non-Activity context or a
+     * `show()` error) does NOT invoke [onResult] — it is reported solely
+     * through a `null` return. This separation is deliberate: routing a
+     * show-failure through `onResult(false)` would let a display failure
+     * persist a decline the user never made (AUDIT-10 #6).
+     *
      * @param context Activity context, required to show a dialog.
-     * @param onResult Callback delivering the consent result.
+     * @param onResult Callback delivering a real user consent decision.
      * @return the shown [AlertDialog], or `null` if no dialog was shown
-     *   (non-Activity context or a show error). The dialog is
-     *   `setCancelable(false)`, so callers must track the returned instance
-     *   and dismiss it on `onDestroyView`/`onDestroy` to avoid leaking its
-     *   window across a config change.
+     *   (non-Activity context or a show error). A `null` return means "no
+     *   decision was made" — callers must not persist anything for it. The
+     *   dialog is `setCancelable(false)`, so callers must track the
+     *   returned instance and dismiss it on `onDestroyView`/`onDestroy` to
+     *   avoid leaking its window across a config change.
      */
     suspend fun forceShowConsentDialog(context: Context, onResult: (Boolean) -> Unit): AlertDialog? {
         return withContext(Dispatchers.Main) {
             if (context !is android.app.Activity) {
-                Timber.e("Cannot show dialog: Context is not an Activity (is ${context::class.java.simpleName})")
-                onResult(false)
+                TimberWrapper.silentError(
+                    IllegalStateException("Context is not an Activity (is ${context::class.java.simpleName})"),
+                    "Cannot show consent dialog: context is not an Activity"
+                )
                 return@withContext null
             }
 
-            try {
+            // The try wraps only the genuinely throwing part (HTML parse,
+            // builder, show()). If show() throws — e.g. BadTokenException on a
+            // finishing Activity — nothing is persisted and null propagates.
+            val dialog = try {
                 val messageWithLink = HtmlCompat.fromHtml(
                     context.getString(R.string.crash_report_dialog_message),
                     HtmlCompat.FROM_HTML_MODE_LEGACY
                 )
 
-                val dialog = AlertDialog.Builder(context)
+                AlertDialog.Builder(context)
                     .setTitle(R.string.crash_report_dialog_title)
                     .setMessage(messageWithLink)
-                    .setPositiveButton(R.string.crash_report_button_accept) { dialog, _ ->
+                    .setPositiveButton(R.string.crash_report_button_accept) { d, _ ->
                         onResult(true)
-                        dialog.dismiss()
+                        d.dismiss()
                     }
-                    .setNegativeButton(R.string.crash_report_button_decline) { dialog, _ ->
+                    .setNegativeButton(R.string.crash_report_button_decline) { d, _ ->
                         onResult(false)
-                        dialog.dismiss()
+                        d.dismiss()
                     }
                     .setCancelable(false)
                     .create()
-
-                dialog.show()
-
-                // Must come AFTER .show() so links become clickable.
-                dialog.findViewById<TextView>(android.R.id.message)?.apply {
-                    movementMethod = LinkMovementMethod.getInstance()
-                }
-
-                dialog
+                    .also { it.show() }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Timber.e(e, "Error showing consent dialog")
-                onResult(false)
+                TimberWrapper.silentError(e, "Error showing consent dialog")
                 null
-            }
+            } ?: return@withContext null
+
+            // Links become clickable only after show(). Pure view property
+            // write (no catch, Rule 11); kept OUTSIDE the show() try so a
+            // dialog that is already on screen is always returned and thus
+            // tracked/dismissable — never discarded to null after it became
+            // visible, which would leak its setCancelable(false) window
+            // (AUDIT-10 #9).
+            dialog.findViewById<TextView>(android.R.id.message)?.movementMethod =
+                LinkMovementMethod.getInstance()
+
+            dialog
         }
     }
 }

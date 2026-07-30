@@ -66,14 +66,17 @@ report() {
 # infrastructure files. CLAUDE.md Rule 9's exception list:
 #   - KolibriLauncherApp.kt, TimberWrapper.kt
 #   - BaseActivity.kt, BaseViewModel.kt
-#   - CrashReportLimiter.kt, CrashReportConsent.kt, CrashReportConsentStore.kt
+#   - CrashReportLimiter.kt, CrashReportConsentStore.kt
+#   (CrashReportConsent.kt was removed from this list: after the consent
+#    refactor it no longer sits on the pre-Hilt bootstrap path and now
+#    uses TimberWrapper.silentError — AUDIT-10 #8.)
 #   - BackupFragment's fragment-level CoroutineExceptionHandler (one
 #     line, identified by message text rather than line number so the
 #     check stays robust to imports / blank-line shifts).
 # Anything else uses TimberWrapper.silentError so the throw-in-DEBUG
 # semantic surfaces programmer-error bugs loudly.
 # ─────────────────────────────────────────────────────────────────────────────
-rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|CrashReportLimiter\.kt|CrashReportConsent\.kt|CrashReportConsentStore\.kt'
+rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|CrashReportLimiter\.kt|CrashReportConsentStore\.kt'
 
 rule9_hits=$(
   grep -rn 'Timber\.e(' "${src_roots[@]}" --include='*.kt' \
