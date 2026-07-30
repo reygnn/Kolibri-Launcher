@@ -71,7 +71,8 @@ in `:app`.
   domain/repository/      interfaces (FavoritesRepository,
                           CrashReportConsentRepository, …) — ~19 of them
   domain/usecase/         ~55 fine-grained use cases (GetDrawerAppsUseCase,
-                          Get/Set/HasAsked + GetCrashReportConsentState, …)
+                          Get/SetCrashReportConsent +
+                          GetCrashReportConsentState, …)
   domain/model/           data classes (AppInfo, HomeSettings, UiState,
                           AppContextMenuAction + LauncherActionLabel,
                           WallpaperState, LauncherShortcut,
@@ -88,11 +89,13 @@ in `:app`.
   di/RepositoryModule     @Binds for every repository interface
   di/DataStoreModule      two Preferences DataStores + their internal
                           Context.settingsDataStore / .consentDataStore
-                          extensions. Only settingsDataStore is Hilt-
-                          provided; consentDataStore is a separate store
-                          (own backing file) so ACRA consent stays
-                          privacy-by-default and out of Auto Backup, read
-                          via its extension on the pre-Hilt bootstrap path.
+                          extensions. Both are Hilt-provided (the consent
+                          one qualified, @ConsentDataStore, injected by
+                          CrashReportConsentRepositoryImpl); consentDataStore
+                          is a separate store (own backing file) so ACRA
+                          consent stays privacy-by-default and out of Auto
+                          Backup, and it is additionally read via its
+                          extension on the pre-Hilt bootstrap path.
 
 :app     (Android Application, depends on :domain + :data)
   ui/                     features: home, appdrawer, settings, onboarding,
@@ -374,9 +377,13 @@ activities.
     plain getters there (`hasConsent`/`hasAsked`) still fall back to
     `false` — deliberately: they only feed display and no write
     follows them. The `catch (Exception)` blocks in
-    `CrashReportConsentRepositoryImpl` are this contract, pinned by
-    `CrashReportConsentRepositoryContract` plus the impl sad-path
-    tests — not an accidental swallow.
+    `CrashReportConsentRepositoryImpl` are this contract, not an
+    accidental swallow. Note where each half is pinned: the contract
+    test only covers the SUCCESS shapes (`Loaded`, `Saved`) across fake
+    and impl — the failure branches are impl-only I/O and live in
+    `CrashReportConsentRepositoryImplTest` alone, which is therefore
+    the file that must go red if someone re-collapses a failure into a
+    default.
 
 12. **Use the short Timber call form.** Write `Timber.d(...)`,
     `Timber.w(...)`, `Timber.tag(...).e(...)` etc. — not

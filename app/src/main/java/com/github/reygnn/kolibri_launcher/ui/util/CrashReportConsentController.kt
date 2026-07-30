@@ -130,8 +130,10 @@ class CrashReportConsentController @Inject constructor(
      * The write is best-effort. Its [ConsentWriteResult] is inspected here
      * (not discarded): a [ConsentWriteResult.Failed] is logged so a persist
      * failure that leaves the store diverging from the just-applied in-memory
-     * ACRA state is visible, not silent. The unset `hasAsked` self-heals via
-     * re-ask on the next launch (AUDIT-10 #11).
+     * ACRA state is visible, not silent. Nothing is persisted in that case,
+     * so the previously stored state keeps winning on the next launch — the
+     * decision the user just made survives only for this session (AUDIT-10
+     * #11; see [ConsentWriteResult] for why this is not always a re-ask).
      */
     fun persistConsent(consent: Boolean) {
         applicationScope.launch {
@@ -141,7 +143,7 @@ class CrashReportConsentController @Inject constructor(
                     Timber.w(
                         result.cause,
                         "Crash-report consent persist failed; " +
-                            "in-memory ACRA already set to $consent, store will re-ask next launch",
+                            "in-memory ACRA set to $consent for this session, store keeps its previous state",
                     )
             }
         }

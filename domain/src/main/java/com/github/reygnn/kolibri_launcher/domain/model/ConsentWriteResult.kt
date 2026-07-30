@@ -12,9 +12,18 @@ package com.github.reygnn.kolibri_launcher.domain.model
  *
  * So the write reports its outcome instead of returning `Unit`: callers can
  * log/telemeter a [Failed] without having to await or handle it as an error.
- * The privacy-safe self-heal is intrinsic — a failed write leaves `hasAsked`
- * unset, so the dialog simply re-appears on the next launch rather than
- * pinning a choice the store never recorded.
+ * A failed write persists nothing, so it can never pin a choice the user did
+ * not make.
+ *
+ * It does NOT follow that the choice is always re-asked. That only holds for
+ * a first-ever decision on a readable store, where the still-unset `hasAsked`
+ * makes the startup gate show the dialog again. Two cases where it does not:
+ * a decision changed later (Settings), where `hasAsked` is already `true` and
+ * the gate re-affirms the OLD stored consent instead of asking; and a store
+ * that stays unreadable, where the gate skips entirely (see
+ * [ConsentReadResult]). In both, the failed write is simply lost and the
+ * previous stored state wins — which is why [Failed] must be surfaced to the
+ * user rather than only logged.
  */
 sealed interface ConsentWriteResult {
 

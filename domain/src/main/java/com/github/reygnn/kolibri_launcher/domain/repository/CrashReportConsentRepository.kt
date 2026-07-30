@@ -45,8 +45,11 @@ import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
  *    returns a [ConsentWriteResult] instead of `Unit`: on failure it persists
  *    nothing, reports via `silentError`, and returns [ConsentWriteResult.Failed]
  *    rather than throwing — so a caller that already switched ACRA in-memory
- *    can log the divergence instead of silently assuming success. The unset
- *    `hasAsked` self-heals via re-ask next launch. See AUDIT-10 #11.
+ *    can report the divergence instead of silently assuming success. Nothing
+ *    is persisted, so a failed write can never pin a choice the user did not
+ *    make; it is simply lost, and the previously stored state keeps winning.
+ *    See AUDIT-10 #11 and the [ConsentWriteResult] KDoc for when that does
+ *    and does not lead to a re-ask.
  *  - **The two plain getters stay total.** [hasConsent] / [hasAsked] fall
  *    back to `false` on an I/O failure. They only feed display and are never
  *    followed by a write, so an unknown state cannot escalate there — the
