@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCrashReportConsentUseCase
@@ -23,7 +24,10 @@ import javax.inject.Singleton
  *    app-lifetime [applicationScope] (`@ApplicationScope`, a
  *    `SupervisorJob`-backed scope), so it survives an immediate UI teardown
  *    after the tap (AUDIT-9 #11): structured concurrency under a known
- *    parent instead of the old detached `CoroutineScope(IO).launch`;
+ *    parent instead of the old detached `CoroutineScope(IO).launch`. The
+ *    write is best-effort and its result is observed, not assumed — a failed
+ *    persist is logged rather than left to diverge silently from the
+ *    in-memory ACRA state (AUDIT-10 #11);
  *  - applying a decision — [applyConsent] / [reaffirmConsent] fold the
  *    persist + ACRA toggle + log sequence that used to be duplicated across
  *    both callers into one place (AUDIT-10 #12).
@@ -66,14 +70,20 @@ class CrashReportConsentController @Inject constructor(
     }
 
     /**
-     * Applies a fresh user decision: persists it (on the app scope) and
-     * switches ACRA to match. Single source for the sequence both callers
-     * used to duplicate (AUDIT-10 #12).
+     * Applies a fresh user decision: switches ACRA to match (synchronous,
+     * in-memory, cannot fail) and persists the choice on the app scope
+     * (best-effort). Single source for the sequence both callers used to
+     * duplicate (AUDIT-10 #12).
+     *
+     * The session is honoured immediately by the toggle; the persist is
+     * fire-and-forget but no longer assumed to succeed — a failed write is
+     * observed and logged in [persistConsent] rather than silently diverging
+     * from the in-memory state (AUDIT-10 #11).
      */
     fun applyConsent(consent: Boolean) {
-        persistConsent(consent)
         crashReportToggle.setEnabled(consent)
         Timber.i("Crash-report consent applied: enabled = $consent")
+        persistConsent(consent)
     }
 
     /**
@@ -90,9 +100,25 @@ class CrashReportConsentController @Inject constructor(
      * Persists [consent] on the app-lifetime scope. Fire-and-forget from
      * the caller's point of view, but structured: cancellation and failures
      * are owned by the app scope's `SupervisorJob`, not orphaned.
+     *
+     * The write is best-effort. Its [ConsentWriteResult] is inspected here
+     * (not discarded): a [ConsentWriteResult.Failed] is logged so a persist
+     * failure that leaves the store diverging from the just-applied in-memory
+     * ACRA state is visible, not silent. The unset `hasAsked` self-heals via
+     * re-ask on the next launch (AUDIT-10 #11).
      */
     fun persistConsent(consent: Boolean) {
-        applicationScope.launch { setConsent(consent) }
+        applicationScope.launch {
+            when (val result = setConsent(consent)) {
+                ConsentWriteResult.Saved -> Unit
+                is ConsentWriteResult.Failed ->
+                    Timber.w(
+                        result.cause,
+                        "Crash-report consent persist failed; " +
+                            "in-memory ACRA already set to $consent, store will re-ask next launch",
+                    )
+            }
+        }
     }
 
     /** The current stored consent flag (used to render the settings summary). */

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentUseCase
@@ -20,8 +21,10 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 /**
  * Focused test for [CrashReportConsentController].
@@ -55,8 +58,15 @@ class CrashReportConsentControllerTest {
 
     private val getConsent = mockk<GetCrashReportConsentUseCase>()
     private val getState = mockk<GetCrashReportConsentStateUseCase>()
-    private val setConsent = mockk<SetCrashReportConsentUseCase>(relaxUnitFun = true)
+    private val setConsent = mockk<SetCrashReportConsentUseCase>()
     private val crashReportToggle = mockk<CrashReportToggle>(relaxUnitFun = true)
+
+    @Before
+    fun setup() {
+        // setConsent now returns a ConsentWriteResult; default the happy path.
+        // Tests that exercise the failure branch override this locally.
+        coEvery { setConsent(any()) } returns ConsentWriteResult.Saved
+    }
 
     @Test
     fun `persistConsent defers the write onto the injected app scope`() = runTest {
@@ -97,6 +107,39 @@ class CrashReportConsentControllerTest {
         // cancel above would kill the pending write and setConsent would never
         // run — turning this red. That is the regression the controller exists
         // to prevent (AUDIT-9 #11 / AUDIT-10 #7).
+        advanceUntilIdle()
+        coVerify(exactly = 1) { setConsent(true) }
+    }
+
+    @Test
+    fun `persistConsent does not crash when the write reports Failed`() = runTest {
+        // A best-effort persist that fails must be observed and logged, not
+        // rethrown into the app scope or assumed successful (AUDIT-10 #11).
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        coEvery { setConsent(true) } returns ConsentWriteResult.Failed(IOException("edit failed"))
+
+        controller.persistConsent(true)
+        advanceUntilIdle()
+
+        // The write was attempted and the Failed result was consumed on the
+        // app scope without surfacing as an uncaught exception (draining the
+        // scheduler above would have rethrown one).
+        coVerify(exactly = 1) { setConsent(true) }
+    }
+
+    @Test
+    fun `applyConsent still switches ACRA when the persist fails`() = runTest {
+        // The in-memory toggle is synchronous and independent of the write, so
+        // a failed persist must not stop ACRA from reflecting the session's
+        // choice (AUDIT-10 #11).
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        coEvery { setConsent(true) } returns ConsentWriteResult.Failed(IOException("edit failed"))
+
+        controller.applyConsent(true)
+
+        verify(exactly = 1) { crashReportToggle.setEnabled(true) }
         advanceUntilIdle()
         coVerify(exactly = 1) { setConsent(true) }
     }

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -27,11 +28,16 @@ import org.junit.Test
  *  3. [CrashReportConsentRepository.readState] returns exactly the same two
  *     flags as the individual getters — the combined read must not drift
  *     from `hasConsent()` / `hasAsked()` (AUDIT-10 #4).
+ *  4. A successful [CrashReportConsentRepository.setConsent] reports
+ *     [ConsentWriteResult.Saved] — the happy-path outcome both impls share.
  *
  * NOT IN CONTRACT — intentional drifts:
- *   - Error handling. The impl logs read/write failures via the DataStore
- *     safety envelope and falls back to `false`; the fake never fails. That
- *     is implementation detail, not part of the observable contract.
+ *   - FAILURE handling only. The impl fails closed on reads (privacy-safe
+ *     `false`) and reports [ConsentWriteResult.Failed] on a write error; the
+ *     fake never fails, so those are impl-only I/O details pinned by
+ *     `CrashReportConsentRepositoryImplTest`, not the observable contract.
+ *     The *shape* of the write result (Saved on success) IS in the contract
+ *     (see #4 above); only the Failed branch is out.
  *
  * @see FakeCrashReportConsentRepositoryContractTest
  * @see CrashReportConsentRepositoryImplContractTest
@@ -65,6 +71,12 @@ abstract class CrashReportConsentRepositoryContract {
         repo.setConsent(true)
         assertTrue(repo.hasConsent())
         assertTrue(repo.hasAsked())
+    }
+
+    @Test
+    fun `setConsent reports Saved on a successful write`() = runTest {
+        val repo = createRepository()
+        assertEquals(ConsentWriteResult.Saved, repo.setConsent(true))
     }
 
     @Test

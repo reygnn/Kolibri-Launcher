@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.ConsentDataStore
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
 import kotlinx.coroutines.CancellationException
@@ -27,6 +28,11 @@ import javax.inject.Singleton
  * path and therefore uses plain `Timber.e` per Rule 9), this impl runs
  * well after ACRA/Timber are wired, so it uses [TimberWrapper.silentError]
  * — read/write failures are logged and, in DEBUG, loud.
+ *
+ * Failure handling here is the deliberate best-effort contract documented on
+ * [CrashReportConsentRepository] (writes report a [ConsentWriteResult]),
+ * pinned by the contract + sad-path tests. The write's `catch (Exception)`
+ * below is that contract, not an accidental swallow (AUDIT-10 #11).
  */
 @Singleton
 class CrashReportConsentRepositoryImpl @Inject constructor(
@@ -63,16 +69,23 @@ class CrashReportConsentRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun setConsent(consent: Boolean) {
-        try {
+    override suspend fun setConsent(consent: Boolean): ConsentWriteResult {
+        return try {
             dataStore.edit { prefs ->
                 prefs[CrashReportConsentStore.HAS_CONSENT_KEY] = consent
                 prefs[CrashReportConsentStore.HAS_ASKED_KEY] = true
             }
+            ConsentWriteResult.Saved
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Best-effort persist: report the failure instead of throwing or
+            // swallowing it silently. Nothing was written, so hasAsked stays
+            // unset and the dialog self-heals via re-ask next launch. The
+            // caller (already switched ACRA in-memory) gets a Failed it can
+            // log rather than a false "saved" (AUDIT-10 #11).
             TimberWrapper.silentError(e, "Failed to save crash-report consent to DataStore")
+            ConsentWriteResult.Failed(e)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 
 /**
@@ -20,6 +21,23 @@ import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
  * `CrashReportConsentStore` directly (it runs before Hilt can inject this
  * repository). Both hit the same underlying `consentDataStore` file, so
  * they stay consistent.
+ *
+ * ## Failure model (best-effort telemetry consent — by design, contract-tested)
+ *
+ * This is opt-in crash telemetry, not user data: correctness of the *stored*
+ * flag is best-effort. This is a deliberate contract, pinned by
+ * `CrashReportConsentRepositoryContract` and the impl sad-path tests — it is
+ * not an unguarded swallow, and should not be re-flagged as one.
+ *
+ *  - **Writes are best-effort and report their outcome.** [setConsent]
+ *    returns a [ConsentWriteResult] instead of `Unit`: on failure it persists
+ *    nothing, reports via `silentError`, and returns [ConsentWriteResult.Failed]
+ *    rather than throwing — so a caller that already switched ACRA in-memory
+ *    can log the divergence instead of silently assuming success. The unset
+ *    `hasAsked` self-heals via re-ask next launch. See AUDIT-10 #11.
+ *
+ *  Cancellation is not a failure: [kotlinx.coroutines.CancellationException]
+ *  propagates on every path and is never collapsed into a [ConsentWriteResult.Failed].
  */
 interface CrashReportConsentRepository {
 
@@ -38,8 +56,11 @@ interface CrashReportConsentRepository {
     suspend fun readState(): CrashReportConsentState
 
     /**
-     * Records the user's consent choice and marks the dialog as asked.
-     * A single write updates both the consent and the "has asked" flag.
+     * Records the user's consent choice and marks the dialog as asked in a
+     * single write. Best-effort: returns [ConsentWriteResult.Saved] on
+     * success or [ConsentWriteResult.Failed] if the underlying write threw —
+     * it does not throw for an I/O failure (cancellation still propagates).
+     * See AUDIT-10 #11 and the class KDoc failure model.
      */
-    suspend fun setConsent(consent: Boolean)
+    suspend fun setConsent(consent: Boolean): ConsentWriteResult
 }

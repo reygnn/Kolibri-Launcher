@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.every
@@ -15,6 +16,8 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Impl-specific SAD-PATH tests for [CrashReportConsentRepositoryImpl].
@@ -25,7 +28,9 @@ import kotlin.test.assertFalse
  * "NOT IN CONTRACT" note):
  *   - a failed DataStore read falls back to `false` (never throws), so a
  *     corrupt/unreadable store keeps ACRA off (privacy-safe default);
- *   - a failed write is swallowed (best-effort persistence);
+ *   - a failed write does not throw and reports [ConsentWriteResult.Failed]
+ *     (best-effort persistence that is observable, not silently swallowed —
+ *     AUDIT-10 #11);
  *   - `CancellationException` is re-thrown on BOTH paths, never collapsed
  *     into the generic fallback — coroutine cancellation must propagate.
  */
@@ -76,14 +81,24 @@ class CrashReportConsentRepositoryImplTest {
     }
 
     @Test
-    fun `setConsent - when edit fails - does not crash and persists nothing`() = runTest {
+    fun `setConsent - when edit fails - reports Failed and persists nothing`() = runTest {
         fakeDataStore.makeEditFail()
 
-        // Must not throw despite the underlying edit failing.
-        repository.setConsent(true)
+        // Must not throw despite the underlying edit failing, and must report
+        // the failure rather than a false "saved" (AUDIT-10 #11).
+        val result = repository.setConsent(true)
 
+        assertIs<ConsentWriteResult.Failed>(result)
         // Read path is unaffected by the edit-fail flag; nothing was stored.
         assertFalse(repository.hasConsent())
+    }
+
+    @Test
+    fun `setConsent - on a successful write - reports Saved`() = runTest {
+        val result = repository.setConsent(true)
+
+        assertTrue(result is ConsentWriteResult.Saved)
+        assertTrue(repository.hasConsent())
     }
 
     @Test
