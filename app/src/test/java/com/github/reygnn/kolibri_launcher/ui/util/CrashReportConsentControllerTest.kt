@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentStateUseCase
@@ -44,7 +45,8 @@ import java.io.IOException
  * would stay green (AUDIT-10 #7).
  *
  * Also pins the startup decision ([CrashReportConsentController.resolveStartupAction],
- * AUDIT-10 #3) and the apply sequence ([CrashReportConsentController.applyConsent] /
+ * AUDIT-10 #3 — including the third branch, where an unreadable store must
+ * skip the gate instead of re-asking, AUDIT-10 #2) and the apply sequence ([CrashReportConsentController.applyConsent] /
  * [CrashReportConsentController.reaffirmConsent], AUDIT-10 #12) now that both
  * live on the controller instead of the Android-runtime callers. The ACRA
  * toggle goes through a faked [CrashReportToggle], so those paths are
@@ -159,7 +161,7 @@ class CrashReportConsentControllerTest {
     fun `resolveStartupAction shows the dialog when never asked`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
-        coEvery { getState() } returns CrashReportConsentState(hasConsent = false, hasAsked = false)
+        coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = false, hasAsked = false))
 
         assertEquals(
             CrashReportConsentController.StartupAction.ShowDialog,
@@ -171,7 +173,7 @@ class CrashReportConsentControllerTest {
     fun `resolveStartupAction re-affirms the stored consent when already asked`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
-        coEvery { getState() } returns CrashReportConsentState(hasConsent = true, hasAsked = true)
+        coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = true, hasAsked = true))
 
         assertEquals(
             CrashReportConsentController.StartupAction.Reaffirm(true),
@@ -180,10 +182,40 @@ class CrashReportConsentControllerTest {
     }
 
     @Test
+    fun `resolveStartupAction skips the gate when the state is unreadable`() = runTest {
+        // An unreadable store must NOT be treated as "never asked": the dialog
+        // branch writes back whatever the user taps, so a transient read
+        // failure could otherwise overwrite a stored decision (AUDIT-10 #2).
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        coEvery { getState() } returns ConsentReadResult.Unavailable(IOException("read failed"))
+
+        assertEquals(
+            CrashReportConsentController.StartupAction.Skip,
+            controller.resolveStartupAction()
+        )
+    }
+
+    @Test
+    fun `resolveStartupAction leaves ACRA untouched when the state is unreadable`() = runTest {
+        // Skip means "do nothing": ACRA keeps whatever the bootstrap read
+        // established, and nothing is persisted (AUDIT-10 #2).
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        coEvery { getState() } returns ConsentReadResult.Unavailable(IOException("read failed"))
+
+        controller.resolveStartupAction()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { crashReportToggle.setEnabled(any()) }
+        coVerify(exactly = 0) { setConsent(any()) }
+    }
+
+    @Test
     fun `resolveStartupAction reads the consent state only once`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
-        coEvery { getState() } returns CrashReportConsentState(hasConsent = false, hasAsked = true)
+        coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = false, hasAsked = true))
 
         controller.resolveStartupAction()
 

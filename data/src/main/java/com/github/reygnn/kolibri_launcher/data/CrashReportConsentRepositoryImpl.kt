@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.ConsentDataStore
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
@@ -30,9 +31,12 @@ import javax.inject.Singleton
  * — read/write failures are logged and, in DEBUG, loud.
  *
  * Failure handling here is the deliberate best-effort contract documented on
- * [CrashReportConsentRepository] (writes report a [ConsentWriteResult]),
- * pinned by the contract + sad-path tests. The write's `catch (Exception)`
- * below is that contract, not an accidental swallow (AUDIT-10 #11).
+ * [CrashReportConsentRepository]: [readState] reports a [ConsentReadResult],
+ * [setConsent] a [ConsentWriteResult], and neither throws for I/O. The
+ * `catch (Exception)` blocks below are that contract — they turn a failure
+ * into a value the caller can act on, not into silence (AUDIT-10 #2 / #11).
+ * Only the two plain getters still fall back to `false`; they feed display
+ * only and are never followed by a write.
  */
 @Singleton
 class CrashReportConsentRepositoryImpl @Inject constructor(
@@ -43,18 +47,24 @@ class CrashReportConsentRepositoryImpl @Inject constructor(
 
     override suspend fun hasAsked(): Boolean = read(CrashReportConsentStore.HAS_ASKED_KEY, "has-asked")
 
-    override suspend fun readState(): CrashReportConsentState {
+    override suspend fun readState(): ConsentReadResult {
         return try {
             val prefs = dataStore.data.first()
-            CrashReportConsentState(
-                hasConsent = prefs[CrashReportConsentStore.HAS_CONSENT_KEY] ?: false,
-                hasAsked = prefs[CrashReportConsentStore.HAS_ASKED_KEY] ?: false,
+            ConsentReadResult.Loaded(
+                CrashReportConsentState(
+                    hasConsent = prefs[CrashReportConsentStore.HAS_CONSENT_KEY] ?: false,
+                    hasAsked = prefs[CrashReportConsentStore.HAS_ASKED_KEY] ?: false,
+                )
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Report the unknown state instead of collapsing it into the
+            // all-false default: the caller's "not asked" branch writes back,
+            // so a failed read must not be able to overwrite a stored
+            // decision (AUDIT-10 #2).
             TimberWrapper.silentError(e, "Failed to read crash-report consent state from DataStore")
-            CrashReportConsentState(hasConsent = false, hasAsked = false)
+            ConsentReadResult.Unavailable(e)
         }
     }
 

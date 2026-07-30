@@ -531,13 +531,26 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     private suspend fun checkAndShowCrashReportConsent() {
         when (val action = crashReportConsentController.resolveStartupAction()) {
             is CrashReportConsentController.StartupAction.Reaffirm -> {
-                // Already answered on a previous launch. ACRA was set from the
-                // stored consent at bootstrap (attachBaseContext); re-affirm it
-                // here — cheap, and covers a bootstrap read that failed —
-                // without showing the dialog again. Synchronous: this runs
-                // under mainActivityExceptionHandler already, so no extra
+                // Already answered on a previous launch (this branch is only
+                // reached when the state read SUCCEEDED with hasAsked == true).
+                // ACRA was set from the stored consent at bootstrap
+                // (attachBaseContext); re-affirm it here — cheap, and covers a
+                // bootstrap read that failed — without showing the dialog
+                // again. Synchronous: this runs under
+                // mainActivityExceptionHandler already, so no extra
                 // lifecycleScope.launch hop is needed (AUDIT-10 #5).
                 crashReportConsentController.reaffirmConsent(action.consent)
+            }
+
+            CrashReportConsentController.StartupAction.Skip -> {
+                // Consent state unreadable — it is unknown whether the user was
+                // ever asked. Doing nothing is the only safe option: showing the
+                // dialog would write back whatever gets tapped and could
+                // overwrite a decision the user already made, while flipping
+                // ACRA would act on a state we do not know. ACRA keeps what the
+                // bootstrap read established; the next launch reads again. The
+                // failure itself is already logged in the controller
+                // (AUDIT-10 #2).
             }
 
             CrashReportConsentController.StartupAction.ShowDialog -> {

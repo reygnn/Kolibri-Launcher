@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -26,8 +27,13 @@ import kotlin.test.assertTrue
  * [CrashReportConsentRepositoryImplContractTest]. This file covers the
  * error envelope the contract deliberately leaves out (see the contract's
  * "NOT IN CONTRACT" note):
- *   - a failed DataStore read falls back to `false` (never throws), so a
- *     corrupt/unreadable store keeps ACRA off (privacy-safe default);
+ *   - a failed `hasConsent`/`hasAsked` read falls back to `false` (never
+ *     throws), so a corrupt/unreadable store keeps ACRA off (privacy-safe
+ *     default);
+ *   - a failed [CrashReportConsentRepositoryImpl.readState] does not throw
+ *     and reports [ConsentReadResult.Unavailable] instead of the all-false
+ *     state, so the startup gate can tell "unreadable" from "never asked"
+ *     (AUDIT-10 #2);
  *   - a failed write does not throw and reports [ConsentWriteResult.Failed]
  *     (best-effort persistence that is observable, not silently swallowed —
  *     AUDIT-10 #11);
@@ -58,13 +64,27 @@ class CrashReportConsentRepositoryImplTest {
     }
 
     @Test
-    fun `readState - when read fails - falls back to all-false state`() = runTest {
+    fun `readState - when read fails - reports Unavailable`() = runTest {
         fakeDataStore.makeReadFail()
 
-        val state = repository.readState()
+        // Must not throw, and must not collapse into the all-false state:
+        // "unreadable" has to stay distinguishable from "never asked", or the
+        // startup gate would show a dialog that writes back over a stored
+        // decision (AUDIT-10 #2).
+        val result = repository.readState()
 
-        assertFalse(state.hasConsent)
-        assertFalse(state.hasAsked)
+        assertIs<ConsentReadResult.Unavailable>(result)
+    }
+
+    @Test
+    fun `readState - on a readable store - reports Loaded`() = runTest {
+        repository.setConsent(true)
+
+        val result = repository.readState()
+
+        assertIs<ConsentReadResult.Loaded>(result)
+        assertTrue(result.state.hasConsent)
+        assertTrue(result.state.hasAsked)
     }
 
     @Test

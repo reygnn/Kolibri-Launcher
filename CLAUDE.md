@@ -75,8 +75,9 @@ in `:app`.
   domain/model/           data classes (AppInfo, HomeSettings, UiState,
                           AppContextMenuAction + LauncherActionLabel,
                           WallpaperState, LauncherShortcut,
-                          CrashReportConsentState, ConsentWriteResult, …) —
-                          pure Kotlin, no Parcelable / no Android imports.
+                          CrashReportConsentState, ConsentRead/WriteResult,
+                          …) — pure Kotlin, no Parcelable / no Android
+                          imports.
   di/DispatcherModule     @Provides for Default/IO/Main + ApplicationScope
 
 :data    (Android Library, depends on :domain)
@@ -354,6 +355,28 @@ activities.
     itself lives in `tools/check-rule11-annotation.awk`; regression-
     test any regex change via `tools/check-conventions-test.sh` (not
     wired into CI, manual rerun).
+
+    **A caught failure must stay a failure — return it, don't erase
+    it.** The sanctioned alternative to propagating an exception is
+    reporting the outcome as a value, not collapsing it into a
+    plausible-looking default. `CrashReportConsentRepository` is the
+    reference: `readState()` returns `ConsentReadResult`
+    (`Loaded`/`Unavailable`), `setConsent()` returns
+    `ConsentWriteResult` (`Saved`/`Failed`), neither throws for I/O,
+    and `CancellationException` still propagates on every path. The
+    reason is not tidiness — a default that is indistinguishable from
+    a real answer *acts*: an unreadable consent store collapsed to
+    "not asked yet" would make the startup gate show a dialog whose
+    answer overwrites the decision the user already made (AUDIT-10
+    #2), and a write that returns `Unit` on failure lets the caller
+    assume a save that never happened (AUDIT-10 #11). Ask what the
+    fallback *causes* downstream, not just whether it looks safe. Two
+    plain getters there (`hasConsent`/`hasAsked`) still fall back to
+    `false` — deliberately: they only feed display and no write
+    follows them. The `catch (Exception)` blocks in
+    `CrashReportConsentRepositoryImpl` are this contract, pinned by
+    `CrashReportConsentRepositoryContract` plus the impl sad-path
+    tests — not an accidental swallow.
 
 12. **Use the short Timber call form.** Write `Timber.d(...)`,
     `Timber.w(...)`, `Timber.tag(...).e(...)` etc. — not

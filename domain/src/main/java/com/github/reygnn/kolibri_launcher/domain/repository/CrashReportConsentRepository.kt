@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 
@@ -25,35 +26,61 @@ import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
  * ## Failure model (best-effort telemetry consent — by design, contract-tested)
  *
  * This is opt-in crash telemetry, not user data: correctness of the *stored*
- * flag is best-effort. This is a deliberate contract, pinned by
- * `CrashReportConsentRepositoryContract` and the impl sad-path tests — it is
- * not an unguarded swallow, and should not be re-flagged as one.
+ * flag is best-effort, and I/O failures are never propagated as exceptions.
+ * They are not swallowed either — both directions report their outcome as a
+ * value, so a caller can tell a real answer from a failure. This is a
+ * deliberate contract, pinned by `CrashReportConsentRepositoryContract` and
+ * the impl sad-path tests; it should not be re-flagged as an unguarded
+ * swallow.
  *
+ *  - **The decision-driving read reports its outcome.** [readState] returns
+ *    a [ConsentReadResult]: [ConsentReadResult.Loaded] with the stored flags,
+ *    or [ConsentReadResult.Unavailable] if the read threw. This matters
+ *    because the "not asked yet" branch of the startup gate ends in a
+ *    non-cancelable dialog that writes back whatever the user taps —
+ *    collapsing an unreadable store into "not asked" would let a transient
+ *    I/O failure overwrite a decision the user already made. An unknown
+ *    state instead makes the gate do nothing. See AUDIT-10 #2.
  *  - **Writes are best-effort and report their outcome.** [setConsent]
  *    returns a [ConsentWriteResult] instead of `Unit`: on failure it persists
  *    nothing, reports via `silentError`, and returns [ConsentWriteResult.Failed]
  *    rather than throwing — so a caller that already switched ACRA in-memory
  *    can log the divergence instead of silently assuming success. The unset
  *    `hasAsked` self-heals via re-ask next launch. See AUDIT-10 #11.
+ *  - **The two plain getters stay total.** [hasConsent] / [hasAsked] fall
+ *    back to `false` on an I/O failure. They only feed display and are never
+ *    followed by a write, so an unknown state cannot escalate there — the
+ *    tri-state is deliberately confined to [readState].
  *
  *  Cancellation is not a failure: [kotlinx.coroutines.CancellationException]
- *  propagates on every path and is never collapsed into a [ConsentWriteResult.Failed].
+ *  propagates on every path and is never collapsed into an
+ *  [ConsentReadResult.Unavailable] / [ConsentWriteResult.Failed].
  */
 interface CrashReportConsentRepository {
 
-    /** Whether the user has consented to ACRA crash reporting. */
+    /**
+     * Whether the user has consented to ACRA crash reporting. Total: an I/O
+     * failure yields `false` (see the class KDoc failure model).
+     */
     suspend fun hasConsent(): Boolean
 
-    /** Whether the consent dialog has been shown at least once already. */
+    /**
+     * Whether the consent dialog has been shown at least once already. Total:
+     * an I/O failure yields `false` (see the class KDoc failure model).
+     */
     suspend fun hasAsked(): Boolean
 
     /**
-     * Reads both flags in a single pass and returns them as a
-     * [CrashReportConsentState]. Prefer this over separate [hasConsent] +
-     * [hasAsked] calls on hot paths (launcher startup), where it avoids a
-     * second read of the same underlying store (AUDIT-10 #4).
+     * Reads both flags in a single pass. Prefer this over separate
+     * [hasConsent] + [hasAsked] calls on hot paths (launcher startup), where
+     * it avoids a second read of the same underlying store (AUDIT-10 #4).
+     *
+     * Returns [ConsentReadResult.Loaded] with the stored
+     * [CrashReportConsentState], or [ConsentReadResult.Unavailable] if the
+     * read failed — an unreadable store must stay distinguishable from a
+     * stored "not asked yet" (AUDIT-10 #2).
      */
-    suspend fun readState(): CrashReportConsentState
+    suspend fun readState(): ConsentReadResult
 
     /**
      * Records the user's consent choice and marks the dialog as asked in a

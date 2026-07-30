@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetCrashReportConsentUseCase
@@ -19,7 +20,8 @@ import javax.inject.Singleton
  * It owns three responsibilities so the Android-runtime callers stay thin
  * glue (Rule 10):
  *  - the startup decision — [resolveStartupAction] returns whether to show
- *    the dialog or just re-affirm ACRA from the stored value (AUDIT-10 #3);
+ *    the dialog, just re-affirm ACRA from the stored value, or do nothing
+ *    because the store was unreadable (AUDIT-10 #3 / #2);
  *  - persistence — [persistConsent] runs the write on the injected
  *    app-lifetime [applicationScope] (`@ApplicationScope`, a
  *    `SupervisorJob`-backed scope), so it survives an immediate UI teardown
@@ -52,6 +54,13 @@ class CrashReportConsentController @Inject constructor(
 
         /** Already answered; re-affirm ACRA from the stored [consent]. */
         data class Reaffirm(val consent: Boolean) : StartupAction
+
+        /**
+         * The stored state could not be read, so it is unknown whether the
+         * user was ever asked. Do nothing this launch: leave ACRA on what the
+         * bootstrap read established and try again next start (AUDIT-10 #2).
+         */
+        data object Skip : StartupAction
     }
 
     /**
@@ -63,10 +72,27 @@ class CrashReportConsentController @Inject constructor(
      * Reads both flags in one shot ([GetCrashReportConsentStateUseCase]),
      * so the common "already answered" start pays a single store read
      * instead of two (AUDIT-10 #4).
+     *
+     * A failed read yields [StartupAction.Skip], never [StartupAction.ShowDialog]:
+     * the dialog branch writes back whatever the user taps, so treating an
+     * unreadable store as "not asked yet" would let a transient I/O failure
+     * overwrite a decision the user had already made (AUDIT-10 #2).
      */
-    suspend fun resolveStartupAction(): StartupAction {
-        val state = getState()
-        return if (state.hasAsked) StartupAction.Reaffirm(state.hasConsent) else StartupAction.ShowDialog
+    suspend fun resolveStartupAction(): StartupAction = when (val result = getState()) {
+        is ConsentReadResult.Loaded ->
+            if (result.state.hasAsked) {
+                StartupAction.Reaffirm(result.state.hasConsent)
+            } else {
+                StartupAction.ShowDialog
+            }
+
+        is ConsentReadResult.Unavailable -> {
+            Timber.w(
+                result.cause,
+                "Crash-report consent state unreadable; leaving ACRA as the bootstrap set it and re-reading next launch",
+            )
+            StartupAction.Skip
+        }
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.domain.model.ConsentWriteResult
+import com.github.reygnn.kolibri_launcher.domain.model.CrashReportConsentState
 import com.github.reygnn.kolibri_launcher.domain.repository.CrashReportConsentRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -29,15 +31,16 @@ import org.junit.Test
  *     flags as the individual getters — the combined read must not drift
  *     from `hasConsent()` / `hasAsked()` (AUDIT-10 #4).
  *  4. A successful [CrashReportConsentRepository.setConsent] reports
- *     [ConsentWriteResult.Saved] — the happy-path outcome both impls share.
+ *     [ConsentWriteResult.Saved], a successful [readState] reports
+ *     [ConsentReadResult.Loaded] — the happy-path outcomes both impls share.
  *
  * NOT IN CONTRACT — intentional drifts:
- *   - FAILURE handling only. The impl fails closed on reads (privacy-safe
- *     `false`) and reports [ConsentWriteResult.Failed] on a write error; the
- *     fake never fails, so those are impl-only I/O details pinned by
- *     `CrashReportConsentRepositoryImplTest`, not the observable contract.
- *     The *shape* of the write result (Saved on success) IS in the contract
- *     (see #4 above); only the Failed branch is out.
+ *   - FAILURE handling only. The impl reports [ConsentReadResult.Unavailable]
+ *     on a failed [readState] and [ConsentWriteResult.Failed] on a write
+ *     error; the fake never fails, so those are impl-only I/O details pinned
+ *     by `CrashReportConsentRepositoryImplTest`, not the observable contract.
+ *     The *shape* of both results on success IS in the contract (see #4
+ *     above); only the failure branches are out.
  *
  * @see FakeCrashReportConsentRepositoryContractTest
  * @see CrashReportConsentRepositoryImplContractTest
@@ -80,6 +83,15 @@ abstract class CrashReportConsentRepositoryContract {
     }
 
     @Test
+    fun `readState reports Loaded on a readable store`() = runTest {
+        val repo = createRepository()
+        assertEquals(
+            ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = false, hasAsked = false)),
+            repo.readState(),
+        )
+    }
+
+    @Test
     fun `setConsent false still marks asked`() = runTest {
         val repo = createRepository()
         repo.setConsent(false)
@@ -103,7 +115,7 @@ abstract class CrashReportConsentRepositoryContract {
         val repo = createRepository()
 
         // Fresh: privacy-by-default.
-        repo.readState().let { state ->
+        repo.loadedState().let { state ->
             assertFalse(state.hasConsent)
             assertFalse(state.hasAsked)
             assertEquals(repo.hasConsent(), state.hasConsent)
@@ -112,7 +124,7 @@ abstract class CrashReportConsentRepositoryContract {
 
         // After consenting.
         repo.setConsent(true)
-        repo.readState().let { state ->
+        repo.loadedState().let { state ->
             assertTrue(state.hasConsent)
             assertTrue(state.hasAsked)
             assertEquals(repo.hasConsent(), state.hasConsent)
@@ -121,11 +133,22 @@ abstract class CrashReportConsentRepositoryContract {
 
         // After declining: asked stays true, consent flips off.
         repo.setConsent(false)
-        repo.readState().let { state ->
+        repo.loadedState().let { state ->
             assertFalse(state.hasConsent)
             assertTrue(state.hasAsked)
             assertEquals(repo.hasConsent(), state.hasConsent)
             assertEquals(repo.hasAsked(), state.hasAsked)
         }
+    }
+
+    /**
+     * A readable store must report [ConsentReadResult.Loaded] — an
+     * [ConsentReadResult.Unavailable] here would mean the happy path itself
+     * lost the state, which no impl may do (AUDIT-10 #2).
+     */
+    private suspend fun CrashReportConsentRepository.loadedState(): CrashReportConsentState {
+        val result = readState()
+        assertTrue("Expected Loaded on a readable store, got $result", result is ConsentReadResult.Loaded)
+        return (result as ConsentReadResult.Loaded).state
     }
 }
