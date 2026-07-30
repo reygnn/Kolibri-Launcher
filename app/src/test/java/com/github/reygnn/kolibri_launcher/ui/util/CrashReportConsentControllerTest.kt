@@ -49,8 +49,9 @@ import java.io.IOException
  * skip the gate instead of re-asking, AUDIT-10 #2) and the apply sequence ([CrashReportConsentController.applyConsent] /
  * [CrashReportConsentController.reaffirmConsent], AUDIT-10 #12) now that both
  * live on the controller instead of the Android-runtime callers. The ACRA
- * toggle goes through a faked [CrashReportToggle], so those paths are
- * JVM-verifiable.
+ * toggle and the "could not be saved" toast go through faked
+ * [CrashReportToggle] / [ConsentSaveFailureNotifier] seams, so those paths are
+ * JVM-verifiable without ACRA or a Context.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CrashReportConsentControllerTest {
@@ -62,6 +63,7 @@ class CrashReportConsentControllerTest {
     private val getState = mockk<GetCrashReportConsentStateUseCase>()
     private val setConsent = mockk<SetCrashReportConsentUseCase>()
     private val crashReportToggle = mockk<CrashReportToggle>(relaxUnitFun = true)
+    private val saveFailureNotifier = mockk<ConsentSaveFailureNotifier>(relaxUnitFun = true)
 
     @Before
     fun setup() {
@@ -73,7 +75,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `persistConsent defers the write onto the injected app scope`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
 
         controller.persistConsent(true)
 
@@ -92,7 +94,7 @@ class CrashReportConsentControllerTest {
         // the app scope for the injected @ApplicationScope.
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         val callerScope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
 
         // The UI triggers the persist from its own lifecycle scope and is torn
         // down in the very same turn — persistConsent launches the write on the
@@ -118,7 +120,7 @@ class CrashReportConsentControllerTest {
         // A best-effort persist that fails must be observed and logged, not
         // rethrown into the app scope or assumed successful (AUDIT-10 #11).
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { setConsent(true) } returns ConsentWriteResult.Failed(IOException("edit failed"))
 
         controller.persistConsent(true)
@@ -131,12 +133,38 @@ class CrashReportConsentControllerTest {
     }
 
     @Test
+    fun `persistConsent tells the user when the write reports Failed`() = runTest {
+        // The confirmation toast the caller already showed says the choice was
+        // applied; if the write then fails, the user must learn that it only
+        // holds for this session (AUDIT-10 #11).
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
+        coEvery { setConsent(false) } returns ConsentWriteResult.Failed(IOException("edit failed"))
+
+        controller.persistConsent(false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { saveFailureNotifier.notifySaveFailed() }
+    }
+
+    @Test
+    fun `persistConsent stays silent when the write succeeds`() = runTest {
+        val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
+
+        controller.persistConsent(true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { saveFailureNotifier.notifySaveFailed() }
+    }
+
+    @Test
     fun `applyConsent still switches ACRA when the persist fails`() = runTest {
         // The in-memory toggle is synchronous and independent of the write, so
         // a failed persist must not stop ACRA from reflecting the session's
         // choice (AUDIT-10 #11).
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { setConsent(true) } returns ConsentWriteResult.Failed(IOException("edit failed"))
 
         controller.applyConsent(true)
@@ -149,7 +177,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `persistConsent forwards the declined choice`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
 
         controller.persistConsent(false)
         advanceUntilIdle()
@@ -160,7 +188,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `resolveStartupAction shows the dialog when never asked`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = false, hasAsked = false))
 
         assertEquals(
@@ -172,7 +200,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `resolveStartupAction re-affirms the stored consent when already asked`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = true, hasAsked = true))
 
         assertEquals(
@@ -187,7 +215,7 @@ class CrashReportConsentControllerTest {
         // branch writes back whatever the user taps, so a transient read
         // failure could otherwise overwrite a stored decision (AUDIT-10 #2).
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getState() } returns ConsentReadResult.Unavailable(IOException("read failed"))
 
         assertEquals(
@@ -201,7 +229,7 @@ class CrashReportConsentControllerTest {
         // Skip means "do nothing": ACRA keeps whatever the bootstrap read
         // established, and nothing is persisted (AUDIT-10 #2).
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getState() } returns ConsentReadResult.Unavailable(IOException("read failed"))
 
         controller.resolveStartupAction()
@@ -214,7 +242,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `resolveStartupAction reads the consent state only once`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getState() } returns ConsentReadResult.Loaded(CrashReportConsentState(hasConsent = false, hasAsked = true))
 
         controller.resolveStartupAction()
@@ -227,7 +255,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `applyConsent persists the decision and switches ACRA to match`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
 
         controller.applyConsent(true)
 
@@ -240,7 +268,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `reaffirmConsent switches ACRA without persisting`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
 
         controller.reaffirmConsent(false)
         advanceUntilIdle()
@@ -252,7 +280,7 @@ class CrashReportConsentControllerTest {
     @Test
     fun `currentConsent delegates to the use case`() = runTest {
         val appScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
-        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle)
+        val controller = CrashReportConsentController(appScope, getConsent, getState, setConsent, crashReportToggle, saveFailureNotifier)
         coEvery { getConsent() } returns false
 
         assertFalse(controller.currentConsent())

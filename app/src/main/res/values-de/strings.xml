@@ -200,6 +200,7 @@
 
     <string name="toast_crash_reports_enabled">Crash-Berichte wurden aktiviert. Vielen Dank für deine Hilfe!</string>
     <string name="toast_crash_reports_disabled">Crash-Berichte wurden deaktiviert.</string>
+    <string name="toast_crash_report_consent_save_failed">Deine Auswahl konnte nicht gespeichert werden und gilt nur für diese Sitzung. Bitte versuche es erneut.</string>
 
     <!-- Entwickler-Befehle: ACRA-Crash-Report-Verifikations-Shortcuts. Auch im
          Release-Build sichtbar, weil der Maintainer sie nach jedem Refactor

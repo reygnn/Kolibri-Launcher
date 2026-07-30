@@ -28,8 +28,8 @@ import javax.inject.Singleton
  *    after the tap (AUDIT-9 #11): structured concurrency under a known
  *    parent instead of the old detached `CoroutineScope(IO).launch`. The
  *    write is best-effort and its result is observed, not assumed — a failed
- *    persist is logged rather than left to diverge silently from the
- *    in-memory ACRA state (AUDIT-10 #11);
+ *    persist is logged and shown to the user rather than left to diverge
+ *    silently from the in-memory ACRA state (AUDIT-10 #11);
  *  - applying a decision — [applyConsent] / [reaffirmConsent] fold the
  *    persist + ACRA toggle + log sequence that used to be duplicated across
  *    both callers into one place (AUDIT-10 #12).
@@ -45,6 +45,7 @@ class CrashReportConsentController @Inject constructor(
     private val getState: GetCrashReportConsentStateUseCase,
     private val setConsent: SetCrashReportConsentUseCase,
     private val crashReportToggle: CrashReportToggle,
+    private val saveFailureNotifier: ConsentSaveFailureNotifier,
 ) {
 
     /** What the first-launch startup gate should do. */
@@ -128,23 +129,26 @@ class CrashReportConsentController @Inject constructor(
      * are owned by the app scope's `SupervisorJob`, not orphaned.
      *
      * The write is best-effort. Its [ConsentWriteResult] is inspected here
-     * (not discarded): a [ConsentWriteResult.Failed] is logged so a persist
-     * failure that leaves the store diverging from the just-applied in-memory
-     * ACRA state is visible, not silent. Nothing is persisted in that case,
-     * so the previously stored state keeps winning on the next launch — the
-     * decision the user just made survives only for this session (AUDIT-10
-     * #11; see [ConsentWriteResult] for why this is not always a re-ask).
+     * (not discarded): a [ConsentWriteResult.Failed] is logged AND surfaced to
+     * the user via [ConsentSaveFailureNotifier]. Nothing is persisted in that
+     * case, so the previously stored state keeps winning on the next launch —
+     * the decision the user just made survives only for this session, and the
+     * confirmation toast the caller already showed would otherwise be the only
+     * feedback they get (AUDIT-10 #11; see [ConsentWriteResult] for why this
+     * is not always corrected by a re-ask).
      */
     fun persistConsent(consent: Boolean) {
         applicationScope.launch {
             when (val result = setConsent(consent)) {
                 ConsentWriteResult.Saved -> Unit
-                is ConsentWriteResult.Failed ->
+                is ConsentWriteResult.Failed -> {
                     Timber.w(
                         result.cause,
                         "Crash-report consent persist failed; " +
                             "in-memory ACRA set to $consent for this session, store keeps its previous state",
                     )
+                    saveFailureNotifier.notifySaveFailed()
+                }
             }
         }
     }

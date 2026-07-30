@@ -223,6 +223,7 @@
 
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
+    <string name="toast_crash_report_consent_save_failed">Your choice could not be saved and applies to this session only. Please try again.</string>
 
     <!-- Developer commands: ACRA crash-report verification shortcuts. Visible
          in release builds because the maintainer needs them after every refactor

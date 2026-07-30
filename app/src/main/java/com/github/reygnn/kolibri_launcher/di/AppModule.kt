@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
+import com.github.reygnn.kolibri_launcher.ui.util.ConsentSaveFailureNotifier
+import com.github.reygnn.kolibri_launcher.ui.util.ConsentSaveFailureNotifierImpl
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggle
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggleImpl
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
@@ -55,6 +57,16 @@ object AppModule {
     @Provides
     @Singleton
     fun provideCrashReportToggle(impl: CrashReportToggleImpl): CrashReportToggle = impl
+
+    /**
+     * The "consent could not be saved" seam. Behind an interface for the same
+     * reason as [CrashReportToggle] — see [ConsentSaveFailureNotifier] KDoc.
+     */
+    @Provides
+    @Singleton
+    fun provideConsentSaveFailureNotifier(
+        impl: ConsentSaveFailureNotifierImpl,
+    ): ConsentSaveFailureNotifier = impl
 
     /**
      * The app's `versionName` from :app's BuildConfig, exposed for injection
