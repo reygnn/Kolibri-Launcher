@@ -68,18 +68,21 @@ in `:app`.
 :domain  (Pure-Kotlin JVM module — `kotlin("jvm")`, no Android SDK)
   core/                   AppConstants, ColorMath, KolibriLog, TimberWrapper,
                           AppUpdateSignal, Qualifiers, CoerceExtensions
-  domain/repository/      interfaces (FavoritesRepository, …) — 19 of them
-  domain/usecase/         ~50 fine-grained use cases (GetDrawerAppsUseCase, …)
+  domain/repository/      interfaces (FavoritesRepository,
+                          CrashReportConsentRepository, …) — ~19 of them
+  domain/usecase/         ~55 fine-grained use cases (GetDrawerAppsUseCase,
+                          Get/Set/HasAsked + GetCrashReportConsentState, …)
   domain/model/           data classes (AppInfo, HomeSettings, UiState,
                           AppContextMenuAction + LauncherActionLabel,
-                          WallpaperState, LauncherShortcut, …) — pure
-                          Kotlin, no Parcelable / no Android imports.
+                          WallpaperState, LauncherShortcut,
+                          CrashReportConsentState, ConsentWriteResult, …) —
+                          pure Kotlin, no Parcelable / no Android imports.
   di/DispatcherModule     @Provides for Default/IO/Main + ApplicationScope
 
 :data    (Android Library, depends on :domain)
   data/                   repository implementations (FavoritesRepositoryImpl,
-                          BackupRepositoryImpl, …), CrashReportConsentStore,
-                          PackageUpdateReceiver
+                          BackupRepositoryImpl, CrashReportConsentRepositoryImpl,
+                          …), CrashReportConsentStore, PackageUpdateReceiver
   data/service/           ShortcutLauncherServiceImpl
   di/RepositoryModule     @Binds for every repository interface
   di/DataStoreModule      two Preferences DataStores + their internal
