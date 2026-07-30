@@ -18,15 +18,16 @@ import org.junit.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /**
  * Impl-specific SAD-PATH tests for [CrashReportConsentRepositoryImpl].
  *
- * The happy-path behaviour (set/get roundtrips) is pinned by
- * [CrashReportConsentRepositoryImplContractTest]. This file covers the
- * error envelope the contract deliberately leaves out (see the contract's
- * "NOT IN CONTRACT" note):
+ * The happy-path behaviour (set/get roundtrips, and the success shapes
+ * `Loaded`/`Saved`) is pinned by [CrashReportConsentRepositoryImplContractTest]
+ * — do not duplicate it here. This file covers ONLY the error envelope the
+ * contract deliberately leaves out (see the contract's "NOT IN CONTRACT"
+ * note), which makes it the single place that goes red if a failure is ever
+ * re-collapsed into a plausible default:
  *   - a failed `hasConsent`/`hasAsked` read falls back to `false` (never
  *     throws), so a corrupt/unreadable store keeps ACRA off (privacy-safe
  *     default);
@@ -77,17 +78,6 @@ class CrashReportConsentRepositoryImplTest {
     }
 
     @Test
-    fun `readState - on a readable store - reports Loaded`() = runTest {
-        repository.setConsent(true)
-
-        val result = repository.readState()
-
-        assertIs<ConsentReadResult.Loaded>(result)
-        assertTrue(result.state.hasConsent)
-        assertTrue(result.state.hasAsked)
-    }
-
-    @Test
     fun `readState - when read is cancelled - propagates CancellationException`() = runTest {
         val cancellingStore = mockk<DataStore<Preferences>>()
         every { cancellingStore.data } returns flow {
@@ -111,14 +101,6 @@ class CrashReportConsentRepositoryImplTest {
         assertIs<ConsentWriteResult.Failed>(result)
         // Read path is unaffected by the edit-fail flag; nothing was stored.
         assertFalse(repository.hasConsent())
-    }
-
-    @Test
-    fun `setConsent - on a successful write - reports Saved`() = runTest {
-        val result = repository.setConsent(true)
-
-        assertTrue(result is ConsentWriteResult.Saved)
-        assertTrue(repository.hasConsent())
     }
 
     @Test
