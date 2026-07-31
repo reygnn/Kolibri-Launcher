@@ -44,7 +44,15 @@ sie beschreiben, was gilt, nicht was sich gegenüber irgendetwas ändert.
 4. **Privacy hat genau ein Gate.** Ob berichtet werden darf, entscheidet
    ausschließlich das ACRA-`enabled`-Flag. Die Ingestion prüft Consent nie
    selbst. Ein Ort, an dem Privacy durchgesetzt wird, ist ein Ort, an dem sie
-   falsch sein kann. *(→ B1)*
+   falsch sein kann. Dass das Gate am *Capture* sitzt (`enabled`), nicht am
+   *Send*, ist zugleich eine Data-at-rest-Garantie: bei `enabled=false`
+   schreibt ACRA **gar keine** Report-Datei — verifiziert für beide Pfade
+   (`ErrorReporterImpl.uncaughtException` bailt vor `ReportBuilder.build`,
+   `ReportExecutor.execute` bailt vor `saveCrashReportFile`; §13). Ein
+   Nicht-Zustimmender hinterlässt also nichts auf Platte. Genau das koppelt
+   dieses Prinzip an G4 (§3.5): würde das Gate an den Send wandern, wäre der
+   Sync-Read entbehrlich — aber der Preis wären lokale Crash-Dateien für
+   Nicht-Zustimmende. *(→ B1, §3.5, G4)*
 5. **Der Reporter wird nie selbst zur Crash-Quelle.** Jeder Pfad innerhalb der
    Crash-Maschinerie schluckt seinen eigenen Fehler; Recovery hat immer Vorrang
    vor Berichterstattung. *(→ C1)*
@@ -118,9 +126,29 @@ trägt ein Kriterium, das sie schließen würde.
   ehesten Gold-Plating. Alternative: gar keine Liveness-Anzeige (ein
   In-Process-Enqueue-Marker löst X4 gerade **nicht**, also entweder richtig oder gar
   nicht).
-- **Reststreit:** „nice-to-have vs. Aufwand".
+- **Billigeres Komplement (source-geprüft): Rückstau zählen statt Send stampen.**
+  Ein toter Sender äußert sich als liegenbleibende Report-Dateien. Die sind aus
+  dem Hauptprozess ohne eigene Ablage lesbar: `ReportLocator` ist **public API**
+  (`ReportLocator.kt:27–35`, `approvedReports`/`unapprovedReports: Array<File>`),
+  und ein Server-Ausfall kommt als `ReportSenderException` durch, die die Datei
+  **nicht** löscht (`ReportDistributor.kt:77–82`) → der Ordner wächst. „N approved
+  Reports, ältester vor X" = Sender tot; leer = gesund *oder* nie gecrasht.
+- **Warum es den Marker trotzdem nicht ersetzt:** File-Count gibt **keine
+  positive HTTP-Bestätigung**. Leere Ordner können auch „Server-URL falsch, nie
+  gecrasht" heißen — das siehst du nie. Nur ein echter Send-Erfolg (HTTP 200)
+  bestätigt den Pfad Ende-zu-Ende; das sieht nur der `:acra`-Prozess. File-Count
+  ist also ein billiger Dead-Server-**Rückstau**-Detektor, kein Liveness-Beweis.
+- **Test-Gotcha (source-geprüft):** in einem **debuggable Build** sendet ACRA
+   per Default gar nicht und löscht die Datei dennoch
+  (`ReportDistributor.kt:96,118–120,66`) — außer `sendReportsInDevMode=true`.
+  Der Rückstau-Zähler wie der Marker sind im Debug-Build also blind; siehe §8
+  (Throw-Test).
+- **Reststreit:** „nice-to-have vs. Aufwand". Der `ReportLocator`-Zähler senkt
+  den Aufwand-Arm (kein zweiter Sender, keine Cross-Prozess-Ablage), zum Preis
+  der positiven HTTP-Bestätigung.
 - **Schließt sich, wenn:** ein realer „ist der Reporter überhaupt noch am Leben?"-
-  Zweifel auftritt. Bis dahin kann der Marker warten, ohne den Rest zu blockieren.
+  Zweifel auftritt. Bis dahin kann der Marker warten; der `ReportLocator`-Zähler
+  wäre die Nullaufwand-Zwischenstufe.
 
 ### G4 — Bootstrap-Consent-Read: synchron auf dem Main-Thread vs. async  *(§3.5)*
 
@@ -131,10 +159,22 @@ trägt ein Kriterium, das sie schließen würde.
   eine StrictMode-Violation. Async lesen und ACRA erst nach bestätigtem Consent
   einschalten verliert nur das schmale Fenster, bis der Read fertig ist — für einen
   **opt-in**-privacy-by-default-Reporter evtl. akzeptabel.
-- **Reststreit:** die strittigste der vier.
-- **Schließt sich, wenn:** die reale Bootstrap-Read-Dauer gemessen ist. Ist das
-  Fenster klein und ein Crash genau darin unwahrscheinlich, gewinnt async; sonst
-  bleibt es synchron.
+- **Aber diese Gabelung ist nicht unabhängig von Prinzip 4.** Async-lesen ohne
+  Coverage-Fenster ginge *nur*, wenn das Gate von Capture auf Send wanderte
+  (ACRA immer `enabled`, ein eigener `ReportSender` verwirft bei fehlendem
+  Consent zur Sendezeit). Der Preis dafür ist source-belegt: bei `enabled=false`
+  schreibt ACRA keine Datei (§13, Prinzip 4), bei `enabled=true` **schon** —
+  Capture-always hieße lokale Crash-Dateien für Nicht-Zustimmende. Für
+  privacy-by-default ist das der teurere Weg. Damit gewinnt das Capture-Gate,
+  und mit ihm der Sync-Read — nicht wegen No-Window-Coverage (das war die
+  schwächere Begründung), sondern wegen Data-at-rest.
+- **Reststreit:** dadurch kleiner als zuvor angenommen — die Kopplung an
+  Prinzip 4 entscheidet die Grundsatzfrage; offen bleibt nur noch das *Wie*
+  (Read-Dauer, StrictMode-Buchung).
+- **Schließt sich, wenn:** die reale Bootstrap-Read-Dauer gemessen ist. Sie
+  entscheidet nicht mehr sync-vs-async (das ist über Data-at-rest gefallen),
+  sondern nur noch, wie laut die StrictMode-Violation in `KNOWN_ISSUES.md`
+  gebucht wird.
 
 ---
 
@@ -319,6 +359,21 @@ ACRA.errorReporter.setEnabled(decision == Granted)
   (`getBoolean` liest beim First-Load ebenfalls von Platte), brächte aber einen
   zweiten Speicher + Write-Through + Drift-Fläche. Die einzige Alternative wäre
   das Coverage-Fenster — genau das, was ein Crash-Reporter nicht haben darf.
+- **Der eigentliche Grund für sync ist Data-at-rest, nicht Coverage (Kopplung
+  an Prinzip 4).** Das No-Window-Argument allein wäre für einen opt-in-Reporter
+  angreifbar (async verlöre nur ein schmales Fenster, G4). Es *sync* zu machen,
+  ist erst dann zwingend, wenn das Privacy-Gate am *Capture* sitzt — und das
+  tut es hier, source-belegt: bei `enabled=false` schreibt ACRA **keine**
+  Report-Datei. Der Uncaught-Handler bailt vor dem Bauen
+  (`ErrorReporterImpl.uncaughtException`: `if (!isEnabled) { handToDefault; return }`,
+  `ErrorReporterImpl.kt:89–94`), und der Silent-Pfad bailt vor dem Speichern
+  (`ReportExecutor.execute`: `if (!isEnabled) { warn; return }` **vor**
+  `saveCrashReportFile`, `ReportExecutor.kt:76–79`). Ergo: `disabled` = null
+  Crash-Daten auf Platte für Nicht-Zustimmende. Die einzige Bauform, die den
+  Sync-Read spart (Gate am Send, `enabled` immer an, Consent-Check im eigenen
+  `ReportSender`), erkauft das mit genau solchen lokalen Dateien — für
+  privacy-by-default der falsche Tausch. Deshalb Capture-Gate + Sync-Read.
+  *(§13, Prinzip 4)*
 - **DataStore bleibt einzige Quelle.** Die Analogie zum Throttle-Limiter (§4.3)
   trägt hier *nicht*: der Limiter läuft synchron aus dem *Crash-Handler-Thread*
   ohne Suspend-Kontext → dort ist SP alternativlos. Der Bootstrap-Read läuft auf
@@ -712,6 +767,12 @@ Preference-Click direkt an den globalen Handler geht):
 - **Throw-Test-Exception** → Toast, dann `Thread { sleep(800); throw }` — der
   Throw läuft auf einem nackten Thread **ohne** CoroutineExceptionHandler, reist
   also durch genau den echten Uncaught-Pfad (§5.1). Der Crash ist hier **gewollt**.
+  **Gotcha (source-geprüft):** in einem debuggable Build wird der so erzeugte
+  Report per Default **nicht gesendet** und die Report-Datei dennoch gelöscht
+  (`ReportDistributor.kt:96,118–120,66`), es sei denn `sendReportsInDevMode=true`.
+  Der Pipeline-Status/Marker bleibt dann stumm, obwohl der Uncaught-Pfad korrekt
+  lief — beim Ende-zu-Ende-Test also `sendReportsInDevMode` setzen oder gegen
+  einen Release-Build testen, sonst jagt man ein Phantom.
 
 ---
 
@@ -865,11 +926,14 @@ neu verifiziert werden muss.
 | **C4** Send-Marker | `ReportSender` (`ReportSender.kt:32`), `ReportSenderFactory : Plugin` (`ReportSenderFactory.kt:33`), `ReportDistributor.distribute(File): Boolean` (`ReportDistributor.kt:60`) | Sende-Erfolg ist **nur** im `:acra`-Prozess beobachtbar. `AcraTree` sieht ihn **nie** — es *enqueued* nur. Ein echter Send-Marker braucht einen eigenen `ReportSender` (Dekorator um `HttpSender`), der bei HTTP-Erfolg cross-prozess in eine Datei stampt. |
 | **B2** Zustellweg | `handleSilentException(e)` nicht-terminal (`ErrorReporter.kt:55`); `handleException(e, endApplication)` terminal (`:70`) | `handleSilentException` = persist + Out-of-process-schedule, **kein** Kill. Der eine Silent-Weg. Nie zusätzlich `handleException` → Doppelversand. |
 | **§4.5** Post-mortem ANR | `ActivityManager.getHistoricalProcessExitReasons` + `ApplicationExitInfo.REASON_ANR` / `.getTraceInputStream()` — Android API 30+ (Ziel ist 36) | Harte ANRs samt System-Multi-Thread-Dump, ohne Live-Sampling. |
+| **Prinzip 4 / G4** Capture-Gate = Data-at-rest | `ErrorReporterImpl.uncaughtException` (`ErrorReporterImpl.kt:89–94`); `ReportExecutor.execute` (`ReportExecutor.kt:76–79`) | Bei `enabled=false` bailt der Uncaught-Handler vor `ReportBuilder.build` (`return` nach `handReportToDefaultExceptionHandler`) und der Silent-Pfad vor `saveCrashReportFile` (`if (!isEnabled) { warn; return }`). ⇒ `disabled` = **keine** Report-Datei = null Data-at-rest. Das koppelt G4 an Prinzip 4: Capture-Gate erzwingt den Sync-Read, weil Send-Gate lokale Dateien für Nicht-Zustimmende hieße. |
+| **C4/G3** Rückstau-Liveness (Komplement) | `ReportLocator(ctx)` public, `approvedReports`/`unapprovedReports: Array<File>` (`ReportLocator.kt:27–35`); Delete-on-Send (`ReportDistributor.kt:66`), Datei überlebt `ReportSenderException` (`:77–82`) | Rückstau ist aus dem Hauptprozess zählbar (public API, kein Reflection); ein toter Server lässt Dateien liegen. **Aber** kein positiver HTTP-Beweis (leer = gesund *oder* nie gecrasht), und im debuggable Build wird per Default nicht gesendet, die Datei aber gelöscht (`:96,118–120`) → im Debug blind. Billiges Komplement, kein Ersatz für den Send-Marker. |
 
 Verifikationsnotiz: geprüft aus `acra-core-5.13.1-sources.jar` /
 `acra-http-5.13.1-sources.jar` (`ACRA.kt`, `ErrorReporter.kt`,
-`ErrorReporterImpl.kt`, `ProcessFinisher.kt`, `BulkReportDeleter.kt`,
-`ReportSender.kt`, `ReportSenderFactory.kt`, `ReportDistributor.kt`); Zeilen­
+`ErrorReporterImpl.kt`, `ReportExecutor.kt`, `ProcessFinisher.kt`,
+`BulkReportDeleter.kt`, `ReportLocator.kt`, `ReportSender.kt`,
+`ReportSenderFactory.kt`, `ReportDistributor.kt`); Zeilen­
 nummern gegen den Stand der gepinnten 5.13.1-Sources.
 
 ---
