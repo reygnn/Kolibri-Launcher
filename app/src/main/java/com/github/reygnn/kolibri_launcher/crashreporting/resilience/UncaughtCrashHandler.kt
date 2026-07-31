@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.os.Process
 import android.util.Log
-import timber.log.Timber
 import kotlin.system.exitProcess
 
 /**
@@ -13,8 +12,12 @@ import kotlin.system.exitProcess
  * want, then delegates the critical persist+schedule+kill to ACRA:
  *  - an OOM `System.gc()` BEFORE ACRA allocates a report (best-effort headroom
  *    so an OOM crash can still be built and persisted);
- *  - a plain `Timber.e` log (Rule 9: this is crash-infra; `silentError` would
- *    throw in DEBUG straight back into the path it is the safety net for).
+ *  - a plain `android.util.Log.e` breadcrumb — deliberately NOT `Timber.e`:
+ *    `AcraTree` is planted process-wide, so a `Timber.e` here would re-enter it
+ *    and enqueue a SECOND, silent `LoggedThrowable` report on top of ACRA's
+ *    fatal auto-report (a double-send, and a doubled crash-loop flood — the very
+ *    thing "uncaught bypasses AcraTree", B1/B3, relies on NOT happening). NOT
+ *    `silentError` either: crash-infra must not throw here (C1).
  *
  * **No flush window.** ACRA sends out-of-process, the report is a file that
  * survives the kill, and `ErrorReporter` exposes no completion callback (§13) —
@@ -46,7 +49,9 @@ class UncaughtCrashHandler(
             }
         }
 
-        Timber.e(throwable, "UNCAUGHT EXCEPTION in thread: ${thread.name}")
+        // Log.e, NOT Timber.e — a Timber.e would re-enter the planted AcraTree
+        // and double-send this crash (see class KDoc).
+        Log.e(TAG, "UNCAUGHT EXCEPTION in thread: ${thread.name}", throwable)
 
         try {
             // = ACRA: persist the report, schedule the out-of-process send, and

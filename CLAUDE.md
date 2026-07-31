@@ -239,8 +239,11 @@ activities.
      `UncaughtExceptionHandler` and the ACRA init moved out to the two files
      below in the ACRA rewrite.)
    - `UncaughtCrashHandler.kt` — the unified (RELEASE+DEBUG) global uncaught
-     handler; a `silentError` throw there would recurse into the crash path
-     it is the safety net for.
+     handler. Crash-infra, so no `silentError`; but its breadcrumb log uses
+     `android.util.Log.e`, NOT `Timber.e` — a `Timber.e` would re-enter the
+     process-wide planted `AcraTree` and double-send the crash (one silent
+     carrier + one fatal auto-report). Same reason `AcraTree.kt` itself uses
+     `Log.e` in its swallow. Neither needs a bare-`Timber.e` whitelist entry.
    - `CrashReportingBootstrap.kt` — ACRA init + the ANR drain + watchdog
      wiring, on the bootstrap path (before/around ACRA being wired).
    - `TimberWrapper.kt` itself — `silentError` calling itself is a literal
