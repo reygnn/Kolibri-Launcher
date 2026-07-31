@@ -44,7 +44,6 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentControll
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentReadResult
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
@@ -495,23 +494,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // Developer commands: ACRA-verification shortcuts. Click handlers are
-        // tiny and effectively can't throw, but we wrap defensively because
-        // a throw in a Preference click handler propagates straight to the
-        // global UncaughtExceptionHandler — which for the throw-test button
-        // is exactly what we WANT, but for the reset-timer button would be
-        // a regression. Two separate handlers keep the intent obvious.
-        findPreference<Preference>(AppConstants.PrefKeys.RESET_ACRA_TIMER)?.setOnPreferenceClickListener {
-            try {
-                CrashReportLimiter.resetAllLimits()
-                showToastSafe(R.string.toast_acra_timer_reset)
-                true
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error resetting ACRA cooldown timer")
-                false
-            }
-        }
-
+        // Developer command: the ACRA throw-test shortcut. A throw in a
+        // Preference click handler propagates straight to the global
+        // UncaughtExceptionHandler — which for the throw-test button is exactly
+        // what we WANT (it exercises the real uncaught path).
         findPreference<Preference>(AppConstants.PrefKeys.THROW_TEST_EXCEPTION)?.setOnPreferenceClickListener {
             // Toast first so the user sees the warning before the crash.
             // The Thread + Thread.sleep(800) gives Android time to render

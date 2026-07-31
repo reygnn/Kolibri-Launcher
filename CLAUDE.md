@@ -185,20 +185,13 @@ activities.
    restore goes through `BackupRepositoryImpl` + `BackupDataAssembler`
    (JSON export/import).
 
-   *One deliberate exception, `SharedPreferences`-backed and intentional:*
-
-   - **`CrashReportLimiter`** uses `SharedPreferences` for ACRA crash-
-     report rate-limit timestamps (`acra_report_limiter`), because its
-     `shouldSendReport()` is called sync from the ACRA crash handler
-     (a non-coroutine thread). DataStore's API is suspend-only, so
-     migrating would require either a sync-blocking `runBlocking` (the
-     StrictMode bug we want to avoid) or an in-memory write-through
-     cache (extra source-of-truth, race-condition surface). Neither is
-     worth it for ephemeral telemetry timestamps that may be lost on
-     any app update.
-
-   This exception is explained in detail in the file's KDoc. Don't try
-   to "fix" it.
+   *No `SharedPreferences` exception remains.* `CrashReportLimiter`
+   (`acra_report_limiter`) — historically the one deliberate
+   `SharedPreferences`-backed store, holding ACRA crash-report rate-limit
+   timestamps read sync from the crash-handler thread — was removed in the
+   ACRA rewrite (ACRA_SPEC.md Belang B): client-side throttling is gone and
+   flood control (fingerprint dedup + ingestion rate-limit) is now entirely
+   server-side (§S). DataStore Preferences is the only app storage.
 
    *Migration history note:* A `DataMigrationManager` class used to live
    in `data/` to bridge schema changes across app updates (most recently
@@ -218,9 +211,8 @@ activities.
 
 7. **`KolibriLauncherApp` is multi-layer crash-safe by design.** The style
    (catching `Throwable` instead of `Exception`, the coroutine
-   `ExceptionHandler`, the global handler, OOM recovery, ACRA spam protection
-   via `CrashReportLimiter`) is intentional — do not "clean it up" or
-   simplify. New critical init paths follow the same pattern: wrap each
+   `ExceptionHandler`, the global handler, OOM recovery) is intentional — do
+   not "clean it up" or simplify. New critical init paths follow the same pattern: wrap each
    block in `try { … } catch (e: Throwable) { TimberWrapper.silentError(e, ...) }`.
    Inside the global crash handler itself, plain `Timber.e` is used —
    see Rule 9 for why.
@@ -251,9 +243,7 @@ activities.
      throw here escapes the safety-net coroutine and lands at the global
      uncaught handler, which is exactly what these wrappers exist to
      prevent.
-   - `CrashReportLimiter.kt`, `ConsentBootstrap.kt` — both are on
-     the bootstrap path. The limiter is called synchronously from ACRA's
-     crash-handler thread (per Rule 5). `ConsentBootstrap`'s reads happen via
+   - `ConsentBootstrap.kt` — on the bootstrap path. Its reads happen via
      `runBlocking` in `attachBaseContext` before Hilt and ACRA are
      initialised; a DEBUG throw there crashes the app before the reporter
      is wired. (`ConsentDialog.kt`, the dialog UI helper, used to be

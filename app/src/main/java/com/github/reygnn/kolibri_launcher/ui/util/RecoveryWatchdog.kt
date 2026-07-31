@@ -9,7 +9,7 @@ import kotlin.system.exitProcess
 /**
  * Self-defense watchdog: kills the process if the main thread stops
  * dispatching for [timeoutMs]. Pairs with
- * [com.github.reygnn.kolibri_launcher.ui.util.AnrReporter] — the reporter
+ * [com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter] — the reporter
  * captures *what* happened (post-mortem via `ApplicationExitInfo` on the
  * next launch); this watchdog ensures the *recovery* happens fast
  * (process restart in seconds rather than waiting 10–15 s for the system

@@ -22,14 +22,13 @@ import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.buildAcraReportThrowable
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
-import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
-import com.github.reygnn.kolibri_launcher.ui.util.UnthrottledReport
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
@@ -203,14 +202,6 @@ class KolibriLauncherApp : Application() {
             if (throwable != null) tree.e(throwable, message) else tree.e(message)
         }
 
-        // Initialize ACRA spam protection FIRST (before any crashes can occur)
-        try {
-            CrashReportLimiter.init(this)
-            Timber.d("CrashReportLimiter initialized successfully")
-        } catch (e: Throwable) {
-            Log.e("KolibriLauncher", "Failed to initialize CrashReportLimiter", e)
-        }
-
         // Setup Timber with crash protection
         try {
             if (BuildConfig.DEBUG) {
@@ -360,11 +351,8 @@ class KolibriLauncherApp : Application() {
         try {
             Timber.e(throwable, "UNCAUGHT EXCEPTION in thread: ${thread.name}")
 
-            // Check if we should send this report (spam protection)
-            val shouldSend = CrashReportLimiter.shouldSendReport(throwable)
-            if (!shouldSend) {
-                Timber.d("Report blocked by spam protection for: ${throwable::class.simpleName}")
-            }
+            // No client-side throttling of real crashes (B3); flood control is
+            // server-side. The uncaught path never went through AcraTree anyway.
 
             // Launcher-specific recovery for OutOfMemoryError
             if (throwable is OutOfMemoryError) {
@@ -454,10 +442,9 @@ class KolibriLauncherApp : Application() {
      * no unmaintained dependency).
      *
      * Dedup is handled entirely by [AnrReporter]'s watermark — each
-     * `ApplicationExitInfo` record is forwarded exactly once, ever. ANRs opt
-     * out of [CrashReportLimiter]'s per-type cooldown via [UnthrottledReport]
-     * (see [AnrException]), so distinct hangs each report and nothing is
-     * collapsed under a shared class+site key.
+     * `ApplicationExitInfo` record is forwarded exactly once, ever. There is no
+     * client-side throttle to bypass (B3): flood control is server-side, so
+     * distinct hangs each report and nothing is collapsed under a client key.
      *
      * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
      * Application is on the crash-handling-infrastructure exception list.
@@ -473,13 +460,11 @@ class KolibriLauncherApp : Application() {
                     // Single delivery path. `Timber.e` routes through AcraTree,
                     // which forwards to ACRA via handleSilentException. ANRs are
                     // already deduplicated by AnrReporter's watermark (each AEI
-                    // record forwarded exactly once, ever), so AnrException opts
-                    // out of CrashReportLimiter's cooldown via UnthrottledReport
-                    // instead of being keyed by its (identical for every ANR)
-                    // class + throw-site, which would collapse distinct hangs. An
-                    // additional explicit `ACRA.errorReporter.handleException`
-                    // here would double-send the report — don't add one. Rule 9:
-                    // plain Timber.e (crash-handling-infrastructure exception).
+                    // record forwarded exactly once, ever); there is no client
+                    // throttle to opt out of (B3). An additional explicit
+                    // `ACRA.errorReporter.handleException` here would double-send
+                    // the report — don't add one. Rule 9: plain Timber.e
+                    // (crash-handling-infrastructure exception).
                     Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
                 }
             } catch (e: Throwable) {
@@ -487,19 +472,6 @@ class KolibriLauncherApp : Application() {
             }
         }
     }
-
-    /**
-     * Marker exception type used solely to carry a post-mortem ANR report
-     * into ACRA. Its stack trace is the *current* point in
-     * `reportPendingAnrsAsync` — not the ANR site, which lives in the
-     * `message` (system-supplied multi-thread dump).
-     *
-     * Implements [UnthrottledReport]: ANRs are already deduplicated by
-     * [AnrReporter]'s watermark, so they opt out of [CrashReportLimiter]'s
-     * per-type cooldown instead of being keyed by their (identical for every
-     * ANR) class + throw-site, which would collapse distinct hangs.
-     */
-    private class AnrException(message: String) : RuntimeException(message), UnthrottledReport
 
     /**
      * Self-defense companion to [AnrReporter]: starts the
@@ -545,68 +517,4 @@ class KolibriLauncherApp : Application() {
         }
     }
 
-    /**
-     * A specialized Timber.Tree that forwards exceptions to ACRA and includes a
-     * diagnostic tool for improperly handled CancellationExceptions.
-     *
-     * Features spam protection: Each exception type is only sent once per 24 hours.
-     *
-     * THE PROBLEM:
-     * Kotlin's `CancellationException` is used for control flow and is not a "true" error.
-     * For performance reasons, it is often created WITHOUT a stack trace. This makes it
-     * impossible to find the location of a faulty `catch (e: Exception)` block that
-     * incorrectly logs it as an error.
-     *
-     * THE SOLUTION:
-     * Every forwarded log is wrapped in a per-report carrier (a `LoggedThrowable`, built by
-     * [buildAcraReportThrowable]) that folds the Timber log context (priority/tag/message)
-     * into its own message and keeps the original throwable as the cause. Constructing a
-     * fresh throwable here FORCES the JVM to generate a stack trace down the Timber call
-     * chain, which for a `CancellationException` points directly at the offending `catch`.
-     *
-     * WHY A CARRIER, NOT `putCustomData`:
-     * The context used to be written to `ACRA.errorReporter`'s PROCESS-GLOBAL custom-data
-     * map before `handleSilentException`, so concurrent reports could swap each other's
-     * metadata (AUDIT-6 #4) — and since `reportContent` omits `ReportField.CUSTOM_DATA`,
-     * that data never reached the server anyway. The carrier is per-report by construction
-     * (no shared state, no lock, no executor) and lands in the collected `STACK_TRACE`.
-     */
-    private class AcraTree : Timber.Tree() {
-
-        override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-            // Only send warnings and errors with exceptions to ACRA
-            if (priority < Log.WARN || t == null) {
-                return
-            }
-
-            // Check spam protection BEFORE processing
-            if (!CrashReportLimiter.shouldSendReport(t)) {
-                // Report is blocked by spam protection - log locally but don't send to ACRA
-                if (BuildConfig.DEBUG) {
-                    Log.d("AcraTree", "Report blocked by spam protection: ${t::class.simpleName}")
-                }
-                return
-            }
-
-            reportErrorToAcra(priority, tag, message, t)
-        }
-
-        private fun reportErrorToAcra(priority: Int, tag: String?, message: String, t: Throwable) {
-            try {
-                // Fold the log context + CancellationException diagnosis into a per-report
-                // carrier throwable (no process-global custom-data map — see class KDoc and
-                // buildAcraReportThrowable). The original throwable rides along as the cause.
-                ACRA.errorReporter.handleSilentException(
-                    buildAcraReportThrowable(priority, tag, message, t)
-                )
-            } catch (e: Throwable) {
-                // Failsafe if ACRA is not initialized or crashes
-                try {
-                    Log.e("AcraTree", "Failed to report exception to ACRA", e)
-                } catch (ignored: Throwable) {
-                    // Even fallback logging can fail
-                }
-            }
-        }
-    }
 }

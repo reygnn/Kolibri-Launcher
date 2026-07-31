@@ -219,7 +219,6 @@ object AppConstants {
         // builds because the maintainer needs them after every refactor that
         // touches the crash pipeline (see TODO §14 for the libs.json/ACRA
         // diagnosis arc that motivated these shortcuts).
-        const val RESET_ACRA_TIMER = "reset_acra_timer"
         const val THROW_TEST_EXCEPTION = "throw_test_exception"
     }
 

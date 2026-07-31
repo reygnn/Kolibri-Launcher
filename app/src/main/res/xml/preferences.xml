@@ -178,12 +178,6 @@
         app:iconSpaceReserved="false">
 
         <Preference
-            android:key="reset_acra_timer"
-            android:title="@string/reset_acra_timer_title"
-            android:summary="@string/reset_acra_timer_summary"
-            app:iconSpaceReserved="false" />
-
-        <Preference
             android:key="throw_test_exception"
             android:title="@string/throw_test_exception_title"
             android:summary="@string/throw_test_exception_summary"
