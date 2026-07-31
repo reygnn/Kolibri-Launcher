@@ -178,6 +178,12 @@
         app:iconSpaceReserved="false">
 
         <Preference
+            android:key="pipeline_status"
+            android:title="@string/pipeline_status_title"
+            android:summary="@string/pipeline_status_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
             android:key="throw_test_exception"
             android:title="@string/throw_test_exception_title"
             android:summary="@string/throw_test_exception_summary"

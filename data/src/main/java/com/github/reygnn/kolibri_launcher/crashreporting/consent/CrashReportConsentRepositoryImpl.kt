@@ -27,9 +27,7 @@ import javax.inject.Singleton
  * [CrashReportConsentRepository]: [readState] reports a [ConsentReadResult],
  * [setConsent] a [ConsentWriteResult], and neither throws for I/O. The
  * `catch (Exception)` blocks below are that contract — they turn a failure
- * into a value the caller can act on, not into silence (A2 / A4). Only the two
- * plain getters fall back to `false`; they feed display only and are never
- * followed by a write.
+ * into a value the caller can act on, not into silence (A2 / A4).
  */
 @Singleton
 class CrashReportConsentRepositoryImpl @Inject constructor(
@@ -82,21 +80,4 @@ class CrashReportConsentRepositoryImpl @Inject constructor(
             ConsentWriteResult.Failed(e)
         }
     }
-
-    override suspend fun hasConsent(): Boolean = loadedDecisionOrNull() == ConsentDecision.Granted
-
-    override suspend fun hasAsked(): Boolean {
-        val decision = loadedDecisionOrNull()
-        return decision != null && decision != ConsentDecision.NeverAsked
-    }
-
-    /**
-     * The stored decision, or `null` when the read failed or the token was
-     * unknown. Backs the two total display getters: they never surface
-     * [ConsentReadResult.Unavailable] and never write, so an unknown state
-     * collapses to `false` here (SR4). Cancellation still propagates via
-     * [readState].
-     */
-    private suspend fun loadedDecisionOrNull(): ConsentDecision? =
-        (readState() as? ConsentReadResult.Loaded)?.decision
 }

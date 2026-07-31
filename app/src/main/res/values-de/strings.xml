@@ -206,6 +206,11 @@
          Release-Build sichtbar, weil der Maintainer sie nach jedem Refactor
          der Crash-Pipeline braucht. -->
     <string name="developer_commands_category_title">Entwickler-Befehle</string>
+    <string name="pipeline_status_title">ACRA-Pipeline-Status</string>
+    <string name="pipeline_status_summary">Zeigt den ungesendeten Crash-Report-Rückstau — ein wachsender Rückstau heißt Sender/Server tot; leer heißt gesund oder nie gecrasht.</string>
+    <string name="toast_pipeline_status_empty">ACRA-Rückstau leer — Sender gesund oder nie gecrasht.</string>
+    <string name="toast_pipeline_status_backlog">ACRA-Rückstau: %1$d approved, %2$d unapproved. Ältester: %3$s</string>
+    <string name="pipeline_status_oldest_unknown">unbekannt</string>
     <string name="throw_test_exception_title">Test-Exception werfen</string>
     <string name="throw_test_exception_summary">Crasht die App absichtlich, um ACRA-Submission end-to-end zu verifizieren. Nur benutzen wenn du Crash-Reporting testen willst.</string>
     <string name="toast_throwing_test_exception">Test-Exception wird geworfen — App crasht gleich.</string>

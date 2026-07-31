@@ -532,8 +532,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         when (val action = crashReportConsentController.resolveStartupAction()) {
             is ConsentController.StartupAction.Reaffirm -> {
                 // Already answered on a previous launch (this branch is only
-                // reached when the state read SUCCEEDED with hasAsked == true).
-                // ACRA was set from the stored consent at bootstrap
+                // reached when the read SUCCEEDED with a stored Granted/Denied
+                // decision). ACRA was set from the stored consent at bootstrap
                 // (attachBaseContext); re-affirm it here — cheap, and covers a
                 // bootstrap read that failed — without showing the dialog
                 // again. Synchronous: this runs under

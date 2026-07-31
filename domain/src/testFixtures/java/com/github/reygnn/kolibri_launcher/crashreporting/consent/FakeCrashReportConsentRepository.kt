@@ -20,8 +20,4 @@ class FakeCrashReportConsentRepository : CrashReportConsentRepository {
         decision = if (granted) ConsentDecision.Granted else ConsentDecision.Denied
         return ConsentWriteResult.Saved
     }
-
-    override suspend fun hasConsent(): Boolean = decision == ConsentDecision.Granted
-
-    override suspend fun hasAsked(): Boolean = decision != ConsentDecision.NeverAsked
 }

@@ -219,9 +219,9 @@ activities.
 
 8. **ACRA is opt-in (privacy-by-default).** Crash reporting is disabled
    immediately after init (`ACRA.errorReporter.setEnabled(false)`) and is
-   only enabled when `CrashReportConsent.hasConsent()` returns `true`. Do
-   not change this order. Reports go to a private server, never to a
-   third-party service.
+   only enabled when the bootstrap read (`ConsentBootstrap.readDecision`)
+   returns `ConsentDecision.Granted`. Do not change this order. Reports go to
+   a private server, never to a third-party service.
 
 9. **Error logging goes through `TimberWrapper`.** Plain `Timber.e(...)`
    only logs — silent in DEBUG too. Use `TimberWrapper.silentError(e, ...)`
@@ -373,12 +373,11 @@ activities.
     answer overwrites the decision the user already made (AUDIT-10
     #2), and a write that returns `Unit` on failure lets the caller
     assume a save that never happened (AUDIT-10 #11). Ask what the
-    fallback *causes* downstream, not just whether it looks safe. Two
-    plain getters there (`hasConsent`/`hasAsked`) still fall back to
-    `false` — deliberately: they only feed display and no write
-    follows them. The `catch (Exception)` blocks in
-    `CrashReportConsentRepositoryImpl` are this contract, not an
-    accidental swallow. Note where each half is pinned: the contract
+    fallback *causes* downstream, not just whether it looks safe. The
+    `catch (Exception)` blocks in `CrashReportConsentRepositoryImpl` are
+    this contract, not an accidental swallow. (The tri-state is confined to
+    `readState`; there are no boolean convenience getters — the live
+    consumers derive what they need from the `ConsentDecision`.) Note where each half is pinned: the contract
     test only covers the SUCCESS shapes (`Loaded`, `Saved`) across fake
     and impl — the failure branches are impl-only I/O and live in
     `CrashReportConsentRepositoryImplTest` alone, which is therefore

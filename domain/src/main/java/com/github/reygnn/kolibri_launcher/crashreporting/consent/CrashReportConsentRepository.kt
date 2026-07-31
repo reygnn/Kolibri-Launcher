@@ -43,10 +43,10 @@ package com.github.reygnn.kolibri_launcher.crashreporting.consent
  *    than throwing — so a caller that already switched ACRA in-memory can
  *    surface the divergence (a toast) instead of silently assuming success
  *    (A4, AUDIT-10 #11).
- *  - **The two plain getters stay total.** [hasConsent] / [hasAsked] fall back
- *    to `false` on any non-loaded read. They only feed display and are never
- *    followed by a write, so an unknown state cannot escalate there — the
- *    tri-state is deliberately confined to [readState] (SR4).
+ *
+ *  The tri-state is deliberately confined to [readState]: there are no boolean
+ *  convenience getters — the two live consumers (startup gate, settings summary)
+ *  derive what they need from the [ConsentDecision] directly.
  *
  *  Cancellation is not a failure: [kotlinx.coroutines.CancellationException]
  *  propagates on every path and is never collapsed into an
@@ -72,19 +72,4 @@ interface CrashReportConsentRepository {
      * throw for an I/O failure (cancellation still propagates). See A4.
      */
     suspend fun setConsent(granted: Boolean): ConsentWriteResult
-
-    /**
-     * Whether the user has consented to ACRA crash reporting — i.e. the stored
-     * decision is [ConsentDecision.Granted]. Display-only and total: any
-     * non-loaded read yields `false` (see the class KDoc failure model).
-     */
-    suspend fun hasConsent(): Boolean
-
-    /**
-     * Whether the consent dialog has been answered at least once — i.e. the
-     * stored decision is not [ConsentDecision.NeverAsked]. Display-only and
-     * total: any non-loaded read yields `false` (see the class KDoc failure
-     * model).
-     */
-    suspend fun hasAsked(): Boolean
 }

@@ -229,6 +229,11 @@
          in release builds because the maintainer needs them after every refactor
          that touches the crash pipeline. -->
     <string name="developer_commands_category_title">Developer Commands</string>
+    <string name="pipeline_status_title">ACRA pipeline status</string>
+    <string name="pipeline_status_summary">Show the unsent crash-report backlog — a growing backlog means the sender/server is dead; empty means healthy or never crashed.</string>
+    <string name="toast_pipeline_status_empty">ACRA backlog empty — sender healthy or never crashed.</string>
+    <string name="toast_pipeline_status_backlog">ACRA backlog: %1$d approved, %2$d unapproved. Oldest: %3$s</string>
+    <string name="pipeline_status_oldest_unknown">unknown</string>
     <string name="throw_test_exception_title">Throw test exception</string>
     <string name="throw_test_exception_summary">Deliberately crashes the app to verify ACRA submission end-to-end. Use only when you want to test crash reporting.</string>
     <string name="toast_throwing_test_exception">Throwing test exception — app will crash now.</string>

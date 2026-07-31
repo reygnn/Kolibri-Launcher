@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.text.format.DateUtils
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
@@ -44,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentControll
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentReadResult
+import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
@@ -97,6 +99,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject
     lateinit var crashReportConsentController: ConsentController
+
+    @Inject
+    lateinit var pipelineBacklogProbe: PipelineBacklogProbe
 
     // 1. Deklaration für die Preference
     // Tracked so onDestroyView can dismiss the currently-open dialog
@@ -492,6 +497,33 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 TimberWrapper.silentError(e, "Error in crash reports preference click")
                 false
             }
+        }
+
+        // Developer command: the ACRA pipeline-status probe (§8c, G3-C). Reads
+        // the unsent-report backlog OFF the main thread and toasts it — a
+        // growing backlog means the sender/server is dead; an empty backlog
+        // means healthy OR never crashed (deliberately ambiguous; the accepted
+        // limit of the ReportLocator baseline over a positive HTTP send-marker).
+        findPreference<Preference>(AppConstants.PrefKeys.PIPELINE_STATUS)?.setOnPreferenceClickListener {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                val backlog = withContext(Dispatchers.IO) { pipelineBacklogProbe.read() }
+                val activityContext = activity ?: return@launch
+                val message = if (backlog.approved == 0 && backlog.unapproved == 0) {
+                    getString(R.string.toast_pipeline_status_empty)
+                } else {
+                    val oldest = backlog.oldestMillis
+                        ?.let { DateUtils.getRelativeTimeSpanString(it).toString() }
+                        ?: getString(R.string.pipeline_status_oldest_unknown)
+                    getString(
+                        R.string.toast_pipeline_status_backlog,
+                        backlog.approved,
+                        backlog.unapproved,
+                        oldest,
+                    )
+                }
+                activityContext.showToastSafe(message)
+            }
+            true
         }
 
         // Developer command: the ACRA throw-test shortcut. A throw in a
