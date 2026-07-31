@@ -21,7 +21,8 @@ Belang B (Ingestion) und C (Resilienz) folgen als eigene Abschnitte.
 
 Verweise `A1..A8`, `SR/SW/SD/RC`, `§n` zeigen auf `ACRA_FLOW.md`.
 
-Status: **Belang A — Entwurf.** B, C — offen.
+Status: **Belang A (Consent) — Entwurf; S (Server-Vertrag) — steht.** B (Ingestion),
+C (Resilienz) — offen.
 
 ---
 
@@ -412,6 +413,157 @@ impl-only (Rule 11-Notiz in `ACRA_FLOW.md`).
 
 ---
 
-## B. Belang B — Ingestion   *(offen — nächster Slice)*
+## S. Server-Vertrag (harte Vorbedingung für Belang B)
+
+`ACRA_FLOW.md` B3/§4.3 verschiebt die **gesamte** Flut-Kontrolle server-seitig: der
+Client drosselt nichts, sendet jeden consent-gateten Report. Damit ist der Server
+kein Implementierungsdetail, sondern eine **externe Abhängigkeit, ohne die das
+Client-Design nicht trägt**. Dieser Abschnitt ist der Vertrag: was der (private,
+selbstgehostete) Server erfüllen **muss**, bevor Belang B darauf baut. `MUSS` =
+tragende Invariante; `SOLL` = starke Empfehlung.
+
+> **SPEC-DECISION S-1 (Backend-Produkt) — ENTSCHIEDEN: Custom/eigener Ingest.**
+> Der Server ist ein selbstgebauter Endpoint (kleiner Server + DB), kein fertiges
+> Backend (Acrarium o. Ä.). Damit ist **jeder** `MUSS`-Punkt unten eine
+> **Bauvorgabe**, kein Konfig-Schalter — dieser Vertrag *ist* die Spec des Ingest.
+> Der Server lebt **außerhalb** dieses Repos; der Vertrag ist die Schnittstelle,
+> die Client und Server gemeinsam ehren. Empfohlene Pipeline-Reihenfolge: **S.10**.
+
+### S.0 Rolle & Grenze
+
+- **Einziger Flut-Kontrollpunkt (B3).** Dedup **und** Rate-Limit sitzen hier, nicht
+  im Client. Grund: ein Client-Throttle säße nur in `AcraTree` und sähe den
+  Crash-Loop (Uncaught umgeht `AcraTree`) nie; nur der Server sieht **beide** Fluten.
+- **Privat, nie ein Drittanbieter.** Reports enthalten Stacktraces der App.
+- **Kennt kein Consent (B1).** Der Server prüft **nie** Consent — per Konstruktion
+  erreichen ihn nur Reports, die der Client bei aktivem Gate gesendet hat. Er hat
+  keinen Consent-Begriff.
+
+### S.1 Eingang — was der Client sendet (fix, ACRA 5.13.1 + §4.7)
+
+- **Endpoint:** `POST` an `BuildConfig.ACRA_URL` (`secrets.properties → acra.url`).
+- **Auth:** HTTP Basic (`ACRA_LOGIN`/`ACRA_PASSWORD`). **TLS 1.2/1.3** erzwungen.
+- **Body:** ACRA-JSON (`reportFormat = JSON`), **exakt** diese Felder (B5):
+  `PACKAGE_NAME, ANDROID_VERSION, APP_VERSION_CODE, APP_VERSION_NAME, BRAND,
+  PHONE_MODEL, STACK_TRACE`. **Kein** `CUSTOM_DATA`, kein Logcat, keine Geräte-ID.
+- **Kadenz (§13, §4.3):** kein Intervall (`setOverrideDeadline(0)`), Bursts bis
+  `MAX_SEND_REPORTS = 5`/Pass, Job-Coalescing *innerhalb* eines App-Lebens. Ein
+  **Crash-Loop** = neuer Prozess je Crash = Sofort-POST im Crash-Takt. Der Server
+  **MUSS** solche Bursts verkraften, ohne umzufallen (das ist der Sinn von S.5).
+
+### S.2 HTTP-Status-Vertrag — die Kopplung an G3-C  *(MUSS, kritisch)*
+
+Der Client leitet seine **einzige** Liveness (G3-C, `PipelineBacklogProbe`) aus dem
+Rückstau ungesendeter Dateien ab: 2xx ⇒ ACRA löscht die Datei; jeder Nicht-Erfolg ⇒
+`ReportSenderException` ⇒ Datei bleibt liegen ⇒ Rückstau wächst (§13). Damit
+„Rückstau wächst" **genau** „Server unerreichbar/kaputt" heißt — und nicht „Server
+hat dedupt" —, gilt:
+
+| Server-Ausgang | HTTP | Client-Folge | Warum |
+|---|---|---|---|
+| Report gespeichert | **2xx** | Datei gelöscht | Normalfall |
+| Report **dedup-** oder **rate-limit-verworfen** (bewusst, kein Fehler) | **MUSS 2xx** | Datei gelöscht | sonst falscher Rückstau → G3-C-Fehlalarm + Backup-Schleife |
+| Server überlastet / down / DB weg | **5xx** (oder Verbindungsabbruch) | Datei bleibt → Rückstau | **gewollt**: der eine Fall, in dem Rückstau wachsen SOLL — G3-C zeigt „tot" |
+| Auth falsch / URL falsch | 4xx/Abbruch | Datei bleibt → Rückstau | Fehlkonfiguration wird als Rückstau sichtbar (§G3) |
+
+**Kernsatz:** ein absichtlicher Drop (Dedup/Rate-Limit) ist für den Client
+**ununterscheidbar von „gespeichert"** — und das ist korrekt. Nur echtes
+Server-Versagen darf den Rückstau treiben.
+
+### S.3 Fingerprint — der Anker für Dedup & Rate-Limit  *(MUSS)*
+
+Beide Fluten (S.4/S.5) hängen an einem **stabilen Fingerprint** über den
+`STACK_TRACE`. Er **MUSS** über Vorkommen desselben Bugs identisch sein und
+Variabel-Rauschen ignorieren.
+
+> **SPEC-DECISION S-2 (Normalisierungsregeln) — ENTSCHIEDEN.** Fix:
+> - **Basis: Exception-Typ + normalisierte Frames** (`Klasse.methode`), **ohne**
+>   die Message. Grund: der Carrier faltet Log-Kontext in die Message
+>   (`"[W/Tag] Type: msg"`, B4); Messages tragen oft variable Daten (IDs, Pfade) →
+>   im Fingerprint würden sie denselben Bug aufsplittern.
+> - **Strippen:** Speicheradressen/`@1a2b3c`-Identity-Hashes, Thread-Namen,
+>   Timestamps. **Zeilennummern behalten** (präziser, pro Version stabil).
+> - **Gruppierung auf DE-obfuskiertem Trace** (nach S.6-Mapping), nicht auf dem
+>   ProGuard-Namen — sonst zerfällt derselbe Bug über Releases hinweg, weil sich
+>   obfuskierte Namen je Mapping ändern.
+
+### S.4 Dedup am Storage  *(MUSS)*
+
+Identische Fingerprints **MUSS** der Server zu **einem** Eintrag mit Zähler
+kollabieren (Occurrence-Count, first-/last-seen, Menge betroffener
+`APP_VERSION_CODE`, Sample `BRAND`/`PHONE_MODEL`/`ANDROID_VERSION`) — **nicht** N
+Tickets öffnen. Löst die *Ticket-Hygiene* (§4.3·1).
+
+### S.5 Rate-Limit an der Ingestion-Kante  *(MUSS)*
+
+Body **früh** hashen bzw. Fingerprint **vor** dem vollen Parsen bilden; gleiche
+Fingerprints pro Zeitfenster W ablehnen (→ Zähler erhöhen **oder** droppen),
+**bevor** voll geparst/gespeichert wird. Dedup allein (S.4) schützt nur den
+Storage, nicht den HTTP-/Parse-Pfad — das hier fängt die **Last** eines
+Crash-Loops (§4.3·2). Drop-Antwort: **2xx** (S.2). Fenster W: Betreiber-Wahl
+(Richtwert Sekunden–Minuten), am Fingerprint, nicht an der Quelle.
+
+### S.6 ProGuard-Mapping  *(MUSS, für Release-Traces)*
+
+Release-`STACK_TRACE` ist R8-obfuskiert. Der Build lädt die Mapping automatisch
+hoch (`uploadProguardMapping` nach `assembleRelease`/`bundleRelease`, `versionName`
+= Tag). Der Server **MUSS** Mappings **pro Version** (`APP_VERSION_CODE`/`NAME`)
+vorhalten und den Trace für Anzeige **und** für S.3-Fingerprinting deobfuskieren.
+Ohne das gruppiert S.4 obfuskierten Müll.
+
+### S.7 Auth- & Secret-Modell  *(SOLL)*
+
+Die Basic-Auth-Credentials sind aus dem APK **extrahierbar** (§4.7, §11) — bewusst
+akzeptiert, weil der Endpoint **wegwerfbar** ist: er nimmt nur Reports *entgegen*,
+liest keine Nutzerdaten. Verteidigung ist deshalb **server-seitig**, nicht
+Client-Geheimhaltung:
+- **SOLL:** Rate-Limit pro Quelle/Fingerprint (S.5 deckt Letzteres), Credential-
+  **Rotation** möglich, Endpoint strikt write-only (nichts anderes exploitierbar).
+- IP-Allowlist ist unpraktikabel (mobile Clients roamen) — kein `MUSS`.
+
+### S.8 PII & Retention  *(MUSS minimal, Retention Betreiber-Sache)*
+
+Durch B5 speichert der Server **keine** PII über `BRAND`/`PHONE_MODEL`/
+`ANDROID_VERSION` hinaus — kein Logcat, keine ID. Retention-Dauer ist
+Betreiber-Politik; der Vertrag garantiert nur, dass **nichts Sensibles ankommt**,
+das eine Aufbewahrung heikel machte.
+
+### S.9 Was der Server NICHT tut
+
+- **Kein Consent-Check** (B1, S.0).
+- **Kein Zurückschieben von Client-Throttle-Verantwortung** — der Client bleibt
+  bewusst dumm/fail-safe (droppt nie einen echten Crash). Alles Dämpfen ist hier.
+- **Kein Verändern der Client-HTTP-Semantik** über S.2 hinaus (2xx=konsumiert).
+
+### S.10 Custom-Ingest — empfohlene Pipeline-Reihenfolge  *(Bauhilfe, folgt aus S-1)*
+
+Weil der Ingest ein Eigenbau ist (S-1), ist die *Reihenfolge* der Schritte selbst
+Teil der Korrektheit — Rate-Limit **vor** vollem Parse (S.5), Deobfuskierung **vor**
+Fingerprint (S.3/S.6):
+
+```
+POST /report  (Basic-Auth, TLS 1.2/1.3)
+  1. Auth prüfen              → 401 bei Fehler (Datei bleibt → Rückstau, S.2)
+  2. Body billig lesen        → STACK_TRACE + APP_VERSION_CODE extrahieren,
+                                 NICHT den vollen Report parsen
+  3. Deobfuskieren            → Mapping[APP_VERSION_CODE] auf STACK_TRACE (S.6)
+  4. Fingerprint bilden       → Typ + normalisierte Frames, ohne Message (S-2)
+  5. Rate-Limit-Check         → fingerprint in Fenster W schon gesehen?
+                                 JA → Zähler++, **2xx**, FERTIG (kein Parse/Store, S.5/S.2)
+  6. Voll parsen + Upsert     → Dedup am Storage: ein Eintrag/Fingerprint
+                                 + Count/first-/last-seen/Versionen (S.4)
+  7. Antwort                  → **2xx** (gespeichert). Nur echtes Versagen → 5xx (S.2)
+```
+- Schritt 5 vor 6 ist der Punkt von S.5: der Crash-Loop-Burst wird abgewiesen,
+  **bevor** teures Parsen/Schreiben passiert.
+- Jeder absichtliche Ausgang (5 und 6) endet in **2xx** — nur Auth (1) und echtes
+  Versagen (7) nicht; genau das hält die G3-C-Kopplung (S.2) sauber.
+- **Test-Anker (Server-seitig, außerhalb dieses Repos):** derselbe Fingerprint
+  zweimal in W → ein Storage-Eintrag, Count 2, beide Male 2xx; Server-500 →
+  Client-Rückstau wächst (manuell gegen `PipelineBacklogProbe` verifizierbar).
+
+---
+
+## B. Belang B — Ingestion   *(offen — nächster Slice; baut auf S)*
 
 ## C. Belang C — Resilienz   *(offen)*
