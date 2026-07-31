@@ -2,6 +2,8 @@ package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.di.consentDataStore
@@ -56,9 +58,18 @@ object ConsentBootstrap {
      * `setEnabled(decision == Granted)` — so it lives in the repository's
      * [CrashReportConsentRepository.readState] (R2) instead.
      */
-    suspend fun readDecision(context: Context): ConsentDecision {
+    suspend fun readDecision(context: Context): ConsentDecision =
+        readDecision(context.consentDataStore)
+
+    /**
+     * Testable core: maps the stored token to a decision, fail-closed. Exposed
+     * so the R1 gate mapping (and its I/O / cancellation handling) can be pinned
+     * with a fake [DataStore] instead of the pre-Hilt `context` extension.
+     */
+    @VisibleForTesting
+    internal suspend fun readDecision(dataStore: DataStore<Preferences>): ConsentDecision {
         return try {
-            when (context.consentDataStore.data.first()[CONSENT_DECISION_KEY]) {
+            when (dataStore.data.first()[CONSENT_DECISION_KEY]) {
                 VALUE_GRANTED -> ConsentDecision.Granted
                 VALUE_DENIED -> ConsentDecision.Denied
                 // Absent OR an unknown token: not Granted -> ACRA stays OFF.

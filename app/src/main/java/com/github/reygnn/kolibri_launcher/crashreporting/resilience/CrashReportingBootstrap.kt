@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
@@ -42,6 +43,23 @@ object CrashReportingBootstrap {
     private const val WATCHDOG_KILL_STORE = "crash_watchdog_kills"
 
     /**
+     * The EXACT report content (B5): minimal, no `CUSTOM_DATA`, no Logcat, no
+     * device ID. Extracted to a constant so the privacy boundary is pinnable by
+     * a test — adding a PII-bearing field is the exact leak B5 forbids. Pinned
+     * by `ReportContentTest`.
+     */
+    @VisibleForTesting
+    internal val REPORT_CONTENT = listOf(
+        ReportField.PACKAGE_NAME,
+        ReportField.ANDROID_VERSION,
+        ReportField.APP_VERSION_CODE,
+        ReportField.APP_VERSION_NAME,
+        ReportField.BRAND,
+        ReportField.PHONE_MODEL,
+        ReportField.STACK_TRACE,
+    )
+
+    /**
      * Called from `attachBaseContext` with the base context. Enforces the §12
      * ordering:
      *  1. `init` → `setEnabled(false)` with no intervening statement (A1) —
@@ -66,15 +84,7 @@ object CrashReportingBootstrap {
                 tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
             }
 
-            reportContent = listOf(
-                ReportField.PACKAGE_NAME,
-                ReportField.ANDROID_VERSION,
-                ReportField.APP_VERSION_CODE,
-                ReportField.APP_VERSION_NAME,
-                ReportField.BRAND,
-                ReportField.PHONE_MODEL,
-                ReportField.STACK_TRACE,
-            )
+            reportContent = REPORT_CONTENT
         }
 
         // §12·1: immediately after init, no intervening statement (A1).

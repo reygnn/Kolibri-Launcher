@@ -3,6 +3,8 @@ package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
@@ -11,14 +13,17 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import kotlin.test.assertFailsWith
 
 /**
  * Pure-JVM test for [AnrReporter]. ApplicationExitInfo is `open` so MockK can
@@ -191,5 +196,49 @@ class AnrReporterTest {
         // Watermark stayed at the last *successful* report (first=100); second
         // and third get retried next launch — the dedup contract.
         assertThat(dataStore.data.first()[watermarkKey]).isEqualTo(100L)
+    }
+
+    // ---------- failure branches (AN3 + cancellation) ----------
+
+    @Test
+    fun `markReported - when the write fails - swallows and does not advance the watermark`() = runTest(mainDispatcherRule.testDispatcher) {
+        dataStore.setInitialData(mutablePreferencesOf(watermarkKey to 100L))
+        dataStore.makeEditFail()
+
+        // AN3: a failed watermark write is swallowed (silentError), not thrown,
+        // and the watermark is NOT advanced — the ANR is retried next launch.
+        reporter().markReported(AnrReport(timestamp = 500L, description = "x", importance = 0, threadDump = null))
+
+        dataStore.resetErrorFlags()
+        assertThat(dataStore.data.first()[watermarkKey]).isEqualTo(100L)
+    }
+
+    @Test
+    fun `markReported - when the write is cancelled - propagates CancellationException`() = runTest(mainDispatcherRule.testDispatcher) {
+        dataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> {
+            reporter().markReported(AnrReport(timestamp = 500L, description = "x", importance = 0, threadDump = null))
+        }
+    }
+
+    @Test
+    fun `newAnrsSinceLastReport - when the watermark read is cancelled - propagates CancellationException`() = runTest(mainDispatcherRule.testDispatcher) {
+        // FakeDataStore only cancels its write path, so inject a cancelling read
+        // via a mock — guards that the CancellationException catch is ordered
+        // BEFORE the generic Exception->emptyList fallback in readWatermark.
+        val cancellingStore = mockk<DataStore<Preferences>>()
+        every { cancellingStore.data } returns flow {
+            throw CancellationException("simulated read cancellation")
+        }
+        val r = AnrReporter(
+            appContext = context,
+            dataStore = cancellingStore,
+            ioDispatcher = UnconfinedTestDispatcher(mainDispatcherRule.testDispatcher.scheduler),
+        )
+
+        assertFailsWith<CancellationException> {
+            r.newAnrsSinceLastReport()
+        }
     }
 }
