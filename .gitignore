@@ -142,3 +142,6 @@ test-reports/
 # Claude Code (local AI tooling)
 .claude/
 
+# ACRA library source (local reference only — see ACRA_FLOW.md §13)
+acra-source_5-13-1/
+

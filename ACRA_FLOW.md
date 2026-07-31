@@ -1,15 +1,17 @@
 # ACRA_FLOW.md
 
-**Ziel-Architektur des Crash-Reporting-Subsystems — bester aktueller Kandidat, noch in Konvergenz.**
+**Ziel-Architektur des Crash-Reporting-Subsystems — konvergiert; alle vier Gabelungen entschieden.**
 
 Dieses Dokument beschreibt den Crash-Reporting-Pfad so, wie er nach heutigem Stand
 am saubersten aussähe: ohne Rücksicht auf heutige Klassennamen, Key-Namen,
 Paketstruktur, Bestandsinstallationen oder darauf, was schon gebaut ist. Es gibt in
-dieser Fassung **keinen** Ist-Zustand und **keine** Migration — aber sehr wohl noch
-offene Fragen. Nichts hier ist beschlossen. Der Großteil ist gut begründet und steht
-als starke Default-Empfehlung; die wenigen echten Gabelungen sind als solche
-markiert und **nicht** vorentschieden. Ziel ist, jetzt genau hinzusehen, damit nicht
-später wieder eine Audit-Runde „entdeckt", was hier vorschnell als erledigt galt.
+dieser Fassung **keinen** Ist-Zustand und **keine** Migration. Die vier echten
+Gabelungen, an denen die APIs mehrere Wege offen ließen, sind inzwischen **alle
+entschieden** (G1 Variante A, G2 Variante A, G3 Variante C, G4 Variante A); jede
+trägt ihren Entscheidungsgrund an Ort und Stelle. Was bleibt, ist genaues Hinsehen,
+damit nicht später eine Audit-Runde „entdeckt", was hier vorschnell als erledigt
+galt — die geschlossenen Gabelungen tragen darum ihre Begründung offen, nicht bloß
+das Ergebnis.
 
 Die **einzige** Fessel ist die Realität der APIs. Kein Baustein darf etwas
 verlangen, was ACRA 5.13.1 oder die Android-Plattform nicht hergeben. Wo eine
@@ -64,117 +66,164 @@ sie beschreiben, was gilt, nicht was sich gegenüber irgendetwas ändert.
    bei Test: *welche Datei rot werden muss*. Eine Invariante ohne benannte
    Durchsetzung ist eine Bitte, kein Gesetz.
 
-Über die sieben Prinzipien hinaus gibt es vier Stellen, an denen die APIs mehrere
-Wege offen lassen und die Wahl echte Substanz hat. Hier tendieren wir aktuell — aber
-diese vier sind **nicht** beschlossen; sie sind die offenen Gabelungen, die der
-nächste Abschnitt mit beiden Seiten aufmacht:
+Über die sieben Prinzipien hinaus gab es vier Stellen, an denen die APIs mehrere
+Wege offen lassen und die Wahl echte Substanz hat. **Alle vier (G1–G4) sind
+inzwischen entschieden.** Der nächste Abschnitt hält jede mit beiden Seiten offen
+und trägt ihren Entscheidungsgrund, damit keine später als „übersehen" wieder
+aufgemacht wird:
 
-- **Uncaught-Pfad:** aktuelle Tendenz zu *einem* Handler in RELEASE *und* DEBUG
-  statt eines DEBUG-only-Wrappers. *(→ §5.1, G1)*
-- **Watchdog:** aktuelle Tendenz zu Kill *und* Capture statt nur einem von beidem.
-  *(→ §6, G2)*
-- **Pipeline-Lebendigkeit:** aktuelle Tendenz zu einem eigenen Send-Marker per Datei
-  mit atomarem Rename. Ob die Beobachtbarkeit den Cross-Prozess-Aufwand wert ist,
-  bleibt offen. *(→ C4, X4, G3)*
-- **Bootstrap-Consent-Read:** aktuelle Tendenz zu synchron auf dem Main-Thread — die
-  teuerste und strittigste der vier. *(→ §3.5, G4)*
+- **Uncaught-Pfad:** **entschieden** — *ein* Handler in RELEASE *und* DEBUG, kein
+  DEBUG-only-Wrapper (der real ausgeführte Build ist Release; Instrumentierung nur
+  im selten laufenden Debug wäre verkehrt herum). *(→ §5.1, G1 — geschlossen)*
+- **Watchdog:** **entschieden** — Kill *und* Capture (nicht nur berichten), mit
+  Loop-Guard gegen Kill-Restart-Schleifen. Recovery ist für einen HOME-Launcher
+  der Kernnutzen; der Slow-Device-Gegenarm ist durch den Hardware-Boden schwach.
+  *(→ §6, G2 — geschlossen)*
+- **Pipeline-Lebendigkeit:** **entschieden** — der `ReportLocator`-Rückstauzähler
+  (Nullaufwand, kein zweiter Sender, keine Cross-Prozess-Ablage) als Baseline; der
+  eigene Send-Marker bleibt dokumentierter Upgrade-Pfad, ausgelöst durch einen
+  realen „lebt der Reporter noch?"-Zweifel. *(→ C4, X4, G3 — geschlossen)*
+- **Bootstrap-Consent-Read:** **entschieden** — synchron (`runBlocking`) auf dem
+  Main-Thread vor `onCreate`, erzwungen durch das Capture-Gate/Data-at-rest
+  (Prinzip 4); reopen erforderte reopen von Prinzip 4. *(→ §3.5, G4 — geschlossen)*
 
 ---
 
-## Offene Gabelungen (noch nicht konvergiert)
+## Gabelungen (konvergiert — alle vier entschieden)
 
-Vier Stellen sind **nicht** entschieden — hier lassen die APIs mehrere Wege offen
-und die Wahl hat Substanz. Der Rest des Dokuments beschreibt jeweils die aktuell
-präferierte Variante als Default; hier stehen beide Seiten, damit die Gabelung
-sichtbar bleibt und nicht später als „übersehen" wieder aufgemacht werden muss. Jede
-trägt ein Kriterium, das sie schließen würde.
+Vier Stellen wurden identifiziert, an denen die APIs mehrere Wege offen lassen und
+die Wahl Substanz hat. **Alle vier sind geschlossen: G1 → A, G2 → A, G3 → C,
+G4 → A.** Der Rest des Dokuments beschreibt jeweils die gewählte Variante als
+Default; hier stehen weiterhin beide Seiten, damit die Entscheidung mit ihrem Grund
+sichtbar bleibt und nicht später als „übersehen" wieder aufgemacht wird. Jede trägt
+den Grund, der sie geschlossen hat — und, wo zutreffend, den Trigger, der sie
+wieder öffnen würde.
 
-### G1 — Uncaught-Pfad: ein Handler vs. DEBUG-only-Wrapper  *(§5.1)*
+### G1 — Uncaught-Pfad: ein Handler vs. DEBUG-only-Wrapper  *(§5.1)* — **GESCHLOSSEN (Variante A)**
 
-- **Tendenz:** ein einziger, in RELEASE und DEBUG identischer `UncaughtCrashHandler`.
+- **Entschieden:** ein einziger, in RELEASE und DEBUG identischer
+  `UncaughtCrashHandler`. Kein DEBUG-only-Wrapper.
 - **Dafür:** der Test deckt den Auslieferungsstand; OOM-GC und Log helfen beiden
   Builds; keine selbstgemachte Build-Divergenz.
-- **Dagegen / Alternative:** minimal weniger Code im RELEASE-Pfad bei einem
-  DEBUG-only-Wrapper — aber die Divergenz wäre selbstgemacht, nicht
-  Plattform-erzwungen.
-- **Reststreit:** gering. Diese Gabelung ist am ehesten reif zum Schließen.
-- **Schließt sich, wenn:** feststeht, dass kein RELEASE-Verhalten gebraucht wird, das
-  der DEBUG-Pfad nicht auch will — aktuell der Fall.
+- **Warum die Alternative (DEBUG-only-Wrapper) entfällt:** ihre einzige „Dafür"-
+  Seite war *minimal weniger Code im RELEASE-Pfad* — illusorisch, weil die zwei
+  Zutaten (OOM-`gc()`, Log) in RELEASE ohnehin gewollt sind. **Der entscheidende
+  Input:** in der Praxis wird fast ausschließlich der **Release**-Build installiert
+  und ausgeführt (der reale Daily-Driver-Build); Debug-Builds laufen nur selten.
+  Ein DEBUG-only-Wrapper instrumentierte damit genau den Build, der real kaum
+  läuft, und ließe den täglich laufenden Release-Pfad ohne OOM-`gc()` — verkehrt
+  herum. Und ACRA killt ohnehin in RELEASE **und** DEBUG (§13/C2), es gibt also
+  keine build-abhängige Kill-Differenz zu bewahren.
+- **Restrisiko:** keines von Substanz. Die Divergenz von B wäre reiner Nachteil
+  gewesen; A hat keinen Gegen-Arm, der offen bliebe.
 
-### G2 — Watchdog: Kill **und** Capture vs. nur eines  *(§6)*
+### G2 — Watchdog: Kill **und** Capture vs. nur eines  *(§6)* — **GESCHLOSSEN (Variante A)**
 
-- **Tendenz:** killen *und* vorher capturen.
+- **Entschieden:** killen *und* vorher capturen — **mit Loop-Guard** (siehe
+  Implementierungsnotiz unten). Capture war ohnehin gesetzt (§10); entschieden ist
+  der Kill *nach* dem Capture.
 - **Dafür (Kill):** die App ist der HOME-Launcher; ein toter Main-Thread heißt toter
-  Home-Button des ganzen Geräts. Kill → OS startet HOME sauber neu.
-- **Dagegen / Alternative:** Selbst-Kill ist aggressiv und trippt auf langsamen
-  Geräten evtl. bei legitimer (endlicher) Single-Message-Arbeit false. Die
-  konservativere Haltung „nie selbst killen, nur berichten" (Capture ohne Kill) ist
-  vertretbar — für viele die sauberere Grenze.
-- **Reststreit:** echt. Das ist eine Wertentscheidung, keine API-Wand.
-- **Schließt sich, wenn:** die real gemessene Trip-Rate auf dem langsamsten
-  Zielgerät bekannt ist. Häufige False-Positives → Schwelle hoch oder Kill raus;
-  keine → Kill bleibt.
+  Home-Button des ganzen Geräts. Kill → OS startet HOME sauber neu. Im Fenster
+  ~5–10 s ohne pending Input deklariert das System oft *keinen* ANR — dann ist der
+  Watchdog-Kill der einzige Weg, den Wedge überhaupt aufzulösen.
+- **Warum die Alternative („nur berichten", Capture ohne Kill) entfällt:** sie ist
+  für eine gewöhnliche App die sauberere Grenze, verschenkt aber für einen
+  **HOME-Launcher** den Kernnutzen — der tote Home-Button bliebe tot, bis der Nutzer
+  selbst neu startet. Ihr Haupt-*Dafür* (False-Kills auf langsamen Geräten
+  vermeiden) ist zudem schwach: `minSdk = 36` zieht einen Hardware-Boden ein, unter
+  dem es keine genuin langsamen Geräte gibt (§6, §11) — was > 8 s in *einer* Message
+  hängt, ist auf Android-16-Silizium real ein Wedge, kein legitimer Slow-Tail.
+- **Restrisiko (benannt, nicht offen):** ein deterministischer Post-`onCreate`-Wedge
+  könnte nach dem Neustart sofort wieder trippen → Kill-Restart-Loop (analog zum
+  Crash-Loop §4.3). Deshalb der Loop-Guard.
+- **Implementierungsnotiz — Loop-Guard:** der `RecoveryWatchdog` zählt eigene Kills
+  cross-prozess-arm (kleiner Timestamp-Zähler, z. B. im settingsDataStore oder einer
+  Marker-Datei): **N Kills innerhalb M Sekunden → Kill aussetzen, nur noch capturen**
+  (Fallback auf Variante B für genau diesen Loop). So bleibt die Recovery der
+  Normalfall, ohne dass ein reproduzierbarer Wedge das Gerät in eine
+  Kill-Restart-Schleife zwingt. Der Zähler ist reine Telemetrie, kein
+  Entscheidungszustand — die Multi-Prozess-Sorge von X2 (Consent) gilt hier nicht.
+  **Gepinnt durch (Prinzip 7):** `RecoveryWatchdog`-Test — (a) erster Trip →
+  Capture *und* `killSwitch`; (b) N-ter Trip innerhalb M s → Capture, **kein**
+  `killSwitch`. Der Zähl-/Fenster-Teil ist reine JVM-Logik (Uhr injizierbar,
+  §Test-Konventionen), aus dem Daemon-Thread herausgezogen (Rule 10).
+- **Bleibende akzeptierte Kante:** die Slow-Device-Falschauslösung (§11) — gültig,
+  weil G2 zugunsten des Kills gefallen ist; durch den Hardware-Boden praktisch
+  entschärft.
+- **Nachmessen (optional, nicht mehr blockierend):** die real gemessene Trip-Rate
+  auf dem langsamsten Zielgerät. Häufige False-Positives → Schwelle hoch; der
+  Hardware-Boden lässt „nahe null" erwarten.
 
-### G3 — Pipeline-Lebendigkeit: eigener Send-Marker vs. gar keine Observability  *(C4/X4)*
+### G3 — Pipeline-Lebendigkeit: eigener Send-Marker vs. gar keine Observability  *(C4/X4)* — **GESCHLOSSEN (Variante C: Rückstauzähler; A als Upgrade-Pfad)**
 
-- **Tendenz:** eigener `ReportSender`-Dekorator, der bei HTTP-Erfolg cross-prozess
-  einen Timestamp in eine Datei (atomarer Rename) stampt.
-- **Dafür:** Prinzip 6 — ein seit Monaten toter Sender darf nicht von „keine
-  Crashes" ununterscheidbar sein.
-- **Dagegen / Alternative:** ein eigener Sender plus die *einzige* zugelassene
-  Cross-Prozess-Ablage, nur für einen Dev-Screen. Für einen Solo-Launcher am
-  ehesten Gold-Plating. Alternative: gar keine Liveness-Anzeige (ein
-  In-Process-Enqueue-Marker löst X4 gerade **nicht**, also entweder richtig oder gar
-  nicht).
-- **Billigeres Komplement (source-geprüft): Rückstau zählen statt Send stampen.**
-  Ein toter Sender äußert sich als liegenbleibende Report-Dateien. Die sind aus
-  dem Hauptprozess ohne eigene Ablage lesbar: `ReportLocator` ist **public API**
-  (`ReportLocator.kt:27–35`, `approvedReports`/`unapprovedReports: Array<File>`),
-  und ein Server-Ausfall kommt als `ReportSenderException` durch, die die Datei
-  **nicht** löscht (`ReportDistributor.kt:77–82`) → der Ordner wächst. „N approved
-  Reports, ältester vor X" = Sender tot; leer = gesund *oder* nie gecrasht.
-- **Warum es den Marker trotzdem nicht ersetzt:** File-Count gibt **keine
-  positive HTTP-Bestätigung**. Leere Ordner können auch „Server-URL falsch, nie
-  gecrasht" heißen — das siehst du nie. Nur ein echter Send-Erfolg (HTTP 200)
-  bestätigt den Pfad Ende-zu-Ende; das sieht nur der `:acra`-Prozess. File-Count
-  ist also ein billiger Dead-Server-**Rückstau**-Detektor, kein Liveness-Beweis.
-- **Test-Gotcha (source-geprüft):** in einem **debuggable Build** sendet ACRA
-   per Default gar nicht und löscht die Datei dennoch
+- **Entschieden:** der **`ReportLocator`-Rückstauzähler** als Baseline-Liveness —
+  Nullaufwand, **kein** zweiter Sender, **keine** Cross-Prozess-Ablage. Der eigene
+  Send-Marker (Variante A) bleibt **dokumentierter Upgrade-Pfad**, nicht jetzt
+  gebaut.
+- **Warum C statt A (voller Send-Marker):** für einen **Solo-Launcher mit einem
+  selbstgehosteten Server, den der Betreiber selbst kennt**, ist ein *positiver*
+  Liveness-Beacon geringwertig — der realistischste Ausfall (Server tot / URL
+  falsch *nach* einem echten Crash) fällt als **Rückstau** auf, und den fängt C zu
+  praktisch null Kosten und **ohne** die einzige Cross-Prozess-Ausnahme, die A
+  bräuchte. A ist mehr, als heute gebraucht wird.
+- **Warum nicht B (gar nichts):** B ließe Prinzip 6 ohne jede Milderung — „seit
+  Monaten tot" und „keine Crashes" blieben ununterscheidbar. Ein In-Process-
+  Enqueue-Marker löst X4 **nicht** (stünde bei beidem still), ist also keine
+  Option. C ist die Nullaufwand-Zwischenstufe, die den wichtigsten Prinzip-6-Fall
+  abdeckt.
+- **Mechanismus C (source-geprüft):** Ein toter Sender äußert sich als
+  liegenbleibende Report-Dateien, aus dem Hauptprozess **ohne eigene Ablage**
+  lesbar: `ReportLocator` ist **public API** (`ReportLocator.kt:27–35`,
+  `approvedReports`/`unapprovedReports: Array<File>`), ein Server-Ausfall kommt als
+  `ReportSenderException` durch, die die Datei **nicht** löscht
+  (`ReportDistributor.kt:77–82`) → der Ordner wächst. „N approved Reports, ältester
+  vor X" = Sender/Server tot; leer = gesund *oder* nie gecrasht.
+- **Bewusste Grenze von C (nicht offen, akzeptiert):** kein **positiver
+  HTTP-Beweis**. Leerer Ordner heißt auch „URL falsch, nie gecrasht" — das siehst
+  du mit C nie. C ist ein Dead-Server-**Rückstau**-Detektor, kein Ende-zu-Ende-
+  Liveness-Beweis. Genau *diese* Lücke schließt später der Upgrade auf A (HTTP-200-
+  Stamp im `:acra`-Prozess) — sie ist der Trigger, nicht ein Mangel von C.
+- **Test-Gotcha (source-geprüft, gilt für C *und* A):** in einem **debuggable
+  Build** sendet ACRA per Default gar nicht und löscht die Datei dennoch
   (`ReportDistributor.kt:96,118–120,66`) — außer `sendReportsInDevMode=true`.
-  Der Rückstau-Zähler wie der Marker sind im Debug-Build also blind; siehe §8
+  Rückstau-Zähler wie Send-Marker sind im Debug-Build also blind; siehe §8
   (Throw-Test).
-- **Reststreit:** „nice-to-have vs. Aufwand". Der `ReportLocator`-Zähler senkt
-  den Aufwand-Arm (kein zweiter Sender, keine Cross-Prozess-Ablage), zum Preis
-  der positiven HTTP-Bestätigung.
-- **Schließt sich, wenn:** ein realer „ist der Reporter überhaupt noch am Leben?"-
-  Zweifel auftritt. Bis dahin kann der Marker warten; der `ReportLocator`-Zähler
-  wäre die Nullaufwand-Zwischenstufe.
+- **Upgrade-Pfad A (dokumentiert, nicht gebaut):** ein eigener `ReportSender`-
+  Dekorator um `HttpSender` (via `ReportSenderFactory`, §13), der bei HTTP-Erfolg
+  cross-prozess einen Timestamp in eine Datei mit atomarem Rename stampt — die
+  *einzige* dann zugelassene Cross-Prozess-Ablage (Telemetrie, kein
+  Entscheidungszustand, Last-Write-Wins). Details/Anti-Pattern: §7 X4, §10, §13.
+- **Trigger für den Upgrade auf A:** ein realer „ist der Reporter überhaupt noch am
+  Leben?"-Zweifel, den der Rückstauzähler nicht auflösen kann (z. B. Verdacht auf
+  falsche `ACRA_URL` ohne jeden Rückstau). Bis dahin bleibt C.
 
-### G4 — Bootstrap-Consent-Read: synchron auf dem Main-Thread vs. async  *(§3.5)*
+### G4 — Bootstrap-Consent-Read: synchron auf dem Main-Thread vs. async  *(§3.5)* — **GESCHLOSSEN (Variante A: sync)**
 
-- **Tendenz:** synchron (`runBlocking`) auf dem Main-Thread, vor `onCreate`.
-- **Dafür:** No-Window-Garantie — die frühen Crashes eines zustimmenden Nutzers sind
-  ab dem ersten Moment abgedeckt.
-- **Dagegen / Alternative:** ein `runBlocking`-Disk-Read bei *jedem* Cold-Start plus
-  eine StrictMode-Violation. Async lesen und ACRA erst nach bestätigtem Consent
-  einschalten verliert nur das schmale Fenster, bis der Read fertig ist — für einen
-  **opt-in**-privacy-by-default-Reporter evtl. akzeptabel.
-- **Aber diese Gabelung ist nicht unabhängig von Prinzip 4.** Async-lesen ohne
-  Coverage-Fenster ginge *nur*, wenn das Gate von Capture auf Send wanderte
-  (ACRA immer `enabled`, ein eigener `ReportSender` verwirft bei fehlendem
-  Consent zur Sendezeit). Der Preis dafür ist source-belegt: bei `enabled=false`
-  schreibt ACRA keine Datei (§13, Prinzip 4), bei `enabled=true` **schon** —
-  Capture-always hieße lokale Crash-Dateien für Nicht-Zustimmende. Für
-  privacy-by-default ist das der teurere Weg. Damit gewinnt das Capture-Gate,
-  und mit ihm der Sync-Read — nicht wegen No-Window-Coverage (das war die
-  schwächere Begründung), sondern wegen Data-at-rest.
-- **Reststreit:** dadurch kleiner als zuvor angenommen — die Kopplung an
-  Prinzip 4 entscheidet die Grundsatzfrage; offen bleibt nur noch das *Wie*
-  (Read-Dauer, StrictMode-Buchung).
-- **Schließt sich, wenn:** die reale Bootstrap-Read-Dauer gemessen ist. Sie
-  entscheidet nicht mehr sync-vs-async (das ist über Data-at-rest gefallen),
-  sondern nur noch, wie laut die StrictMode-Violation in `KNOWN_ISSUES.md`
-  gebucht wird.
+- **Entschieden:** synchron (`runBlocking`) auf dem Main-Thread, vor `onCreate`:
+  `setEnabled(readDecision() == Granted)`.
+- **Der entscheidende Grund ist Data-at-rest, nicht No-Window (Kopplung an
+  Prinzip 4).** Die Achse ist nicht sync-vs-async, sondern *wo das Gate sitzt*. Mit
+  dem **Capture-Gate** schreibt ACRA bei `enabled=false` **keine** Report-Datei
+  (§13) — ein Nicht-Zustimmender hinterlässt nichts auf Platte. Async *ohne*
+  Coverage-Fenster ginge nur mit Gate am **Send** (ACRA immer `enabled`, eigener
+  `ReportSender` verwirft zur Sendezeit) — und `enabled=true` schreibt Dateien
+  **auch für Nicht-Zustimmende**. Das ist die teurere, privacy-schlechtere Bauform.
+  Damit gewinnt das Capture-Gate, und mit ihm der Sync-Read.
+- **Dazu No-Window-Coverage (die schwächere, aber reale Zweitbegründung):** der
+  ACRA-Zustand ist korrekt, *bevor* der erste Crash möglich ist — die frühen
+  Crashes eines zustimmenden Nutzers sind ab Moment null abgedeckt.
+- **Warum async (Variante B) entfällt:** entweder Coverage-Fenster (verliert
+  ausgerechnet die frühen Cold-Start-Crashes eines Zustimmenden) oder Send-Gate
+  (lokale Crash-Dateien für Nicht-Zustimmende, gegen Prinzip 4). Kein
+  SharedPreferences-Mirror rettet async: `getBoolean` liest beim First-Load auch
+  von Platte, bringt aber einen zweiten Speicher + Drift-Fläche.
+- **Reopen erfordert reopen von Prinzip 4.** Es gibt keinen substanziellen Weg,
+  G4 neu zu öffnen, ohne Prinzip 4 zu öffnen (lokale Dateien *oder* Coverage-Fenster
+  akzeptieren). Prinzip 4 steht als Leitprinzip; damit ist G4 gefallen.
+- **Einziger Rest (kein Architektur-, nur Buchungs-To-do):** die reale
+  Bootstrap-Read-Dauer messen. Sie entscheidet **nicht** sync-vs-async (gefallen
+  über Data-at-rest), sondern nur, wie laut die StrictMode-DiskReadViolation in
+  `KNOWN_ISSUES.md` gebucht wird.
 
 ---
 
@@ -247,7 +296,7 @@ eine davon, ist sie falsch — egal wie plausibel sie aussieht. Die Spalte
 | **C1** | **Der Reporter crasht die App nie.** Jeder Pfad *innerhalb* der ACRA-/ANR-/Watchdog-Maschinerie schluckt seinen eigenen Fehler. *(Rule 7)* | Linter Rule 9 (Crash-Infra-Whitelist); Review |
 | **C2** | **Nach Uncaught-Crash terminiert der Prozess deterministisch.** Kein Zombie. Den Kill besorgt ACRAs eigener `ProcessFinisher` (`exitProcess(10)`) in RELEASE **und** DEBUG (§13); **kein** Flush-Fenster (Versand ist out-of-process, §5.1). Unser Kill ist reiner Backstop. Lügende Zustände → `silentDeath`. | Uncaught-Handler-Test (Backstop-Kill-Pfad erreicht); `silentDeath`-Test |
 | **C3** | **Der Watchdog verblindet den ANR-Reporter nicht.** Ein Watchdog-Kill erzeugt kein `REASON_ANR`; darum captured der Watchdog **vor** dem Kill selbst einen Report. Kein stiller Verlust von Looper-Stalls. *(→ §7 X1)* | `RecoveryWatchdog`-Test: Capture-Callback vor `killSwitch` |
-| **C4** | **Pipeline-Lebendigkeit ist beobachtbar.** Ein toter Reporter ist von „keine Crashes" unterscheidbar. Der dafür nötige Marker ist ein Last-Successful-**Send**-Marker, cross-prozess vom `:acra`-Sender bei HTTP-Erfolg gestampt (§13, X4), **nicht** von `AcraTree` (das sähe nur das Enqueue). Im Dev-Screen sichtbar. | `AcraHttpSender`-Test: HTTP-Erfolg stampt Marker; Dev-Screen-Test |
+| **C4** | **Pipeline-Lebendigkeit ist beobachtbar.** Ein toter Reporter ist von „keine Crashes" unterscheidbar. **Baseline (G3-C):** der `ReportLocator`-**Rückstauzähler** — aus dem Hauptprozess gezählte liegenbleibende Report-Dateien (public API, keine eigene Ablage), im Dev-Screen sichtbar. Erkennt den toten Sender/Server als wachsenden Rückstau, gibt aber **keinen** positiven HTTP-Beweis. Der Last-Successful-**Send**-Marker (cross-prozess vom `:acra`-Sender bei HTTP-Erfolg, §13/X4) bleibt **Upgrade-Pfad (G3-A)**, nicht Baseline; er säße **nicht** in `AcraTree` (das sähe nur das Enqueue). | Baseline: `ReportLocator`-Rückstau-Test + Dev-Screen-Test. Upgrade A: `AcraHttpSender`-Test (HTTP-Erfolg stampt Marker) |
 
 ---
 
@@ -351,14 +400,15 @@ per Reaffirm rekonziliert.
 | RC1 | R1 AUS (Fehler), R2 liest `Granted` | `Reaffirm(true)` → ACRA an — **der Grund für Reaffirm** | A1 |
 | RC2 | R2 liest `Denied` (Folgestart) | `Reaffirm(false)` → ACRA bleibt AUS, idempotent, **kein** Purge (nichts war an). „R1=AN, R2=`Denied`" ist **nicht erreichbar** — zwischen R1 und R2 läuft kein Write (Settings ist vor dem Gate unerreichbar), also ist die einzige reale R1≠R2-Divergenz die von RC1. Destruktiver Widerruf inkl. Queue-Purge nur via Settings-`applyConsent(false)` (A7). | A1 |
 
-### 3.5 Der Bootstrap-Read: synchron, DataStore, Haupt-Prozess (Tendenz, Gabelung G4)
+### 3.5 Der Bootstrap-Read: synchron, DataStore, Haupt-Prozess (entschieden, G4 → sync)
 
 Ein Crash-Reporter existiert, um die *frühen* Crashes zu fangen — also sollte der
 ACRA-Zustand korrekt sein, **bevor der erste Crash möglich ist**, d.h. vor
 `onCreate`. Dieser Anspruch macht den Rest zu einem Binär: entweder synchron auf dem
 Main-Thread lesen, oder ein (schmales) Coverage-Fenster für zustimmende Nutzer in
-Kauf nehmen. Aktuell **tendieren wir zum synchronen Read** — die Gegenseite (async,
-Fenster akzeptieren) steht in G4:
+Kauf nehmen. **Entschieden ist der synchrone Read** (G4 → Variante A; getragen von
+Data-at-rest/Prinzip 4, nicht bloß No-Window) — die verworfene Gegenseite (async,
+Fenster akzeptieren) ist in G4 dokumentiert:
 
 ```
 val decision = runBlocking { consentDataStore.readDecision() }   # ein kleiner Read
@@ -570,8 +620,10 @@ RELEASE **und** DEBUG. Zwei Konsequenzen prägen den ganzen Pfad:
 2. **Der deterministische Kill ist ACRAs, nicht unserer** (`exitProcess(10)`). C2
    ist erfüllt, ohne dass wir killen müssen.
 
-**Aktuelle Tendenz (Gabelung G1): ein einziger Handler in beiden Builds.** Kein
-DEBUG-only-Wrapper. Der `UncaughtCrashHandler` umschließt ACRAs Handler in RELEASE
+**Entschieden (G1 geschlossen, Variante A): ein einziger Handler in beiden Builds.**
+Kein DEBUG-only-Wrapper — der real ausgeführte Build ist Release, Instrumentierung
+allein im selten laufenden Debug wäre verkehrt herum (§0/G1). Der
+`UncaughtCrashHandler` umschließt ACRAs Handler in RELEASE
 *und* DEBUG identisch — er ergänzt nur zwei Dinge, die beide Builds *gleich* wollen,
 und delegiert dann den kritischen Versand+Kill an ACRA:
 
@@ -606,7 +658,11 @@ Daemon-Thread (kein Coroutine — muss laufen, wenn der Main-Looper hängt), kil
 den Prozess, wenn der Main-Looper > Schwelle (§6) nicht dispatcht. Start **nach**
 `onCreate` via `Handler.post`, damit die schwere Cold-Start-Arbeit nicht selbst
 einen Kill-Restart-Loop auf dem HOME-Prozess auslöst. Er ist zugleich
-Report-Quelle (§6, §4.1).
+Report-Quelle (§6, §4.1). Ein **Loop-Guard** (G2, §6, Schritt 0) setzt den Kill
+aus, sobald N eigene Kills innerhalb M Sekunden erreicht sind — dann *nur noch
+capturen* —, damit ein *deterministischer* Post-`onCreate`-Wedge (den der
+`onCreate`-Gate-Start nicht abfängt) das Gerät nicht in eine Kill-Restart-Schleife
+zwingt.
 
 ### 5.3 Rule-9-Ausnahme (plain `Timber.e`)
 
@@ -623,34 +679,35 @@ Rekursions-Begründung.
 | # | Fehler | Verhalten | Invariante |
 |---|---|---|---|
 | RS1 | ACRA-Init wirft in `attachBaseContext` | gefangen, `Log.e`-Fallback (Timber noch nicht da), App läuft weiter, ACRA AUS diesen Lauf | C1 |
-| RS2 | `handleSilentException` wirft im AcraTree | geschluckt (`Log.e`), Report verloren, App überlebt, Marker nicht gestampt | C1, C4 |
+| RS2 | `handleSilentException` wirft im AcraTree | geschluckt (`Log.e`), Report verloren, App überlebt; kein Report persistiert → kein Rückstau-Eintrag (C-Zähler unberührt) | C1, C4 |
 | RS3 | Fehler *im* Uncaught-Handler | falls Default-Handler noch nicht gerufen: nachholen; dann trotzdem Prozess killen | C2 |
 | RS4 | Main-Looper stallt > Schwelle | Watchdog captured Stack (§6), dann killt Prozess, OS startet HOME sauber neu | C2, C3 |
 
 ---
 
-## 6. Der Watchdog als Report-Quelle (Stall-Capture) — Tendenz (Gabelung G2)
+## 6. Der Watchdog als Report-Quelle (Stall-Capture) — entschieden (G2, Variante A)
 
 Der Watchdog erfüllt zwei Aufgaben, die sich **nicht ausschließen** und die wir
-aktuell zusammenführen (G2 hält die Alternative „nur berichten" offen): **schnelle
-Recovery** (Kill, damit der
-HOME-Prozess nicht sekundenlang tot wirkt) und **Sichtbarkeit** (der Stall darf
-nicht spurlos verschwinden, Prinzip 6). Der Ablauf beim Trip:
+zusammenführen (G2 ist zugunsten von Kill *und* Capture geschlossen; „nur berichten"
+ist verworfen): **schnelle Recovery** (Kill, damit der HOME-Prozess nicht
+sekundenlang tot wirkt) und **Sichtbarkeit** (der Stall darf nicht spurlos
+verschwinden, Prinzip 6). Der Ablauf beim Trip:
 
 ```
 Trip (Main-Looper hat timeoutMs nicht getickt):
+   0. Loop-Guard: killCount(fenster M) >= N ?  → Kill AUSSETZEN, nur Schritt 1–2 (capturen)
    1. Capture:  mainStack = mainThread.stackTrace       # wir sind auf dem Daemon-Thread
    2. Enqueue:  Timber.e(WatchdogStallException(mainStack))  # → §4.2
                   → handleSilentException persistiert + plant Out-of-process-Versand (:acra);
                     kleiner File-Write auf dem DAEMON-Thread, nicht dem hängenden Main-Thread
-   3. Kill:     killSwitch()   # Process.killProcess + exitProcess(10)
+   3. Kill:     recordKill(); killSwitch()   # Process.killProcess + exitProcess(10)
    (1–2 in try/catch(Throwable) geschluckt — Kill hat Vorrang, ST1)
    Kein Flush-Schritt: die persistierte Datei überlebt den Kill, :acra sendet sie (§5.1, §13)
 ```
 
-**Tendenz: Kill *und* Capture, nicht nur eines** (die offene Alternative „nur
-berichten" steht in G2). Die zwei Rollen sind hier bewusst nicht verschweißt,
-sondern *begründet zusammengeführt*:
+**Entschieden: Kill *und* Capture, nicht nur eines** (die Alternative „nur berichten"
+ist in G2 verworfen). Die zwei Rollen sind hier bewusst nicht verschweißt, sondern
+*begründet zusammengeführt*:
 
 - **Warum überhaupt killen (nicht nur berichten)?** Diese App ist der
   HOME-Launcher. Ein wirklich blockierter Main-Thread heißt: der Home-Button des
@@ -666,6 +723,15 @@ sondern *begründet zusammengeführt*:
   einzige In-Process-Schritt ist ein kleiner File-Write — und der läuft auf dem
   **Daemon-Thread**, nicht auf dem hängenden Main-Thread. Die historische Sorge
   „I/O auf dem gerade hängenden Thread" ist damit sachlich ausgeräumt.
+- **Warum ein Loop-Guard (Schritt 0)?** Ein *deterministischer* Post-`onCreate`-Wedge
+  würde nach jedem sauberen Neustart sofort wieder trippen → Kill-Restart-Schleife
+  auf dem HOME-Prozess (dasselbe Muster wie der Crash-Loop §4.3). Der Guard zählt
+  eigene Kills und setzt den Kill aus, sobald **N Kills innerhalb M Sekunden**
+  erreicht sind — dann *nur noch capturen* (kontrollierter Fallback auf „nur
+  berichten" für genau diesen Loop). Recovery bleibt der Normalfall; die Schleife
+  wird gebrochen, statt das Gerät endlos neu zu starten. Der Zähler ist reine
+  Telemetrie (kleine Marker-Datei/`settingsDataStore`), **kein**
+  Entscheidungszustand — die X2-Multi-Prozess-Sorge (Consent) gilt hier nicht.
 
 **`timeoutMs = 8 s` (Default, begründet).** Die System-Input-Dispatch-ANR-
 Schwelle liegt bei ~5 s, die Broadcast-Foreground-Schwelle bei ~10 s. 8 s sitzt
@@ -679,10 +745,16 @@ System deklariert *keine* input-ANR) ist der Watchdog der einzige Weg, den Stall
 trippt nur, wenn eine **einzelne** Looper-Message > 8 s blockiert; legitime
 Arbeit, die zwischen Messages zurückgibt, pumpt den Looper und trippt nie. Eine
 einzelne Main-Thread-Operation, die legitim > 8 s braucht, ist selbst ein Bug —
-und wird auf dem langsamsten Zielgerät ggf. false-getrippt. Das ist die bewusst
-akzeptierte Kante (§10, `ACCEPTED_LIMITATIONS.md`): der Preis dafür, dass ein
-echter Wedge den HOME-Prozess nicht sekundenlang tot lässt — solange G2 zugunsten
-des Kills ausfällt. Fällt G2 auf „nur berichten", verschwindet diese Kante.
+und der Hardware-Boden (`minSdk = 36`, durchweg Android-16-Silizium, keine Alt-/
+Billig-Geräte) macht genau diese Klasse praktisch leer: was auf solcher Hardware
+> 8 s in *einer* Message hängt, ist real ein Wedge, kein Slow-Device-Artefakt.
+Der Watchdog meldet damit nur echte Hangs; „false" ist er allenfalls dem Namen
+nach. Das ist die bewusst akzeptierte Kante (§10, §11,
+`ACCEPTED_LIMITATIONS.md`): der Preis dafür, dass ein echter Wedge den
+HOME-Prozess nicht sekundenlang tot lässt. Sie bleibt, weil G2 zugunsten des Kills
+**geschlossen** ist — durch den Hardware-Boden aber praktisch entschärft. (Der
+Loop-Guard adressiert eine *andere* Kante — den deterministischen Kill-Restart-Loop,
+nicht die einmalige Slow-Device-Fehlauslösung.)
 
 ---
 
@@ -748,24 +820,35 @@ akzeptiert.
 Korrekt für Stabilität — aber ein seit Monaten kaputter Sender ist von einem
 gesunden, stillen System **ununterscheidbar**.
 
-**Vorschlag (Mechanismus, Gabelung G3):** ein Last-Successful-**Send**-Marker (C4).
-Nur die Beobachtung eines erfolgreichen *Sends* löst das Problem — ein
-In-Process-„Enqueue"-Marker in `AcraTree` stünde bei „keine Crashes" und „toter
-Sender" gleichermaßen still. Sende-Erfolg ist aber nur im `:acra`-Prozess
-sichtbar (out-of-process, §13). Deshalb:
+**Gewählte Auflösung (G3-C): der `ReportLocator`-Rückstauzähler.** Ein toter
+Sender/Server äußert sich als liegenbleibende Report-Dateien; der Hauptprozess
+zählt sie über die **public API** `ReportLocator` (`ReportLocator.kt:27–35`) —
+**ohne** eigene Ablage, **ohne** zweiten Sender. „N approved Reports, ältester vor
+X" = Rückstau (Sender/Server tot); leer = gesund *oder* nie gecrasht. Im Dev-Screen
+sichtbar (§8c). Das deckt den wichtigsten Prinzip-6-Fall zu Nullaufwand — ohne jede
+Cross-Prozess-Ausnahme.
 
-- Ein eigener `ReportSender` (Dekorator um `HttpSender`, via `ReportSenderFactory`
-  registriert, §13) stampt bei HTTP-Erfolg einen Timestamp.
-- **Ablage (vorgeschlagen):** eine **Datei mit atomarem Rename**
-  (`File.renameTo` auf demselben Filesystem) unter `filesDir` — *nicht*
-  SharedPreferences (nicht verlässlich multi-prozess). Der Sender schreibt im
-  `:acra`-Prozess, der Haupt-Prozess liest für den Dev-Screen. Last-Write-Wins,
-  reiner Telemetrie-Timestamp.
+**Bewusst nicht gelöst von C — kein positiver HTTP-Beweis.** Ein leerer Ordner kann
+auch „`ACRA_URL` falsch, nie gecrasht" heißen; das sieht der Rückstauzähler nie.
+Nur die Beobachtung eines erfolgreichen *Sends* (HTTP 200) bestätigt den Pfad
+Ende-zu-Ende — und der ist ausschließlich im `:acra`-Prozess sichtbar
+(out-of-process, §13). Ein In-Process-„Enqueue"-Marker in `AcraTree` löst das
+**nicht** (stünde bei „keine Crashes" und „toter Sender" gleich still).
 
-Das ist die **eine** bewusst zugelassene Cross-Prozess-Ablage — vertretbar, weil
-es kein Entscheidungszustand ist (anders als Consent, der laut X2 gerade **nicht**
-multi-prozess sein darf). Der Preis ist ehrlich benannt: ein zusätzlicher Sender
-plus eine begründete Cross-Prozess-Ausnahme für ein Diagnosewerkzeug.
+**Upgrade-Pfad (G3-A, dokumentiert, nicht gebaut):** genau diese HTTP-Bestätigung
+liefert ein eigener `ReportSender` (Dekorator um `HttpSender`, via
+`ReportSenderFactory` registriert, §13), der bei HTTP-Erfolg einen Timestamp stampt.
+
+- **Ablage:** eine **Datei mit atomarem Rename** (`File.renameTo` auf demselben
+  Filesystem) unter `filesDir` — *nicht* SharedPreferences (nicht verlässlich
+  multi-prozess). Der Sender schreibt im `:acra`-Prozess, der Hauptprozess liest
+  für den Dev-Screen. Last-Write-Wins, reiner Telemetrie-Timestamp.
+- Das wäre dann die **eine** bewusst zugelassene Cross-Prozess-Ablage — vertretbar,
+  weil kein Entscheidungszustand (anders als Consent, der laut X2 gerade **nicht**
+  multi-prozess sein darf). Der Preis, ehrlich benannt: ein zusätzlicher Sender plus
+  eine begründete Cross-Prozess-Ausnahme für ein Diagnosewerkzeug — der Grund, warum
+  A **nicht** die Baseline ist. **Trigger:** ein realer Liveness-Zweifel ohne
+  Rückstau (§G3).
 
 ---
 
@@ -791,19 +874,21 @@ Anzeige).
 
 **c) Developer-Kommandos** (bewusst getrennte Handler, weil ein Throw im
 Preference-Click direkt an den globalen Handler geht):
-- **Pipeline-Status** → zeigt den Last-Successful-**Send**-Marker (C4): „letzter
-  erfolgreich *gesendeter* Report vor X" bzw. „nie". Der Marker wird vom eigenen
-  `ReportSender` (`AcraHttpSender`) im `:acra`-Prozess bei HTTP-Erfolg gestampt
-  (§13, X4), **nicht** von `AcraTree`. Der Diagnose-Anker für X4.
+- **Pipeline-Status** → zeigt den **`ReportLocator`-Rückstau** (C4-Baseline, G3-C):
+  „N approved/unapproved Reports, ältester vor X" bzw. „Ordner leer". Wachsender
+  Rückstau = Sender/Server tot; leer = gesund *oder* nie gecrasht. Aus dem
+  Hauptprozess über die public API `ReportLocator` gelesen (§13, X4) — **kein**
+  eigener Sender, **keine** Cross-Prozess-Ablage. Der Diagnose-Anker für X4. (Bei
+  Upgrade auf G3-A käme hier zusätzlich der Last-Successful-**Send**-Timestamp.)
 - **Throw-Test-Exception** → Toast, dann `Thread { sleep(800); throw }` — der
   Throw läuft auf einem nackten Thread **ohne** CoroutineExceptionHandler, reist
   also durch genau den echten Uncaught-Pfad (§5.1). Der Crash ist hier **gewollt**.
   **Gotcha (source-geprüft):** in einem debuggable Build wird der so erzeugte
   Report per Default **nicht gesendet** und die Report-Datei dennoch gelöscht
   (`ReportDistributor.kt:96,118–120,66`), es sei denn `sendReportsInDevMode=true`.
-  Der Pipeline-Status/Marker bleibt dann stumm, obwohl der Uncaught-Pfad korrekt
-  lief — beim Ende-zu-Ende-Test also `sendReportsInDevMode` setzen oder gegen
-  einen Release-Build testen, sonst jagt man ein Phantom.
+  Der Rückstauzähler (und ein etwaiger Send-Marker) bleibt dann stumm, obwohl der
+  Uncaught-Pfad korrekt lief — beim Ende-zu-Ende-Test also `sendReportsInDevMode`
+  setzen oder gegen einen Release-Build testen, sonst jagt man ein Phantom.
 
 ---
 
@@ -823,9 +908,15 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 :app/crashreporting/
    consent/   ConsentController, ConsentDialog, AcraToggle,
               ConsentSaveFailureNotifier
-   ingestion/ AcraTree, AnrReporter, AcraHttpSender (ReportSender-Dekorator, :acra)
+   ingestion/ AcraTree, AnrReporter
+              [Upgrade G3-A: AcraHttpSender (ReportSender-Dekorator, :acra)]
    resilience/ UncaughtCrashHandler, RecoveryWatchdog, CrashReportingBootstrap
+   diagnostics/ PipelineBacklogProbe (liest ReportLocator im Hauptprozess, G3-C)
 ```
+
+Baseline-Liveness ist die `PipelineBacklogProbe` (G3-C, zählt `ReportLocator`-
+Rückstau, keine Cross-Prozess-Ablage); `AcraHttpSender` ist der **Upgrade-Pfad
+G3-A** und wird erst bei einem realen Liveness-Zweifel gebaut (§G3, §7 X4).
 
 | Komponente | Modul | Verantwortung | Besitzt **nicht** |
 |---|---|---|---|
@@ -836,11 +927,12 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 | `ConsentDialog` | app | **Nur** Dialog bauen/zeigen, `onResult` bei echtem Tap, `null` sonst (A3) | Lesen, Persistieren, Scope |
 | `AcraToggle` | app | Seam über `ACRA.errorReporter.setEnabled` + Queue-Purge (`BulkReportDeleter`, **beide** Ordner, §13) — hält den Seiteneffekt in `:app`, Controller JVM-testbar | Entscheidungslogik |
 | `ConsentSaveFailureNotifier` | app | Seam: Toast bei fehlgeschlagenem Persist (A4) | Entscheidungslogik |
-| `AcraTree` | app | Der eine Zustellweg: Gate → Carrier → `handleSilentException` (persist + Out-of-process-schedule); schluckt (C1/B2/B4) | Consent-Check (B1); Flut-Kontrolle (server-seitig, §4.3); **Send-Erfolg** (→ `AcraHttpSender`) |
-| `AcraHttpSender` | app (`:acra`-Prozess) | `ReportSender`-Dekorator um `HttpSender`; stampt bei HTTP-Erfolg den Last-Successful-Send-Marker cross-prozess in eine Datei mit atomarem Rename (C4/X4, §13) | Report-Inhalt, Consent-Gate |
+| `AcraTree` | app | Der eine Zustellweg: Gate → Carrier → `handleSilentException` (persist + Out-of-process-schedule); schluckt (C1/B2/B4) | Consent-Check (B1); Flut-Kontrolle (server-seitig, §4.3); **Liveness** (→ `PipelineBacklogProbe` / Upgrade `AcraHttpSender`) |
+| `PipelineBacklogProbe` | app (Hauptprozess) | **Baseline-Liveness (G3-C):** zählt `ReportLocator`-Rückstau (public API) für den Dev-Screen; keine eigene Ablage, kein Sender (C4/X4, §13) | Send-Bestätigung (das kann nur A); Report-Inhalt |
+| `AcraHttpSender` | app (`:acra`-Prozess) — **Upgrade G3-A, nicht Baseline** | `ReportSender`-Dekorator um `HttpSender`; stampt bei HTTP-Erfolg den Last-Successful-Send-Marker cross-prozess in eine Datei mit atomarem Rename (C4/X4, §13). Erst bei realem Liveness-Zweifel gebaut (§G3). | Report-Inhalt, Consent-Gate |
 | `buildAcraReportThrowable`/`LoggedThrowable` | domain | Per-Report-Carrier (B4), pure/JVM-testbar | Android-Runtime |
 | `AnrReporter` | app | AEI → `AnrReport`, Watermark-Dedup, best-effort | ACRA-Aufruf (delegiert an Handler) |
-| `RecoveryWatchdog` | app | Looper-Stall-Kill **+** Stall-Capture (Daemon-Thread) → `handleSilentException`, *vor* dem Kill (§6, C3, X1) | Consent, Sende-Entscheidung |
+| `RecoveryWatchdog` | app | Looper-Stall-Kill **+** Stall-Capture (Daemon-Thread) → `handleSilentException`, *vor* dem Kill; **Loop-Guard** (N Kills/M s → nur capturen, §6) (§6, C3, X1) | Consent, Sende-Entscheidung |
 | `UncaughtCrashHandler` | app (RELEASE **und** DEBUG) | Wrapper um ACRAs Handler: OOM-GC + Log, dann Delegation; **kein** Flush-Fenster; Kill ist ACRAs `ProcessFinisher` (eigener Kill nur Backstop bei Veto/Wurf) — C2, §5.1, §13 | eigenes Flushen; Build-abhängige Divergenz |
 | `CrashReportingBootstrap` | app | ACRA-Init-Reihenfolge (A1), Prozess-Check (X2), Handler/Watchdog-Wiring, KolibriLog-Bridge | Consent-Entscheidung (an R1/Gate) |
 | `MainActivity`/`SettingsFragment` | app | Dünner Glue: Gate-Ergebnis rendern, Dialog tracken/dismissen | Alles obige |
@@ -869,15 +961,23 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 - **Widerruf ohne Queue-Purge** — lässt Reports der Nicht-Consent-Phase später
   abfließen. *(A7, X3)*
 - **Watchdog nur killen lassen (ohne Capture)** — macht die langsamsten Hangs
-  unsichtbar (C3, X1); das bleibt ein Anti-Pattern unabhängig davon, wie G2 fällt.
-  (Ob *überhaupt* gekillt wird — Kill vs. nur berichten — ist dagegen die offene
-  Gabelung G2, kein abzulehnender „Fix".) *(§6)*
-- **DEBUG-only-Divergenz im Uncaught-Pfad** — aktuell abgelehnt zugunsten eines
-  Pfads für beide Builds; die Abwägung selbst ist Gabelung G1. *(§5.1)*
-- **Den C4-Marker in `AcraTree` stampen** — `AcraTree` sieht nur das *Enqueue*,
-  nie den Sende-Erfolg; ein solcher Marker löst X4 gerade nicht. *(C4, X4, §13)*
-- **Den C4-Marker in SharedPreferences ablegen** — nicht verlässlich
-  multi-prozess; die Ablage ist Datei-mit-atomarem-Rename. *(X4)*
+  unsichtbar (C3, X1); das bleibt ein Anti-Pattern. (Ob *überhaupt* gekillt wird,
+  war Gabelung G2 — **geschlossen zugunsten Kill *und* Capture, Variante A**, §6.
+  Capture ist damit gesetzt; „nur killen ohne Capture" bleibt unabhängig davon
+  verboten.) *(§6)*
+- **DEBUG-only-Divergenz im Uncaught-Pfad** — abgelehnt zugunsten eines Pfads für
+  beide Builds (G1 **geschlossen**, Variante A: der real ausgeführte Build ist
+  Release). *(§5.1, §0/G1)*
+- **Den Send-Marker in `AcraTree` stampen** *(gilt für den Upgrade-Pfad G3-A)* —
+  `AcraTree` sieht nur das *Enqueue*, nie den Sende-Erfolg; ein solcher Marker löst
+  X4 gerade nicht. *(C4, X4, §13)*
+- **Den Send-Marker in SharedPreferences ablegen** *(gilt für den Upgrade-Pfad
+  G3-A)* — nicht verlässlich multi-prozess; die Ablage ist
+  Datei-mit-atomarem-Rename. *(X4)*
+- **Die G3-C-Baseline durch einen In-Process-Enqueue-Marker „ersetzen"** — der
+  stünde bei „keine Crashes" und „toter Sender" gleich still, löst X4 **nicht**.
+  Baseline ist der `ReportLocator`-Rückstauzähler; Send-Bestätigung kann nur der
+  Upgrade A. *(C4, X4, §G3)*
 - **Consent nach SharedPreferences verlagern** — DataStore ist die einzige
   Quelle; der Bootstrap-`runBlocking` ist am kontrollierten Main-Thread-Punkt
   API-begründet (§3.5).
@@ -899,12 +999,24 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 
 Diese Grenzen sind überwiegend die Stellen, an denen die Lösung an eine harte
 API-/Plattform-Wand stößt — echte Zwänge, keine Baustellen, unabhängig davon, wie
-die offenen Gabelungen ausgehen. Wo eine zusätzlich an einer Gabelung hängt
-(Watchdog → G2), ist das vermerkt.
+die offenen Gabelungen ausgehen. Die Watchdog-Slow-Device-Kante folgt aus der
+G2-Entscheidung (Kill, geschlossen zugunsten Variante A) und ist als solche
+vermerkt.
 
 - **StrictMode-DiskReadViolation beim Bootstrap-Read (§3.5).** Ein persistierter
   Fakt vor dem ersten möglichen Crash *ist* ein synchroner Disk-Read. Unvermeidbar
   bei jedem Speicher. Gehört nach `KNOWN_ISSUES.md`.
+- **Pre-Consent-Fenster im Erststart bleibt unabgedeckt (§3.2, Prinzip 2/4).** Bis
+  der Nutzer im Erststart den Consent-Dialog beantwortet, ist ACRA fail-closed AUS
+  (`NeverAsked`). Jeder Crash zwischen `attachBaseContext` und dem „Ja"-Tap wird nie
+  erfasst — und selbst nach `Granted` deckt der Reporter erst ab dem nächsten Moment,
+  nicht rückwirkend das Fenster davor. Das folgt **zwingend** aus opt-in +
+  privacy-by-default: fail-closed heißt, ein noch-nicht-gefragter Nutzer hinterlässt
+  bewusst keine Crash-Daten (Prinzip 2, Data-at-rest via Capture-Gate, Prinzip 4).
+  Der synchrone Bootstrap-Read (§3.5) minimiert nur das Fenster *zustimmender
+  Folgestarts*, dieses Erststart-Fenster kann er prinzipiell nicht schließen. Kein
+  Bug, sondern die Kehrseite von A1 — explizit gelistet, damit es nicht später als
+  „übersehene Lücke" wiederentdeckt wird. Gehört nach `ACCEPTED_LIMITATIONS.md`.
 - **Crash-Loop kostet Ingestion-Last, nicht durch den Client gebremst (§4.3).**
   ACRA sendet ohne Intervall (`setOverrideDeadline(0)`, `MAX_SEND_REPORTS=5`,
   Coalescing; §13), und es gibt keinen Client-Throttle. Ein Startup-Crash-Loop
@@ -916,17 +1028,31 @@ die offenen Gabelungen ausgehen. Wo eine zusätzlich an einer Gabelung hängt
   wäre die Alternative — bewusst nicht gewählt (Overhead, unmaintaint). Gehört
   nach `ACCEPTED_LIMITATIONS.md`.
 - **Watchdog-Falschauslösung auf Slow-Device-Tail (§6).** Eine legitime einzelne
-  Main-Thread-Operation > 8 s wird false-getrippt. Der Preis für Recovery des
-  HOME-Prozesses — gültig, *solange* G2 zugunsten des Kills ausfällt. Fällt G2 auf
-  „nur berichten", verschwindet diese Kante.
+  Main-Thread-Operation > 8 s würde false-getrippt. **Praktisch entschärft durch
+  den Hardware-Boden:** `minSdk = 36` heißt, jedes Zielgerät lief mit oder wurde
+  auf Android 16 gehoben — durchweg aktuelles Silizium, keine Billig-/Alt-Geräte in
+  der Population. Was auf solcher Hardware in *einer* Looper-Message > 8 s blockiert,
+  ist damit **immer ein echter Wedge**, kein Slow-Device-Artefakt — der Watchdog
+  kann nur einen realen Hang früh melden, nie legitime Langsamkeit bestrafen.
+  „False" ist er allenfalls dem Namen nach. Genau deshalb ist die Kante sauber
+  *akzeptiert*, nicht bloß in Kauf genommen. Sie folgt aus der G2-Entscheidung
+  (Kill, geschlossen zugunsten Variante A). **Nicht** vom Loop-Guard adressiert —
+  der bricht den *deterministischen Kill-Restart-Loop*, nicht die einmalige
+  Slow-Device-Fehlauslösung. Gehört nach `ACCEPTED_LIMITATIONS.md`.
 - **Extrahierbare Basic-Auth-Credentials im `BuildConfig` (§4.7).** Aus dem APK
   extrahierbar; bei einem wegwerfbaren Ingest-Endpoint verkraftbar (nur Schreiben
   von Reports, kein Zugriff auf Nutzerdaten). Gegenmaßnahme ist server-seitiges
   Rate-Limiting/Rotation, nicht Client-Geheimhaltung. Gehört nach
   `ACCEPTED_LIMITATIONS.md`.
-- **Cross-Prozess-Send-Marker als Datei (§X4).** Die *einzige* zugelassene
-  Cross-Prozess-Ablage; kein Entscheidungszustand, Last-Write-Wins. Der Preis der
-  Beobachtbarkeit.
+- **Keine positive HTTP-Liveness in der Baseline (§X4, G3-C).** Die gewählte
+  Baseline (`ReportLocator`-Rückstauzähler) erkennt einen toten Sender/Server nur
+  als *Rückstau*, nicht per HTTP-200-Beweis; ein leerer Ordner bleibt „gesund
+  *oder* nie gecrasht". Bewusst akzeptiert zum Preis von Nullaufwand und **keiner**
+  Cross-Prozess-Ablage. Gehört nach `ACCEPTED_LIMITATIONS.md`.
+- **Cross-Prozess-Send-Marker als Datei — *nur wenn* der Upgrade G3-A gebaut wird
+  (§X4).** Dann die *einzige* zugelassene Cross-Prozess-Ablage; kein
+  Entscheidungszustand, Last-Write-Wins. In der Baseline existiert sie **nicht** —
+  diese Grenze greift erst mit dem Upgrade.
 
 ---
 
@@ -958,12 +1084,12 @@ neu verifiziert werden muss.
 | **A7** Queue-Purge | `BulkReportDeleter(ctx).deleteReports(approved: Boolean, nrToKeep: Int)` — public (`BulkReportDeleter.kt:32`) | Löscht ungesendete Reports. ACRA hält **zwei** Ordner (`ReportLocator`: `ACRA-approved` **und** `ACRA-unapproved`); vollständiger Purge ruft **beide**. Offizielle API, kein Griff in private Verzeichnisse. |
 | **C2** Deterministischer Kill | `ProcessFinisher` → `Process.killProcess(Process.myPid())`; `exitProcess(10)` (`ProcessFinisher.kt:91–92`) | ACRA killt **selbst**, RELEASE **und** DEBUG. C2 ist ACRAs Garantie, nicht die unseres Wrappers. Unser Kill ist nur Backstop. |
 | **§5.1** „Flush" | *(kein Symbol — existiert nachweislich nicht)* | `ErrorReporter` (`ErrorReporter.kt`) exponiert **keinen** Completion-Callback — nur `handleSilentException` (`:55`) / `handleException(_, endApplication)` (`:70`) / `setEnabled` / Custom-Data. Versand ist **out-of-process + asynchron**; der Report ist eine **Datei**, die den Kill überlebt. Im sterbenden Prozess **nichts zu flushen**. |
-| **C4** Send-Marker | `ReportSender` (`ReportSender.kt:32`), `ReportSenderFactory : Plugin` (`ReportSenderFactory.kt:33`), `ReportDistributor.distribute(File): Boolean` (`ReportDistributor.kt:60`) | Sende-Erfolg ist **nur** im `:acra`-Prozess beobachtbar. `AcraTree` sieht ihn **nie** — es *enqueued* nur. Ein echter Send-Marker braucht einen eigenen `ReportSender` (Dekorator um `HttpSender`), der bei HTTP-Erfolg cross-prozess in eine Datei stampt. |
+| **C4** Send-Marker *(Upgrade-Pfad G3-A, nicht Baseline)* | `ReportSender` (`ReportSender.kt:32`), `ReportSenderFactory : Plugin` (`ReportSenderFactory.kt:33`), `ReportDistributor.distribute(File): Boolean` (`ReportDistributor.kt:60`) | Sende-Erfolg ist **nur** im `:acra`-Prozess beobachtbar. `AcraTree` sieht ihn **nie** — es *enqueued* nur. Ein echter Send-Marker braucht einen eigenen `ReportSender` (Dekorator um `HttpSender`), der bei HTTP-Erfolg cross-prozess in eine Datei stampt. Nur nötig, wenn positive HTTP-Liveness verlangt wird (G3-Trigger). |
 | **B2** Zustellweg | `handleSilentException(e)` nicht-terminal (`ErrorReporter.kt:55`); `handleException(e, endApplication)` terminal (`:70`) | `handleSilentException` = persist + Out-of-process-schedule, **kein** Kill. Der eine Silent-Weg. Nie zusätzlich `handleException` → Doppelversand. |
 | **§4.5** Post-mortem ANR | `ActivityManager.getHistoricalProcessExitReasons` + `ApplicationExitInfo.REASON_ANR` / `.getTraceInputStream()` — Android API 30+ (Ziel ist 36) | Harte ANRs samt System-Multi-Thread-Dump, ohne Live-Sampling. |
 | **B3/§4.3** Sender-Kadenz (kein Intervall) | `DefaultSenderScheduler` „schedules sending instantly", `setOverrideDeadline(0)` (`DefaultSenderScheduler.kt:76`), Job-ID `0` (`:51`); `MAX_SEND_REPORTS = 5` (`ACRAConstants.kt:44`, break in `SendingConductor.kt:47`); `DefaultRetryPolicy` nur bei Total-Fail | ACRA pact Sends **nicht** per Intervall. Dämpfer sind nur Coalescing (fixe Job-ID → Burst *innerhalb eines App-Lebens* kollabiert) + 5 Reports/Pass. Ein Crash-Loop (neuer Prozess je Crash) sendet im Crash-Takt → Flut-Kontrolle (Dedup + Rate-Limit) muss server-seitig sein, ein Client-Throttle wäre überflüssig und deckte den Loop eh nicht. |
 | **Prinzip 4 / G4** Capture-Gate = Data-at-rest | `ErrorReporterImpl.uncaughtException` (`ErrorReporterImpl.kt:89–94`); `ReportExecutor.execute` (`ReportExecutor.kt:76–79`) | Bei `enabled=false` bailt der Uncaught-Handler vor `ReportBuilder.build` (`return` nach `handReportToDefaultExceptionHandler`) und der Silent-Pfad vor `saveCrashReportFile` (`if (!isEnabled) { warn; return }`). ⇒ `disabled` = **keine** Report-Datei = null Data-at-rest. Das koppelt G4 an Prinzip 4: Capture-Gate erzwingt den Sync-Read, weil Send-Gate lokale Dateien für Nicht-Zustimmende hieße. |
-| **C4/G3** Rückstau-Liveness (Komplement) | `ReportLocator(ctx)` public, `approvedReports`/`unapprovedReports: Array<File>` (`ReportLocator.kt:27–35`); Delete-on-Send (`ReportDistributor.kt:66`), Datei überlebt `ReportSenderException` (`:77–82`) | Rückstau ist aus dem Hauptprozess zählbar (public API, kein Reflection); ein toter Server lässt Dateien liegen. **Aber** kein positiver HTTP-Beweis (leer = gesund *oder* nie gecrasht), und im debuggable Build wird per Default nicht gesendet, die Datei aber gelöscht (`:96,118–120`) → im Debug blind. Billiges Komplement, kein Ersatz für den Send-Marker. |
+| **C4/G3** Rückstau-Liveness *(gewählte Baseline G3-C)* | `ReportLocator(ctx)` public, `approvedReports`/`unapprovedReports: Array<File>` (`ReportLocator.kt:27–35`); Delete-on-Send (`ReportDistributor.kt:66`), Datei überlebt `ReportSenderException` (`:77–82`) | Rückstau ist aus dem Hauptprozess zählbar (public API, kein Reflection); ein toter Server lässt Dateien liegen. **Baseline-Liveness** (`PipelineBacklogProbe`, §9). Grenze (akzeptiert): kein positiver HTTP-Beweis (leer = gesund *oder* nie gecrasht), und im debuggable Build wird per Default nicht gesendet, die Datei aber gelöscht (`:96,118–120`) → im Debug blind. Für positive HTTP-Bestätigung: Upgrade auf den Send-Marker (Zeile oben, G3-A). |
 
 Verifikationsnotiz: geprüft aus `acra-core-5.13.1-sources.jar` /
 `acra-http-5.13.1-sources.jar` (`ACRA.kt`, `ErrorReporter.kt`,
@@ -982,6 +1108,7 @@ Verifikationsnotiz: geprüft aus `acra-core-5.13.1-sources.jar` /
   (Timber/silentError/silentDeath), 11 (Fehler-als-Wert).
 - `KNOWN_ISSUES.md` — der bewusste StrictMode-DiskReadViolation von R1 (§3.5, §11).
 - `ACCEPTED_LIMITATIONS.md` — extrahierbare Basic-Auth-Credentials (§4.7), bewusst
-  verlorene Soft-ANRs (§4.5/§6), Watchdog-Slow-Device-Kante (§6, §11).
+  verlorene Soft-ANRs (§4.5/§6), Watchdog-Slow-Device-Kante (§6, §11),
+  unabgedecktes Pre-Consent-Fenster im Erststart (§3.2/§11).
 - `AUDIT-10.md` — crash-consent-layering-Review (Consent-Invarianten §2).
 - `AUDIT-6.md` / `AUDIT-6_ADDENDUM.md` — Carrier-Exception statt CUSTOM_DATA.
