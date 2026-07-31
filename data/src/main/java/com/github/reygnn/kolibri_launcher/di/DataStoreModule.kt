@@ -18,7 +18,7 @@ import javax.inject.Singleton
  * Internal visibility (not private) so a small number of bootstrap-time
  * call sites that run before Hilt can reach it without a second
  * provider:
- *   - [com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore]
+ *   - [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap]
  *     reads / writes the ACRA consent flag here. The methods are
  *     called from KolibriLauncherApp.attachBaseContext, which runs
  *     before Hilt is initialised, so they can't take it via @Inject.
@@ -32,7 +32,7 @@ internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDat
 
 /**
  * Separate DataStore<Preferences> holding ONLY the ACRA crash-report
- * consent state ([com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore]).
+ * consent state ([com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap]).
  *
  * Deliberately a second file rather than a key in [settingsDataStore]:
  * Android Auto Backup includes the settings DataStore (so user config
@@ -62,7 +62,7 @@ object DataStoreModule {
     /**
      * The consent [consentDataStore], exposed to Hilt for the interactive
      * (post-Hilt) path — `CrashReportConsentRepositoryImpl` injects it via
-     * [ConsentDataStore]. Same singleton the bootstrap `CrashReportConsentStore`
+     * [ConsentDataStore]. Same singleton the bootstrap `ConsentBootstrap`
      * reaches through the extension, so both see the same file. Qualified so it
      * does not collide with the unqualified settings store above.
      */

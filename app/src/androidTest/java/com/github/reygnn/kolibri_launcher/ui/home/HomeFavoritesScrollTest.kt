@@ -15,7 +15,8 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
@@ -62,7 +63,7 @@ class HomeFavoritesScrollTest {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking {
             settings.setOnboardingCompleted()
-            CrashReportConsentStore.saveConsent(ctx, consent = false)
+            ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
 
             // Seed favorites with REAL launchable apps from the device,
             // per `INSTRUMENTED_TESTING_NOTES` "ASSUMPTION TRAPS" #1:

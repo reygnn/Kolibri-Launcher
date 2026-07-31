@@ -14,7 +14,8 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
@@ -60,7 +61,7 @@ class HomeFavoriteLongPressTest {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking {
             settings.setOnboardingCompleted()
-            CrashReportConsentStore.saveConsent(ctx, consent = false)
+            ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
 
             // One real launchable component as a favorite is enough
             // for this test (we long-press item 0). Real components

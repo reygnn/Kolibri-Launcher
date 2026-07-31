@@ -13,7 +13,8 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
@@ -90,7 +91,7 @@ class HomeGestureLayoutTest {
             // doesn't show up on top of HomeFragment and steal the
             // touches we're trying to dispatch. consent=false so ACRA
             // doesn't actually transmit anything during instrumented runs.
-            CrashReportConsentStore.saveConsent(ctx, consent = false)
+            ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
         }
     }
 

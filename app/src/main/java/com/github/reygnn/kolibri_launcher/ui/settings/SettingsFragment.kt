@@ -40,8 +40,10 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
@@ -95,7 +97,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     lateinit var settingsRepository: SettingsRepository
 
     @Inject
-    lateinit var crashReportConsentController: CrashReportConsentController
+    lateinit var crashReportConsentController: ConsentController
 
     // 1. Deklaration für die Preference
     // Tracked so onDestroyView can dismiss the currently-open dialog
@@ -459,7 +461,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         // a rotation with it open leaks its window (it is
                         // setCancelable(false), so it stays up). AUDIT-3 #12.
                         currentDialog?.dismiss()
-                        currentDialog = CrashReportConsent.forceShowConsentDialog(activityContext) { userGaveConsent ->
+                        currentDialog = ConsentDialog.show(activityContext) { userGaveConsent ->
                             // Persist (on the app-lifetime scope) + apply to
                             // ACRA through the controller — one source for the
                             // sequence both callers used to duplicate
@@ -561,12 +563,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private suspend fun updateCrashReportSummary() {
         withContext(Dispatchers.Main) {
-            try {
-                // currentConsent() is a DataStore read (real I/O, can throw),
-                // which is what this catch is here for.
-                applyCrashReportSummary(crashReportConsentController.currentConsent())
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Could not update crash report summary")
+            // currentDecision() reports its outcome as a value (no throw for I/O),
+            // so the old try/catch is gone: an unreadable store is the Unavailable
+            // branch, which leaves the summary as-is — display only, no write
+            // follows, so a stale summary is the safe outcome (A2). The failure is
+            // already reported by the repository.
+            when (val result = crashReportConsentController.currentDecision()) {
+                is ConsentReadResult.Loaded ->
+                    applyCrashReportSummary(result.decision == ConsentDecision.Granted)
+
+                is ConsentReadResult.Unavailable -> Unit
             }
         }
     }

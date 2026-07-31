@@ -17,7 +17,8 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -90,7 +91,7 @@ class BackupFragmentSafImportTest {
     @Before fun setUp() {
         hiltRule.inject()
         runBlocking {
-            CrashReportConsentStore.saveConsent(context, consent = false)
+            ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)
         }
 
         // ── Resolve two real launcher components for the seed payload ─

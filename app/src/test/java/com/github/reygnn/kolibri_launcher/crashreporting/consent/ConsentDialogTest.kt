@@ -4,6 +4,7 @@ import android.content.Context
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -24,6 +25,7 @@ import org.junit.Test
  * exact same "log + return null, no onResult" contract. The happy path (real
  * dialog + button taps) is pinned in `ConsentDialogRobolectricTest`.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConsentDialogTest {
 
     @get:Rule

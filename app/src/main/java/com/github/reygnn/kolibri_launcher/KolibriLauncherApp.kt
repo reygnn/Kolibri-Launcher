@@ -24,7 +24,8 @@ import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.buildAcraReportThrowable
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.ui.util.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.CrashReportLimiter
@@ -161,7 +162,7 @@ class KolibriLauncherApp : Application() {
 
                 // Check consent status
                 val userHasGivenConsent = runBlocking {
-                    CrashReportConsentStore.hasConsent(base)
+                    ConsentBootstrap.readDecision(base) == ConsentDecision.Granted
                 }
 
                 // Only enable if user has given consent

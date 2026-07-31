@@ -43,8 +43,8 @@ import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizati
 import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsent
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -275,7 +275,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     @Inject
     lateinit var appLauncher: AppLauncher
     @Inject
-    lateinit var crashReportConsentController: CrashReportConsentController
+    lateinit var crashReportConsentController: ConsentController
 
     /**
      * Latest wallpaper-surface classification emitted by
@@ -530,7 +530,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     private suspend fun checkAndShowCrashReportConsent() {
         when (val action = crashReportConsentController.resolveStartupAction()) {
-            is CrashReportConsentController.StartupAction.Reaffirm -> {
+            is ConsentController.StartupAction.Reaffirm -> {
                 // Already answered on a previous launch (this branch is only
                 // reached when the state read SUCCEEDED with hasAsked == true).
                 // ACRA was set from the stored consent at bootstrap
@@ -539,10 +539,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 // again. Synchronous: this runs under
                 // mainActivityExceptionHandler already, so no extra
                 // lifecycleScope.launch hop is needed (AUDIT-10 #5).
-                crashReportConsentController.reaffirmConsent(action.consent)
+                crashReportConsentController.reaffirmConsent(action.granted)
             }
 
-            CrashReportConsentController.StartupAction.Skip -> {
+            ConsentController.StartupAction.Skip -> {
                 // Consent state unreadable — it is unknown whether the user was
                 // ever asked. Doing nothing is the only safe option: showing the
                 // dialog would write back whatever gets tapped and could
@@ -553,8 +553,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 // (AUDIT-10 #2).
             }
 
-            CrashReportConsentController.StartupAction.ShowDialog -> {
-                val consentDialog = CrashReportConsent.forceShowConsentDialog(this) { userGaveConsent ->
+            ConsentController.StartupAction.ShowDialog -> {
+                val consentDialog = ConsentDialog.show(this) { userGaveConsent ->
                     // Persist + apply the decision through the controller
                     // (app-lifetime scope for the write; survives an immediate
                     // Activity teardown after the tap). AUDIT-10 #12.

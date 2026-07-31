@@ -18,7 +18,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
@@ -96,7 +97,7 @@ class AppDrawerFragmentSearchTest {
             // Marking consent as already-asked closes that gap. Set
             // `consent=false` because we don't want ACRA to actually
             // forward anything during instrumented tests.
-            CrashReportConsentStore.saveConsent(ctx, consent = false)
+            ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
         }
     }
 

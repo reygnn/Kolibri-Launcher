@@ -84,7 +84,7 @@ in `:app`.
 :data    (Android Library, depends on :domain)
   data/                   repository implementations (FavoritesRepositoryImpl,
                           BackupRepositoryImpl, CrashReportConsentRepositoryImpl,
-                          …), CrashReportConsentStore, PackageUpdateReceiver
+                          …), ConsentBootstrap, PackageUpdateReceiver
   data/service/           ShortcutLauncherServiceImpl
   di/RepositoryModule     @Binds for every repository interface
   di/DataStoreModule      two Preferences DataStores + their internal
@@ -251,12 +251,12 @@ activities.
      throw here escapes the safety-net coroutine and lands at the global
      uncaught handler, which is exactly what these wrappers exist to
      prevent.
-   - `CrashReportLimiter.kt`, `CrashReportConsentStore.kt` — both are on
+   - `CrashReportLimiter.kt`, `ConsentBootstrap.kt` — both are on
      the bootstrap path. The limiter is called synchronously from ACRA's
-     crash-handler thread (per Rule 5). The store's reads happen via
+     crash-handler thread (per Rule 5). `ConsentBootstrap`'s reads happen via
      `runBlocking` in `attachBaseContext` before Hilt and ACRA are
      initialised; a DEBUG throw there crashes the app before the reporter
-     is wired. (`CrashReportConsent.kt`, the dialog UI helper, used to be
+     is wired. (`ConsentDialog.kt`, the dialog UI helper, used to be
      listed here but no longer is: after the consent refactor it sits off
      the bootstrap path and its catches now use `silentError` — the
      throw-in-DEBUG is wanted there, since a dialog that fails to show must

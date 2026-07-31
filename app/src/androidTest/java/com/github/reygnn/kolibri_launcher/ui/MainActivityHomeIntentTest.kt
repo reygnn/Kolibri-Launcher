@@ -5,7 +5,8 @@ import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
-import com.github.reygnn.kolibri_launcher.data.CrashReportConsentStore
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.DefaultHomeRoleHelper
 import com.github.reygnn.kolibri_launcher.support.ShellCommand
@@ -69,7 +70,7 @@ class MainActivityHomeIntentTest {
             // crash-consent dialog, otherwise MainActivity.onCreate stalls
             // on user-input expectations and we never reach RESUMED.
             settings.setOnboardingCompleted()
-            CrashReportConsentStore.saveConsent(ctx, consent = false)
+            ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
         }
         DefaultHomeRoleHelper.setSelfAsDefault()
         assumeTrue(

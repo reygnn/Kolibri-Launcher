@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -37,6 +38,7 @@ import org.robolectric.annotation.Config
  *    and `onResult` never fires before a tap — a real user decision is the ONLY
  *    thing that reaches `onResult` (A3).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @HiltAndroidTest
 @Config(application = HiltTestApplication::class)

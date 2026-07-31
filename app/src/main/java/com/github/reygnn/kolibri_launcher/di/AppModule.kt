@@ -6,10 +6,10 @@ import android.content.pm.PackageManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
-import com.github.reygnn.kolibri_launcher.ui.util.ConsentSaveFailureNotifier
-import com.github.reygnn.kolibri_launcher.ui.util.ConsentSaveFailureNotifierImpl
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggle
-import com.github.reygnn.kolibri_launcher.ui.util.CrashReportToggleImpl
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggle
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggleImpl
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifier
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifierImpl
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides
@@ -50,17 +50,17 @@ object AppModule {
     fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
 
     /**
-     * The ACRA enable/disable seam. Behind an interface so
-     * [com.github.reygnn.kolibri_launcher.ui.util.CrashReportConsentController]
-     * stays JVM-testable (see [CrashReportToggle] KDoc).
+     * The ACRA enable/disable + revoke-purge seam. Behind an interface so
+     * [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController]
+     * stays JVM-testable (see [AcraToggle] KDoc).
      */
     @Provides
     @Singleton
-    fun provideCrashReportToggle(impl: CrashReportToggleImpl): CrashReportToggle = impl
+    fun provideAcraToggle(impl: AcraToggleImpl): AcraToggle = impl
 
     /**
      * The "consent could not be saved" seam. Behind an interface for the same
-     * reason as [CrashReportToggle] — see [ConsentSaveFailureNotifier] KDoc.
+     * reason as [AcraToggle] — see [ConsentSaveFailureNotifier] KDoc.
      */
     @Provides
     @Singleton
