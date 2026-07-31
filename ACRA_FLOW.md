@@ -222,7 +222,7 @@ eine davon, ist sie falsch — egal wie plausibel sie aussieht. Die Spalte
 | # | Invariante | Gepinnt durch |
 |---|---|---|
 | **A1** | **Fail-closed beim Einschalten.** ACRA wird deaktiviert *konstruiert* und nur bei einem positiven, bekannten Read (`Granted`) eingeschaltet. Jede Unsicherheit (ungelesen, unlesbar, `NeverAsked`, `Denied`) lässt es AUS. | Bootstrap-Test + Controller-Test (`resolveStartupAction`); §3.5 fixiert die Init-*Reihenfolge* als Teil der Invariante |
-| **A2** | **Kein lügender Read.** `Unavailable` bleibt unterscheidbar von `Denied`/`NeverAsked`. Ein Read-Fehler treibt nie einen Write und öffnet nie den Dialog. *(AUDIT-10 #2)* | `ConsentRepositoryImplTest` (Failure-Branch, impl-only); Controller-Test (`Unavailable → Skip`) |
+| **A2** | **Kein lügender Read.** `Unavailable` bleibt unterscheidbar von `Denied`/`NeverAsked`. Ein Read-Fehler treibt nie einen Write und öffnet nie den Dialog. Ein *vorhandener, unbekannter* Token (weder `GRANTED`/`DENIED`) ist `Unavailable`, **nicht** `NeverAsked` (§3.1, SR5). *(AUDIT-10 #2)* | `ConsentRepositoryImplTest` (Failure-Branch **inkl. Unknown-Token → `Unavailable`**, impl-only); Controller-Test (`Unavailable → Skip`) |
 | **A3** | **Schreiben nur bei echter Nutzerentscheidung.** Kein erschienener Dialog, kein Nicht-Activity-Kontext, kein Config-Change vor dem Tap persistiert. Nur ein echter Button-Tap schreibt. *(AUDIT-10 #6/#8)* | `ConsentDialog`-Test (Robolectric): `onResult` feuert nur bei Tap, sonst `null` |
 | **A4** | **Fehlgeschlagener Write ist sichtbar und verliert sauber.** Nichts wird geschrieben, die Session ehrt den Tap in-memory, der Nutzer wird per Toast informiert. *(AUDIT-10 #11)* | Controller-Test (`Failed → Notifier aufgerufen`) |
 | **A5** | **Consent reist nicht und aufersteht nicht.** Eigener DataStore-File, aus Backup + Transfer ausgeschlossen, nicht Purgeable. Frische Installation → neu fragen. | `backup_rules.xml`/`data_extraction_rules.xml`-Assertion; Manifest-Review |
@@ -274,6 +274,18 @@ Key `consent_decision` mit den Werten `"GRANTED"` / `"DENIED"`; **fehlt** der Ke
 ist die Entscheidung `NeverAsked`. Abwesenheit *ist* der Default — kein Sentinel,
 kein null-Boolean, keine vierte Kodierung. Damit ist der Persistenz-Rand ebenso
 tristate wie das Modell (A8 reicht bis auf die Platte).
+
+**Ein *vorhandener, aber unbekannter* Wert ist kein `NeverAsked`.** Liest der
+Store einen String, der weder `"GRANTED"` noch `"DENIED"` ist (verstümmelter
+Write, manipuliert, Token einer künftigen Version), wäre „als `NeverAsked`
+behandeln" ein lügender Read: wir *haben* einen Datensatz, können ihn nur nicht
+deuten — genau der A2-Fall. Deshalb → `Unavailable` (R2 → `Skip`, kein Dialog,
+kein Write) bzw. bei R1 → nicht-`Granted` → ACRA bleibt AUS (fail-closed). Das
+heilt nicht von selbst (jeder Start liest denselben Müll → ACRA bleibt aus, wird
+nie neu gefragt), aber der Settings-Toggle (W2) überschreibt den Müll mit einem
+sauberen Token — die Recovery ist da, nur nicht automatisch. Echte Datei-
+Corruption wirft ohnehin `IOException` → derselbe `Unavailable`-Pfad (SR2/SR5).
+*(A2, Prinzip 2)*
 
 Der persistente Fakt wird an **zwei** Momenten gelesen und an **zwei**
 geschrieben — **ein File, ein Key, zwei Leser** (R1 läuft vor Hilt und kann das
@@ -328,6 +340,7 @@ per Reaffirm rekonziliert.
 | SR2 | R2 `readState()` wirft | → `Unavailable` → `Skip` (nichts tun); ACRA behält Bootstrap-Wert, kein Dialog | A2 |
 | SR3 | R1 **und** R2 fehlgeschlagen | ACRA AUS, kein Dialog; nächster Start liest neu (heilt selbst) | A1+A2 |
 | SR4 | Display-Getter wirft | → `NeverAsked`/`false` (nur Anzeige, kein Write folgt) | — |
+| SR5 | Store liest unbekannten Token (weder `GRANTED`/`DENIED` noch abwesend) | → `Unavailable` → `Skip` (R2) bzw. AUS (R1), **nie** `NeverAsked`; Recovery via Settings-Toggle | A2 |
 | SW1 | W1/W2 Write wirft | `Failed`, nichts persistiert, Session ehrt Tap, **Toast** | A4 |
 | SW2 | Write gecancelt | `CancellationException` propagiert; Persist läuft auf `ApplicationScope`, UI-Teardown cancelt ihn nicht | A6 |
 | SD1 | Nicht-Activity-Kontext | `null`, `onResult` feuert nicht, nichts persistiert | A3 |
@@ -336,7 +349,7 @@ per Reaffirm rekonziliert.
 | SD4 | Config-Change bei offenem Dialog | dismissed on destroy, Gate läuft auf Recreate erneut → wieder `ShowDialog` | A3 |
 | SP1 | Revoke: Queue-Purge wirft | `silentError` geschluckt; ACRA ist trotzdem aus, kein Report kann mehr *entstehen* — Restrisiko: Altbestand bleibt liegen (nächster Revoke räumt) | A7, C1 |
 | RC1 | R1 AUS (Fehler), R2 liest `Granted` | `Reaffirm(true)` → ACRA an — **der Grund für Reaffirm** | A1 |
-| RC2 | R1 AN, R2 liest `Denied` (Revoke-Race) | `Reaffirm(false)` → ACRA aus + Queue-Purge | A1, A7 |
+| RC2 | R2 liest `Denied` (Folgestart) | `Reaffirm(false)` → ACRA bleibt AUS, idempotent, **kein** Purge (nichts war an). „R1=AN, R2=`Denied`" ist **nicht erreichbar** — zwischen R1 und R2 läuft kein Write (Settings ist vor dem Gate unerreichbar), also ist die einzige reale R1≠R2-Divergenz die von RC1. Destruktiver Widerruf inkl. Queue-Purge nur via Settings-`applyConsent(false)` (A7). | A1 |
 
 ### 3.5 Der Bootstrap-Read: synchron, DataStore, Haupt-Prozess (Tendenz, Gabelung G4)
 
@@ -508,8 +521,10 @@ onCreate → reportPendingAnrsAsync (ApplicationScope):
   System-Multi-Thread-Dump inkl. Locks, null Background-Overhead, keine
   unmaintainte Dependency. Soft-ANRs gehen bewusst verloren — hier greift die
   Watchdog-Quelle (§6, §7 X1) als Komplement.
-- **Best-effort:** der Handler **schluckt** ACRA-Sendefehler (C1), also advanced
-  die Watermark auch, wenn ein Report ACRA nie erreicht → dieser ANR fällt weg.
+- **Best-effort:** der Handler **schluckt** einen Fehler des
+  `handleSilentException`-**Enqueues** (C1) — *kein* Sendefehler, der Versand ist
+  out-of-process und hier gar nicht sichtbar (§4.2). Also advanced die Watermark
+  auch, wenn der Report nicht einmal persistiert wird → dieser ANR fällt weg.
   Akzeptiert (ist ACRA kaputt, gibt es eh nichts zu retten). Handler **nicht**
   zum Rethrow bringen, um zu „recovern" — das unterliefe den Crash-Infra-Swallow.
 
@@ -520,7 +535,7 @@ onCreate → reportPendingAnrsAsync (ApplicationScope):
 | AN1 | AEI-Read wirft | `silentError` → `emptyList`; Watermark unverändert; nächster Start liest neu | C1 |
 | AN2 | Trace-Stream null / Read wirft | Report **ohne** Dump statt ANR fallen zu lassen | C1 |
 | AN3 | Watermark-Write wirft | `silentError`, Watermark nicht advanced → ANR ggf. nächsten Start erneut (Duplikat akzeptiert) | C1 |
-| AN4 | Handler schluckt ACRA-Sendefehler | Watermark advanced trotzdem, ANR gedroppt (best-effort) | C1 |
+| AN4 | Handler schluckt `handleSilentException`-**Enqueue**-Fehler (nicht Send — der ist out-of-process, §4.2) | Watermark advanced trotzdem, ANR gedroppt (best-effort) | C1 |
 | ST1 | Stack-Capture im Watchdog wirft | geschluckt; Kill läuft trotzdem — Recovery hat Vorrang vor Report | C1, C3 |
 
 ### 4.7 Report-Inhalt & Transport *(B5)*
