@@ -43,7 +43,9 @@ Sechs Entscheidungen prägen diese Spec und weichen bewusst vom Bestand ab:
 5. **Der Bootstrap ist prozess-bewusst.** ACRA spawnt einen eigenen
    Sender-Prozess; `attachBaseContext` läuft dort ebenfalls. Nur der
    Haupt-Prozess liest Consent und schaltet ACRA — der Sender-Prozess fasst
-   das Gate nie an. *(→ X2)*
+   das Gate nie an. (ACRA stubt den Reporter dort ohnehin selbst; gespart wird
+   der überflüssige DataStore-Read, **nicht** eine sonst mögliche Inkonsistenz
+   — §11.) *(→ X2)*
 6. **Jede Invariante trägt eine Durchsetzung.** Test, Linter oder Review —
    und wenn Test, *welche Datei rot werden muss*. Eine Invariante ohne
    Durchsetzung ist eine Bitte, kein Gesetz. *(→ §2, Spalte „Gepinnt durch")*
@@ -107,7 +109,7 @@ Durchsetzung gilt als noch nicht implementiert.
 | **A4** | **Fehlgeschlagener Write ist sichtbar und verliert sauber.** Nichts wird geschrieben, die Session ehrt den Tap in-memory, der Nutzer wird per Toast informiert. *(AUDIT-10 #11)* | Controller-Test (`Failed → Notifier aufgerufen`) |
 | **A5** | **Consent reist nicht und aufersteht nicht.** Eigener DataStore-File, aus Backup + Transfer ausgeschlossen, nicht Purgeable. Frische Installation → neu fragen. | `backup_rules.xml`/`data_extraction_rules.xml`-Assertion; Manifest-Review |
 | **A6** | **Cancellation ist kein Fehler.** `CancellationException` propagiert überall und wird nie in `Unavailable`/`Failed` gefaltet. | Contract-Test (fake + impl), beide Read/Write-Pfade |
-| **A7** | **Widerruf ist destruktiv.** Ein Wechsel auf `Denied` löscht die ungesendete ACRA-Report-Warteschlange, damit kein Report aus der Consent-Phase nach einem späteren Re-Consent abfließt. | Controller-Test (`applyConsent(false)` ruft Queue-Purge) |
+| **A7** | **Widerruf ist destruktiv.** Ein Wechsel auf `Denied` löscht die ungesendete ACRA-Report-Warteschlange (`BulkReportDeleter`, **beide** Ordner, §11), damit kein Report aus der Consent-Phase nach einem späteren Re-Consent abfließt. | Controller-Test (`applyConsent(false)` ruft Queue-Purge); `AcraToggle`-Purge-Test (beide Ordner) |
 | **A8** | **Illegale Zustände unrepräsentierbar.** Consent ist genau ein `ConsentDecision`-Sealed-Wert; es gibt kein Feldpaar, das inkonsistent werden kann. | Typsystem (kompiliert nicht anders); Model-Test |
 
 ### Ingestion (B)
@@ -125,9 +127,9 @@ Durchsetzung gilt als noch nicht implementiert.
 | # | Invariante | Gepinnt durch |
 |---|---|---|
 | **C1** | **Der Reporter crasht die App nie.** Jeder Pfad *innerhalb* der ACRA-/Throttle-/ANR-/Watchdog-Maschinerie schluckt seinen eigenen Fehler. *(Rule 7)* | Linter Rule 9 (Crash-Infra-Whitelist); Review |
-| **C2** | **Nach Uncaught-Crash terminiert der Prozess deterministisch.** Kein Zombie: Flush-Fenster, dann harter Kill. Lügende Zustände → `silentDeath`. *(Rule 9/12)* | Uncaught-Handler-Test (Kill-Pfad erreicht); `silentDeath`-Test |
+| **C2** | **Nach Uncaught-Crash terminiert der Prozess deterministisch.** Kein Zombie. Den Kill besorgt ACRAs eigener `ProcessFinisher` (`exitProcess(10)`) in RELEASE **und** DEBUG (§11); **kein** Flush-Fenster (Versand ist out-of-process, §5.1). Unser Kill ist reiner Backstop. Lügende Zustände → `silentDeath`. *(Rule 9/12)* | Uncaught-Handler-Test (Backstop-Kill-Pfad erreicht); `silentDeath`-Test |
 | **C3** | **Der Watchdog verblindet den ANR-Reporter nicht.** Ein Watchdog-Kill erzeugt kein `REASON_ANR`; darum captured der Watchdog **vor** dem Kill selbst einen Report. Kein stiller Verlust von Looper-Stalls. *(→ §7 X1)* | `RecoveryWatchdog`-Test: Capture-Callback vor `killSwitch` |
-| **C4** | **Pipeline-Lebendigkeit ist beobachtbar.** Ein toter Reporter ist von „keine Crashes" unterscheidbar (Last-Successful-Send-Marker, im Dev-Screen sichtbar). | `AcraTree`-Test: erfolgreicher Send stampt Marker; Dev-Screen-Test |
+| **C4** | **Pipeline-Lebendigkeit ist beobachtbar.** Ein toter Reporter ist von „keine Crashes" unterscheidbar. Der dafür nötige Marker ist ein Last-Successful-**Send**-Marker — nur der trennt „toter Sender" von „keine Crashes". Er wird von einem eigenen `ReportSender`-Dekorator im `:acra`-Prozess bei HTTP-Erfolg cross-prozess gestampt (§11, X4), **nicht** von `AcraTree` (das sähe nur das Enqueue). Im Dev-Screen sichtbar. | `AcraHttpSender`-Test: HTTP-Erfolg stampt Marker; Dev-Screen-Test |
 
 ---
 
@@ -238,6 +240,12 @@ ACRA.errorReporter.setEnabled(decision == Granted)
   `Granted`-Read schaltet ein. Zwischen `init` und `setEnabled(false)` darf
   keine Anweisung stehen, die crashen könnte — sonst existiert das Mikro-Fenster
   mit aktivem Reporter bei unbekanntem Consent, das A1 verbietet.
+- **Prozess-Gate (X2):** der gesamte Block (Read + `setEnabled`) läuft nur, wenn
+  `!ACRA.isACRASenderServiceProcess()` (verifizierte API, §11). Im `:acra`-Prozess
+  stubt ACRA den Reporter ohnehin selbst — der Read entfiele dort ersatzlos, nicht
+  als Notlösung, sondern weil dort nichts zu entscheiden ist. `ACRA.init` selbst
+  bleibt in **jedem** Prozess (es konfiguriert dort korrekt den Sender); nur unser
+  Consent-Read + Toggle wird gegatet.
 
 ---
 
@@ -268,9 +276,11 @@ Timber.e(throwable, msg)                              # der EINZIGE Weg (B2)
         2. Throttle:  ReportThrottle.shouldSend(t) == false → return   (außer UnthrottledReport)
         3. Carrier:   buildAcraReportThrowable(priority, tag, msg, t)   # per-Report (B4)
         4. Zustellen: ACRA.errorReporter.handleSilentException(carrier)
-                        └─ (nur wirksam, wenn ACRA enabled — das Consent-Gate, B1)
-        5. Marker:    bei Erfolg: Last-Successful-Send stampen (C4)
+                        └─ persistiert + plant Out-of-process-Versand (:acra, §11); nur wirksam,
+                           wenn ACRA enabled — das Consent-Gate (B1). Sende-Erfolg ist HIER nicht sichtbar.
         (alles ab Schritt 3 in try/catch(Throwable) → geschluckt, C1)
+        Kein Send-Marker in diesem Pfad: Schritt 4 enqueued nur. Der C4-SEND-Marker
+        wird out-of-process von AcraHttpSender gestampt, nie hier (§11, X4).
 ```
 
 Nie zusätzlich `handleException` direkt aufrufen — Doppelversand. *(B2)*
@@ -367,28 +377,47 @@ onCreate → reportPendingAnrsAsync (ApplicationScope):
 
 ### 5.1 Uncaught-Crash-Pfad
 
-- **RELEASE:** ACRAs eigener installierter UncaughtExceptionHandler fängt den
-  Crash, sendet den vollen Report, Prozess endet.
+**Was ACRA selbst tut (verifiziert, §11).** ACRAs installierter Handler
+(`ErrorReporterImpl.uncaughtException`) sammelt den Report, **persistiert ihn als
+Datei**, plant den Versand **out-of-process** (`JobSenderService`/
+`LegacySenderService` im `:acra`-Prozess) und killt dann den Haupt-Prozess über
+seinen `ProcessFinisher` (`Process.killProcess`; `exitProcess(10)`). Zwei
+Konsequenzen prägen den ganzen Pfad:
+
+1. **Es gibt im sterbenden Prozess nichts zu flushen.** Der Report ist eine
+   Datei, die den Kill überlebt; ein *anderer* Prozess sendet sie. Ein
+   „Flush-Fenster" (Sleep *oder* „Completion-Hook abwarten") im Haupt-Prozess
+   würde auf einen Vorgang warten, der absichtlich anderswo läuft — und
+   `ErrorReporter` exponiert ohnehin **keinen** Completion-Callback (§11). Darum:
+   **kein Flush-Fenster, keine Wartelogik.**
+2. **Der deterministische Kill ist ACRAs, nicht unserer** — RELEASE **und** DEBUG
+   (`exitProcess(10)`). C2 ist erfüllt, ohne dass wir killen müssen.
+
+- **RELEASE:** ACRAs nackter Handler — persistiert, plant Versand, killt. Nichts
+  hinzuzufügen.
 - **DEBUG:** die App *umschließt* ACRAs Handler (`setupGlobalExceptionHandler`,
-  nur DEBUG), um Resilienz-Belange zu ergänzen — der Versand bleibt ACRAs
-  Handler:
+  nur DEBUG), um **Entwickler-Diagnose** zu ergänzen — Versand *und* Kill bleiben
+  ACRAs:
   ```
   handleUncaughtException(thread, t):
      Timber.e(t, ...)                          # Rule 9: plain Timber.e (Crash-Infra)
      if t is OutOfMemoryError: System.gc()     # Notfall-GC, Best-effort
-     defaultExceptionHandler.uncaughtException(thread, t)   # = ACRA sendet
-     finally: flushWindow()                    # siehe unten
-              Process.killProcess(); exitProcess(10)        # deterministisch (C2)
+     defaultExceptionHandler.uncaughtException(thread, t)   # = ACRA: persist + schedule(:acra) + exitProcess(10)
+     # ACRA killt hier bereits. Der folgende Kill ist reiner Backstop —
+     # nur erreicht, falls ACRA NICHT killte (Administrator-Veto auf endApplication / Handler warf):
+     Process.killProcess(); exitProcess(10)    # deterministisch (C2)
   ```
-- **`flushWindow()`:** bevorzugt ACRAs eigenen Completion-/Callback-Hook
-  abwarten (bounded), nicht ein geratenes `Thread.sleep(500)`. Nur wenn die
-  Library keinen Hook exponiert, ist ein *beschränkter* Sleep der Fallback — und
-  dann als „geraten, Obergrenze X" dokumentiert, nicht als „genug".
-- **DEBUG-only-Wrapper — bewusst benannte Divergenz:** RELEASE läuft durch
-  ACRAs nackten Handler, DEBUG durch den Wrapper. Man testet also in DEBUG einen
-  anderen Pfad, als man ausliefert. Das ist gewollt (die Zusatz-Belange sind
-  Entwickler-Diagnose), muss aber bekannt sein: der *Versand*-Pfad ist in beiden
-  identisch (ACRAs Handler), nur die Umhüllung unterscheidet sich.
+- **Reihenfolge-Invariante:** Der Wrapper muss **nach** `ACRA.init` installiert
+  werden, damit sein `defaultExceptionHandler` ACRAs `ErrorReporterImpl` ist (den
+  ACRA in `attachBaseContext` als Default-Handler registriert), nicht der
+  Vor-ACRA-Handler. Wird er davor gesetzt, delegiert er am Reporter vorbei und
+  **kein Report entsteht**.
+- **DEBUG-only-Wrapper — bewusst benannte, aber begrenzte Divergenz:** RELEASE
+  läuft durch ACRAs nackten Handler, DEBUG durch den Wrapper. Versand- **und**
+  Kill-Pfad sind in beiden identisch (ACRAs `ErrorReporterImpl` /
+  `ProcessFinisher`); der Wrapper *ergänzt* nur Logging + OOM-GC, er *ersetzt*
+  den ausgelieferten Pfad nicht. Damit ist die Divergenz auf die Diagnose-Zutat
+  beschränkt — nicht auf den kritischen Versand/Kill.
 - **Kein Throttling echter Crashes** (B3). Ein etwaiger Throttle-Aufruf hier ist
   informativ und gated nichts.
 
@@ -431,10 +460,12 @@ Trip:
 ```
 Trip (Main-Looper hat timeoutMs nicht getickt):
    1. Capture:  mainStack = mainThread.stackTrace       # wir sind auf dem Daemon-Thread
-   2. Report:   Timber.e(WatchdogStallException(mainStack))  # UnthrottledReport → §4.2
-   3. Flush:    bounded window (wie §5.1)
-   4. Kill:     killSwitch()   # Process.killProcess + exitProcess(10)
-   (1–3 in try/catch(Throwable) geschluckt — Kill hat Vorrang, ST1)
+   2. Enqueue:  Timber.e(WatchdogStallException(mainStack))  # UnthrottledReport → §4.2
+                  → handleSilentException persistiert + plant Out-of-process-Versand (:acra);
+                    kleiner File-Write auf dem DAEMON-Thread, nicht dem hängenden Main-Thread
+   3. Kill:     killSwitch()   # Process.killProcess + exitProcess(10)
+   (1–2 in try/catch(Throwable) geschluckt — Kill hat Vorrang, ST1)
+   Kein Flush-Schritt: die persistierte Datei überlebt den Kill, :acra sendet sie (§5.1, §11)
 ```
 
 - **timeoutMs = 8 s (Default).** Begründung, nicht magisch: die
@@ -449,6 +480,14 @@ Trip (Main-Looper hat timeoutMs nicht getickt):
   `REASON_ANR`, also fängt der `AnrReporter` (§4.5) diesen Stall nie. Ohne
   Schritt 1–2 wäre er unsichtbar. Der Report ist `UnthrottledReport`, weil jeder
   Stall terminal ist (Prozess stirbt danach) — kein Cooldown-Kandidat.
+- **Warum das trotz sofortigem Kill ankommt:** `handleSilentException`
+  *persistiert* den Report und plant den Versand **out-of-process** (§11); die
+  Datei überlebt den `exitProcess(10)` und wird vom `:acra`-Prozess gesendet. Der
+  einzige In-Process-Schritt ist ein kleiner File-Write — und der läuft auf dem
+  **Daemon-Thread**, nicht auf dem hängenden Main-Thread. Das entkräftet die
+  historische Sorge des heutigen `RecoveryWatchdog` („I/O auf dem gerade
+  hängenden Thread"): die I/O findet dort nicht statt. Die bewusste Umkehr der
+  bisherigen „meldet nicht"-Entscheidung ist in §7 X1 ausgeführt.
 - **Warum best-effort:** Recovery > Report. Wirft das Capture/Send, wird es
   geschluckt und der Kill läuft trotzdem (ST1, C3). Ein hängender Reporter darf
   die Recovery nie blockieren.
@@ -474,19 +513,43 @@ nie davon.
 **Auflösung:** der Watchdog captured vor dem Kill selbst (§6, Quelle 4). C
 liefert damit B seinen eigenen Report. *(C3)*
 
+**Bewusste Umkehr einer dokumentierten Entscheidung.** Der heutige
+`RecoveryWatchdog` trägt einen KDoc-Abschnitt „Why this doesn't report" mit zwei
+Gründen: (a) es dupliziere `AnrReporter`, (b) es verlange I/O „auf dem gerade
+hängenden Thread"; dazu eine Future-self-Note: „the fix is in `AnrReporter`, not
+here." Diese Spec kehrt die Entscheidung um — begründet, nicht still:
+- Grund (b) ist für den hier spezifizierten Pfad **sachlich falsch**: Capture und
+  `handleSilentException`-Persist laufen auf dem **Daemon-Thread** (§6); der
+  Main-Thread wird nicht angefasst.
+- Grund (a) trifft **gerade nicht** zu: Selbst-Kill-Stalls erzeugen kein
+  `REASON_ANR`, `AnrReporter` filtert aber auf `REASON_ANR` (verifiziert am
+  heutigen Filter) und sieht sie deshalb nie — es gibt nichts zu duplizieren; ohne
+  den Watchdog-Report sind sie unsichtbar. Der vorgemerkte Alternativweg („fix in
+  `AnrReporter`") funktioniert für **diese** Stall-Klasse folglich nicht.
+Die Umkehr ist damit keine Abweichung hinter dem Rücken der alten Entscheidung,
+sondern die Auflösung genau dieses Nahtfehlers. Wird §6 umgesetzt, muss der
+`RecoveryWatchdog`-KDoc entsprechend umgeschrieben werden (der „doesn't report"-
+Abschnitt wird falsch).
+
 ### X2 — Bootstrap (A) läuft in jedem Prozess (C)
 
-**Problem:** ACRA spawnt einen eigenen **Sender-Prozess**; `attachBaseContext`
-und damit R1 laufen dort ebenfalls. Ein naiver Bootstrap würde im
-Sender-Prozess erneut Consent lesen und ACRA toggeln — doppelte Arbeit,
-potenziell inkonsistent, und DataStore Preferences ist nicht multi-prozess-
-sicher (zwei Prozesse, die denselben File halten, ist explizit kein
-unterstützter Modus).
+**Problem:** ACRA spawnt einen eigenen **Sender-Prozess** (`:acra`);
+`attachBaseContext` und damit R1 laufen dort ebenfalls. Präzise, gegen 5.13.1
+verifiziert (§11): `ACRA.init` installiert im Sender-Prozess **selbst schon**
+keinen `ErrorReporterImpl` — `errorReporter` bleibt ein Stub, ein `setEnabled`
+dort ist ein **No-Op**. Der Toggle kann also **nicht** inkonsistent werden; die
+naheliegende Sorge „ACRA im Sender-Prozess falsch toggeln" trifft nicht zu. Was
+*bleibt*: ein naiver Bootstrap führt im `:acra`-Prozess den überflüssigen
+`runBlocking`-DataStore-Read (R1) aus — Arbeit im falschen Prozess auf einem
+Store, den DataStore Preferences ausdrücklich **nicht** multi-prozess-sicher hält
+(zwei Prozesse am selben File ist kein unterstützter Modus).
 
-**Auflösung:** der Bootstrap ist **prozess-bewusst**. Nur der Haupt-Prozess
-führt R1 + `setEnabled` aus; im Sender-Prozess (Prozessname endet auf ACRAs
-Sender-Suffix) überlässt der Bootstrap ACRA seine eigene, dafür vorgesehene
-Init und fasst das Gate nicht an. *(A1, C1)*
+**Auflösung:** der Bootstrap gated R1 + `setEnabled` mit
+`ACRA.isACRASenderServiceProcess()` (public, `@JvmStatic`, §11): nur der
+Haupt-Prozess liest Consent und toggelt; im `:acra`-Prozess überlässt der
+Bootstrap ACRA seine eigene, dafür vorgesehene Init und fasst weder Gate noch
+DataStore an. Der Nutzen ist damit ehrlich benannt — **vermiedener
+Fehl-Prozess-Read**, nicht „verhinderte Inkonsistenz". *(A1, C1)*
 
 ### X3 — Consent-„aus" (A) vs. liegende Report-Dateien (B)
 
@@ -496,7 +559,11 @@ Revoke und späterem Re-Consent könnten Reports abfließen, die *während der
 Nicht-Consent-Phase* entstanden — ein Privacy-Leck an der Naht A↔B.
 
 **Auflösung:** Revoke ist destruktiv — `applyConsent(false)` löscht die
-ungesendete ACRA-Queue. *(A7; Sad-Path SP1)*
+ungesendete ACRA-Queue über die offizielle API `BulkReportDeleter(context)
+.deleteReports(approved, nrToKeep = 0)`, und zwar für **beide** Ordner
+(`approved = true` **und** `false` — ACRA hält `ACRA-approved` *und*
+`ACRA-unapproved`, §11; nur einer räumt die Hälfte). Kein Griff in private
+Verzeichnisse. *(A7; Sad-Path SP1)*
 
 ### X4 — Toter Reporter (B/C) vs. „keine Crashes" (Beobachter)
 
@@ -505,9 +572,20 @@ Korrekt für Stabilität — aber ein seit Monaten kaputter Sender ist von einem
 gesunden, stillen System **ununterscheidbar**. Der Belang C erkauft Stabilität
 mit einem Informationsloch.
 
-**Auflösung:** ein Last-Successful-Send-Marker (C4), im Dev-Screen (§8c)
-sichtbar. Billig, und rettet den einen Fall, in dem das ganze Subsystem
-unbemerkt sinnlos geworden ist.
+**Auflösung:** ein Last-Successful-**Send**-Marker (C4), im Dev-Screen (§8c)
+sichtbar. Wichtig — und der Grund, warum die naive Variante nicht reicht: **nur
+die Beobachtung eines erfolgreichen *Sends* löst das Problem.** Ein billiger
+In-Process-„Enqueue"-Marker (in `AcraTree`) tut es **nicht**: er stünde bei
+„keine Crashes" und bei „toter Sender" gleichermaßen still und unterscheidet die
+beiden gerade nicht. Sende-Erfolg ist aber nur im `:acra`-Prozess sichtbar
+(out-of-process, §11). Der Marker wird deshalb von einem **eigenen `ReportSender`**
+(Dekorator um `HttpSender`) bei HTTP-Erfolg in einen cross-prozess lesbaren
+Timestamp geschrieben und im Haupt-Prozess gelesen. Das ist die **eine** bewusst
+zugelassene Cross-Prozess-Ablage — vertretbar, weil es ein reiner
+Telemetrie-Timestamp mit Last-Write-Wins ist (kein Entscheidungszustand wie
+Consent, der laut X2 gerade **nicht** multi-prozess sein darf). Der Preis der
+Beobachtbarkeit ist also ehrlich benannt: nicht „billig", sondern ein
+zusätzlicher Sender plus eine begründete Cross-Prozess-Ausnahme.
 
 ---
 
@@ -518,7 +596,7 @@ Drei ACRA-Berührungen im `SettingsFragment`:
 **a) Consent-Toggle** (Preference-Klick):
 ```
 forceShowConsentDialog(activityContext) { userGaveConsent ->
-   controller.applyConsent(userGaveConsent)      # ACRA-Toggle + W2-Persist + ggf. Queue-Purge (§3, A7)
+   controller.applyConsent(userGaveConsent)      # ACRA-Toggle + W2-Persist + ggf. Queue-Purge via BulkReportDeleter (§3, A7, §11)
    showToastSafe(enabled/disabled)               # Bestätigung
    applyCrashReportSummary(userGaveConsent)       # Summary direkt aus dem Wert,
 }                                                  # KEIN Re-Read (Race mit Persist, AUDIT-10 #1)
@@ -535,8 +613,11 @@ Anzeige).
 Preference-Click direkt an den globalen Handler geht):
 - **Reset ACRA-Timer** → `ReportThrottle.resetAll()` + Toast. Fehler →
   `silentError`, `false`. Nur Dedup-State, keine Nutzerdaten.
-- **Pipeline-Status** → zeigt den Last-Successful-Send-Marker (C4): „letzter
-  erfolgreicher Report vor X" bzw. „nie". Der Diagnose-Anker für X4.
+- **Pipeline-Status** → zeigt den Last-Successful-**Send**-Marker (C4): „letzter
+  erfolgreich *gesendeter* Report vor X" bzw. „nie". Der Marker wird vom eigenen
+  `ReportSender` (`AcraHttpSender`) im `:acra`-Prozess bei HTTP-Erfolg gestampt
+  (§11, X4), **nicht** von `AcraTree` — der sähe nur das Enqueue, nicht den
+  Versand. Der Diagnose-Anker für X4.
 - **Throw-Test-Exception** → Toast, dann `Thread { sleep(800); throw }` — der
   Throw läuft auf einem nackten Thread **ohne** CoroutineExceptionHandler, reist
   also durch genau den echten Uncaught-Pfad (§5.1). Der Crash ist hier
@@ -560,7 +641,7 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 :app/crashreporting/
    consent/   ConsentController, ConsentDialog, AcraToggle,
               ConsentSaveFailureNotifier
-   ingestion/ AcraTree, ReportThrottle, AnrReporter
+   ingestion/ AcraTree, ReportThrottle, AnrReporter, AcraHttpSender (ReportSender-Dekorator, :acra)
    resilience/ UncaughtCrashHandler, RecoveryWatchdog, CrashReportingBootstrap
 ```
 
@@ -571,14 +652,15 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 | `ConsentDecision`/`ConsentReadResult`/`ConsentWriteResult` | domain | Sealed-Modelle (A2/A4/A8), pure Kotlin | — |
 | `ConsentController` | app | Koordinator: `resolveStartupAction`, `applyConsent` (inkl. Queue-Purge bei Revoke, A7), `reaffirmConsent`, `persistConsent`. Läuft auf `ApplicationScope`. | Dialog-Bau, DataStore |
 | `ConsentDialog` | app | **Nur** Dialog bauen/zeigen, `onResult` bei echtem Tap, `null` sonst (A3) | Lesen, Persistieren, Scope |
-| `AcraToggle` | app | Seam über `ACRA.setEnabled` + Queue-Purge — hält den Seiteneffekt in `:app`, Controller JVM-testbar | Entscheidungslogik |
+| `AcraToggle` | app | Seam über `ACRA.errorReporter.setEnabled` + Queue-Purge (`BulkReportDeleter`, **beide** Ordner, §11) — hält den Seiteneffekt in `:app`, Controller JVM-testbar | Entscheidungslogik |
 | `ConsentSaveFailureNotifier` | app | Seam: Toast bei fehlgeschlagenem Persist (A4) | Entscheidungslogik |
-| `AcraTree` | app | Der eine Zustellweg: Gate → Throttle → Carrier → `handleSilentException` → Marker; schluckt (C1/B2/B4/C4) | Consent-Check (B1) |
+| `AcraTree` | app | Der eine Zustellweg: Gate → Throttle → Carrier → `handleSilentException` (persist + Out-of-process-schedule); schluckt (C1/B2/B4) | Consent-Check (B1); **Send-Erfolg** (out-of-process, → `AcraHttpSender`) |
+| `AcraHttpSender` | app (`:acra`-Prozess) | `ReportSender`-Dekorator um `HttpSender`; stampt bei HTTP-Erfolg den Last-Successful-Send-Marker cross-prozess (C4/X4, §11) | Report-Inhalt, Consent-Gate |
 | `ReportThrottle` | app | 24h-Throttle des Silent-Error-Stroms, fail-open (B3) | Crashes/ANRs/Stalls drosseln |
 | `buildAcraReportThrowable`/`LoggedThrowable` | domain | Per-Report-Carrier (B4), pure/JVM-testbar | Android-Runtime |
 | `AnrReporter` | app | AEI → `AnrReport`, Watermark-Dedup, best-effort | ACRA-Aufruf (delegiert an Handler) |
-| `RecoveryWatchdog` | app | Looper-Stall-Kill **+** Stall-Capture als Report-Quelle (§6, C3) | Consent, Sende-Entscheidung |
-| `UncaughtCrashHandler` | app | DEBUG-Wrapper um ACRAs Handler: Log, OOM-GC, Flush, deterministischer Kill (C2) | RELEASE-Versand (= ACRA) |
+| `RecoveryWatchdog` | app | Looper-Stall-Kill **+** Stall-Capture (Daemon-Thread) → `handleSilentException`, *vor* dem Kill (§6, C3, X1) | Consent, Sende-Entscheidung |
+| `UncaughtCrashHandler` | app (nur DEBUG) | Wrapper um ACRAs Handler: Log + OOM-GC, dann Delegation; **kein** Flush-Fenster; Kill ist ACRAs `ProcessFinisher` (eigener Kill nur Backstop bei Veto/Wurf) — C2, §5.1, §11 | RELEASE-Pfad (= ACRAs nackter Handler), eigenes Flushen |
 | `CrashReportingBootstrap` | app | ACRA-Init-Reihenfolge (A1), Prozess-Check (X2), Handler/Watchdog-Wiring, KolibriLog-Bridge | Consent-Entscheidung (an R1/Gate) |
 | `MainActivity`/`SettingsFragment` | app | Dünner Glue: Gate-Ergebnis rendern, Dialog tracken/dismissen | Alles obige |
 
@@ -608,21 +690,54 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
   SharedPreferences — beide Speicherwahlen sind begründet (Rule 5 + §3.5/§4.3).
 - **Repository `Purgeable` machen** — Factory-Reset darf Privacy nicht
   umkippen. *(A5)*
-- **Bootstrap-Read im Sender-Prozess ausführen** — doppelt, nicht
-  multi-prozess-sicher. *(X2)*
+- **Bootstrap-Read im Sender-Prozess ausführen** — überflüssiger Read im falschen
+  Prozess auf einem nicht multi-prozess-sicheren Store; per
+  `ACRA.isACRASenderServiceProcess()` gaten (der Toggle selbst ist dort ohnehin
+  ein No-Op). *(X2, §11)*
 - **Handler zum Rethrow bringen, um einen ANR/Stall zu „recovern"** —
   unterläuft den Crash-Infra-Swallow. *(§4.5, §6)*
 - **`silentError` in Crash-Infra-Dateien** — rekursiert ins Safety-Net. *(§5.3,
   Rule 9)*
 - **Den doppelten R1/R2-Read „vereinheitlichen", indem R1 entfällt** — R1 muss
   vor Hilt laufen; ein File, zwei Leser, per Reaffirm rekonziliert ist korrekt.
-- **`Thread.sleep(N)` als Flush-„Beweis"** — die Zahl ist geraten; ACRAs
-  Completion-Hook ist der richtige Anker, ein bounded Sleep nur der dokumentierte
-  Fallback. *(§5.1)*
+- **Irgendein Flush-Fenster im sterbenden Prozess** (Sleep *oder* „Completion-
+  Hook abwarten") — ACRA persistiert den Report und sendet ihn **out-of-process**;
+  die Datei überlebt den Kill, es gibt in-process nichts zu flushen, und einen
+  Completion-Callback exponiert `ErrorReporter` gar nicht (§11). Warten wäre
+  Warten aufs Falsche. *(§5.1)*
+- **Den C4-Marker in `AcraTree` als „letzter Report" stampen** — `AcraTree` sieht
+  nur das *Enqueue*, nie den Sende-Erfolg (out-of-process); ein solcher Marker
+  stünde bei „keine Crashes" und „toter Sender" gleich still und löst X4 gerade
+  nicht. Der Marker gehört in den `:acra`-`ReportSender`. *(C4, X4, §11)*
 
 ---
 
-## 11. Verwandte Docs
+## 11. ACRA-5.13.1-API-Anker (verifiziert gegen die gepinnte Version)
+
+Jede Invariante, die von ACRAs *Verhalten* abhängt, ist hier an ein reales,
+gegen `ch.acra:acra-{core,http}:5.13.1` (die per CLAUDE.md Rule 6 gepinnte,
+nicht änderbare Version) verifiziertes Symbol gebunden. Die Sources wurden dafür
+gelesen, nicht die Doku geglaubt. Ändert sich die Version, ist diese Tabelle die
+Checkliste, die neu verifiziert werden muss — jede Zeile ist ein Punkt, an dem
+die Library die Spec tragen *muss*, sonst kippt eine Invariante.
+
+| Belang / Invariante | ACRA-Symbol (5.13.1, verifiziert) | Verhalten, auf das sich die Spec stützt |
+|---|---|---|
+| **X2** Prozess-Gate | `ACRA.isACRASenderServiceProcess()` — public, `@JvmStatic` | Prozessname endet auf `:acra`. **Wichtig:** `ACRA.init` installiert im Sender-Prozess **selbst schon** keinen `ErrorReporterImpl` (`errorReporter` bleibt ein Stub via `StubCreator`), `setEnabled` ist dort ein **No-Op**. Unser Gate verhindert also keinen inkonsistenten Toggle (den kann es nicht geben), sondern nur den überflüssigen `runBlocking`-DataStore-Read im zweiten Prozess. |
+| **A7** Queue-Purge | `BulkReportDeleter(ctx).deleteReports(approved, nrToKeep=0)` — public | Löscht ungesendete Reports. ACRA hält **zwei** Ordner (`ReportLocator`: `ACRA-approved` **und** `ACRA-unapproved`); ein vollständiger Purge ruft **beide** (`approved=true` *und* `false`), sonst bleibt eine Hälfte liegen. Offizielle API, kein Griff in private Verzeichnisse. |
+| **C2** Deterministischer Kill | `ErrorReporterImpl.uncaughtException` → `ReportExecutor.endApplication` → `ProcessFinisher` (`Process.killProcess`; `exitProcess(10)`) | ACRA killt **selbst**, in RELEASE **und** DEBUG. C2 ist keine DEBUG-only-Zutat unseres Wrappers, sondern ACRAs Garantie. Unser Kill ist nur Backstop. |
+| **§5.1** „Flush" | *(kein Symbol — existiert nachweislich nicht)* | `ErrorReporter` exponiert **keinen** Completion-Callback (Interface hat nur `handleSilentException` / `handleException(_, endApplication)` / `setEnabled` / Custom-Data). Versand ist **out-of-process + asynchron**: `DefaultSenderScheduler` plant `JobSenderService`/`LegacySenderService` im `:acra`-Prozess; der Report ist eine **Datei**, die den Kill des Haupt-Prozesses überlebt. Im sterbenden Prozess gibt es **nichts zu flushen**. |
+| **C4** Send-Marker | `ReportSender` / `ReportSenderFactory` (`@AutoService`), `ReportDistributor.distribute(): Boolean` | Sende-Erfolg ist **nur** im `:acra`-Prozess beobachtbar. `AcraTree` sieht ihn **nie** — es *enqueued* nur. Ein echter Send-Marker braucht einen eigenen `ReportSender` (Dekorator um `HttpSender`), der bei HTTP-Erfolg cross-prozess stampt — siehe C4/X4. |
+| **B2** Zustellweg | `handleSilentException(e)` (nicht-terminal), `handleException(e, endApplication)` (terminal) | `handleSilentException` = persist + Out-of-process-schedule, **kein** Kill. Der eine Silent-Weg. Nie zusätzlich `handleException` → Doppelversand. |
+
+Verifikationsnotiz: geprüft aus `acra-core-5.13.1-sources.jar` /
+`acra-http-5.13.1-sources.jar` (`ACRA.kt`, `ErrorReporterImpl.kt`,
+`ReportExecutor.kt`, `ProcessFinisher.kt`, `DefaultSenderScheduler.kt`,
+`BulkReportDeleter.kt`, `ReportLocator.kt`, `ReportSender.kt`).
+
+---
+
+## 12. Verwandte Docs
 
 - `CLAUDE.md` — Rule 5 (Storage), 7 (Crash-Safety), 8 (opt-in), 9
   (Timber/silentError/silentDeath), 11 (Fehler-als-Wert).
