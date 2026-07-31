@@ -1,12 +1,15 @@
 # ACRA_FLOW.md
 
-**Ideal-Architektur des Crash-Reporting-Subsystems — reine grüne Wiese.**
+**Ziel-Architektur des Crash-Reporting-Subsystems — bester aktueller Kandidat, noch in Konvergenz.**
 
-Dieses Dokument beschreibt den Crash-Reporting-Pfad so, wie man ihn in einer
-idealen Welt bauen würde: ohne Rücksicht auf heutige Klassennamen, Key-Namen,
-Paketstruktur, Bestandsinstallationen oder darauf, was schon gebaut ist. Es gibt
-in dieser Fassung **keinen** Ist-Zustand, **keine** Migration und **keinen**
-Reifegrad — jede Entscheidung ist frisch getroffen und gilt als beschlossen.
+Dieses Dokument beschreibt den Crash-Reporting-Pfad so, wie er nach heutigem Stand
+am saubersten aussähe: ohne Rücksicht auf heutige Klassennamen, Key-Namen,
+Paketstruktur, Bestandsinstallationen oder darauf, was schon gebaut ist. Es gibt in
+dieser Fassung **keinen** Ist-Zustand und **keine** Migration — aber sehr wohl noch
+offene Fragen. Nichts hier ist beschlossen. Der Großteil ist gut begründet und steht
+als starke Default-Empfehlung; die wenigen echten Gabelungen sind als solche
+markiert und **nicht** vorentschieden. Ziel ist, jetzt genau hinzusehen, damit nicht
+später wieder eine Audit-Runde „entdeckt", was hier vorschnell als erledigt galt.
 
 Die **einzige** Fessel ist die Realität der APIs. Kein Baustein darf etwas
 verlangen, was ACRA 5.13.1 oder die Android-Plattform nicht hergeben. Wo eine
@@ -53,20 +56,85 @@ sie beschreiben, was gilt, nicht was sich gegenüber irgendetwas ändert.
    bei Test: *welche Datei rot werden muss*. Eine Invariante ohne benannte
    Durchsetzung ist eine Bitte, kein Gesetz.
 
-Diese Ideal-Fassung trifft zusätzlich vier Entscheidungen, die eine
-kompromiss­behaftete Fassung offen ließe — jede ist in §13 API-gedeckt:
+Über die sieben Prinzipien hinaus gibt es vier Stellen, an denen die APIs mehrere
+Wege offen lassen und die Wahl echte Substanz hat. Hier tendieren wir aktuell — aber
+diese vier sind **nicht** beschlossen; sie sind die offenen Gabelungen, die der
+nächste Abschnitt mit beiden Seiten aufmacht:
 
-- **Ein Uncaught-Pfad, kein Build-Split.** Kein DEBUG-only-Wrapper; ein einziger,
-  in RELEASE *und* DEBUG identischer Handler. Divergenz nur, wo die *Plattform*
-  sie erzwingt, nie zur Entwickler­bequemlichkeit. *(→ §5.1)*
-- **Der Watchdog killt *und* berichtet — und beide Rollen sind entschieden, nicht
-  verschweißt.** Capture-vor-Kill, ein Schwellwert, Kill ist für einen
-  HOME-Launcher die richtige Wahl. *(→ §6)*
-- **Pipeline-Lebendigkeit hat einen festgelegten Mechanismus**, keine „später zu
-  klärende" Ablage: Datei mit atomarem Rename, geschrieben vom Sender im
-  `:acra`-Prozess. *(→ C4, X4)*
-- **Der Bootstrap-Consent-Read ist synchron auf dem Main-Thread** — als tragende
-  Kostenseite der No-Window-Garantie, nicht als Notlösung. *(→ §3.5)*
+- **Uncaught-Pfad:** aktuelle Tendenz zu *einem* Handler in RELEASE *und* DEBUG
+  statt eines DEBUG-only-Wrappers. *(→ §5.1, G1)*
+- **Watchdog:** aktuelle Tendenz zu Kill *und* Capture statt nur einem von beidem.
+  *(→ §6, G2)*
+- **Pipeline-Lebendigkeit:** aktuelle Tendenz zu einem eigenen Send-Marker per Datei
+  mit atomarem Rename. Ob die Beobachtbarkeit den Cross-Prozess-Aufwand wert ist,
+  bleibt offen. *(→ C4, X4, G3)*
+- **Bootstrap-Consent-Read:** aktuelle Tendenz zu synchron auf dem Main-Thread — die
+  teuerste und strittigste der vier. *(→ §3.5, G4)*
+
+---
+
+## Offene Gabelungen (noch nicht konvergiert)
+
+Vier Stellen sind **nicht** entschieden — hier lassen die APIs mehrere Wege offen
+und die Wahl hat Substanz. Der Rest des Dokuments beschreibt jeweils die aktuell
+präferierte Variante als Default; hier stehen beide Seiten, damit die Gabelung
+sichtbar bleibt und nicht später als „übersehen" wieder aufgemacht werden muss. Jede
+trägt ein Kriterium, das sie schließen würde.
+
+### G1 — Uncaught-Pfad: ein Handler vs. DEBUG-only-Wrapper  *(§5.1)*
+
+- **Tendenz:** ein einziger, in RELEASE und DEBUG identischer `UncaughtCrashHandler`.
+- **Dafür:** der Test deckt den Auslieferungsstand; OOM-GC und Log helfen beiden
+  Builds; keine selbstgemachte Build-Divergenz.
+- **Dagegen / Alternative:** minimal weniger Code im RELEASE-Pfad bei einem
+  DEBUG-only-Wrapper — aber die Divergenz wäre selbstgemacht, nicht
+  Plattform-erzwungen.
+- **Reststreit:** gering. Diese Gabelung ist am ehesten reif zum Schließen.
+- **Schließt sich, wenn:** feststeht, dass kein RELEASE-Verhalten gebraucht wird, das
+  der DEBUG-Pfad nicht auch will — aktuell der Fall.
+
+### G2 — Watchdog: Kill **und** Capture vs. nur eines  *(§6)*
+
+- **Tendenz:** killen *und* vorher capturen.
+- **Dafür (Kill):** die App ist der HOME-Launcher; ein toter Main-Thread heißt toter
+  Home-Button des ganzen Geräts. Kill → OS startet HOME sauber neu.
+- **Dagegen / Alternative:** Selbst-Kill ist aggressiv und trippt auf langsamen
+  Geräten evtl. bei legitimer (endlicher) Single-Message-Arbeit false. Die
+  konservativere Haltung „nie selbst killen, nur berichten" (Capture ohne Kill) ist
+  vertretbar — für viele die sauberere Grenze.
+- **Reststreit:** echt. Das ist eine Wertentscheidung, keine API-Wand.
+- **Schließt sich, wenn:** die real gemessene Trip-Rate auf dem langsamsten
+  Zielgerät bekannt ist. Häufige False-Positives → Schwelle hoch oder Kill raus;
+  keine → Kill bleibt.
+
+### G3 — Pipeline-Lebendigkeit: eigener Send-Marker vs. gar keine Observability  *(C4/X4)*
+
+- **Tendenz:** eigener `ReportSender`-Dekorator, der bei HTTP-Erfolg cross-prozess
+  einen Timestamp in eine Datei (atomarer Rename) stampt.
+- **Dafür:** Prinzip 6 — ein seit Monaten toter Sender darf nicht von „keine
+  Crashes" ununterscheidbar sein.
+- **Dagegen / Alternative:** ein eigener Sender plus die *einzige* zugelassene
+  Cross-Prozess-Ablage, nur für einen Dev-Screen. Für einen Solo-Launcher am
+  ehesten Gold-Plating. Alternative: gar keine Liveness-Anzeige (ein
+  In-Process-Enqueue-Marker löst X4 gerade **nicht**, also entweder richtig oder gar
+  nicht).
+- **Reststreit:** „nice-to-have vs. Aufwand".
+- **Schließt sich, wenn:** ein realer „ist der Reporter überhaupt noch am Leben?"-
+  Zweifel auftritt. Bis dahin kann der Marker warten, ohne den Rest zu blockieren.
+
+### G4 — Bootstrap-Consent-Read: synchron auf dem Main-Thread vs. async  *(§3.5)*
+
+- **Tendenz:** synchron (`runBlocking`) auf dem Main-Thread, vor `onCreate`.
+- **Dafür:** No-Window-Garantie — die frühen Crashes eines zustimmenden Nutzers sind
+  ab dem ersten Moment abgedeckt.
+- **Dagegen / Alternative:** ein `runBlocking`-Disk-Read bei *jedem* Cold-Start plus
+  eine StrictMode-Violation. Async lesen und ACRA erst nach bestätigtem Consent
+  einschalten verliert nur das schmale Fenster, bis der Read fertig ist — für einen
+  **opt-in**-privacy-by-default-Reporter evtl. akzeptabel.
+- **Reststreit:** die strittigste der vier.
+- **Schließt sich, wenn:** die reale Bootstrap-Read-Dauer gemessen ist. Ist das
+  Fenster klein und ein Crash genau darin unwahrscheinlich, gewinnt async; sonst
+  bleibt es synchron.
 
 ---
 
@@ -230,14 +298,14 @@ per Reaffirm rekonziliert.
 | RC1 | R1 AUS (Fehler), R2 liest `Granted` | `Reaffirm(true)` → ACRA an — **der Grund für Reaffirm** | A1 |
 | RC2 | R1 AN, R2 liest `Denied` (Revoke-Race) | `Reaffirm(false)` → ACRA aus + Queue-Purge | A1, A7 |
 
-### 3.5 Der Bootstrap-Read: synchron, DataStore, Haupt-Prozess (entschieden)
+### 3.5 Der Bootstrap-Read: synchron, DataStore, Haupt-Prozess (Tendenz, Gabelung G4)
 
-Ein Crash-Reporter existiert, um die *frühen* Crashes zu fangen — also muss der
+Ein Crash-Reporter existiert, um die *frühen* Crashes zu fangen — also sollte der
 ACRA-Zustand korrekt sein, **bevor der erste Crash möglich ist**, d.h. vor
-`onCreate`. Das ist nicht verhandelbar und macht den Rest zu einem Binär:
-entweder synchron auf dem Main-Thread lesen, oder ein Coverage-Fenster für
-zustimmende Nutzer in Kauf nehmen. In der idealen Welt gibt es kein solches
-Fenster — wir **lesen synchron**:
+`onCreate`. Dieser Anspruch macht den Rest zu einem Binär: entweder synchron auf dem
+Main-Thread lesen, oder ein (schmales) Coverage-Fenster für zustimmende Nutzer in
+Kauf nehmen. Aktuell **tendieren wir zum synchronen Read** — die Gegenseite (async,
+Fenster akzeptieren) steht in G4:
 
 ```
 val decision = runBlocking { consentDataStore.readDecision() }   # ein kleiner Read
@@ -413,7 +481,7 @@ RELEASE **und** DEBUG. Zwei Konsequenzen prägen den ganzen Pfad:
 2. **Der deterministische Kill ist ACRAs, nicht unserer** (`exitProcess(10)`). C2
    ist erfüllt, ohne dass wir killen müssen.
 
-**Die Ideal-Entscheidung: ein einziger Handler in beiden Builds.** Kein
+**Aktuelle Tendenz (Gabelung G1): ein einziger Handler in beiden Builds.** Kein
 DEBUG-only-Wrapper. Der `UncaughtCrashHandler` umschließt ACRAs Handler in RELEASE
 *und* DEBUG identisch — er ergänzt nur zwei Dinge, die beide Builds *gleich* wollen,
 und delegiert dann den kritischen Versand+Kill an ACRA:
@@ -472,10 +540,11 @@ Rekursions-Begründung.
 
 ---
 
-## 6. Der Watchdog als Report-Quelle (Stall-Capture) — entschieden
+## 6. Der Watchdog als Report-Quelle (Stall-Capture) — Tendenz (Gabelung G2)
 
-Der Watchdog erfüllt zwei Aufgaben, die sich **nicht ausschließen** und die diese
-Fassung **nicht offen lässt**: **schnelle Recovery** (Kill, damit der
+Der Watchdog erfüllt zwei Aufgaben, die sich **nicht ausschließen** und die wir
+aktuell zusammenführen (G2 hält die Alternative „nur berichten" offen): **schnelle
+Recovery** (Kill, damit der
 HOME-Prozess nicht sekundenlang tot wirkt) und **Sichtbarkeit** (der Stall darf
 nicht spurlos verschwinden, Prinzip 6). Der Ablauf beim Trip:
 
@@ -490,8 +559,9 @@ Trip (Main-Looper hat timeoutMs nicht getickt):
    Kein Flush-Schritt: die persistierte Datei überlebt den Kill, :acra sendet sie (§5.1, §13)
 ```
 
-**Entschieden: Kill *und* Capture, nicht nur eines.** Die zwei Rollen sind hier
-bewusst nicht verschweißt, sondern *begründet zusammengeführt*:
+**Tendenz: Kill *und* Capture, nicht nur eines** (die offene Alternative „nur
+berichten" steht in G2). Die zwei Rollen sind hier bewusst nicht verschweißt,
+sondern *begründet zusammengeführt*:
 
 - **Warum überhaupt killen (nicht nur berichten)?** Diese App ist der
   HOME-Launcher. Ein wirklich blockierter Main-Thread heißt: der Home-Button des
@@ -523,8 +593,8 @@ Arbeit, die zwischen Messages zurückgibt, pumpt den Looper und trippt nie. Eine
 einzelne Main-Thread-Operation, die legitim > 8 s braucht, ist selbst ein Bug —
 und wird auf dem langsamsten Zielgerät ggf. false-getrippt. Das ist die bewusst
 akzeptierte Kante (§10, `ACCEPTED_LIMITATIONS.md`): der Preis dafür, dass ein
-echter Wedge den HOME-Prozess nicht sekundenlang tot lässt. Kein offener Punkt —
-eine getroffene Abwägung.
+echter Wedge den HOME-Prozess nicht sekundenlang tot lässt — solange G2 zugunsten
+des Kills ausfällt. Fällt G2 auf „nur berichten", verschwindet diese Kante.
 
 ---
 
@@ -590,7 +660,7 @@ akzeptiert.
 Korrekt für Stabilität — aber ein seit Monaten kaputter Sender ist von einem
 gesunden, stillen System **ununterscheidbar**.
 
-**Auflösung (Mechanismus festgelegt):** ein Last-Successful-**Send**-Marker (C4).
+**Vorschlag (Mechanismus, Gabelung G3):** ein Last-Successful-**Send**-Marker (C4).
 Nur die Beobachtung eines erfolgreichen *Sends* löst das Problem — ein
 In-Process-„Enqueue"-Marker in `AcraTree` stünde bei „keine Crashes" und „toter
 Sender" gleichermaßen still. Sende-Erfolg ist aber nur im `:acra`-Prozess
@@ -598,7 +668,7 @@ sichtbar (out-of-process, §13). Deshalb:
 
 - Ein eigener `ReportSender` (Dekorator um `HttpSender`, via `ReportSenderFactory`
   registriert, §13) stampt bei HTTP-Erfolg einen Timestamp.
-- **Ablage (festgelegt, nicht „später"):** eine **Datei mit atomarem Rename**
+- **Ablage (vorgeschlagen):** eine **Datei mit atomarem Rename**
   (`File.renameTo` auf demselben Filesystem) unter `filesDir` — *nicht*
   SharedPreferences (nicht verlässlich multi-prozess). Der Sender schreibt im
   `:acra`-Prozess, der Haupt-Prozess liest für den Dev-Screen. Last-Write-Wins,
@@ -705,11 +775,12 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
   den Server eh nicht. *(B4, AUDIT-6 #4)*
 - **Widerruf ohne Queue-Purge** — lässt Reports der Nicht-Consent-Phase später
   abfließen. *(A7, X3)*
-- **Watchdog nur killen lassen (ohne Capture)** oder **nur berichten (ohne
-  Kill)** — Ersteres macht die langsamsten Hangs unsichtbar (C3, X1), Zweiteres
-  lässt den HOME-Prozess sekundenlang tot (§6). Beide Rollen sind entschieden.
-- **DEBUG-only-Divergenz im Uncaught-Pfad** — ein Pfad, beide Builds; Divergenz
-  nur, wo die Plattform sie erzwingt. *(§5.1)*
+- **Watchdog nur killen lassen (ohne Capture)** — macht die langsamsten Hangs
+  unsichtbar (C3, X1); das bleibt ein Anti-Pattern unabhängig davon, wie G2 fällt.
+  (Ob *überhaupt* gekillt wird — Kill vs. nur berichten — ist dagegen die offene
+  Gabelung G2, kein abzulehnender „Fix".) *(§6)*
+- **DEBUG-only-Divergenz im Uncaught-Pfad** — aktuell abgelehnt zugunsten eines
+  Pfads für beide Builds; die Abwägung selbst ist Gabelung G1. *(§5.1)*
 - **Den C4-Marker in `AcraTree` stampen** — `AcraTree` sieht nur das *Enqueue*,
   nie den Sende-Erfolg; ein solcher Marker löst X4 gerade nicht. *(C4, X4, §13)*
 - **Den C4-Marker in SharedPreferences ablegen** — nicht verlässlich
@@ -732,9 +803,10 @@ Belange — **nicht** verstreut in `ui/util/`. Das Paket ist die Architektur, di
 
 ## 11. Akzeptierte Grenzen (von den APIs / der Plattform erzwungen)
 
-Diese Grenzen sind **keine** offenen Punkte und **kein** Reifegrad — sie sind
-die Stellen, an denen die ideale Lösung an eine harte API-/Plattform-Wand stößt.
-Jede ist eine getroffene Abwägung, keine Baustelle.
+Diese Grenzen sind überwiegend die Stellen, an denen die Lösung an eine harte
+API-/Plattform-Wand stößt — echte Zwänge, keine Baustellen, unabhängig davon, wie
+die offenen Gabelungen ausgehen. Wo eine zusätzlich an einer Gabelung hängt
+(Watchdog → G2), ist das vermerkt.
 
 - **StrictMode-DiskReadViolation beim Bootstrap-Read (§3.5).** Ein persistierter
   Fakt vor dem ersten möglichen Crash *ist* ein synchroner Disk-Read. Unvermeidbar
@@ -749,7 +821,8 @@ Jede ist eine getroffene Abwägung, keine Baustelle.
   nach `ACCEPTED_LIMITATIONS.md`.
 - **Watchdog-Falschauslösung auf Slow-Device-Tail (§6).** Eine legitime einzelne
   Main-Thread-Operation > 8 s wird false-getrippt. Der Preis für Recovery des
-  HOME-Prozesses. Getroffene Abwägung, kein offener Punkt.
+  HOME-Prozesses — gültig, *solange* G2 zugunsten des Kills ausfällt. Fällt G2 auf
+  „nur berichten", verschwindet diese Kante.
 - **Extrahierbare Basic-Auth-Credentials im `BuildConfig` (§4.7).** Aus dem APK
   extrahierbar; bei einem wegwerfbaren Ingest-Endpoint verkraftbar (nur Schreiben
   von Reports, kein Zugriff auf Nutzerdaten). Gegenmaßnahme ist server-seitiges
