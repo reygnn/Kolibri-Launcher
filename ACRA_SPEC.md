@@ -21,8 +21,8 @@ Belang B (Ingestion) und C (Resilienz) folgen als eigene Abschnitte.
 
 Verweise `A1..A8`, `SR/SW/SD/RC`, `§n` zeigen auf `ACRA_FLOW.md`.
 
-Status: **Belang A (Consent) — Entwurf; S (Server-Vertrag) — steht.** B (Ingestion),
-C (Resilienz) — offen.
+Status: **A (Consent) — Entwurf; S (Server-Vertrag) — steht; B (Ingestion) —
+Entwurf.** C (Resilienz) — offen.
 
 ---
 
@@ -564,6 +564,212 @@ POST /report  (Basic-Auth, TLS 1.2/1.3)
 
 ---
 
-## B. Belang B — Ingestion   *(offen — nächster Slice; baut auf S)*
+## B. Belang B — Ingestion
 
-## C. Belang C — Resilienz   *(offen)*
+Die Report-Pipeline: vier Quellen, ein Zustellweg, kein Client-Throttle (die
+Flut-Kontrolle liegt im Server-Vertrag S). Baut auf **S** (jeder gesendete Report
+trifft dort auf Dedup + Rate-Limit) und speist **C** (die Resilienz-Quellen liefern
+über denselben Weg).
+
+### B.0 Namens- & Paket-Mapping (heute → Rewrite)
+
+| Heute (Ist) | Rewrite (`crashreporting/ingestion/`) | Modul | Änderung |
+|---|---|---|---|
+| `AcraTree` (genestet in `KolibriLauncherApp.kt`) | `AcraTree` (eigene Datei) | :app | Auszug; **Throttle-Schritt entfällt** (B3) |
+| `core.CrashReportContext` (`buildAcraReportThrowable`, `LoggedThrowable`) | `ReportCarrier` | :domain | Datei-Umbenennung; pure bleibt |
+| `ui.util.AnrReporter` + `AnrException` | `AnrReporter` + `AnrException` | :app | Auszug; `AnrException` verliert `UnthrottledReport` |
+| `ui.util.CrashReportLimiter` + `UnthrottledReport` | **— gelöscht —** | :app | **entfällt komplett** (B3, §4.3) |
+| ACRA-`reportContent`/`httpSender` (in `attachBaseContext`) | bleibt in `attachBaseContext` | :app | Feldliste = B5; Init-*Wiring* gehört zu C |
+
+### B.1 Vier Quellen, zwei ACRA-Eingänge (§4.1)
+
+| Quelle | Belang | ACRA-Eingang |
+|---|---|---|
+| **Uncaught-Crash** | C | ACRAs eigener `UncaughtExceptionHandler` (Auto-Report, voller `reportContent`) |
+| **Geloggter Fehler** (`Timber.e/w(t)`, WARN+) | B | `AcraTree` → `handleSilentException(carrier)` |
+| **Post-mortem ANR** (`ApplicationExitInfo` REASON_ANR) | B | `Timber.e(AnrException)` → `AcraTree` → `handleSilentException` |
+| **Watchdog-Stall** (`WatchdogStallException`, *vor* Kill) | C→B | `Timber.e(WatchdogStallException)` → `AcraTree` |
+
+Zwei Quellen sind *B-eigen* (geloggter Fehler, ANR); zwei entstehen in *C*
+(Uncaught, Stall) und laufen nur durch B. `WatchdogStallException` lebt bei C
+(§C, `RecoveryWatchdog`), wird aber hier zugestellt.
+
+### B.2 Der eine Zustellweg — `AcraTree` (:app)  *(B2)*
+
+```kotlin
+// crashreporting/ingestion/AcraTree.kt
+internal class AcraTree : Timber.Tree() {
+    override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+        // 1. Gate: nur WARN+ MIT Throwable. Kein Consent-Check (B1 — das enabled-Flag gatet).
+        if (priority < Log.WARN || t == null) return
+        try {
+            // 2. Carrier: per-Report (B4)
+            val carrier = buildAcraReportThrowable(priority, tag, message, t)
+            // 3. Zustellen: persist + Out-of-process-schedule; No-Op wenn ACRA disabled (B1)
+            ACRA.errorReporter.handleSilentException(carrier)
+            // KEIN Throttle-Schritt (B3). KEIN Send-Marker (enqueued nur, §4.2/G3-C).
+        } catch (t2: Throwable) {
+            // C1: schlucken. android.util.Log.e — NICHT Timber (Selbst-Rekursion!),
+            //     NICHT silentError (Crash-Infra, kein DEBUG-Throw).
+            Log.e("AcraTree", "report enqueue failed", t2)
+        }
+    }
+}
+```
+
+> **Nicht offensichtlich, tragend:** der Swallow nutzt **`android.util.Log.e`**, nicht
+> `Timber.e`. `AcraTree` *ist* ein Timber-Tree — ein `Timber.e` in seinem eigenen
+> `catch` re-enterte `AcraTree.log` (Endlos-Rekursion). Und **nicht** `silentError`
+> (Rule 9): ein DEBUG-Throw im Zustellweg landete wieder im selben Pfad. Genau
+> deshalb braucht `AcraTree` **keinen** Rule-9-Whitelist-Eintrag — es verwendet gar
+> kein bare `Timber.e` (siehe B.9). *(RS2, C1)*
+
+- **Nie zusätzlich `handleException(…)`** aufrufen — das wäre terminal + Doppelversand
+  (B2, §13). Der einzige Aufruf ist `handleSilentException`.
+- **Kein Consent-Check** (B1): `AcraTree` verlässt sich darauf, dass A das
+  `enabled`-Flag korrekt gesetzt hat. Bei `disabled` ist `handleSilentException` ein
+  No-Op (§13).
+- **Planting:** in `onCreate` via `Timber.plant(AcraTree())` (Wiring-Detail, C).
+
+### B.3 Was gelöscht wird: `CrashReportLimiter` + `UnthrottledReport`  *(B3)*
+
+Ersatzloser Wegfall — die Flut-Kontrolle ist server-seitig (S.4/S.5):
+- `CrashReportLimiter` (object, SharedPreferences `acra_report_limiter`) + sein
+  `CrashReportLimiter.init(context)`-Aufruf → **weg**. Damit fällt die **einzige**
+  `SharedPreferences`-Ausnahme (CLAUDE.md Rule 5) ersatzlos.
+- `UnthrottledReport` (Marker-Interface) → **weg**; es existierte nur, um den
+  Throttle zu umgehen. `AnrException` implementiert es nicht mehr.
+- **Grund (§4.3):** ein Client-Throttle säße nur in `AcraTree` und sähe den
+  Crash-Loop (Uncaught umgeht `AcraTree`) nie; er deckte nur den Silent-Strom. Der
+  Server sieht beide Fluten (S.0). Kosten ehrlich: ein Crash-Loop POSTet im
+  Crash-Takt (§11-Grenze), gebremst an der Ingestion-Kante (S.5), nicht im Client.
+
+### B.4 `ReportCarrier` (:domain, pure)  *(B4)*
+
+```kotlin
+// crashreporting/ingestion/ReportCarrier.kt   (:domain, Android-frei, JVM-testbar)
+/** Faltet Log-Kontext in die Message einer frischen Exception, Original als cause.
+ *  Landet in STACK_TRACE (das IST in reportContent, B5); kein putCustomData. */
+fun buildAcraReportThrowable(priority: Int, tag: String?, message: String, cause: Throwable): Throwable
+
+internal class LoggedThrowable(message: String, cause: Throwable) : Throwable(message, cause)
+```
+- Message-Format: `"[W/Tag] OriginalType: message"` (Priority-Buchstabe + Tag +
+  Original-Typ), Original unter „Caused by:".
+- **Diagnose-Note bei `CancellationException`:** ein Zusatz in der Message, der auf
+  den fehlerhaften `catch` zeigt (eine geloggte `CancellationException` ist fast
+  immer ein Bug).
+- **Warum kein `putCustomData`:** prozess-globale Mutable-Map → Thread-Race (zwei
+  Reports vertauschen Metadaten, AUDIT-6 #4); zudem listet `reportContent` kein
+  `CUSTOM_DATA` → die Daten erreichten den Server nie. Carrier ist per-Report by
+  construction (kein Shared State, kein Lock).
+
+### B.5 `AnrReporter` (:app)  *(§4.5)*
+
+```kotlin
+// crashreporting/ingestion/AnrReporter.kt
+@Singleton
+class AnrReporter @Inject constructor(
+    @ApplicationContext private val appContext: Context,
+    private val dataStore: DataStore<Preferences>,          // settings-Store (unqualifiziert)
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) {
+    /** Beim nächsten Start: neue REASON_ANR-AEI seit Watermark, chronologisch,
+     *  je → handler(report). handler = { Timber.e(AnrException(...)) } (→ B.2). */
+    suspend fun reportPendingAnrs(handler: suspend (AnrReport) -> Unit)
+    // intern: newAnrsSinceLastReport(), markReported()
+}
+data class AnrReport(val timestamp: Long, val description: String,
+                     val importance: Int, val threadDump: String?)
+class AnrException(message: String) : RuntimeException(message)   // KEIN UnthrottledReport mehr
+```
+- **Kein Live-Sampling** (kein `ANRWatchDog`): `getHistoricalProcessExitReasons` +
+  `ApplicationExitInfo.REASON_ANR` + `.getTraceInputStream()` (API 30+, Ziel 36).
+- **Dedup = Watermark** `longPreferencesKey("anr_reporter_last_reported_ts")` im
+  **settings**-DataStore: jeder AEI-Record genau einmal. AEI-Recordzahl beschränkt →
+  flood-safe.
+- **Best-effort (C1):** der `handler` schluckt einen **Enqueue**-Fehler (nicht Send —
+  out-of-process, §4.2); die Watermark advanced trotzdem → dieser ANR fällt weg.
+  Handler **nicht** zum Rethrow bringen (unterliefe den Crash-Infra-Swallow).
+- **Wiring:** `onCreate` → `reportPendingAnrsAsync()` auf `ApplicationScope` (C).
+
+### B.6 Report-Inhalt & Transport (ACRA-CoreConfiguration)  *(B5, §4.7)*
+
+Die Config bleibt in `attachBaseContext` (Init-*Reihenfolge* = C, §12); die
+*Inhalte* sind B:
+```kotlin
+initAcra {
+    reportFormat = StringFormat.JSON
+    httpSender {
+        uri = BuildConfig.ACRA_URL                    // privat, selbstgehostet (S)
+        basicAuthLogin = BuildConfig.ACRA_LOGIN
+        basicAuthPassword = BuildConfig.ACRA_PASSWORD
+        httpMethod = HttpSender.Method.POST
+        tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
+    }
+    reportContent = listOf(                           // EXAKT diese 7, nicht mehr (B5)
+        PACKAGE_NAME, ANDROID_VERSION, APP_VERSION_CODE, APP_VERSION_NAME,
+        BRAND, PHONE_MODEL, STACK_TRACE)
+    // KEIN CUSTOM_DATA, kein Logcat, keine ID.
+}
+```
+> **Konfig-Vollständigkeit (MUSS, sonst UX-Bruch):** **kein** Interaktions-Plugin
+> (Dialog-/Notification-Mode). Der Consent-Dialog ist unser eigener (`ConsentDialog`,
+> A), die Zustellung ist `handleSilentException` (still) — ACRAs eingebauter
+> Dialog/Notification darf **nicht** konfiguriert sein, sonst erscheint ein zweiter,
+> fremder Consent-/Report-Dialog. (Kein `dialog{}`/`notification{}`-Block, keine
+> `ReportingInteractionMode`-Plugin-Dependency.)
+
+### B.7 DI/Wiring-Deltas
+
+- `AcraTree` — **kein** Hilt (ist ein Timber-Tree); in `onCreate` geplantet (C).
+- `ReportCarrier` — reine Funktionen, kein DI.
+- `AnrReporter` — `@Singleton @Inject` (unverändert); braucht settings-DataStore
+  (unqualifiziert), `@ApplicationContext`, `@IoDispatcher`. Aus `onCreate` gewired (C).
+- **Entfällt:** jeder `CrashReportLimiter.init`-Aufruf.
+
+### B.8 Test-Inventar
+
+Pfade: `ReportCarrier` → `domain/src/test/.../crashreporting/ingestion/ReportCarrierTest.kt`
+(pure JVM). `AcraTree`/`AnrReporter` → `app/src/test/.../crashreporting/ingestion/…`
+(AnrReporter braucht Robolectric o. gemockten `ActivityManager` für AEI).
+
+| `@Test` | Datei | pinnt |
+|---|---|---|
+| `priority < WARN → kein handleSilentException` | AcraTreeTest | Gate |
+| `t == null → kein handleSilentException` | AcraTreeTest | Gate |
+| `WARN+ mit t → buildCarrier + handleSilentException genau einmal` | AcraTreeTest | B2 |
+| `handleSilentException wirft → geschluckt, kein Rethrow` | AcraTreeTest | C1, RS2 |
+| `AcraTree ruft NIE handleException` | AcraTreeTest / Linter | B2 |
+| `AcraTree liest NIE Consent, kein Throttle` | AcraTreeTest / Linter | B1, B3 |
+| `Carrier: Message "[W/Tag] Type: msg", Original als cause` | ReportCarrierTest | B4 |
+| `Carrier: CancellationException → Diagnose-Note` | ReportCarrierTest | B4 |
+| `reportContent == exakt die 7 Felder` | Assertion-Test | B5 |
+| `AEI-Read wirft → emptyList, Watermark unverändert` | AnrReporterTest | AN1, C1 |
+| `Trace-Stream null → Report ohne Dump` | AnrReporterTest | AN2 |
+| `Watermark-Write wirft → nicht advanced` | AnrReporterTest | AN3 |
+| `Enqueue-Fehler im Handler → Watermark advanced, ANR gedroppt` | AnrReporterTest | AN4 |
+| `jeder AEI-Record genau einmal (Watermark-Dedup)` | AnrReporterTest | §4.5 |
+
+### B.9 Linter-Delta (Ingestion-Teil)
+
+- **Rule 9:** **kein** neuer Whitelist-Eintrag. `AcraTree` schluckt mit
+  `android.util.Log.e` (nicht `Timber.e`) → vom `Timber.e`-Detektor gar nicht
+  erfasst. `AnrReporter` nutzt `silentError` (nicht Crash-Infra-exempt; läuft beim
+  nächsten Start, best-effort). `ReportCarrier` wirft nie (pure).
+- **B2-Linter:** `handleException(`/`handleSilentException(` nur in `AcraTree`
+  erlaubt (kein Zweitaufruf/Doppelversand). *Neuer Check* — nach
+  `tools/check-conventions.sh` (analog zu Toast-Routing).
+- **B3-Linter:** kein `ReportThrottle`/`shouldSend` in `AcraTree`; `CrashReportLimiter`
+  existiert nicht mehr. *Neuer/erweiterter Check.*
+- **B4-Linter:** kein `putCustomData(` irgendwo. *Neuer Check.*
+- **B1-Linter:** kein Consent-Read außerhalb `crashreporting/consent/`.
+
+> **SPEC-DECISION B-1 (neue Linter-Checks) — Default: ja, aber verschiebbar.**
+> B2/B3/B4/B1 sind billige grep-Checks im Stil der bestehenden
+> (`check-conventions.sh`). Empfehlung: mit der Implementierung einführen, nicht
+> vorab. Kein Blocker für die Spec.
+
+---
+
+## C. Belang C — Resilienz   *(offen — nächster Slice)*
