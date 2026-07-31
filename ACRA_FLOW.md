@@ -746,3 +746,66 @@ Verifikationsnotiz: geprüft aus `acra-core-5.13.1-sources.jar` /
   bewusst verlorene Soft-ANRs außerhalb des Watchdog-Fensters (§4.5/§6).
 - `AUDIT-10.md` — crash-consent-layering-Review (Consent-Invarianten §2).
 - `AUDIT-6.md` / `AUDIT-6_ADDENDUM.md` — Carrier-Exception statt CUSTOM_DATA.
+
+---
+
+## 13. Reifegrad & Umsetzungsreihenfolge
+
+Diese Spec beschreibt einen Soll-Zustand, dessen Teile **unterschiedlich reif**
+sind. Das ist kein Widerspruch zur Ziel-Architektur — es ist die ehrliche
+Trennung zwischen „entschieden und weitgehend gebaut" und „neu, mit
+Verhaltensänderung und offenen Kanten". Wer umsetzt, liest die Reihenfolge unten
+als Priorität: billig-und-reif zuerst, riskant-und-unreif zuletzt.
+
+### Ausgereift (auslieferungsreif — entschieden, verifiziert, meist schon gebaut)
+
+- **Consent A1–A8.** AUDIT-10-Arbeit, auf diesem Branch gebaut und gepinnt.
+  Einziger Netto-Neubau: `ConsentDecision` sealed statt zwei Booleans — vom
+  Typsystem erzwungen, Risiko minimal.
+- **Ingestion B1–B5.** AcraTree, Carrier-Exception (`putCustomData` restlos
+  entfernt), Throttle + `UnthrottledReport`, `AnrReporter` mit Watermark.
+- **§5.1/C2 Uncaught-Pfad** — nach der 5.13.1-Korrektur: Out-of-process-Modell,
+  Kill via ACRAs `ProcessFinisher`, kein Flush-Fenster, Reihenfolge-Invariante.
+- **X2 Prozess-Gate & A7-Purge-*Mechanismus*** — an verifizierte APIs gebunden
+  (`isACRASenderServiceProcess()`, `BulkReportDeleter`). Die *API-Frage* ist zu.
+- **§9 Packaging-Reorg** nach `crashreporting/` — konzeptionell trivial, nur ein
+  großer mechanischer Diff.
+
+### Noch nicht ganz (echte Lücken — Pflege vor Umsetzung, absteigendes Risiko)
+
+- **§6/X1 Watchdog-als-Report-Quelle — unreifster, riskantester Punkt.** Die
+  Umkehr ist begründet, aber offen: (1) die 8-s-Schwelle ist gegen *Timing*-
+  Falschauslösung argumentiert, **nicht** gegen *Slow-Device-Tail-Latency* —
+  schwere legitime Main-Thread-Arbeit kann 8 s überschreiten und den
+  **HOME-Prozess** killen-und-neustarten; (2) die Stall-Erkennung selbst
+  (Daemon-Thread, echter Looper-Hang) ist die Flaky-Instrumented-Test-Klasse,
+  die das Projekt meidet — nur der Capture-vor-Kill-Seam (C3) ist JVM-testbar;
+  (3) **Kill vs. nur Capture** ist ungeklärt — die Spec verschweißt beides.
+  *Braucht:* Slow-Device-Falschauslösungs-Analyse + explizite Kill/Capture-Wahl.
+- **C4/X4 Send-Marker — Mechanismus unterspezifiziert, Kandidat zum Verschieben.**
+  Der Cross-Prozess-Store ist nicht festgelegt (SharedPreferences ist nicht
+  verlässlich multi-prozess; ehrliche Wahl: Datei mit atomarem Rename). Kosten:
+  ein zusätzlicher Sender + die einzige sonst verbotene Cross-Prozess-Ablage für
+  ein Dev-Screen-Diagnosewerkzeug. *Rat:* als **optional/später** markieren.
+- **A7-Purge — Rest-Kanten.** Zwei ungenannte Fälle: Revoke-während-aktivem-Send-
+  Race (`:acra` sendet, während der Main-Prozess löscht — benigne, aber benennen)
+  und SP1-Restrisiko (Purge wirft → geschluckt → Altbestand bleibt). Je eine Zeile.
+
+### Vielleicht Pflege (Urteilsfragen & Politur — kein Defekt)
+
+- **Consent-Storage (DataStore + `runBlocking` vs. SP-Mirror).** Intern
+  wasserdicht, aber die eine Stelle, wo grüne Wiese mehr hergäbe. Design-
+  Entscheidung: bewusst bestätigen (→ „ausgereift") oder einmal neu aufmachen.
+- **Die „Gepinnt durch"-Spalte insgesamt.** Als Anspruch exzellent, aber mehrere
+  neue Pins (Watchdog-Trip, Multi-Prozess-Bootstrap, Cross-Prozess-Marker) liegen
+  im schwer-testbaren Bereich, der mit dem strengen androidTest-Bar kollidiert.
+  Einmal markieren, welcher Pin JVM-real ist und welcher einen instrumentierten
+  Test bräuchte, den das Projekt evtl. gar nicht will.
+- **`KNOWN_ISSUES.md §3`** beschreibt den R1-Read noch nicht — reines Doc-Follow-up.
+
+### Empfohlene Umsetzungsreihenfolge
+
+1. Package-Reorg + `ConsentDecision` sealed (billig, reif).
+2. A7-Purge inkl. der zwei Rest-Kanten.
+3. §6 Watchdog-Report — erst nach eigener Slow-Device-/Kill-vs-Capture-Analyse.
+4. C4-Send-Marker — zuletzt oder bewusst weglassen.
