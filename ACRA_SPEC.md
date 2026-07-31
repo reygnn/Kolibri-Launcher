@@ -21,8 +21,9 @@ Belang B (Ingestion) und C (Resilienz) folgen als eigene Abschnitte.
 
 Verweise `A1..A8`, `SR/SW/SD/RC`, `§n` zeigen auf `ACRA_FLOW.md`.
 
-Status: **A (Consent) — Entwurf; S (Server-Vertrag) — steht; B (Ingestion) —
-Entwurf.** C (Resilienz) — offen.
+Status: **Alle Belange als Entwurf komplett — A (Consent), B (Ingestion),
+C (Resilienz) + S (Server-Vertrag).** Offene Punkte sind ausdrücklich benannte
+Nicht-Blocker (SPEC-DECISION B-1/C-1, zwei Messungen); siehe Doc-Ende.
 
 ---
 
@@ -772,4 +773,208 @@ Pfade: `ReportCarrier` → `domain/src/test/.../crashreporting/ingestion/ReportC
 
 ---
 
-## C. Belang C — Resilienz   *(offen — nächster Slice)*
+## C. Belang C — Resilienz
+
+Das Safety-Net um A und B: die App überlebt eigene Crashes, der Reporter wird nie
+selbst zur Crash-Quelle (C1). Enthält die zwei Wert-Gabelungen G1 (Uncaught) und
+G2 (Watchdog) — beide zugunsten Variante A geschlossen — sowie die G3-C-Baseline-
+Liveness und die harten Init-Reihenfolgen (§12).
+
+### C.0 Namens- & Paket-Mapping (heute → Rewrite)
+
+| Heute (Ist) | Rewrite (`crashreporting/resilience/`) | Modul | Änderung |
+|---|---|---|---|
+| `setupGlobalExceptionHandler()` (DEBUG-only) + `handleUncaughtException` (in `KolibriLauncherApp.kt`) | `UncaughtCrashHandler` (eigene Datei) | :app | **unified RELEASE+DEBUG (G1)**; **500 ms-Sleep raus** (kein Flush-Fenster); eigener Kill nur Backstop |
+| `ui.util.RecoveryWatchdog` (Kill-only) | `RecoveryWatchdog` + `WatchdogStallException` | :app | **+ Capture-vor-Kill (C3/X1)**, **+ Loop-Guard (G2)** |
+| ACRA-Init/Wiring verstreut in `KolibriLauncherApp` | `CrashReportingBootstrap` | :app | herausgezogen; `KolibriLauncherApp` wird dünner Glue |
+| — (neu, G3-C) | `PipelineBacklogProbe` | :app | Baseline-Liveness aus `ReportLocator` |
+
+### C.1 `UncaughtCrashHandler` (G1 → A: ein Pfad, beide Builds)
+
+```kotlin
+// crashreporting/resilience/UncaughtCrashHandler.kt
+class UncaughtCrashHandler(
+    private val defaultHandler: Thread.UncaughtExceptionHandler?,   // = ACRAs ErrorReporterImpl
+) : Thread.UncaughtExceptionHandler {
+    override fun uncaughtException(thread: Thread, t: Throwable) {
+        if (t is OutOfMemoryError) System.gc()          // Best-effort: Speicher frei, BEVOR ACRA allokiert
+        Timber.e(t, "uncaught")                          // Rule 9: plain Timber.e (Crash-Infra)
+        defaultHandler?.uncaughtException(thread, t)     // = ACRA: persist + schedule(:acra) + exitProcess(10)
+        // ACRA killt hier bereits. Folgender Kill ist reiner Backstop —
+        // nur erreicht, falls ACRA NICHT killte (Admin-Veto / Handler warf):
+        Process.killProcess(Process.myPid()); exitProcess(10)   // deterministisch (C2)
+    }
+}
+```
+- **Unified, kein DEBUG-only-Wrapper (G1):** identisch in RELEASE und DEBUG; der
+  reale Build ist Release, Instrumentierung nur in DEBUG wäre verkehrt.
+- **Kein Flush-Fenster:** das heutige `Thread.sleep(500)` **entfällt**. ACRA sendet
+  out-of-process, die Report-Datei überlebt den Kill, ein Completion-Callback
+  existiert nicht (§13/§5.1). Es gibt im sterbenden Prozess nichts zu flushen.
+- **Kill ist ACRAs, unserer nur Backstop (C2):** ACRAs `ProcessFinisher` killt in
+  beiden Builds; unser `killProcess`/`exitProcess(10)` greift nur, falls ACRA es
+  nicht tat.
+- **Reihenfolge (§12·2):** **nach** `ACRA.init` installieren, damit `defaultHandler`
+  ACRAs `ErrorReporterImpl` ist — sonst delegiert der Wrapper am Reporter vorbei und
+  **kein Report entsteht**.
+
+### C.2 `RecoveryWatchdog` (G2 → A: Kill *und* Capture, mit Loop-Guard)
+
+```kotlin
+// crashreporting/resilience/RecoveryWatchdog.kt
+class RecoveryWatchdog(
+    private val timeoutMs: Long = 8_000L,                 // §6: zwischen Input-ANR ~5s und Broadcast ~10s
+    private val mainThread: Thread = Looper.getMainLooper().thread,
+    private val capture: (Throwable) -> Unit,             // = { Timber.e(it) } → §B.2
+    private val loopGuard: LoopGuard,                     // C.3
+    private val killSwitch: () -> Unit = { Process.killProcess(Process.myPid()); exitProcess(10) },
+) : Thread("RecoveryWatchdog") { init { isDaemon = true } }   // Daemon: läuft, wenn Main-Looper hängt
+
+class WatchdogStallException(mainStack: Array<StackTraceElement>) : RuntimeException("main looper stalled") {
+    init { stackTrace = mainStack }
+}
+```
+Trip-Ablauf (§6), Schritt 0 = Loop-Guard:
+```
+Trip (Main-Looper hat timeoutMs nicht getickt):
+  0. if (loopGuard.shouldSuppressKill()) → nur Schritt 1–2, KEIN Kill (Fallback „nur berichten")
+  1. Capture:  mainStack = mainThread.stackTrace          # auf dem Daemon-Thread
+  2. Enqueue:  capture(WatchdogStallException(mainStack))  # → §B.2 (persist + :acra-schedule)
+  3. Kill:     loopGuard.recordKill(); killSwitch()
+  (1–2 in try/catch(Throwable) geschluckt — Kill hat Vorrang, ST1; Swallow via Log.e, nicht Timber-Rekursion)
+```
+- **Warum Capture *vor* Kill (C3/X1):** ein `Process.killProcess` erzeugt kein
+  `REASON_ANR` → der `AnrReporter` (B) sieht diesen Stall nie. Ohne Schritt 1–2 wäre
+  er unsichtbar.
+- **Warum es trotz Kill ankommt:** `handleSilentException` persistiert die Datei
+  (überlebt Kill), `:acra` sendet sie; der einzige In-Process-Schritt ist ein
+  kleiner File-Write auf dem **Daemon**-Thread, nicht dem hängenden Main-Thread.
+- **Loop-Guard (G2):** bricht den deterministischen Kill-Restart-Loop (C.3).
+- **Reihenfolge (§12·3):** **nach** `onCreate` starten (`Handler.post`), sonst kann
+  schwere Cold-Start-Arbeit den HOME-Prozess in einen Restart-Loop killen.
+- **Slow-Device-Kante (§11):** eine legitime > 8 s-Single-Message wird false-
+  getrippt — durch den `minSdk 36`-Hardware-Boden praktisch entschärft; akzeptiert.
+
+### C.3 Loop-Guard-Store (`LoopGuard`)  *(G2-Implementierungsnotiz)*
+
+Der Loop-Guard braucht: **cross-restart** (jeder Kill = neuer Prozess), **sync
+schreibbar vom Daemon-Thread** *am Kill-Zeitpunkt* (Prozess stirbt gleich). Das ist
+exakt die Constraint, für die `CrashReportLimiter` SharedPreferences nutzte — und
+die wir in B gerade entfernt haben.
+
+```kotlin
+// crashreporting/resilience/LoopGuard.kt
+class LoopGuard(
+    private val store: File,          // C-1: plain File unter noBackupFilesDir
+    private val windowMs: Long = 60_000L,
+    private val maxKills: Int = 3,
+    private val now: () -> Long = { System.currentTimeMillis() },
+) {
+    fun shouldSuppressKill(): Boolean // recent kills (aus File, beim Start gelesen) im Fenster >= maxKills
+    fun recordKill()                  // SYNCHRON: Timestamp an File anhängen (java.io, überlebt Kill)
+}
+```
+
+> **SPEC-DECISION C-1 (Loop-Guard-Ablage) — ENTSCHIEDEN: plain File.**
+> - **Gewählt: kleine plain-`File`** (Timestamp-Zeilen, Ring über die letzten
+>   `maxKills`+1) unter `noBackupFilesDir` — synchron via `java.io` schreibbar
+>   (überlebt den Kill), cross-restart lesbar, kein Suspend. `noBackup`, damit ein
+>   Geräte-Transfer keine falsche Kill-Historie mitschleppt. **Reine Telemetrie,
+>   kein Entscheidungszustand** → die X2-Multi-Prozess-Sorge (Consent) gilt nicht.
+> - **Gegen SharedPreferences:** brächte die in B ersatzlos gelöschte
+>   `SharedPreferences`-Ausnahme (Rule 5) zurück — für denselben Grund
+>   (sync-from-crash-thread), den wir gerade abgeschafft haben. Vermeiden.
+> - **Gegen DataStore:** suspend-only, am Kill-Zeitpunkt auf dem Daemon-Thread
+>   **nicht** synchron nutzbar. Scheidet aus.
+
+### C.4 `PipelineBacklogProbe` (G3-C: Baseline-Liveness)
+
+```kotlin
+// crashreporting/resilience/PipelineBacklogProbe.kt  (Hauptprozess)
+class PipelineBacklogProbe @Inject constructor(@ApplicationContext private val context: Context) {
+    data class Backlog(val approved: Int, val unapproved: Int, val oldestMillis: Long?)
+    /** Liest ReportLocator (ACRA public API, §13): liegenbleibende Report-Dateien.
+     *  Wachsend = Sender/Server tot; leer = gesund ODER nie gecrasht. Für Dev-Screen (§8c). */
+    fun read(): Backlog   // ReportLocator(context).approvedReports/unapprovedReports (Array<File>), min lastModified
+}
+```
+- **Kein** zweiter Sender, **keine** Cross-Prozess-Ablage (das wäre der Upgrade
+  G3-A, `AcraHttpSender` — nicht gebaut).
+- **Grenze (akzeptiert, §11):** kein positiver HTTP-Beweis; leer bleibt mehrdeutig.
+- Nutzt bei Fehlern `silentError` (nicht Crash-Infra — läuft auf Dev-Screen-Abruf).
+
+### C.5 `CrashReportingBootstrap` (Init-Reihenfolge, X2, Wiring)
+
+Zieht die heute in `KolibriLauncherApp` verstreute Init heraus; die App wird dünner
+Glue.
+```kotlin
+// crashreporting/resilience/CrashReportingBootstrap.kt
+object CrashReportingBootstrap {
+    /** attachBaseContext, NACH initAcra{} (B.6). */
+    fun afterInit(app: Application, base: Context) {
+        ACRA.errorReporter.setEnabled(false)                       // §12·1: SOFORT, ohne Zwischenanweisung (A1)
+        if (!ACRA.isACRASenderServiceProcess()) {                  // X2: Prozess-Gate
+            val decision = runBlocking { ConsentBootstrap.readDecision(base) }   // §3.5 sync (G4)
+            if (decision == ConsentDecision.Granted) ACRA.errorReporter.setEnabled(true)
+        }
+        val default = Thread.getDefaultUncaughtExceptionHandler()  // = ACRA (nach init)
+        Thread.setDefaultUncaughtExceptionHandler(UncaughtCrashHandler(default))   // §12·2
+        // KolibriLog-Bridge: core/KolibriLog-Lambdas an Timber/silentError wiren
+    }
+    /** onCreate. */
+    fun onCreate(app: Application, scope: CoroutineScope, anrReporter: AnrReporter, watchdog: RecoveryWatchdog) {
+        Timber.plant(AcraTree()); Timber.plant(ToastErrorTree())   // + DebugTree in DEBUG
+        scope.launch { anrReporter.reportPendingAnrs { report -> Timber.e(AnrException(report.description)) } }  // B.5
+        Handler(Looper.getMainLooper()).post { watchdog.start() }  // §12·3: nach onCreate
+    }
+}
+```
+
+### C.6 Harte Sequenz-Invarianten (§12)
+
+| # | Reihenfolge | Bruch-Folge |
+|---|---|---|
+| §12·1 | `initAcra{}` → **`setEnabled(false)` ohne Zwischenanweisung** (A1) | Mikro-Fenster mit aktivem Reporter bei unbekanntem Consent |
+| §12·2 | `ACRA.init` → **dann `UncaughtCrashHandler` installieren** | Wrapper delegiert am Reporter vorbei → **kein Report** |
+| §12·3 | `onCreate` fertig → **dann `RecoveryWatchdog.start()`** | Cold-Start-Arbeit killt HOME-Prozess in Restart-Loop |
+
+### C.7 Rule-9-Whitelist-Delta
+
+Neue Crash-Infra-Dateien mit plain `Timber.e` (§5.3) → in `rule9_allowed_files`
+(`tools/check-conventions.sh` Z. 79) ergänzen:
+- `UncaughtCrashHandler\.kt` — der globale Handler (plain `Timber.e`).
+- `RecoveryWatchdog\.kt` — Capture-Swallow (plain `Timber.e`/`Log.e`).
+- `CrashReportingBootstrap\.kt` — Bootstrap-Pfad (ACRA-Init, Consent-Read).
+- (`ConsentBootstrap\.kt` bereits in A.9; `KolibriLauncherApp\.kt` bleibt.)
+
+`PipelineBacklogProbe`, `LoopGuard` nutzen **kein** bare `Timber.e` (silentError bzw.
+reine Logik) → kein Eintrag. `AcraTree` ebenfalls nicht (Log.e, B.9).
+
+### C.8 Test-Inventar
+
+Pfade: `app/src/test/.../crashreporting/resilience/…`; `RecoveryWatchdog`/`LoopGuard`
+sind aus dem Daemon-Thread herausgezogene reine Logik (JVM, `now`/`killSwitch`/
+`capture` injizierbar — Rule 10).
+
+| `@Test` | Datei | pinnt |
+|---|---|---|
+| `OOM → System.gc vor Delegation` | UncaughtCrashHandlerTest | §5.1 |
+| `delegiert an defaultHandler (ACRA)` | UncaughtCrashHandlerTest | §12·2 |
+| `Backstop-Kill erreicht, wenn defaultHandler nicht killt` | UncaughtCrashHandlerTest | C2 |
+| `kein Thread.sleep / Flush-Fenster` | UncaughtCrashHandlerTest (Review) | §5.1 |
+| `erster Trip → capture UND killSwitch` | RecoveryWatchdogTest | G2, C3 |
+| `N-ter Trip in M s → capture, KEIN killSwitch` | RecoveryWatchdogTest | G2 (Loop-Guard) |
+| `capture wirft → geschluckt, Kill läuft trotzdem` | RecoveryWatchdogTest | ST1, C1 |
+| `LoopGuard: recordKill persistiert; shouldSuppressKill zählt Fenster` | LoopGuardTest | G2 |
+| `LoopGuard: cross-restart (neuer Store-Read sieht alte Kills)` | LoopGuardTest | G2 |
+| `PipelineBacklogProbe: N Dateien → Backlog(n, …, oldest)` | PipelineBacklogProbeTest | C4 |
+| `Bootstrap: setEnabled(false) direkt nach init` | (Bootstrap-/Review) | §12·1, A1 |
+| `Bootstrap: Handler NACH init installiert` | (Review) | §12·2 |
+| `RS1 ACRA-Init wirft → Log.e-Fallback, App läuft, ACRA AUS` | BootstrapTest | RS1, C1 |
+
+---
+
+*Ende der drei Belange. Offene, ausdrücklich benannte Nicht-Blocker:* SPEC-DECISION
+B-1 (neue Linter mit der Implementierung), SPEC-DECISION C-1 (Loop-Guard = plain
+File, empfohlen), sowie die Messungen aus `ACRA_FLOW.md` (G4-Read-Dauer, optional
+G2-Trip-Rate).
