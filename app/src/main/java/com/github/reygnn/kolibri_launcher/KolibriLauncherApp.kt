@@ -17,19 +17,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
-import android.os.Process
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
+import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
-import com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -38,17 +33,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import org.acra.ACRA
-import org.acra.ReportField
-import org.acra.config.httpSender
-import org.acra.data.StringFormat
-import org.acra.ktx.initAcra
-import org.acra.security.TLS
-import org.acra.sender.HttpSender
 import timber.log.Timber
 import javax.inject.Inject
-import kotlin.system.exitProcess
 
 /**
  * ULTRA CRASH-SAFE Application Class
@@ -56,10 +42,9 @@ import kotlin.system.exitProcess
  * Multi-layer exception handling:
  * - All operations wrapped in try-catch with Throwable
  * - CoroutineExceptionHandler for application scope
- * - Global uncaught exception handler with recovery attempts
- * - ACRA initialized with privacy-by-default
+ * - Crash reporting (init, uncaught handler, watchdog, ANR drain) delegated
+ *   to `CrashReportingBootstrap`, privacy-by-default
  * - Safe package receiver registration
- * - ACRA spam protection (max 1 report per exception per 24h)
  *
  * This ensures the launcher stays alive even under extreme conditions
  * like OutOfMemoryError, StackOverflowError, or corrupted system state.
@@ -74,9 +59,6 @@ class KolibriLauncherApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val packageUpdateReceiver = PackageUpdateReceiver()
-
-    // Global exception handler
-    private var defaultExceptionHandler: Thread.UncaughtExceptionHandler? = null
 
     // Ultra Paranoia: Coroutine exception handler for application scope
     private val applicationExceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -94,86 +76,28 @@ class KolibriLauncherApp : Application() {
 
     /**
      * ACRA must be initialised here — `attachBaseContext` runs before `onCreate`
-     * and before any other Application code, so it's the only safe place to install
-     * the global crash handler before something else can crash.
+     * and before any other Application code, so it is the only safe place to
+     * install the crash handler before something else can crash.
      *
-     * ## Why `runBlocking` is intentional here
-     *
-     * `initAcra { ... }` enables crash reporting by default. We disable it
-     * immediately afterwards (Rule 8: privacy-by-default) and only re-enable
-     * it when the user has given consent. The consent state lives in disk
-     * storage, so reading it is unavoidably I/O. We block the main thread
-     * for that read deliberately:
-     *
-     * - Reading async (e.g. by launching a coroutine in `onCreate`) would
-     *   open a micro-window between the disable in this method and the
-     *   re-enable in `onCreate` during which ACRA stays disabled even when
-     *   the user has consented. Small window, but real — and the whole
-     *   point of Rule 8 is that the consent decision is the source of truth,
-     *   not "consented but the launcher missed it".
-     * - The read is small (single key) and effectively free on warm starts.
-     * - `runBlocking(Dispatchers.IO)` would not help: the inner
-     *   `withContext(Dispatchers.IO)` in [CrashReportConsentStore.hasConsent]
-     *   already moves the actual I/O off the calling thread of the suspend
-     *   function, but `runBlocking` always blocks its caller. Wrapping it
-     *   in another IO dispatcher just adds a hop with no benefit.
-     *
-     * ## StrictMode noise
-     *
-     * In DEBUG this triggers a DiskReadViolation. That's expected — it is
-     * intentional code, not a bug to fix. Cross-reference `KNOWN_ISSUES.md`
-     * (section "Intentional violations") before chasing it. The backing
-     * store is the project DataStore (see [CrashReportConsentStore.hasConsent]);
-     * the StrictMode noise comes from the synchronous file read, not from
-     * the storage choice — `runBlocking { dataStore.data.first() }` blocks
-     * the main thread the same way a `SharedPreferences.getBoolean` would.
+     * The whole ACRA bootstrap (init, the §12 ordering, the X2-gated synchronous
+     * consent read, the uncaught-handler install) lives in
+     * [CrashReportingBootstrap.attachBaseContext] — see there for the
+     * `runBlocking`/StrictMode rationale (§3.5) and the fail-closed sequence.
+     * This override is thin glue: delegate inside the Rule-7 paranoia catch.
      */
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
 
         if (base != null) {
             try {
-                initAcra {
-                    buildConfigClass = BuildConfig::class.java
-                    reportFormat = StringFormat.JSON
-
-                    httpSender {
-                        uri = BuildConfig.ACRA_URL
-                        basicAuthLogin = BuildConfig.ACRA_LOGIN
-                        basicAuthPassword = BuildConfig.ACRA_PASSWORD
-                        httpMethod = HttpSender.Method.POST
-                        tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
-                    }
-
-                    reportContent = listOf(
-                        ReportField.PACKAGE_NAME,
-                        ReportField.ANDROID_VERSION,
-                        ReportField.APP_VERSION_CODE,
-                        ReportField.APP_VERSION_NAME,
-                        ReportField.BRAND,
-                        ReportField.PHONE_MODEL,
-                        ReportField.STACK_TRACE
-                    )
-                }
-
-                // Immediately disable ACRA after initialization (privacy-by-default)
-                ACRA.errorReporter.setEnabled(false)
-
-                // Check consent status
-                val userHasGivenConsent = runBlocking {
-                    ConsentBootstrap.readDecision(base) == ConsentDecision.Granted
-                }
-
-                // Only enable if user has given consent
-                if (userHasGivenConsent) {
-                    ACRA.errorReporter.setEnabled(true)
-                    Timber.i("ACRA initialized. Enabled: true")
-                }
+                // Owns ACRA init + the X2-gated consent read + the uncaught
+                // handler install, in the §12 order. See CrashReportingBootstrap.
+                CrashReportingBootstrap.attachBaseContext(this, base)
             } catch (e: Throwable) {
-                // Ultra paranoid: Catch everything, even in ACRA init
-                // Use Android Log as fallback since Timber might not be initialized
+                // Ultra paranoid: even crash-reporting init must not crash the
+                // app. Android Log fallback since Timber may not be wired yet.
                 try {
-                    Log.e("KolibriLauncher", "CRITICAL: Failed to initialize ACRA", e)
+                    Log.e("KolibriLauncher", "CRITICAL: Failed to initialize crash reporting", e)
                 } catch (ignored: Throwable) {
                     // Even logging can fail - nothing we can do
                 }
@@ -217,21 +141,9 @@ class KolibriLauncherApp : Application() {
                 })
                 Timber.plant(ToastErrorTree())
             }
-
-            // ACRA tree for both DEBUG and RELEASE
-            Timber.plant(AcraTree())
         } catch (e: Throwable) {
             // Timber initialization failed - continue without it
             Log.e("KolibriLauncher", "Failed to initialize Timber", e)
-        }
-
-        // Setup global exception handler (optional, ACRA handles it)
-        if (BuildConfig.DEBUG) {
-            try {
-                setupGlobalExceptionHandler()
-            } catch (e: Throwable) {
-                Timber.e(e, "Failed to setup global exception handler")
-            }
         }
 
         // Setup StrictMode for debugging
@@ -243,8 +155,9 @@ class KolibriLauncherApp : Application() {
             }
         }
 
-        reportPendingAnrsAsync()
-        startRecoveryWatchdogAfterBootstrap()
+        // Plant the delivery tree, drain post-mortem ANRs, start the watchdog
+        // (§12·3). See CrashReportingBootstrap.
+        CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
 
         // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
         // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
@@ -328,73 +241,6 @@ class KolibriLauncherApp : Application() {
         }
     }
 
-    private fun setupGlobalExceptionHandler() {
-        try {
-            defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
-
-            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-                handleUncaughtException(thread, throwable)
-            }
-        } catch (e: Throwable) {
-            Timber.e(e, "Failed to setup global exception handler")
-        }
-    }
-
-    /**
-     * Handles uncaught exceptions with recovery attempts.
-     * Tries to keep the launcher alive when possible.
-     * Respects spam protection limits.
-     */
-    private fun handleUncaughtException(thread: Thread, throwable: Throwable) {
-        var handlerCalled = false
-
-        try {
-            Timber.e(throwable, "UNCAUGHT EXCEPTION in thread: ${thread.name}")
-
-            // No client-side throttling of real crashes (B3); flood control is
-            // server-side. The uncaught path never went through AcraTree anyway.
-
-            // Launcher-specific recovery for OutOfMemoryError
-            if (throwable is OutOfMemoryError) {
-                try {
-                    // Emergency garbage collection
-                    System.gc()
-                    Runtime.getRuntime().gc()
-                    Timber.w("Emergency GC triggered due to OutOfMemoryError")
-                } catch (e: Throwable) {
-                    // Even GC can fail - ignore
-                }
-            }
-
-            // Call default exception handler once (ACRA will handle it)
-            defaultExceptionHandler?.uncaughtException(thread, throwable)
-            handlerCalled = true
-
-        } catch (e: Throwable) {
-            Timber.e(e, "Error in crash handler")
-
-            // Only call default handler if not already called
-            if (!handlerCalled) {
-                try {
-                    defaultExceptionHandler?.uncaughtException(thread, throwable)
-                } catch (ignored: Throwable) {
-                    // Nothing we can do at this point
-                }
-            }
-        } finally {
-            // Give system time to cleanup and ACRA to send report
-            try {
-                Thread.sleep(500)
-            } catch (ignored: InterruptedException) {
-                // Ignore
-            }
-
-            // Final resort - terminate process
-            Process.killProcess(Process.myPid())
-            exitProcess(10)
-        }
-    }
-
     private fun setupStrictMode() {
         // WICHTIG: StrictMode darf NUR im Debug-Modus laufen!
         // Im Release kostet das Performance und nervt den User.
@@ -423,88 +269,6 @@ class KolibriLauncherApp : Application() {
         } catch (e: Throwable) {
             // Sollte eigentlich nie passieren, aber gut für Defensive Programming
             Timber.e(e, "Error setting up StrictMode")
-        }
-    }
-
-    /**
-     * Walks `ApplicationExitInfo` for any ANRs the system recorded since
-     * the last app start, forwards each to ACRA via a synthetic exception
-     * that carries the system-supplied multi-thread dump as its message,
-     * and advances [AnrReporter]'s persisted watermark once the forward
-     * returns. Note the forward is best-effort: `AcraTree` swallows ACRA
-     * send failures (Rule 7/9), so the watermark advances even when a
-     * report never reaches ACRA — see [AnrReporter]'s "Best-effort
-     * delivery" KDoc for why that is intentional.
-     *
-     * Replaces the previous `ANRWatchDog(5000)` live-sampling approach.
-     * See [AnrReporter] KDoc for the trade-off (soft-ANR loss accepted in
-     * exchange for richer system thread dumps + zero background overhead +
-     * no unmaintained dependency).
-     *
-     * Dedup is handled entirely by [AnrReporter]'s watermark — each
-     * `ApplicationExitInfo` record is forwarded exactly once, ever. There is no
-     * client-side throttle to bypass (B3): flood control is server-side, so
-     * distinct hangs each report and nothing is collapsed under a client key.
-     *
-     * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
-     * Application is on the crash-handling-infrastructure exception list.
-     */
-    private fun reportPendingAnrsAsync() {
-        applicationScope.launch(applicationExceptionHandler) {
-            try {
-                anrReporter.reportPendingAnrs { report ->
-                    val description = report.description.ifBlank { "ANR" }
-                    val synthetic = AnrException(
-                        message = "$description\n\n${report.threadDump.orEmpty()}",
-                    )
-                    // Single delivery path. `Timber.e` routes through AcraTree,
-                    // which forwards to ACRA via handleSilentException. ANRs are
-                    // already deduplicated by AnrReporter's watermark (each AEI
-                    // record forwarded exactly once, ever); there is no client
-                    // throttle to opt out of (B3). An additional explicit
-                    // `ACRA.errorReporter.handleException` here would double-send
-                    // the report — don't add one. Rule 9: plain Timber.e
-                    // (crash-handling-infrastructure exception).
-                    Timber.e(synthetic, "ANR (post-mortem from ApplicationExitInfo)")
-                }
-            } catch (e: Throwable) {
-                Timber.e(e, "Error walking pending ANRs")
-            }
-        }
-    }
-
-    /**
-     * Self-defense companion to [AnrReporter]: starts the
-     * [RecoveryWatchdog] daemon thread that kills the process if the
-     * main looper stops dispatching for 8 s.
-     *
-     * Started via `Handler.post { … }` rather than directly so the
-     * first watchdog tick lands *after* `onCreate` returns and the
-     * main thread re-enters its dispatch loop. Otherwise the heavy
-     * cold-start work in this method (DataStore reads, migrations,
-     * receiver registration) could legitimately block past 8 s and
-     * trigger a kill-restart-loop on a HOME process that the OS
-     * eagerly relaunches. See [RecoveryWatchdog] KDoc for the full
-     * "why a Thread, not a coroutine" + "why 8 s" + AEI-categorization
-     * caveat.
-     *
-     * Plain `Timber.e` (not `silentError`) per CLAUDE.md Rule 9: this
-     * Application is on the crash-handling-infrastructure exception
-     * list. The catch is defensive — `Handler.post` to the main
-     * Looper is structurally safe, but an OOM during post-allocation
-     * is the kind of edge that we don't want to crash startup over.
-     */
-    private fun startRecoveryWatchdogAfterBootstrap() {
-        try {
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    RecoveryWatchdog().start()
-                } catch (e: Throwable) {
-                    Timber.e(e, "Failed to start RecoveryWatchdog")
-                }
-            }
-        } catch (e: Throwable) {
-            Timber.e(e, "Failed to schedule RecoveryWatchdog start")
         }
     }
 

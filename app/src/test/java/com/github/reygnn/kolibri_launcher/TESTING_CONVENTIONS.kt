@@ -518,7 +518,7 @@ package com.github.reygnn.kolibri_launcher
  * UncaughtExceptionHandler, plants Timber trees, registers a
  * BroadcastReceiver, creates a CoroutineScope, launches the
  * [com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter] coroutine,
- * and starts a [com.github.reygnn.kolibri_launcher.ui.util.RecoveryWatchdog]
+ * and starts a [com.github.reygnn.kolibri_launcher.crashreporting.resilience.RecoveryWatchdog]
  * daemon thread. None of that is torn down between tests, so every
  * Robolectric test class would leak one of each. With ~10+ Robolectric
  * test classes and the test executor at -Xmx512m, the accumulated

@@ -234,8 +234,15 @@ activities.
    net for, or land in ACRA's own machinery. These files keep plain
    `Timber.e`:
 
-   - `KolibriLauncherApp.kt` — the global `UncaughtExceptionHandler` and
-     ACRA init (~7 spots). The original Rule 9 exception.
+   - `KolibriLauncherApp.kt` — the app-scope `CoroutineExceptionHandler` and
+     the `onCreate` init catches. The original Rule 9 exception. (The global
+     `UncaughtExceptionHandler` and the ACRA init moved out to the two files
+     below in the ACRA rewrite.)
+   - `UncaughtCrashHandler.kt` — the unified (RELEASE+DEBUG) global uncaught
+     handler; a `silentError` throw there would recurse into the crash path
+     it is the safety net for.
+   - `CrashReportingBootstrap.kt` — ACRA init + the ANR drain + watchdog
+     wiring, on the bootstrap path (before/around ACRA being wired).
    - `TimberWrapper.kt` itself — `silentError` calling itself is a literal
      loop.
    - `BaseActivity.kt` and `BaseViewModel.kt` — the

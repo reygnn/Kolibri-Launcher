@@ -76,7 +76,7 @@ report() {
 # Anything else uses TimberWrapper.silentError so the throw-in-DEBUG
 # semantic surfaces programmer-error bugs loudly.
 # ─────────────────────────────────────────────────────────────────────────────
-rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|ConsentBootstrap\.kt'
+rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|ConsentBootstrap\.kt|UncaughtCrashHandler\.kt|CrashReportingBootstrap\.kt'
 
 rule9_hits=$(
   grep -rn 'Timber\.e(' "${src_roots[@]}" --include='*.kt' \
