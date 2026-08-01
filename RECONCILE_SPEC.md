@@ -10,9 +10,10 @@ und der belegte Defekt, dann die Zielinvariante, dann die baubaren Deltas
 separates `ACRA_FLOW.md` aufsetzt, ist diese Spec selbsttragend — Reconcile hat
 kein eigenes Architektur-Doc.
 
-**Status:** Entwurf komplett. Zwei bewusst benannte Gabelungen (`SPEC-DECISION
-R-1`, `R-2`) sind vor Umsetzung zu entscheiden; beide sind am Doc-Ende
-gesammelt. Kein Blocker für den Start.
+**Status:** Entwurf komplett, **beide Gabelungen entschieden** (`SPEC-DECISION
+R-1` = Empfehlung: Component-genau für Favorites/Swipe/Hidden, Paket-genau für
+Custom-Names, fail-safe; `R-2` = Welt-Diff **ersetzen**). Umsetzung nach §9,
+Schritt für Schritt. Details der Entscheidungen in §10.
 
 **Verhältnis zu bereits Gelandetem.**
 - Der `EXTRA_REPLACING`-Guard (Commit `4e719ff8`, „`fix(sync)`") ist **bereits
@@ -290,23 +291,21 @@ Schritt 1 ist das System jederzeit auslieferbar.
 
 ---
 
-## §10 Offene Entscheidungen
+## §10 Entscheidungen (getroffen)
 
-- **`SPEC-DECISION R-1` (Verifikations-Ebene & API).** Paket-genau
-  (`getLaunchIntentForPackage(pkg) == null`) oder Component-genau
-  (`resolveActivity(component)`)? Paket-genau ist einfacher und deckt den
-  häufigen Fall (ganze App weg); Component-genau ist präziser bei Apps mit
-  mehreren Launcher-Activities, deren *eine* Component verschwindet (z. B.
-  Alias-Toggle). Empfehlung: **Component-genau** für Favorites/Swipe/Hidden
-  (die auf `pkg/class` keyed sind), **Paket-genau** für Custom-Names (auf `pkg`
-  keyed). Fail-safe-Regel in beiden Fällen: System-API-Fehler ⇒ „present" ⇒
-  **nicht löschen**.
-- **`SPEC-DECISION R-2` (Welt-Diff behalten oder ersetzen).** Der pro-Ziel-
-  verifizierte Cold-Start-Sweep (§4) dominiert den listen-vertrauenden strikt.
-  Empfehlung: **ersetzen** und die `cleanup*(installed)`-Methoden entfernen —
-  weniger Code, kein Restrisiko. Alternative: behalten als zweiten Backstop,
-  aber dann muss auch er §5's Sanity-Guard tragen, sonst reimportiert er den
-  Defekt.
+- **`SPEC-DECISION R-1` (Verifikations-Ebene & API) — ENTSCHIEDEN: der
+  Empfehlung folgen.** **Component-genau** für Favorites/Swipe/Hidden (auf
+  `pkg/class` keyed) via `resolveActivity(component)`-Ebene; **Paket-genau**
+  für Custom-Names (auf `pkg` keyed) via `getLaunchIntentForPackage(pkg)`.
+  Fail-safe in beiden Fällen: **System-API-Fehler ⇒ „present" ⇒ nicht löschen.**
+  Das `PackagePresence`-Interface (§7) bildet beide Ebenen ab
+  (`isComponentPresent(cn)` + `isPackagePresent(pkg)`).
+- **`SPEC-DECISION R-2` (Welt-Diff behalten oder ersetzen) — ENTSCHIEDEN:
+  ersetzen.** Der listen-vertrauende Welt-Diff wird vollständig durch den
+  pro-Ziel-verifizierten Reconcile ersetzt; die `cleanup*(installed)`-Methoden
+  werden **entfernt** (samt ihrer Contract-Test-Tripel), zugunsten der
+  paket-/component-adressierten Löschung aus §6. Kein Backstop, kein
+  §5-Sanity-Guard nötig — die Partiell-Liste-Klasse existiert danach nicht mehr.
 
 ---
 
