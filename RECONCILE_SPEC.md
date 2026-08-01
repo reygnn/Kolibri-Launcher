@@ -10,18 +10,66 @@ und der belegte Defekt, dann die Zielinvariante, dann die baubaren Deltas
 separates `ACRA_FLOW.md` aufsetzt, ist diese Spec selbsttragend — Reconcile hat
 kein eigenes Architektur-Doc.
 
-**Status:** Entwurf komplett, **beide Gabelungen entschieden** (`SPEC-DECISION
-R-1` = Empfehlung: Component-genau für Favorites/Swipe/Hidden, Paket-genau für
-Custom-Names, fail-safe; `R-2` = Welt-Diff **ersetzen**). Umsetzung nach §9,
-Schritt für Schritt. Details der Entscheidungen in §10.
+**Status: UMGESETZT** — der Defekt aus §0.2 ist geschlossen. Beim Umsetzen von §9
+löste die schlankere **Verifikations-Veto**-Variante die event-targeted
+Ersetzung (§2–§6) ab; siehe „Umsetzung (as-built)" direkt unten. Die beiden
+Gabelungen (`SPEC-DECISION R-1` = Component-/Paket-genau + fail-safe; `R-2` =
+ursprünglich „Welt-Diff ersetzen") sind in §10 dokumentiert; R-2 wurde vom Veto
+neu gerahmt (Welt-Diff bleibt als Kandidaten-Finder).
 
 **Verhältnis zu bereits Gelandetem.**
 - Der `EXTRA_REPLACING`-Guard (Commit `4e719ff8`, „`fix(sync)`") ist **bereits
   auf `main`** und entfernt die Update-Zeit-Churn. Er ist Vorarbeit, nicht Teil
-  dieses Rewrites — der Rewrite darf ihn voraussetzen.
-- Der optionale Interim-Sanity-Guard (#3) ist **nicht** umgesetzt; falls er vor
-  dem Rewrite gewünscht wird, ist er in §5 als Teilmenge dieser Spec beschrieben
-  und kann isoliert vorgezogen werden.
+  dieses Rewrites — der Rewrite setzt ihn voraus.
+- Der optionale Interim-Sanity-Guard (#3) wurde **nicht** gebraucht: der Veto
+  erfüllt R-INV per-Ziel, damit ist die Partiell-Liste-Klasse strukturell tot
+  (kein Schwellwert-Guard nötig).
+
+---
+
+## Umsetzung (as-built) — Verifikations-Veto
+
+Beim Abarbeiten von §9 zeigte sich, dass die event-targeted Variante (§2–§6)
+durch einen schlankeren Ansatz ersetzt werden kann, der **R-INV (§1) identisch
+erfüllt**: das **Verifikations-Veto**.
+
+Der Welt-Diff bleibt als billiger **Kandidaten-Finder** — aber jede
+vorgeschlagene Löschung geht vor dem Entfernen durch `PackagePresence`. Ein
+Kandidat (Zuweisung, die in der geladenen Liste fehlt), den `PackagePresence`
+noch als vorhanden meldet, wird **vetoed** (zurück ins effektive Valid-Set
+gelegt). Eine partielle/transiente Ladung kann so keine noch installierte App
+mehr entfernen; eine echt entfernte fällt weiter durch die Prüfung und wird
+gelöscht. Verifikation läuft nur auf Kandidaten (im Normalfall null) →
+Steady-State kostet nichts über den heutigen Intersect.
+
+**Warum das §2–§6 ablöst:**
+- Erfüllt R-INV identisch — Löschung ist durch `PackagePresence` gegated, nicht
+  durch Listen-Mitgliedschaft.
+- Wirkt auf **jeder** Ladung inkl. Cold-Start → **§4 entfällt** (kein separater
+  Cold-Start-Sweep; die Aufholung toter-Prozess-Uninstalls bleibt erhalten und
+  ist jetzt sicher).
+- Welt-Diff + `cleanup*` bleiben als Vorfilter → **§5 entfällt**; R-2 wird von
+  „ersetzen" zu „als Kandidaten-Finder behalten + verifizieren".
+- Billiger als der Voll-Ersatz (der pro Cold-Start *alle* Zuweisungen prüfen
+  müsste).
+
+**Commit-Trail:**
+- `de021520` — §9.1 `PackageEvent` + `AppUpdateSignal`-Typ. **Behalten** als
+  Erweiterungspunkt; die `Added/Removed`-Nutzlast ist unter dem Veto noch
+  ungenutzt (der Veto ist reload-getrieben, event-agnostisch). Bewusste
+  Entscheidung: legitimer, billiger Hook für eine spätere Effizienz-Optimierung
+  (Kandidaten nur für das gemeldete Paket prüfen), kein totes Feld.
+- `0e932912` — §9.2 `PackagePresence`-Seam (das Deletion Gate, §1/§7) — als
+  suspend/IO-intern, fail-safe.
+- `7bd7a77e` — §9.3 Verifikations-Veto in `ObserveInstalledAppsUseCase` (die
+  Verhaltensänderung; schließt §0.2). Kern-Test: „partielle Ladung vetoed eine
+  noch vorhandene App, entfernt aber einen echten Orphan".
+
+Die folgenden Abschnitte §1–§10 bleiben als **Design-Record**. §1 (R-INV) ist die
+Invariante, die der Veto erfüllt; §7 (`PackagePresence`) und §8 (Test-Inventar,
+soweit relevant) wurden umgesetzt. **§2–§6 beschreiben die *nicht gebaute*
+event-targeted Alternative** — als Begründungs-Spur erhalten, nicht als
+Bauanleitung.
 
 ---
 
@@ -273,6 +321,12 @@ mit dieser Liste"). Der Rewrite braucht zusätzlich **ziel-adressierte** Löschu
 
 ## §9 Migration & Reihenfolge
 
+> **As-built:** Schritte 1–3 gebaut (`de021520`, `0e932912`, `7bd7a77e`);
+> Schritt 3 wurde als Verifikations-Veto statt als event-targeted Live-Cleanup
+> umgesetzt. **Schritte 4–5 entfielen** (vom Veto abgedeckt bzw. obsolet, s.
+> „Umsetzung (as-built)" oben). Die ursprüngliche Reihenfolge bleibt als
+> Planungs-Record stehen.
+
 1. `PackageEvent` (:domain) + `AppUpdateSignal`-Typwechsel + Receiver-Mapping +
    Delegate-Collect. Rein mechanisch, verhaltensneutral (Bus trägt jetzt Nutzlast,
    Verhalten noch wie heute wenn Delegate weiter pauschal refresht).
@@ -301,11 +355,14 @@ Schritt 1 ist das System jederzeit auslieferbar.
   Das `PackagePresence`-Interface (§7) bildet beide Ebenen ab
   (`isComponentPresent(cn)` + `isPackagePresent(pkg)`).
 - **`SPEC-DECISION R-2` (Welt-Diff behalten oder ersetzen) — ENTSCHIEDEN:
-  ersetzen.** Der listen-vertrauende Welt-Diff wird vollständig durch den
-  pro-Ziel-verifizierten Reconcile ersetzt; die `cleanup*(installed)`-Methoden
-  werden **entfernt** (samt ihrer Contract-Test-Tripel), zugunsten der
-  paket-/component-adressierten Löschung aus §6. Kein Backstop, kein
-  §5-Sanity-Guard nötig — die Partiell-Liste-Klasse existiert danach nicht mehr.
+  ersetzen; beim Bauen zum Veto neu gerahmt.** Ursprünglicher Beschluss:
+  Welt-Diff vollständig ersetzen, `cleanup*` entfernen. **As-built:** die
+  Verifikations-Veto-Variante (s. „Umsetzung (as-built)" oben) erfüllt R-INV
+  identisch, **ohne** den Welt-Diff zu entfernen — er bleibt als billiger
+  Kandidaten-Finder, `cleanup*` bleibt, und jede vorgeschlagene Löschung wird
+  durch `PackagePresence` gegated. Das dominiert den Voll-Ersatz (gleiche
+  Garantie, weniger Code, billiger, keine Contract-Test-Tripel entfernt). „Kein
+  §5-Sanity-Guard nötig" gilt weiterhin — die Partiell-Liste-Klasse ist tot.
 
 ---
 
