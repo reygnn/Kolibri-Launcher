@@ -101,13 +101,49 @@ class ObserveUiColorsUseCaseTest {
         }
     }
 
+    // The tonal shadow must INVERT against text luminance for contrast: dark text
+    // gets a near-opaque white shadow, light text gets a black shadow. The old
+    // test only asserted "no crash" — a swapped inversion or moved threshold would
+    // have shipped a dark (invisible) shadow behind dark text with every test
+    // green. Assertions use literal packed ARGB ints so they depend on neither
+    // ColorMath.argb's packing nor the luminance formula's mid-range precision
+    // (BLACK luminance is definitionally 0, WHITE is 1).
+
     @Test
-    fun `shadow enabled calls calculateTonalShadowColor`() = runTest {
-        settingsRepository.setTextColor(Color.WHITE)
+    fun `shadow for very dark text is a near-opaque white shadow`() = runTest {
+        settingsRepository.setTextColor(Color.BLACK) // luminance 0 -> band 1
         settingsRepository.setTextShadowEnabled(true)
 
         useCase().test {
-            awaitItem() // Just verify no crash
+            assertThat(awaitItem().shadowColor).isEqualTo(0xCCFFFFFF.toInt()) // argb(204,255,255,255)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `shadow for very light text is a black shadow (inversion)`() = runTest {
+        settingsRepository.setTextColor(Color.WHITE) // luminance 1 -> band 4
+        settingsRepository.setTextShadowEnabled(true)
+
+        useCase().test {
+            assertThat(awaitItem().shadowColor).isEqualTo(0x99000000.toInt()) // argb(153,0,0,0)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `auto surface shadow inverts against the classifier-derived text color`() = runTest {
+        // The real auto path (no user override): LIGHT surface -> black text ->
+        // white shadow; DARK surface -> white text -> black shadow.
+        settingsRepository.setTextColor(0)
+        settingsRepository.setTextShadowEnabled(true)
+
+        classificationFlow.value = LuminanceClassification.LIGHT
+        useCase().test {
+            assertThat(awaitItem().shadowColor).isEqualTo(0xCCFFFFFF.toInt())
+
+            classificationFlow.value = LuminanceClassification.DARK
+            assertThat(awaitItem().shadowColor).isEqualTo(0x99000000.toInt())
             cancelAndIgnoreRemainingEvents()
         }
     }
