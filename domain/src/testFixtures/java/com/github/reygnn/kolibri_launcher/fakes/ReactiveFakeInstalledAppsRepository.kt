@@ -18,9 +18,9 @@ class ReactiveFakeInstalledAppsRepository(
     private val delegate = FakeInstalledAppsRepository()
 
     private val rawApps = listOf(
-        AppInfo("Clock", "Clock", "com.android.clock", "com.android.clock.Clock", true),
-        AppInfo("Camera", "Camera", "com.android.camera", "com.android.camera.Camera", true),
-        AppInfo("Calculator", "Calculator", "com.android.calculator", "com.android.calculator.Calculator", true)
+        AppInfo("Clock", "Clock", "com.android.clock", "com.android.clock.Clock"),
+        AppInfo("Camera", "Camera", "com.android.camera", "com.android.camera.Camera"),
+        AppInfo("Calculator", "Calculator", "com.android.calculator", "com.android.calculator.Calculator")
     )
 
     /** Direkter Zugriff auf den Flow für Tests die ihn brauchen */
