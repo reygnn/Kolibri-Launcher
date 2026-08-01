@@ -28,7 +28,7 @@ class ResetAppUsageUseCaseTest {
     private val testApp = AppInfo(
         originalName = "Test App", displayName = "Test App",
         packageName = "com.test.app", className = "MainActivity",
-        isSystemApp = false, isFavorite = false
+        isFavorite = false
     )
 
     @Before

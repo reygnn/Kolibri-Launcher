@@ -342,7 +342,6 @@ class BackupRepositoryImplNamingConventionTest {
             displayName = "App $packageName",
             packageName = packageName,
             className = "$packageName.Main",
-            isSystemApp = false,
             isFavorite = false
         )
 }

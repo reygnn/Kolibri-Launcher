@@ -76,7 +76,6 @@ abstract class FavoritesOrderRepositoryContract {
         displayName = name,
         packageName = pkg,
         className = klass,
-        isSystemApp = false,
         isFavorite = true
     )
 

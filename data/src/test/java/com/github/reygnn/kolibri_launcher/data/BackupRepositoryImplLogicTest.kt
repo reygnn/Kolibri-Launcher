@@ -721,7 +721,6 @@ class BackupRepositoryImplLogicTest {
             displayName = "App $packageName",
             packageName = packageName,
             className = className, // Vollqualifizierter Klassenname (wichtig für componentName Logik)
-            isSystemApp = false,
             isFavorite = false
         )
     }

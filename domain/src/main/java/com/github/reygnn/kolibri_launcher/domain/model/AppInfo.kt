@@ -12,7 +12,6 @@ data class AppInfo(
     val displayName: String,
     val packageName: String,
     val className: String,
-    val isSystemApp: Boolean = false,
     val isFavorite: Boolean = false
 ) {
     /**

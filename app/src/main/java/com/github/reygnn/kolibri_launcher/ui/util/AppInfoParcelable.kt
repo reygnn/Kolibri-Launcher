@@ -15,7 +15,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * Hand-rolled `Parcelable` rather than `@Parcelize`: the kotlin-parcelize
  * compiler-plugin's IR pass doesn't attach to AGP 9 built-in Kotlin's
  * `compileKotlin` tasks (TODO §10 mega-bundle post-mortem, 2026-05-15).
- * Six trivial fields — manual write/read is cheaper than the
+ * Five trivial fields — manual write/read is cheaper than the
  * `android.builtInKotlin=false` escape-hatch's deferred AGP-10 bill.
  * `data class` is preserved (`equals`/`hashCode`/`toString`/`copy` are
  * orthogonal to `Parcelable`); only the three interface methods + `CREATOR`
@@ -26,7 +26,6 @@ data class AppInfoParcelable(
     val displayName: String,
     val packageName: String,
     val className: String,
-    val isSystemApp: Boolean,
     val isFavorite: Boolean
 ) : Parcelable {
     fun toAppInfo(): AppInfo = AppInfo(
@@ -34,7 +33,6 @@ data class AppInfoParcelable(
         displayName = displayName,
         packageName = packageName,
         className = className,
-        isSystemApp = isSystemApp,
         isFavorite = isFavorite
     )
 
@@ -45,7 +43,6 @@ data class AppInfoParcelable(
         dest.writeString(displayName)
         dest.writeString(packageName)
         dest.writeString(className)
-        dest.writeInt(if (isSystemApp) 1 else 0)
         dest.writeInt(if (isFavorite) 1 else 0)
     }
 
@@ -55,7 +52,6 @@ data class AppInfoParcelable(
             displayName = source.readString()!!,
             packageName = source.readString()!!,
             className = source.readString()!!,
-            isSystemApp = source.readInt() != 0,
             isFavorite = source.readInt() != 0
         )
 
@@ -68,6 +64,5 @@ fun AppInfo.toParcelable(): AppInfoParcelable = AppInfoParcelable(
     displayName = displayName,
     packageName = packageName,
     className = className,
-    isSystemApp = isSystemApp,
     isFavorite = isFavorite
 )

@@ -72,7 +72,6 @@ abstract class AppUsageRepositoryContract {
         displayName = displayName,
         packageName = packageName,
         className = "$packageName.MainActivity",
-        isSystemApp = false,
         isFavorite = false
     )
 

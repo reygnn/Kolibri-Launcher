@@ -63,7 +63,6 @@ abstract class InstalledAppsStateRepositoryContract {
         displayName = name,
         packageName = pkg,
         className = "$pkg.MainActivity",
-        isSystemApp = false,
         isFavorite = false
     )
 

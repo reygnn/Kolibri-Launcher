@@ -19,13 +19,12 @@ import org.robolectric.RobolectricTestRunner
 class AppInfoParcelableTest {
 
     @Test
-    fun `round-trip preserves all fields when both booleans are true`() {
+    fun `round-trip preserves all fields when isFavorite is true`() {
         val original = AppInfoParcelable(
             originalName = "Original Display",
             displayName = "Custom Display",
             packageName = "com.example.app",
             className = "com.example.app.MainActivity",
-            isSystemApp = true,
             isFavorite = true
         )
 
@@ -35,13 +34,12 @@ class AppInfoParcelableTest {
     }
 
     @Test
-    fun `round-trip preserves all fields when both booleans are false`() {
+    fun `round-trip preserves all fields when isFavorite is false`() {
         val original = AppInfoParcelable(
             originalName = "Original",
             displayName = "Display",
             packageName = "com.example.app",
             className = "com.example.app.Main",
-            isSystemApp = false,
             isFavorite = false
         )
 
@@ -51,20 +49,18 @@ class AppInfoParcelableTest {
     }
 
     @Test
-    fun `round-trip distinguishes mixed boolean states`() {
-        val systemNonFav = AppInfoParcelable(
+    fun `round-trip reads back the isFavorite flag value, not just equality`() {
+        val favorite = AppInfoParcelable(
             originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isSystemApp = true, isFavorite = false
+            className = "W", isFavorite = true
         )
-        val nonSystemFav = AppInfoParcelable(
+        val nonFavorite = AppInfoParcelable(
             originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isSystemApp = false, isFavorite = true
+            className = "W", isFavorite = false
         )
 
-        assertThat(roundTrip(systemNonFav).isSystemApp).isTrue()
-        assertThat(roundTrip(systemNonFav).isFavorite).isFalse()
-        assertThat(roundTrip(nonSystemFav).isSystemApp).isFalse()
-        assertThat(roundTrip(nonSystemFav).isFavorite).isTrue()
+        assertThat(roundTrip(favorite).isFavorite).isTrue()
+        assertThat(roundTrip(nonFavorite).isFavorite).isFalse()
     }
 
     @Test
@@ -74,7 +70,6 @@ class AppInfoParcelableTest {
             displayName = "",
             packageName = "",
             className = "",
-            isSystemApp = false,
             isFavorite = false
         )
 
@@ -85,7 +80,7 @@ class AppInfoParcelableTest {
     fun `describeContents returns 0 (no file descriptors)`() {
         val instance = AppInfoParcelable(
             originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isSystemApp = false, isFavorite = false
+            className = "W", isFavorite = false
         )
         assertThat(instance.describeContents()).isEqualTo(0)
     }

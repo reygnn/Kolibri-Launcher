@@ -195,7 +195,7 @@ class LauncherViewModelSecurityTest {
     ) = AppInfo(
         originalName = displayName, displayName = displayName,
         packageName = packageName, className = ".MainActivity",
-        isSystemApp = false, isFavorite = false
+        isFavorite = false
     )
 
     // ========================================================================
