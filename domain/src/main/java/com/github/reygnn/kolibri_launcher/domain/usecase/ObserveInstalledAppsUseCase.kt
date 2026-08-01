@@ -9,10 +9,12 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
+import com.github.reygnn.kolibri_launcher.domain.service.PackagePresence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retry
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
@@ -25,7 +27,8 @@ class ObserveInstalledAppsUseCase @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val swipeActionsRepository: SwipeActionsRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
-    private val customNamesRepository: CustomNamesRepository
+    private val customNamesRepository: CustomNamesRepository,
+    private val packagePresence: PackagePresence
 ) {
 
     /**
@@ -96,27 +99,36 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                         // (runCleanup) so one failure can't skip the others. The
                         // empty-input guard lives above (realApps.isEmpty()).
                         //
-                        // These are four separate cleanup calls by design, one
-                        // per repository. They are NOT batched into a single
-                        // DataStore transaction on purpose: each store owns its
-                        // keys behind its own repository interface, and merging
-                        // the writes would break that boundary. Cost is bounded —
-                        // DataStore.edit skips the disk write when nothing
-                        // changed, so the steady state (no orphans) is four cheap
-                        // in-memory reads. Don't "optimize" this into one edit.
-                        val allValidComponentNames = realApps.map { it.componentName }
-                        val allValidPackageNames = realApps.map { it.packageName }
+                        // The loaded list is only a removal-CANDIDATE finder, not
+                        // ground truth (RECONCILE_SPEC §3, R-INV): an assignment
+                        // absent from it is verified through PackagePresence before
+                        // being dropped, and a still-present target is added back
+                        // into the effective valid set (a "veto"). This is what
+                        // makes a partial or transient load unable to prune a
+                        // still-installed app. Verification runs only on candidates
+                        // (usually none), so the steady state costs nothing beyond
+                        // the existing intersect.
+                        //
+                        // Still four separate cleanup calls by design, one per
+                        // repository: each store owns its keys behind its own
+                        // interface; merging the writes would break that boundary.
+                        val validComponents = realApps.map { it.componentName }
+                        val validPackages = realApps.map { it.packageName }
+                        val effectiveValidComponents =
+                            validComponents + vetoedComponents(validComponents.toHashSet())
+                        val effectiveValidPackages =
+                            validPackages + vetoedPackages(validPackages.toHashSet())
                         runCleanup("favorites") {
-                            favoritesRepository.cleanupFavoriteComponents(allValidComponentNames)
+                            favoritesRepository.cleanupFavoriteComponents(effectiveValidComponents)
                         }
                         runCleanup("swipe actions") {
-                            swipeActionsRepository.cleanupSwipeActions(allValidComponentNames)
+                            swipeActionsRepository.cleanupSwipeActions(effectiveValidComponents)
                         }
                         runCleanup("hidden components") {
-                            hiddenAppsRepository.cleanupHiddenComponents(allValidComponentNames)
+                            hiddenAppsRepository.cleanupHiddenComponents(effectiveValidComponents)
                         }
                         runCleanup("custom names") {
-                            customNamesRepository.cleanupCustomNames(allValidPackageNames)
+                            customNamesRepository.cleanupCustomNames(effectiveValidPackages)
                         }
 
                         // Wichtig: Den zentralen State aktualisieren
@@ -147,6 +159,34 @@ class ObserveInstalledAppsUseCase @Inject constructor(
      * swallowed) so a cancelled load propagates promptly instead of falling
      * through to the state update and Success emit.
      */
+    /**
+     * Component-keyed assignments (favorites + swipe + hidden) that are absent
+     * from [validComponents] — i.e. removal candidates — but that
+     * [PackagePresence] still reports present. These are VETOED: added back to
+     * the effective valid set so cleanup keeps them. A partial load thus cannot
+     * prune a still-installed app; a genuinely-gone one still fails the check
+     * and is removed. CancellationException propagates from the reads/checks.
+     */
+    private suspend fun vetoedComponents(validComponents: Set<String>): Set<String> {
+        val assigned = HashSet<String>()
+        assigned += favoritesRepository.favoriteComponentsFlow.first()
+        assigned += hiddenAppsRepository.hiddenAppsFlow.first()
+        swipeActionsRepository.swipeLeftAppFlow.first()?.let { assigned += it }
+        swipeActionsRepository.swipeRightAppFlow.first()?.let { assigned += it }
+
+        val candidates = assigned - validComponents
+        return candidates.filterTo(HashSet()) { packagePresence.isComponentPresent(it) }
+    }
+
+    /**
+     * Package-keyed custom-name assignments absent from [validPackages] that
+     * [PackagePresence] still reports present — vetoed, see [vetoedComponents].
+     */
+    private suspend fun vetoedPackages(validPackages: Set<String>): Set<String> {
+        val candidates = customNamesRepository.getAllCustomNames().keys - validPackages
+        return candidates.filterTo(HashSet()) { packagePresence.isPackagePresent(it) }
+    }
+
     private suspend fun runCleanup(label: String, cleanup: suspend () -> Unit) {
         try {
             cleanup()

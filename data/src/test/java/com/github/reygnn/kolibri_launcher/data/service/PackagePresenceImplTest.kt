@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,11 +24,12 @@ import org.robolectric.RobolectricTestRunner
  * failure must resolve to "present" so the reconcile never deletes an
  * assignment on a transient system-API error (RECONCILE_SPEC R-INV / R-1).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class PackagePresenceImplTest {
 
     private val packageManager: PackageManager = mockk()
-    private val presence = PackagePresenceImpl(packageManager)
+    private val presence = PackagePresenceImpl(packageManager, UnconfinedTestDispatcher())
 
     private fun launcherActivity(pkg: String, cls: String): ResolveInfo =
         ResolveInfo().apply {
@@ -38,19 +42,19 @@ class PackagePresenceImplTest {
     // ===== isPackagePresent (package-level, for custom-names) =====
 
     @Test
-    fun `isPackagePresent - launch intent exists - present`() {
+    fun `isPackagePresent - launch intent exists - present`() = runTest {
         every { packageManager.getLaunchIntentForPackage("com.app") } returns mockk<Intent>()
         assertTrue(presence.isPackagePresent("com.app"))
     }
 
     @Test
-    fun `isPackagePresent - no launch intent - absent`() {
+    fun `isPackagePresent - no launch intent - absent`() = runTest {
         every { packageManager.getLaunchIntentForPackage("com.app") } returns null
         assertFalse(presence.isPackagePresent("com.app"))
     }
 
     @Test
-    fun `isPackagePresent - PackageManager throws - present (fail-safe)`() {
+    fun `isPackagePresent - PackageManager throws - present (fail-safe)`() = runTest {
         every { packageManager.getLaunchIntentForPackage(any()) } throws RuntimeException("PM dead")
         assertTrue(presence.isPackagePresent("com.app"))
     }
@@ -58,7 +62,7 @@ class PackagePresenceImplTest {
     // ===== isComponentPresent (component-level, for favorites/swipe/hidden) =====
 
     @Test
-    fun `isComponentPresent - matching launcher activity - present`() {
+    fun `isComponentPresent - matching launcher activity - present`() = runTest {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns listOf(launcherActivity("com.app", "com.app.Main"))
@@ -67,7 +71,7 @@ class PackagePresenceImplTest {
     }
 
     @Test
-    fun `isComponentPresent - package has other launcher activities but not this one - absent`() {
+    fun `isComponentPresent - package has other launcher activities but not this one - absent`() = runTest {
         // The alias-disable case: the class the assignment points at is gone,
         // even though the package still has a (different) launcher entry.
         every {
@@ -78,7 +82,7 @@ class PackagePresenceImplTest {
     }
 
     @Test
-    fun `isComponentPresent - no launcher activities - absent`() {
+    fun `isComponentPresent - no launcher activities - absent`() = runTest {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns emptyList()
@@ -87,7 +91,7 @@ class PackagePresenceImplTest {
     }
 
     @Test
-    fun `isComponentPresent - PackageManager throws - present (fail-safe)`() {
+    fun `isComponentPresent - PackageManager throws - present (fail-safe)`() = runTest {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } throws RuntimeException("PM dead")

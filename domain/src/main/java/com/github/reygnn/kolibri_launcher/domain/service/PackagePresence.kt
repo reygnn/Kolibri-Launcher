@@ -27,13 +27,14 @@ interface PackagePresence {
     /**
      * True if `componentName` (`"package/class"`, the flattened launcher-entry
      * form used across the app) still resolves as a launcher activity, or if
-     * presence could not be determined (fail-safe).
+     * presence could not be determined (fail-safe). Suspends: the impl hops to
+     * IO for the PackageManager query so callers never block the main thread.
      */
-    fun isComponentPresent(componentName: String): Boolean
+    suspend fun isComponentPresent(componentName: String): Boolean
 
     /**
      * True if `packageName` still has a launcher entry, or if presence could
-     * not be determined (fail-safe).
+     * not be determined (fail-safe). Suspends (IO), see [isComponentPresent].
      */
-    fun isPackagePresent(packageName: String): Boolean
+    suspend fun isPackagePresent(packageName: String): Boolean
 }
