@@ -232,6 +232,59 @@ class CustomNamesViewModelTest {
     }
 
     @Test
+    fun `setCustomName - name equal to original - removes instead of persisting a redundant override`() = runTest {
+        // The VM guard is `isNotBlank() && customName != app.originalName -> set,
+        // else remove` (a second decision point, separate from RenameDecision).
+        // Typing the app's own original name ("Clock") must CLEAR any override, not
+        // persist a redundant one. Only the empty-string sub-case was pinned before;
+        // dropping the `!= originalName` clause would regress silently.
+        fakeCustomNamesRepository.onUpdateTrigger = {
+            fakeInstalledAppsRepository.triggerAppsUpdate()
+        }
+
+        viewModel.uiState.test {
+            awaitItem()
+            fakeInstalledAppsRepository.triggerAppsUpdate()
+            awaitItem() // masterAppList loaded — com.android.clock has originalName "Clock"
+
+            viewModel.setCustomName("com.android.clock", "World Clock")
+            awaitItem()
+            Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock")).isTrue()
+
+            // Set it back to the original name -> must clear the override.
+            viewModel.setCustomName("com.android.clock", "Clock")
+            val state = awaitItem()
+            Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock")).isFalse()
+            Truth.assertThat(state.appsWithCustomNames).isEmpty()
+        }
+    }
+
+    @Test
+    fun `setCustomName - whitespace-only name - removes (blank, not just empty)`() = runTest {
+        // Pins that the guard uses isNotBlank(), not isNotEmpty(): "   " is not
+        // empty but is blank, so it must clear the override. A regression to
+        // isNotEmpty() would persist a whitespace override and this turns red.
+        fakeCustomNamesRepository.onUpdateTrigger = {
+            fakeInstalledAppsRepository.triggerAppsUpdate()
+        }
+
+        viewModel.uiState.test {
+            awaitItem()
+            fakeInstalledAppsRepository.triggerAppsUpdate()
+            awaitItem()
+
+            viewModel.setCustomName("com.android.clock", "World Clock")
+            awaitItem()
+            Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock")).isTrue()
+
+            viewModel.setCustomName("com.android.clock", "   ")
+            val state = awaitItem()
+            Truth.assertThat(fakeCustomNamesRepository.hasCustomNameForPackage("com.android.clock")).isFalse()
+            Truth.assertThat(state.appsWithCustomNames).isEmpty()
+        }
+    }
+
+    @Test
     fun `setCustomName - called multiple times rapidly - handles correctly`() = runTest {
         fakeCustomNamesRepository.onUpdateTrigger = {
             fakeInstalledAppsRepository.triggerAppsUpdate()
