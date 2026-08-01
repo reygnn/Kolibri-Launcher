@@ -80,4 +80,35 @@ class LoopGuardTest {
         // Ring keeps maxKills+1 = 4 lines at most.
         assertTrue(store.readLines().filter { it.isNotBlank() }.size <= 4)
     }
+
+    // ---------- swallow on the kill path (load-bearing: a rethrow kills the
+    // watchdog daemon thread). A directory-as-store makes readLines/writeText
+    // throw; removing the catch turns these GREEN tests red. ----------
+
+    @Test
+    fun `unreadable store reads as no kills so recovery still fires`() {
+        val dir = unreadableStore()
+        try {
+            // read fails -> swallow -> empty -> not suppressed (kill fires), per
+            // the guard's "read failure reads as no recent kills" contract.
+            assertFalse(LoopGuard(dir, maxKills = 1, now = { clock }).shouldSuppressKill())
+        } finally {
+            dir.delete()
+        }
+    }
+
+    @Test
+    fun `unwritable store does not crash recordKill`() {
+        val dir = unreadableStore()
+        try {
+            // write fails -> swallow -> no throw out of the (would-be daemon) call.
+            LoopGuard(dir, maxKills = 3, now = { clock }).recordKill()
+        } finally {
+            dir.delete()
+        }
+    }
+
+    /** A directory in place of the store file: java.io read/write both throw on it. */
+    private fun unreadableStore(): File =
+        File.createTempFile("loopguard-dir", "").apply { delete(); mkdir() }
 }

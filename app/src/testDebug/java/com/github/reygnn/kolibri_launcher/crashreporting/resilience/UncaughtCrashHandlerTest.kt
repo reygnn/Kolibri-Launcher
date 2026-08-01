@@ -32,6 +32,22 @@ class UncaughtCrashHandlerTest {
     }
 
     @Test
+    fun `delegates to the default handler BEFORE the backstop kill`() {
+        // Ordering is load-bearing: in production killSwitch = killProcess +
+        // exitProcess(10), so a kill-before-delegate reorder would tear the
+        // process down before ACRA (the delegate) persists/schedules the report —
+        // every uncaught crash lost. The two-counter tests above stay green under
+        // that reorder; an ordered event log is what actually pins it.
+        val events = mutableListOf<String>()
+        UncaughtCrashHandler(
+            defaultHandler = { _, _ -> events += "delegate" },
+            killSwitch = { events += "kill" },
+        ).uncaughtException(Thread.currentThread(), RuntimeException("boom"))
+
+        assertEquals(listOf("delegate", "kill"), events)
+    }
+
+    @Test
     fun `an OutOfMemoryError still delegates and backstop-kills`() {
         handler().uncaughtException(Thread.currentThread(), OutOfMemoryError("oom"))
 

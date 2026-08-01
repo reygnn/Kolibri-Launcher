@@ -87,23 +87,45 @@ object CrashReportingBootstrap {
             reportContent = REPORT_CONTENT
         }
 
-        // §12·1: immediately after init, no intervening statement (A1).
-        ACRA.errorReporter.setEnabled(false)
-
-        // X2: only the main process reads consent and toggles.
-        if (!ACRA.isACRASenderServiceProcess()) {
-            val granted = runBlocking { ConsentBootstrap.readDecision(base) == ConsentDecision.Granted }
-            if (granted) {
-                ACRA.errorReporter.setEnabled(true)
-                Timber.i("ACRA enabled from stored consent")
-            }
-        }
+        // §12·1: immediately after init, disable first, then read consent (A1).
+        applyConsentGate(
+            setEnabled = { ACRA.errorReporter.setEnabled(it) },
+            // X2: only the main process reads consent and toggles; the `:acra`
+            // sender process (errorReporter is a stub there) stays disabled.
+            readDecision = {
+                if (ACRA.isACRASenderServiceProcess()) null
+                else runBlocking { ConsentBootstrap.readDecision(base) }
+            },
+        )
 
         // §12·2: install AFTER init so the delegate is ACRA's ErrorReporterImpl.
         // Unified across RELEASE and DEBUG (G1).
         Thread.setDefaultUncaughtExceptionHandler(
             UncaughtCrashHandler(Thread.getDefaultUncaughtExceptionHandler()),
         )
+    }
+
+    /**
+     * The §12·1 (A1) privacy gate, extracted from [attachBaseContext] so it is
+     * JVM-testable without the ACRA singleton (same seam pattern as
+     * [AcraTree]/[UncaughtCrashHandler]). Invariants pinned by
+     * `CrashReportingBootstrapConsentGateTest`:
+     *  - [setEnabled]`(false)` is the FIRST action, before [readDecision] runs —
+     *    no window where an active reporter sees an unknown decision (A1);
+     *  - ACRA is re-enabled ONLY for a verified [ConsentDecision.Granted] — never
+     *    for `NeverAsked`/`Denied` (Rule 8, privacy-by-default);
+     *  - a `null` decision (the `:acra` sender process, X2) leaves ACRA disabled.
+     */
+    @VisibleForTesting
+    internal fun applyConsentGate(
+        setEnabled: (Boolean) -> Unit,
+        readDecision: () -> ConsentDecision?,
+    ) {
+        setEnabled(false)
+        if (readDecision() == ConsentDecision.Granted) {
+            setEnabled(true)
+            Timber.i("ACRA enabled from stored consent")
+        }
     }
 
     /**
@@ -117,10 +139,14 @@ object CrashReportingBootstrap {
         app: Application,
         scope: CoroutineScope,
         anrReporter: AnrReporter,
-        // Seam: defaults to the real static; a test injects the process verdict
-        // so the X2 gate is verifiable without ACRA. Same pattern as the injected
-        // killSwitch/capture on UncaughtCrashHandler/RecoveryWatchdog.
+        // Seams: default to the real side effects; tests inject the process
+        // verdict + recording lambdas so the X2 gate AND each main-process side
+        // effect are verifiable without ACRA / a real Timber forest / a real
+        // watchdog thread. Same pattern as the injected killSwitch/capture on
+        // UncaughtCrashHandler/RecoveryWatchdog.
         isSenderProcess: () -> Boolean = { ACRA.isACRASenderServiceProcess() },
+        plantDeliveryTree: () -> Unit = { Timber.plant(AcraTree()) },
+        startWatchdog: () -> Unit = { startWatchdogAfterBootstrap(app) },
     ) {
         // X2: the `:acra` sender process must run NONE of this — symmetric with
         // attachBaseContext, which gates its consent read the same way. Both the
@@ -132,9 +158,9 @@ object CrashReportingBootstrap {
         // would only forward to a stub errorReporter here anyway.
         if (isSenderProcess()) return
 
-        Timber.plant(AcraTree())
+        plantDeliveryTree()
         reportPendingAnrsAsync(scope, anrReporter)
-        startWatchdogAfterBootstrap(app)
+        startWatchdog()
     }
 
     private fun reportPendingAnrsAsync(scope: CoroutineScope, anrReporter: AnrReporter) {
