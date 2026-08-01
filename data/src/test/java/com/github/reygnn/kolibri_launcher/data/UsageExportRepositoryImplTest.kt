@@ -335,6 +335,77 @@ class UsageExportRepositoryImplTest {
     }
 
     @Test
+    fun `importFromJson - merge mode - deduplicates a timestamp present in both existing and import`() = runTest {
+        // A timestamp in BOTH the stored set and the imported file must collapse to
+        // one entry (KDoc: "Duplikate werden entfernt"). Without .distinct(),
+        // overlapping re-imports would inflate the set and evict genuinely-distinct
+        // older timestamps under the cap — silent usage-history corruption.
+        val shared = currentTime - TimeUnit.HOURS.toMillis(1)
+        val onlyExisting = currentTime - TimeUnit.HOURS.toMillis(3)
+        val onlyImported = currentTime - TimeUnit.HOURS.toMillis(2)
+        val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
+
+        fakeDataStore.setInitialData(
+            preferencesOf(key to setOf(onlyExisting.toString(), shared.toString()))
+        )
+
+        val json = """
+            {
+                "version": "1.0.0",
+                "usage_data": {
+                    "com.test": ["${Instant.ofEpochMilli(shared)}", "${Instant.ofEpochMilli(onlyImported)}"]
+                }
+            }
+        """.trimIndent()
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
+        assertIs<UsageImportResult.Success>(result)
+
+        val stored = fakeDataStore.data.first()[key] ?: emptySet()
+        // shared collapses: union of 3 distinct timestamps, not 4.
+        assertEquals(3, stored.size)
+        assertTrue(stored.contains(onlyExisting.toString()))
+        assertTrue(stored.contains(shared.toString()))
+        assertTrue(stored.contains(onlyImported.toString()))
+    }
+
+    @Test
+    fun `importFromJson - merge mode - enforces the cap after combining, keeping the newest`() = runTest {
+        // The cap applies to the MERGED set, not just the input (KDoc:
+        // "MAX_TIMESTAMPS_PER_APP Limit wird eingehalten"). The replace-branch cap
+        // is tested elsewhere; this pins the merge branch: existing is already at
+        // MAX, a few newer imports must evict the oldest existing — not grow the set.
+        val limit = AppConstants.MAX_TIMESTAMPS_PER_APP
+        val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
+
+        // MAX distinct existing timestamps, all older than the imports.
+        val existing = (1..limit).map { currentTime - TimeUnit.HOURS.toMillis(1) - it * 1000L }
+        fakeDataStore.setInitialData(
+            preferencesOf(key to existing.map { it.toString() }.toSet())
+        )
+
+        // Three NEWER distinct timestamps.
+        val newer = listOf(currentTime - 1000L, currentTime - 2000L, currentTime - 3000L)
+        val newerIso = newer.joinToString(", ") { "\"${Instant.ofEpochMilli(it)}\"" }
+        val json = """
+            {
+                "version": "1.0.0",
+                "usage_data": { "com.test": [$newerIso] }
+            }
+        """.trimIndent()
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
+        assertIs<UsageImportResult.Success>(result)
+
+        val stored = fakeDataStore.data.first()[key] ?: emptySet()
+        assertEquals(limit, stored.size) // capped at MAX after merge, not MAX + 3
+        newer.forEach { assertTrue("newest import must survive", stored.contains(it.toString())) }
+        existing.sorted().take(3).forEach {
+            assertFalse("the oldest existing must be evicted", stored.contains(it.toString()))
+        }
+    }
+
+    @Test
     fun `importFromJson - filters invalid timestamps (future or old)`() = runTest {
         // Arrange
         val validTs = currentTime - TimeUnit.HOURS.toMillis(1)
