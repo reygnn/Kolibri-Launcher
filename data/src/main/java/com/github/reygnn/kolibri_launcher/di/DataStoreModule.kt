@@ -13,20 +13,15 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * The single DataStore<Preferences> instance for the whole app.
- *
- * Internal visibility (not private) so a small number of bootstrap-time
- * call sites that run before Hilt can reach it without a second
- * provider:
- *   - [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap]
- *     reads / writes the ACRA consent flag here. The methods are
- *     called from KolibriLauncherApp.attachBaseContext, which runs
- *     before Hilt is initialised, so they can't take it via @Inject.
- *
- * All other consumers must keep going through Hilt by injecting
- * `DataStore<Preferences>` produced by [DataStoreModule.provideSettingsDataStore].
+ * The app's general settings / user-config store (favorites, layout, colours,
+ * …) — one of two Preferences DataStores. The ACRA crash-report consent flag is
+ * NOT here; it lives in the separate [consentDataStore] (its own file, excluded
+ * from Auto Backup). `private` because nothing outside this file touches the
+ * extension: runtime consumers inject `DataStore<Preferences>` from
+ * [DataStoreModule.provideSettingsDataStore], and the pre-Hilt bootstrap only
+ * ever reaches [consentDataStore], never this store.
  */
-internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = AppConstants.SETTINGS_DATASTORE_NAME
 )
 
@@ -41,9 +36,10 @@ internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDat
  * exclude at file granularity, so the consent needs its own file. There
  * is intentionally NO migration from the old settings-store keys: a
  * pre-existing install's consent simply resets once (privacy-safe) and
- * the dialog re-appears. Same `internal` visibility and bootstrap
- * rationale as [settingsDataStore] (read from
- * `KolibriLauncherApp.attachBaseContext` before Hilt).
+ * the dialog re-appears. `internal` (not `private`) so the pre-Hilt accessor
+ * [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap] —
+ * which reads this store from `KolibriLauncherApp.attachBaseContext` before Hilt
+ * is up — can reach the extension across files.
  */
 internal val Context.consentDataStore: DataStore<Preferences> by preferencesDataStore(
     name = AppConstants.CONSENT_DATASTORE_NAME
