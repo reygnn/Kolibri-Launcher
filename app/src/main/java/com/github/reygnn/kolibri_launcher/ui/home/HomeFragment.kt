@@ -40,6 +40,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
@@ -59,7 +60,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -355,8 +355,12 @@ class HomeFragment : Fragment() {
         bitmapLoader = { uri -> withContext(Dispatchers.IO) { loadBitmapFromUri(uri) } }
     )
 
-    /** In-flight wallpaper render; cancelled when a newer state arrives (latest wins). */
-    private var wallpaperRenderJob: Job? = null
+    /**
+     * Serializes wallpaper renders latest-wins: a newer state cancels the
+     * in-flight render of the previous one. The invariant lives in the
+     * scheduler so it can be unit-tested — see WallpaperRenderScheduler.
+     */
+    private val wallpaperRenderScheduler = WallpaperRenderScheduler()
 
     /**
      * Owns the wallpaper-edit-mode click listeners, layer-buttons state,
@@ -1415,13 +1419,13 @@ class HomeFragment : Fragment() {
 
         // Staleness guard: a newer state cancels the in-flight render of the
         // previous one, so a slower decode can never land on top of a newer
-        // wallpaper (latest wins). Tied to viewLifecycleOwner, so onDestroyView
-        // cancels it too. No try/catch per Rule 11: bind wraps its own throwy ops
-        // and the loader catches its own I/O. The decode runs off the main thread
-        // inside the suspend bitmapLoader; only plans that load bitmaps suspend, so
-        // a property-only update stays synchronous/instant.
-        wallpaperRenderJob?.cancel()
-        wallpaperRenderJob = viewLifecycleOwner.lifecycleScope.launch {
+        // wallpaper (latest wins). The scheduler owns that invariant. Tied to
+        // viewLifecycleOwner, so onDestroyView cancels it too. No try/catch per
+        // Rule 11: bind wraps its own throwy ops and the loader catches its own
+        // I/O. The decode runs off the main thread inside the suspend
+        // bitmapLoader; only plans that load bitmaps suspend, so a property-only
+        // update stays synchronous/instant.
+        wallpaperRenderScheduler.render(viewLifecycleOwner.lifecycleScope) {
             wallpaperViewBinder.bind(
                 view = wallpaperView,
                 target = state,
@@ -1529,6 +1533,11 @@ class HomeFragment : Fragment() {
         binding.wallpaperView.onLayerTransformChanged = null
         binding.wallpaperView.onActiveLayerChanged = null
         binding.wallpaperView.onLayerTapped = null
+
+        // Cancel any in-flight wallpaper render and release its handle. The
+        // viewLifecycleOwner scope cancellation already stops the coroutine;
+        // this drops the stale Job reference across view recreations.
+        wallpaperRenderScheduler.cancel()
 
         // Detach the fragment-lifetime favoritesAdapter from the view being
         // destroyed. Without this, the discarded RecyclerView's data observer
