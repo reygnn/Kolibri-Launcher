@@ -40,7 +40,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.calculateWallpaperInSampleSize
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
@@ -1439,26 +1439,10 @@ class HomeFragment : Fragment() {
         // visible behavior for any of those cases.
         return try {
             val ctx = context ?: return null
-
-            // 1. Read dimensions only — inJustDecodeBounds allocates no pixels.
-            val bounds = android.graphics.BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-            ctx.contentResolver.openInputStream(uri)?.use { inputStream ->
-                android.graphics.BitmapFactory.decodeStream(inputStream, null, bounds)
-            }
-
-            // 2. Downsample so the decoded bitmap stays under the Canvas ~100 MB
-            //    per-bitmap draw limit. A full-res camera photo (e.g. POCO 108 MP)
-            //    would otherwise crash ZoomableImageView.onDraw with
-            //    "Canvas: trying to draw too large(… bytes) bitmap". See
-            //    BitmapDownsampling.
-            val opts = android.graphics.BitmapFactory.Options().apply {
-                inSampleSize = calculateWallpaperInSampleSize(bounds.outWidth, bounds.outHeight)
-            }
-            ctx.contentResolver.openInputStream(uri)?.use { inputStream ->
-                android.graphics.BitmapFactory.decodeStream(inputStream, null, opts)
-            }
+            // Bounded decode: downsample below the Canvas ~100 MB per-bitmap draw
+            // limit so a huge camera photo (POCO 108 MP) can't crash the wallpaper
+            // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
+            decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error loading bitmap from $uri")
             null
