@@ -27,7 +27,6 @@ import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +40,6 @@ import javax.inject.Inject
  *
  * Multi-layer exception handling:
  * - All operations wrapped in try-catch with Throwable
- * - CoroutineExceptionHandler for application scope
  * - Crash reporting (init, uncaught handler, watchdog, ANR drain) delegated
  *   to `CrashReportingBootstrap`, privacy-by-default
  * - Safe package receiver registration
@@ -59,20 +57,6 @@ class KolibriLauncherApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val packageUpdateReceiver = PackageUpdateReceiver()
-
-    // Ultra Paranoia: Coroutine exception handler for application scope
-    private val applicationExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        try {
-            Timber.e(throwable, "Uncaught exception in application scope")
-        } catch (e: Throwable) {
-            // Even logging can fail - silent fallback
-            try {
-                Log.e("KolibriLauncher", "Exception in app scope and logging failed", throwable)
-            } catch (ignored: Throwable) {
-                // Absolute last resort - nothing we can do
-            }
-        }
-    }
 
     /**
      * ACRA must be initialised here — `attachBaseContext` runs before `onCreate`

@@ -16,9 +16,11 @@
       BackupRulesSsotTest (the XML can't reference the constant directly —
       the backup framework parses this file statically).
 
-  Not covered (allowlist off for it): the "sharedpref" domain — the only SP
-  file is the ephemeral ACRA rate-limiter (acra_report_limiter); a fresh
-  device should start with no rate-limit history.
+  Not covered (allowlist off for it): the "sharedpref" domain — the app keeps
+  no SharedPreferences at all (DataStore-only, CLAUDE.md Rule 5). The one former
+  SP file, the ACRA rate-limiter (acra_report_limiter), was removed in the ACRA
+  rewrite when client-side throttling moved server-side, so there is nothing in
+  this domain to back up either way.
 -->
 <data-extraction-rules>
     <cloud-backup>

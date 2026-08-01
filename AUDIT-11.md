@@ -176,7 +176,15 @@ ohne dass ein Test rot wird?") ist der eigentliche Ertrag — er erklärt, warum
 ersten beiden Durchläufe so wenig fanden: Mehrere sicherheitskritische Invarianten
 sind gar nicht durch Tests gepinnt, ein grüner Lauf beweist dort wenig.
 
-### Test-Lücken (ungepinnte Invarianten)
+> **Status (2026-08-01): T1–T4 + C1/C2 behoben; V1/U1 offen.** Die drei kritischen
+> Invarianten sind jetzt über injizierte Seams gepinnt: `applyConsentGate` (T2,
+> aus `attachBaseContext` extrahiert), `plantDeliveryTree`/`startWatchdog` (T3, in
+> `onCreate`), eine geordnete Events-Liste für `UncaughtCrashHandler` (T1) und
+> Fehler-Injektion via Verzeichnis-Store für `LoopGuard` (T4). **Verifiziert per
+> Mutation:** Kill-vor-Delegate (T1) und `!= Denied`-Gate (T2) einzeln eingebaut →
+> die neuen Tests werden rot, die alten Zwei-Zähler-Tests blieben grün (genau der
+> Beleg). C1 (totes Feld) entfernt, C2 (Kommentar) korrigiert. **V1** (Watchdog-
+> Re-Arm) und **U1** bleiben bewusst offen (deine Entscheidung).
 
 - **T1 — `medium` · `UncaughtCrashHandler`-Reihenfolge ungepinnt.**
   `UncaughtCrashHandler.kt:59` (delegate an ACRA) → `:67` (`killSwitch`).
@@ -290,5 +298,6 @@ Handler, C2 stale Kommentar). **Antwort auf die Ausgangs-Skepsis:** nicht „meh
 Bugs versteckt", sondern „das Netz hat Löcher" — die Zahl echter Prod-Bugs bleibt bei
 2 (beide behoben), aber T1–T4 sollten geschlossen werden, damit sie es auch bleibt.
 
-**Status Durchlauf 3:** dokumentiert, noch **offen** (T1–T4 Test-Lücken, V1 Verhalten,
-C1–C2 Cleanup; U1 Grenzfall zur Beobachtung).
+**Status Durchlauf 3:** T1–T4 (Test-Lücken) + C1/C2 (Cleanup) **behoben** (Fixes per
+Mutation gegengeprüft). **Offen:** V1 (Watchdog re-armt nicht — bewusst nicht gefixt,
+kein ACCEPTED_LIMITATIONS-Eintrag) und U1 (Grenzfall zur Beobachtung).
