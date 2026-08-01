@@ -14,28 +14,37 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
  */
 
 /**
- * Cap for each side of a decoded wallpaper bitmap. 4096 px keeps the worst case
- * (4096×4096×4 B ≈ 67 MB, ARGB_8888) comfortably under the Canvas ~100 MB draw
- * limit, while staying well above any phone screen resolution (so display + zoom
- * quality is unaffected for realistic images) and within common GL max-texture
- * sizes.
+ * Budget for a decoded wallpaper bitmap, expressed as a PIXEL AREA (ARGB_8888 =
+ * 4 bytes/px). 24 M px ≈ 91.5 MB stays under the Canvas ~100 MB per-bitmap draw
+ * limit (`RecordingCanvas` MAX_BITMAP_SIZE) with margin.
+ *
+ * Deliberately an **area** budget, not a per-side cap: only images that would
+ * actually overrun the Canvas limit get downsampled. A merely-large photo (e.g.
+ * a 16 MP camera image at 4608×3456) already displayed fine, so it is left at
+ * full resolution — which matters because [ZoomableImageView] stores single-image
+ * zoom/pan as a bitmap-absolute `_singleScale`; downsampling such an image would
+ * shift a saved transform. Images big enough to hit this budget were crashing
+ * before the fix, so they have no valid saved transform to preserve. The default
+ * center-crop path recomputes from the intrinsic size and is transparent to
+ * downsampling either way.
  */
-const val MAX_WALLPAPER_DIMENSION_PX = 4096
+const val MAX_WALLPAPER_PIXELS = 24_000_000
 
 /**
  * The `inSampleSize` (a power of two, per `BitmapFactory` semantics) that brings
- * a [srcWidth]×[srcHeight] image so both sides are ≤ [maxDim]. Returns 1 for
- * images already within bounds or for unknown/invalid dimensions (≤ 0) — the
+ * a [srcWidth]×[srcHeight] image to at most [maxPixels] decoded pixels. Returns 1
+ * for images already within budget or for unknown/invalid dimensions (≤ 0) — the
  * caller then decodes at full size, which is correct for those cases.
  */
 fun calculateWallpaperInSampleSize(
     srcWidth: Int,
     srcHeight: Int,
-    maxDim: Int = MAX_WALLPAPER_DIMENSION_PX,
+    maxPixels: Int = MAX_WALLPAPER_PIXELS,
 ): Int {
-    if (srcWidth <= 0 || srcHeight <= 0 || maxDim <= 0) return 1
+    if (srcWidth <= 0 || srcHeight <= 0 || maxPixels <= 0) return 1
     var sample = 1
-    while (srcWidth / sample > maxDim || srcHeight / sample > maxDim) {
+    // Long arithmetic: srcWidth * srcHeight overflows Int for large images.
+    while ((srcWidth.toLong() / sample) * (srcHeight.toLong() / sample) > maxPixels) {
         sample *= 2
     }
     return sample
