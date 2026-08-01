@@ -29,13 +29,15 @@ class WallpaperViewBinder(
 
     /**
      * Abstract bitmap loader so the binder doesn't depend on Android's
-     * ContentResolver directly. The Fragment-side implementation should
-     * call [android.content.ContentResolver.openInputStream] and
-     * [android.graphics.BitmapFactory.decodeStream], returning null on
-     * failure.
+     * ContentResolver directly. `suspend` because decoding is I/O + CPU and MUST
+     * run off the main thread (the Fragment-side impl wraps the
+     * openInputStream + bounded decode in `withContext(Dispatchers.IO)`). The
+     * binder only calls it for plans that actually load bitmaps (SwitchToSingleLayer
+     * / FullRebuild), so a property-only update never touches I/O. Returns null on
+     * failure (caller treats null as "skip this layer").
      */
     fun interface BitmapLoader {
-        fun load(uri: Uri): Bitmap?
+        suspend fun load(uri: Uri): Bitmap?
     }
 
     /**
@@ -53,7 +55,7 @@ class WallpaperViewBinder(
      *     a full rebuild finishes — useful for kicking off a toolbar
      *     refresh in edit mode.
      */
-    fun bind(
+    suspend fun bind(
         view: ZoomableImageView,
         target: WallpaperState,
         preferredActiveLayerId: String? = null,
@@ -82,7 +84,7 @@ class WallpaperViewBinder(
     // PLAN APPLICATION
     // ===========================================
 
-    private fun apply(
+    private suspend fun apply(
         view: ZoomableImageView,
         plan: RebuildPlan,
         onRebuildComplete: (() -> Unit)?
@@ -156,7 +158,7 @@ class WallpaperViewBinder(
         }
     }
 
-    private fun applySingleLayer(
+    private suspend fun applySingleLayer(
         view: ZoomableImageView,
         plan: RebuildPlan.SwitchToSingleLayer,
         onRebuildComplete: (() -> Unit)?
@@ -195,7 +197,7 @@ class WallpaperViewBinder(
         }
     }
 
-    private fun applyFullRebuild(
+    private suspend fun applyFullRebuild(
         view: ZoomableImageView,
         plan: RebuildPlan.FullRebuild,
         onRebuildComplete: (() -> Unit)?

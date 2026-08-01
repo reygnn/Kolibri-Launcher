@@ -6,6 +6,8 @@ import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -20,13 +22,14 @@ import org.robolectric.RobolectricTestRunner
  * resolution and reintroduces the Canvas "too large bitmap" crash (#21). A revert
  * to `setImageURI` turns this red: the loader would never be called.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class WallpaperViewBinderSingleLayerTest {
 
     private fun view() = ZoomableImageView(ApplicationProvider.getApplicationContext())
 
     @Test
-    fun `single-image wallpaper loads through the bounded loader and sets the bitmap`() {
+    fun `single-image wallpaper loads through the bounded loader and sets the bitmap`() = runTest {
         var loaderCalls = 0
         val bmp = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
         val binder = WallpaperViewBinder { _ ->
@@ -44,7 +47,7 @@ class WallpaperViewBinderSingleLayerTest {
     }
 
     @Test
-    fun `single-image wallpaper whose load fails hides the view`() {
+    fun `single-image wallpaper whose load fails hides the view`() = runTest {
         val binder = WallpaperViewBinder { _ -> null } // decode failed / unreadable
         val view = view()
 

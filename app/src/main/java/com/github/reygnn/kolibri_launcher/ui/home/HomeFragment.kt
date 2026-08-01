@@ -59,7 +59,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -347,8 +349,14 @@ class HomeFragment : Fragment() {
     private val contentSpacingCalculator = ContentSpacingCalculator()
     private val timeFormatter = TimeEventFormatter()
     private val wallpaperViewBinder = WallpaperViewBinder(
-        bitmapLoader = { uri -> loadBitmapFromUri(uri) }
+        // suspend loader: the decode runs off the main thread. The binder only
+        // calls it for plans that actually load bitmaps (SwitchToSingleLayer /
+        // FullRebuild), so a property-only update never hits I/O.
+        bitmapLoader = { uri -> withContext(Dispatchers.IO) { loadBitmapFromUri(uri) } }
     )
+
+    /** In-flight wallpaper render; cancelled when a newer state arrives (latest wins). */
+    private var wallpaperRenderJob: Job? = null
 
     /**
      * Owns the wallpaper-edit-mode click listeners, layer-buttons state,
@@ -1394,39 +1402,38 @@ class HomeFragment : Fragment() {
 
     private fun updateWallpaper(state: WallpaperState) {
         if (_binding == null) return
-
-        // No try/catch per Rule 11. wallpaperViewBinder.bind() has its
-        // own internal safety wrappers around the throwy operations
-        // (view.setImageURI, bitmap loading, layer mutations); the
-        // bitmap loader passed in (loadBitmapFromUri) catches its own
-        // I/O errors and returns null. StateFlow.value reads + the
-        // edit-mode property check + controller fire-and-forget calls
-        // are programmer-error only.
         val wallpaperView = binding.wallpaperView
 
-        // Read-and-consume the one-shot focus hint: when a new layer
-        // was just added, the delegate sets this so the view selects
-        // the new layer automatically. Consuming here prevents the
-        // hint from leaking into an unrelated next rebuild.
+        // Read-and-consume the one-shot focus hint (on Main, before the async
+        // render): when a new layer was just added, the delegate sets this so the
+        // view selects it automatically. Consuming here prevents the hint from
+        // leaking into an unrelated next rebuild.
         val focusHint = viewModel.pendingFocusLayerId.value
         if (focusHint != null) {
             viewModel.consumePendingFocusLayerId()
         }
 
-        wallpaperViewBinder.bind(
-            view = wallpaperView,
-            target = state,
-            preferredActiveLayerId = focusHint,
-            onRebuildComplete = {
-                // Refresh the layer-toolbar after a rebuild while in
-                // edit mode. Inner try/catch removed per Rule 11 —
-                // the controller's methods touch only View properties.
-                if (wallpaperView.isEditMode) {
-                    wallpaperEditController?.applyLayerButtonsState()
-                    wallpaperEditController?.updateLayerIndicator()
+        // Staleness guard: a newer state cancels the in-flight render of the
+        // previous one, so a slower decode can never land on top of a newer
+        // wallpaper (latest wins). Tied to viewLifecycleOwner, so onDestroyView
+        // cancels it too. No try/catch per Rule 11: bind wraps its own throwy ops
+        // and the loader catches its own I/O. The decode runs off the main thread
+        // inside the suspend bitmapLoader; only plans that load bitmaps suspend, so
+        // a property-only update stays synchronous/instant.
+        wallpaperRenderJob?.cancel()
+        wallpaperRenderJob = viewLifecycleOwner.lifecycleScope.launch {
+            wallpaperViewBinder.bind(
+                view = wallpaperView,
+                target = state,
+                preferredActiveLayerId = focusHint,
+                onRebuildComplete = {
+                    if (wallpaperView.isEditMode) {
+                        wallpaperEditController?.applyLayerButtonsState()
+                        wallpaperEditController?.updateLayerIndicator()
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap? {
