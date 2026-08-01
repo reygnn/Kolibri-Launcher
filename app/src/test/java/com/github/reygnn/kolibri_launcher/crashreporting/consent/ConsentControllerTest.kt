@@ -235,6 +235,25 @@ class ConsentControllerTest {
         controller.applyConsent(false)
 
         verify(exactly = 1) { acraToggle.setEnabled(false) }
+        advanceUntilIdle()
+        verify(exactly = 1) { acraToggle.purgeReportQueue() }
+    }
+
+    @Test
+    fun `applyConsent false defers the purge onto the injected app scope`() = runTest {
+        // purgeReportQueue() is filesystem I/O; it must NOT run inline on the
+        // caller (main) thread. StandardTestDispatcher is lazy, so if it were
+        // still inline this verify(exactly = 0) before advancing would fail. Only
+        // the volatile-flag toggle is allowed to run synchronously. A refactor
+        // moving the purge back inline turns this red.
+        val controller = buildController()
+
+        controller.applyConsent(false)
+
+        verify(exactly = 1) { acraToggle.setEnabled(false) }
+        verify(exactly = 0) { acraToggle.purgeReportQueue() }
+
+        advanceUntilIdle()
         verify(exactly = 1) { acraToggle.purgeReportQueue() }
     }
 
@@ -243,6 +262,7 @@ class ConsentControllerTest {
         val controller = buildController()
 
         controller.applyConsent(true)
+        advanceUntilIdle()
 
         verify(exactly = 0) { acraToggle.purgeReportQueue() }
     }

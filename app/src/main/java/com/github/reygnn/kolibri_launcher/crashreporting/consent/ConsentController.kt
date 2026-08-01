@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
 import com.github.reygnn.kolibri_launcher.core.ApplicationScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -80,17 +81,37 @@ class ConsentController @Inject constructor(
     /**
      * Applies a fresh user decision: switches ACRA to match (synchronous,
      * in-memory, cannot fail), purges the unsent queue on a revoke (A7), and
-     * persists the choice on the app scope (best-effort). Single source for the
-     * sequence both callers share.
+     * persists the choice (best-effort). Single source for the sequence both
+     * callers share.
+     *
+     * Only the ACRA toggle runs inline: it is a volatile-flag write and must
+     * take effect immediately so a revoke stops capture before anything touches
+     * disk. Both disk side effects — the revoke purge AND the persist — run on
+     * the app-lifetime [applicationScope], off the caller's (main) thread. The
+     * purge is filesystem I/O (`BulkReportDeleter`); running it inline from the
+     * dialog's button callback would block the launcher's main thread and trip
+     * StrictMode. Deferring it also lets the cleanup survive an immediate UI
+     * teardown, same as the persist.
      */
     fun applyConsent(granted: Boolean) {
         acraToggle.setEnabled(granted)
+        Timber.i("Crash-report consent applied: enabled = $granted")
         if (!granted) {
             // Revoke is destructive: drop reports created during the consent
             // phase so they cannot drain after a later re-consent (A7).
-            acraToggle.purgeReportQueue()
+            applicationScope.launch {
+                try {
+                    acraToggle.purgeReportQueue()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    // Real I/O failure mode (Rule 11), and applicationScope has
+                    // no CoroutineExceptionHandler — a swallow here keeps a failed
+                    // best-effort purge from escalating to the global handler.
+                    Timber.w(e, "Crash-report queue purge failed on revoke")
+                }
+            }
         }
-        Timber.i("Crash-report consent applied: enabled = $granted")
         persistConsent(granted)
     }
 

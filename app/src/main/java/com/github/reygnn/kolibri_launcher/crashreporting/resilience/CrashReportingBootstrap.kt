@@ -107,12 +107,31 @@ object CrashReportingBootstrap {
     }
 
     /**
-     * Called from `onCreate`. Plants the single delivery tree, drains
-     * post-mortem ANRs on [scope], and starts the watchdog *after* onCreate
-     * returns (§12·3) so heavy cold-start work does not self-trip a
-     * kill-restart loop.
+     * Called from `onCreate`. In the main process: plants the single delivery
+     * tree, drains post-mortem ANRs on [scope], and starts the watchdog *after*
+     * onCreate returns (§12·3) so heavy cold-start work does not self-trip a
+     * kill-restart loop. In the `:acra` sender process this is a no-op (X2) —
+     * see the gate below for why.
      */
-    fun onCreate(app: Application, scope: CoroutineScope, anrReporter: AnrReporter) {
+    fun onCreate(
+        app: Application,
+        scope: CoroutineScope,
+        anrReporter: AnrReporter,
+        // Seam: defaults to the real static; a test injects the process verdict
+        // so the X2 gate is verifiable without ACRA. Same pattern as the injected
+        // killSwitch/capture on UncaughtCrashHandler/RecoveryWatchdog.
+        isSenderProcess: () -> Boolean = { ACRA.isACRASenderServiceProcess() },
+    ) {
+        // X2: the `:acra` sender process must run NONE of this — symmetric with
+        // attachBaseContext, which gates its consent read the same way. Both the
+        // ANR drain and the watchdog write process-shared state the main process
+        // owns: the settings-DataStore watermark (AnrReporter) and the LoopGuard
+        // kill-counter file under noBackupFilesDir. A second writer in `:acra`
+        // is a cross-process race — a fresh ANR's watermark advanced past without
+        // a live reporter (silent loss), plus a clobbered kill count. AcraTree
+        // would only forward to a stub errorReporter here anyway.
+        if (isSenderProcess()) return
+
         Timber.plant(AcraTree())
         reportPendingAnrsAsync(scope, anrReporter)
         startWatchdogAfterBootstrap(app)

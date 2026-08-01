@@ -73,6 +73,12 @@ schlimmeren ANR-Cross-Process-**Write** ungated.
 (mindestens um den ANR-Drain; Tree-Plant und Watchdog im `:acra`-Prozess sind
 bestenfalls nutzlos, gehören aber ebenfalls hinter das Gate).
 
+**Status (2026-08-01): behoben.** `onCreate` returnt früh im Sender-Prozess
+(gesamter Body hinter dem Gate; Prozess-Prädikat als Default-Parameter injiziert,
+Muster wie `UncaughtCrashHandler.killSwitch`). Gepinnt durch
+`CrashReportingBootstrapProcessGateTest` (testDebug): Sender-Prozess ruft
+`reportPendingAnrs` **nie**, Hauptprozess **einmal**.
+
 ---
 
 ### #2 — `low` · Consent-Widerruf löscht die ACRA-Report-Dateien (Disk-I/O) synchron auf dem Main-Thread
@@ -106,6 +112,14 @@ Jank + Inkonsistenz zum bereits ausgelagerten Persist.
 **Fix-Richtung:** `setEnabled(granted)` muss synchron bleiben (in-memory, stoppt
 ACRA-Capture sofort), aber `purgeReportQueue()` in denselben `applicationScope`
 verschieben wie den Persist — analog zum bestehenden Muster.
+
+**Status (2026-08-01): behoben.** Der Widerruf-Purge läuft nun in einem
+`applicationScope.launch` (mit `CancellationException`-Rethrow + Best-effort-
+Swallow, da der App-Scope keinen `CoroutineExceptionHandler` hat); nur der
+In-Memory-Toggle bleibt synchron. Gepinnt durch den neuen Test
+`applyConsent false defers the purge onto the injected app scope` in
+`ConsentControllerTest` (verify(exactly = 0) vor `advanceUntilIdle`, exactly = 1
+danach).
 
 ---
 
@@ -154,4 +168,4 @@ Zuordnung der Bootstrap-Verdrahtung, nicht in der Fachlogik der Schichten:
 | 1 | medium  | `CrashReportingBootstrap.kt:115` | `onCreate` ungated → ANR-Drain im `:acra`-Prozess schreibt Settings-DataStore cross-process (stiller ANR-Verlust + Write-Contention) |
 | 2 | low     | `ConsentController.kt:91` | Widerruf-Purge (Datei-I/O) inline auf dem Main-Thread statt auf `applicationScope` |
 
-Beide Fixes sind klein und lokal; #1 ist der Prioritätsfund (eine `!isACRASenderServiceProcess()`-Klammer um den ANR-Drain).
+Beide Fixes sind klein und lokal; #1 ist der Prioritätsfund (eine `!isACRASenderServiceProcess()`-Klammer um den ANR-Drain). **Beide am 2026-08-01 behoben** (Code + je ein pinnender Test; Details in den Status-Zeilen oben).
