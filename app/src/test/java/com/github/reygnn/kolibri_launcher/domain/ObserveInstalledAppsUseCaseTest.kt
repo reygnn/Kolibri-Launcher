@@ -185,6 +185,41 @@ class ObserveInstalledAppsUseCaseTest {
     }
 
     @Test
+    fun `invoke isolates a failing cleanup - other stores still reconcile and state still updates`() = runTest {
+        // The four cleanups share a try-block with updateApps + emit(Success). If
+        // a store's cleanup weren't guarded independently (runCleanup), its throw
+        // would land in the outer catch and SKIP updateApps + Success — so a
+        // freshly installed/uninstalled app would never reach the drawer/home
+        // over a transient DataStore hiccup. Pin that a failing favorites cleanup
+        // is isolated: the other stores still reconcile, the state still updates,
+        // and the load still reports Success.
+        favoritesRepository.throwOnCleanup = RuntimeException("DataStore write failed")
+
+        val validComponent = testApps[0].componentName // com.app1/com.app1.Main
+        val orphanComponent = "com.gone/com.gone.Main"
+        swipeActionsRepository.swipeLeftApp = orphanComponent
+        hiddenAppsRepository.hiddenApps = setOf(validComponent, orphanComponent)
+        customNamesRepository.setCustomNameForPackage("com.gone", "Drop")
+
+        installedAppsRepository.installedApps = testApps
+
+        useCase().test {
+            // The failing favorites cleanup must NOT abort the load.
+            assertThat(awaitItem()).isEqualTo(AppLoadResult.Success)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Favorites cleanup was attempted (and threw)...
+        assertThat(favoritesRepository.cleanupCallCount).isEqualTo(1)
+        // ...the other three stores still reconciled despite it...
+        assertThat(swipeActionsRepository.swipeLeftApp).isNull()
+        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(validComponent)
+        assertThat(customNamesRepository.getAllCustomNames()).isEmpty()
+        // ...and the freshly loaded list still reached the central state.
+        assertThat(installedAppsStateRepository.getCurrentApps()).isEqualTo(testApps)
+    }
+
+    @Test
     fun `invoke does not reconcile swipe hidden custom names when app list is empty`() = runTest {
         // Cold-start guard: an empty load must NOT wipe assignments.
         swipeActionsRepository.swipeLeftApp = "com.gone/com.gone.Main"
@@ -323,6 +358,9 @@ class ObserveInstalledAppsUseCaseTest {
         var lastCleanupComponentNames: List<String>? = null
         var cleanupCallCount = 0
 
+        /** When set, cleanup records the call and then throws it (I/O-failure sim). */
+        var throwOnCleanup: Throwable? = null
+
         override val favoriteComponentsFlow = flow
 
         override suspend fun isFavoriteComponent(componentName: String?) =
@@ -331,6 +369,7 @@ class ObserveInstalledAppsUseCaseTest {
         override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
             cleanupCallCount++
             lastCleanupComponentNames = installedComponentNames
+            throwOnCleanup?.let { throw it }
         }
 
         override suspend fun toggleFavoriteComponent(componentName: String) = true
