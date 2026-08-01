@@ -26,6 +26,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.PackageEvent
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -525,7 +526,7 @@ class AppManagementDelegateTest {
 
     @Test
     fun `start listens for app updates in non-test mode`() = runTest {
-        val updateFlow = MutableSharedFlow<Unit>()
+        val updateFlow = MutableSharedFlow<PackageEvent>()
         val signal: AppUpdateSignal = mockk {
             every { events } returns updateFlow
         }
@@ -536,7 +537,7 @@ class AppManagementDelegateTest {
         advanceUntilIdle()
 
         // Emit an update signal
-        updateFlow.emit(Unit)
+        updateFlow.emit(PackageEvent.Added("com.test.app"))
         advanceUntilIdle()
 
         // refreshAppsUseCase should have been called

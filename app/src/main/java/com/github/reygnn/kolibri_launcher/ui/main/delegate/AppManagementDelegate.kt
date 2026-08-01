@@ -261,6 +261,10 @@ class AppManagementDelegate(
     }
 
     private fun listenForAppUpdates() = scope.launchSafe("Error listening for app updates") {
+        // Step 1 (RECONCILE_SPEC §9): behaviour-neutral. Every PackageEvent still
+        // drives a full display refresh; the payload is not yet consulted.
+        // Event-targeted reconcile (acting on Added/Removed differently) lands in
+        // §3 — the world-diff cleanup stays in place until then.
         appUpdateSignal.events.collect {
             try {
                 refreshAppsUseCase()

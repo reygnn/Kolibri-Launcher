@@ -26,6 +26,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.core.PackageEvent
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -204,7 +205,7 @@ class LauncherViewModelDoomsdayTest {
 
     @Test
     fun `doomsday - DDOS - 10000 rapid app updates do not crash`() = runTest {
-        val updateFlow = MutableSharedFlow<Unit>()
+        val updateFlow = MutableSharedFlow<PackageEvent>()
         every { appUpdateSignal.events } returns updateFlow
 
         val vm = createViewModel(enableTestMode = false)
@@ -212,7 +213,7 @@ class LauncherViewModelDoomsdayTest {
 
         // Feuer frei
         repeat(10_000) {
-            updateFlow.emit(Unit)
+            updateFlow.emit(PackageEvent.Added("com.ddos.app"))
         }
         advanceUntilIdle()
 

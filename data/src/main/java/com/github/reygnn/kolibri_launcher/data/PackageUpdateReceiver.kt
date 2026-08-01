@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.VisibleForTesting
+import com.github.reygnn.kolibri_launcher.core.PackageEvent
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
@@ -96,12 +97,22 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             // Relevante Action erkannt
             Timber.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
 
+            // Map the Intent to a typed event at this :data edge; the bus stays
+            // Android-free. Only ADDED/REMOVED reach here (guards above), and a
+            // replace-removal was already filtered, so REMOVED is a genuine
+            // uninstall.
+            val event = if (action == Intent.ACTION_PACKAGE_ADDED) {
+                PackageEvent.Added(packageName)
+            } else {
+                PackageEvent.Removed(packageName)
+            }
+
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
             scope.launch {
                 try {
                     withTimeout(SIGNAL_TIMEOUT_MS) {
-                        processPackageUpdate(context, onFinish)
+                        processPackageUpdate(context, event, onFinish)
                     }
                 } catch (e: CancellationException) {
                     Timber.d("[KOLIBRI] Coroutine was cancelled")
@@ -118,7 +129,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun processPackageUpdate(context: Context, onFinish: () -> Unit) {
+    private suspend fun processPackageUpdate(context: Context, event: PackageEvent, onFinish: () -> Unit) {
         try {
             val appContext = context.applicationContext ?: context
 
@@ -139,7 +150,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             val appUpdateSignal = hiltEntryPoint.getAppUpdateSignal()
 
             try {
-                appUpdateSignal.sendUpdateSignal()
+                appUpdateSignal.send(event)
                 Timber.d("[KOLIBRI] Update signal sent successfully")
             } catch (e: CancellationException) {
                 throw e
