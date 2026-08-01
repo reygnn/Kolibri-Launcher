@@ -195,3 +195,66 @@ Reopen this entry if any of the following changes:
   Server hardening defuses the *server-facing* half of the flood, but not the
   on-device half (writes, `:acra` wakeups, battery, queue backlog) — so it
   lowers, but does not by itself remove, the objection to a re-arm.
+
+---
+
+## 4. Post-mortem ANR watermark advances while ACRA is transiently disabled
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Very rare — needs a transient consent-read failure at cold
+  start coinciding with a pending AEI ANR, for a consent-*granted* user
+- **Affected:** `CrashReportingBootstrap.onCreate` ANR drain + `AnrReporter`
+  watermark; AUDIT-11 U1 — a named trigger for the AN4 accepted-loss family
+
+### Explanation
+
+`onCreate`'s post-mortem ANR drain runs unconditionally, regardless of ACRA's
+current enabled state. For each pending ANR it advances the watermark
+(`AnrReporter` `KEY_WATERMARK`), and the delivery handler
+(`Timber.e → AcraTree → handleSilentException`) is a silent no-op while ACRA is
+disabled (Rule 7/C1: the delivery path swallows and never reports back).
+
+Scenario: stored decision = Granted, but the bootstrap consent read (R1, the
+`attachBaseContext` `runBlocking`) hits a *transient* DataStore `IOException` →
+fail-closed to `NeverAsked` → ACRA stays disabled at `onCreate`. The drain walks
+a pending post-mortem ANR, the handler swallows (ACRA off), and the watermark
+advances past it. A later successful read in `MainActivity` (RC1) reaffirms
+Granted and enables ACRA — but that ANR is already past the watermark and is
+never sent. RC1 heals the ACRA flag; it cannot rewind the watermark.
+
+### Why it is accepted
+
+- **It is a specific trigger for an already-accepted outcome.** AN4
+  (ACRA_FLOW.md §4.5, `AnrReporter` KDoc) already states generically: "the
+  watermark advances even when the report is not persisted → that ANR is
+  dropped. Accepted." U1 only names one path (transient read failure) into that
+  priced-in outcome. The loss is a single post-mortem ANR — telemetry only, no
+  user-facing effect, bounded by the AEI record count and server-side dedup.
+- **The naive fix regresses a privacy property.** Gating the drain on
+  `ACRA.isEnabled()` looks obvious, but the same "consume-while-disabled"
+  mechanism is exactly what stops a *Denied → later-Granted* user's pre-consent
+  ANRs from being sent after they consent: the drain advances the watermark past
+  them while ACRA is off. Gate the drain and those old ANRs stay above the
+  watermark, to be sent on the first post-consent launch. Losing one report
+  (U1) is preferable to sending pre-consent data.
+- **A correct fix is surgical and costly.** It would have to defer the drain
+  *only* when the consent read was `Unavailable` — not when it was a definitive
+  `Denied`/`NeverAsked` — which means un-collapsing the fail-closed bootstrap
+  read (threading a `ConsentReadResult`-style tri-state into the `onCreate`
+  drain decision) and coordinating with the intentional delivery-path swallow.
+  That is real coupling added to the §12-ordered bootstrap for one rare item.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Telemetry shows this actually happening: consent-*granted* devices losing
+  post-mortem ANRs to a transient cold-start read failure (distinct from the
+  generic AN4 "ACRA broken" loss).
+- The bootstrap consent read gains a tri-state (`Unavailable` vs `NeverAsked`)
+  on the `runBlocking` path — at which point the surgical "defer only on
+  `Unavailable`" fix becomes cheap and consistent with the existing
+  `ConsentReadResult` pattern (Rule 11).
+- The ANR drain is moved to run only under a reconciled, known-good consent
+  decision (e.g. after RC1 rather than unconditionally in `onCreate`), which
+  would make the ordering race moot.

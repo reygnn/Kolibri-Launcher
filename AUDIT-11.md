@@ -185,7 +185,9 @@ sind gar nicht durch Tests gepinnt, ein grüner Lauf beweist dort wenig.
 > die neuen Tests werden rot, die alten Zwei-Zähler-Tests blieben grün (genau der
 > Beleg). C1 (totes Feld) entfernt, C2 (Kommentar) korrigiert. **V1** (Watchdog-
 > Re-Arm) als akzeptierte Grenze dokumentiert (`ACCEPTED_LIMITATIONS.md` #3, mit
-> Re-Evaluations-Triggern statt Fix). **U1** bleibt als Beobachtung offen.
+> Re-Evaluations-Triggern statt Fix). **U1** ebenfalls als benannte Grenze
+> dokumentiert (`ACCEPTED_LIMITATIONS.md` #4 — benannter Trigger für die
+> AN4-Familie).
 
 - **T1 — `medium` · `UncaughtCrashHandler`-Reihenfolge ungepinnt.**
   `UncaughtCrashHandler.kt:59` (delegate an ACRA) → `:67` (`killSwitch`).
@@ -255,6 +257,10 @@ sind gar nicht durch Tests gepinnt, ein grüner Lauf beweist dort wenig.
   rückt vor, obwohl nicht gesendet → ANR weg) ist als AN4 generell akzeptiert und
   getestet; die spezifische Doppel-Bedingung (transienter R1-Fehler statt „ACRA
   kaputt") ist nur nicht namentlich abgedeckt. Grenzfall — nicht klar Defekt.
+  **Status: als benannte Grenze dokumentiert** (`ACCEPTED_LIMITATIONS.md` #4); der
+  naive Fix (Drain auf `isEnabled` gaten) würde eine Privacy-Eigenschaft
+  regressieren (Denied→Granted-Nutzer bekäme Vor-Consent-ANRs gesendet), der
+  chirurgische Fix bräuchte einen Tri-State-Bootstrap-Read.
 
 ### Verworfen (dokumentiert-by-design)
 
@@ -301,4 +307,6 @@ Bugs versteckt", sondern „das Netz hat Löcher" — die Zahl echter Prod-Bugs 
 
 **Status Durchlauf 3:** T1–T4 (Test-Lücken) + C1/C2 (Cleanup) **behoben** (Fixes per
 Mutation gegengeprüft). **V1** als akzeptierte Grenze **dokumentiert**
-(`ACCEPTED_LIMITATIONS.md` #3). **Offen:** nur noch U1 (Grenzfall zur Beobachtung).
+(`ACCEPTED_LIMITATIONS.md` #3). **U1** ebenfalls als benannte Grenze dokumentiert
+(`ACCEPTED_LIMITATIONS.md` #4). **Keine offenen Punkte mehr** — alles Bestätigte ist
+behoben oder als benannte Grenze eingeordnet.
