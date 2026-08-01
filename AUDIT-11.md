@@ -8,10 +8,11 @@
 > Schichten (`crashreporting/{consent,ingestion,resilience}`) plus
 > Cross-Cutting-Verdrahtung (ausgedünntes `KolibriLauncherApp`, DI, MainActivity/
 > SettingsFragment, Linter). Umgesetzt als vertikale Schnitte über die Module.
-> **Methode:** zwei Durchläufe, je 4 Finder-Agenten (ein Schnitt pro Agent:
-> Consent / Ingestion / Resilience / Cross-Cutting) und ein **adversarialer
-> Verifizierer** pro Schnitt (Finding überlebt nur, wenn der Skeptiker das
-> konkrete Failure-Szenario gegen den echten Quelltext bestätigen kann).
+> **Methode:** drei Durchläufe mit adversarialem **Verifizierer** pro Finding
+> (Finding überlebt nur, wenn der Skeptiker das konkrete Failure-Szenario gegen
+> den echten Quelltext bestätigen kann). Durchläufe 1–2 nach vertikalen Modul-
+> Schnitten (Consent / Ingestion / Resilience / Cross-Cutting), Durchlauf 3 nach
+> Brillen über die gesamte Fläche.
 >
 >  - **Durchlauf 1 — Korrektheit + Konventionen:** Bugs, Crash-Pipeline-
 >    Korrektheit (Doppel-Send, Consent-Gate-Reihenfolge), harte CLAUDE.md-
@@ -21,10 +22,18 @@
 >    Coroutine-Scopes/Cancellation, Atomarität, Sichtbarkeit, Hilt-Scoping als
 >    Nebenläufigkeitsfrage. → **2 bestätigte Funde** (#1, #2; 1 Kandidat
 >    geprüft & verworfen).
+>  - **Durchlauf 3 — frische Brillen (Test-Integrität, Privacy, State-Machine,
+>    Deleted-World):** motiviert durch die berechtigte Skepsis, dass ~5.400 LOC
+>    nur 2 Fehler haben. **AUDIT-10.md wurde hier explizit als Basis abgesetzt**
+>    (es auditiert die im Cutover gelöschte Vor-Rewrite-Fassung — kein „schon in
+>    AUDIT-10 gefixt"-Verwerfen). → **7 bestätigte Funde** (T1–T4 Test-Lücken,
+>    V1 Verhalten, C1–C2 Cleanup; + 1 unsicher, 3 verworfen). Kernaussage: keine
+>    neuen *Logik*-Bugs, aber das **Test-Sicherheitsnetz** hat Löcher an
+>    sicherheitskritischen Invarianten.
 >
-> Beide bestätigten Funde wurden nach dem Workflow **von Hand gegen den
-> Quelltext nachgeprüft** (Datei/Zeilen unten belegt) und vom Verifizierer
-> herabgestuft (high→medium bzw. medium→low).
+> Die bestätigten Funde aus Durchlauf 2 (#1, #2) und die nicht-grep-Funde aus
+> Durchlauf 3 (V1, C1, C2) wurden nach dem Workflow **von Hand gegen den
+> Quelltext nachgeprüft** (Datei/Zeilen belegt).
 
 ---
 
@@ -158,12 +167,111 @@ in Durchlauf 1, Ingestion in Durchlauf 2.
 
 ---
 
+## Durchlauf 3 — Test-Integrität & frische Brillen (AUDIT-10-frei)
+
+Vier Brillen über die gesamte crashreporting-Fläche. Privacy und State-Machine
+förderten **keine** bestätigten neuen Logik-Bugs zutage (Verworfenes unten). Der
+**Test-Integritäts-Lens** (Mutation-Mindset: „welche Prod-Zeile kann ich brechen,
+ohne dass ein Test rot wird?") ist der eigentliche Ertrag — er erklärt, warum die
+ersten beiden Durchläufe so wenig fanden: Mehrere sicherheitskritische Invarianten
+sind gar nicht durch Tests gepinnt, ein grüner Lauf beweist dort wenig.
+
+### Test-Lücken (ungepinnte Invarianten)
+
+- **T1 — `medium` · `UncaughtCrashHandler`-Reihenfolge ungepinnt.**
+  `UncaughtCrashHandler.kt:59` (delegate an ACRA) → `:67` (`killSwitch`).
+  `UncaughtCrashHandlerTest` nutzt zwei unabhängige Zähler (`delegated`, `kills`)
+  und prüft nur `assertEquals(1, …)` — **keine Reihenfolge**. *Überlebende
+  Mutation:* `killSwitch()` vor den Delegate ziehen → beide Zähler bleiben 1,
+  Test grün; in Prod (`killProcess`+`exitProcess(10)`) stirbt der Prozess, **bevor**
+  ACRA den Report persistiert → jeder uncaught Crash verloren (C1/C2). *Fix:*
+  geordnete Events-Liste wie `RecoveryWatchdogTest.kt:43` es bereits vormacht.
+- **T2 — `medium` · `attachBaseContext` (§12·1/A1-Privacy-Gate) ohne jede
+  Coverage.** Grep über test/testDebug/data-test: **null** ausführbare Referenz
+  auf `attachBaseContext`. *Überlebende Mutationen:* (A) `setEnabled(false)`
+  (`CrashReportingBootstrap.kt:91`) löschen → ACRA bleibt nach `init` an → Reporting
+  für NeverAsked/Denied (Rule-8-Bruch); (B) `== ConsentDecision.Granted` (`:95`)
+  lockern; (C) Handler-Install (`:104`) vor `initAcra` (`:75`) ziehen → Wrapper
+  delegiert am Reporter vorbei. Alle drei bleiben grün. Das Token→Decision-Mapping
+  ist gepinnt (`ConsentBootstrapTest`), aber Decision→ACRA-enabled — das eigentliche
+  Privacy-Gate — nicht.
+- **T3 — `medium` · `onCreate` Watchdog-Start + Tree-Plant nicht assertet.**
+  `CrashReportingBootstrapProcessGateTest` prüft nur `reportPendingAnrs`-Zähler.
+  *Überlebende Mutation:* `startWatchdogAfterBootstrap(app)` (`:137`) **oder**
+  `Timber.plant(AcraTree())` (`:135`) löschen → grün; ersteres kippt die
+  Selbst-Recovery, letzteres den einzigen Delivery-Tree (gar keine Reports mehr).
+  `Timber.forest()` macht den Plant trivial assertbar.
+- **T4 — `low` · `LoopGuard`-Swallow nie durch Fehler getestet.**
+  `LoopGuardTest` nutzt immer eine echte, schreibbare Temp-Datei; die
+  catch-Blöcke in `readTimestamps`/`writeTimestamps` (`LoopGuard.kt:56`,`:65`)
+  werden nie ausgelöst. Der Swallow ist load-bearing (rethrow tötet den
+  Watchdog-Daemon-Thread). `AnrReporter`s strukturgleicher Swallow **ist** gepinnt
+  → inkonsistente Lücke. *Fix:* Store-Pfad auf ein Verzeichnis zeigen lassen.
+
+### Verhalten
+
+- **V1 — `low` · `RecoveryWatchdog` re-armt nie nach Loop-Guard-unterdrücktem
+  Trip.** `run()` (`RecoveryWatchdog.kt:74-88`) macht nach `onStallDetected()`
+  ein **unbedingtes `return`** (`:85`) — auch wenn der Kill unterdrückt wurde
+  (`:109`). *Szenario:* Loop-Guard-Schwelle erreicht (3 Kills/60 s) → 4. Prozess,
+  transienter Stall, `shouldSuppressKill()==true` → capture-only, `run()` returnt →
+  Daemon-Thread tot; der (potenziell langlebige HOME-)Prozess läuft danach
+  watchdog-los und re-armt auch nach Ablauf des 60-s-Fensters nicht. Selten,
+  bereits degradierter Zustand, `AnrReporter` als Post-mortem-Fallback → `low`.
+  Quellenverifiziert.
+
+### Cleanup
+
+- **C1 — `low` · Verwaistes `applicationExceptionHandler`-Feld.**
+  `KolibriLauncherApp.kt:64` — der ANR-Drain, der es früher konsumierte, lebt jetzt
+  in `CrashReportingBootstrap.reportPendingAnrsAsync` als bares `scope.launch { try
+  … }`. Grep: einzige Vorkommen = die Definition; nie an `applicationScope` gehängt.
+  Toter Code + Latenz-Falle (ein künftiges `applicationScope.launch{}` wäre entgegen
+  dem Anschein ungeschützt). Quellenverifiziert.
+- **C2 — `low` · Stale-Doc: `data_extraction_rules.xml:~19` nennt gelöschte
+  `acra_report_limiter`.** Der Kommentar begründet die unbedeckte sharedpref-Domain
+  mit „einziger SP-File ist der ACRA-Rate-Limiter" — die Datei existiert seit dem
+  Rewrite (Rule 5) nicht mehr. Kein Funktions-Effekt. (Die `LoopGuard.kt:17`-
+  Erwähnung ist bewusste History-KDoc, kein Defekt.) Quellenverifiziert.
+
+### Unsicher (weder bestätigt noch verworfen)
+
+- **U1 — `low` · ANR-Drain vor Consent-Reconciliation.** `CrashReportingBootstrap.kt:136`.
+  *Szenario:* pending Hard-ANR + stored=GRANTED; transienter R1-Read-Fehler in
+  `attachBaseContext` → fail-closed NeverAsked → ACRA aus; `onCreate` drained den
+  ANR (Handler = No-op bei disabled ACRA, kein Throw) → Watermark rückt vor; später
+  liest MainActivity GRANTED, `reaffirmConsent(true)` schaltet ACRA an — der ANR ist
+  aber schon hinterm Watermark, dauerhaft weg. RC1 heilt nur das ACRA-Flag, nicht das
+  Watermark. Mechanismus real und erreichbar, **aber** der Ausfall-Ausgang (Watermark
+  rückt vor, obwohl nicht gesendet → ANR weg) ist als AN4 generell akzeptiert und
+  getestet; die spezifische Doppel-Bedingung (transienter R1-Fehler statt „ACRA
+  kaputt") ist nur nicht namentlich abgedeckt. Grenzfall — nicht klar Defekt.
+
+### Verworfen (dokumentiert-by-design)
+
+- **STACK_TRACE-PII** (`ReportCarrier.kt:54`): das Falten der Log-Message in einen
+  Carrier-Throwable, der in `ReportField.STACK_TRACE` landet, ist erklärtes
+  Redesign-Ziel (B4) — Spec S-2 nennt „variable Daten (IDs, Pfade)" explizit und
+  strippt sie nur server-seitig aus dem Fingerprint, verspricht kein Scrubben des
+  gespeicherten STACK_TRACE. Kein zu pinnender Invariant.
+- **Purge-Durability** (`ConsentController.kt`): fire-and-forget-Purge auf
+  `applicationScope` bei Prozess-Kill innerhalb ms → Restdatei. ACRA_FLOW.md §X3
+  benennt genau diese Race als „akzeptiert (best-effort, kein Cross-Prozess-Lock)";
+  Leak nur bei späterem **Re-Consent**, nicht während Denied.
+- **Settings-Summary-Stale** (`SettingsFragment.kt:593`): der schädliche Zustand
+  (ACRA an **und** `readState()==Unavailable`) ist unerreichbar — R1-Read und
+  `readState` teilen dieselbe DataStore-Instanz + In-Memory-Cache; ein erfolgreicher
+  GRANTED-Read (der ACRA anschaltet) wärmt den Cache, ein Folge-Read kann dann nicht
+  `Unavailable` liefern.
+
+---
+
 ## Gesamtbild
 
-Der Branch ist unter der Korrektheits-/Konventions-Brille **sauber** (0 Funde) —
-konsistent mit den bereits durchlaufenen AUDIT-10-Runden. Die Nebenläufigkeits-
-Brille förderte **zwei echte Funde** zutage, beide in der Prozess-/Thread-
-Zuordnung der Bootstrap-Verdrahtung, nicht in der Fachlogik der Schichten:
+Der Branch ist unter der Korrektheits-/Konventions-Brille **sauber** (0 Funde).
+Die Nebenläufigkeits-Brille förderte **zwei echte Funde** zutage, beide in der
+Prozess-/Thread-Zuordnung der Bootstrap-Verdrahtung, nicht in der Fachlogik der
+Schichten:
 
 | # | Schwere | Datei | Kern |
 |---|---------|-------|------|
@@ -171,3 +279,16 @@ Zuordnung der Bootstrap-Verdrahtung, nicht in der Fachlogik der Schichten:
 | 2 | low     | `ConsentController.kt:91` | Widerruf-Purge (Datei-I/O) inline auf dem Main-Thread statt auf `applicationScope` |
 
 Beide Fixes sind klein und lokal; #1 ist der Prioritätsfund (eine `!isACRASenderServiceProcess()`-Klammer um den ANR-Drain). **Beide am 2026-08-01 behoben** (Code + je ein pinnender Test; Details in den Status-Zeilen oben).
+
+Durchlauf 3 bestätigt das Bild für die **Produktions-Logik** (Privacy, State-Machine:
+nichts Neues), verschiebt den Befund aber auf das **Test-Sicherheitsnetz**: die drei
+kritischsten Invarianten — Crash-Handler-Reihenfolge (T1), Privacy-Init-Gate (T2),
+Watchdog-Start/Delivery-Tree (T3) — sind ungepinnt. Genau deshalb fanden Durchläufe 1–2
+so wenig: an diesen Stellen fängt ein grüner Lauf eine Regression gar nicht. Dazu ein
+seltener Verhaltens-Edge (V1, Watchdog re-armt nicht) und zwei Aufräumer (C1 toter
+Handler, C2 stale Kommentar). **Antwort auf die Ausgangs-Skepsis:** nicht „mehr Logik-
+Bugs versteckt", sondern „das Netz hat Löcher" — die Zahl echter Prod-Bugs bleibt bei
+2 (beide behoben), aber T1–T4 sollten geschlossen werden, damit sie es auch bleibt.
+
+**Status Durchlauf 3:** dokumentiert, noch **offen** (T1–T4 Test-Lücken, V1 Verhalten,
+C1–C2 Cleanup; U1 Grenzfall zur Beobachtung).
