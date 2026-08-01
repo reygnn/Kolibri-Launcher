@@ -78,6 +78,21 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 return
             }
 
+            // Skip the removal half of an in-place update. During a replace,
+            // the system sends PACKAGE_REMOVED(EXTRA_REPLACING=true) followed by
+            // PACKAGE_ADDED(EXTRA_REPLACING=true), both post-commit. Acting on
+            // the REMOVED half would fire a redundant reconcile sweep during the
+            // most volatile moment of the update; the paired PACKAGE_ADDED still
+            // refreshes (and it is the safe, app-present path). Standard launcher
+            // practice — a replace is not an uninstall.
+            if (action == Intent.ACTION_PACKAGE_REMOVED &&
+                intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+            ) {
+                Timber.d("[KOLIBRI] PACKAGE_REMOVED is a replace (update); paired ADDED will refresh. Skipping.")
+                safeOnFinish(onFinish)
+                return
+            }
+
             // Relevante Action erkannt
             Timber.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
 

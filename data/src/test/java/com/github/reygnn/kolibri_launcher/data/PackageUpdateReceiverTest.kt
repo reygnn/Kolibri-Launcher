@@ -106,6 +106,8 @@ class PackageUpdateReceiverTest {
     @Test
     fun `handleReceive - with package removed action - processes correctly`() = runTest {
         every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
+        // A genuine uninstall, not a replace — so it takes the processing path.
+        every { intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) } returns false
 
         val mockUri = mockk<Uri>()
         every { mockUri.schemeSpecificPart } returns "com.old.app"
@@ -118,5 +120,30 @@ class PackageUpdateReceiverTest {
         advanceUntilIdle()
 
         Assert.assertTrue(finishCalled)
+    }
+
+    @Test
+    fun `handleReceive - PACKAGE_REMOVED during a replace (update) is skipped, not processed`() {
+        every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
+        // EXTRA_REPLACING=true marks the removal half of an in-place update.
+        every { intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) } returns true
+
+        val mockUri = mockk<Uri>()
+        every { mockUri.schemeSpecificPart } returns "com.updating.app"
+        every { intent.data } returns mockUri
+
+        var finishCalled = false
+
+        // Not a runTest: the processing path launches a coroutine on the (un-advanced)
+        // Main test dispatcher, so if this removal were processed, onFinish would fire
+        // only from inside that coroutine and stay false here. A synchronous finish
+        // therefore proves the replace-removal took the early-return skip path and
+        // fired no reconcile signal — the paired PACKAGE_ADDED handles the refresh.
+        receiver.handleReceive(context, intent) { finishCalled = true }
+
+        Assert.assertTrue(
+            "replace-removal should finish immediately without launching processing",
+            finishCalled
+        )
     }
 }
