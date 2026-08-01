@@ -19,7 +19,7 @@
 >    verworfen, siehe unten).
 >  - **Durchlauf 2 — Nebenläufigkeit:** Main- vs. Disk-I/O-Thread, Dispatcher,
 >    Coroutine-Scopes/Cancellation, Atomarität, Sichtbarkeit, Hilt-Scoping als
->    Nebenläufigkeitsfrage. → **2 bestätigte Funde** (#1, #2; 2 Kandidaten
+>    Nebenläufigkeitsfrage. → **2 bestätigte Funde** (#1, #2; 1 Kandidat
 >    geprüft & verworfen).
 >
 > Beide bestätigten Funde wurden nach dem Workflow **von Hand gegen den
@@ -125,34 +125,36 @@ danach).
 
 ## Geprüft & verworfen (Nachvollziehbarkeit)
 
-Vier weitere Kandidaten wurden von Findern erhoben und vom adversarialen
-Verifizierer gegen Quelltext + Spec **widerlegt** — hier dokumentiert, damit ein
-späterer Lauf sie nicht als „neu" wieder aufmacht:
+Drei Kandidaten wurden von Findern erhoben, vom adversarialen Verifizierer aber
+gegen Quelltext + Spec **widerlegt** — hier dokumentiert, damit ein späterer Lauf
+sie nicht als „neu" wieder aufmacht. Keiner ist ein offener Punkt.
 
-- **[D1, Durchlauf 1, Consent]** `CrashReportConsentRepositoryImpl.kt:50` —
-  Unknown-Token-`silentError` liegt im `try`, wirft in DEBUG und wird vom eigenen
-  `catch` doppelt gemeldet. → **Verworfen:** beabsichtigtes Rule-9-Fail-Loud in
-  DEBUG (im Kommentar dokumentiert); RELEASE liefert korrekt `Unavailable`, Tests
-  setzen `preventCrashForTesting`. Rein kosmetischer DEBUG-Doppel-Log, Produktions-
+- **[D1 · Durchlauf 1 · Consent] — Status: verworfen.**
+  `CrashReportConsentRepositoryImpl.kt:50` — Unknown-Token-`silentError` liegt im
+  `try`, wirft in DEBUG und wird vom eigenen `catch` doppelt gemeldet.
+  *Begründung:* beabsichtigtes Rule-9-Fail-Loud in DEBUG (im Kommentar
+  dokumentiert); RELEASE liefert korrekt `Unavailable`, Tests setzen
+  `preventCrashForTesting`. Rein kosmetischer DEBUG-Doppel-Log, Produktions-
   Consent-State nie falsch.
-- **[D2, Durchlauf 1, Ingestion]** `AnrReporter.kt:142` — `readWatermark` fällt bei
-  Read-Fehler auf `0L` zurück (statt „diesen Start überspringen"), meldet theoretisch
-  alte ANRs neu. → **Verworfen:** ACRA_SPEC.md §B.5 deklariert das durch beschränkte
-  AEI-Recordzahl + serverseitige Fingerprint-Dedup (§S) explizit als flood-safe;
-  Rule-11-Schaden-Test greift nicht (harmlose, deduplizierte Duplikate, keine
-  handelnde Fehlentscheidung).
-- **[D3, Durchlauf 2, Consent]** `ConsentBootstrap.kt:70` / `CrashReportingBootstrap.kt:95`
-  — R1-Consent-Read via `runBlocking` blockiert den Main-Thread beim Kaltstart ohne
-  Timeout (ANR-Risiko). → **Verworfen:** ACRA_FLOW.md §3.5 + Entscheidung G4 sind eine
-  ausführliche, bewusste Design-Begründung für exakt diesen synchronen Read (Variante A
-  als einzige Konstruktion ohne Coverage-Window); der Read ist ein einzelner
+- **[D2 · Durchlauf 1 · Ingestion] — Status: verworfen.**
+  `AnrReporter.kt:142` — `readWatermark` fällt bei Read-Fehler auf `0L` zurück
+  (statt „diesen Start überspringen"), meldet theoretisch alte ANRs neu.
+  *Begründung:* ACRA_SPEC.md §B.5 deklariert das durch beschränkte AEI-Recordzahl
+  + serverseitige Fingerprint-Dedup (§S) explizit als flood-safe; Rule-11-Schaden-
+  Test greift nicht (harmlose, deduplizierte Duplikate, keine handelnde
+  Fehlentscheidung).
+- **[D3 · Durchlauf 2 · Consent] — Status: verworfen.**
+  `ConsentBootstrap.kt:70` / `CrashReportingBootstrap.kt:95` — R1-Consent-Read via
+  `runBlocking` blockiert den Main-Thread beim Kaltstart ohne Timeout (ANR-Risiko).
+  *Begründung:* ACRA_FLOW.md §3.5 + Entscheidung G4 sind eine ausführliche,
+  bewusste Design-Begründung für exakt diesen synchronen Read (Variante A als
+  einzige Konstruktion ohne Coverage-Window); der Read ist ein einzelner
   String-Key aus einer dedizierten Ein-Key-Datei (kleinstmöglicher DataStore-Read),
   weit unter der ANR-Schwelle. Der vorgeschlagene `withTimeout` würde die
   No-Window-Garantie (Prinzip 4) opfern.
 
-_(Der vierte verworfene Kandidat = die REJECTED-Fälle oben decken alle vier ab;
-Ingestion in Durchlauf 2 und beide Cross-Cutting-Finder in Durchlauf 1 lieferten
-gar keine Funde.)_
+Die übrigen Finder-Winkel lieferten gar keine Funde: Resilience und Cross-Cutting
+in Durchlauf 1, Ingestion in Durchlauf 2.
 
 ---
 
