@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.TimeBasedEventsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.UsageExportRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.WallpaperRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.service.PackagePresenceImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
@@ -37,6 +38,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepos
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.kolibri_launcher.domain.service.PackagePresence
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
 import dagger.Module
@@ -113,6 +115,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindShortcutLauncherService(impl: ShortcutLauncherServiceImpl): ShortcutLauncherService
+
+    @Binds
+    @Singleton
+    abstract fun bindPackagePresence(impl: PackagePresenceImpl): PackagePresence
 
     @Binds
     @Singleton
