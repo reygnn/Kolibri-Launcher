@@ -73,7 +73,8 @@ object AppConstants {
      * re-asks. Auto-backup rules operate at file granularity, so the
      * consent needs its own file to be excludable. See
      * `res/xml/data_extraction_rules.xml` + `res/xml/backup_rules.xml`,
-     * which include only the settings DataStore file by name.
+     * which back up the whole `datastore/` directory and exclude the consent
+     * file (`acra_consent.preferences_pb`) by name.
      */
     const val CONSENT_DATASTORE_NAME = "acra_consent"
 
