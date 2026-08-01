@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import android.content.ActivityNotFoundException
+
 /**
  * Outcome of an app-launch attempt (see [AppLauncher]).
  *
@@ -34,3 +36,34 @@ sealed interface AppLaunchResult {
     /** Any other, unexpected launch failure. */
     data class Failed(val cause: Throwable) : AppLaunchResult
 }
+
+/**
+ * Runs [launch] — the actual `LauncherApps.startMainActivity` system call — and
+ * maps its outcome to a typed [AppLaunchResult]. This is the four-category
+ * System-API boundary frame lifted out of [AppLauncherImpl] so the
+ * exception→result taxonomy can be pinned by a plain test, without the
+ * un-mockable Activity / ActivityOptions / ComponentName statics that surround
+ * the call site:
+ *
+ *  - success                     → [AppLaunchResult.Launched]
+ *  - [ActivityNotFoundException] → [AppLaunchResult.ComponentGone] (the app is
+ *    gone; this is the branch whose [AppLaunchResult.shouldReconcile] kicks the
+ *    orphan-reconcile sweep that cleans stale swipe/favorite assignments)
+ *  - [SecurityException]         → [AppLaunchResult.PermissionDenied]
+ *  - any other [Throwable]       → [AppLaunchResult.Failed] (cause preserved)
+ *
+ * Behaviour is identical to the inline try/catch it replaces. The broad
+ * `Throwable` catch is the sanctioned System-API-boundary form (Rule 11): a
+ * real failure mode reported as a value, never a swallowed programmer error.
+ */
+internal fun runLaunchCatching(launch: () -> Unit): AppLaunchResult =
+    try {
+        launch()
+        AppLaunchResult.Launched
+    } catch (e: ActivityNotFoundException) {
+        AppLaunchResult.ComponentGone
+    } catch (e: SecurityException) {
+        AppLaunchResult.PermissionDenied
+    } catch (e: Throwable) {
+        AppLaunchResult.Failed(e)
+    }

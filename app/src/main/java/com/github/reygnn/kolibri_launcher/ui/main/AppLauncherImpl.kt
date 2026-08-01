@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.app.Activity
 import android.app.ActivityOptions
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
@@ -16,11 +15,13 @@ import javax.inject.Inject
  * launcher's open-animation.
  *
  * Maps each expected failure mode to a typed [AppLaunchResult] so the caller
- * never sees a raw exception. The three-way catch (four-category frame:
- * package gone → [AppLaunchResult.ComponentGone], denied →
- * [AppLaunchResult.PermissionDenied], everything else → [AppLaunchResult.Failed])
- * is a genuine System-API boundary — the same triple that used to live inline
- * in `MainActivity.launchApp`.
+ * never sees a raw exception. The exception→result taxonomy (package gone →
+ * [AppLaunchResult.ComponentGone], denied → [AppLaunchResult.PermissionDenied],
+ * everything else → [AppLaunchResult.Failed]) lives in [runLaunchCatching] so it
+ * can be pinned in isolation from the un-mockable Activity/ActivityOptions
+ * statics here; this class only supplies the actual system call. It is a genuine
+ * System-API boundary — the same triple that used to live inline in
+ * `MainActivity.launchApp`.
  */
 class AppLauncherImpl @Inject constructor() : AppLauncher {
 
@@ -31,7 +32,7 @@ class AppLauncherImpl @Inject constructor() : AppLauncher {
                     IllegalStateException("LauncherApps service unavailable"),
                 )
 
-        return try {
+        return runLaunchCatching {
             val componentName = ComponentName(appInfo.packageName, appInfo.className)
             val options = ActivityOptions.makeCustomAnimation(
                 activity,
@@ -44,13 +45,6 @@ class AppLauncherImpl @Inject constructor() : AppLauncher {
                 null,
                 options.toBundle(),
             )
-            AppLaunchResult.Launched
-        } catch (e: ActivityNotFoundException) {
-            AppLaunchResult.ComponentGone
-        } catch (e: SecurityException) {
-            AppLaunchResult.PermissionDenied
-        } catch (e: Throwable) {
-            AppLaunchResult.Failed(e)
         }
     }
 }
