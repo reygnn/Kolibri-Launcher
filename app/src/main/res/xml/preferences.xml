@@ -169,7 +169,7 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
-    <!-- Entwickler-Befehle: ACRA-Verifikations-Shortcuts (Reset Limiter,
+    <!-- Entwickler-Befehle: ACRA-Verifikations-Shortcuts (Pipeline-Status,
          Throw Test Exception). Auch im Release sichtbar — siehe TODO §14
          und die Strings im values/strings.xml. -->
     <PreferenceCategory
