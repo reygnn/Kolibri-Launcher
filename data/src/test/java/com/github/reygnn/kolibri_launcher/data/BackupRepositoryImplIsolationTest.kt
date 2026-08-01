@@ -282,8 +282,17 @@ class BackupRepositoryImplIsolationTest {
         val result = backupManager.importFromJson(createTargetBackupJson(), options)
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        // CHANGED:
-        assertThat(fakeHiddenRepo.hiddenApps).containsAtLeastElementsIn(targetHidden)
+        // CHANGED — additive MERGE, not replace. Import phase 3 calls
+        // updateComponentVisibilities(toHide = imported, toShow = emptySet()),
+        // so the imported hidden components are ADDED to whatever is already
+        // hidden and nothing is un-hidden. This is a deliberate asymmetry with
+        // favorites (ISOLATION 1, which replaces): restoring a backup onto a
+        // configured device must not silently drop the user's current hidden
+        // apps that are absent from the backup. containsExactly(base + target)
+        // pins both halves — a regression to replace-semantics (result would be
+        // just {target}) turns this red.
+        assertThat(fakeHiddenRepo.hiddenApps)
+            .containsExactlyElementsIn(baselineHidden + targetHidden)
 
         // UNCHANGED:
         assertFavoritesUnchanged()
@@ -302,9 +311,17 @@ class BackupRepositoryImplIsolationTest {
         val result = backupManager.importFromJson(createTargetBackupJson(), options)
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        // CHANGED:
+        // CHANGED — additive UPSERT, not replace. Import phase 4 calls
+        // setCustomNamesInBatch(imported), which upserts each key and leaves
+        // custom names for other packages intact. Same deliberate asymmetry
+        // with favorites (which replaces): a restore onto a configured device
+        // must keep the user's existing custom names that are absent from the
+        // backup. Asserting the pre-existing "com.base" entry survives
+        // alongside the imported "com.target" pins the merge — a regression to
+        // replace-semantics (dropping com.base) turns this red.
         val names = fakeNamesRepo.getAllCustomNames()
         assertThat(names).containsEntry("com.target", "Target Name")
+        assertThat(names).containsEntry("com.base", "Base Name")
 
         // UNCHANGED:
         assertFavoritesUnchanged()
