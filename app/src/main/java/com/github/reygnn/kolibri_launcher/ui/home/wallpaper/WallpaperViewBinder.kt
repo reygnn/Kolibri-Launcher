@@ -164,8 +164,17 @@ class WallpaperViewBinder(
         if (view.isMultiLayerMode) {
             view.clearLayers()
         }
+        // Route through the same bounded [bitmapLoader] as the multi-layer path
+        // instead of setImageURI: setImageURI decodes at full resolution, so a
+        // huge camera photo (e.g. POCO 108 MP) overruns the Canvas ~100 MB draw
+        // limit and crashes ZoomableImageView.onDraw. The loader downsamples.
+        val bitmap = bitmapLoader.load(plan.imageUri)
+        if (bitmap == null) {
+            view.visibility = View.GONE
+            return
+        }
         try {
-            view.setImageURI(plan.imageUri)
+            view.setImageBitmap(bitmap)
             view.visibility = View.VISIBLE
 
             view.post {
