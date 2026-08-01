@@ -126,3 +126,72 @@ Reopen this entry if any of the following changes:
 - The clipboard feature grows a second consumer that needs the full text
   rather than a capped preview — the cap is what makes the whole read
   wasteful today.
+
+---
+
+## 3. RecoveryWatchdog does not re-arm after a loop-guard-suppressed trip
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Very rare — needs the loop-guard threshold already reached
+  *and* a later, separate recoverable stall on the surviving process
+- **Affected:** `RecoveryWatchdog.run()` (crashreporting/resilience); AUDIT-11 V1
+
+### Explanation
+
+`run()` returns unconditionally after `onStallDetected()`. In the normal
+*kill* path that is correct — the process is terminating (`killProcess` +
+`exitProcess(10)`), and a fresh watchdog starts in the restarted process. The
+`return` only actually executes in the *suppressed* path: once the loop-guard
+has seen `maxKills` self-kills within `windowMs` (default 3 / 60 s), the next
+trip captures the stall but does **not** kill (`shouldSuppressKill()` → true),
+so the process survives — and `run()` then returns, ending the daemon thread.
+
+Consequence: that surviving process (potentially the long-lived HOME process)
+runs **watchdog-less** for the rest of its life. It never re-arms, even after
+the 60 s kill window ages out. A genuine *later* main-thread hang in that
+process gets no fast (~8 s) self-recovery and falls back to the system's slower
+~10 s ANR path.
+
+### Why it is accepted
+
+- **The trigger is a narrow, already-pathological corner.** All must hold: the
+  loop-guard is engaged (≥3 self-kills in 60 s — the device is already in a
+  restart storm), *then* the surviving process hits a *separate* stall, *and*
+  that stall would have self-recovered. And there is a fallback: post-mortem
+  `AnrReporter` still catches hard ANRs on the next launch, and the system ANR
+  path still works. The user-visible loss is "slightly slower recovery in an
+  already-degraded state," not a lost crash.
+- **The naive fix is worse than the gap.** Simply looping instead of returning
+  would, on a *deterministic* wedge (exactly what tripped the loop-guard),
+  re-capture the same stall every `timeoutMs` → an on-device report/queue flood
+  (disk writes + `:acra` sender wakeups + POST attempts + backlog, per the
+  G3-C probe) on a device that is already struggling. A *correct* fix must
+  distinguish transient stall from persistent wedge and dedup per episode.
+- **The correct fix adds state to the component that must have the least.** The
+  watchdog is a raw daemon `Thread` *by design* (its KDoc: "the recovery path
+  must have fewer moving parts than what it watches"; "don't modernise"). A
+  recovery-gated re-arm loop with episode-dedup is exactly the kind of state
+  that design deliberately avoids — added to the most safety-critical,
+  least-testable path, where a mistake can reopen the kill-restart loop the
+  loop-guard (C.3/G2) exists to close. Cost-vs-coverage is unfavourable.
+- **It also leans the right way on flood philosophy (B3).** The rewrite deleted
+  the client-side throttle and put flood control server-side (§S). "Capture
+  once on suppression, then stop" is itself a mild client-side flood-suppression
+  — conservative, and it keeps the on-device cost bounded without a client
+  throttle to maintain.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Telemetry/ACRA shows real devices actually reaching loop-guard suppression
+  *and* then surviving long enough to hit a second recoverable stall — i.e. the
+  corner happens in the field, not just on paper.
+- `RecoveryWatchdog.run()` gains a test harness (today only `onStallDetected()`
+  is unit-tested), at which point a recovery-gated re-arm becomes safely
+  testable and the risk half of the trade shrinks.
+- A flood-hardened server (fingerprint dedup + ingestion rate-limit, §S) is in
+  place **and** the on-device capture cost of a re-arm is separately bounded.
+  Server hardening defuses the *server-facing* half of the flood, but not the
+  on-device half (writes, `:acra` wakeups, battery, queue backlog) — so it
+  lowers, but does not by itself remove, the objection to a re-arm.

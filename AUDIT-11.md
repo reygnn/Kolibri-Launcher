@@ -184,7 +184,8 @@ sind gar nicht durch Tests gepinnt, ein grüner Lauf beweist dort wenig.
 > Mutation:** Kill-vor-Delegate (T1) und `!= Denied`-Gate (T2) einzeln eingebaut →
 > die neuen Tests werden rot, die alten Zwei-Zähler-Tests blieben grün (genau der
 > Beleg). C1 (totes Feld) entfernt, C2 (Kommentar) korrigiert. **V1** (Watchdog-
-> Re-Arm) und **U1** bleiben bewusst offen (deine Entscheidung).
+> Re-Arm) als akzeptierte Grenze dokumentiert (`ACCEPTED_LIMITATIONS.md` #3, mit
+> Re-Evaluations-Triggern statt Fix). **U1** bleibt als Beobachtung offen.
 
 - **T1 — `medium` · `UncaughtCrashHandler`-Reihenfolge ungepinnt.**
   `UncaughtCrashHandler.kt:59` (delegate an ACRA) → `:67` (`killSwitch`).
@@ -299,5 +300,5 @@ Bugs versteckt", sondern „das Netz hat Löcher" — die Zahl echter Prod-Bugs 
 2 (beide behoben), aber T1–T4 sollten geschlossen werden, damit sie es auch bleibt.
 
 **Status Durchlauf 3:** T1–T4 (Test-Lücken) + C1/C2 (Cleanup) **behoben** (Fixes per
-Mutation gegengeprüft). **Offen:** V1 (Watchdog re-armt nicht — bewusst nicht gefixt,
-kein ACCEPTED_LIMITATIONS-Eintrag) und U1 (Grenzfall zur Beobachtung).
+Mutation gegengeprüft). **V1** als akzeptierte Grenze **dokumentiert**
+(`ACCEPTED_LIMITATIONS.md` #3). **Offen:** nur noch U1 (Grenzfall zur Beobachtung).
