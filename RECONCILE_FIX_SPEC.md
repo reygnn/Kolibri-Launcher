@@ -8,8 +8,15 @@ schließt — er reintroduziert eine engere Variante genau der Klasse, die er be
 Dieses Dokument beschreibt das Problem und legt den Fix fest. Es ist **Plan, noch kein Code**:
 erst Doc-Review bis grün, dann Umsetzung nach §7.
 
-**Status:** Entwurf zur Review. Eine offene Gabelung (`SPEC-DECISION F-1`) ist vor der Umsetzung
-zu entscheiden; siehe §8.
+**Status:** Entwurf, **Revision 2** — überarbeitet nach einem Multi-Agent-Doc-Review (13 Agents,
+5 bestätigte Schwächen, alle eingearbeitet): Swipe-In-Edit-Wert-Guard (§2/§5), vollständiger
+Test-Blast-Radius + invertierter Edit-Fail-Test (§3/§6), ehrliche atomare Umsetzungs-Reihenfolge
+(§7). Zwei offene Gabelungen vor der Umsetzung: `SPEC-DECISION F-1` (F-C vs F-B) und `F-2`
+(atomar vs. add-alongside); siehe §8.
+
+**Umsetzungs-Disziplin (bindend):** beim Übergang in den Code wird **erst gemergt, wenn alles
+nachweislich grün ist** (alle drei Modul-Suiten + Linter) — kein Merge auf rotem/ungetestetem
+Stand. Siehe §7.4.
 
 ---
 
@@ -109,11 +116,18 @@ Generischer Mechanismus (identisch für alle vier Stores, an die Store-Struktur 
 2. orphans = current - installedSet                            // Kandidaten: zugewiesen, aber nicht in der Ladung
 3. if (orphans.isEmpty()) return                               // Steady State: keine Arbeit, keine IO
 4. verifiedAbsent = orphans.filterNot { isStillPresent(it) }   // presence-gegatet; Fail-Safe: present -> behalten
-5. if (verifiedAbsent.isNotEmpty()) dataStore.edit { entferne genau verifiedAbsent }
+5. if (verifiedAbsent.isNotEmpty()) dataStore.edit { /* WERT-scoped entfernen, s.u. */ }
 ```
 
-Jeder gelöschte Schlüssel war in `verifiedAbsent` → einzeln presence-geprüft. R-INV-2 hält. Es
-existiert kein „intersect gegen die Liste" mehr.
+**Schritt 5 ist wert-scoped, nicht schlüssel-blind (kritisch, §5).** Das `edit{}` **re-liest** den
+aktuellen Store und entfernt nur, was *jetzt noch* einem verifiziert-abwesenden Wert entspricht —
+nie „was zu Schritt 1 im Slot stand". Für die Mengen-Stores (Favorites/Hidden) heißt das
+`current_im_edit − verifiedAbsent`; für die Map (Custom Names) `remove(key)` je verifiziert-
+abwesendem Paket (Key ≙ Wert). Für **Swipe** siehe die eigene Notiz unten — dort ist der Wert-Guard
+nicht automatisch, weil der Key der Slot ist.
+
+Jeder gelöschte Schlüssel war in `verifiedAbsent` → einzeln presence-geprüft, **und** sein Wert galt
+noch im Moment des Deletes. R-INV-2 hält. Es existiert kein „intersect gegen die Liste" mehr.
 
 **Eigenschaften:**
 - **Eine Read-Autorität:** Schritt 1 (Orphan-Basis) und Schritt 5 (Delete) sind derselbe Store;
@@ -143,9 +157,24 @@ runCleanup("custom names")     { customNamesRepository.reconcileCustomNames(vali
 Der Use-Case liest **keine** Zuweisungen mehr selbst → M1/M2/H1 verschwinden an der Wurzel, weil
 die Divergenz zwischen zwei Reads nicht mehr existiert.
 
-**Store-spezifische Notiz Swipe:** Swipe hat zwei Slots (`swipeLeftApp`/`swipeRightApp`), keine
-Menge. `reconcileSwipeActions` liest beide Slots fail-closed, bildet Orphans aus den belegten
-Slots, presence-prüft, und leert nur verifiziert-abwesende Slots.
+**Store-spezifische Notiz Swipe (der einzige Slot-Store — Vorsicht).** Swipe hat zwei Slots
+(`swipeLeftApp`/`swipeRightApp`), keine Menge; der DataStore-**Key ist der Slot**, nicht der
+Ziel-Wert (die Component). Das heutige `cleanupSwipeActions` liest den Slot-Wert **im `edit{}`** und
+löscht atomar — es gibt heute kein TOCTOU-Fenster. F-C muss den Wert-Read für die Presence-Prüfung
+**aus** der Transaktion ziehen (Prädikat ist `suspend`), also entsteht ein Read→Check→Edit-Fenster.
+Deshalb **MUSS** `reconcileSwipeActions` im `edit{}` den Slot-Wert **erneut lesen** und den Slot nur
+leeren, wenn `preferences[slot]` *dort noch* einer verifiziert-abwesenden Component gleicht:
+
+```
+edit { for slot in [LEFT, RIGHT]:
+         val nowInSlot = preferences[slot]
+         if (nowInSlot != null && nowInSlot in verifiedAbsentSet) preferences.remove(slot) }
+```
+
+Ein blindes `remove(LEFT)`, nur weil LEFT zu Schritt 1 abwesend war, würde eine im Fenster
+gesetzte Neuzuweisung `LEFT = Y` (Y die ganze Zeit installiert) **überschreiben** — Y nie
+presence-geprüft, R-INV verletzt (der Slot-spezifische Fund des Doc-Reviews). Der Wert-Guard stellt
+die Atomizität wieder her, die der heutige In-Edit-Read schon hat.
 
 Die Alternative (Design F-B: Orchestrierung im Use-Case mit `readX()`-+-`removeX(keys)`-Primitiven
 statt Prädikat-im-Repo) steht in §8 als `SPEC-DECISION F-1`.
@@ -164,6 +193,9 @@ statt Prädikat-im-Repo) steht in §8 als `SPEC-DECISION F-1`.
 | `data/.../FavoritesRepositoryImpl.kt` (+ Swipe/Hidden/CustomNames-Impls) | Impl nach dem §2-Mechanismus: fail-closed `dataStore.data.first()`, Orphan-Compute, Prädikat-Filter, gezielter Remove im `edit{}`; **kein** Throwable-Swallow. |
 | `domain/src/testFixtures/.../fakes/Fake*Repository.kt` (4×) | `reconcileX` über den In-Memory-State (gleiche Semantik: Orphans − present). |
 | `domain/src/testFixtures/.../*RepositoryContract.kt` (4×) | `cleanup*`-Contract-Methoden auf `reconcile*` mit Prädikat umstellen (siehe Test-Plan §6). |
+| `app/src/test/.../ObserveInstalledAppsUseCaseTest.kt` — `TestFakeFavoritesRepository` (lokales Stub, ~:415) | Interface-Implementierer: `cleanupFavoriteComponents` → `reconcileFavoriteComponents`. **Zusätzlich** braucht das Stub jetzt echte prädikat-gegatete Entfernung (heute reiner Call-Tracker: `cleanupCallCount`/`lastCleanupComponentNames`, mutiert den Flow nie) — sonst kann der M3-Favorites-Fall (§6.3) „Orphan entfernt" nicht prüfen. `throwOnCleanup` bleibt (der Isolations-Test braucht es). |
+| `domain/src/test/.../ToggleFavoriteUseCaseTest.kt` (~:208) | anonymer `FavoritesRepository`-Implementierer: `override cleanupFavoriteComponents` → `reconcileFavoriteComponents`. |
+| `data/src/test/.../FavoritesRepositoryImplTest.kt` (~:129/:380/:404) + `CustomNamesRepositoryImplTest.kt` (~:243) | direkte Impl-Aufrufe `cleanup* → reconcile*` (Prädikat mitgeben). **Achtung:** `FavoritesRepositoryImplTest` „when DataStore edit fails - keeps current state" (~:387) pinnt den **heutigen Swallow**; §2 invertiert das (kein Swallow, propagiert) → dieser Test muss auf „wirft" umgestellt werden (Test-Plan §6.6). |
 
 `PackagePresence`/`PackagePresenceImpl`/`FakePackagePresence` bleiben **unverändert** — sie waren
 korrekt; der Bug lag ausschließlich in der Read-Divergenz eine Ebene darüber.
@@ -186,18 +218,28 @@ korrekt; der Bug lag ausschließlich in der Read-Divergenz eine Ebene darüber.
 ## §5 Restfenster (TOCTOU) — warum es sicher ist
 
 Zwischen Schritt 1 (Read) und Schritt 5 (Delete) läuft die Presence-Prüfung (suspend IO). Ein
-gleichzeitiger Write kann in diesem Fenster passieren. Warum das R-INV-2 nicht bricht:
-- Gelöscht wird **ausschließlich** die in Schritt 4 bestimmte `verifiedAbsent`-Menge (konkrete,
-  verifiziert-abwesende Schlüssel). Eine gleichzeitig **hinzugefügte** Zuweisung ist nicht in dieser
-  Menge → unangetastet.
-- Ein Schlüssel in `verifiedAbsent` wurde als *abwesende App* bestätigt; dass der Nutzer im ms-
-  Fenster genau für diese abwesende App eine Zuweisung setzt, ist praktisch unmöglich (man kann
-  keine deinstallierte App als Favorit/Swipe setzen).
-- Der Delete ist ein gezieltes `- verifiedAbsent` innerhalb `edit{}` (transaktional), kein
-  „setze auf berechnete Menge", also kann er keinen fremden gleichzeitigen Write überschreiben.
+gleichzeitiger Write kann in diesem Fenster passieren. Der Delete ist deshalb **wert-scoped im
+`edit{}`** (§2 Schritt 5): er re-liest den aktuellen Store und entfernt nur, was *jetzt noch* einem
+verifiziert-abwesenden Wert entspricht.
 
-Damit ist das Restfenster harmlos — im Gegensatz zum heutigen „intersect gegen die Liste", der eine
-ganze Live-Store-Momentaufnahme gegen eine möglicherweise veraltete Kandidatensicht verrechnet.
+**Mengen-Stores (Favorites/Hidden) und Map-Store (Custom Names) — unbedingt sicher.** Der Delete ist
+`current_im_edit − verifiedAbsent` bzw. `remove(key)` je abwesendem Paket. Eine gleichzeitig
+**hinzugefügte** Zuweisung ist strukturell nicht in `verifiedAbsent` → unangetastet. Und einen
+Schlüssel für eine *abwesende* App neu zu setzen ist praktisch unmöglich (man kann keine
+deinstallierte App als Favorit/Hidden/Custom-Name setzen). Kein „setze auf berechnete Menge".
+
+**Swipe-Store (Slot-keyed) — braucht den expliziten Wert-Guard, sonst NICHT sicher.** Hier ist der
+Key der Slot, nicht der Wert; „entferne den verifiziert-abwesenden Slot" würde ohne Guard zu
+„entferne, was gerade im Slot steht" degenerieren. Der gefährliche Fall ist **nicht** die
+Neuzuweisung *derselben* abwesenden App, sondern die Neuzuweisung des Slots an eine **andere, die
+ganze Zeit installierte** App Y im Fenster: `remove(LEFT)` würde Y clobbern, obwohl Y ∉
+`verifiedAbsent` und nie presence-geprüft. Der In-Edit-Wert-Guard aus §2 (re-lies `preferences[slot]`,
+leere nur bei Wert-Gleichheit mit einer verifiziert-abwesenden Component) schließt das — er stellt
+exakt die Atomizität wieder her, die der heutige In-Edit-Read von `cleanupSwipeActions` schon hat.
+
+Mit dem Wert-Guard ist das Restfenster für **alle** Stores harmlos — im Gegensatz zum heutigen
+„intersect gegen die Liste", der eine ganze Live-Store-Momentaufnahme gegen eine möglicherweise
+veraltete Kandidatensicht verrechnet.
 
 ---
 
@@ -219,24 +261,52 @@ Regression-Guards für die drei Funde plus die zwei Test-Lücken:
    wird kein Orphan entfernt, mit `{ false }` werden Orphans entfernt, leere Ladung /
    nicht-Orphan-Einträge bleiben. (Der fail-closed Read-Fehler ist Impl-only, da der Fake keinen
    Read-Fehler hat — dokumentiert wie die bestehende „Failure-Branch nur Impl"-Regel.)
+6. **Invertierter Edit-Fail-Test (Impl):** `FavoritesRepositoryImplTest` „when DataStore edit fails
+   - keeps current state" (~:387) pinnt heute den Swallow (`should not crash`, alte Daten bleiben).
+   §2 entfernt den Swallow → der Test muss auf **wirft** umgestellt werden (der Store-übersprungen-
+   und-nichts-gelöscht-Ausgang wird dann eine Ebene höher von `runCleanup` sichergestellt, §4).
+   Die analogen Swipe/Hidden/CustomNames-Edit-Fail-Tests gleich mitprüfen.
+7. **Swipe-Wert-Guard (§2/§5):** ein Test, der im Read→Edit-Fenster den Slot von der abwesenden
+   Component X auf eine **vorhandene** App Y umschreibt und pinnt, dass `reconcileSwipeActions` Y
+   **nicht** clobbert (der Slot-spezifische R-INV-2-Fall). Falls als reiner Unit-Test schwer
+   deterministisch, mindestens der Wert-Gleichheits-Zweig direkt (Slot-Wert ≠ verifiziert-abwesend →
+   nicht entfernen).
+
+**Feasibility Fail-closed (§6.1):** der Fake kann keinen Read-Fehler simulieren; der Kern-fail-closed-
+Test läuft daher am Impl-Level (echter DataStore, dessen Read `IOException` wirft) — die
+Use-Case-Level-Variante braucht ein Fake, dessen `reconcileX` den Wurf durchreicht.
 
 Der bestehende Kern-Veto-Test (`partial load vetoes a still-present app…`) wird auf die neue
-`reconcileX`-Signatur portiert und um den Favorites-Fall (M3) erweitert.
+`reconcileX`-Signatur portiert und um den **Favorites**-Fall (M3) erweitert — was voraussetzt, dass
+das lokale `TestFakeFavoritesRepository` echte Entfernung bekommt (§3).
 
 ---
 
 ## §7 Umsetzungs-Reihenfolge
 
-1. Interfaces + Fakes + Contract-Umstellung `cleanup* → reconcile*` (mechanisch, kompiliert).
-2. Ein Impl nach §2 (z. B. Favorites), Contract grün, dann die anderen drei.
-3. `ObserveInstalledAppsUseCase` auf `reconcileX` umstellen, Veto-Helfer entfernen.
-4. Regressionstests §6.1–§6.4 ergänzen.
-5. `RECONCILE_SPEC.md` §3/Umsetzung nachziehen (R-INV → R-INV-2, „eine Read-Autorität, fail-closed").
-6. Verifikation: alle drei Modul-Suiten + `checkConventions` + `checkRule13` grün.
+**Wichtig — kein grün-kompilierender Zwischenschritt bei reiner Signatur-Ersetzung.** Interface und
+`ObserveInstalledAppsUseCase` liegen beide in `:domain`-main; §3 *ersetzt* `cleanupX` durch
+`reconcileX` (kein Nebeneinander). Sobald das Interface umgestellt ist, brechen `:domain` (Use-Case-
+Aufrufe) und `:data` (Impl-`override`s) **bis** Use-Case + alle Impls + alle Test-Implementierer
+mitgezogen sind. Der Kern ist daher **ein atomarer Schritt**, nicht drei FF-mergebare Checkpoints.
+Zusätzlich ist der Umschalt-Schritt ohnehin die **Verhaltensänderung** (fail-closed statt fail-open),
+also nicht „verhaltensneutral".
 
-Jeder Schritt eigener Branch + FF-Merge + Checkpoint, wie in der Serie üblich. Kein Schritt lässt
-das System in einem schlechteren Zustand als heute (Schritt 1-2 sind verhaltensneutral, bis der
-Use-Case in Schritt 3 umschaltet).
+1. **Ein Commit/Branch (atomar, kompiliert erst am Ende grün):** Interfaces + 4 Impls (§2) + 4
+   Fakes + 4 Contracts + `ObserveInstalledAppsUseCase` (Veto-Helfer raus) + **alle** Test-Call-
+   Sites/-Implementierer aus §3 (inkl. `TestFakeFavoritesRepository`-Entfernung, anonyme
+   Implementierer, direkte Impl-Aufrufe). Erst wenn alles zusammensteht, kompiliert der Baum.
+2. Regressionstests §6.1–§6.7 ergänzen (Kern-fail-closed, Presence-Veto inkl. Favorites/M3,
+   Event-Mapping/L1, invertierter Edit-Fail-Test, Swipe-Wert-Guard).
+3. `RECONCILE_SPEC.md` §3/Umsetzung nachziehen (R-INV → R-INV-2, „eine Read-Autorität, fail-closed").
+4. **Verifikation vor dem Merge (nicht verhandelbar):** alle drei Modul-Suiten +
+   `checkConventions` + `checkRule13` **nachweislich grün** — erst dann FF-Merge. Kein Merge auf
+   einem roten/ungetesteten Stand.
+
+*(Alternative Reihenfolge, falls kleinere Commits gewünscht: `reconcileX` **zusätzlich** zu
+`cleanupX` einführen, Caller migrieren, dann `cleanupX` löschen — das erlaubt grün-kompilierende
+Zwischenstände, widerspricht aber der „ersetzen"-Formulierung in §3 und verdoppelt kurzzeitig die
+Methoden. `SPEC-DECISION F-2`, s. §8.)*
 
 ---
 
@@ -251,10 +321,18 @@ Use-Case in Schritt 3 umschaltet).
     ruft `removeX`. Zwei Methoden pro Store, dünnere Repos, Reconcile-Logik zentral im Use-Case
     (leichter am Stück zu testen), aber ein separater Read/Remove statt einer Read-Autorität → das
     TOCTOU-Argument (§5) muss dort genauso greifen (Remove löscht nur konkrete verifiziert-abwesende
-    Schlüssel — tut es).
+    Schlüssel — tut es). **Achtung:** F-B's `removeSwipe(...)` braucht denselben In-Edit-Wert-Guard
+    wie §2/§5 (Slot-Wert re-lesen, nur bei Wert-Gleichheit leeren) — die Slot-vs-Wert-Falle gilt
+    unabhängig davon, wo die Orchestrierung lebt.
   - Empfehlung: **F-C**, weil Read und Delete beim selben Store bleiben (die Divergenz, die den Bug
     verursachte, wird strukturell unmöglich) und weil die Store-Strukturen ohnehin verschieden sind
     (Set vs. Zwei-Slot vs. Map), also wenig DRY-Gewinn durch zentrale Orchestrierung.
+
+- **`SPEC-DECISION F-2` (Umsetzungs-Form, §7).** Atomarer Ein-Commit-Umbau (empfohlen: klar, aber
+  ein großer Commit, erst am Ende grün) **vs.** `reconcileX` zusätzlich einführen → Caller migrieren
+  → `cleanupX` löschen (grün-kompilierende Zwischenstände, aber kurzzeitige Methoden-Verdopplung und
+  Widerspruch zur „ersetzen"-Formulierung in §3). Empfehlung: **atomar**, da der Umbau ohnehin klein
+  und in sich geschlossen ist und die Verhaltensänderung nicht sinnvoll teilbar ist.
 
 ---
 
