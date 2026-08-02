@@ -5,7 +5,6 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -24,26 +23,27 @@ import org.junit.Test
  * Das [SwipeActionsRepository]-Interface ist klein, aber hat mehrere
  * lohnende Stellen für einen Contract:
  *
- *   - **Slot-Unabhängigkeit:** Ein `setSwipeAction(LEFT, …)` darf den Flow
- *     für RIGHT nicht beeinflussen — und umgekehrt. Das ist die wichtigste
- *     Eigenschaft, die der Contract festschreibt: die beiden Slots sind
- *     separate Werte mit separater Persistenz.
+ * State is read back through the single authoritative read surface
+ * [SwipeActionsRepository.getSwipeActionComponent] — there is no longer a
+ * hot/shared read flow.
  *
- *   - **NONE-Slot:** Ist explizit ein No-Op. Weder LEFT noch RIGHT dürfen
- *     sich ändern. Manager loggt + returnt früh, Fake hat einen leeren
- *     Branch — ohne Contract könnte einer der beiden später aus Versehen
- *     etwas tun.
+ *   - **Slot independence:** a `setSwipeAction(LEFT, …)` must not affect the
+ *     RIGHT slot — and vice versa. This is the most important property the
+ *     contract pins: the two slots are separate values with separate
+ *     persistence.
  *
- *   - **null-Semantik:** `setSwipeAction(slot, null)` löscht den Slot →
- *     der Flow emittiert wieder `null`. Konsistent mit "kein Wert
- *     persistiert".
+ *   - **NONE slot:** explicitly a no-op. Neither LEFT nor RIGHT may change.
+ *     The impl logs + returns early, the fake has an empty branch — without a
+ *     contract one of the two could later do something by accident.
  *
- * NICHT IM CONTRACT (Manager-spezifisch):
+ *   - **null semantics:** `setSwipeAction(slot, null)` clears the slot →
+ *     [getSwipeActionComponent] returns `null` again. Consistent with "no
+ *     value persisted".
+ *
+ * NICHT IM CONTRACT (impl-spezifisch):
  *   - Der Manager wirft Exceptions in `setSwipeAction` weiter (für `launchSafe`
  *     im ViewModel). Der Fake nicht. Fehlerverhalten ist Implementierungs-
  *     Detail, nicht Interface-Garantie.
- *   - `shareIn`-Lifecycle gehört in einen `SwipeActionsRepositoryImplShareInTest`
- *     (analog zu `FavoritesRepositoryImplShareInTest`), falls jemals nötig.
  *
  * @see FakeSwipeActionsRepositoryContractTest
  * @see SwipeActionsRepositoryImplContractTest
@@ -63,34 +63,41 @@ abstract class SwipeActionsRepositoryContract {
     private val appA = "com.example.a/.MainActivity"
     private val appB = "com.example.b/.MainActivity"
 
+    // Read helpers — the authoritative read surface for both slots.
+    private suspend fun SwipeActionsRepository.left() =
+        getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+
+    private suspend fun SwipeActionsRepository.right() =
+        getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
+
     // ---------- Initial State ----------
 
     @Test
-    fun `fresh repository emits null for swipeLeftAppFlow`() = runTest {
+    fun `fresh repository returns null for LEFT slot`() = runTest {
         val repo = createRepository()
-        assertNull(repo.swipeLeftAppFlow.first())
+        assertNull(repo.left())
     }
 
     @Test
-    fun `fresh repository emits null for swipeRightAppFlow`() = runTest {
+    fun `fresh repository returns null for RIGHT slot`() = runTest {
         val repo = createRepository()
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.right())
     }
 
     // ---------- setSwipeAction LEFT ----------
 
     @Test
-    fun `setSwipeAction LEFT reflects in swipeLeftAppFlow`() = runTest {
+    fun `setSwipeAction LEFT reflects in the LEFT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
+        assertEquals(appA, repo.left())
     }
 
     @Test
-    fun `setSwipeAction LEFT does not affect swipeRightAppFlow`() = runTest {
+    fun `setSwipeAction LEFT does not affect the RIGHT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.right())
     }
 
     @Test
@@ -98,7 +105,7 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appB)
-        assertEquals(appB, repo.swipeLeftAppFlow.first())
+        assertEquals(appB, repo.left())
     }
 
     @Test
@@ -106,23 +113,23 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
-        assertNull(repo.swipeLeftAppFlow.first())
+        assertNull(repo.left())
     }
 
     // ---------- setSwipeAction RIGHT (Spiegel von LEFT) ----------
 
     @Test
-    fun `setSwipeAction RIGHT reflects in swipeRightAppFlow`() = runTest {
+    fun `setSwipeAction RIGHT reflects in the RIGHT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
-        assertEquals(appA, repo.swipeRightAppFlow.first())
+        assertEquals(appA, repo.right())
     }
 
     @Test
-    fun `setSwipeAction RIGHT does not affect swipeLeftAppFlow`() = runTest {
+    fun `setSwipeAction RIGHT does not affect the LEFT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
-        assertNull(repo.swipeLeftAppFlow.first())
+        assertNull(repo.left())
     }
 
     @Test
@@ -130,13 +137,13 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.right())
     }
 
     // ---------- Slot-Unabhängigkeit ----------
 
     /**
-     * Beide Slots gleichzeitig setzen → beide Flows liefern den jeweils eigenen
+     * Beide Slots gleichzeitig setzen → beide liefern den jeweils eigenen
      * Wert. Das ist das eigentliche Versprechen: zwei unabhängige Slots, kein
      * versehentliches Übersprechen.
      */
@@ -146,8 +153,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
 
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
-        assertEquals(appB, repo.swipeRightAppFlow.first())
+        assertEquals(appA, repo.left())
+        assertEquals(appB, repo.right())
     }
 
     /**
@@ -160,8 +167,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
 
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
-        assertEquals(appA, repo.swipeRightAppFlow.first())
+        assertEquals(appA, repo.left())
+        assertEquals(appA, repo.right())
     }
 
     @Test
@@ -172,8 +179,8 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
 
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertEquals(appB, repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertEquals(appB, repo.right())
     }
 
     // ---------- NONE-Slot ----------
@@ -192,8 +199,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.NONE, "irrelevant")
         repo.setSwipeAction(SwipeSlot.NONE, null)
 
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
-        assertEquals(appB, repo.swipeRightAppFlow.first())
+        assertEquals(appA, repo.left())
+        assertEquals(appB, repo.right())
     }
 
     @Test
@@ -201,11 +208,9 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.NONE, appA)
 
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertNull(repo.right())
     }
-
-    // ---------- purgeRepository ----------
 
     // ---------- reconcileSwipeActions ----------
 
@@ -217,8 +222,8 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.reconcileSwipeActions(listOf(appB)) { false } // appA uninstalled
 
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertEquals(appB, repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertEquals(appB, repo.right())
     }
 
     @Test
@@ -229,8 +234,8 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.reconcileSwipeActions(listOf(appA, appB)) { false }
 
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
-        assertEquals(appB, repo.swipeRightAppFlow.first())
+        assertEquals(appA, repo.left())
+        assertEquals(appB, repo.right())
     }
 
     @Test
@@ -241,8 +246,8 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.reconcileSwipeActions(emptyList()) { false }
 
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertNull(repo.right())
     }
 
     @Test
@@ -251,15 +256,15 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         // appA absent from the load but the presence predicate vetoes clearing it.
         repo.reconcileSwipeActions(emptyList()) { it == appA }
-        assertEquals(appA, repo.swipeLeftAppFlow.first())
+        assertEquals(appA, repo.left())
     }
 
     @Test
     fun `reconcileSwipeActions on fresh repository is a no-op`() = runTest {
         val repo = createRepository()
         repo.reconcileSwipeActions(listOf(appA)) { false }
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertNull(repo.right())
     }
 
     // ---------- getSwipeActionComponent (authoritative read for the launch path) ----------
@@ -301,6 +306,8 @@ abstract class SwipeActionsRepositoryContract {
         assertNull(repo.getSwipeActionComponent(SwipeSlot.NONE))
     }
 
+    // ---------- purgeRepository ----------
+
     @Test
     fun `purgeRepository clears both slots`() = runTest {
         val repo = createRepository()
@@ -309,15 +316,15 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertNull(repo.right())
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertNull(repo.swipeLeftAppFlow.first())
-        assertNull(repo.swipeRightAppFlow.first())
+        assertNull(repo.left())
+        assertNull(repo.right())
     }
 }

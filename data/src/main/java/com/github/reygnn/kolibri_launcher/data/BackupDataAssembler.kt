@@ -84,10 +84,9 @@ class BackupDataAssembler @Inject constructor(
         val favoritesOrder = favoritesOrderRepository.getFavoriteComponentsOrderSnapshot()
         val hiddenComponents = hiddenAppsRepository.hiddenAppsFlow.first()
         val customAppNames = customNamesRepository.getAllCustomNames()
-        // Authoritative fresh reads (NOT the hot swipeXxxAppFlow replay cache):
-        // the swipe flows are never kept warm on Home, so .first() could hand
-        // back a stale replay and back up the previously assigned app. Same root
-        // cause and fix as the swipe-launch path (getSwipeActionComponent).
+        // Authoritative fresh reads from the store (getSwipeActionComponent):
+        // the backup must capture the swipe assignments exactly as currently
+        // stored, independent of any UI cache.
         val swipeLeftApp = swipeActionsRepository.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
         val swipeRightApp = swipeActionsRepository.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 

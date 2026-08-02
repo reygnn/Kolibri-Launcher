@@ -378,12 +378,14 @@ package com.github.reygnn.kolibri_launcher
  *   mit allen bestehenden Contract-Tests — funktioniert zuverlässig.
  *
  * MANAGER-TEST: `externalScope = null` BEI shareIn-BASIERTEN MANAGERN
- *   Managers, die `shareIn(externalScope, WhileSubscribed(…), replay = 1)`
- *   über ihre Flows legen (FavoritesRepositoryImpl, FavoritesOrderRepositoryImpl,
- *   SwipeActionsRepositoryImpl), haben einen Write-then-Read-Bug unter
- *   UnconfinedTestDispatcher: der Write geht durch zu dataStore, der
- *   Upstream-Collector hat den Update aber noch nicht in den Replay-Buffer
- *   geschrieben, der Read liefert den alten gecachten Wert.
+ *   Managers that layer `shareIn(externalScope, WhileSubscribed(…), replay = 1)`
+ *   over their flows (FavoritesRepositoryImpl, FavoritesOrderRepositoryImpl)
+ *   have a write-then-read bug under UnconfinedTestDispatcher: the write
+ *   reaches dataStore, but the upstream collector has not yet written the
+ *   update into the replay buffer, so the read returns the old cached value.
+ *   (SwipeActionsRepositoryImpl used to belong here; it no longer hot-shares
+ *   — all its reads are authoritative fresh reads — so it needs no such
+ *   externalScope handling.)
  *
  *   Lösung: im Manager-Contract-Test `externalScope = null` übergeben —
  *   das überspringt die shareIn-Schicht, der Flow bleibt cold, und jeder
@@ -841,7 +843,6 @@ package com.github.reygnn.kolibri_launcher
  *   GestureDelegate              — lock-block-duration ✓ pinned
  *   FavoritesRepositoryImpl      — share-in timeout    ✓ pinned (ShareInTest)
  *   FavoritesOrderRepositoryImpl — share-in timeout    ✗ relies on contract
- *   SwipeActionsRepositoryImpl   — share-in timeout    ✗ relies on contract
  *   InstalledAppsRepositoryImpl  — share-in timeout    ✗ relies on contract
  *   LayoutDelegate               — share-in timeout    ✗ relies on contract
  *   AppManagementDelegate        — initial-load delay  ✗ low-risk (100ms)

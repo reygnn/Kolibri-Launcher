@@ -1,19 +1,13 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import timber.log.Timber
 import java.io.IOException
 import java.util.concurrent.CancellationException
@@ -21,40 +15,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manager für die Zuweisung von Swipe-Aktionen (Links/Rechts).
+ * DataStore-backed implementation of [SwipeActionsRepository].
  *
- * Diese Klasse implementiert das `SwipeActionsRepository`-Interface und folgt dem
- * gleichen Architekturmuster wie `FavoritesOrderRepositoryImpl`.
+ * Stores the assigned ComponentName for the LEFT and RIGHT swipe slots in a
+ * Preferences DataStore, one key per slot.
  *
- * **Core Funktionalität:**
- * - Speichert und liest den ComponentName für "Swipe Left".
- * - Speichert und liest den ComponentName für "Swipe Right".
- * - Stellt beide Werte als Hot, Shared Flows bereit.
+ * **All reads are authoritative and fresh** (`dataStore.data.first()`): the
+ * launch path ([getSwipeActionComponent]) and the reconcile path read the
+ * current stored value directly, so a slot reassigned in the Settings activity
+ * takes effect on the very next swipe. There is no hot/shared flow — an earlier
+ * `WhileSubscribed(replay = 1)` share was removed because nothing consumed it,
+ * and its replay cache could hand back a stale assignment on the first swipe
+ * after a change while Home held no subscriber.
  *
- * **Architektur: Hot Shared Flow**
- * - Verwendet `shareIn()` mit `WhileSubscribed`, um eine einzige, geteilte
- * Subscription zum DataStore über alle Beobachter hinweg zu nutzen.
- * - Stellt Testbarkeit durch einen privaten Konstruktor und eine `createForTesting`-Factory-Methode sicher,
- * die eine benutzerdefinierte `SharingStarted`-Strategie erlaubt.
- *
- * **Datenfluss:**
- * 1. `SwipeActionsViewModel` ruft `setSwipeAction()` auf.
- * 2. Manager speichert den ComponentName (oder null) im DataStore.
- * 3. DataStore emittiert den neuen Wert.
- * 4. `swipeLeftAppFlow` / `swipeRightAppFlow` geben den neuen Wert an das ViewModel weiter.
- * 5. ViewModel berechnet den `SwipeActionsUiState` neu.
- *
- * @param dataStore Preferences DataStore zur Persistierung.
- * @param externalScope Application-Scope für das Hot-Flow-Sharing.
- * @param sharingStrategy Die Strategie für das Sharing (z.B. WhileSubscribed).
+ * @param dataStore Preferences DataStore used for persistence.
  */
 @Singleton
-open class SwipeActionsRepositoryImpl private constructor(
-    dataStore: DataStore<Preferences>,
-    externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted,
-) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
-    SwipeActionsRepository {
+class SwipeActionsRepositoryImpl @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+) : SwipeActionsRepository {
 
     /**
      * Interne Definition der DataStore-Schlüssel, spezifisch für diesen Manager.
@@ -63,49 +42,6 @@ open class SwipeActionsRepositoryImpl private constructor(
         val SWIPE_LEFT_APP_COMPONENT = stringPreferencesKey("swipe_left_app_component")
         val SWIPE_RIGHT_APP_COMPONENT = stringPreferencesKey("swipe_right_app_component")
     }
-
-    companion object {
-        /**
-         * Factory-Methode zur Erstellung einer Instanz für Unit-Tests.
-         */
-        @VisibleForTesting
-        fun createForTesting(
-            dataStore: DataStore<Preferences>,
-            externalScope: CoroutineScope?,
-            sharingStrategy: SharingStarted
-        ): SwipeActionsRepositoryImpl {
-            return SwipeActionsRepositoryImpl(dataStore, externalScope, sharingStrategy)
-        }
-    }
-
-    /**
-     * Hilt-Konstruktor für die Produktion.
-     */
-    @Inject
-    constructor(
-        dataStore: DataStore<Preferences>,
-        @ApplicationScope externalScope: CoroutineScope?
-    ) : this(
-        dataStore = dataStore,
-        externalScope = externalScope,
-        sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
-    )
-
-    /**
-     * Builds the hot, shared flow for a single swipe-slot key.
-     */
-    private fun swipeActionFlow(key: Preferences.Key<String>): Flow<String?> =
-        sharedReadFlow("Error reading swipe action key: ${key.name}") { preferences ->
-            // Returns the stored String, or null when the slot is unset — which
-            // is exactly what the `String?` interface type expects.
-            preferences[key]
-        }
-
-    override val swipeLeftAppFlow: Flow<String?> =
-        swipeActionFlow(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
-
-    override val swipeRightAppFlow: Flow<String?> =
-        swipeActionFlow(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
 
     override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
         val key = when (slot) {
@@ -144,12 +80,10 @@ open class SwipeActionsRepositoryImpl private constructor(
             SwipeSlot.NONE -> return null
         }
         return try {
-            // Authoritative FRESH read straight from the store — deliberately NOT
-            // swipeXxxAppFlow (hot shareIn, replay=1, WhileSubscribed): that
-            // flow's replay cache serves a stale value on the first swipe after
-            // the assignment was changed in the Settings activity while Home held
-            // no subscriber. The launch decision needs current truth, not a UI
-            // cache.
+            // Authoritative FRESH read straight from the store. The launch
+            // decision needs the current assignment: a slot changed in the
+            // Settings activity must take effect on the very next swipe, so the
+            // read never goes through a cache.
             dataStore.data.first()[key]
         } catch (e: CancellationException) {
             throw e
@@ -167,8 +101,8 @@ open class SwipeActionsRepositoryImpl private constructor(
         installedComponentNames: List<String>,
         isStillPresent: suspend (String) -> Boolean,
     ) {
-        // FAIL-CLOSED read (propagates; NOT the fail-open shared flow). No
-        // try/catch — errors propagate to the caller's runCleanup (R-INV-2).
+        // FAIL-CLOSED read (propagates). No try/catch — errors propagate to the
+        // caller's runCleanup (R-INV-2).
         val current = dataStore.data.first()
         val installedSet = installedComponentNames.toSet()
         val orphans = listOfNotNull(

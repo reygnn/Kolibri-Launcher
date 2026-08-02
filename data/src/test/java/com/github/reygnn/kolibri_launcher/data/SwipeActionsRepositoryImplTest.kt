@@ -6,9 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Rule
@@ -31,10 +29,8 @@ class SwipeActionsRepositoryImplTest {
     private val leftKey = stringPreferencesKey("swipe_left_app_component")
     private val rightKey = stringPreferencesKey("swipe_right_app_component")
 
-    private fun TestScope.newRepo(store: FakeDataStore): SwipeActionsRepositoryImpl =
-        SwipeActionsRepositoryImpl.createForTesting(
-            store, this.backgroundScope, SharingStarted.Companion.Lazily,
-        )
+    private fun newRepo(store: FakeDataStore): SwipeActionsRepositoryImpl =
+        SwipeActionsRepositoryImpl(store)
 
     @Test
     fun `reconcileSwipeActions - when DataStore edit fails - propagates (fail-closed)`() = runTest {
@@ -66,16 +62,13 @@ class SwipeActionsRepositoryImplTest {
     }
 
     @Test
-    fun `getSwipeActionComponent - reads the current stored value without a warm flow subscriber`() = runTest {
+    fun `getSwipeActionComponent - reads the current stored value`() = runTest {
         // Swipe-stale-replay fix: the launch path reads the authoritative store
-        // value via getSwipeActionComponent, NOT the hot swipeXxxAppFlow
-        // (replay=1, WhileSubscribed). Here the assignment is changed with NO
-        // active collector on the flow — exactly the Home situation while the
-        // Settings activity is open — and the launch read must return the NEW
-        // value, not a stale replay. (The runtime replay race is timing-based
-        // and not reproduced deterministically here; this pins the fix's
-        // contract: getSwipeActionComponent is an authoritative fresh read that
-        // never depends on the flow being kept warm.)
+        // value via getSwipeActionComponent. Here the assignment is changed and
+        // the launch read must return the NEW value — exactly the Home situation
+        // while the Settings activity is open. This pins the fix's contract:
+        // getSwipeActionComponent is an authoritative fresh read straight from
+        // the store, never a cache.
         val store = FakeDataStore()
         store.setInitialData(preferencesOf(rightKey to "com.old/Component"))
         val repo = newRepo(store)

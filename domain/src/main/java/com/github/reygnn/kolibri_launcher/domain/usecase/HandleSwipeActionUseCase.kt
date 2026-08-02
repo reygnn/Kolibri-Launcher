@@ -27,11 +27,10 @@ class HandleSwipeActionUseCase @Inject constructor(
         if (slot == SwipeSlot.NONE) return Result.NoAction
 
         // Read the CURRENT assignment straight from the store via
-        // getSwipeActionComponent, NOT the hot-shared swipeXxxAppFlow: that
-        // flow's replay cache can serve a stale value on the first swipe after
-        // the assignment was changed in the Settings activity while Home held no
-        // subscriber, launching the previously assigned app (fixed: authoritative
-        // fresh read).
+        // getSwipeActionComponent (authoritative fresh read): a slot changed in
+        // the Settings activity must take effect on the very next swipe, so this
+        // never reads through a cache that could launch the previously assigned
+        // app.
         val componentName = swipeActionsRepository.getSwipeActionComponent(slot)
 
         if (componentName == null) {

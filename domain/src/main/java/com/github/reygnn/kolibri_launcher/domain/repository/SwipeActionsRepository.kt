@@ -1,25 +1,12 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Ein Interface, das den Vertrag für das Speichern und Abrufen von
  * App-Zuweisungen für Wischgesten (Swipe Actions) definiert.
  */
 interface SwipeActionsRepository : Purgeable {
-
-    /**
-     * Ein Flow, der den ComponentName der App für "Swipe Left" bereitstellt.
-     * Emittiert `null`, wenn keine App zugewiesen ist.
-     */
-    val swipeLeftAppFlow: Flow<String?>
-
-    /**
-     * Ein Flow, der den ComponentName der App für "Swipe Right" bereitstellt.
-     * Emittiert `null`, wenn keine App zugewiesen ist.
-     */
-    val swipeRightAppFlow: Flow<String?>
 
     /**
      * Speichert die Zuweisung für einen bestimmten [SwipeSlot].
@@ -48,15 +35,12 @@ interface SwipeActionsRepository : Purgeable {
     )
 
     /**
-     * Reads the CURRENT component assigned to [slot] straight from the store,
-     * bypassing the hot-shared [swipeLeftAppFlow]/[swipeRightAppFlow] replay
-     * cache. The launch path needs the authoritative value: the shared flow
-     * (replay=1, WhileSubscribed) can hand back a stale replay on the first
-     * swipe after the assignment was changed in the Settings activity while
-     * Home held no subscriber — so the first swipe would launch the previously
-     * assigned app. Returns `null` for an unassigned slot, for [SwipeSlot.NONE],
-     * or on a transient read failure (non-destructive: no launch rather than a
-     * wrong app).
+     * Reads the CURRENT component assigned to [slot] straight from the store.
+     * The launch path needs the authoritative value: a slot changed in the
+     * Settings activity must take effect on the very next swipe, so the read
+     * never goes through a cache. Returns `null` for an unassigned slot, for
+     * [SwipeSlot.NONE], or on a transient read failure (non-destructive: no
+     * launch rather than a wrong app).
      */
     suspend fun getSwipeActionComponent(slot: SwipeSlot): String?
 }

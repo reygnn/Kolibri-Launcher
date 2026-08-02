@@ -125,10 +125,10 @@ class SwipeActionsViewModel @Inject constructor(
                 // them, so the init-block combine collector never emits a
                 // transient "full list, no assignments" state (sub-frame flash).
                 //
-                // Authoritative fresh reads (getSwipeActionComponent → store),
-                // NOT the hot swipeXxxAppFlow: reopening this cold settings screen
-                // would otherwise .first()-read a stale replay and show the
-                // previously assigned app in the chip. Same fix as the launch path.
+                // Authoritative fresh reads (getSwipeActionComponent → store):
+                // reopening this cold settings screen must show the value
+                // currently stored, never a cached previous assignment in the
+                // chip. Same authoritative-read contract as the launch path.
                 val left = getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
                 val right = getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
                 allAppsMasterList.value = allApps
