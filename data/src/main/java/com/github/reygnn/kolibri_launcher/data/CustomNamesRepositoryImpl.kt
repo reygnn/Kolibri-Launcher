@@ -263,30 +263,35 @@ class CustomNamesRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun cleanupCustomNames(installedPackageNames: List<String>) {
-        try {
-            val installedSet = installedPackageNames.toSet()
-            dataStore.edit { preferences ->
-                // Remove entries whose package is no longer installed. Snapshot
-                // the orphan keys first, then remove — no concurrent
-                // modification of the underlying map.
-                val orphanKeys = preferences.customNameKeys()
-                    .filter { it.customNamePackage() !in installedSet }
-                if (orphanKeys.isNotEmpty()) {
-                    // Log only the count, never package names (PII).
-                    Timber.w("Removed ${orphanKeys.size} orphaned custom names")
-                    orphanKeys.forEach { preferences.remove(it) }
-                }
+    override suspend fun reconcileCustomNames(
+        installedPackageNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    ) {
+        // FAIL-CLOSED read (propagates; NOT the swallow-to-empty getAllCustomNames).
+        // Candidate read and delete are the same authority; no try/catch — errors
+        // propagate to the caller's runCleanup (RECONCILE_FIX_SPEC R-INV-2).
+        val current = dataStore.data.first()
+        val assignedPackages = current.customNameKeys().mapTo(HashSet()) { it.customNamePackage() }
+        val orphans = assignedPackages - installedPackageNames.toSet()
+        if (orphans.isEmpty()) return
+
+        // isStillPresent receives a PACKAGE name (custom names are package-based).
+        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
+        if (verifiedAbsent.isEmpty()) return
+
+        dataStore.edit { preferences ->
+            // Value-scoped: key == package identity, so remove(key) can only touch
+            // the verified-absent package. Re-snapshot inside the edit.
+            val toRemove = preferences.customNameKeys()
+                .filter { it.customNamePackage() in verifiedAbsent }
+            if (toRemove.isNotEmpty()) {
+                // Log only the count, never package names (PII).
+                Timber.w("Removed ${toRemove.size} orphaned custom names")
+                toRemove.forEach { preferences.remove(it) }
             }
-            // Intentionally NO triggerCustomNameUpdate(): this runs inside the
-            // app-load pipeline; emitting an update here would re-trigger a
-            // reload and loop. The removed names are for uninstalled packages,
-            // so no currently-visible app name is affected.
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to cleanup custom names, keeping current state")
         }
+        // Intentionally NO triggerCustomNameUpdate(): this runs inside the
+        // app-load pipeline; emitting an update here would re-trigger a reload.
     }
 
     override suspend fun purgeRepository() {

@@ -205,7 +205,10 @@ class ToggleFavoriteUseCaseTest {
             }
         }
 
-        override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {}
+        override suspend fun reconcileFavoriteComponents(
+            installedComponentNames: List<String>,
+            isStillPresent: suspend (String) -> Boolean,
+        ) {}
         override suspend fun addFavoriteComponent(componentName: String) = true
         override suspend fun removeFavoriteComponent(componentName: String) = true
         override suspend fun saveFavoriteComponents(componentNames: List<String>) {

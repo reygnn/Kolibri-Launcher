@@ -8,7 +8,10 @@ schließt — er reintroduziert eine engere Variante genau der Klasse, die er be
 Dieses Dokument beschreibt das Problem und legt den Fix fest. Es ist **Plan, noch kein Code**:
 erst Doc-Review bis grün, dann Umsetzung nach §7.
 
-**Status:** Entwurf, **Revision 3** — zwei Multi-Agent-Doc-Reviews durchlaufen. Rev 2 arbeitete die
+**Status: UMGESETZT** (F-C, atomar) — alle drei Modul-Suiten + `checkConventions` + `checkRule13`
+nachweislich grün vor dem Merge. Regressionstests §6.1–§6.7 + L1 vorhanden.
+
+*(Historie:)* Entwurf, **Revision 3** — zwei Multi-Agent-Doc-Reviews durchlaufen. Rev 2 arbeitete die
 5 Funde aus Runde 1 ein (Swipe-In-Edit-Wert-Guard §2/§5, Test-Blast-Radius §3/§6, atomare
 Reihenfolge §7). Rev 3 arbeitet die 6 Funde aus Runde 2 ein — **kein** Soundness-Loch (Kern-Design
 F-C und Swipe-Guard bestätigt), nur Präzision/Test-Plan: §6.1 pinnt jetzt den **assertThrows**-

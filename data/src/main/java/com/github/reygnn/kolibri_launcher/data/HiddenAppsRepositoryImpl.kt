@@ -198,25 +198,27 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun cleanupHiddenComponents(installedComponentNames: List<String>) {
-        try {
-            dataStore.edit { preferences ->
-                val currentHidden = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
-                if (currentHidden.isEmpty()) return@edit
+    override suspend fun reconcileHiddenComponents(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    ) {
+        // FAIL-CLOSED read (propagates; NOT the fail-open shared flow). No
+        // try/catch — errors propagate to the caller's runCleanup (R-INV-2).
+        val current = dataStore.data.first()[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
+        val orphans = current - installedComponentNames.toSet()
+        if (orphans.isEmpty()) return
 
-                val installedSet = installedComponentNames.toSet()
-                val cleaned = currentHidden.intersect(installedSet)
+        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
+        if (verifiedAbsent.isEmpty()) return
 
-                if (cleaned.size < currentHidden.size) {
-                    // Log only the count, never componentNames (PII).
-                    Timber.w("Removed ${currentHidden.size - cleaned.size} orphaned hidden components")
-                    preferences[PreferencesKeys.HIDDEN_COMPONENTS] = cleaned
-                }
+        dataStore.edit { preferences ->
+            // Value-scoped: re-read inside the edit, subtract verified-absent.
+            val now = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: return@edit
+            val cleaned = now - verifiedAbsent
+            if (cleaned.size < now.size) {
+                Timber.w("Removed ${now.size - cleaned.size} orphaned hidden components")
+                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = cleaned
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {  // Throwable statt Exception
-            TimberWrapper.silentError(e, "Failed to cleanup hidden components, keeping current state")
         }
     }
 

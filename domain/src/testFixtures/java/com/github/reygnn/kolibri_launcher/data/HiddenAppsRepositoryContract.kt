@@ -277,47 +277,57 @@ abstract class HiddenAppsRepositoryContract {
         assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
     }
 
-    // ---------- cleanupHiddenComponents ----------
+    // ---------- reconcileHiddenComponents ----------
 
     @Test
-    fun `cleanupHiddenComponents keeps only components in installed list`() = runTest {
+    fun `reconcileHiddenComponents keeps only components in installed list`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
         repo.hideComponent(compB)
         repo.hideComponent(compC)
 
-        repo.cleanupHiddenComponents(listOf(compA, compC))
+        repo.reconcileHiddenComponents(listOf(compA, compC)) { false }
 
         assertEquals(setOf(compA, compC), repo.hiddenAppsFlow.first())
     }
 
     @Test
-    fun `cleanupHiddenComponents with all installed changes nothing`() = runTest {
+    fun `reconcileHiddenComponents with all installed changes nothing`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
         repo.hideComponent(compB)
 
-        repo.cleanupHiddenComponents(listOf(compA, compB, compC))
+        repo.reconcileHiddenComponents(listOf(compA, compB, compC)) { false }
 
         assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
     }
 
     @Test
-    fun `cleanupHiddenComponents with empty installed list clears hidden set`() = runTest {
+    fun `reconcileHiddenComponents with empty installed list clears hidden set`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
         repo.hideComponent(compB)
 
-        repo.cleanupHiddenComponents(emptyList())
+        repo.reconcileHiddenComponents(emptyList()) { false }
 
         assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
     }
 
     @Test
-    fun `cleanupHiddenComponents on empty repository stays empty`() = runTest {
+    fun `reconcileHiddenComponents on empty repository stays empty`() = runTest {
         val repo = createRepository()
-        repo.cleanupHiddenComponents(listOf(compA, compB))
+        repo.reconcileHiddenComponents(listOf(compA, compB)) { false }
         assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+    }
+
+    @Test
+    fun `reconcileHiddenComponents keeps an orphan the presence check reports present`() = runTest {
+        val repo = createRepository()
+        repo.hideComponent(compA)
+        repo.hideComponent(compB)
+        // compB absent from the load but the presence predicate vetoes its removal.
+        repo.reconcileHiddenComponents(listOf(compA)) { it == compB }
+        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
     }
 
     // ---------- purgeRepository ----------

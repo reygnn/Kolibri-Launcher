@@ -11,13 +11,16 @@ interface HiddenAppsRepository : Purgeable {
     suspend fun updateComponentVisibilities(componentsToHide: Set<String>, componentsToShow: Set<String>)
 
     /**
-     * Removes any hidden componentName that is not in
-     * [installedComponentNames] (app uninstalled). Called after every
-     * successful app load from
-     * [com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase],
-     * analogous to [FavoritesRepository.cleanupFavoriteComponents]. The
-     * empty-installed guard lives at the caller (guard on an empty app list),
-     * so a cold start does not wipe the hidden set.
+     * Reconciles the hidden set against the loaded app list, gating each
+     * removal through [isStillPresent] — analogous to
+     * [FavoritesRepository.reconcileFavoriteComponents] (RECONCILE_FIX_SPEC
+     * R-INV-2). A hidden component absent from [installedComponentNames] is only
+     * a candidate; it is removed only if [isStillPresent] returns false. The
+     * candidate read and the delete are the same fail-closed store read; the
+     * empty-installed guard lives at the caller.
      */
-    suspend fun cleanupHiddenComponents(installedComponentNames: List<String>)
+    suspend fun reconcileHiddenComponents(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    )
 }

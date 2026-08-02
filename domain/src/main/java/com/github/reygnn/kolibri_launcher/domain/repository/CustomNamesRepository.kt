@@ -12,14 +12,17 @@ interface CustomNamesRepository : Purgeable {
     suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean
 
     /**
-     * Removes any custom name whose package is not in [installedPackageNames]
-     * (app uninstalled). Custom names are package- (not component-) based, so
-     * matching is done against package names. Called after every successful
-     * app load from
-     * [com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase],
-     * analogous to [FavoritesRepository.cleanupFavoriteComponents]. The
-     * empty-installed guard lives at the caller (guard on an empty app list),
-     * so a cold start does not wipe custom names.
+     * Reconciles custom names against the loaded app list, gating each removal
+     * through [isStillPresent] — analogous to
+     * [FavoritesRepository.reconcileFavoriteComponents] (RECONCILE_FIX_SPEC
+     * R-INV-2). Custom names are package- (not component-) based, so
+     * [isStillPresent] receives a package name. A name whose package is absent
+     * from [installedPackageNames] is only a candidate; it is removed only if
+     * [isStillPresent] returns false. Same fail-closed read for candidate and
+     * delete; empty-installed guard lives at the caller.
      */
-    suspend fun cleanupCustomNames(installedPackageNames: List<String>)
+    suspend fun reconcileCustomNames(
+        installedPackageNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    )
 }

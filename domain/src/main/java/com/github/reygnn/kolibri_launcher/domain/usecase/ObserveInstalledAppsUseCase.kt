@@ -14,7 +14,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retry
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
@@ -100,35 +99,39 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                         // empty-input guard lives above (realApps.isEmpty()).
                         //
                         // The loaded list is only a removal-CANDIDATE finder, not
-                        // ground truth (RECONCILE_SPEC §3, R-INV): an assignment
-                        // absent from it is verified through PackagePresence before
-                        // being dropped, and a still-present target is added back
-                        // into the effective valid set (a "veto"). This is what
-                        // makes a partial or transient load unable to prune a
-                        // still-installed app. Verification runs only on candidates
-                        // (usually none), so the steady state costs nothing beyond
-                        // the existing intersect.
+                        // ground truth (RECONCILE_FIX_SPEC R-INV-2): each store
+                        // reconciles its own assignments against the list and gates
+                        // every deletion through PackagePresence — a candidate the
+                        // check reports present is kept. Candidate-read and delete
+                        // are the SAME fail-closed store read inside the repo, so a
+                        // partial or transient load cannot prune a still-installed
+                        // assignment. Verification runs only on candidates (usually
+                        // none), so the steady state costs nothing extra.
                         //
-                        // Still four separate cleanup calls by design, one per
-                        // repository: each store owns its keys behind its own
-                        // interface; merging the writes would break that boundary.
+                        // Four separate reconcile calls by design, one per
+                        // repository (each owns its keys); runCleanup isolates a
+                        // per-store failure so one bad store can't skip the others.
                         val validComponents = realApps.map { it.componentName }
                         val validPackages = realApps.map { it.packageName }
-                        val effectiveValidComponents =
-                            validComponents + vetoedComponents(validComponents.toHashSet())
-                        val effectiveValidPackages =
-                            validPackages + vetoedPackages(validPackages.toHashSet())
                         runCleanup("favorites") {
-                            favoritesRepository.cleanupFavoriteComponents(effectiveValidComponents)
+                            favoritesRepository.reconcileFavoriteComponents(validComponents) {
+                                packagePresence.isComponentPresent(it)
+                            }
                         }
                         runCleanup("swipe actions") {
-                            swipeActionsRepository.cleanupSwipeActions(effectiveValidComponents)
+                            swipeActionsRepository.reconcileSwipeActions(validComponents) {
+                                packagePresence.isComponentPresent(it)
+                            }
                         }
                         runCleanup("hidden components") {
-                            hiddenAppsRepository.cleanupHiddenComponents(effectiveValidComponents)
+                            hiddenAppsRepository.reconcileHiddenComponents(validComponents) {
+                                packagePresence.isComponentPresent(it)
+                            }
                         }
                         runCleanup("custom names") {
-                            customNamesRepository.cleanupCustomNames(effectiveValidPackages)
+                            customNamesRepository.reconcileCustomNames(validPackages) {
+                                packagePresence.isPackagePresent(it)
+                            }
                         }
 
                         // Wichtig: Den zentralen State aktualisieren
@@ -159,34 +162,6 @@ class ObserveInstalledAppsUseCase @Inject constructor(
      * swallowed) so a cancelled load propagates promptly instead of falling
      * through to the state update and Success emit.
      */
-    /**
-     * Component-keyed assignments (favorites + swipe + hidden) that are absent
-     * from [validComponents] — i.e. removal candidates — but that
-     * [PackagePresence] still reports present. These are VETOED: added back to
-     * the effective valid set so cleanup keeps them. A partial load thus cannot
-     * prune a still-installed app; a genuinely-gone one still fails the check
-     * and is removed. CancellationException propagates from the reads/checks.
-     */
-    private suspend fun vetoedComponents(validComponents: Set<String>): Set<String> {
-        val assigned = HashSet<String>()
-        assigned += favoritesRepository.favoriteComponentsFlow.first()
-        assigned += hiddenAppsRepository.hiddenAppsFlow.first()
-        swipeActionsRepository.swipeLeftAppFlow.first()?.let { assigned += it }
-        swipeActionsRepository.swipeRightAppFlow.first()?.let { assigned += it }
-
-        val candidates = assigned - validComponents
-        return candidates.filterTo(HashSet()) { packagePresence.isComponentPresent(it) }
-    }
-
-    /**
-     * Package-keyed custom-name assignments absent from [validPackages] that
-     * [PackagePresence] still reports present — vetoed, see [vetoedComponents].
-     */
-    private suspend fun vetoedPackages(validPackages: Set<String>): Set<String> {
-        val candidates = customNamesRepository.getAllCustomNames().keys - validPackages
-        return candidates.filterTo(HashSet()) { packagePresence.isPackagePresent(it) }
-    }
-
     private suspend fun runCleanup(label: String, cleanup: suspend () -> Unit) {
         try {
             cleanup()

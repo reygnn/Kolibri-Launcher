@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import timber.log.Timber
@@ -135,28 +136,36 @@ open class SwipeActionsRepositoryImpl private constructor(
         }
     }
 
-    override suspend fun cleanupSwipeActions(installedComponentNames: List<String>) {
-        try {
-            val installedSet = installedComponentNames.toSet()
-            dataStore.edit { preferences ->
-                // Remove each slot whose target is no longer installed. Log only
-                // the slot, never the componentName (PII), and never crash — on
-                // failure the current state is kept.
-                val left = preferences[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT]
-                if (left != null && left !in installedSet) {
-                    preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
-                    Timber.w("Removed orphaned LEFT swipe action")
-                }
-                val right = preferences[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT]
-                if (right != null && right !in installedSet) {
-                    preferences.remove(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
-                    Timber.w("Removed orphaned RIGHT swipe action")
-                }
+    override suspend fun reconcileSwipeActions(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    ) {
+        // FAIL-CLOSED read (propagates; NOT the fail-open shared flow). No
+        // try/catch — errors propagate to the caller's runCleanup (R-INV-2).
+        val current = dataStore.data.first()
+        val installedSet = installedComponentNames.toSet()
+        val orphans = listOfNotNull(
+            current[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT],
+            current[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT],
+        ).filterTo(HashSet()) { it !in installedSet }
+        if (orphans.isEmpty()) return
+
+        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
+        if (verifiedAbsent.isEmpty()) return
+
+        dataStore.edit { preferences ->
+            // VALUE-GUARD (RECONCILE_FIX_SPEC §2/§5): a slot is keyed, not the
+            // target, so re-read the slot value INSIDE the edit and clear it only
+            // if it STILL holds a verified-absent component — never a blind
+            // remove(slot), which would clobber a concurrent reassignment.
+            if (preferences[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT] in verifiedAbsent) {
+                preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
+                Timber.w("Removed orphaned LEFT swipe action")
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to cleanup swipe actions, keeping current state")
+            if (preferences[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT] in verifiedAbsent) {
+                preferences.remove(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
+                Timber.w("Removed orphaned RIGHT swipe action")
+            }
         }
     }
 

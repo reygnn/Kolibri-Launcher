@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakePackagePresence
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -124,7 +125,7 @@ class ObserveInstalledAppsUseCaseTest {
     // =========================================================================
 
     @Test
-    fun `invoke calls cleanupFavoriteComponents with correct componentNames`() = runTest {
+    fun `invoke calls reconcileFavoriteComponents with correct componentNames`() = runTest {
         // Arrange
         installedAppsRepository.installedApps = testApps
 
@@ -199,6 +200,7 @@ class ObserveInstalledAppsUseCaseTest {
         val orphanComponent = "com.gone/com.gone.Main"
         val orphanPkg = "com.gone"
 
+        favoritesRepository.saveFavoriteComponents(listOf(stillInstalled, orphanComponent))
         hiddenAppsRepository.hiddenApps = setOf(stillInstalled, orphanComponent)
         swipeActionsRepository.swipeLeftApp = stillInstalled
         swipeActionsRepository.swipeRightApp = orphanComponent
@@ -218,10 +220,12 @@ class ObserveInstalledAppsUseCaseTest {
         }
 
         // Vetoed (verified-present) assignments survive the partial load...
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(stillInstalled)
         assertThat(hiddenAppsRepository.hiddenApps).contains(stillInstalled)
         assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(stillInstalled)
         assertThat(customNamesRepository.getAllCustomNames()).containsKey(stillInstalledPkg)
-        // ...while the genuine orphan is still removed.
+        // ...while the genuine orphan is still removed (M3 covers favorites too).
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(orphanComponent)
         assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(orphanComponent)
         assertThat(swipeActionsRepository.swipeRightApp).isNull()
         assertThat(customNamesRepository.getAllCustomNames()).doesNotContainKey(orphanPkg)
@@ -412,10 +416,18 @@ class ObserveInstalledAppsUseCaseTest {
         override suspend fun isFavoriteComponent(componentName: String?) =
             componentName in flow.value
 
-        override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
+        override suspend fun reconcileFavoriteComponents(
+            installedComponentNames: List<String>,
+            isStillPresent: suspend (String) -> Boolean,
+        ) {
             cleanupCallCount++
             lastCleanupComponentNames = installedComponentNames
             throwOnCleanup?.let { throw it }
+            // Real predicate-gated removal (RECONCILE_FIX_SPEC M3) so the favorites
+            // veto branch is exercisable, not just call-tracked.
+            val orphans = flow.value - installedComponentNames.toSet()
+            val verifiedAbsent = orphans.filterTo(HashSet()) { !isStillPresent(it) }
+            flow.value = flow.value - verifiedAbsent
         }
 
         override suspend fun toggleFavoriteComponent(componentName: String) = true

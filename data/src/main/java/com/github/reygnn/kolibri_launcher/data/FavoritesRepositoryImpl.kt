@@ -68,12 +68,13 @@ import javax.inject.Singleton
  * Components are identified by their full component name string:
  * `"packageName/activityClassName"` (e.g., "com.android.chrome/.MainActivity")
  *
- * **Cleanup Mechanism:**
- * `cleanupFavoriteComponents()` removes favorites for uninstalled apps by:
- * - Taking intersection with currently installed components
- * - Logging removal count for debugging
- * - Preserving backup in debug builds
- * - Failing gracefully on errors (keeps current state)
+ * **Reconcile Mechanism:**
+ * `reconcileFavoriteComponents()` removes favorites for uninstalled apps by:
+ * - Computing orphans (favorites absent from the loaded app list)
+ * - Gating each orphan through the injected presence predicate; a still-present
+ *   one is vetoed (kept) — RECONCILE_FIX_SPEC R-INV-2
+ * - Reading candidate and deleting from the SAME fail-closed store read (a read
+ *   error propagates and deletes nothing), and removing value-scoped in `edit{}`
  *
  * **Data Flow:**
  * 1. User toggles favorite via UI
@@ -86,7 +87,8 @@ import javax.inject.Singleton
  * All operations return Boolean success indicators or use default values on failure.
  * IOException from DataStore is caught and results in empty set emission.
  * [java.util.concurrent.CancellationException] is always re-thrown for proper coroutine cancellation.
- * Cleanup failures preserve current state rather than clearing favorites.
+ * `reconcileFavoriteComponents()` is deliberately fail-closed: a read/edit error
+ * propagates (no swallow) so the caller's runCleanup skips it and deletes nothing.
  *
  * @property dataStore Preferences DataStore for persisting favorites set
  * @property externalScope Application scope for hot Flow sharing (null in tests)
@@ -230,31 +232,31 @@ constructor(
         }
     }
 
-    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
-        try {
-            dataStore.edit { preferences ->
-                val currentFavorites = preferences[PreferencesKeys.FAVORITES] ?: emptySet()
-                if (currentFavorites.isEmpty()) return@edit
+    override suspend fun reconcileFavoriteComponents(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    ) {
+        // FAIL-CLOSED read (propagates IOException; deliberately NOT the fail-open
+        // shared flow / safeReadFlow): candidate read and delete are the same
+        // authority (RECONCILE_FIX_SPEC R-INV-2). No try/catch here — errors
+        // propagate to the caller's runCleanup, which skips this store.
+        val current = dataStore.data.first()[PreferencesKeys.FAVORITES] ?: emptySet()
+        val orphans = current - installedComponentNames.toSet()
+        if (orphans.isEmpty()) return
 
-                val installedSet = installedComponentNames.toSet()
-                val cleanedFavorites = currentFavorites.intersect(installedSet)
+        // Gate every candidate through PackagePresence; a present one is vetoed.
+        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
+        if (verifiedAbsent.isEmpty()) return
 
-                if (cleanedFavorites.size < currentFavorites.size) {
-                    val removedCount = currentFavorites.size - cleanedFavorites.size
-                    Timber.w("Removed $removedCount invalid favorites")
-
-                    if (TimberWrapper.isDebugBuild) {
-                        Timber.d("Backup favorites before cleanup: $currentFavorites")
-                    }
-
-                    preferences[PreferencesKeys.FAVORITES] = cleanedFavorites
-                }
+        dataStore.edit { preferences ->
+            // Value-scoped: re-read inside the edit and subtract the verified-absent
+            // set, so a concurrently-added favorite survives.
+            val now = preferences[PreferencesKeys.FAVORITES] ?: return@edit
+            val cleaned = now - verifiedAbsent
+            if (cleaned.size < now.size) {
+                Timber.w("Removed ${now.size - cleaned.size} orphaned favorites")
+                preferences[PreferencesKeys.FAVORITES] = cleaned
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            TimberWrapper.silentError(e, "Failed to cleanup favorites, keeping current state")
-            // Nicht crashen, einfach den aktuellen Zustand behalten
         }
     }
 

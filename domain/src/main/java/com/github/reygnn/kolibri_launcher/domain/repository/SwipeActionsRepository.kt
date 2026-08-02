@@ -31,13 +31,19 @@ interface SwipeActionsRepository : Purgeable {
     suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?)
 
     /**
-     * Removes any slot assignment whose componentName is not in
-     * [installedComponentNames] (app uninstalled). Called after every
-     * successful app load from
-     * [com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase],
-     * analogous to [FavoritesRepository.cleanupFavoriteComponents]. The
-     * empty-installed guard lives at the caller (guard on an empty app list),
-     * so a cold start does not wipe assignments.
+     * Reconciles the swipe slots against the loaded app list, gating each
+     * removal through [isStillPresent] — analogous to
+     * [FavoritesRepository.reconcileFavoriteComponents] (RECONCILE_FIX_SPEC
+     * R-INV-2). A slot whose component is absent from [installedComponentNames]
+     * is only a candidate; it is cleared only if [isStillPresent] returns false.
+     *
+     * Slot-keyed store: the delete re-reads each slot INSIDE `edit{}` and clears
+     * it only if it STILL holds a verified-absent component (value-guard, §2/§5)
+     * — never a blind `remove(slot)`, which would clobber a concurrent
+     * reassignment. Fail-closed read; empty-installed guard lives at the caller.
      */
-    suspend fun cleanupSwipeActions(installedComponentNames: List<String>)
+    suspend fun reconcileSwipeActions(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    )
 }

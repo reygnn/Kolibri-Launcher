@@ -101,11 +101,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             // Android-free. Only ADDED/REMOVED reach here (guards above), and a
             // replace-removal was already filtered, so REMOVED is a genuine
             // uninstall.
-            val event = if (action == Intent.ACTION_PACKAGE_ADDED) {
-                PackageEvent.Added(packageName)
-            } else {
-                PackageEvent.Removed(packageName)
-            }
+            val event = mapToPackageEvent(action, packageName)
 
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -128,6 +124,19 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             safeOnFinish(onFinish)
         }
     }
+
+    /**
+     * Maps a relevant package action to a typed [PackageEvent]. Only ADDED/
+     * REMOVED reach the caller (guards in [handleReceive]); a genuine uninstall
+     * (REMOVED, replace already filtered) is the non-ADDED case.
+     */
+    @VisibleForTesting
+    internal fun mapToPackageEvent(action: String, packageName: String): PackageEvent =
+        if (action == Intent.ACTION_PACKAGE_ADDED) {
+            PackageEvent.Added(packageName)
+        } else {
+            PackageEvent.Removed(packageName)
+        }
 
     private suspend fun processPackageUpdate(context: Context, event: PackageEvent, onFinish: () -> Unit) {
         try {

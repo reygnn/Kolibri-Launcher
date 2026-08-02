@@ -22,6 +22,7 @@ import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 import kotlin.test.assertFailsWith
 
 class CustomNamesRepositoryImplTest {
@@ -45,6 +46,18 @@ class CustomNamesRepositoryImplTest {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
         customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger)
+    }
+
+    @Test
+    fun `reconcileCustomNames - when DataStore edit fails - propagates (fail-closed)`() = runTest {
+        val key = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
+        fakeDataStore.setInitialData(preferencesOf(key to "Drop"))
+        fakeDataStore.makeEditFail()
+        // Orphan com.gone, predicate reports it absent -> edit attempted -> throws
+        // (no swallow; the skip is enforced upstream by runCleanup, §6.6).
+        assertFailsWith<IOException> {
+            customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
+        }
     }
 
     // ========== EXISTING TESTS ==========
@@ -235,12 +248,12 @@ class CustomNamesRepositoryImplTest {
     }
 
     @Test
-    fun `cleanupCustomNames - removes orphans but does NOT trigger update`() = runTest {
+    fun `reconcileCustomNames - removes orphans but does NOT trigger update`() = runTest {
         val validKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.installed")
         val orphanKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
         fakeDataStore.setInitialData(preferencesOf(validKey to "Keep", orphanKey to "Drop"))
 
-        customNamesManager.cleanupCustomNames(listOf("com.installed"))
+        customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
 
         // Orphan gone, valid kept.
         Assert.assertEquals(mapOf("com.installed" to "Keep"), customNamesManager.getAllCustomNames())

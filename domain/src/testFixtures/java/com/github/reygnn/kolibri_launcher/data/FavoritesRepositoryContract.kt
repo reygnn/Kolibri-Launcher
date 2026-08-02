@@ -268,37 +268,46 @@ abstract class FavoritesRepositoryContract {
         assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
     }
 
-    // ---------- cleanupFavoriteComponents ----------
+    // ---------- reconcileFavoriteComponents ----------
 
     @Test
-    fun `cleanupFavoriteComponents keeps only components in installed list`() = runTest {
+    fun `reconcileFavoriteComponents keeps only components in installed list`() = runTest {
         val repo = createRepository()
         repo.saveFavoriteComponents(listOf(compA, compB, compC))
-        repo.cleanupFavoriteComponents(listOf(compA, compC))
+        repo.reconcileFavoriteComponents(listOf(compA, compC)) { false }
         assertEquals(setOf(compA, compC), repo.favoriteComponentsFlow.first())
     }
 
     @Test
-    fun `cleanupFavoriteComponents with all favorites installed changes nothing`() = runTest {
+    fun `reconcileFavoriteComponents with all favorites installed changes nothing`() = runTest {
         val repo = createRepository()
         repo.saveFavoriteComponents(listOf(compA, compB))
-        repo.cleanupFavoriteComponents(listOf(compA, compB, compC))
+        repo.reconcileFavoriteComponents(listOf(compA, compB, compC)) { false }
         assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
     }
 
     @Test
-    fun `cleanupFavoriteComponents with empty installed list clears favorites`() = runTest {
+    fun `reconcileFavoriteComponents with empty installed list clears favorites`() = runTest {
         val repo = createRepository()
         repo.saveFavoriteComponents(listOf(compA, compB))
-        repo.cleanupFavoriteComponents(emptyList())
+        repo.reconcileFavoriteComponents(emptyList()) { false }
         assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
     }
 
     @Test
-    fun `cleanupFavoriteComponents on empty repository stays empty`() = runTest {
+    fun `reconcileFavoriteComponents on empty repository stays empty`() = runTest {
         val repo = createRepository()
-        repo.cleanupFavoriteComponents(listOf(compA, compB))
+        repo.reconcileFavoriteComponents(listOf(compA, compB)) { false }
         assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+    }
+
+    @Test
+    fun `reconcileFavoriteComponents keeps an orphan the presence check reports present`() = runTest {
+        val repo = createRepository()
+        repo.saveFavoriteComponents(listOf(compA, compB))
+        // compB is absent from the load but the presence predicate vetoes its removal.
+        repo.reconcileFavoriteComponents(listOf(compA)) { it == compB }
+        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
     }
 
     // ---------- purgeRepository ----------

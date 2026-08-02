@@ -40,8 +40,13 @@ class FakeFavoritesRepository : FavoritesRepository {
         }
     }
 
-    override suspend fun cleanupFavoriteComponents(installedComponentNames: List<String>) {
-        favorites = favorites.intersect(installedComponentNames.toSet())
+    override suspend fun reconcileFavoriteComponents(
+        installedComponentNames: List<String>,
+        isStillPresent: suspend (String) -> Boolean,
+    ) {
+        val orphans = favorites - installedComponentNames.toSet()
+        val verifiedAbsent = orphans.filterTo(HashSet()) { !isStillPresent(it) }
+        favorites = favorites - verifiedAbsent
     }
 
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {

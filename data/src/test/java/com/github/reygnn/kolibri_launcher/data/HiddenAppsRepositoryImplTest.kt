@@ -18,6 +18,7 @@ import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 import kotlin.test.assertFailsWith
 
 class HiddenAppsRepositoryImplTest {
@@ -41,6 +42,17 @@ class HiddenAppsRepositoryImplTest {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
         hiddenAppsManager = HiddenAppsRepositoryImpl(fakeDataStore)
+    }
+
+    @Test
+    fun `reconcileHiddenComponents - when DataStore edit fails - propagates (fail-closed)`() = runTest {
+        fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.app1/Component")))
+        fakeDataStore.makeEditFail()
+        // Orphan com.app1, predicate reports it absent -> edit attempted -> throws
+        // (no swallow; the skip is enforced upstream by runCleanup, §6.6).
+        assertFailsWith<IOException> {
+            hiddenAppsManager.reconcileHiddenComponents(listOf("com.other/Component")) { false }
+        }
     }
 
     // ========== EXISTING TESTS ==========

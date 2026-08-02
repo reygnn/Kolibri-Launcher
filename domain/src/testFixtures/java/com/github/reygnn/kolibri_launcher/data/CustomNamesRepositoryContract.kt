@@ -385,16 +385,16 @@ abstract class CustomNamesRepositoryContract {
         assertEquals("Valid", repo.getDisplayNameForPackage(pkgC, "OriginalC"))
     }
 
-    // ---------- cleanupCustomNames ----------
+    // ---------- reconcileCustomNames ----------
 
     @Test
-    fun `cleanupCustomNames keeps only names for installed packages`() = runTest {
+    fun `reconcileCustomNames keeps only names for installed packages`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Name A")
         repo.setCustomNameForPackage(pkgB, "Name B")
         repo.setCustomNameForPackage(pkgC, "Name C")
 
-        repo.cleanupCustomNames(listOf(pkgA, pkgC))
+        repo.reconcileCustomNames(listOf(pkgA, pkgC)) { false }
 
         assertTrue(repo.hasCustomNameForPackage(pkgA))
         assertFalse(repo.hasCustomNameForPackage(pkgB))
@@ -402,32 +402,41 @@ abstract class CustomNamesRepositoryContract {
     }
 
     @Test
-    fun `cleanupCustomNames with all packages installed changes nothing`() = runTest {
+    fun `reconcileCustomNames with all packages installed changes nothing`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Name A")
         repo.setCustomNameForPackage(pkgB, "Name B")
 
-        repo.cleanupCustomNames(listOf(pkgA, pkgB, pkgC))
+        repo.reconcileCustomNames(listOf(pkgA, pkgB, pkgC)) { false }
 
         assertEquals(mapOf(pkgA to "Name A", pkgB to "Name B"), repo.getAllCustomNames())
     }
 
     @Test
-    fun `cleanupCustomNames with empty installed list clears all names`() = runTest {
+    fun `reconcileCustomNames with empty installed list clears all names`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Name A")
         repo.setCustomNameForPackage(pkgB, "Name B")
 
-        repo.cleanupCustomNames(emptyList())
+        repo.reconcileCustomNames(emptyList()) { false }
 
         assertEquals(emptyMap<String, String>(), repo.getAllCustomNames())
     }
 
     @Test
-    fun `cleanupCustomNames on empty repository stays empty`() = runTest {
+    fun `reconcileCustomNames on empty repository stays empty`() = runTest {
         val repo = createRepository()
-        repo.cleanupCustomNames(listOf(pkgA, pkgB))
+        repo.reconcileCustomNames(listOf(pkgA, pkgB)) { false }
         assertEquals(emptyMap<String, String>(), repo.getAllCustomNames())
+    }
+
+    @Test
+    fun `reconcileCustomNames keeps a name the presence check reports present`() = runTest {
+        val repo = createRepository()
+        repo.setCustomNameForPackage(pkgA, "Name A")
+        // pkgA absent from the load but the presence predicate vetoes removal.
+        repo.reconcileCustomNames(emptyList()) { it == pkgA }
+        assertTrue(repo.hasCustomNameForPackage(pkgA))
     }
 
     // ---------- purgeRepository ----------

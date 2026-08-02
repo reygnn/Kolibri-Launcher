@@ -10,12 +10,20 @@ und der belegte Defekt, dann die Zielinvariante, dann die baubaren Deltas
 separates `ACRA_FLOW.md` aufsetzt, ist diese Spec selbsttragend — Reconcile hat
 kein eigenes Architektur-Doc.
 
-**Status: UMGESETZT** — der Defekt aus §0.2 ist geschlossen. Beim Umsetzen von §9
-löste die schlankere **Verifikations-Veto**-Variante die event-targeted
-Ersetzung (§2–§6) ab; siehe „Umsetzung (as-built)" direkt unten. Die beiden
-Gabelungen (`SPEC-DECISION R-1` = Component-/Paket-genau + fail-safe; `R-2` =
-ursprünglich „Welt-Diff ersetzen") sind in §10 dokumentiert; R-2 wurde vom Veto
-neu gerahmt (Welt-Diff bleibt als Kandidaten-Finder).
+**Status: UMGESETZT, danach zu R-INV-2 gehärtet.** Der ursprüngliche
+Verifikations-Veto (§0.2-Fix, Commit `7bd7a77e`) hatte ein vom Multi-Agent-Review
+gefundenes Rest-Loch: der Veto las Lösch-Kandidaten aus einem *anderen* Read als
+dem, aus dem `cleanup*` löschte (Read-Divergenz, fail-open). Der Fix dafür ist in
+**`RECONCILE_FIX_SPEC.md`** (R-INV-2): pro-Store `reconcileX(installed,
+isStillPresent)` — eine **fail-closed** Read-Autorität pro Store, wert-scoped
+Delete, In-Edit-Wert-Guard für den Slot-keyed Swipe-Store. Damit ist die
+Read-Divergenz strukturell weg. Die folgenden Abschnitte beschreiben den
+*ursprünglichen* Veto (Design-Record); der aktuelle Stand ist R-INV-2.
+
+Beim Umsetzen von §9 löste die schlankere **Verifikations-Veto**-Variante die
+event-targeted Ersetzung (§2–§6) ab; siehe „Umsetzung (as-built)" direkt unten.
+Die beiden Gabelungen (`SPEC-DECISION R-1` = Component-/Paket-genau + fail-safe;
+`R-2` = ursprünglich „Welt-Diff ersetzen") sind in §10 dokumentiert.
 
 **Verhältnis zu bereits Gelandetem.**
 - Der `EXTRA_REPLACING`-Guard (Commit `4e719ff8`, „`fix(sync)`") ist **bereits

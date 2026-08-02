@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.content.Intent
+import com.github.reygnn.kolibri_launcher.core.PackageEvent
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -144,6 +145,24 @@ class PackageUpdateReceiverTest {
         Assert.assertTrue(
             "replace-removal should finish immediately without launching processing",
             finishCalled
+        )
+    }
+
+    // ========== Intent -> PackageEvent mapping (L1) ==========
+
+    @Test
+    fun `mapToPackageEvent - PACKAGE_ADDED maps to Added`() {
+        Assert.assertEquals(
+            PackageEvent.Added("com.example"),
+            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_ADDED, "com.example"),
+        )
+    }
+
+    @Test
+    fun `mapToPackageEvent - PACKAGE_REMOVED maps to Removed`() {
+        Assert.assertEquals(
+            PackageEvent.Removed("com.example"),
+            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_REMOVED, "com.example"),
         )
     }
 }
