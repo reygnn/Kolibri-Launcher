@@ -59,6 +59,24 @@ class FavoritesOrderRepositoryImplTest {
         )
     }
 
+    @Test
+    fun `getFavoriteComponentsOrderSnapshot - when the store read fails - returns empty (fail-open)`() = runTest {
+        // Fail-OPEN (non-destructive): a transient read IOException yields an empty
+        // list, never throws — the backup records empty rather than crashing the
+        // user-initiated export.
+        val orderKey = stringPreferencesKey("favorites_order_components_list_json")
+        val store = FakeDataStore()
+        store.setInitialData(
+            preferencesOf(orderKey to JSONArray(listOf("com.app1/Component")).toString())
+        )
+        val repo = FavoritesOrderRepositoryImpl.createForTesting(
+            store, this.backgroundScope, SharingStarted.Companion.Lazily
+        )
+        store.makeReadFail()
+
+        Assert.assertEquals(emptyList<String>(), repo.getFavoriteComponentsOrderSnapshot())
+    }
+
     // ========== EXISTING TESTS ==========
 
     @Test

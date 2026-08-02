@@ -466,6 +466,27 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
+    fun `getFavoriteComponentsSnapshot - when the store read fails - returns empty (fail-open)`() = runTest {
+        // The backup snapshot read is fail-OPEN (non-destructive): a transient
+        // read IOException yields an empty set, never throws — the backup records
+        // empty rather than crashing the user-initiated export. (Contrast the
+        // reconcile path, which is fail-CLOSED and propagates.)
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
+            fakeDataStore,
+            this.backgroundScope,
+            SharingStarted.Companion.Lazily
+        )
+        fakeDataStore.makeReadFail()
+
+        Assert.assertEquals(
+            emptySet<String>(),
+            favoritesRepositoryImpl.getFavoriteComponentsSnapshot()
+        )
+    }
+
+    @Test
     fun `addFavoriteComponent - when already favorite - still returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))

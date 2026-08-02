@@ -367,4 +367,59 @@ class FavoritesRepositoryImplShareInTest {
 
         scope.cancel()
     }
+
+    // ========================================================================
+    // 5. AUTHORITATIVE SNAPSHOT vs STALE REPLAY (backup-stale-read regression)
+    // ========================================================================
+
+    /**
+     * Discriminating regression test for the backup-stale-replay fix
+     * (`getFavoriteComponentsSnapshot`). Reproduces the exact production
+     * condition: the shared flow is warmed to an OLD value, its
+     * `WhileSubscribed` upstream then drops (replay=1 retains OLD), and the store
+     * changes to a NEW value with NO active subscriber — so the replay cache is
+     * stale while the store is fresh.
+     *
+     * We assert BOTH sides so the discrimination is self-proving, without
+     * touching production code:
+     *  - the authoritative snapshot returns the fresh store value (NEW), and
+     *  - the hot flow's replay is provably stale (OLD).
+     * A buggy impl reading `favoriteComponentsFlow.first()` would therefore
+     * return OLD and fail the snapshot assertion — exactly the pre-fix bug. The
+     * plain ImplTest "reads current value without a warm subscriber" test cannot
+     * catch this, because it never warms-then-stalls the flow.
+     */
+    @Test
+    fun `getFavoriteComponentsSnapshot returns the fresh store value while the shared flow replay is stale`() = runTest {
+        val scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob())
+        val fake = FakeDataStore()
+        fake.setInitialData(preferencesOf(favoritesKey to setOf(compA))) // OLD
+        val manager = buildManager(
+            fake, scope, SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
+        )
+
+        // Warm the shared flow so replay=1 caches OLD, then unsubscribe.
+        manager.favoriteComponentsFlow.test {
+            assertEquals(setOf(compA), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        testScheduler.runCurrent()
+
+        // Let WhileSubscribed drop the upstream; the replay cache (OLD) is retained.
+        advanceTimeBy(AppConstants.FLOW_SHARING_TIMEOUT_MS + 1000)
+        testScheduler.runCurrent()
+
+        // Change the store with NO active subscriber — the flow never observes it,
+        // so its replay stays OLD. Exactly the backup-screen situation.
+        manager.saveFavoriteComponents(listOf(compB)) // NEW
+        advanceUntilIdle()
+
+        // Authoritative snapshot returns the fresh store value...
+        assertEquals(setOf(compB), manager.getFavoriteComponentsSnapshot())
+        // ...while the hot flow's replay is provably stale (returns OLD). This is
+        // the discrimination: a buggy impl reading the flow would return OLD here.
+        assertEquals(setOf(compA), manager.favoriteComponentsFlow.first())
+
+        scope.cancel()
+    }
 }

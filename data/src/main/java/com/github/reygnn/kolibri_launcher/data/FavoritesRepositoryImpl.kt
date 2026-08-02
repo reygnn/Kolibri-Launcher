@@ -242,7 +242,14 @@ constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
-            // Fail-open, mirroring the flow (safeReadFlow → empty on IOException).
+            // Fail-open to empty on a transient read error — non-destructive: a
+            // backup that can't read favorites records empty rather than crashing
+            // the user-initiated export. Matches the flow's RELEASE behavior
+            // (safeReadFlow → empty on IOException). Deliberately Timber.w, NOT
+            // silentError: an IOException here is a real I/O failure, not a
+            // programmer error, so it must not throw in DEBUG — this is a conscious
+            // divergence from the flow (whose safeReadFlow DOES throw in DEBUG via
+            // silentError), so a DEBUG backup doesn't crash on a store hiccup.
             Timber.w(e, "Error reading favorites snapshot; treating as empty")
             emptySet()
         }
