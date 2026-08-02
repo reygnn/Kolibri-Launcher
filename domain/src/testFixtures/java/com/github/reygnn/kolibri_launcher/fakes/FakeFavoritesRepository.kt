@@ -56,6 +56,8 @@ class FakeFavoritesRepository : FavoritesRepository {
         favorites = componentNames.filter { it.isNotBlank() }.toSet()
     }
 
+    override suspend fun getFavoriteComponentsSnapshot(): Set<String> = favorites
+
     override suspend fun purgeRepository() {
         favorites = emptySet()
     }

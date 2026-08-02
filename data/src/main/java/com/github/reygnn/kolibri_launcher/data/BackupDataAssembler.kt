@@ -75,8 +75,13 @@ class BackupDataAssembler @Inject constructor(
      * images on top of this).
      */
     suspend fun buildBackupData(): BackupData {
-        val favoriteComponents = favoritesRepository.favoriteComponentsFlow.first()
-        val favoritesOrder = favoritesOrderRepository.favoriteComponentsOrderFlow.first()
+        // Favorites + FavoritesOrder are the only hot-shared flows here (shareIn,
+        // replay=1, WhileSubscribed); Home never keeps them warm while the backup
+        // screen is open, so a .first() replay could be stale. Read them
+        // authoritatively (fresh store snapshot). Hidden + the settings flows are
+        // COLD flows whose .first() is already a fresh disk read — left unchanged.
+        val favoriteComponents = favoritesRepository.getFavoriteComponentsSnapshot()
+        val favoritesOrder = favoritesOrderRepository.getFavoriteComponentsOrderSnapshot()
         val hiddenComponents = hiddenAppsRepository.hiddenAppsFlow.first()
         val customAppNames = customNamesRepository.getAllCustomNames()
         // Authoritative fresh reads (NOT the hot swipeXxxAppFlow replay cache):

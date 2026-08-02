@@ -14,9 +14,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONException
 import timber.log.Timber
+import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -283,6 +285,23 @@ open class FavoritesOrderRepositoryImpl private constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error removing component from order: $componentName")
             false
+        }
+    }
+
+    override suspend fun getFavoriteComponentsOrderSnapshot(): List<String> {
+        return try {
+            // Authoritative FRESH read (not the hot favoriteComponentsOrderFlow
+            // replay cache): the backup export runs while Home holds no
+            // subscriber, so a .first() on the shared flow could return a stale
+            // replayed list. Same JSON parsing (+ MAX_ORDER_LIST_SIZE cap) as the
+            // flow, via the shared parseOrderString.
+            parseOrderString(dataStore.data.first()[PreferencesKeys.ORDER_LIST])
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            // Fail-open, mirroring the flow (safeReadFlow → empty on IOException).
+            Timber.w(e, "Error reading favorites order snapshot; treating as empty")
+            emptyList()
         }
     }
 

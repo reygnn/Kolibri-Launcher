@@ -440,6 +440,32 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
+    fun `getFavoriteComponentsSnapshot - reads current value without a warm flow subscriber`() = runTest {
+        // Backup-stale-replay fix: the backup export reads favorites via the
+        // authoritative getFavoriteComponentsSnapshot, NOT the hot
+        // favoriteComponentsFlow (shareIn, replay=1). Here the favorites are
+        // changed with NO active collector on the flow — exactly the situation
+        // while the backup screen is open — and the read must return the NEW set,
+        // not a stale replay. (The runtime replay race is timing-based and not
+        // reproduced deterministically here; this pins the authoritative-read
+        // contract.)
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.old/Component")))
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
+            fakeDataStore,
+            this.backgroundScope,
+            SharingStarted.Companion.Lazily
+        )
+
+        favoritesRepositoryImpl.saveFavoriteComponents(listOf("com.new/Component"))
+
+        Assert.assertEquals(
+            setOf("com.new/Component"),
+            favoritesRepositoryImpl.getFavoriteComponentsSnapshot()
+        )
+    }
+
+    @Test
     fun `addFavoriteComponent - when already favorite - still returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))

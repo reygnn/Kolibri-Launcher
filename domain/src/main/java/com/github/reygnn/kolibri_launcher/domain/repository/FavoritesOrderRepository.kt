@@ -19,4 +19,14 @@ interface FavoritesOrderRepository : Purgeable {
      */
     suspend fun sortFavoriteComponents(favoriteApps: List<AppInfo>, order: List<String>): List<AppInfo>
     suspend fun saveOrder(orderedComponentNames : List<String>): Boolean
+
+    /**
+     * Reads the CURRENT favorites order straight from the store (fresh
+     * `dataStore.data.first()` + the same JSON parsing as the flow), bypassing
+     * the hot-shared [favoriteComponentsOrderFlow] replay cache. Used by the
+     * backup export, which runs while Home holds no subscriber and could
+     * otherwise capture a stale replayed list. Fail-open on I/O (empty list),
+     * mirroring the flow.
+     */
+    suspend fun getFavoriteComponentsOrderSnapshot(): List<String>
 }

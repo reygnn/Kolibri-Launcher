@@ -31,6 +31,34 @@ class FavoritesOrderRepositoryImplTest {
     private val dataStore: DataStore<Preferences> = mockk(relaxed = true)
 
 
+    // ========== getFavoriteComponentsOrderSnapshot (authoritative read for backup) ==========
+
+    @Test
+    fun `getFavoriteComponentsOrderSnapshot reads current order without a warm flow subscriber`() = runTest {
+        // Backup-stale-replay fix: the backup export reads the order via the
+        // authoritative getFavoriteComponentsOrderSnapshot, NOT the hot
+        // favoriteComponentsOrderFlow (shareIn, replay=1). Changed with NO active
+        // collector — the backup-screen situation — the read must return the NEW
+        // order, not a stale replay. (Runtime replay race is timing-based and not
+        // reproduced deterministically here; this pins the authoritative-read
+        // contract, including the shared JSON parsing.)
+        val orderKey = stringPreferencesKey("favorites_order_components_list_json")
+        val store = FakeDataStore()
+        store.setInitialData(
+            preferencesOf(orderKey to JSONArray(listOf("com.old/Component")).toString())
+        )
+        val repo = FavoritesOrderRepositoryImpl.createForTesting(
+            store, this.backgroundScope, SharingStarted.Companion.Lazily
+        )
+
+        repo.saveOrder(listOf("com.new.a/Component", "com.new.b/Component"))
+
+        Assert.assertEquals(
+            listOf("com.new.a/Component", "com.new.b/Component"),
+            repo.getFavoriteComponentsOrderSnapshot()
+        )
+    }
+
     // ========== EXISTING TESTS ==========
 
     @Test

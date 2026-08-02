@@ -241,6 +241,35 @@ abstract class FavoritesOrderRepositoryContract {
         assertEquals(listOf(appA, appB, appC), result)
     }
 
+    // ---------- getFavoriteComponentsOrderSnapshot (authoritative read for backup) ----------
+
+    @Test
+    fun `getFavoriteComponentsOrderSnapshot returns the saved order`() = runTest {
+        val repo = createRepository()
+        val order = listOf(appC.componentName, appA.componentName, appB.componentName)
+        repo.saveOrder(order)
+        assertEquals(order, repo.getFavoriteComponentsOrderSnapshot())
+    }
+
+    @Test
+    fun `getFavoriteComponentsOrderSnapshot reflects the LATEST save, never the previous one`() = runTest {
+        val repo = createRepository()
+        repo.saveOrder(listOf(appA.componentName))
+        repo.saveOrder(listOf(appB.componentName, appC.componentName))
+        // Core guarantee behind the backup-stale-replay fix: the snapshot read
+        // returns the newest persisted order, not the one it replaced.
+        assertEquals(
+            listOf(appB.componentName, appC.componentName),
+            repo.getFavoriteComponentsOrderSnapshot()
+        )
+    }
+
+    @Test
+    fun `getFavoriteComponentsOrderSnapshot on fresh repository is empty`() = runTest {
+        val repo = createRepository()
+        assertEquals(emptyList<String>(), repo.getFavoriteComponentsOrderSnapshot())
+    }
+
     // ---------- purgeRepository ----------
 
     @Test

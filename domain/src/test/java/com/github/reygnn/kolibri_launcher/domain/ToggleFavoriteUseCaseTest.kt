@@ -215,6 +215,8 @@ class ToggleFavoriteUseCaseTest {
             favorites = componentNames.toSet()
         }
 
+        override suspend fun getFavoriteComponentsSnapshot(): Set<String> = favorites
+
         override suspend fun purgeRepository() {
             favorites = emptySet()
         }

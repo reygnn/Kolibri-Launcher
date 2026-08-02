@@ -25,4 +25,13 @@ interface FavoritesRepository : Purgeable {
     suspend fun addFavoriteComponent(componentName: String): Boolean
     suspend fun removeFavoriteComponent(componentName: String): Boolean
     suspend fun saveFavoriteComponents(componentNames: List<String>)
+
+    /**
+     * Reads the CURRENT favorite components straight from the store (fresh
+     * `dataStore.data.first()`), bypassing the hot-shared [favoriteComponentsFlow]
+     * replay cache. Used by the backup export, which runs while Home holds no
+     * subscriber and could otherwise capture a stale replayed set. Fail-open: a
+     * read error yields the empty default (mirrors the flow), never throws for I/O.
+     */
+    suspend fun getFavoriteComponentsSnapshot(): Set<String>
 }

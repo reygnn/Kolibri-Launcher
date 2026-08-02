@@ -437,6 +437,8 @@ class ObserveInstalledAppsUseCaseTest {
             flow.value = componentNames.toSet()
         }
 
+        override suspend fun getFavoriteComponentsSnapshot(): Set<String> = flow.value
+
         override suspend fun purgeRepository() {
             flow.value = emptySet()
             lastCleanupComponentNames = null

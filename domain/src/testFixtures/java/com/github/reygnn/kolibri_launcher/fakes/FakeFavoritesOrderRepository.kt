@@ -45,6 +45,8 @@ class FakeFavoritesOrderRepository : FavoritesOrderRepository {
         return orderedApps + remainingApps
     }
 
+    override suspend fun getFavoriteComponentsOrderSnapshot(): List<String> = order
+
     override suspend fun purgeRepository() {
         orderState.value = emptyList()
         savedOrder = null

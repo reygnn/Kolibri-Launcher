@@ -89,6 +89,33 @@ abstract class FavoritesRepositoryContract {
         assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
     }
 
+    // ---------- getFavoriteComponentsSnapshot (authoritative read for backup) ----------
+
+    @Test
+    fun `getFavoriteComponentsSnapshot returns the current favorites`() = runTest {
+        val repo = createRepository()
+        repo.addFavoriteComponent(compA)
+        repo.addFavoriteComponent(compB)
+        assertEquals(setOf(compA, compB), repo.getFavoriteComponentsSnapshot())
+    }
+
+    @Test
+    fun `getFavoriteComponentsSnapshot reflects the LATEST change, never a previous one`() = runTest {
+        val repo = createRepository()
+        repo.addFavoriteComponent(compA)
+        repo.removeFavoriteComponent(compA)
+        repo.addFavoriteComponent(compB)
+        // Core guarantee behind the backup-stale-replay fix: the snapshot read
+        // returns the newest persisted set, not the one it replaced.
+        assertEquals(setOf(compB), repo.getFavoriteComponentsSnapshot())
+    }
+
+    @Test
+    fun `getFavoriteComponentsSnapshot on fresh repository is empty`() = runTest {
+        val repo = createRepository()
+        assertEquals(emptySet<String>(), repo.getFavoriteComponentsSnapshot())
+    }
+
     // ---------- addFavoriteComponent ----------
 
     @Test

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
+import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -229,6 +230,21 @@ constructor(
             throw e
         } catch (e: Exception) {
             TimberWrapper.silentError(e, "Error saving favorite components")
+        }
+    }
+
+    override suspend fun getFavoriteComponentsSnapshot(): Set<String> {
+        return try {
+            // Authoritative FRESH read (not the hot favoriteComponentsFlow replay
+            // cache): the backup export runs while Home holds no subscriber, so a
+            // .first() on the shared flow could return a stale replayed set.
+            dataStore.data.first()[PreferencesKeys.FAVORITES] ?: emptySet()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            // Fail-open, mirroring the flow (safeReadFlow → empty on IOException).
+            Timber.w(e, "Error reading favorites snapshot; treating as empty")
+            emptySet()
         }
     }
 
