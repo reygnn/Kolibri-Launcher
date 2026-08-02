@@ -88,6 +88,19 @@ class SwipeActionsRepositoryImplTest {
     }
 
     @Test
+    fun `getSwipeActionComponent - when the read fails - returns null (fail-open)`() = runTest {
+        // The launch read is fail-OPEN (unlike the fail-closed reconcile path): a
+        // transient IOException yields null -> NoAction, never a wrong app. This
+        // is the only fail-open read left in the repo since the swipe flows were
+        // removed, so it is pinned here directly.
+        val store = FakeDataStore()
+        store.setInitialData(preferencesOf(leftKey to "com.app/Component"))
+        val repo = newRepo(store)
+        store.makeReadFail()
+        Assert.assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+    }
+
+    @Test
     fun `reconcileSwipeActions - value guard - a slot reassigned during the presence check survives`() = runTest {
         val absent = "com.gone/Component"      // in LEFT at read time, verified absent
         val installed = "com.here/Component"   // reassigned into LEFT during the check
