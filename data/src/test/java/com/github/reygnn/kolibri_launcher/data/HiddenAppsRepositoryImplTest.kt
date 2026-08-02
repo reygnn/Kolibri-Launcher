@@ -55,6 +55,20 @@ class HiddenAppsRepositoryImplTest {
         }
     }
 
+    @Test
+    fun `reconcileHiddenComponents - when the candidate read fails - propagates (fail-closed)`() = runTest {
+        // The candidate read is fail-CLOSED (dataStore.data.first(), not the
+        // fail-open hiddenAppsFlow): a read error propagates so the caller's
+        // runCleanup skips the store and deletes nothing. A fail-open read would
+        // yield empty -> no candidate -> "nothing deleted" too, so only asserting
+        // the throw distinguishes fail-closed from the M1 regression (§6.1).
+        fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.app1/Component")))
+        fakeDataStore.makeReadFail()
+        assertFailsWith<IOException> {
+            hiddenAppsManager.reconcileHiddenComponents(listOf("com.other/Component")) { false }
+        }
+    }
+
     // ========== EXISTING TESTS ==========
 
     @Test

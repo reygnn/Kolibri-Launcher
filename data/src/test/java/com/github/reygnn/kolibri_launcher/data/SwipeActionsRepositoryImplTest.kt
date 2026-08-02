@@ -49,6 +49,22 @@ class SwipeActionsRepositoryImplTest {
     }
 
     @Test
+    fun `reconcileSwipeActions - when the candidate read fails - propagates (fail-closed)`() = runTest {
+        // The candidate read is fail-CLOSED (dataStore.data.first(), not the
+        // fail-open shared swipe flow): a read error propagates so the caller's
+        // runCleanup skips the store and deletes nothing. A fail-open read would
+        // yield empty -> no candidate -> "nothing deleted" too, so only asserting
+        // the throw distinguishes fail-closed from the M1 regression (§6.1).
+        val store = FakeDataStore()
+        store.setInitialData(preferencesOf(leftKey to "com.app1/Component"))
+        val repo = newRepo(store)
+        store.makeReadFail()
+        assertFailsWith<IOException> {
+            repo.reconcileSwipeActions(listOf("com.other/Component")) { false }
+        }
+    }
+
+    @Test
     fun `reconcileSwipeActions - value guard - a slot reassigned during the presence check survives`() = runTest {
         val absent = "com.gone/Component"      // in LEFT at read time, verified absent
         val installed = "com.here/Component"   // reassigned into LEFT during the check

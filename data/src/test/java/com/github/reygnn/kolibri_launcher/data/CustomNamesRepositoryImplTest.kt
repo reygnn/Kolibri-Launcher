@@ -60,6 +60,22 @@ class CustomNamesRepositoryImplTest {
         }
     }
 
+    @Test
+    fun `reconcileCustomNames - when the candidate read fails - propagates (fail-closed)`() = runTest {
+        // The candidate read is fail-CLOSED (dataStore.data.first(), NOT the
+        // swallow-to-empty getAllCustomNames the spec forbids): a read error
+        // propagates so the caller's runCleanup skips the store and deletes
+        // nothing. A fail-open read would yield empty -> no candidate ->
+        // "nothing deleted" too, so only asserting the throw distinguishes
+        // fail-closed from the M1 regression (§6.1).
+        val key = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
+        fakeDataStore.setInitialData(preferencesOf(key to "Drop"))
+        fakeDataStore.makeReadFail()
+        assertFailsWith<IOException> {
+            customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
+        }
+    }
+
     // ========== EXISTING TESTS ==========
 
     @Test
