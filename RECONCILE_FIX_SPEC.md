@@ -332,7 +332,14 @@ Methoden. `SPEC-DECISION F-2`, s. §8.)*
 
 ---
 
-## §8 Offene Entscheidung
+## §8 Entscheidungen (getroffen)
+
+- **`SPEC-DECISION F-1` — ENTSCHIEDEN: F-C** (Prädikat-im-Repo). Read+Delete beim Store-Besitzer;
+  die Read-Divergenz wird strukturell unmöglich.
+- **`SPEC-DECISION F-2` — ENTSCHIEDEN: atomar** (ein Commit, §7). Kompiliert erst am Ende grün;
+  Merge nur bei nachweislich grünen Suiten + Linter.
+
+Ursprüngliche Optionen zur Nachvollziehbarkeit:
 
 - **`SPEC-DECISION F-1` (wo lebt die Reconcile-Logik).**
   - **F-C (empfohlen, §2):** Prädikat-im-Repo. `reconcileX(installed, isStillPresent)`, das Repo
