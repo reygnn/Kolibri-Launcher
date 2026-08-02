@@ -14,8 +14,12 @@ Reihenfolge §7). Rev 3 arbeitet die 6 Funde aus Runde 2 ein — **kein** Soundn
 F-C und Swipe-Guard bestätigt), nur Präzision/Test-Plan: §6.1 pinnt jetzt den **assertThrows**-
 Vertrag (nicht nur „Store unverändert"), §6.6/§6.7 fordern **neue** Edit-Fail- und Swipe-Clobber-
 Tests statt nicht-existente, §7 „Stub erweitert, nicht gelöscht", §3 um KDoc-Cross-Refs ergänzt.
-Zwei offene Gabelungen vor der Umsetzung: `SPEC-DECISION F-1` (F-C vs F-B) und `F-2` (atomar vs.
-add-alongside); siehe §8.
+Nach drei Multi-Agent-Doc-Reviews **grün** (Runde 3: 0 Pipeline-Funde, ein letzter KDoc-Nit —
+`FavoritesRepositoryImpl.kt:72–89` semantisch statt nur umbenennen — eingearbeitet). Kern-Design
+(F-C) und Swipe-Wert-Guard über zwei Runden ohne Soundness-Fund bestätigt.
+
+Zwei offene Gabelungen, die **der Mensch vor der Umsetzung** entscheidet: `SPEC-DECISION F-1`
+(F-C vs F-B, Empfehlung F-C) und `F-2` (atomar vs. add-alongside, Empfehlung atomar); siehe §8.
 
 **Umsetzungs-Disziplin (bindend):** beim Übergang in den Code wird **erst gemergt, wenn alles
 nachweislich grün ist** (alle drei Modul-Suiten + Linter) — kein Merge auf rotem/ungetestetem
@@ -200,7 +204,8 @@ statt Prädikat-im-Repo) steht in §8 als `SPEC-DECISION F-1`.
 | `domain/src/test/.../ToggleFavoriteUseCaseTest.kt` (~:208) | anonymer `FavoritesRepository`-Implementierer: `override cleanupFavoriteComponents` → `reconcileFavoriteComponents`. |
 | `data/src/test/.../FavoritesRepositoryImplTest.kt` (~:129/:380/:404) + `CustomNamesRepositoryImplTest.kt` (~:243) | direkte Impl-Aufrufe `cleanup* → reconcile*` (Prädikat mitgeben). **Achtung:** `FavoritesRepositoryImplTest` „when DataStore edit fails - keeps current state" (~:387) pinnt den **heutigen Swallow**; §2 invertiert das (kein Swallow, propagiert) → dieser Test muss auf „wirft" umgestellt werden (Test-Plan §6.6). |
 | **Neue** Impl-Edit-Fail-Tests (§6.6) | Swipe/Hidden/CustomNames haben heute **keinen** Cleanup-Edit-Fail-Test; je einen **neu** schreiben (assertThrows). `SwipeActionsRepositoryImplTest.kt` **existiert nicht** und wird neu angelegt (heute nur Contract-Test). |
-| KDoc-/Prosa-Cross-Refs zum umbenannten `cleanupFavoriteComponents` | `CustomNamesRepository.kt:20`, `HiddenAppsRepository.kt:18`, `SwipeActionsRepository.kt:38` (`[FavoritesRepository.cleanupFavoriteComponents]`-@links) + `FavoritesRepositoryImpl.kt:72` (Prosa) auf `reconcileFavoriteComponents` nachziehen (sonst tote KDoc-Links). |
+| KDoc-Cross-Refs zum umbenannten `cleanupFavoriteComponents` | `CustomNamesRepository.kt:20`, `HiddenAppsRepository.kt:18`, `SwipeActionsRepository.kt:38` (`[FavoritesRepository.cleanupFavoriteComponents]`-@links) auf `reconcileFavoriteComponents` nachziehen (sonst tote KDoc-Links). |
+| `FavoritesRepositoryImpl.kt:72–89` (Klassen-KDoc „Cleanup Mechanism" + „Error Handling") | **Nicht nur Umbenennung — semantisch neu schreiben:** die Zeilen `:73` „Taking intersection with currently installed components", `:76` „Failing gracefully on errors (keeps current state)" und `:89` „Cleanup failures preserve current state rather than clearing favorites" beschreiben das **alte** Verhalten, das F-C **umkehrt** (Orphans − presence-verifiziert-abwesend; fail-**closed** Read, propagiert, kein Swallow). KDoc-Block entsprechend anpassen. |
 
 `PackagePresence`/`PackagePresenceImpl`/`FakePackagePresence` bleiben **unverändert** — sie waren
 korrekt; der Bug lag ausschließlich in der Read-Divergenz eine Ebene darüber.
