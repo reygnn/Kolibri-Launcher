@@ -29,6 +29,7 @@ class SwipeActionsRepositoryImplTest {
     val timberRule = TimberRule()
 
     private val leftKey = stringPreferencesKey("swipe_left_app_component")
+    private val rightKey = stringPreferencesKey("swipe_right_app_component")
 
     private fun TestScope.newRepo(store: FakeDataStore): SwipeActionsRepositoryImpl =
         SwipeActionsRepositoryImpl.createForTesting(
@@ -62,6 +63,35 @@ class SwipeActionsRepositoryImplTest {
         assertFailsWith<IOException> {
             repo.reconcileSwipeActions(listOf("com.other/Component")) { false }
         }
+    }
+
+    @Test
+    fun `getSwipeActionComponent - reads the current stored value without a warm flow subscriber`() = runTest {
+        // Swipe-stale-replay fix: the launch path reads the authoritative store
+        // value via getSwipeActionComponent, NOT the hot swipeXxxAppFlow
+        // (replay=1, WhileSubscribed). Here the assignment is changed with NO
+        // active collector on the flow — exactly the Home situation while the
+        // Settings activity is open — and the launch read must return the NEW
+        // value, not a stale replay. (The runtime replay race is timing-based
+        // and not reproduced deterministically here; this pins the fix's
+        // contract: getSwipeActionComponent is an authoritative fresh read that
+        // never depends on the flow being kept warm.)
+        val store = FakeDataStore()
+        store.setInitialData(preferencesOf(rightKey to "com.old/Component"))
+        val repo = newRepo(store)
+
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, "com.new/Component")
+
+        Assert.assertEquals(
+            "com.new/Component",
+            repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT),
+        )
+    }
+
+    @Test
+    fun `getSwipeActionComponent - returns null for an unassigned slot`() = runTest {
+        val repo = newRepo(FakeDataStore())
+        Assert.assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
     }
 
     @Test

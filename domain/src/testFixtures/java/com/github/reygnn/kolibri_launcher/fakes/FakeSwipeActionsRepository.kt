@@ -33,6 +33,13 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
         }
     }
 
+    override suspend fun getSwipeActionComponent(slot: SwipeSlot): String? =
+        when (slot) {
+            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> swipeLeftApp
+            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> swipeRightApp
+            SwipeSlot.NONE -> null
+        }
+
     override suspend fun reconcileSwipeActions(
         installedComponentNames: List<String>,
         isStillPresent: suspend (String) -> Boolean,

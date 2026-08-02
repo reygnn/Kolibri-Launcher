@@ -46,4 +46,17 @@ interface SwipeActionsRepository : Purgeable {
         installedComponentNames: List<String>,
         isStillPresent: suspend (String) -> Boolean,
     )
+
+    /**
+     * Reads the CURRENT component assigned to [slot] straight from the store,
+     * bypassing the hot-shared [swipeLeftAppFlow]/[swipeRightAppFlow] replay
+     * cache. The launch path needs the authoritative value: the shared flow
+     * (replay=1, WhileSubscribed) can hand back a stale replay on the first
+     * swipe after the assignment was changed in the Settings activity while
+     * Home held no subscriber — so the first swipe would launch the previously
+     * assigned app. Returns `null` for an unassigned slot, for [SwipeSlot.NONE],
+     * or on a transient read failure (non-destructive: no launch rather than a
+     * wrong app).
+     */
+    suspend fun getSwipeActionComponent(slot: SwipeSlot): String?
 }

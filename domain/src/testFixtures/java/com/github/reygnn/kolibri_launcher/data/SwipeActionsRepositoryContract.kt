@@ -262,6 +262,45 @@ abstract class SwipeActionsRepositoryContract {
         assertNull(repo.swipeRightAppFlow.first())
     }
 
+    // ---------- getSwipeActionComponent (authoritative read for the launch path) ----------
+
+    @Test
+    fun `getSwipeActionComponent returns the assigned LEFT component`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
+        assertEquals(appA, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+    }
+
+    @Test
+    fun `getSwipeActionComponent returns the assigned RIGHT component`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
+        assertEquals(appB, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
+    }
+
+    @Test
+    fun `getSwipeActionComponent reflects the LATEST assignment, never the previous one`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
+        // The core guarantee behind the swipe-stale-replay fix: the launch read
+        // returns the newest value, not the one it replaced.
+        assertEquals(appB, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
+    }
+
+    @Test
+    fun `getSwipeActionComponent returns null for an unassigned slot`() = runTest {
+        val repo = createRepository()
+        assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+    }
+
+    @Test
+    fun `getSwipeActionComponent returns null for NONE`() = runTest {
+        val repo = createRepository()
+        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
+        assertNull(repo.getSwipeActionComponent(SwipeSlot.NONE))
+    }
+
     @Test
     fun `purgeRepository clears both slots`() = runTest {
         val repo = createRepository()

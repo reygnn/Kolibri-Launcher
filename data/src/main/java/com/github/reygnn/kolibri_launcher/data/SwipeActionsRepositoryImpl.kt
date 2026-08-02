@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import timber.log.Timber
+import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -133,6 +134,32 @@ open class SwipeActionsRepositoryImpl private constructor(
             TimberWrapper.silentError(e, "Error saving swipe action for $slot")
             // Wir werfen den Fehler weiter, damit der Aufrufer (VM) darauf reagieren kann
             throw e
+        }
+    }
+
+    override suspend fun getSwipeActionComponent(slot: SwipeSlot): String? {
+        val key = when (slot) {
+            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> PreferencesKeys.SWIPE_LEFT_APP_COMPONENT
+            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT
+            SwipeSlot.NONE -> return null
+        }
+        return try {
+            // Authoritative FRESH read straight from the store — deliberately NOT
+            // swipeXxxAppFlow (hot shareIn, replay=1, WhileSubscribed): that
+            // flow's replay cache serves a stale value on the first swipe after
+            // the assignment was changed in the Settings activity while Home held
+            // no subscriber. The launch decision needs current truth, not a UI
+            // cache.
+            dataStore.data.first()[key]
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            // Expected failure mode (I/O), handled non-destructively: a transient
+            // read error yields no launch (NoAction), never a wrong app. Plain
+            // Timber.w (not silentError) — an IOException here is a real I/O
+            // failure, not a programmer error, so it must not throw in DEBUG.
+            Timber.w(e, "Error reading swipe action for $slot; treating as unassigned")
+            null
         }
     }
 

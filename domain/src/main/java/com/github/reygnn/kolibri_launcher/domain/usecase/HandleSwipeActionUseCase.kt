@@ -4,7 +4,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
-import kotlinx.coroutines.flow.first
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
 
@@ -23,13 +22,17 @@ class HandleSwipeActionUseCase @Inject constructor(
     }
 
     suspend operator fun invoke(slot: SwipeSlot): Result {
-        val componentName = when (slot) {
-            SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT -> swipeActionsRepository.swipeLeftAppFlow.first()
-            SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT -> swipeActionsRepository.swipeRightAppFlow.first()
-            // NONE is never passed by GestureDelegate; handle it explicitly
-            // instead of letting an else funnel it into the right-swipe flow.
-            SwipeSlot.NONE -> return Result.NoAction
-        }
+        // NONE is never passed by GestureDelegate; handle it explicitly instead
+        // of reading a slot for it.
+        if (slot == SwipeSlot.NONE) return Result.NoAction
+
+        // Read the CURRENT assignment straight from the store via
+        // getSwipeActionComponent, NOT the hot-shared swipeXxxAppFlow: that
+        // flow's replay cache can serve a stale value on the first swipe after
+        // the assignment was changed in the Settings activity while Home held no
+        // subscriber, launching the previously assigned app (fixed: authoritative
+        // fresh read).
+        val componentName = swipeActionsRepository.getSwipeActionComponent(slot)
 
         if (componentName == null) {
             KolibriLog.d("No app assigned to swipe $slot")
