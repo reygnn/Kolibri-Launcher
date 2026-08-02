@@ -8,11 +8,14 @@ schließt — er reintroduziert eine engere Variante genau der Klasse, die er be
 Dieses Dokument beschreibt das Problem und legt den Fix fest. Es ist **Plan, noch kein Code**:
 erst Doc-Review bis grün, dann Umsetzung nach §7.
 
-**Status:** Entwurf, **Revision 2** — überarbeitet nach einem Multi-Agent-Doc-Review (13 Agents,
-5 bestätigte Schwächen, alle eingearbeitet): Swipe-In-Edit-Wert-Guard (§2/§5), vollständiger
-Test-Blast-Radius + invertierter Edit-Fail-Test (§3/§6), ehrliche atomare Umsetzungs-Reihenfolge
-(§7). Zwei offene Gabelungen vor der Umsetzung: `SPEC-DECISION F-1` (F-C vs F-B) und `F-2`
-(atomar vs. add-alongside); siehe §8.
+**Status:** Entwurf, **Revision 3** — zwei Multi-Agent-Doc-Reviews durchlaufen. Rev 2 arbeitete die
+5 Funde aus Runde 1 ein (Swipe-In-Edit-Wert-Guard §2/§5, Test-Blast-Radius §3/§6, atomare
+Reihenfolge §7). Rev 3 arbeitet die 6 Funde aus Runde 2 ein — **kein** Soundness-Loch (Kern-Design
+F-C und Swipe-Guard bestätigt), nur Präzision/Test-Plan: §6.1 pinnt jetzt den **assertThrows**-
+Vertrag (nicht nur „Store unverändert"), §6.6/§6.7 fordern **neue** Edit-Fail- und Swipe-Clobber-
+Tests statt nicht-existente, §7 „Stub erweitert, nicht gelöscht", §3 um KDoc-Cross-Refs ergänzt.
+Zwei offene Gabelungen vor der Umsetzung: `SPEC-DECISION F-1` (F-C vs F-B) und `F-2` (atomar vs.
+add-alongside); siehe §8.
 
 **Umsetzungs-Disziplin (bindend):** beim Übergang in den Code wird **erst gemergt, wenn alles
 nachweislich grün ist** (alle drei Modul-Suiten + Linter) — kein Merge auf rotem/ungetestetem
@@ -196,6 +199,8 @@ statt Prädikat-im-Repo) steht in §8 als `SPEC-DECISION F-1`.
 | `app/src/test/.../ObserveInstalledAppsUseCaseTest.kt` — `TestFakeFavoritesRepository` (lokales Stub, ~:415) | Interface-Implementierer: `cleanupFavoriteComponents` → `reconcileFavoriteComponents`. **Zusätzlich** braucht das Stub jetzt echte prädikat-gegatete Entfernung (heute reiner Call-Tracker: `cleanupCallCount`/`lastCleanupComponentNames`, mutiert den Flow nie) — sonst kann der M3-Favorites-Fall (§6.3) „Orphan entfernt" nicht prüfen. `throwOnCleanup` bleibt (der Isolations-Test braucht es). |
 | `domain/src/test/.../ToggleFavoriteUseCaseTest.kt` (~:208) | anonymer `FavoritesRepository`-Implementierer: `override cleanupFavoriteComponents` → `reconcileFavoriteComponents`. |
 | `data/src/test/.../FavoritesRepositoryImplTest.kt` (~:129/:380/:404) + `CustomNamesRepositoryImplTest.kt` (~:243) | direkte Impl-Aufrufe `cleanup* → reconcile*` (Prädikat mitgeben). **Achtung:** `FavoritesRepositoryImplTest` „when DataStore edit fails - keeps current state" (~:387) pinnt den **heutigen Swallow**; §2 invertiert das (kein Swallow, propagiert) → dieser Test muss auf „wirft" umgestellt werden (Test-Plan §6.6). |
+| **Neue** Impl-Edit-Fail-Tests (§6.6) | Swipe/Hidden/CustomNames haben heute **keinen** Cleanup-Edit-Fail-Test; je einen **neu** schreiben (assertThrows). `SwipeActionsRepositoryImplTest.kt` **existiert nicht** und wird neu angelegt (heute nur Contract-Test). |
+| KDoc-/Prosa-Cross-Refs zum umbenannten `cleanupFavoriteComponents` | `CustomNamesRepository.kt:20`, `HiddenAppsRepository.kt:18`, `SwipeActionsRepository.kt:38` (`[FavoritesRepository.cleanupFavoriteComponents]`-@links) + `FavoritesRepositoryImpl.kt:72` (Prosa) auf `reconcileFavoriteComponents` nachziehen (sonst tote KDoc-Links). |
 
 `PackagePresence`/`PackagePresenceImpl`/`FakePackagePresence` bleiben **unverändert** — sie waren
 korrekt; der Bug lag ausschließlich in der Read-Divergenz eine Ebene darüber.
@@ -247,10 +252,14 @@ veraltete Kandidatensicht verrechnet.
 
 Regression-Guards für die drei Funde plus die zwei Test-Lücken:
 
-1. **M1/M2 fail-closed (der Kern-Regressionstest):** Bei einem Reconcile, dessen Zuweisungs-Read
-   `IOException` wirft, während die Ladung partiell ist (Ziel-App fehlt), darf **nichts** gelöscht
-   werden. Am Impl-Level (DataStore-Read wirft) oder Use-Case-Level (Fake-Repo, dessen `reconcileX`
-   den fail-closed Read simuliert werfen lässt) — der Store bleibt unverändert, R-INV-2 hält.
+1. **M1/M2 fail-closed (der Kern-Regressionstest):** Am Impl-Level: bei einem `reconcileX`, dessen
+   Zuweisungs-Read `IOException` wirft, MUSS `reconcileX` die Exception **propagieren** (assertThrows)
+   — **nicht** nur „Store unverändert" prüfen. Grund: ein fail-**open** Read (z. B. Wiederverwendung
+   von `favoriteComponentsFlow.first()` über `safeReadFlow`) liefert bei Read-Fehler `emptySet()` →
+   `orphans` leer → nichts gelöscht → Store *ebenfalls* unverändert. „Store unverändert" grün-lightet
+   also genau die M1-Regression, die §2 verbietet; nur assertThrows unterscheidet fail-closed von
+   fail-open. Dass der Wurf oben von `runCleanup` gefangen wird (Store übersprungen, nichts gelöscht),
+   ist §4 — hier wird der **Read-Propagations-Vertrag** gepinnt, nicht der Ausgang.
 2. **Presence-Veto positiv (verschärft):** Orphan, dessen `isStillPresent` `true` liefert, bleibt;
    Orphan mit `false` wird entfernt — pro Store, inkl. **Favorites** (schließt M3).
 3. **M3 — Favorites-Veto-Zweig:** ein droppte-aber-vorhandenes Ziel, das **einem Favoriten**
@@ -261,20 +270,25 @@ Regression-Guards für die drei Funde plus die zwei Test-Lücken:
    wird kein Orphan entfernt, mit `{ false }` werden Orphans entfernt, leere Ladung /
    nicht-Orphan-Einträge bleiben. (Der fail-closed Read-Fehler ist Impl-only, da der Fake keinen
    Read-Fehler hat — dokumentiert wie die bestehende „Failure-Branch nur Impl"-Regel.)
-6. **Invertierter Edit-Fail-Test (Impl):** `FavoritesRepositoryImplTest` „when DataStore edit fails
-   - keeps current state" (~:387) pinnt heute den Swallow (`should not crash`, alte Daten bleiben).
-   §2 entfernt den Swallow → der Test muss auf **wirft** umgestellt werden (der Store-übersprungen-
-   und-nichts-gelöscht-Ausgang wird dann eine Ebene höher von `runCleanup` sichergestellt, §4).
-   Die analogen Swipe/Hidden/CustomNames-Edit-Fail-Tests gleich mitprüfen.
-7. **Swipe-Wert-Guard (§2/§5):** ein Test, der im Read→Edit-Fenster den Slot von der abwesenden
-   Component X auf eine **vorhandene** App Y umschreibt und pinnt, dass `reconcileSwipeActions` Y
-   **nicht** clobbert (der Slot-spezifische R-INV-2-Fall). Falls als reiner Unit-Test schwer
-   deterministisch, mindestens der Wert-Gleichheits-Zweig direkt (Slot-Wert ≠ verifiziert-abwesend →
-   nicht entfernen).
+6. **Edit-Fail wirft (Impl, alle vier Stores):** Heute schluckt jeder `cleanup*`-Impl einen
+   `edit`-Fehler (`catch(Throwable) → silentError`, „keeps current state") — §2/§4 entfernen den
+   Swallow, der Fehler propagiert. Nur **Favorites** hat dafür heute einen Test
+   (`FavoritesRepositoryImplTest` „when DataStore edit fails - keeps current state", ~:387) — der
+   wird auf **wirft** invertiert. Für **Swipe/Hidden/CustomNames existiert KEIN** solcher Test
+   (Swipe hat gar **kein** Impl-Test-File) → je einen **neu hinzufügen**, der pinnt, dass
+   `reconcileX` bei Edit-Fehler propagiert. (Alle vier in §3 aufgeführt.)
+7. **Swipe-Wert-Guard (§2/§5) — der Clobber-Test, verpflichtend:** ein Test, bei dem das
+   Presence-Prädikat (das zwischen Read und Edit läuft) im selben Store `setSwipeAction(LEFT, Y)`
+   ausführt (Y die ganze Zeit installiert) und dann `false` für die abwesende X zurückgibt; gepinnt
+   wird, dass `reconcileSwipeActions` den LEFT-Slot **behält** (Y nicht clobbert). Deterministisch,
+   weil `FakeDataStore` Writes über einen Mutex serialisiert — der Prädikat-Write ist persistiert,
+   bevor das Reconcile-`edit{}` den Slot re-liest. Der reine „Slot-Wert ≠ verifiziert-abwesend"-Zweig
+   ist **kein** ausreichender Ersatz: ihn besteht auch eine blinde `remove(slot)`-Impl (ohne
+   Fenster-Write gibt es nichts zu unterscheiden).
 
-**Feasibility Fail-closed (§6.1):** der Fake kann keinen Read-Fehler simulieren; der Kern-fail-closed-
-Test läuft daher am Impl-Level (echter DataStore, dessen Read `IOException` wirft) — die
-Use-Case-Level-Variante braucht ein Fake, dessen `reconcileX` den Wurf durchreicht.
+**Feasibility Fail-closed (§6.1):** der Fake kann keinen Read-Fehler simulieren; der assertThrows-
+Kern-Test läuft daher am Impl-Level (echter DataStore, dessen Read `IOException` wirft). Eine
+optionale Use-Case-Level-Variante braucht ein Fake, dessen `reconcileX` den Wurf durchreicht.
 
 Der bestehende Kern-Veto-Test (`partial load vetoes a still-present app…`) wird auf die neue
 `reconcileX`-Signatur portiert und um den **Favorites**-Fall (M3) erweitert — was voraussetzt, dass
@@ -294,8 +308,11 @@ also nicht „verhaltensneutral".
 
 1. **Ein Commit/Branch (atomar, kompiliert erst am Ende grün):** Interfaces + 4 Impls (§2) + 4
    Fakes + 4 Contracts + `ObserveInstalledAppsUseCase` (Veto-Helfer raus) + **alle** Test-Call-
-   Sites/-Implementierer aus §3 (inkl. `TestFakeFavoritesRepository`-Entfernung, anonyme
-   Implementierer, direkte Impl-Aufrufe). Erst wenn alles zusammensteht, kompiliert der Baum.
+   Sites/-Implementierer aus §3: das lokale `TestFakeFavoritesRepository` (Stub um echte
+   prädikat-gegatete Entfernung **erweitert, nicht gelöscht** — `lastCleanupComponentNames`/
+   `cleanupCallCount`/`throwOnCleanup` bleiben, die Konsumenten `:139`/`:155` + M3 brauchen es), die
+   anonymen Implementierer, die direkten Impl-Aufrufe, und die KDoc-Cross-Refs (§3). Erst wenn alles
+   zusammensteht, kompiliert der Baum.
 2. Regressionstests §6.1–§6.7 ergänzen (Kern-fail-closed, Presence-Veto inkl. Favorites/M3,
    Event-Mapping/L1, invertierter Edit-Fail-Test, Swipe-Wert-Guard).
 3. `RECONCILE_SPEC.md` §3/Umsetzung nachziehen (R-INV → R-INV-2, „eine Read-Autorität, fail-closed").
