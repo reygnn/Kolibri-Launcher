@@ -79,8 +79,12 @@ class BackupDataAssembler @Inject constructor(
         val favoritesOrder = favoritesOrderRepository.favoriteComponentsOrderFlow.first()
         val hiddenComponents = hiddenAppsRepository.hiddenAppsFlow.first()
         val customAppNames = customNamesRepository.getAllCustomNames()
-        val swipeLeftApp = swipeActionsRepository.swipeLeftAppFlow.first()
-        val swipeRightApp = swipeActionsRepository.swipeRightAppFlow.first()
+        // Authoritative fresh reads (NOT the hot swipeXxxAppFlow replay cache):
+        // the swipe flows are never kept warm on Home, so .first() could hand
+        // back a stale replay and back up the previously assigned app. Same root
+        // cause and fix as the swipe-launch path (getSwipeActionComponent).
+        val swipeLeftApp = swipeActionsRepository.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        val swipeRightApp = swipeActionsRepository.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 
         val textColor = settingsRepository.textColorFlow.first()
         val textShadowEnabled = settingsRepository.textShadowEnabledFlow.first()
