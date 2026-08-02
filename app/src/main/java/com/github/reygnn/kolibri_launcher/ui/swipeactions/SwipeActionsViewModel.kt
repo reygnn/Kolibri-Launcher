@@ -7,8 +7,7 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeLeftAppUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeRightAppUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeActionComponentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -26,8 +25,7 @@ import kotlin.coroutines.cancellation.CancellationException
 @HiltViewModel
 class SwipeActionsViewModel @Inject constructor(
     private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
-    private val getSwipeLeftAppUseCase: GetSwipeLeftAppUseCase,
-    private val getSwipeRightAppUseCase: GetSwipeRightAppUseCase,
+    private val getSwipeActionComponentUseCase: GetSwipeActionComponentUseCase,
     private val setSwipeActionUseCase: SetSwipeActionUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
@@ -126,8 +124,13 @@ class SwipeActionsViewModel @Inject constructor(
                 // list, then assign all three without a suspend point between
                 // them, so the init-block combine collector never emits a
                 // transient "full list, no assignments" state (sub-frame flash).
-                val left = getSwipeLeftAppUseCase().first()
-                val right = getSwipeRightAppUseCase().first()
+                //
+                // Authoritative fresh reads (getSwipeActionComponent → store),
+                // NOT the hot swipeXxxAppFlow: reopening this cold settings screen
+                // would otherwise .first()-read a stale replay and show the
+                // previously assigned app in the chip. Same fix as the launch path.
+                val left = getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+                val right = getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
                 allAppsMasterList.value = allApps
                 swipeLeftComponent.value = left
                 swipeRightComponent.value = right

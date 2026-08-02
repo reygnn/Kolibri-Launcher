@@ -4,8 +4,7 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeLeftAppUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeRightAppUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeActionComponentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -40,8 +39,7 @@ class SwipeActionsViewModelTest {
     // Das entspricht dem alten Mockito-`lenient()`-Verhalten und macht den Test robuster
     // gegenüber zukünftigen ViewModel-Änderungen, die zusätzliche Methoden aufrufen.
     private val getInstalledAppsUseCase: GetInstalledAppsUseCase = mockk(relaxed = true)
-    private val getSwipeLeftAppUseCase: GetSwipeLeftAppUseCase = mockk(relaxed = true)
-    private val getSwipeRightAppUseCase: GetSwipeRightAppUseCase = mockk(relaxed = true)
+    private val getSwipeActionComponentUseCase: GetSwipeActionComponentUseCase = mockk(relaxed = true)
     private val setSwipeActionUseCase: SetSwipeActionUseCase = mockk(relaxed = true)
 
     private lateinit var viewModel: SwipeActionsViewModel
@@ -54,15 +52,14 @@ class SwipeActionsViewModelTest {
 
     @Before
     fun setup() {
-        // Default Flow Stubs (jeder Test darf sie überschreiben)
+        // Default stubs (each test may override them)
         every { getInstalledAppsUseCase() } returns flowOf(testApps)
-        every { getSwipeLeftAppUseCase() } returns flowOf(null)
-        every { getSwipeRightAppUseCase() } returns flowOf(null)
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns null
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns null
 
         viewModel = SwipeActionsViewModel(
             getInstalledAppsUseCase,
-            getSwipeLeftAppUseCase,
-            getSwipeRightAppUseCase,
+            getSwipeActionComponentUseCase,
             setSwipeActionUseCase,
             mainDispatcherRule.testDispatcher
         )
@@ -73,8 +70,8 @@ class SwipeActionsViewModelTest {
     @Test
     fun `initialize - loads apps and current assignments`() = runTest {
         // Arrange
-        every { getSwipeLeftAppUseCase() } returns flowOf(appA.componentName)
-        every { getSwipeRightAppUseCase() } returns flowOf(null)
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns appA.componentName
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns null
 
         // Act
         viewModel.initialize()
@@ -182,7 +179,7 @@ class SwipeActionsViewModelTest {
     @Test
     fun `onAppSelected - moves app from Right to Left if selected while Left is active`() = runTest {
         // Arrange: App B is initially RIGHT
-        every { getSwipeRightAppUseCase() } returns flowOf(appB.componentName)
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns appB.componentName
         viewModel.initialize()
         advanceUntilIdle()
 
@@ -201,7 +198,7 @@ class SwipeActionsViewModelTest {
     @Test
     fun `onAppSelected - moves app from Left to Right if selected while Right is active`() = runTest {
         // Arrange: App A is initially LEFT
-        every { getSwipeLeftAppUseCase() } returns flowOf(appA.componentName)
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns appA.componentName
         viewModel.initialize()
         advanceUntilIdle()
 
@@ -222,8 +219,8 @@ class SwipeActionsViewModelTest {
     @Test
     fun `onSlotCleared - clears specific slot`() = runTest {
         // Arrange
-        every { getSwipeLeftAppUseCase() } returns flowOf(appA.componentName)
-        every { getSwipeRightAppUseCase() } returns flowOf(appB.componentName)
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns appA.componentName
+        coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns appB.componentName
         viewModel.initialize()
         advanceUntilIdle()
 
