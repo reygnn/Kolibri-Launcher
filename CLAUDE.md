@@ -384,8 +384,12 @@ activities.
     `withContext` / `.await()` / `delay` would have missed the very bug
     that motivated the check. Whitelist today (AUDIT-12 rollout):
     `WallpaperViewBinder.kt`, `MainActivity.kt`, `AppDrawerFragment.kt`,
-    `InstalledAppsRepositoryImpl.kt`, `BackupRepositoryImpl.kt`, and
-    `HomeFragment.kt`; append to the `cancel_files` array in
+    `InstalledAppsRepositoryImpl.kt`, `BackupRepositoryImpl.kt`,
+    `HomeFragment.kt`, `TimeBasedEventsRepositoryImpl.kt`, and
+    `FlowCollection.kt` (the shared `collectOnStarted` helper — every
+    view-lifecycle collector in the app funnels through it, so its
+    two-layer CancellationException rethrow is the highest-blast-radius
+    arm to keep intact); append to the `cancel_files` array in
     `tools/check-conventions.sh` to add a file (adding one with
     unreviewed catches just turns the build red — that IS the review
     prompt). Logic in `tools/check-cancellation-rethrow.awk`, whose
