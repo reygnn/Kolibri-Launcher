@@ -179,6 +179,7 @@ class BackupRepositoryImpl @Inject constructor(
                 read == 2 && magic[0] == 0x50.toByte() && magic[1] == 0x4B.toByte()
             } ?: false
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
             false
         }
     }
@@ -278,6 +279,7 @@ class BackupRepositoryImpl @Inject constructor(
                 null
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
             null
         }
     }
@@ -380,6 +382,7 @@ class BackupRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error reading JSON from ZIP")
             null
         }
@@ -414,6 +417,7 @@ class BackupRepositoryImpl @Inject constructor(
                 val canAccess = try {
                     context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
                 } catch (e: Exception) {
+                    // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
                     false
                 }
 
@@ -470,6 +474,7 @@ class BackupRepositoryImpl @Inject constructor(
             val canAccess = try {
                 context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
             } catch (e: Exception) {
+                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
                 false
             }
 
@@ -569,6 +574,7 @@ class BackupRepositoryImpl @Inject constructor(
             val uri = try {
                 uriString.toUri()
             } catch (e: Exception) {
+                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
                 return@withContext ImportResult.Error("Invalid format")
             }
 
@@ -578,6 +584,7 @@ class BackupRepositoryImpl @Inject constructor(
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
+                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
                 Timber.w(e, "Could not determine file size, proceeding with caution")
                 0L
             }
@@ -649,6 +656,7 @@ class BackupRepositoryImpl @Inject constructor(
                     pfd.statSize
                 } ?: 0L
             } catch (e: Exception) {
+                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
                 Timber.w(e, "Could not determine file size for preview")
                 0L
             }
@@ -697,6 +705,7 @@ class BackupRepositoryImpl @Inject constructor(
             TimberWrapper.silentError(e, "Permission denied for preview")
             null
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
             // Umbrella catch widened from Exception per four-category frame:
             // preview path reads the JSON content and parses it; OOM during
             // JSONObject construction or parseBackupData on a large input can
