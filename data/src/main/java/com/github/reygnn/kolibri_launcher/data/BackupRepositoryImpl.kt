@@ -491,6 +491,11 @@ class BackupRepositoryImpl @Inject constructor(
             } else {
                 Timber.w("Wallpaper URI not accessible, skipping: $wallpaperUri")
             }
+        } catch (e: CancellationException) {
+            // Rethrow: copyToInternal and saveWallpaperStateForRestore both
+            // suspend, so a cancelled restore must propagate rather than be
+            // logged as a failed wallpaper restore.
+            throw e
         } catch (e: Throwable) {
             // Catch kept (Expected error, four-category frame): single-layer
             // bitmap copy via WallpaperFileManager.copyToInternal can OOM on
