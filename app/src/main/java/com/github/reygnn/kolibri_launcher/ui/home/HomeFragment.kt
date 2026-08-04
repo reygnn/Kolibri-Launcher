@@ -324,6 +324,7 @@ class HomeFragment : Fragment() {
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in HomeFragment")
         } catch (loggingError: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame): the
             // recursion-into-error-pipeline guard documented in the field
             // KDoc above. If Timber itself crashes, fall back to stderr
@@ -687,6 +688,7 @@ class HomeFragment : Fragment() {
         val baseMargin = try {
             resources.getDimensionPixelSize(R.dimen.spacing_medium)
         } catch (e: Exception) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             AppConstants.FALLBACK_DIMEN_PX
         }
 
@@ -980,6 +982,7 @@ class HomeFragment : Fragment() {
                     binding.calendarChipsContainer.addView(chip)
                 }
             } catch (e: Throwable) {
+                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error creating chip")
             }
         }
@@ -1056,6 +1059,7 @@ class HomeFragment : Fragment() {
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error creating alarm chip instance")
             null
         }
@@ -1085,6 +1089,7 @@ class HomeFragment : Fragment() {
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error creating calendar chip instance")
             null
         }
@@ -1220,6 +1225,7 @@ class HomeFragment : Fragment() {
                     onDoubleClick()
                 }
             } catch (e: Throwable) {
+                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error in onClick")
             }
         }
@@ -1455,6 +1461,7 @@ class HomeFragment : Fragment() {
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
             decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error loading bitmap from $uri")
             null
         }
