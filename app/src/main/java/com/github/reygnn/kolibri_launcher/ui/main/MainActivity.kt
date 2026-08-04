@@ -474,6 +474,16 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             TimberWrapper.silentError(e, "Error in handleInitialSetup")
             try {
                 initializeMainApp()
+            } catch (cancellation: CancellationException) {
+                // Rethrow per canonical Kotlin coroutines guidance: the
+                // recovery call suspends (consent-store read), so a torn-down
+                // Activity (rotation, home switch, process pressure) cancels it
+                // here. A cancelled Activity is normal teardown, NOT a lying
+                // state — routing it into silentDeath would exitProcess(1) on
+                // ordinary control flow and defeat the isInitialized retry on
+                // the next onCreate. silentDeath stays reserved for a genuine
+                // recovery failure below.
+                throw cancellation
             } catch (fallbackError: Throwable) {
                 // Inner catch kept (Unrecoverable, four-category frame):
                 // last recovery path also failed. Letting the Activity
