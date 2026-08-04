@@ -251,6 +251,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in MainActivity")
         } catch (loggingError: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame): the
             // recursion-into-error-pipeline guard documented in the field
             // KDoc above. If Timber itself crashes, fall back to stderr
@@ -297,6 +298,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     Intent.ACTION_BATTERY_CHANGED -> viewModel.updateBatteryLevelFromIntent(intent)
                 }
             } catch (e: Throwable) {
+                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 // Catch kept (HOME-Activity-resilience boundary, four-
                 // category frame): BroadcastReceiver.onReceive runs as a
                 // system callback. An unhandled throw here crashes the
@@ -356,6 +358,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 viewModel.onSetWallpaperImage(uri)
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame): the
             // ActivityResult callback runs outside any outer Catchall,
             // and onSetWallpaperImage delegates into a coroutine that
@@ -421,6 +424,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 TimberWrapper.silentDeath("NavHostFragment not found — main UI cannot start")
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Unrecoverable, four-category frame): see the
             // silentDeath rationale in the if/else branch above.
             // Gleicher Grund wie oben: setContentView/findFragment kann fatal
@@ -502,6 +506,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             val intent = Intent(this, OnboardingActivity::class.java)
             onboardingLauncher.launch(intent)
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame):
             // ActivityResultLauncher.launch can throw on lifecycle-state
             // mismatches or activity-not-found. Fallback initialises
@@ -600,6 +605,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             registerReceiver(systemEventReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame):
             // registerReceiver is a system-API call that can fail on
             // permission issues or system races. Resetting the flag to
@@ -662,6 +668,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             try {
                 currentNav.navigate(destinationId)
             } catch (e: Throwable) {
+                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 // Catch kept (Expected error, four-category frame):
                 // NavController.navigate throws IllegalStateException when
                 // the saved destination ID is no longer in the graph
@@ -671,6 +678,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 try {
                     currentNav.popBackStack(R.id.homeFragment, false)
                 } catch (fallbackError: Throwable) {
+                    // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                     // Inner catch kept (Expected error, four-category
                     // frame): even popBackStack can fail in degenerate
                     // nav-graph states. silentError logs and continues;
@@ -741,6 +749,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                         ContentUris.appendId(builder, System.currentTimeMillis())
                         startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
                     } catch (e: Throwable) {
+                        // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                         // Inner catch kept (Expected error, four-category
                         // frame): outer Catchall would log but not Toast,
                         // so the user-visible "no calendar app" recovery
@@ -783,6 +792,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                                 Timber.d("[MAIN] Drawer closed")
                             }
                         } catch (e: Throwable) {
+                            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                             // Inner catch kept (Expected error, four-
                             // category frame): scoped log "Error popping
                             // back stack" preserves diagnostic context
@@ -801,6 +811,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     try {
                         WallpaperImagePicker.launch(wallpaperPickerLauncher)
                     } catch (e: Throwable) {
+                        // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                         // Inner catch kept (Expected error, four-category
                         // frame): same shape as OpenCalendar — outer
                         // Catchall would lose the user-visible Toast
@@ -832,6 +843,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Outer Catchall kept (HOME-Activity-resilience boundary,
             // four-category frame): event dispatch must not crash the
             // launcher. Anything reaching this catch is a programmer
@@ -997,6 +1009,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             body()
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (HOME-Activity-resilience boundary, four-category
             // frame): see the KDoc above — a system click callback has no
             // outer Catchall, so an unhandled throw here crashes the launcher.
@@ -1137,6 +1150,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 try {
                     actions.getOrNull(which)?.invoke()
                 } catch (e: Throwable) {
+                    // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                     // Inner catch kept (HOME-Activity-resilience boundary,
                     // four-category frame): system click-listener
                     // callback runs outside any outer Catchall, so an
@@ -1225,6 +1239,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             startActivity(intent)
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame):
             // startActivity throws ActivityNotFoundException for
             // optional system intents (clock app, calendar, battery
@@ -1245,6 +1260,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     Timber.w(e, "Primary intent failed, fallback succeeded: %s", intent)
                     return
                 } catch (fallbackError: Throwable) {
+                    // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                     // Inner catch kept (Expected error, four-category
                     // frame): even the fallback intent can fail. The
                     // Toast below then handles the user-visible recovery.

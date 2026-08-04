@@ -164,6 +164,7 @@ class AppDrawerFragment : Fragment() {
         try {
             TimberWrapper.silentError(throwable, "Uncaught exception in AppDrawerFragment")
         } catch (loggingError: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             // Catch kept (Expected error, four-category frame): the
             // recursion-into-error-pipeline guard documented in the field
             // KDoc above. If Timber itself crashes, fall back to stderr
@@ -384,6 +385,7 @@ class AppDrawerFragment : Fragment() {
             }
             startActivity(intent)
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
             viewModel.onAppInfoError()
         }
@@ -688,6 +690,7 @@ class AppDrawerFragment : Fragment() {
                 Timber.w("View could not request focus")
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error in showKeyboardNow")
         }
     }
@@ -719,6 +722,7 @@ class AppDrawerFragment : Fragment() {
                 imm?.hideSoftInputFromWindow(view.windowToken, 0)
             }
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error hiding keyboard")
         }
     }
@@ -745,6 +749,7 @@ class AppDrawerFragment : Fragment() {
             longClickedApp = null
             searchQueryChangeTracker.reset()
         } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error in onDestroyView")
         } finally {
             appDrawerAdapter = null

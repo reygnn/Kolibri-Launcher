@@ -229,6 +229,8 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/wallpaper/WallpaperViewBinder.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerFragment.kt"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 
