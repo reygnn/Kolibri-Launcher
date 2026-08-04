@@ -595,6 +595,10 @@ class AppDrawerFragment : Fragment() {
             //    the safer choice for the user.
             val isAutoShowEnabled = try {
                 viewModel.isAutoShowKeyboardEnabled()
+            } catch (e: CancellationException) {
+                // Rethrow: the read suspends, so closing the drawer cancels it
+                // here — normal control flow, not a reportable error.
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error reading autoShowKeyboard setting")
                 false
