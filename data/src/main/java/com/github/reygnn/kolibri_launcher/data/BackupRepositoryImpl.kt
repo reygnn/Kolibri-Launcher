@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -428,6 +429,12 @@ class BackupRepositoryImpl @Inject constructor(
                 } else {
                     Timber.w("Wallpaper layer $index URI not accessible, skipping: $uriString")
                 }
+            } catch (e: CancellationException) {
+                // Rethrow: copyToInternal suspends, so a cancelled restore
+                // would otherwise file one bogus report per remaining layer
+                // AND keep copying in a dead job. Cancellation aborts the
+                // whole import loop, as it should.
+                throw e
             } catch (e: Throwable) {
                 // Catch kept (Expected error, four-category frame): per-layer
                 // bitmap copy can OOM on a large source bitmap; one bad layer
