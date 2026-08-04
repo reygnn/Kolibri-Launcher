@@ -54,6 +54,19 @@ import javax.inject.Singleton
  * Errors are logged silently via [TimberWrapper] and result in empty lists or fallback
  * values. [java.util.concurrent.CancellationException] is always re-thrown to preserve coroutine cancellation.
  *
+ * That last guarantee includes the two hand-written `try { emit(...) } catch`
+ * blocks inside the `Flow.catch { }` recovery arms (AUDIT-12 #7/#8): `emit` is a
+ * suspension point, so a cancelled collector would otherwise be reported as a
+ * `CRITICAL` error. This file is in the `cancel_files` whitelist of
+ * `./gradlew checkConventions`, which is the regression guard for that: any
+ * broad catch reachable from a suspend point must rethrow `CancellationException`
+ * or the build fails. It is NOT unit-tested — the suspension point is the
+ * framework `emit` inside a recovery arm that the surrounding inner catches make
+ * nearly unreachable, so no injectable seam exists to land a cancellation there
+ * deterministically; a test would be contrived timing theater. The structural
+ * linter check is the honest guard here (see `app/src/test/CLAUDE.md`:
+ * "ehrliches KDoc > zu viele Tests").
+ *
  * **Threading:**
  * - App loading runs on [kotlinx.coroutines.Dispatchers.IO]
  * - Uses [kotlinx.coroutines.SupervisorJob] to isolate failures
