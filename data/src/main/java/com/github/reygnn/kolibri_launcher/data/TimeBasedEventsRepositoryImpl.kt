@@ -117,6 +117,9 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                 type = TimeBasedEventType.ALARM
             )
         } catch (e: Exception) { // CancellationException ist hier unwahrscheinlich, aber Exception fängt alles außer Errors
+            // No suspension point: getNextAlarm is a plain fun with only
+            // synchronous system-service calls — cancellation cannot arise here
+            // (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error getting next alarm")
             null
         }
@@ -175,6 +178,9 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                                 )
                             )
                         } catch (e: Exception) {
+                            // No suspension point: the guarded body only reads
+                            // synchronous cursor columns — cancellation cannot
+                            // arise here (AUDIT-12 whitelist review).
                             // Ignoriere defekte Zeilen
                         }
                     }

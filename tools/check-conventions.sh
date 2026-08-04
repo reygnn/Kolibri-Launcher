@@ -235,6 +235,7 @@ cancel_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/InstalledAppsRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/TimeBasedEventsRepositoryImpl.kt"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 
