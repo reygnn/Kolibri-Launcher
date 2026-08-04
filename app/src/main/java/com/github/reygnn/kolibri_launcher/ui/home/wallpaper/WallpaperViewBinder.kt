@@ -7,6 +7,7 @@ import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import kotlinx.coroutines.CancellationException
 
 /**
  * Binds a [WallpaperState] to a [ZoomableImageView] by computing and
@@ -225,6 +226,15 @@ class WallpaperViewBinder(
                     id = spec.id
                 )
                 addedLayerIds.add(spec.id)
+            } catch (e: CancellationException) {
+                // Rethrow per canonical: bitmapLoader.load is a suspension
+                // point (HomeFragment wraps the decode in withContext(IO)),
+                // and cancellation is normal control flow on this path — the
+                // render job is cancelled by the next wallpaper state
+                // (latest-wins) and by onDestroyView. Letting it fall into
+                // the Throwable branch below reports a bogus crash AND keeps
+                // decoding the remaining layers on behalf of a dead job.
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error loading layer ${spec.id}")
             }
