@@ -65,6 +65,7 @@ class UsageExportRepositoryImpl @Inject constructor(
         return try {
             Instant.ofEpochMilli(millis).toString()  // z.B. "2024-12-08T14:30:00.000Z"
         } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
             millis.toString()  // Fallback auf raw value
         }
     }
@@ -155,6 +156,7 @@ class UsageExportRepositoryImpl @Inject constructor(
             val (version, usageData) = try {
                 parseUsageData(jsonString)
             } catch (e: Exception) {
+                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Failed to parse usage export")
                 return UsageImportResult.InvalidFormat
             }
@@ -417,6 +419,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                         pfd.statSize
                     } ?: 0L
                 } catch (e: Throwable) {
+                    // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                     Timber.w(e, "Could not determine file size")
                     0L
                 }

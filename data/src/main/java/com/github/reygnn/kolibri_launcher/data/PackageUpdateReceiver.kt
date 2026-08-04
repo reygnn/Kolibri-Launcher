@@ -31,6 +31,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
         val pendingResult = try {
             goAsync()
         } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "[KOLIBRI] Failed to call goAsync(), processing synchronously")
             null
         }
@@ -40,10 +41,12 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 try {
                     pendingResult?.finish()
                 } catch (e: Throwable) {
+                    // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                     TimberWrapper.silentError(e, "[KOLIBRI] Error finishing pendingResult")
                 }
             }
         } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "[KOLIBRI] CRITICAL error in onReceive")
             try {
                 pendingResult?.finish()
@@ -120,6 +123,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             }
 
         } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "[KOLIBRI] CRITICAL error in handleReceive")
             safeOnFinish(onFinish)
         }
@@ -152,6 +156,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                     InstalledAppsRepositoryEntryPoint::class.java
                 )
             } catch (e: Throwable) {
+                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "[KOLIBRI] Failed to access Hilt entry point")
                 return
             }
@@ -181,6 +186,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
         try {
             onFinish()
         } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "[KOLIBRI] Error in onFinish callback")
         }
     }

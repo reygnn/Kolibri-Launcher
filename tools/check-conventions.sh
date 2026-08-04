@@ -237,6 +237,9 @@ cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/TimeBasedEventsRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/flow/FlowCollection.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 

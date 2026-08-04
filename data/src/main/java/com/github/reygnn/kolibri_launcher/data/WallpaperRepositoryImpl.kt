@@ -79,6 +79,7 @@ class WallpaperRepositoryImpl @Inject constructor(
             try {
                 parseWallpaperState(preferences)
             } catch (e: Throwable) {
+                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error parsing wallpaper state")
                 WallpaperState.NONE
             }
@@ -135,6 +136,7 @@ class WallpaperRepositoryImpl @Inject constructor(
                     parseSingleLayerState(preferences)
                 }
             } catch (e: Throwable) {
+                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 // Highlight this case more visibly: the user may have configured
                 // several layers and will now suddenly see only one (or none).
                 // Logging here is non-fatal but helps post-mortem diagnosis.
@@ -384,6 +386,7 @@ class WallpaperRepositoryImpl @Inject constructor(
                     )
                 )
             } catch (e: Throwable) {
+                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error parsing layer at index $i, skipping")
             }
         }
