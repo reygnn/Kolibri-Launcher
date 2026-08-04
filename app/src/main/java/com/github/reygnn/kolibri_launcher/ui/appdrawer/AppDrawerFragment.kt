@@ -550,6 +550,10 @@ class AppDrawerFragment : Fragment() {
             try {
                 val hasUsage = try {
                     viewModel.hasUsageData(app.packageName)
+                } catch (e: CancellationException) {
+                    // Rethrow: the read suspends; a torn-down fragment cancels
+                    // here. Reaches the outer CancellationException arm below.
+                    throw e
                 } catch (e: Throwable) {
                     false
                 }
@@ -562,6 +566,14 @@ class AppDrawerFragment : Fragment() {
                     hasUsage = hasUsage
                 )
 
+            } catch (e: CancellationException) {
+                // Rethrow: previously the only suspension point (hasUsageData)
+                // was swallowed by the inner catch, so cancellation never
+                // reached this outer catch — the "shielded but fragile" spot
+                // from AUDIT-12. Now that the inner catch rethrows, and to stay
+                // correct if ContextMenuHelper.show ever becomes suspend, this
+                // must propagate cancellation rather than log it as an error.
+                throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error in showAppContextMenu")
             }
