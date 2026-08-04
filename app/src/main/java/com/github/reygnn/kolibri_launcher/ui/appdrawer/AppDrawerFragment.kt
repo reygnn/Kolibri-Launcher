@@ -482,6 +482,11 @@ class AppDrawerFragment : Fragment() {
                 // 1. Setting holen (Suspend call safe im ViewModel)
                 val isAutoLaunchEnabled = try {
                     viewModel.isAutoLaunchEnabled()
+                } catch (e: CancellationException) {
+                    // Rethrow: swallowing to `false` here let a cancelled
+                    // coroutine keep filtering in a dead scope. Propagates to
+                    // the outer CancellationException arm below.
+                    throw e
                 } catch (e: Throwable) {
                     false // Fallback
                 }
