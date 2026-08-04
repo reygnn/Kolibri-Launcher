@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -345,8 +345,9 @@ activities.
     **Annotation-discipline linter (positive list).** `./gradlew
     checkConventions` enforces the marker phrase on broad catches
     (`Throwable` / `Exception`) in files that opted in to the
-    convention. Today the whitelist is MainActivity only; HomeFragment
-    will follow once its catches are reviewed under the same lens.
+    convention. Today the whitelist is MainActivity +
+    WallpaperEditController; HomeFragment will follow once its catches
+    are reviewed under the same lens.
     Accepted markers within ±5 lines of the catch (symmetric window):
     `[Cc]atch[a-z]* kept` (covers "Catch kept", "Inner catch kept",
     "Triple-catch kept", "Outer Catchall kept") or
@@ -358,6 +359,34 @@ activities.
     itself lives in `tools/check-rule11-annotation.awk`; regression-
     test any regex change via `tools/check-conventions-test.sh` (not
     wired into CI, manual rerun).
+
+    **Cancellation-rethrow linter (positive list).** The coroutine form
+    of the above, and the one defect in this rule that is *invisible in
+    a diff*. A `catch (e: Throwable)` is harmless while its try-block
+    has no suspension point — no `CancellationException` can reach it.
+    The day a call inside that block becomes `suspend`, the untouched
+    catch silently turns into a cancellation swallower: normal coroutine
+    control flow gets logged as a crash, and the already-cancelled job
+    keeps working. The catch line never changes, so review sees nothing.
+    This has bitten the project three times (`e1ef671d`, `fb62b88d`,
+    and `4c09c30b` → `WallpaperViewBinder.applyFullRebuild`, where every
+    latest-wins wallpaper switch filed a bogus ACRA report per layer).
+
+    So in a whitelisted file, **every** broad catch must declare which
+    case it is: either it sits behind a `catch (e: CancellationException)
+    { throw e }` arm on the same try (satisfied structurally, no comment
+    needed), or it carries the marker `no suspension point` within ±5
+    lines. Deliberately aggressive rather than detecting suspend calls:
+    a suspend call has no syntactic tell — `bitmapLoader.load(uri)`
+    reads exactly like a blocking call — so any detector keyed on
+    `withContext` / `.await()` / `delay` would have missed the very bug
+    that motivated the check. Whitelist today:
+    `WallpaperViewBinder.kt`; append to the `cancel_files` array in
+    `tools/check-conventions.sh` to add a file (adding one with
+    unreviewed catches just turns the build red — that IS the review
+    prompt). Logic in `tools/check-cancellation-rethrow.awk`,
+    regression-tested via `tools/check-cancellation-rethrow-test.sh`
+    (manual rerun, not a CI gate).
 
     **A caught failure must stay a failure — return it, don't erase
     it.** The sanctioned alternative to propagating an exception is

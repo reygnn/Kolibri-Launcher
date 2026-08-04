@@ -189,10 +189,15 @@ class WallpaperViewBinder(
                     applySingleTransformOrDefault(view, plan.transform)
                     onRebuildComplete?.invoke()
                 } catch (e: Throwable) {
+                    // No suspension point: this is a plain Runnable handed to
+                    // View.post, outside any coroutine.
                     TimberWrapper.silentError(e, "Error applying single-layer transform")
                 }
             }
         } catch (e: Throwable) {
+            // No suspension point: the suspending bitmapLoader.load call sits
+            // ABOVE this try deliberately, so cancellation propagates from
+            // there. What remains inside is view mutation plus a View.post.
             TimberWrapper.silentError(e, "Error loading single-layer wallpaper")
             view.visibility = View.GONE
         }
@@ -286,6 +291,7 @@ class WallpaperViewBinder(
                 view.invalidate()
                 onRebuildComplete?.invoke()
             } catch (e: Throwable) {
+                // No suspension point: plain Runnable handed to View.post.
                 TimberWrapper.silentError(e, "Error applying layer updates")
             }
         }

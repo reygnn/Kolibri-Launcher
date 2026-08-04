@@ -206,6 +206,55 @@ if [ -n "$rule11_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Cancellation-rethrow discipline — the coroutine form of Rule 11. In a
+# whitelisted file, every broad catch must either sit behind a
+# `catch (…: CancellationException) { throw e }` arm or state that its
+# try-block cannot suspend (marker: `no suspension point`).
+#
+# Why aggressive instead of detecting suspension points: a suspend call has
+# no syntactic tell. `bitmapLoader.load(uri)` reads exactly like a blocking
+# call, so a detector keyed on `withContext` / `.await()` / `delay` would
+# have missed 4c09c30b — the regression that motivated this check, where a
+# pre-existing catch turned into a cancellation swallower the moment the
+# call inside it became suspend, without the catch line ever changing.
+#
+# Scope (positive list, NOT all files), same growth model as Rule 11 above:
+# a file joins once its broad catches have been reviewed and each one is
+# either structurally satisfied or annotated. Adding a file with unreviewed
+# catches just turns the build red — that IS the review prompt.
+#
+# The detection logic lives in `tools/check-cancellation-rethrow.awk`;
+# regression-test any regex change via
+# `tools/check-cancellation-rethrow-test.sh` (manual rerun, not a CI gate).
+# ─────────────────────────────────────────────────────────────────────────────
+cancel_files=(
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/wallpaper/WallpaperViewBinder.kt"
+)
+cancel_awk="$script_dir/check-cancellation-rethrow.awk"
+
+if [ ! -f "$cancel_awk" ]; then
+  echo "ERROR: Cancellation-rethrow awk script not found: $cancel_awk" >&2
+  exit 2
+fi
+
+cancel_hits=""
+for file in "${cancel_files[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: Cancellation-rethrow whitelist file not found: $file" >&2
+    exit 2
+  fi
+  hits=$(awk -f "$cancel_awk" "$file")
+  if [ -n "$hits" ]; then
+    cancel_hits="${cancel_hits}${hits}
+"
+  fi
+done
+
+if [ -n "$cancel_hits" ]; then
+  report "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" "${cancel_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."
