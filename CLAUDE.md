@@ -345,9 +345,11 @@ activities.
     **Annotation-discipline linter (positive list).** `./gradlew
     checkConventions` enforces the marker phrase on broad catches
     (`Throwable` / `Exception`) in files that opted in to the
-    convention. Today the whitelist is MainActivity +
-    WallpaperEditController; HomeFragment will follow once its catches
-    are reviewed under the same lens.
+    convention. Today the whitelist is MainActivity,
+    WallpaperEditController, and HomeFragment — the last added in the
+    AUDIT-12 rollout once its catches were reviewed under the same lens
+    (fitting, since HomeFragment is the four-category reference file
+    itself).
     Accepted markers within ±5 lines of the catch (symmetric window):
     `[Cc]atch[a-z]* kept` (covers "Catch kept", "Inner catch kept",
     "Triple-catch kept", "Outer Catchall kept") or
@@ -380,11 +382,16 @@ activities.
     a suspend call has no syntactic tell — `bitmapLoader.load(uri)`
     reads exactly like a blocking call — so any detector keyed on
     `withContext` / `.await()` / `delay` would have missed the very bug
-    that motivated the check. Whitelist today:
-    `WallpaperViewBinder.kt`; append to the `cancel_files` array in
+    that motivated the check. Whitelist today (AUDIT-12 rollout):
+    `WallpaperViewBinder.kt`, `MainActivity.kt`, `AppDrawerFragment.kt`,
+    `InstalledAppsRepositoryImpl.kt`, `BackupRepositoryImpl.kt`, and
+    `HomeFragment.kt`; append to the `cancel_files` array in
     `tools/check-conventions.sh` to add a file (adding one with
     unreviewed catches just turns the build red — that IS the review
-    prompt). Logic in `tools/check-cancellation-rethrow.awk`,
+    prompt). Logic in `tools/check-cancellation-rethrow.awk`, whose
+    case-(a) walk is indentation-based so a cancellation-first arm still
+    satisfies an umbrella `catch (Throwable)` sitting behind typed arms
+    (the stacked-catch shape in `BackupRepositoryImpl.saveBackupToFile`);
     regression-tested via `tools/check-cancellation-rethrow-test.sh`
     (manual rerun, not a CI gate).
 
