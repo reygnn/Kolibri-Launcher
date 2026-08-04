@@ -174,25 +174,64 @@ fun case13RunCatchingMentionedInProse() {
     // CASE 13: prose mention on a comment line. Must NOT trigger.
     work()
 }
+
+suspend fun case14StackedCancellationFirst() {
+    try {
+        assembler.buildBackupData()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: BackupException) {
+        throw e
+    } catch (e: SecurityException) {
+        log(e)
+        throw BackupException("wrap", e)
+    } catch (e: IOException) {
+        log(e)
+        throw BackupException("wrap", e)
+    } catch (e: Throwable) {
+        // CASE 14: umbrella catch several TYPED arms below a
+        // cancellation-first arm — the production stacked-catch shape
+        // (BackupRepositoryImpl.saveBackupToFile). The upward walk must skip
+        // the sibling arms and reach the CancellationException arm. Must NOT
+        // trigger.
+        log(e)
+    }
+}
+
+suspend fun case15StackedNoCancellation() {
+    try {
+        assembler.buildBackupData()
+    } catch (e: BackupException) {
+        throw e
+    } catch (e: IOException) {
+        log(e)
+        throw BackupException("wrap", e)
+    } catch (e: Throwable) {
+        // CASE 15: same stacked shape but NO cancellation arm anywhere in
+        // the chain. MUST trigger.
+        log(e)
+    }
+}
 EOF
 
-# Expected triggers: CASE 4, CASE 5, CASE 6, CASE 11. Line numbers are
-# counted against the heredoc above — recount them if the fixture is edited.
+# Expected triggers: CASE 4, CASE 5, CASE 6, CASE 11, CASE 15. Line numbers
+# are counted against the heredoc above — recount them if the fixture is edited.
 expected="$fixture:43:     catch (e: Throwable) {
 $fixture:52:     catch (e: Exception) {
 $fixture:70:     catch (e: Throwable) {
-$fixture:116:     val result = runCatching {"
+$fixture:116:     val result = runCatching {
+$fixture:167:     } catch (e: Throwable) {"
 
 actual=$(awk -f "$awk_script" "$fixture")
 
 if [ "$actual" = "$expected" ]; then
-  echo "✓ Cancellation-rethrow awk: 4 expected violations on synthetic fixture"
+  echo "✓ Cancellation-rethrow awk: 5 expected violations on synthetic fixture"
   echo "  (CASE 4 bare catch, CASE 5 broad Exception, CASE 6 unrelated earlier"
-  echo "  arm, CASE 11 bare runCatching)."
+  echo "  arm, CASE 11 bare runCatching, CASE 15 stacked chain w/o cancellation)."
   echo "✓ All other cases (adjacent rethrow arm, rethrow arm behind comments,"
   echo "  in-body guard single-line + block form, 'no suspension point' marker,"
-  echo "  narrowed type, KDoc-only catch, prose mention of runCatching)"
-  echo "  correctly silent."
+  echo "  narrowed type, KDoc-only catch, prose mention of runCatching,"
+  echo "  CASE 14 stacked cancellation-first umbrella) correctly silent."
   exit 0
 fi
 

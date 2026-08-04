@@ -56,12 +56,23 @@
 #
 # == DETECTING CASE (a) ==
 #
-# Walk upward from the broad catch, skipping the lines that legitimately sit
-# between two arms of the same try-statement: comments, a bare `throw e`, and
-# brace-only lines. The first substantive line decides. That keeps a
-# CancellationException arm belonging to an EARLIER, unrelated try-statement
-# from accidentally satisfying a later catch, because real code would stand
-# between them.
+# Walk upward from the broad catch using indentation to stay inside the same
+# try's catch-chain. All arms of one try share the broad catch's indentation
+# (X); arm bodies and the try body are indented deeper and are skipped, as are
+# trivia and brace-only arm closings. At level X a sibling `} catch (T) {`
+# continues the chain; the first level-X line that is neither a catch arm nor
+# trivia — the `try {`, or the enclosing scope — ends it. A CancellationException
+# arm found before that end satisfies the broad catch.
+#
+# Skipping whole sibling arms this way is what lets a cancellation-first arm
+# satisfy an umbrella `catch (Throwable)` sitting several TYPED arms below it
+# (the stacked-catch shape in BackupRepositoryImpl.saveBackupToFile: Cancellation
+# → BackupException → SecurityException → IOException → Throwable). The earlier
+# "first substantive line decides" walk stopped at the first typed arm's
+# `throw Wrapped(...)` body and false-flagged the umbrella. A CancellationException
+# arm belonging to an EARLIER, unrelated try still cannot satisfy a later catch,
+# because that statement's own `try {` line sits at level X between them and ends
+# the walk (fixture CASE 6).
 #
 # == DETECTING CASE (c) ==
 #
@@ -94,20 +105,37 @@ END {
 
         satisfied = 0
 
-        # --- Case (a): preceding CancellationException arm ---------------
+        # --- Case (a): a CancellationException arm in the SAME chain -----
+        # Catch arms of one try share the broad catch's indentation (X);
+        # arm bodies and the try body are indented deeper. Walk upward:
+        # skip trivia, brace-only arm closings, and anything indented deeper
+        # than X (arm/try bodies). At level X a sibling `} catch (T) {`
+        # continues the chain and is skipped; the first level-X line that is
+        # neither a catch arm nor trivia (the `try {`, or outer code) ends
+        # the chain. This lets a cancellation-first arm satisfy an umbrella
+        # `catch (Throwable)` sitting several typed arms below it — the
+        # stacked-catch pattern in BackupRepositoryImpl.saveBackupToFile —
+        # while the intervening `try {` of an unrelated earlier statement
+        # still stops the walk (CASE 6).
         if (is_catch) {
+            match(lines[n], /^[[:space:]]*/)
+            base_indent = RLENGTH
             for (i = n - 1; i >= 1; i--) {
                 line = lines[i]
 
-                # Lines that may legitimately separate two catch arms.
                 if (line ~ /^[[:space:]]*$/) continue                  # blank
                 if (line ~ /^[[:space:]]*(\/\/|\*|\/\*)/) continue      # comment
-                if (line ~ /^[[:space:]]*throw[[:space:]]+[a-zA-Z_]+[[:space:]]*$/) continue
-                if (line ~ /^[[:space:]]*\}[[:space:]]*$/) continue     # brace only
+                if (line ~ /^[[:space:]]*\}[[:space:]]*$/) continue     # brace-only arm close
 
-                # First substantive line decides.
-                if (line ~ /catch \([a-zA-Z_]+: CancellationException\)/) satisfied = 1
-                break
+                match(line, /^[[:space:]]*/)
+                if (RLENGTH > base_indent) continue                    # arm/try body — skip
+
+                code = line
+                gsub(/\/\/.*$/, "", code)
+                if (code ~ /catch \([a-zA-Z_]+: CancellationException\)/) { satisfied = 1; break }
+                if (code ~ /catch \([a-zA-Z_]+: [A-Za-z0-9_.<>]+\)/) continue  # sibling arm — keep walking
+
+                break   # level-X non-catch line (try {, outer code) ends the chain
             }
         }
 
