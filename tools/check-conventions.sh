@@ -180,6 +180,7 @@ fi
 rule11_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/WallpaperEditController.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
 )
 rule11_awk="$script_dir/check-rule11-annotation.awk"
 

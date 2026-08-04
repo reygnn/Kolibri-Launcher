@@ -688,6 +688,8 @@ class HomeFragment : Fragment() {
         val baseMargin = try {
             resources.getDimensionPixelSize(R.dimen.spacing_medium)
         } catch (e: Exception) {
+            // Catch kept (Expected error, four-category frame): getDimensionPixelSize
+            // can throw Resources.NotFoundException under ProGuard / a themed context.
             // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             AppConstants.FALLBACK_DIMEN_PX
         }
@@ -982,6 +984,8 @@ class HomeFragment : Fragment() {
                     binding.calendarChipsContainer.addView(chip)
                 }
             } catch (e: Throwable) {
+                // Catch kept (Expected error, four-category frame): per-item chip
+                // creation + addView; one failing event must not abort the loop.
                 // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error creating chip")
             }
@@ -1059,6 +1063,8 @@ class HomeFragment : Fragment() {
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): Chip construction can
+            // throw on resource lookup / themed-context issues; per-item recovery to null.
             // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error creating alarm chip instance")
             null
@@ -1089,6 +1095,8 @@ class HomeFragment : Fragment() {
                 configureChip(this, colors, chipMaxWidth)
             }
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): Chip construction can
+            // throw on resource lookup / themed-context issues; per-item recovery to null.
             // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error creating calendar chip instance")
             null
@@ -1225,6 +1233,9 @@ class HomeFragment : Fragment() {
                     onDoubleClick()
                 }
             } catch (e: Throwable) {
+                // Catch kept (HOME-Activity-resilience boundary, four-category frame):
+                // onClick is a system input-dispatcher callback; a throw from a concrete
+                // onDoubleClick() must not crash the launcher.
                 // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error in onClick")
             }
@@ -1461,6 +1472,9 @@ class HomeFragment : Fragment() {
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
             decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): bitmap I/O boundary —
+            // FileNotFoundException / SecurityException + OOM (Throwable umbrella); the
+            // caller treats null as "skip this layer".
             // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
             TimberWrapper.silentError(e, "Error loading bitmap from $uri")
             null
