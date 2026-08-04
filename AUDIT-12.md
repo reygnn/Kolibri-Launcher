@@ -192,9 +192,20 @@ Guard-Idiom steht dort in einem Flow-`.catch { }`, das die Catch-Regex ohnehin
 nie traf, und `runCatching` kommt schlicht nicht vor. Sie sind Zukunftsgarantien,
 keine Aufräumarbeit.
 
-**Whitelist heute:** `WallpaperViewBinder.kt`.
-**Empfohlene Aufnahme nach dem Fix:** `MainActivity.kt`, `AppDrawerFragment.kt`,
-`BackupRepositoryImpl.kt`, `InstalledAppsRepositoryImpl.kt`.
+**Whitelist nach der Umsetzung:** `WallpaperViewBinder.kt`, `MainActivity.kt`,
+`AppDrawerFragment.kt`, `InstalledAppsRepositoryImpl.kt`,
+`BackupRepositoryImpl.kt` — alle vier empfohlenen Dateien aufgenommen. Die
+non-suspend-Catches tragen den `no suspension point`-Marker, die Fixes sind
+strukturelle Rethrow-Arme.
+
+**awk-Härtung während der Umsetzung:** Das Whitelisten von `BackupRepositoryImpl`
+hat eine Lücke im case-(a)-Scan offengelegt: `saveBackupToFile` (:550) ist
+korrekt (Cancellation-Arm vor den typisierten Armen), wurde aber fälschlich
+geflaggt, weil der Aufwärts-Scan an der ersten typisierten `throw Wrapped(...)`-
+Zeile stoppte. Der Scan ist jetzt einrückungs-basiert und erkennt einen
+cancellation-first-Arm auch hinter typisierten Geschwister-Armen (Stacked-catch-
+Muster); ein unrelated früherer try erfüllt weiterhin nicht (dessen `try {`-Zeile
+bricht den Walk). Regression-Fixtures CASE 14/15, 15/15 grün.
 
 **Ausdrücklich nicht empfohlen:** die aggressive Regel global scharf zu
 schalten. Das kostet ~185 Marker-Kommentare an Stellen ohne jedes Risiko und
@@ -202,16 +213,26 @@ verwässert genau die Aussage, die der Marker tragen soll.
 
 ---
 
-## Offene Entscheidungen
+## Entschieden & umgesetzt
 
-1. **#1 (`MainActivity:477`)** — soll Cancellation dort in den Rethrow, oder
-   ist der Prozess-Exit auf dem Recovery-Pfad gewollt? Das ist eine Aussage
-   über den `silentDeath`-Vertrag (CLAUDE.md Rule 9: „Pfade, die nicht mit
-   einem lügenden Zustand weiterlaufen dürfen"), nicht über diesen Catch. Eine
-   abgebrochene Activity ist kein lügender Zustand — aber die Entscheidung
-   gehört dem Maintainer.
-2. **Reihenfolge der Fixes** — `:app` (#1–#4) berührt keine Contract-Tests,
-   `:data` (#5–#8) schon. Getrennte Branches sind vertretbar.
-3. **Testabdeckung** — `WallpaperViewBinderCancellationTest` ist die Vorlage
-   (Cancellation propagiert *und* bricht die Schleife ab, echte Fehler bleiben
-   gefangen). Für #7/#8 wäre der Contract-Test der natürliche Ort.
+1. **#1 (`MainActivity`)** — **Rethrow.** Cancellation geht dort in den
+   Durchreich-Arm, nicht in `silentDeath`. Eine abgebrochene Activity ist kein
+   lügender Zustand; der Prozess-Exit hätte zudem das dokumentierte
+   `isInitialized`-Retry beim nächsten `onCreate` sabotiert. `silentDeath` bleibt
+   für einen echten Recovery-Fehlschlag reserviert.
+2. **Reihenfolge der Fixes** — umgesetzt in zwei Branches: `:app` (#1–#4) auf
+   `chore/cancellation-audit`, `:data` (#5–#8) auf `chore/cancellation-audit-data`
+   (auf ersterem aufgesetzt).
+3. **Testabdeckung** — für #7/#8 **kein Unit-Test**, sondern Linter-Guard +
+   KDoc. Nach dem Codelesen war der natürliche Ort *nicht* ein Contract-Test:
+   der Suspension Point ist das Framework-`emit` in einem `Flow.catch`-Recovery-
+   Arm, den die inneren Catches fast unerreichbar machen — keine injizierbare
+   Naht wie beim `WallpaperViewBinderCancellationTest` (dort ist der
+   `BitmapLoader` injiziert). Ein Test wäre Timing-Theater; die
+   `cancel_files`-Whitelist ist der ehrliche, deterministische Guard, die
+   Begründung steht im Impl-KDoc (Prinzip „ehrliches KDoc > zu viele Tests").
+
+Zusätzlich mit erledigt: die „Abgeschirmt, aber fragil"-Stelle
+`AppDrawerFragment:560` — der #4-Fix gibt dem äußeren Catch einen eigenen
+Rethrow-Arm, die Stelle ist nicht mehr zufällig durch die Aufrufkette
+abgeschirmt, sondern strukturell korrekt.
