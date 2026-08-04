@@ -94,6 +94,11 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             try {
                 TimberWrapper.silentError(e, "Error in apps state flow, emitting empty list")
                 emit(emptyList())
+            } catch (catchError: CancellationException) {
+                // Rethrow: emit() is a suspension point, so a cancelled
+                // collector lands its CancellationException here — normal
+                // control flow, not the CRITICAL error below.
+                throw catchError
             } catch (catchError: Throwable) {
                 TimberWrapper.silentError(catchError, "CRITICAL: Error in catch block")
                 // Letzte Verteidigungslinie: Leere Liste
@@ -166,6 +171,11 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             try {
                 TimberWrapper.silentError(e, "Flow catch: Error in loadAppsFromPackageManager")
                 emit(emptyList())
+            } catch (catchError: CancellationException) {
+                // Rethrow: emit() suspends, so a cancelled collector lands its
+                // CancellationException here — must propagate, not be logged as
+                // the CRITICAL error below.
+                throw catchError
             } catch (catchError: Throwable) {
                 TimberWrapper.silentError(catchError, "CRITICAL: Error in flow catch block")
             }
