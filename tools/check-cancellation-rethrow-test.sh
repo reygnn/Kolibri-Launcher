@@ -132,21 +132,66 @@ fun case8KDocComment() {
      */
     work()
 }
+
+suspend fun case9InBodyGuardSingleLine() {
+    try { loader.load(uri) }
+    catch (e: Throwable) {
+        // CASE 9: the SettingsRepositoryImpl idiom — guard + throw on one
+        // line inside the body. Correct code, must NOT trigger.
+        if (e is CancellationException || e !is Exception) throw e
+        log(e)
+    }
+}
+
+suspend fun case10InBodyGuardMultiLine() {
+    try { loader.load(uri) }
+    catch (e: Throwable) {
+        // CASE 10: same guard, block form. Must NOT trigger.
+        if (e is CancellationException) {
+            throw e
+        }
+        log(e)
+    }
+}
+
+suspend fun case11RunCatchingBare() {
+    val result = runCatching {
+        // CASE 11: runCatching swallows CancellationException and has no
+        // `catch` keyword at all. MUST trigger.
+        loader.load(uri)
+    }
+    log(result)
+}
+
+fun case12RunCatchingMarked() {
+    // CASE 12: No suspension point — pure parsing, no coroutine in sight.
+    val result = runCatching { Integer.parseInt(raw) }
+    log(result)
+}
+
+fun case13RunCatchingMentionedInProse() {
+    // We deliberately avoid runCatching here so cancellation propagates.
+    // CASE 13: prose mention on a comment line. Must NOT trigger.
+    work()
+}
 EOF
 
-# Expected triggers: CASE 4, CASE 5, CASE 6. Line numbers are counted
-# against the heredoc above — recount them if the fixture is edited.
+# Expected triggers: CASE 4, CASE 5, CASE 6, CASE 11. Line numbers are
+# counted against the heredoc above — recount them if the fixture is edited.
 expected="$fixture:43:     catch (e: Throwable) {
 $fixture:52:     catch (e: Exception) {
-$fixture:70:     catch (e: Throwable) {"
+$fixture:70:     catch (e: Throwable) {
+$fixture:116:     val result = runCatching {"
 
 actual=$(awk -f "$awk_script" "$fixture")
 
 if [ "$actual" = "$expected" ]; then
-  echo "✓ Cancellation-rethrow awk: 3 expected violations on synthetic fixture"
-  echo "  (CASE 4 bare catch, CASE 5 broad Exception, CASE 6 unrelated earlier arm)."
+  echo "✓ Cancellation-rethrow awk: 4 expected violations on synthetic fixture"
+  echo "  (CASE 4 bare catch, CASE 5 broad Exception, CASE 6 unrelated earlier"
+  echo "  arm, CASE 11 bare runCatching)."
   echo "✓ All other cases (adjacent rethrow arm, rethrow arm behind comments,"
-  echo "  'no suspension point' marker, narrowed type, KDoc-only catch)"
+  echo "  in-body guard single-line + block form, 'no suspension point' marker,"
+  echo "  narrowed type, KDoc-only catch, prose mention of runCatching)"
   echo "  correctly silent."
   exit 0
 fi
