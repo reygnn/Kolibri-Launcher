@@ -48,8 +48,8 @@ class BackupViewModel @Inject constructor(
                     BackupState.Error("Export failed")
                 }
             } catch (e: CancellationException) {
-            throw e
-        }catch (e: Throwable) {
+                throw e
+            } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error exporting backup")
                 _backupState.value = BackupState.Error(e.message ?: "Unknown error")
             }

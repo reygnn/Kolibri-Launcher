@@ -86,6 +86,8 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
             // throw RuntimeException("ACRA Test Crash")
 
         } catch (e: Throwable) {
+            // no suspension point — non-suspend onCreate body, cannot see
+            // CancellationException.
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish()
         }
@@ -113,6 +115,8 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
             adapter = null
             _binding = null
         } catch (e: Throwable) {
+            // no suspension point — non-suspend onDestroy teardown, cannot see
+            // CancellationException.
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -250,12 +254,16 @@ class CustomNamesActivity : BaseActivity<UiEvent, CustomNamesViewModel>() {
                     try {
                         imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
                     } catch (e: Throwable) {
+                        // no suspension point — the sole suspend call (delay)
+                        // sits outside this try; showSoftInput is a blocking IPC.
                         TimberWrapper.silentError(e, "Error showing keyboard in dialog")
                     }
                 }
             }
 
         } catch (e: Throwable) {
+            // no suspension point — non-suspend dialog-setup body; the nested
+            // lifecycleScope.launch is a fire-and-forget builder, not awaited.
             TimberWrapper.silentError(e, "Error creating rename dialog")
             showError(getString(R.string.error_generic))
         }

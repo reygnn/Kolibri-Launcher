@@ -151,6 +151,8 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 try {
                     finish()
                 } catch (e: Exception) {
+                    // `finish()` is a synchronous Android call — no suspension point,
+                    // so no CancellationException can reach this catch.
                     Timber.e(e, "Error finishing activity")
                 }
                 true

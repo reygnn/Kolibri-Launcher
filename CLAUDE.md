@@ -393,7 +393,38 @@ activities.
     `WallpaperRepositoryImpl.kt`, `UsageExportRepositoryImpl.kt`,
     `PackageUpdateReceiver.kt` (locked for the broad catches that sit in a
     suspend frame yet guard only a non-suspend call today — the shape that
-    would flip invisibly if that call became `suspend`); append to the
+    would flip invisibly if that call became `suspend`), and the
+    coroutine safety-net base classes `BaseActivity.kt` and
+    `BaseViewModel.kt` (the highest-blast-radius arm of all — every
+    activity/ViewModel coroutine funnels through their `launchSafe` /
+    `executeSafe` / collector wrappers; the broad `Throwable` catches
+    already sit behind `CancellationException`-first arms, and the two
+    non-suspend-guarding catches — `finish()` in `BaseActivity`, the
+    nested `onError`/`handleError` catch in `BaseViewModel.executeSafe` —
+    carry the `no suspension point` marker), two `LauncherViewModel`
+    delegates: `ClockDelegate.kt` (two non-suspend battery catches around
+    `registerReceiver` / Intent-extra reads, `no suspension point`
+    markers) and `WallpaperDelegate.kt` (whose `getDisplayName`
+    `withContext(ioDispatcher)` block was an actual live swallower — a
+    broad `catch (Throwable) { null }` sitting in a suspend frame; fixed
+    by a `CancellationException`-first rethrow arm so cancellation
+    propagates instead of collapsing to `null`), and the backup /
+    custom-names surfaces added in the codebase-wide scan:
+    `BackupFragment.kt` (its `showImportOptionsDialog`
+    `viewLifecycleOwner.lifecycleScope.launch` block was a **live**
+    swallower — the `catch (Throwable)` closed a try whose body suspends
+    on `withTimeoutOrNull { backupPreview.first { … } }`, so a
+    view-teardown cancellation was `silentError`-reported as a crash;
+    fixed with a `CancellationException`-first arm), `BackupViewModel.kt`
+    (already rethrew, but a glued/mis-indented `}catch` was defeating the
+    detector — re-formatted, not a behaviour change), `CustomNamesActivity.kt`
+    (all non-suspend / `no suspension point` markers — the inner
+    `showSoftInput` catch guards a blocking IPC while its `delay` sits
+    outside the try), and `SettingsFragment.kt` (25 non-suspend view /
+    listener / lifecycle catches carry `no suspension point` markers; the
+    one suspend-frame catch, the `showSortFavoritesFragment` fragment
+    transaction, gained a `CancellationException`-first arm to match its
+    three siblings); append to the
     `cancel_files` array in
     `tools/check-conventions.sh` to add a file (adding one with
     unreviewed catches just turns the build red — that IS the review

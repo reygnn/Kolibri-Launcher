@@ -104,6 +104,8 @@ abstract class BaseViewModel<E>(
             } catch (handlerError: Throwable) {
                 // The caller-supplied onError callback itself threw —
                 // log and swallow so executeSafe still returns null.
+                // `onError`/`handleError` are non-suspend — no suspension point,
+                // so no CancellationException can reach this catch.
                 Timber.e(handlerError, "Error in custom error handler")
             }
             null

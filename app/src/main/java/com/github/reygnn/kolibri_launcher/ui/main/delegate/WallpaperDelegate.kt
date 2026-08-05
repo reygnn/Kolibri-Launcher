@@ -769,7 +769,11 @@ class WallpaperDelegate(
             )?.use { cursor ->
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             }
+        } catch (e: CancellationException) {
+            throw e  // Coroutine control flow — must propagate, never collapse to null.
         } catch (e: Throwable) {
+            // Foreign SAF/cloud provider query can genuinely fail — null is the
+            // correct fallback for that; cancellation is handled above.
             null
         }
     }

@@ -151,6 +151,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             setupPreferenceListeners()
 
         } catch (e: Throwable) {
+            // no suspension point — non-suspend onCreatePreferences inflation, cannot see CancellationException
             // setPreferencesFromResource liest XML — echter I/O-Pfad.
             TimberWrapper.silentError(e, "Error in onCreatePreferences")
         }
@@ -180,6 +181,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true // Erlaube das Toggle auf 'false'
                 }
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in calendar change listener")
                 false
             }
@@ -194,6 +196,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in alarm change listener")
                 false
             }
@@ -208,6 +211,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in doubleTapClipboard change listener")
                 false
             }
@@ -222,6 +226,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
                 false
             }
@@ -236,6 +241,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
                 false
             }
@@ -251,6 +257,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in rotation lock change listener")
                 false
             }
@@ -288,6 +295,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 startActivity(intent)
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error starting edit favorites")
                 false
             }
@@ -312,6 +320,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in sort favorites click")
                 if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                 false
@@ -329,6 +338,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error starting hidden apps")
                 if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
                 false
@@ -342,6 +352,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 startActivity(intent)
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error starting app names activity")
                 false
             }
@@ -364,6 +375,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend fragment transaction, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error showing backup fragment")
                 false
             }
@@ -392,6 +404,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend fragment transaction, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error showing usage export fragment")
                 false
             }
@@ -406,6 +419,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 )
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error opening app info")
                 false
             }
@@ -448,6 +462,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 startActivity(intent)
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error starting swipe actions activity")
                 false
             }
@@ -494,6 +509,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 true
             } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
                 TimberWrapper.silentError(e, "Error in crash reports preference click")
                 false
             }
@@ -569,11 +585,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
             val customTabsIntent = builder.build()
             customTabsIntent.launchUrl(context, url.toUri())
         } catch (e: Throwable) {
+            // no suspension point — non-suspend custom-tab launch, cannot see CancellationException
             TimberWrapper.silentError(e, "Could not open Custom Tab, falling back to standard browser.")
             try {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 context.startActivity(intent)
             } catch (fallbackError: Throwable) {
+                // no suspension point — non-suspend fallback browser launch, cannot see CancellationException
                 TimberWrapper.silentError(fallbackError, "Even the fallback browser intent failed.")
             }
         }
@@ -813,6 +831,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 .replace(android.R.id.content, fragment)
                 .addToBackStack(null)
                 .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             // Fragment-Transaktionen werfen IllegalStateException unter
             // Race-Bedingungen mit dem Lifecycle.
@@ -826,6 +846,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             val intent = Intent(Intent.ACTION_SET_WALLPAPER)
             startActivity(Intent.createChooser(intent, getString(R.string.wallpaper_picker_title)))
         } catch (e: Throwable) {
+            // no suspension point — non-suspend wallpaper-picker launch, cannot see CancellationException
             TimberWrapper.silentError(e, "Error opening system wallpaper picker")
             openWallpaperSettings()
         }
@@ -836,6 +857,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
             viewModel.onWallpaperSettingsFallback()
         } catch (e: Throwable) {
+            // no suspension point — non-suspend wallpaper-settings launch, cannot see CancellationException
             viewModel.onErrorOpeningWallpaperSettings(e)
         }
     }
@@ -853,6 +875,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val roleManager = try {
             requireContext().getSystemService(RoleManager::class.java)
         } catch (e: Throwable) {
+            // no suspension point — non-suspend RoleManager fetch, cannot see CancellationException
             TimberWrapper.silentError(e, "Error getting RoleManager")
             return
         }
@@ -865,6 +888,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val isDefault = try {
             roleManager.isRoleHeld(RoleManager.ROLE_HOME)
         } catch (e: Throwable) {
+            // no suspension point — non-suspend role-held check, cannot see CancellationException
             TimberWrapper.silentError(e, "Error checking role")
             false
         }
@@ -913,6 +937,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
         } catch (e: Throwable) {
+            // no suspension point — non-suspend permission request, cannot see CancellationException
             TimberWrapper.silentError(e, "Error handling calendar permission request")
         }
     }
@@ -921,6 +946,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
         } catch (e: Throwable) {
+            // no suspension point — non-suspend launcher-settings launch, cannot see CancellationException
             viewModel.onErrorOpeningDefaultLauncherSettings(e)
         }
     }
@@ -957,6 +983,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
                 .show()
         } catch (e: Throwable) {
+            // no suspension point — non-suspend factory-reset dialog, cannot see CancellationException
             TimberWrapper.silentError(e, "Cannot show factory reset dialog")
         }
     }

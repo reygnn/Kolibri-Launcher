@@ -103,6 +103,8 @@ class ClockDelegate(
                 _batteryString.value = DEFAULT_BATTERY
             }
         } catch (e: Throwable) {
+            // Non-suspend method reading Intent extras — no suspension point,
+            // so no CancellationException can reach this catch.
             TimberWrapper.silentError(e, "Failed to update battery level from intent")
             _batteryString.value = DEFAULT_BATTERY
         }
@@ -149,6 +151,8 @@ class ClockDelegate(
             )
             updateBatteryLevelFromIntent(batteryIntent)
         } catch (e: Throwable) {
+            // Non-suspend method calling registerReceiver — no suspension point,
+            // so no CancellationException can reach this catch.
             TimberWrapper.silentError(e, "Failed to register battery receiver")
             _batteryString.value = DEFAULT_BATTERY
         }
