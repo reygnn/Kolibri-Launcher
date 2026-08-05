@@ -458,7 +458,8 @@ activities.
     swept 17 such arms across `LayoutDelegate`, the `Get*AppsUseCase`
     family, `ObserveInstalledAppsUseCase`, and `InstalledAppsRepositoryImpl`
     — the last already guarded the `emit()` cancellation but still logged
-    the incoming `e` unguarded.)
+    the incoming `e` unguarded.) Regression-tested via
+    `tools/check-flow-catch-rethrow-test.sh` (manual rerun, not a CI gate).
 
     **Discovery — when a refactor may need a NEW `cancel_files` entry.**
     Because the whitelist is a positive list, the linter is blind to a
