@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -434,6 +434,31 @@ activities.
     (the stacked-catch shape in `BackupRepositoryImpl.saveBackupToFile`);
     regression-tested via `tools/check-cancellation-rethrow-test.sh`
     (manual rerun, not a CI gate).
+
+    **The `Flow.catch { }` operator is the other cancellation swallower,
+    and it is enforced GLOBALLY (not a positive list).** The `catch (Type)`
+    walker above cannot see it — `Flow.catch` is a method call, not a
+    catch-clause. Yet it delivers a `CancellationException` to its lambda
+    whenever the cancellation originates UPSTREAM rather than from the
+    downstream `emit` (the `stateIn(SharingStarted.Eagerly)` teardown case:
+    the flow sits idle in the upstream, so the cancel surfaces there). An
+    arm that then LOGS the exception at report level (`silentError`,
+    `KolibriLog.w`/`.e`, `Timber.w`/`.e` — all WARN+ and delivered to ACRA
+    by `AcraTree`) without first rethrowing the cancellation files a bogus
+    report on every teardown — the same ACRA flood, one per arm. So every
+    logging `Flow.catch` arm must guard first: `if (e is
+    CancellationException) throw e` (the `SettingsRepositoryImpl` form), or
+    a narrowing rethrow that propagates everything non-recoverable
+    (`if (e is IOException) { … } else throw e`, as in `DataStoreReadFlow`
+    / `AppUsageRepositoryImpl`). Enforced by `./gradlew checkConventions`
+    via `tools/check-flow-catch-rethrow.awk` — a GLOBAL scan, because the
+    shape is precise: only an arm that BOTH logs at report level AND lacks
+    a guard flags; a `.catch { }` that merely emits a fallback without
+    logging cannot flood ACRA and is left alone. (The AUDIT-12 follow-on
+    swept 17 such arms across `LayoutDelegate`, the `Get*AppsUseCase`
+    family, `ObserveInstalledAppsUseCase`, and `InstalledAppsRepositoryImpl`
+    — the last already guarded the `emit()` cancellation but still logged
+    the incoming `e` unguarded.)
 
     **Discovery — when a refactor may need a NEW `cancel_files` entry.**
     Because the whitelist is a positive list, the linter is blind to a

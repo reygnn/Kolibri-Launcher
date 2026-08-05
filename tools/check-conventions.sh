@@ -274,6 +274,35 @@ if [ -n "$cancel_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Flow.catch cancellation-rethrow — the coroutine-operator form of the check
+# above, and the one the `catch (Type)` walker cannot see. A `Flow.catch { }`
+# arm that logs at report level (silentError / KolibriLog.w|e / Timber.w|e)
+# without first rethrowing CancellationException floods ACRA on every upstream
+# cancellation (SharingStarted.Eagerly teardown). GLOBAL scan, not a positive
+# list — the shape is precise (only logging arms without a guard flag). Logic
+# in tools/check-flow-catch-rethrow.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+flowcatch_awk="$script_dir/check-flow-catch-rethrow.awk"
+
+if [ ! -f "$flowcatch_awk" ]; then
+  echo "ERROR: Flow.catch rethrow awk script not found: $flowcatch_awk" >&2
+  exit 2
+fi
+
+flowcatch_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$flowcatch_awk" "$kt")
+  if [ -n "$hits" ]; then
+    flowcatch_hits="${flowcatch_hits}${hits}
+"
+  fi
+done < <(find "${src_roots[@]}" -name '*.kt')
+
+if [ -n "$flowcatch_hits" ]; then
+  report "Flow.catch — logging arm without a CancellationException rethrow (floods ACRA on upstream cancellation)" "${flowcatch_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."
