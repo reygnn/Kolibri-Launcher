@@ -22,6 +22,7 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -71,6 +72,8 @@ class BackupFragment : Fragment() {
             try {
                 viewModel.exportBackup(it.toString())
             } catch (e: Throwable) {
+                // no suspension point — non-suspend activity-result callback,
+                // cannot see CancellationException.
                 TimberWrapper.silentError(e, "Export failed")
                 showError(getString(R.string.backup_export_failed))
             }
@@ -90,6 +93,8 @@ class BackupFragment : Fragment() {
                 viewModel.previewBackup(it.toString())
                 showImportOptionsDialog(it.toString())
             } catch (e: Throwable) {
+                // no suspension point — non-suspend activity-result callback,
+                // cannot see CancellationException.
                 TimberWrapper.silentError(e, "Import preview failed")
                 showError(getString(R.string.error_generic))
             }
@@ -233,6 +238,11 @@ class BackupFragment : Fragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
 
+            } catch (e: CancellationException) {
+                // The try body suspends (withTimeoutOrNull + backupPreview.first);
+                // a view-teardown cancellation must propagate, not be reported as
+                // a crash. Rethrow per canonical.
+                throw e
             // Outer Catchall kept: DialogImportOptionsBinding.inflate +
             // MaterialAlertDialogBuilder + show() — Dialog/View-Inflation
             // chain may OutOfMemoryError on low-memory devices, plus
