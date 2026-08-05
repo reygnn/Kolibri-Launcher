@@ -23,6 +23,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # Convention linter (CLAUDE.md Rules 9/11/12, naming, Toast routing,
+      # cancellation-rethrow discipline). Runs first as a fast-fail gate so a
+      # swallowed CancellationException or a bare Timber.e cannot merge to main
+      # unnoticed — the check only fired on manual `./gradlew checkConventions`
+      # before. File-based scan, needs no git history.
+      - name: Run convention linter
+        run: ./gradlew checkConventions --stacktrace
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 
