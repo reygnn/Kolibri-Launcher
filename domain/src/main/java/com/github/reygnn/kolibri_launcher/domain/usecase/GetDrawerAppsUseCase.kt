@@ -33,10 +33,12 @@ class GetDrawerAppsUseCase @Inject constructor(
 
         // Non-critical Flows: Mit individuellen Fallbacks
         settingsRepository.sortOrderFlow.catch { e ->
+            if (e is CancellationException) throw e
             KolibriLog.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
             emit(SortOrder.ALPHABETICAL)
         },
         hiddenAppsRepository.hiddenAppsFlow.catch { e ->
+            if (e is CancellationException) throw e
             KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
@@ -79,6 +81,7 @@ class GetDrawerAppsUseCase @Inject constructor(
         sortedApps
     }
         .catch { e ->
+            if (e is CancellationException) throw e
             // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
             // was die obigen Catches nicht abdecken (Programmierfehler).
             // silentError macht das in DEBUG laut, in RELEASE landet

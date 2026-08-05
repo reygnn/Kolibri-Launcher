@@ -104,6 +104,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             loadAppsFromPackageManager()
         }
         .catch { e ->
+            if (e is CancellationException) throw e
             try {
                 TimberWrapper.silentError(e, "Error in apps state flow, emitting empty list")
                 emit(emptyList())
@@ -181,6 +182,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
         }
     }
         .catch { e ->
+            if (e is CancellationException) throw e
             try {
                 TimberWrapper.silentError(e, "Flow catch: Error in loadAppsFromPackageManager")
                 emit(emptyList())

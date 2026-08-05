@@ -19,6 +19,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUs
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -43,6 +44,7 @@ class LayoutDelegate(
 
     val layoutScaleState: StateFlow<Float> = getLayoutSettingsUseCase.layoutScale
         .catch { e ->
+            if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing layout scale")
             emit(AppConstants.DEFAULT_LAYOUT_SCALE)
         }
@@ -54,6 +56,7 @@ class LayoutDelegate(
 
     val verticalPaddingState: StateFlow<Float> = getLayoutSettingsUseCase.verticalPadding
         .catch { e ->
+            if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing vertical padding")
             emit(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         }
@@ -65,6 +68,7 @@ class LayoutDelegate(
 
     val isFontBoldState: StateFlow<Boolean> = getLayoutSettingsUseCase.isFontBold
         .catch { e ->
+            if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing font bold")
             emit(AppConstants.DEFAULT_FONT_BOLD)
         }
@@ -76,6 +80,7 @@ class LayoutDelegate(
 
     val contentTopMarginState: StateFlow<Float> = getLayoutSettingsUseCase.contentTopMargin
         .catch { e ->
+            if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing content top margin")
             emit(0f)
         }
@@ -87,6 +92,7 @@ class LayoutDelegate(
 
     val favoritesAlignmentState: StateFlow<FavoritesAlignment> = getLayoutSettingsUseCase.favoritesAlignment
         .catch { e ->
+            if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing favorites alignment")
             emit(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
         }

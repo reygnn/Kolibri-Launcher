@@ -15,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -51,6 +52,7 @@ class GetRecentAppsUseCase @Inject constructor(
 
         val hidden = hiddenAppsRepository.hiddenAppsFlow
             .catch { e ->
+                if (e is CancellationException) throw e
                 KolibriLog.w(e, "hiddenAppsFlow error in recents - showing all")
                 emit(emptySet())
             }

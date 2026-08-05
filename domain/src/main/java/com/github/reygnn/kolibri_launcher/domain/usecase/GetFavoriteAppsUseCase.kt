@@ -66,14 +66,17 @@ class GetFavoriteAppsUseCase @Inject constructor(
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
         installedAppsStateRepository.rawAppsFlow,
         favoritesRepository.favoriteComponentsFlow.catch { e ->
+            if (e is CancellationException) throw e
             KolibriLog.w(e, "favoriteComponentsFlow error - using empty set fallback")
             emit(emptySet())
         },
         hiddenAppsRepository.hiddenAppsFlow.catch { e ->
+            if (e is CancellationException) throw e
             KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
         favoritesOrderRepository.favoriteComponentsOrderFlow.catch { e ->
+            if (e is CancellationException) throw e
             KolibriLog.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
         }
@@ -87,6 +90,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         processApps(rawApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
+        if (e is CancellationException) throw e
         TimberWrapper.silentError(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }

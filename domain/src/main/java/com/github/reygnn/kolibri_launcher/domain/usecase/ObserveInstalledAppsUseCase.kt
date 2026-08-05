@@ -66,6 +66,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     }
                 }
                 .catch { e ->
+                    if (e is CancellationException) throw e
                     // Dies fängt Fehler im Upstream-Flow (getInstalledApps, retry)
                     TimberWrapper.silentError(e, "Failed to collect installed apps")
 
