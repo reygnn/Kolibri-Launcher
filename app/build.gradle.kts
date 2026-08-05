@@ -365,6 +365,19 @@ tasks.register<Exec>("checkRule13") {
     commandLine = listOf("bash", "tools/check-rule13-german-comments.sh")
 }
 
+// Discovery aid for the cancellation-rethrow whitelist. The linter (cancel_files
+// positive list) is blind to non-listed files by design; this sweeps every
+// non-whitelisted main source for the broad-catch shape and ranks hits by
+// coroutine density. Report-only — it never fails the build. Run after a
+// refactor that gives a file coroutine work (CLAUDE.md Rule 11, "Discovery").
+// NOT wired into `checkConventions`/CI — a discovery tool, not a gate.
+tasks.register<Exec>("scanCancelCandidates") {
+    group = "verification"
+    description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/scan-cancel-candidates.sh")
+}
+
 // Code coverage configuration via JaCoCo.
 tasks.register<JacocoReport>("jacocoTestReport") {
     dependsOn("testDebugUnitTest")

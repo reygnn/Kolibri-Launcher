@@ -435,6 +435,28 @@ activities.
     regression-tested via `tools/check-cancellation-rethrow-test.sh`
     (manual rerun, not a CI gate).
 
+    **Discovery — when a refactor may need a NEW `cancel_files` entry.**
+    Because the whitelist is a positive list, the linter is blind to a
+    broad catch in a file it does not list: a rewrite that gives a
+    previously-synchronous file coroutine work — a new
+    `launch`/`async`/`withContext`/`suspend fun`, or making an existing
+    call inside a broad catch `suspend` — introduces exactly the
+    invisible-flip risk with nothing to flag it. There is no automatic
+    detector (a suspend call has no syntactic tell — that is the whole
+    reason the check is a positive list, not a global sweep). So the
+    trigger is manual and yours to run: **after such a refactor, run
+    `./gradlew scanCancelCandidates`** (script
+    `tools/scan-cancel-candidates.sh`). It sweeps every non-whitelisted
+    main source for the broad-catch shape the linter would flag and ranks
+    files by coroutine density so likely suspend-frame swallowers surface
+    first; it is report-only and never fails the build (deliberately not
+    wired into `checkConventions`/CI — a 36-file wall of non-suspend
+    catches would be noise, not a gate). Triage its output with the
+    AUDIT-12 lens: a broad catch physically inside a suspend frame with
+    no `CancellationException` arm → fix it (rethrow arm) and/or add the
+    file here; a non-suspend catch → leave it. Crash-infra files (Rule 9)
+    are excluded from the scan as known-intentional.
+
     **A caught failure must stay a failure — return it, don't erase
     it.** The sanctioned alternative to propagating an exception is
     reporting the outcome as a value, not collapsing it into a
