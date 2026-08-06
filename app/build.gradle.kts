@@ -339,9 +339,16 @@ configurations.all {
 // Source script: `tools/check-conventions.sh`. Add new checks there, not here.
 //
 // Currently checks:
-//   - Rule 9   — bare `Timber.e(` outside the documented crash-infra files
-//   - Rule 12  — `Timber.Forest.*` (use the short form)
-//   - Naming   — `*Manager` classes inside `data/` (use `*RepositoryImpl`)
+//   - Rule 9    — bare `Timber.e(` outside the documented crash-infra files
+//   - Rule 11   — broad-catch annotation + cancellation-rethrow discipline
+//   - Rule 12   — `Timber.Forest.*` (use the short form)
+//   - Naming    — `*Manager` classes inside `data/` (use `*RepositoryImpl`)
+//   - Toast     — bare `Toast.makeText(` outside `ToastSafe.kt`
+//   - Flow.catch — logging arm without a CancellationException rethrow
+//   - SharedFlow — unbuffered `MutableSharedFlow(...)` that drops emissions
+//   - Purge     — declared preference key not wiped by `purgeRepository()`
+//   - ActivityResult — registerForActivityResult() in a lifecycle method
+//   - Adapter   — Fragment RecyclerView adapter not nulled in onDestroyView
 //
 // Run via `./gradlew checkConventions` or invoke the script directly.
 tasks.register<Exec>("checkConventions") {

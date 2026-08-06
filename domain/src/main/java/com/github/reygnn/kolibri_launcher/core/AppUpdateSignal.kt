@@ -18,7 +18,10 @@ import javax.inject.Singleton
 @Singleton
 open class AppUpdateSignal @Inject constructor() : Purgeable {
 
-    private val _events = MutableSharedFlow<PackageEvent>()
+    // extraBufferCapacity = 1 so a package event emitted while the collector
+    // is momentarily absent (process just started by this very broadcast) is
+    // buffered instead of dropped by the rendezvous default (AUDIT-9 #5).
+    private val _events = MutableSharedFlow<PackageEvent>(extraBufferCapacity = 1)
     val events = _events.asSharedFlow()
 
     open suspend fun send(event: PackageEvent) {

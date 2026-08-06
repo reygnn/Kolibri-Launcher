@@ -271,7 +271,8 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(booleanPreferencesKey("secure_window"))
 
             // WICHTIG: Onboarding Status wird NICHT gelöscht
-            // preferences.remove(PreferenceKeys.ONBOARDING_COMPLETED)
+            // purge-exempt: ONBOARDING_COMPLETED — kept intentionally across a
+            // reset (see the KDoc "AUSNAHME" above).
         }
     }
 }

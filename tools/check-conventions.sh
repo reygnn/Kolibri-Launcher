@@ -303,6 +303,124 @@ if [ -n "$flowcatch_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Unbuffered MutableSharedFlow — a `MutableSharedFlow(...)` built with the
+# default zero buffer (`replay = 0, extraBufferCapacity = 0`) silently drops an
+# emission when no collector is subscribed (AUDIT-9 #5, `AppUpdateSignal`).
+# GLOBAL scan over main sources — the shape is precise (only a bare
+# construction with a provably-zero buffer flags; type annotations, imports and
+# comment mentions never do). Escape hatch for a provably-safe rendezvous flow:
+# a `rendezvous intended` marker within +/-2 lines. Test buffering is out of
+# scope (unbuffered-with-immediate-collector is legitimate and fails fast);
+# see TESTING_CONVENTIONS.kt §2. Logic in tools/check-unbuffered-sharedflow.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+sharedflow_awk="$script_dir/check-unbuffered-sharedflow.awk"
+
+if [ ! -f "$sharedflow_awk" ]; then
+  echo "ERROR: Unbuffered-SharedFlow awk script not found: $sharedflow_awk" >&2
+  exit 2
+fi
+
+sharedflow_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$sharedflow_awk" "$kt")
+  if [ -n "$hits" ]; then
+    sharedflow_hits="${sharedflow_hits}${hits}
+"
+  fi
+done < <(find "${src_roots[@]}" -name '*.kt')
+
+if [ -n "$sharedflow_hits" ]; then
+  report "Unbuffered MutableSharedFlow — drops emissions with no subscriber (add \`extraBufferCapacity = 1\` / \`replay\`, or a \`rendezvous intended\` marker)" "${sharedflow_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# purgeRepository() completeness — a "reset all settings" must wipe every
+# statically-declared preference key of the repo. AUDIT-4 #1 caught
+# SettingsRepositoryImpl declaring APP_DRAWER_MODE but never removing it in
+# purge. Per-file scan over data/*RepositoryImpl.kt: every constant-style
+# `val UPPER_SNAKE = <...>PreferencesKey(...)` must be referenced in a
+# non-comment line of purgeRepository() (a real remove) or carry a
+# `purge-exempt NAME` marker. Dynamic camelCase per-entity keys are excluded;
+# a wholesale `.clear()` exempts the file. Logic in
+# tools/check-purge-completeness.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+purge_awk="$script_dir/check-purge-completeness.awk"
+
+if [ ! -f "$purge_awk" ]; then
+  echo "ERROR: purge-completeness awk script not found: $purge_awk" >&2
+  exit 2
+fi
+
+purge_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$purge_awk" "$kt")
+  if [ -n "$hits" ]; then
+    purge_hits="${purge_hits}${hits}
+"
+  fi
+done < <(find "$repo_root/data/src/main/java" -name '*RepositoryImpl.kt')
+
+if [ -n "$purge_hits" ]; then
+  report "purgeRepository() completeness — declared preference key not wiped on reset (add a \`preferences.remove(...)\` or a \`purge-exempt\` marker)" "${purge_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# registerForActivityResult() placement — must be a field initializer or run in
+# onCreate; called from onViewCreated / onResume / etc. it throws
+# "LifecycleOwners must call register before they are STARTED" on the next
+# config change (AUDIT-5 #2). Global scan over app/ main sources: only a call
+# whose innermost enclosing function is a forbidden lifecycle method flags.
+# Logic in tools/check-activity-result-placement.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+arresult_awk="$script_dir/check-activity-result-placement.awk"
+
+if [ ! -f "$arresult_awk" ]; then
+  echo "ERROR: registerForActivityResult-placement awk script not found: $arresult_awk" >&2
+  exit 2
+fi
+
+arresult_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$arresult_awk" "$kt")
+  if [ -n "$hits" ]; then
+    arresult_hits="${arresult_hits}${hits}
+"
+  fi
+done < <(find "$repo_root/app/src/main/java" -name '*.kt')
+
+if [ -n "$arresult_hits" ]; then
+  report "registerForActivityResult() placement — called from a lifecycle method (move to a field initializer or onCreate)" "${arresult_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RecyclerView adapter null-out — a Fragment that assigns a non-null
+# `recyclerView.adapter` must clear it (`adapter = null`) in onDestroyView, or
+# the view hierarchy leaks across the view-recreation cycle (AUDIT-3 #13,
+# AUDIT-4 #3). Per-file scan over app/ main sources; Fragments only (Activities
+# clear in onDestroy). Escape hatch: an `adapter-nulling n/a` marker on the
+# assignment. Logic in tools/check-adapter-nulling.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+adapter_awk="$script_dir/check-adapter-nulling.awk"
+
+if [ ! -f "$adapter_awk" ]; then
+  echo "ERROR: adapter-nulling awk script not found: $adapter_awk" >&2
+  exit 2
+fi
+
+adapter_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$adapter_awk" "$kt")
+  if [ -n "$hits" ]; then
+    adapter_hits="${adapter_hits}${hits}
+"
+  fi
+done < <(find "$repo_root/app/src/main/java" -name '*.kt')
+
+if [ -n "$adapter_hits" ]; then
+  report "RecyclerView adapter null-out — Fragment assigns an adapter but never nulls it in onDestroyView (leak)" "${adapter_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."

@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -201,6 +201,21 @@ activities.
    be additively backward-compatible. Git history under `data/` has the
    full implementation if a future migration ever needs the same shape
    back.
+
+   *Purge completeness (enforced).* A "reset all settings"
+   (`purgeRepository()`) must wipe **every** statically-declared preference
+   key of its repo — a key left behind is a reset that silently lies
+   (AUDIT-4 #1: `SettingsRepositoryImpl` declared `APP_DRAWER_MODE` but never
+   removed it). `./gradlew checkConventions` enforces this per file
+   (`tools/check-purge-completeness.awk`): every constant-style
+   `val UPPER_SNAKE = <…>PreferencesKey(…)` must be referenced in a
+   non-comment line of that file's `purgeRepository()` (a comment merely
+   *naming* the key does not count — that adjacency is how the AUDIT-4 gap
+   hid), or carry a `purge-exempt NAME` marker for state intentionally kept
+   across a reset (only `ONBOARDING_COMPLETED` today). Dynamic per-entity
+   keys (local `camelCase` vals built from a prefix, purged by iteration)
+   are excluded; a wholesale `.clear()` exempts the file. Regression-tested
+   via `tools/check-purge-completeness-test.sh` (manual rerun, not a CI gate).
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
@@ -540,6 +555,63 @@ activities.
     against `a65a6b2` (2026-05-01, the rule's introduction commit)
     and left the codebase clean from that cutoff forward; anything
     earlier is grandfathered legacy.
+
+### Event-bus SharedFlows must be buffered (enforced)
+
+A `MutableSharedFlow(...)` built with the default zero buffer
+(`replay = 0, extraBufferCapacity = 0`) is a **rendezvous** flow: `emit`
+suspends until a collector is present, so an event fired while nobody is
+subscribed is silently **dropped** (or, under a `withTimeout`, cancelled and
+lost). For a lifecycle-independent producer — a `BroadcastReceiver`, a process
+just started by the very broadcast it must react to — that is a latent
+lost-update bug. AUDIT-9 #5 was exactly this: `AppUpdateSignal._events` was an
+unbuffered `MutableSharedFlow<PackageEvent>()` while its siblings
+(`AppUpdateModule` `extraBufferCapacity = 1`, `ErrorEventBus` `replay = 5`)
+were correctly buffered; fixed to `extraBufferCapacity = 1`.
+
+`./gradlew checkConventions` enforces this globally over main sources
+(`tools/check-unbuffered-sharedflow.awk`): any `MutableSharedFlow(...)`
+**construction** with a provably-zero buffer flags — type annotations
+(`: MutableSharedFlow<Unit>`), imports and comment mentions never do. Give the
+flow a real buffer (`extraBufferCapacity`/`replay`), or, if a collector is
+provably always active before any emit so a drop cannot happen, record that
+with a `rendezvous intended` marker within ±2 lines. Test buffering stays out
+of scope (unbuffered-with-immediate-collector is legitimate and fails fast —
+the test hangs; see `TESTING_CONVENTIONS.kt` §2). Regression-tested via
+`tools/check-unbuffered-sharedflow-test.sh` (manual rerun, not a CI gate).
+
+### Fragment teardown discipline (enforced)
+
+Two mechanical view-lifecycle gates, both currently green, both in
+`checkConventions`:
+
+- **`registerForActivityResult()` placement**
+  (`tools/check-activity-result-placement.awk`). The call must be a field
+  initializer or run in `onCreate`; from `onViewCreated` / `onResume` / etc.
+  it throws *"LifecycleOwners must call register before they are STARTED"* on
+  the next config change (AUDIT-5 #2). The check resolves each call's
+  innermost enclosing function by brace depth and flags only the forbidden
+  lifecycle methods — a field or a plain helper is fine.
+
+- **RecyclerView adapter null-out** (`tools/check-adapter-nulling.awk`). A
+  Fragment that assigns a non-null `recyclerView.adapter` must clear it
+  (`adapter = null`) in `onDestroyView`, or the view tree leaks across the
+  view-recreation cycle (AUDIT-3 #13, AUDIT-4 #3); `AppDrawerFragment` is the
+  reference. Fragments only — Activities clear in `onDestroy` and are out of
+  scope. Escape hatch for an adapter provably owned elsewhere: an
+  `adapter-nulling n/a` marker on the assignment line.
+
+Both are regression-tested via `tools/check-fragment-teardown-test.sh` (manual
+rerun, not a CI gate).
+
+*Not turned into gates (deliberately):* "raw `lifecycleScope.launch` outside a
+`launchSafe`" and "flow `.collect` outside `collectOnStarted`" were evaluated
+and rejected — the view layer has no `launchSafe` extension, so raw
+`lifecycleScope.launch` guarded by a `CoroutineExceptionHandler` **is** the
+standing idiom (~24 legitimate sites), and every raw-collect site is a
+legitimate multi-sub-launch / nested-coroutine case the helper explicitly
+excludes. A gate there would be all-noise, against the "precise shape" rule
+the other checks hold to.
 
 ---
 
