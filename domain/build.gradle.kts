@@ -25,6 +25,11 @@ plugins {
     alias(libs.plugins.ksp)
     `java-test-fixtures`
     alias(libs.plugins.kotlin.serialization)
+    // Produces build/jacoco/test.exec — note the task is `test`, not
+    // `testDebugUnitTest`: this is a pure-JVM module with no build variants,
+    // the same asymmetry that kept it out of the CI test step. :app's
+    // aggregating `jacocoTestReport` consumes the exec file.
+    id("jacoco")
 }
 
 java {

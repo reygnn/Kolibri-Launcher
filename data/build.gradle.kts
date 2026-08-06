@@ -28,6 +28,10 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
+    // Produces build/jacoco/testDebugUnitTest.exec, which :app's aggregating
+    // `jacocoTestReport` consumes. Without it this module's 859 tests ran but
+    // contributed nothing to the coverage number.
+    id("jacoco")
 }
 
 android {
