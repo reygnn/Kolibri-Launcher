@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out, Exception breadth)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -603,6 +603,36 @@ Two mechanical view-lifecycle gates, both currently green, both in
 
 Both are regression-tested via `tools/check-fragment-teardown-test.sh` (manual
 rerun, not a CI gate).
+
+### Exception-vs-Throwable breadth (enforced — Rule 11 sibling)
+
+`OutOfMemoryError` (and every `Error`) is a `Throwable`, **not** an `Exception`.
+So `catch (e: Exception)` wrapped around an ALLOCATION or system-callback
+boundary — bitmap decode/compose, layout inflation, large JSON/ZIP encoding —
+silently misses the exact failure it was written to survive. AUDIT.md category
+A was this shape ~14 times (`ZoomableImageView` bitmap paths,
+`BackupRepositoryImpl`'s JSON/ZIP umbrella, `AppContextMenuDialogFragment`
+inflate/bind); the fix widened those umbrellas to `catch (e: Throwable)`. This
+is the exact complement of the cancellation checks: those guard a catch that is
+too BROAD (Throwable swallowing `CancellationException`); this guards one too
+NARROW (Exception missing `OutOfMemoryError`) — widen to Throwable and, in a
+suspend frame, the resulting broad catch is handed to the cancellation check.
+
+`./gradlew checkConventions` enforces it as a **positive list**
+(`tools/check-exception-breadth.awk`), same growth model as the Rule 11 /
+cancellation whitelists: a file joins only once every broad catch on its
+allocation boundaries is `Throwable`, a narrowed type, or — where `Exception`
+is genuinely right (a pure-I/O boundary, e.g. a `contentResolver.openInputStream`
+probe, where no `Error` can arise) — carries an `Exception sufficient` marker
+within ±5 lines. A bare `catch (e: Exception)` with no marker flags. It is
+deliberately NOT a global scan: most `catch (Exception)` in the tree are correct
+— narrow race guards (RecyclerView `notifyItem*` / `submitList` throwing
+`IllegalStateException`, where `Throwable` would WRONGLY swallow OOM) or pure
+I/O — so only files that ARE allocation boundaries belong on the list. Today:
+`ZoomableImageView`, `AppContextMenuDialogFragment` (both already Throwable-only;
+the entry locks the AUDIT category-A remediation against regression). Append to
+the `oom_files` array in `tools/check-conventions.sh` to add a file. Regression-
+tested via `tools/check-exception-breadth-test.sh` (manual rerun, not a CI gate).
 
 *Not turned into gates (deliberately):* "raw `lifecycleScope.launch` outside a
 `launchSafe`" and "flow `.collect` outside `collectOnStarted`" were evaluated

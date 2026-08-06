@@ -421,6 +421,48 @@ if [ -n "$adapter_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Exception-vs-Throwable breadth — `OutOfMemoryError` is an Error/Throwable, not
+# an Exception, so `catch (e: Exception)` around an allocation / system-callback
+# boundary (bitmap, inflate, large JSON/ZIP) misses the failure it exists for
+# (AUDIT.md category A, ~14×). In a whitelisted allocation-boundary file every
+# broad catch must be `Throwable`, a narrowed type, or (pure-I/O only) carry an
+# `Exception sufficient` marker; a bare `catch (e: Exception)` flags.
+#
+# Positive list, same growth model as Rule 11 / cancellation above — a file
+# joins once its allocation-boundary catches are reviewed. NOT a global scan:
+# most `catch (Exception)` in the tree are correct (race guards where Throwable
+# would wrongly swallow OOM, or pure I/O). Logic in
+# tools/check-exception-breadth.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+oom_files=(
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/ZoomableImageView.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
+)
+oom_awk="$script_dir/check-exception-breadth.awk"
+
+if [ ! -f "$oom_awk" ]; then
+  echo "ERROR: exception-breadth awk script not found: $oom_awk" >&2
+  exit 2
+fi
+
+oom_hits=""
+for file in "${oom_files[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: exception-breadth whitelist file not found: $file" >&2
+    exit 2
+  fi
+  hits=$(awk -f "$oom_awk" "$file")
+  if [ -n "$hits" ]; then
+    oom_hits="${oom_hits}${hits}
+"
+  fi
+done
+
+if [ -n "$oom_hits" ]; then
+  report "Exception breadth — bare \`catch (e: Exception)\` at an allocation boundary (use \`Throwable\` for OOM, or an \`Exception sufficient\` marker)" "${oom_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."

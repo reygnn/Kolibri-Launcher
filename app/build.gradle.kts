@@ -349,6 +349,7 @@ configurations.all {
 //   - Purge     — declared preference key not wiped by `purgeRepository()`
 //   - ActivityResult — registerForActivityResult() in a lifecycle method
 //   - Adapter   — Fragment RecyclerView adapter not nulled in onDestroyView
+//   - ExceptionBreadth — bare catch(Exception) at a whitelisted OOM boundary
 //
 // Run via `./gradlew checkConventions` or invoke the script directly.
 tasks.register<Exec>("checkConventions") {
