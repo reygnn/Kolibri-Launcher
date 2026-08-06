@@ -469,6 +469,61 @@ if [ -n "$oom_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Localization parity — every key in res/values/ must have a res/values-de/
+# twin and vice versa. A missing German entry silently ships English text to a
+# German device (stringResource falls back to the default locale, so nothing
+# fails at compile time); an orphaned German entry is dead weight, usually the
+# fossil of a renamed English key. `translatable="false"` in the default locale
+# exempts. GLOBAL, not a positive list — there is no judgement call here, and
+# the codebase is parity-clean today, so this locks that state.
+# Logic in tools/check-strings-parity.awk.
+# ─────────────────────────────────────────────────────────────────────────────
+parity_awk="$script_dir/check-strings-parity.awk"
+
+if [ ! -f "$parity_awk" ]; then
+  echo "ERROR: strings-parity awk script not found: $parity_awk" >&2
+  exit 2
+fi
+
+parity_hits=""
+for res in strings arrays; do
+  default_xml="$repo_root/app/src/main/res/values/$res.xml"
+  de_xml="$repo_root/app/src/main/res/values-de/$res.xml"
+  # Only compare pairs that exist — a resource file with no German counterpart
+  # at all is a different (and louder) problem than key-level drift.
+  [ -f "$default_xml" ] && [ -f "$de_xml" ] || continue
+  hits=$(awk -f "$parity_awk" "$default_xml" "$de_xml" | sed "s|^|$res.xml — |")
+  if [ -n "$hits" ]; then
+    parity_hits="${parity_hits}${hits}
+"
+  fi
+done
+
+if [ -n "$parity_hits" ]; then
+  report "Localization parity — key present in only one locale (values/ vs values-de/)" "${parity_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rule 2 — contract-test triple completeness. Every `*Repository` interface in
+# :domain needs XyzRepositoryContract + FakeXyzRepositoryContractTest +
+# XyzRepositoryImplContractTest, or a canonical `NO CONTRACT TEST (ADR)` /
+# `NO IMPL CONTRACT TEST (ADR)` marker in the contract file. Rule 2 already
+# allowed justified gaps; what this adds is one greppable token for them.
+# Logic in tools/check-contract-triple.sh.
+# ─────────────────────────────────────────────────────────────────────────────
+triple_sh="$script_dir/check-contract-triple.sh"
+
+if [ ! -f "$triple_sh" ]; then
+  echo "ERROR: contract-triple script not found: $triple_sh" >&2
+  exit 2
+fi
+
+triple_hits=$(bash "$triple_sh")
+if [ -n "$triple_hits" ]; then
+  report "Rule 2 — incomplete contract-test triple (add the missing test, or an ADR marker in the contract)" "$triple_hits"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."

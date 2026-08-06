@@ -16,6 +16,13 @@ import org.junit.Test
  * INSTALLED APPS REPOSITORY — CONTRACT TEST (BEWUSST DÜNN)
  * ============================================================================
  *
+ * NO IMPL CONTRACT TEST (ADR) — canonical marker read by `./gradlew
+ * checkConventions` (tools/check-contract-triple.sh). Exempts the impl half
+ * only; the fake contract test stays required. The German rationale below is
+ * the actual argument — this line only makes it greppable. The impl is a
+ * system-API wrapper (LauncherApps / PackageManager) and carries its own
+ * impl-level coverage.
+ *
  * Dieser Contract ist absichtlich klein. Hintergrund:
  *
  * Es gibt zwei Fakes für das [InstalledAppsRepository]-Interface:

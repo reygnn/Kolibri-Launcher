@@ -15,6 +15,13 @@ import org.junit.Test
  * BACKUP REPOSITORY — CONTRACT TEST (BEWUSST DÜNN, FAKE-ONLY)
  * ============================================================================
  *
+ * NO IMPL CONTRACT TEST (ADR) — canonical marker read by `./gradlew
+ * checkConventions` (tools/check-contract-triple.sh). Exempts the impl half
+ * only; the fake contract test stays required. The German rationale below
+ * ("KEIN MANAGER-CONTRACT-TEST") is the actual argument — this line only makes
+ * it greppable. BackupRepositoryImpl keeps its own impl-level coverage in
+ * BackupRepositoryImplTest / …DoomsdayTest.
+ *
  * Dieser Contract ist absichtlich klein. Hintergrund:
  *
  * Es gibt für [BackupRepository] genau eine Fake-Implementierung

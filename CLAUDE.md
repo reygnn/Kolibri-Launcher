@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out, Exception breadth)
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out, Exception breadth, localization parity, Rule 2 contract triple)
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -170,6 +170,30 @@ activities.
    are justified per-repo in the corresponding contract KDoc under a
    "NO CONTRACT TEST (ADR)" note, and each still carries impl-level test
    coverage. Details: `app/src/test/CLAUDE.md`.
+
+   **Enforced** by `./gradlew checkConventions`
+   (`tools/check-contract-triple.sh`): every `*Repository` interface in
+   `:domain` needs the full triple, or a marker in its contract file.
+   Two markers, because the exemptions are not all the same size:
+   `NO CONTRACT TEST (ADR)` exempts the whole triple, `NO IMPL CONTRACT
+   TEST (ADR)` exempts only the impl half and keeps the fake contract
+   test required. Non-repository interfaces (`Purgeable`,
+   `WallpaperBitmapLuminance`) are out of scope by the name filter.
+
+   The rollout found no missing *reasoning* — all six exemptions were
+   argued at length in their contract KDoc. What was missing was one
+   spelling: `TimeBasedEvents` wrote "KEIN CONTRACT TEST", `Backup`
+   "CONTRACT TEST (BEWUSST DÜNN, FAKE-ONLY)", `InstalledApps` "CONTRACT
+   TEST (BEWUSST DÜNN)" — three self-invented headings, none greppable,
+   so the decision was invisible to any check. Each gained a canonical
+   marker line next to (not instead of) its existing German rationale.
+   Same lesson as `Exception sufficient`: a linter cannot judge prose
+   quality, only the presence of a stable token — so the token has to be
+   decided once and reused. Regression-tested via
+   `tools/check-contract-triple-test.sh` (manual rerun, not a CI gate);
+   because the check is filesystem-shaped rather than text-shaped, that
+   test builds a synthetic repo skeleton instead of feeding a fixture to
+   an awk core.
 
 3. **When a contract test goes red, the impl wins.** Align the fake to
    the impl, not the other way around — impl behavior is production
@@ -748,6 +772,29 @@ Plain `runTest { }` creates its own `TestCoroutineScheduler`, so
 `res/values/strings.xml` (default, English) and `res/values-de/strings.xml`
 (German). When changing UI, update both locales — no hardcoded strings in
 Kotlin or XML.
+
+**Parity is enforced** by `./gradlew checkConventions`
+(`tools/check-strings-parity.awk`, covering `strings.xml` and `arrays.xml`).
+Both drift directions flag, because they are different defects: a key only in
+`values/` ships English text to a German device without failing anything at
+compile time (`stringResource` falls back to the default locale), and a key only
+in `values-de/` is dead weight, usually the fossil of a renamed English twin.
+`<string>`, `<string-array>` and `<plurals>` are all covered at name level;
+per-quantity coverage inside a `<plurals>` is not checked, since German and
+English share the same one/other split.
+
+`translatable="false"` in the DEFAULT locale is the exemption — the platform's
+own way of marking something as not-UI-prose. 14 keys carry it today (the
+blend-mode names, `time_placeholder`, `battery_placeholder`) and are correctly
+absent from `values-de/`. An orphan in `values-de/` is never exempt: a locale
+override of a non-translatable key is itself the bug.
+
+Unlike the catch-breadth axes this is a GLOBAL check, not a positive list —
+a key is either in both files or it is not, and the `translatable` attribute
+already encodes every legitimate exception, so there is no judgement call for a
+whitelist to record. The tree was parity-clean when the check landed, so it
+locks that state rather than reporting debt. Regression-tested via
+`tools/check-strings-parity-test.sh` (manual rerun, not a CI gate).
 
 ---
 

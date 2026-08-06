@@ -5,6 +5,11 @@ package com.github.reygnn.kolibri_launcher.data
  * TIME BASED EVENTS REPOSITORY — KEIN CONTRACT TEST
  * ============================================================================
  *
+ * NO CONTRACT TEST (ADR) — canonical marker read by `./gradlew
+ * checkConventions` (tools/check-contract-triple.sh). The German rationale
+ * below is the actual argument; this line exists only so the decision is
+ * greppable under one spelling instead of three self-invented headings.
+ *
  * Diese Datei enthält absichtlich KEINEN Code. Sie dokumentiert eine bewusste
  * Lücke in der Contract-Test-Suite.
  *
