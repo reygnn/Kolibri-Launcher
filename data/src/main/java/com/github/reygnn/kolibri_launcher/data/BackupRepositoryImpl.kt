@@ -417,6 +417,7 @@ class BackupRepositoryImpl @Inject constructor(
                     context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
                 } catch (e: Exception) {
                     // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+                    // Exception sufficient (pure I/O probe, no allocation path → no Error).
                     false
                 }
 
@@ -474,6 +475,7 @@ class BackupRepositoryImpl @Inject constructor(
                 context.contentResolver.openInputStream(sourceUri)?.use { true } ?: false
             } catch (e: Exception) {
                 // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+                // Exception sufficient (pure I/O probe, no allocation path → no Error).
                 false
             }
 
@@ -574,6 +576,7 @@ class BackupRepositoryImpl @Inject constructor(
                 uriString.toUri()
             } catch (e: Exception) {
                 // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+                // Exception sufficient (URI parse, no allocation path → no Error).
                 return@withContext ImportResult.Error("Invalid format")
             }
 
@@ -584,6 +587,7 @@ class BackupRepositoryImpl @Inject constructor(
                 } ?: 0L
             } catch (e: Exception) {
                 // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+                // Exception sufficient (pure I/O probe, no allocation path → no Error).
                 Timber.w(e, "Could not determine file size, proceeding with caution")
                 0L
             }
@@ -656,6 +660,7 @@ class BackupRepositoryImpl @Inject constructor(
                 } ?: 0L
             } catch (e: Exception) {
                 // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+                // Exception sufficient (pure I/O probe, no allocation path → no Error).
                 Timber.w(e, "Could not determine file size for preview")
                 0L
             }

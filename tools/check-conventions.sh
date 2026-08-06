@@ -437,6 +437,12 @@ fi
 oom_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/ZoomableImageView.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperFileManager.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
 )
 oom_awk="$script_dir/check-exception-breadth.awk"
 

@@ -155,8 +155,13 @@ class UsageExportRepositoryImpl @Inject constructor(
             // Phase 2: Parse
             val (version, usageData) = try {
                 parseUsageData(jsonString)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
+                // Widened from Exception per the breadth check: parseUsageData builds a
+                // JSONObject graph plus boxed Long lists from a string that may be up to
+                // MAX_BACKUP_SIZE_BYTES, so the live object graph runs well above the raw
+                // string size — an OOM here is an Error, which `Exception` would have
+                // missed. Same shape as the BackupRepositoryImpl JSON/ZIP umbrella.
                 TimberWrapper.silentError(e, "Failed to parse usage export")
                 return UsageImportResult.InvalidFormat
             }

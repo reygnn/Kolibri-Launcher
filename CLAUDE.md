@@ -630,9 +630,51 @@ deliberately NOT a global scan: most `catch (Exception)` in the tree are correct
 `IllegalStateException`, where `Throwable` would WRONGLY swallow OOM) or pure
 I/O — so only files that ARE allocation boundaries belong on the list. Today:
 `ZoomableImageView`, `AppContextMenuDialogFragment` (both already Throwable-only;
-the entry locks the AUDIT category-A remediation against regression). Append to
+the entry locks the AUDIT category-A remediation against regression), and
+`BackupRepositoryImpl` — the first file to join via the MARKER route rather than
+Throwable-only, and the reason the two markers are separate tokens. Its real
+allocation catches (the JSON/ZIP umbrella, the per-layer bitmap copy) were
+already widened to `Throwable`; what remained were five pure-I/O probes
+(`openInputStream` / `openFileDescriptor` / `toUri`) whose comments read
+"synchronous I/O only" — a CANCELLATION statement, because the file is also on
+the `cancel_files` list. Reusing that phrase as a breadth marker would have made
+every catch commented for cancellation reasons count as OOM-reviewed
+(false negatives), so each of the five gained its own `Exception sufficient`
+line alongside the existing one. Same file, two whitelists, two independently
+argued axes — that is the intended shape, not a duplication. Alongside it the
+allocation core joined as pure regression locks, all already `Throwable`-only:
+`WallpaperFileManager`, `WallpaperRepositoryImpl`, `WallpaperBitmapLuminanceImpl`
+(bitmap copy / decode / luminance) and `AnrReporter` (trace read). The inflate-only
+view classes (`MainActivity`, `SettingsFragment`, `AppDrawerFragment`, …) were
+deliberately NOT added despite being clean today — half of `ui/` on the list would
+make "is listed" stop meaning anything. Append to
 the `oom_files` array in `tools/check-conventions.sh` to add a file. Regression-
 tested via `tools/check-exception-breadth-test.sh` (manual rerun, not a CI gate).
+
+**Discovery — `./gradlew scanOomCandidates`.** Sibling of `scanCancelCandidates`
+for this axis (`tools/scan-oom-candidates.sh`, report-only, never fails the
+build). Sweeps every non-whitelisted main source for a bare `catch (e: Exception)`
+and ranks by ALLOCATION density (bitmap / inflate / JSON / ZIP / bulk-read lines)
+rather than hit count — hit count is dominated by adapters full of legitimate race
+guards, while density is the proxy for "this file allocates", which is the only
+reason the breadth question exists. Run it after adding code that decodes a
+bitmap, inflates a layout, or parses a large JSON/ZIP payload. Triage: an
+`Exception` catch around an allocation → widen to `Throwable`; a narrow race guard
+(`notifyItem*` / `submitList` / `getItem` under a list swap) → **leave it**,
+`Throwable` there would swallow the OOM this check exists to surface; a pure-I/O
+probe → keep `Exception` plus the marker if the file joins. `AppDrawerAdapter` and
+`FavoritesAdapter` rank high in that scan and are the standing leave-it case —
+they inflate in `onCreateViewHolder`, but the flagged catches are the race guards,
+not the inflate. Density is a file-level proxy, not a per-catch verdict.
+
+*The AUDIT category-A find this discovery scan would have caught:*
+`UsageExportRepositoryImpl.parseUsageData` built a `JSONObject` graph plus boxed
+`Long` lists from a string capped only at `MAX_BACKUP_SIZE_BYTES` — the live
+object graph runs well above the raw string size — under a `catch (e: Exception)`.
+Identical shape to the `BackupRepositoryImpl` JSON/ZIP umbrella, missed because
+the file was not on the list. Widened to `Throwable`; its existing `no suspension
+point` marker had to move ABOVE the new rationale comment to stay inside the
+cancellation check's ±5-line window (that file is on `cancel_files` too).
 
 *Not turned into gates (deliberately):* "raw `lifecycleScope.launch` outside a
 `launchSafe`" and "flow `.collect` outside `collectOnStarted`" were evaluated

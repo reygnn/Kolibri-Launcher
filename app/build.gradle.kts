@@ -49,8 +49,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 37 // DO NOT CHANGE !!!
-        versionCode = 167
-        versionName = "0.99.147"
+        versionCode = 168
+        versionName = "0.99.148"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
@@ -384,6 +384,18 @@ tasks.register<Exec>("scanCancelCandidates") {
     description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
     workingDir = rootDir
     commandLine = listOf("bash", "tools/scan-cancel-candidates.sh")
+}
+
+// Same discovery aid for the OTHER breadth axis: the oom_files positive list is
+// blind to non-listed files, so a new `catch (e: Exception)` around a bitmap /
+// inflate / JSON / ZIP boundary is invisible. Ranks hits by allocation density.
+// Report-only — it never fails the build, and is NOT wired into
+// `checkConventions`/CI: most Exception catches in the tree are correct.
+tasks.register<Exec>("scanOomCandidates") {
+    group = "verification"
+    description = "Lists non-whitelisted files whose Exception catches may belong in oom_files (report-only)."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/scan-oom-candidates.sh")
 }
 
 // Code coverage configuration via JaCoCo.
