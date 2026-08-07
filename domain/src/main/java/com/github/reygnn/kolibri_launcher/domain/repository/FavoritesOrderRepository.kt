@@ -23,9 +23,10 @@ interface FavoritesOrderRepository : Purgeable {
     /**
      * Reads the CURRENT favorites order straight from the store (fresh
      * `dataStore.data.first()` + the same JSON parsing as the flow), bypassing
-     * the hot-shared [favoriteComponentsOrderFlow] replay cache. Used by the
-     * backup export, which runs while Home holds no subscriber and could
-     * otherwise capture a stale replayed list. Fail-open on I/O (empty list),
+     * the hot-shared [favoriteComponentsOrderFlow] replay cache. Used by any
+     * point-read from a context without a warm Home subscriber — backup export
+     * and Settings sort-favorites — each of which could otherwise capture a
+     * stale replayed list (e.g. right after a backup restore). Fail-open on I/O (empty list),
      * mirroring the flow.
      */
     suspend fun getFavoriteComponentsOrderSnapshot(): List<String>

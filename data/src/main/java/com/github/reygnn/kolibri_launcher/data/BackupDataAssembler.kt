@@ -249,6 +249,7 @@ class BackupDataAssembler @Inject constructor(
             // current favorites from the flow — that path performs no favorites
             // write, so the replay cache cannot lag an in-import edit()
             // (favorites otherwise only mutate from the subscribed Home path).
+            // stale-replay ok: write-free import-order fallback branch.
             val currentFavoritesSet = importedFavorites
                 ?: favoritesRepository.favoriteComponentsFlow.first().toHashSet()
 

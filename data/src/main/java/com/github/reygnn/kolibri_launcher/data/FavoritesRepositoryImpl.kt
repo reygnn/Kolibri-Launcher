@@ -211,6 +211,9 @@ constructor(
         if (componentName.isNullOrBlank()) return false
 
         return try {
+            // stale-replay ok: called from the Home path (AppManagementDelegate),
+            // where GetFavoriteAppsUseCase keeps a warm subscriber on this hot
+            // flow, so the replay cache is current — not a cold cross-Activity read.
             favoriteComponentsFlow.first().contains(componentName)
         } catch (e: CancellationException) {
             throw e

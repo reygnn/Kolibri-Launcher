@@ -4,11 +4,9 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
-import io.mockk.every
+import io.mockk.coEvery
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -34,9 +32,10 @@ class GetFavoriteComponentsUseCaseTest {
     }
 
     @Test
-    fun `invoke - returns set from repository flow`() = runTest {
+    fun `invoke - returns set from repository snapshot`() = runTest {
+        // Pins the use case to the authoritative fresh read, not the hot replay flow.
         val expectedSet = setOf("com.example.app/MainActivity", "com.test.app/HomeActivity")
-        every { favoritesRepository.favoriteComponentsFlow } returns flowOf(expectedSet)
+        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } returns expectedSet
 
         val result = useCase()
 
@@ -44,9 +43,9 @@ class GetFavoriteComponentsUseCaseTest {
     }
 
     @Test
-    fun `invoke - propagates exception from repository`() = runTest {
+    fun `invoke - propagates exception from repository snapshot`() = runTest {
         val expectedError = RuntimeException("Database load failed")
-        every { favoritesRepository.favoriteComponentsFlow } returns flow { throw expectedError }
+        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } throws expectedError
 
         val exception = assertFailsWith<RuntimeException> { useCase() }
         assertEquals(expectedError.message, exception.message)

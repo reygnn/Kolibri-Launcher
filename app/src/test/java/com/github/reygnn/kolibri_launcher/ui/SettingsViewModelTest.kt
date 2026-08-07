@@ -3,6 +3,8 @@ package com.github.reygnn.kolibri_launcher.ui
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -12,6 +14,8 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +27,8 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -36,6 +42,8 @@ class SettingsViewModelTest {
 
     private lateinit var getInstalledAppsUseCase: GetInstalledAppsUseCase
     private lateinit var factoryResetUseCase: FactoryResetUseCase
+    private lateinit var favoritesRepository: FavoritesRepository
+    private lateinit var favoritesOrderRepository: FavoritesOrderRepository
 
     private lateinit var viewModel: SettingsViewModel
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
@@ -48,6 +56,8 @@ class SettingsViewModelTest {
     fun setup() {
         getInstalledAppsUseCase = mockk(relaxed = true)
         factoryResetUseCase = mockk(relaxed = true)
+        favoritesRepository = mockk(relaxed = true)
+        favoritesOrderRepository = mockk(relaxed = true)
 
         rawAppsFlow = MutableStateFlow(emptyList())
 
@@ -62,6 +72,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -73,6 +85,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -105,6 +119,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -126,6 +142,8 @@ class SettingsViewModelTest {
             viewModel = SettingsViewModel(
                 getInstalledAppsUseCase,
                 factoryResetUseCase,
+                favoritesRepository,
+                favoritesOrderRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -145,6 +163,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -161,6 +181,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -187,6 +209,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -204,6 +228,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -220,6 +246,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -244,11 +272,15 @@ class SettingsViewModelTest {
             val viewModel1 = SettingsViewModel(
                 getInstalledAppsUseCase,
                 factoryResetUseCase,
+                favoritesRepository,
+                favoritesOrderRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
             val viewModel2 = SettingsViewModel(
                 getInstalledAppsUseCase,
                 factoryResetUseCase,
+                favoritesRepository,
+                favoritesOrderRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -268,6 +300,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -288,6 +322,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -314,6 +350,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -331,6 +369,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -351,6 +391,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -371,6 +413,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -397,6 +441,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -419,6 +465,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -441,6 +489,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -467,6 +517,8 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             getInstalledAppsUseCase,
             factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -475,6 +527,95 @@ class SettingsViewModelTest {
             val event = awaitItem()
             assertTrue(event is UiEvent.ShowToast)
             assertEquals(com.github.reygnn.kolibri_launcher.R.string.error_loading_apps, event.messageResId)
+        }
+    }
+
+    // ========== AUDIT-13: STALE-REPLAY REGRESSION (prepareFavoritesForSorting) ==========
+    // The whole point of the fix: the sort dialog must read favorites + order from
+    // the authoritative FRESH snapshot, NOT the hot favoriteComponentsFlow /
+    // favoriteComponentsOrderFlow replay caches (stale under a stopped Home).
+
+    private fun createViewModel(): SettingsViewModel = SettingsViewModel(
+        getInstalledAppsUseCase,
+        factoryResetUseCase,
+        favoritesRepository,
+        favoritesOrderRepository,
+        mainDispatcher = mainDispatcherRule.testDispatcher
+    )
+
+    @Test
+    fun `prepareFavoritesForSorting - reads via snapshot, never the hot replay flow`() = runTest {
+        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } returns setOf(app1.componentName)
+        coEvery { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() } returns emptyList()
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns listOf(app1)
+
+        val outcome = createViewModel().prepareFavoritesForSorting(testApps)
+
+        assertIs<SettingsViewModel.SortFavoritesOutcome.Ready>(outcome)
+        // Authoritative fresh reads were used...
+        coVerify(exactly = 1) { favoritesRepository.getFavoriteComponentsSnapshot() }
+        coVerify(exactly = 1) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
+        // ...and the stale hot replay flows were NOT touched. This is the regression lock.
+        verify(exactly = 0) { favoritesRepository.favoriteComponentsFlow }
+        verify(exactly = 0) { favoritesOrderRepository.favoriteComponentsOrderFlow }
+    }
+
+    @Test
+    fun `prepareFavoritesForSorting - empty app list - returns AppsNotLoaded without reading repos`() =
+        runTest {
+            val outcome = createViewModel().prepareFavoritesForSorting(emptyList())
+
+            assertEquals(SettingsViewModel.SortFavoritesOutcome.AppsNotLoaded, outcome)
+            coVerify(exactly = 0) { favoritesRepository.getFavoriteComponentsSnapshot() }
+            coVerify(exactly = 0) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
+        }
+
+    @Test
+    fun `prepareFavoritesForSorting - no favorites among installed apps - returns NoFavorites`() =
+        runTest {
+            coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } returns setOf("com.absent/Gone")
+
+            val outcome = createViewModel().prepareFavoritesForSorting(testApps)
+
+            assertEquals(SettingsViewModel.SortFavoritesOutcome.NoFavorites, outcome)
+            // Order is only read once there is something to sort.
+            coVerify(exactly = 0) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
+        }
+
+    @Test
+    fun `prepareFavoritesForSorting - returns Ready with the ordered favorites`() = runTest {
+        val savedOrder = listOf(app2.componentName, app1.componentName)
+        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } returns
+            setOf(app1.componentName, app2.componentName)
+        coEvery { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() } returns savedOrder
+        // Impl sorts; here we assert the fragment receives exactly what sort produced.
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), savedOrder) } returns listOf(app2, app1)
+
+        val outcome = createViewModel().prepareFavoritesForSorting(testApps)
+
+        assertIs<SettingsViewModel.SortFavoritesOutcome.Ready>(outcome)
+        assertEquals(listOf(app2, app1), outcome.orderedFavorites)
+        coVerify(exactly = 1) { favoritesOrderRepository.sortFavoriteComponents(listOf(app1, app2), savedOrder) }
+    }
+
+    @Test
+    fun `prepareFavoritesForSorting - snapshot read fails non-IO - fails open to NoFavorites`() =
+        runTest {
+            // Mirrors the fragment it replaced: a non-cancellation read error degrades
+            // (empty favorites) rather than aborting; TimberRule suppresses the DEBUG throw.
+            coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } throws RuntimeException("store hiccup")
+
+            val outcome = createViewModel().prepareFavoritesForSorting(testApps)
+
+            assertEquals(SettingsViewModel.SortFavoritesOutcome.NoFavorites, outcome)
+        }
+
+    @Test
+    fun `prepareFavoritesForSorting - CancellationException from snapshot propagates`() = runTest {
+        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } throws CancellationException("cancelled")
+
+        assertFailsWith<CancellationException> {
+            createViewModel().prepareFavoritesForSorting(testApps)
         }
     }
 }

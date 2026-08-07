@@ -30,8 +30,6 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupFragment
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesActivity
@@ -55,7 +53,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -87,12 +84,6 @@ import javax.inject.Inject
 class SettingsFragment : PreferenceFragmentCompat() {
 
     private val viewModel: SettingsViewModel by viewModels({ requireActivity() })
-
-    @Inject
-    lateinit var favoritesRepository: FavoritesRepository
-
-    @Inject
-    lateinit var favoritesOrderRepository: FavoritesOrderRepository
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
@@ -777,45 +768,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // viewModel.installedApps.value ist ein StateFlow-Read — wirft nicht.
         val allApps = viewModel.installedApps.value
 
-        if (allApps.isEmpty()) {
-            viewModel.onAppListNotLoaded()
-            return
-        }
-
-        val favoriteComponents = try {
-            favoritesRepository.favoriteComponentsFlow.first()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error getting favorite components")
-            emptySet()
-        }
-
-        // filter mit Set.contains auf Strings — wirft nicht.
-        val favoriteApps = allApps.filter { favoriteComponents.contains(it.componentName) }
-
-        if (favoriteApps.isEmpty()) {
-            viewModel.onNoFavoritesToSort()
-            return
-        }
-
-        val savedOrder = try {
-            favoritesOrderRepository.favoriteComponentsOrderFlow.first()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error getting saved order")
-            emptyList()
-        }
-
-        val orderedFavoriteApps = try {
-            favoritesOrderRepository.sortFavoriteComponents(favoriteApps, savedOrder)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error sorting favorites")
-            favoriteApps
-        }
+        // Favorites + order are read via authoritative FRESH snapshots (never the
+        // hot replay flows) and filtered/sorted in the ViewModel — see
+        // SettingsViewModel.prepareFavoritesForSorting / AUDIT-13. Fragment stays
+        // thin glue: map the outcome to a toast or the sort-dialog transaction.
+        val orderedFavoriteApps =
+            when (val outcome = viewModel.prepareFavoritesForSorting(allApps)) {
+                SettingsViewModel.SortFavoritesOutcome.AppsNotLoaded -> {
+                    viewModel.onAppListNotLoaded()
+                    return
+                }
+                SettingsViewModel.SortFavoritesOutcome.NoFavorites -> {
+                    viewModel.onNoFavoritesToSort()
+                    return
+                }
+                is SettingsViewModel.SortFavoritesOutcome.Ready -> outcome.orderedFavorites
+            }
 
         // CRASH-SAFE: Check state again before transaction
         if (!isAdded || isStateSaved || isDetached) {

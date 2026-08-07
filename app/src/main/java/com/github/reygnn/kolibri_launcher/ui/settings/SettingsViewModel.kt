@@ -5,6 +5,8 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
@@ -22,6 +24,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
     private val factoryResetUseCase: FactoryResetUseCase,
+    private val favoritesRepository: FavoritesRepository,
+    private val favoritesOrderRepository: FavoritesOrderRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -66,6 +70,73 @@ class SettingsViewModel @Inject constructor(
         launchSafe {
             sendEvent(UiEvent.ShowToast(R.string.no_favorites_to_sort))
         }
+    }
+
+    /**
+     * Outcome of [prepareFavoritesForSorting]. Keeps the fragment thin glue: it
+     * maps each case to a toast or the sort-dialog transaction.
+     */
+    sealed interface SortFavoritesOutcome {
+        /** The installed-apps list wasn't loaded yet — nothing to sort against. */
+        data object AppsNotLoaded : SortFavoritesOutcome
+
+        /** No favorites intersect the installed apps — nothing to sort. */
+        data object NoFavorites : SortFavoritesOutcome
+
+        /** Ready to open the sort dialog on this ordered favorites list. */
+        data class Ready(val orderedFavorites: List<AppInfo>) : SortFavoritesOutcome
+    }
+
+    /**
+     * Builds the ordered favorites list for the sort dialog.
+     *
+     * Reads favorites and their order via authoritative FRESH snapshots
+     * ([FavoritesRepository.getFavoriteComponentsSnapshot] /
+     * [FavoritesOrderRepository.getFavoriteComponentsOrderSnapshot]), NEVER the hot
+     * `favoriteComponentsFlow` / `favoriteComponentsOrderFlow` replay caches:
+     * Settings is a separate Activity, so MainActivity is STOPPED and holds no warm
+     * subscriber — a `.first()` on the replay flow could sort a stale set right
+     * after a backup restore (AUDIT-13). Lifted out of the fragment (Rule 10) so
+     * this decision is JVM-testable.
+     *
+     * Fail-open per read (mirrors the fragment it replaced): a non-cancellation
+     * read/sort error degrades to empty / unsorted rather than aborting the dialog;
+     * `CancellationException` always propagates.
+     */
+    suspend fun prepareFavoritesForSorting(allApps: List<AppInfo>): SortFavoritesOutcome {
+        if (allApps.isEmpty()) return SortFavoritesOutcome.AppsNotLoaded
+
+        val favoriteComponents = try {
+            favoritesRepository.getFavoriteComponentsSnapshot()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error getting favorite components")
+            emptySet()
+        }
+
+        val favoriteApps = allApps.filter { favoriteComponents.contains(it.componentName) }
+        if (favoriteApps.isEmpty()) return SortFavoritesOutcome.NoFavorites
+
+        val savedOrder = try {
+            favoritesOrderRepository.getFavoriteComponentsOrderSnapshot()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error getting saved order")
+            emptyList()
+        }
+
+        val orderedFavorites = try {
+            favoritesOrderRepository.sortFavoriteComponents(favoriteApps, savedOrder)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error sorting favorites")
+            favoriteApps
+        }
+
+        return SortFavoritesOutcome.Ready(orderedFavorites)
     }
 
     fun onWallpaperSettingsFallback() {

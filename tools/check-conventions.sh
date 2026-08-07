@@ -248,6 +248,7 @@ cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/backup/BackupViewModel.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/customnames/CustomNamesActivity.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/SettingsFragment.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/SettingsViewModel.kt"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 

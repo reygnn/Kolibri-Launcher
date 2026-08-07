@@ -49,8 +49,8 @@ android {
         applicationId = "com.github.reygnn.kolibri_launcher"
         minSdk = 36 // DO NOT CHANGE !!!
         targetSdk = 37 // DO NOT CHANGE !!!
-        versionCode = 168
-        versionName = "0.99.148"
+        versionCode = 169
+        versionName = "0.99.149"
 
         // BuildConfig-Felder erstellen
         buildConfigField(
@@ -350,6 +350,10 @@ configurations.all {
 //   - ActivityResult — registerForActivityResult() in a lifecycle method
 //   - Adapter   — Fragment RecyclerView adapter not nulled in onDestroyView
 //   - ExceptionBreadth — bare catch(Exception) at a whitelisted OOM boundary
+//   - StaleReplay — hot-flow `.first()` point-read outside the allowlist
+//                   (AUDIT-13; enforced via the `checkStaleReplayRead` task
+//                   wired below as a dependsOn, so `./gradlew checkConventions`
+//                   — the CI gate — fails on it too)
 //
 // Run via `./gradlew checkConventions` or invoke the script directly.
 tasks.register<Exec>("checkConventions") {
@@ -357,6 +361,11 @@ tasks.register<Exec>("checkConventions") {
     description = "Runs the project-convention linter (CLAUDE.md rules)."
     workingDir = rootDir
     commandLine = listOf("bash", "tools/check-conventions.sh")
+    // AUDIT-13 stale-replay gate rides along with the main convention gate so the
+    // single CI step (`./gradlew checkConventions`) enforces it. It is a separate
+    // task (own script/awk/allowlist) rather than folded into check-conventions.sh,
+    // and stays independently runnable via `./gradlew checkStaleReplayRead`.
+    dependsOn("checkStaleReplayRead")
 }
 
 // Rule 13 — git-diff-aware German-comment linter. Flags `+` lines (added
@@ -384,6 +393,39 @@ tasks.register<Exec>("scanCancelCandidates") {
     description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
     workingDir = rootDir
     commandLine = listOf("bash", "tools/scan-cancel-candidates.sh")
+}
+
+// AUDIT-13 stale-replay point-read gate — a `stale_files` positive list, exactly
+// like cancel_files/oom_files. Verifies ONLY the whitelisted files that
+// legitimately point-read a hot-shared replay flow (favorites/order/fab): every
+// such `.first()`/`.firstOrNull()` in a listed file must carry a `stale-replay
+// ok` marker (±5 lines) or be converted to getXSnapshot(); an unmarked one fails.
+// The class of bug that caused the swipe regression and the two favorites UI
+// consumers. Discovery of a NEW read in a NON-listed file is the report-only
+// scanStaleReplayRead below — the gate is blind to non-listed files by design.
+// Detector: tools/check-stale-replay-read.awk; regression test:
+// tools/check-stale-replay-read-test.sh. Set STALE_REPLAY_REPORT_ONLY=1 for
+// discovery mode. Runs standalone via `./gradlew checkStaleReplayRead`, and
+// automatically as a `dependsOn` of `checkConventions` (the CI gate above).
+tasks.register<Exec>("checkStaleReplayRead") {
+    group = "verification"
+    description = "Verifies hot-flow point-reads in the stale_files whitelist carry a marker (AUDIT-13)."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/check-stale-replay-read.sh")
+}
+
+// Discovery half of the stale-replay axis, mirroring scanCancelCandidates /
+// scanOomCandidates: the stale_files positive list is blind to non-listed files,
+// so a new `.first()`/`.firstOrNull()` on a favorites/order/fab flow added to a
+// non-whitelisted file is invisible to the gate. This sweeps every non-listed
+// main source with the SAME awk and ranks by hit count. Report-only — never
+// fails the build. Run after adding such a read, especially from a non-Home
+// context. Run via `./gradlew scanStaleReplayRead`.
+tasks.register<Exec>("scanStaleReplayRead") {
+    group = "verification"
+    description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
+    workingDir = rootDir
+    commandLine = listOf("bash", "tools/scan-stale-replay-candidates.sh")
 }
 
 // Same discovery aid for the OTHER breadth axis: the oom_files positive list is

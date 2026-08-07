@@ -29,8 +29,10 @@ interface FavoritesRepository : Purgeable {
     /**
      * Reads the CURRENT favorite components straight from the store (fresh
      * `dataStore.data.first()`), bypassing the hot-shared [favoriteComponentsFlow]
-     * replay cache. Used by the backup export, which runs while Home holds no
-     * subscriber and could otherwise capture a stale replayed set. Fail-open: a
+     * replay cache. Used by any point-read from a context without a warm Home
+     * subscriber — backup export, Settings sort-favorites, Onboarding
+     * edit-favorites — each of which could otherwise capture a stale replayed
+     * set (e.g. right after a backup restore). Fail-open: a
      * read error yields the empty default (mirrors the flow), never throws for I/O.
      */
     suspend fun getFavoriteComponentsSnapshot(): Set<String>
