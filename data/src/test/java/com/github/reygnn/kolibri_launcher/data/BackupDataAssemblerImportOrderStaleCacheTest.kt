@@ -32,22 +32,26 @@ import org.junit.Test
  * BACKUP-DATA-ASSEMBLER — IMPORT-ORDER STALE-CACHE TEST (AUDIT-9 #2)
  * ============================================================================
  *
- * Pins the Phase-2 fix for AUDIT-9 #2. In production
- * `FavoritesRepositoryImpl.favoriteComponentsFlow` is a
- * `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS, replay = 1)` hot share whose
- * retained replay value lags a Phase-1 `saveFavoriteComponents` write while
- * no UI collector is subscribed — which is exactly the state during an
- * import from the Settings/Backup screen (the Home fragment is stopped).
+ * Pins the Phase-2 fix for AUDIT-9 #2. The fix makes import Phase 2 REUSE the
+ * exact favorites set Phase 1 just wrote, instead of re-deriving it by
+ * re-reading `favoriteComponentsFlow.first()`.
  *
- * Before the fix, Phase 2 re-read that flow via `.first()`, saw the
- * pre-import favorites, and filtered the imported order against them. On a
- * fresh restore the replay value is `emptySet`, so the whole imported order
- * was silently discarded (`saveOrder(emptyList())`). The fix makes Phase 2
- * reuse the exact set Phase 1 wrote instead of re-reading the flow.
+ * Historical context: `FavoritesRepositoryImpl.favoriteComponentsFlow` used to
+ * be a `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS, replay = 1)` hot share whose
+ * retained replay value lagged a Phase-1 `saveFavoriteComponents` write while no
+ * UI collector was subscribed — exactly the state during an import from the
+ * Settings/Backup screen (Home stopped). Before the fix, Phase 2 re-read that
+ * flow, saw the pre-import favorites (`emptySet` on a fresh restore), and
+ * filtered the imported order against them — silently discarding it
+ * (`saveOrder(emptyList())`).
  *
- * The fakes/impl the other assembler tests use always return a fresh cold
- * flow (`externalScope = null`), so they can't reproduce the lag — this test
- * uses a deliberately lagging flow stub that stays on the pre-import value.
+ * NOTE (DATASTORE_READ_SPEC Belang A): that flow is now a plain COLD flow, so the
+ * production replay-lag can no longer occur — a `.first()` would read fresh. This
+ * test therefore no longer reproduces a real production hazard; it uses a
+ * deliberately lagging flow stub purely to guard the code STRUCTURE (Phase 2 must
+ * reuse the just-written set, never re-derive from a re-read). A full re-author
+ * (or retirement) is the tracked spec §7 follow-up; kept green here as a
+ * structural regression guard.
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)

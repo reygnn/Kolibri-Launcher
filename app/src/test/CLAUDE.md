@@ -155,8 +155,9 @@ in den Contract. Fake anpassen, dann rot→grün.
    `FavoritesRepositoryContract.kt` + `FakeFavoritesRepositoryContractTest.kt`
    + `FavoritesRepositoryImplContractTest.kt`. Das zeigt das Muster in seiner
    vollen Form, mit ausführlichem KDoc.
-3. **Bei Bedarf** `FavoritesRepositoryImplShareInTest.kt` für die `shareIn`-
-   Infrastruktur-Test-Mechanik.
+3. **(Retired)** The `*ShareInTest` files are gone — every DataStore-backed repo
+   is a cold flow now (DATASTORE_READ_SPEC Belang A), so there is no `shareIn`
+   infrastructure left to test.
 4. **Bei Bedarf** `OnboardingActivityRobolectricTest.kt` als Vorlage für
    Activity/Fragment-Tests via Robolectric + Hilt — eingeführt 2026-05-01
    als Pilot, Pattern dokumentiert in `TESTING_CONVENTIONS.kt` →
@@ -170,7 +171,8 @@ in den Contract. Fake anpassen, dann rot→grün.
 **Neues Interface + neue Impl + neuer Fake:**
 Baue Contract-Pair. Reihenfolge: abstract Class zuerst, dann die zwei
 Subklassen. Siehe TESTING_CONVENTIONS.kt → "CONTRACT TESTS" für das Muster.
-Wenn die Impl `shareIn` benutzt, `externalScope = null` im Test.
+(DataStore repos no longer use `shareIn` — cold flows since DATASTORE_READ_SPEC
+Belang A — so there is no `externalScope = null` test step.)
 
 **Neue Methode in existierendem Interface:**
 Methode auch in beide Implementierungen einfügen, dann `@Test`-Methode(n)

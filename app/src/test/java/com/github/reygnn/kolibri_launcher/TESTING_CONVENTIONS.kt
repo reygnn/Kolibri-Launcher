@@ -126,11 +126,11 @@ package com.github.reygnn.kolibri_launcher
  * adding the rule. The compiler funnels you toward the convention.
  *
  * `BaseViewModel(mainDispatcher: CoroutineDispatcher)` makes this
- * non-optional for all subclasses. Repository tests that use
- * `shareIn`/`stateIn` follow a parallel pattern: they take an
- * `externalScope` constructor parameter so tests can pass `null` and
- * sidestep Main entirely (see FavoritesRepositoryImplShareInTest for
- * the case where the test does want Main and uses the rule).
+ * non-optional for all subclasses. (The DataStore repos used to follow a
+ * parallel pattern — an `externalScope` constructor parameter a test could set
+ * to `null` to skip the `shareIn` layer — but that is gone: DATASTORE_READ_SPEC
+ * Belang A flipped them to cold flows, so there is no scope param and no
+ * `*ShareInTest`.)
  *
  * If a future ViewModel skips the constructor-injected dispatcher
  * (hard-coding `Dispatchers.Main` in the body, say), the
@@ -377,28 +377,23 @@ package com.github.reygnn.kolibri_launcher
  *   in die abstrakte Basisklasse, NICHT in jede Subklasse einzeln. Verifiziert
  *   mit allen bestehenden Contract-Tests — funktioniert zuverlässig.
  *
- * MANAGER-TEST: `externalScope = null` BEI shareIn-BASIERTEN MANAGERN
- *   Managers that layer `shareIn(externalScope, WhileSubscribed(…), replay = 1)`
- *   over their flows (FavoritesRepositoryImpl, FavoritesOrderRepositoryImpl)
- *   have a write-then-read bug under UnconfinedTestDispatcher: the write
- *   reaches dataStore, but the upstream collector has not yet written the
- *   update into the replay buffer, so the read returns the old cached value.
- *   (SwipeActionsRepositoryImpl used to belong here; it no longer hot-shares
- *   — all its reads are authoritative fresh reads — so it needs no such
- *   externalScope handling.)
+ * MANAGER-TEST: `externalScope = null` — RETIRED (DATASTORE_READ_SPEC Belang A)
+ *   FavoritesRepositoryImpl, FavoritesOrderRepositoryImpl and
+ *   FabPositionRepositoryImpl used to layer
+ *   `shareIn(externalScope, WhileSubscribed(…), replay = 1)` over their flows and
+ *   took an `externalScope` constructor param so a contract test could pass `null`
+ *   to skip the hot-share layer — which otherwise returned a stale replay value on
+ *   a write-then-read under UnconfinedTestDispatcher. All three are cold flows now:
+ *   no scope param, no replay cache, and the `*ShareInTest` files are deleted. A
+ *   `.first()` after a write is fresh by construction.
  *
- *   Lösung: im Manager-Contract-Test `externalScope = null` übergeben —
- *   das überspringt die shareIn-Schicht, der Flow bleibt cold, und jeder
- *   `.first()` sieht den aktuellen dataStore-Wert direkt. Konkretes
- *   Beispiel in `FavoritesRepositoryImplContractTest.kt`.
- *
- *   Das shareIn-Verhalten SELBST gehört NICHT in den Contract (es ist
- *   Produktions-Infrastruktur, kein Interface-Vertrag). Separater Test:
- *   `FavoritesRepositoryImplShareInTest.kt` prüft Replay, Hot-Sharing und
- *   WhileSubscribed-Timeout mit virtueller Zeit.
- *
- *   Wichtig dort: `testScheduler.runCurrent()` statt `advanceUntilIdle()`,
- *   sonst läuft man versehentlich durch den WhileSubscribed-Timeout.
+ *   Hot-shares still exist elsewhere — InstalledAppsRepositoryImpl and the
+ *   Wallpaper delegate (`WhileSubscribed`), plus the Layout delegate (`Eagerly`,
+ *   no timeout) — all via `stateIn` with an owned scope. But they are collected
+ *   continuously, never point-read on a decision path, and do NOT take a
+ *   test-injectable `externalScope`, so this technique never applied to them. The
+ *   `WhileSubscribed` timeout ones (InstalledApps, Wallpaper) are covered under
+ *   TIME-BASED ASSERTIONS below.
  *
  * MOCK-THEATER VERMEIDEN — WENN MANAGER NICHT EHRLICH INSTANZIIERBAR IST:
  *   Wenn der Manager System-APIs braucht (PackageManager, ContentResolver,
@@ -737,8 +732,7 @@ package com.github.reygnn.kolibri_launcher
  * ============================================================================
  *
  * Reference: `ObserveInstalledAppsUseCaseTest.retry counter resets between
- *             invocations on IOException backoff` (commit f8a578b),
- *             `FavoritesRepositoryImplShareInTest` (the older idiom).
+ *             invocations on IOException backoff` (commit f8a578b).
  *
  *
  * THE GAP THAT BIRTHED THIS CONVENTION
@@ -810,9 +804,11 @@ package com.github.reygnn.kolibri_launcher
  *     advanceTimeBy(2000)
  *     // upstream has now timed out — next read goes to dataStore
  *
- *   Source: `FavoritesRepositoryImplShareInTest`. Pins the exact
- *   timeout boundary so a later edit that changes the constant gets
- *   noticed.
+ *   This idiom came from the now-deleted `FavoritesRepositoryImplShareInTest`
+ *   (those repos are cold flows since DATASTORE_READ_SPEC Belang A). It stays
+ *   here as the reference technique for the `WhileSubscribed` hot-shares that
+ *   remain (InstalledApps and the Wallpaper delegate), neither of which pins its
+ *   timeout boundary in an isolated test today.
  *
  *
  * BACKSTOP — what `advanceUntilIdle()` proves and what it doesn't
@@ -841,23 +837,24 @@ package com.github.reygnn.kolibri_launcher
  *
  *   ObserveInstalledAppsUseCase  — retry/backoff       ✓ pinned
  *   GestureDelegate              — lock-block-duration ✓ pinned
- *   FavoritesRepositoryImpl      — share-in timeout    ✓ pinned (ShareInTest)
- *   FavoritesOrderRepositoryImpl — share-in timeout    ✗ relies on contract
- *   InstalledAppsRepositoryImpl  — share-in timeout    ✗ relies on contract
- *   LayoutDelegate               — share-in timeout    ✗ relies on contract
+ *   InstalledAppsRepositoryImpl  — share-in timeout    ✗ no isolated test
+ *   WallpaperDelegate            — share-in timeout    ✗ no isolated test
  *   AppManagementDelegate        — initial-load delay  ✗ low-risk (100ms)
  *   PackageUpdateReceiver        — withTimeout 3s      ✗ system path
  *   AppDrawerFragment            — search debounce     ✗ Fragment-side
  *   HomeFragment                 — scroll-debounce     ✗ Fragment-side
  *   BackupFragment               — preview timeout     ✗ Fragment-side
  *
- * "✗ relies on contract" means the share-in semantic is uniformly
- * tested in `FavoritesRepositoryImplShareInTest` for one impl, and
- * the others use the same `shareIn` builder with the same constant —
- * a regression in any of them would show up in the contract test
- * surface even without an isolated check. If the constant ever
- * diverges across the impls, each of those needs its own
- * ShareInTest mirror.
+ * (FavoritesRepositoryImpl / FavoritesOrderRepositoryImpl / FabPositionRepositoryImpl
+ * were share-in-timeout sites until DATASTORE_READ_SPEC Belang A flipped them to
+ * cold flows — no timeout to pin anymore; their `*ShareInTest` files are deleted.)
+ *
+ * "✗ no isolated test" means the `WhileSubscribed` timeout for that hot-share is
+ * not pinned in a dedicated virtual-time test. It used to be covered indirectly by
+ * `FavoritesRepositoryImplShareInTest` (same `shareIn` builder, same constant); with
+ * that test gone, a divergence in the shared timeout constant would now go unnoticed
+ * until a regression lands. Promote one of these to an isolated ShareInTest-style
+ * check if the shared constant ever needs per-site guarantees.
  *
  * "✗ Fragment-side" means the test would need Robolectric or a
  * dedicated controller-extraction (per Rule 10) before a JVM test

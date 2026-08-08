@@ -760,10 +760,14 @@ Plain `runTest { }` creates its own `TestCoroutineScheduler`, so
 - **A `MutableSharedFlow()` with no subscriber in test setup → buffer
   overflow.** The first emission suspends. Fix: `BufferOverflow.DROP_OLDEST`
   or Turbine.
-- **Repository takes a `shareIn` external-scope parameter?** In tests,
-  set `externalScope = null`. See `FavoritesRepositoryImplShareInTest.kt`.
 - **Contract-test pattern for every new repository interface.** No
   shortcuts unless there is a justified exception in the contract KDoc.
+
+> The old *"repository takes a `shareIn` external-scope parameter → set
+> `externalScope = null` in tests"* note was removed: the DATASTORE_READ_SPEC
+> Belang A refactor flipped every DataStore-backed repo to a cold flow, so no
+> repo takes an `externalScope`/`sharingStrategy` constructor param anymore and
+> the `*ShareInTest` files are gone.
 
 ---
 

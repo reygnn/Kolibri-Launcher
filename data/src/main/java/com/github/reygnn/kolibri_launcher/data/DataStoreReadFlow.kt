@@ -5,13 +5,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 import timber.log.Timber
 import java.io.IOException
 
@@ -124,21 +121,3 @@ internal suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
 internal suspend fun <T> DataStore<Preferences>.snapshotFailClosed(
     transform: suspend (Preferences) -> T,
 ): T = transform(data.first())
-
-/**
- * Hot-sharing tail shared by the `shareIn`-backed repositories: shares the
- * flow across collectors when an [externalScope] is present (production),
- * or returns the cold flow unchanged when it is `null` (the test path — see
- * `FavoritesRepositoryImplShareInTest`). Replays the latest value to new
- * collectors by default.
- */
-internal fun <T> Flow<T>.shareInOrRaw(
-    externalScope: CoroutineScope?,
-    started: SharingStarted,
-    replay: Int = 1,
-): Flow<T> =
-    if (externalScope != null) {
-        shareIn(scope = externalScope, started = started, replay = replay)
-    } else {
-        this
-    }
