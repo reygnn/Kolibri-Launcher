@@ -29,33 +29,31 @@ import org.junit.Test
 
 /**
  * ============================================================================
- * BACKUP-DATA-ASSEMBLER — IMPORT-ORDER STALE-CACHE TEST (AUDIT-9 #2)
+ * BACKUP-DATA-ASSEMBLER — IMPORT-ORDER REUSE TEST (AUDIT-9 #2)
  * ============================================================================
  *
- * Pins the Phase-2 fix for AUDIT-9 #2. The fix makes import Phase 2 REUSE the
- * exact favorites set Phase 1 just wrote, instead of re-deriving it by
- * re-reading `favoriteComponentsFlow.first()`.
+ * Pins the Phase-2 fix for AUDIT-9 #2: import Phase 2 filters the imported ORDER
+ * against the exact favorites set Phase 1 just wrote (`importedFavorites`),
+ * NOT against a re-read of `favoriteComponentsFlow`.
  *
- * Historical context: `FavoritesRepositoryImpl.favoriteComponentsFlow` used to
- * be a `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS, replay = 1)` hot share whose
- * retained replay value lagged a Phase-1 `saveFavoriteComponents` write while no
- * UI collector was subscribed — exactly the state during an import from the
- * Settings/Backup screen (Home stopped). Before the fix, Phase 2 re-read that
- * flow, saw the pre-import favorites (`emptySet` on a fresh restore), and
- * filtered the imported order against them — silently discarding it
- * (`saveOrder(emptyList())`).
+ * The guard is discriminating by construction: the test imports favorites {A, B}
+ * (Phase 1) and stubs `favoriteComponentsFlow` to return a DIVERGENT value
+ * (`emptySet`). If Phase 2 ever regresses to re-reading the flow, it would filter
+ * the order against the empty set and drop it (`saveOrder(emptyList())`); because
+ * it reuses the Phase-1 set, the order survives. The assertion fails iff the
+ * reuse is broken.
  *
- * NOTE (DATASTORE_READ_SPEC Belang A): that flow is now a plain COLD flow, so the
- * production replay-lag can no longer occur — a `.first()` would read fresh. This
- * test therefore no longer reproduces a real production hazard; it uses a
- * deliberately lagging flow stub purely to guard the code STRUCTURE (Phase 2 must
- * reuse the just-written set, never re-derive from a re-read). A full re-author
- * (or retirement) is the tracked spec §7 follow-up; kept green here as a
- * structural regression guard.
+ * Why the flow divergence is synthetic: before DATASTORE_READ_SPEC Belang A the
+ * flow was a `WhileSubscribed(replay = 1)` hot share whose replay lagged a Phase-1
+ * write while no collector was subscribed (the Settings/Backup-screen state) —
+ * that was the real production hazard. The flow is a plain COLD flow now, so a
+ * `.first()` reads fresh and the lag can no longer occur; the stub only exists to
+ * make a re-read regression observable. This is a structural guard, not a
+ * reproduction of a live hazard.
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class BackupDataAssemblerImportOrderStaleCacheTest {
+class BackupDataAssemblerImportOrderReuseTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -101,16 +99,17 @@ class BackupDataAssemblerImportOrderStaleCacheTest {
     )
 
     @Test
-    fun `import order survives a stale favoriteComponentsFlow replay cache`() = runTest {
+    fun `import Phase 2 filters the order against the Phase-1 imported favorites, not the flow`() = runTest {
         // ── ARRANGE
         // Both favorites are installed, so Phase 1 writes {A, B}.
         every { installedAppsRepository.getInstalledApps() } returns
             MutableStateFlow(listOf(appA, appB))
 
-        // Simulate the production WhileSubscribed(replay = 1) hazard: the hot
-        // flow's replay cache still reflects the PRE-import favorites (empty on
-        // a fresh restore) and never observes Phase 1's write. If Phase 2
-        // trusted this flow it would filter the order against an empty set.
+        // Stub the flow to a DIVERGENT value (empty): it disagrees with the set
+        // Phase 1 imports ({A, B}). If Phase 2 regressed to re-reading the flow it
+        // would filter the order against this empty set and drop it; reusing the
+        // Phase-1 set keeps the order. (The divergence is synthetic — the flow is
+        // cold in production and cannot actually lag; see the class KDoc.)
         every { favoritesRepository.favoriteComponentsFlow } returns flowOf(emptySet())
 
         val backup = BackupData(
@@ -129,8 +128,9 @@ class BackupDataAssemblerImportOrderStaleCacheTest {
         // ── ACT
         val result = makeAssembler().performImport(backup, ImportOptions(), wallpaperRestorer)
 
-        // ── ASSERT: the imported order is preserved because Phase 2 uses the
-        // set Phase 1 wrote, not the lagging flow. Pre-fix this was empty.
+        // ── ASSERT: the imported order is preserved because Phase 2 filters it
+        // against the Phase-1 set {A, B}, not the divergent (empty) flow. A re-read
+        // regression would capture an empty list here.
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(savedOrder.captured).containsExactly(compA, compB).inOrder()
     }

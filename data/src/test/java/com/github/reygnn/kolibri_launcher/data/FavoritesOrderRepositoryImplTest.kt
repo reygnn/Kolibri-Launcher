@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -460,25 +461,31 @@ class FavoritesOrderRepositoryImplTest {
     // ========== MISSING LIMIT & PURGE TESTS ==========
 
     @Test
-    fun `saveOrder - enforces size limit - truncates list`() = runTest {
+    fun `saveOrder - enforces size limit - truncates to MAX_ORDER_LIST_SIZE`() = runTest {
         val fakeDataStore = FakeDataStore()
         val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
-        val hugeList = (1..300).map { "com.app$it/Component" }
+        // MAX_ORDER_LIST_SIZE (impl private const) = MAX_FAVORITES_ON_HOME *
+        // AVG_COMPONENTS_PER_PACKAGE(6) + SAFETY_BUFFER(2). The input must EXCEED the
+        // cap, or saveOrder's take(MAX_ORDER_LIST_SIZE) is a no-op and the test proves
+        // nothing — the previous 300-entry version passed trivially on `300 < 500`,
+        // never exercising the cap (3002).
+        val maxOrderListSize = AppConstants.MAX_FAVORITES_ON_HOME * 6 + 2
+        val overLimit = (1..(maxOrderListSize + 8)).map { "com.app$it/Component" }
 
-        // Act
-        manager.saveOrder(hugeList)
+        manager.saveOrder(overLimit)
         advanceUntilIdle()
 
-        // Assert
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        // Wir prüfen, ob die gespeicherte Liste kleiner ist als die Eingabe
-        Assert.assertTrue(
-            "List should be truncated (Saved: ${savedOrder.size}, Input: 500)",
-            savedOrder.size < 500
+        Assert.assertEquals(
+            "saved list must be capped at MAX_ORDER_LIST_SIZE",
+            maxOrderListSize,
+            savedOrder.size
         )
-        // Prüfen, ob die ersten Items erhalten blieben (Reihenfolge wichtig)
+        // take() keeps the head: first item survives, last is the one at the cap
+        // boundary, everything past MAX_ORDER_LIST_SIZE is dropped.
         Assert.assertEquals("com.app1/Component", savedOrder.first())
+        Assert.assertEquals("com.app$maxOrderListSize/Component", savedOrder.last())
     }
 
     @Test
