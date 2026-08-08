@@ -308,6 +308,15 @@ kann, und gehörte damit nicht in einen Commit, der etwas anderes tut.
 > explizit über einen `replay`-Parameter konfiguriert, und implizit (jeder
 > `StateFlow`/`stateIn` repliziert per Definition seinen aktuellen Wert,
 > `replay = 1`).
+>
+> **Update 2026-08-08 (DATASTORE_READ_SPEC, Belang A):** Die drei
+> DataStore-gestützten Hot-Shares dieser Aufnahme — `FavoritesRepositoryImpl`,
+> `FavoritesOrderRepositoryImpl`, `FabPositionRepositoryImpl` — wurden auf **kalte
+> Flows** umgestellt und die `shareInOrRaw`-Basis (`SharedDataStoreFlowRepository`)
+> gelöscht. Die Tabellen unten (Zeile `shareInOrRaw(…)`-Tail, `shareIn(…)`-
+> Hot-Shares) sind ab diesem Datum **historisch**. Verbleibende Hot-Shares:
+> `InstalledAppsRepositoryImpl` und die Layout-/Wallpaper-Delegates (teurer
+> Upstream bzw. `stateIn`, nie punktgelesen) — bewusst NICHT angefasst.
 
 ## Explizit `replay = N` konfiguriert
 

@@ -581,11 +581,22 @@ Fixbares zeigen.
   abgeschlossen; Code darf beginnen. Merge-Sperre gilt weiter für den Rewrite
   (Code): kein Merge, bevor der echte Diff mehrere Multi-Agent-Reviews bestanden
   hat.**
+- **2026-08-08 — Multi-Agent-CODE-Reviews (je Commit).** Fab **GO**; Order
+  **GO-WITH-CHANGES** (lügende KDocs gefixt); Favorites **GO-WITH-CHANGES** (beide
+  sicherheitskritischen Achsen — reconcile fail-closed, Gate-Stilllegung —
+  verifiziert; Scan-Companion-Bug + Contract-KDoc gefixt); Cleanup
+  **GO-WITH-CHANGES** (Doku-Matrix Layout→Wallpaper korrigiert, Test-KDoc ehrlich);
+  Belang C **GO-WITH-CHANGES** (Wipe auf allen Pfaden geschlossen, Lifecycle sound;
+  thrown-error-Test + `Unavailable(cause)`-Angleichung nachgezogen). Serie als
+  merge-ready erklärt.
+- **2026-08-08 — Fast-Forward-Merge nach `main`.** Umgesetzt in
+  `51c291cd` (Spec) · `b08c9791` (Fab 1/4) · `30e62a71` (Order 2/4) ·
+  `00b49956` (Favorites 3/4) · `6f609d54` (Cleanup 4/4) · `ddd3cb52` (Belang C).
 
 ---
 
 ## 12. Abschluss
 
-Nach dem Merge diese Spec auf „umgesetzt in `<commits>`" aktualisieren und den
-AUDIT-13-Anhang „Flows mit `replay` im Repo" um den Hinweis ergänzen, dass die
-drei DataStore-Hot-Shares aufgelöst wurden (Tabelle dort wird sonst stale).
+**Umgesetzt und nach `main` gemergt (2026-08-08)** — Commit-Liste im Review-Log
+oben. Der AUDIT-13-Anhang „Flows mit `replay` im Repo" ist um die Auflösung der
+drei DataStore-Hot-Shares ergänzt (sonst wäre die Tabelle dort stale).
