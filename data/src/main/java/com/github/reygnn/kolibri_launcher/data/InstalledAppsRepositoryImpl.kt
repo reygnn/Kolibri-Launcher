@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -40,19 +41,16 @@ import javax.inject.Singleton
  * 1. External trigger via [triggerAppsUpdate]
  * 2. Query PackageManager for LAUNCHER apps
  * 3. Process and enrich app metadata (names, display names)
- * 4. Emit sorted list through [kotlinx.coroutines.flow.StateFlow]
+ * 4. Emit the result as a typed [AppLoad] through a [kotlinx.coroutines.flow.StateFlow]
  *
- * **Key Features:**
- * - Reactive updates through [kotlinx.coroutines.flow.Flow] and [kotlinx.coroutines.flow.StateFlow]
- * - Trigger-based refresh mechanism via [kotlinx.coroutines.flow.MutableSharedFlow]
- * - Custom app name resolution through [com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository]
- * - Automatic alphabetical sorting by display name
- * - Deferred subscription with 5-second timeout (WhileSubscribed)
- *
- * **Error Handling:**
- * All operations are wrapped in comprehensive try-catch blocks to prevent crashes.
- * Errors are logged silently via [TimberWrapper] and result in empty lists or fallback
- * values. [java.util.concurrent.CancellationException] is always re-thrown to preserve coroutine cancellation.
+ * **Error Handling (INSTALLED_APPS_LOAD_SPEC Belang A):**
+ * A load error is represented as [AppLoad.Failed], NOT collapsed into an empty
+ * list. Collapsing would make "empty" ambiguous and, because a `stateIn`
+ * StateFlow never delivers an upstream exception to its collector, would render
+ * the downstream retry/error-recovery dead. The loader still catches its own
+ * throwables (it must not crash) but emits [AppLoad.Failed] instead of
+ * `Loaded(emptyList())`. [java.util.concurrent.CancellationException] is always
+ * re-thrown to preserve coroutine cancellation.
  *
  * That last guarantee includes the two hand-written `try { emit(...) } catch`
  * blocks inside the `Flow.catch { }` recovery arms (AUDIT-12 #7/#8): `emit` is a
@@ -88,7 +86,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val appsStateFlow: StateFlow<List<AppInfo>> = appsUpdateTrigger
+    private val appsStateFlow: StateFlow<AppLoad> = appsUpdateTrigger
         .onStart {
             try {
                 emit(Unit)
@@ -106,26 +104,31 @@ class InstalledAppsRepositoryImpl @Inject constructor(
         .catch { e ->
             if (e is CancellationException) throw e
             try {
-                TimberWrapper.silentError(e, "Error in apps state flow, emitting empty list")
-                emit(emptyList())
+                // Expected transient load failure — modeled as a VALUE (Failed),
+                // NOT reported here (Timber.d is a debug breadcrumb, not delivered
+                // to ACRA). The single report site is the use-case's no-cache branch
+                // (INSTALLED_APPS_LOAD_SPEC Rule-9 / anti-flood): reporting here would
+                // fire on every glitch, including ones fully recovered from cache.
+                Timber.d(e, "Apps flow error; reporting Failed")
+                emit(AppLoad.Failed(e))
             } catch (catchError: CancellationException) {
                 // Rethrow: emit() is a suspension point, so a cancelled
                 // collector lands its CancellationException here — normal
-                // control flow, not the CRITICAL error below.
+                // control flow, not the last-resort emit below.
                 throw catchError
             } catch (catchError: Throwable) {
-                TimberWrapper.silentError(catchError, "CRITICAL: Error in catch block")
-                // Letzte Verteidigungslinie: Leere Liste
-                emit(emptyList())
+                // emit() itself failing IS genuinely unexpected — keep silentError.
+                TimberWrapper.silentError(catchError, "CRITICAL: emit failed in apps flow catch")
+                emit(AppLoad.Failed(e))
             }
         }
         .stateIn(
             scope = scope,
             started = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-            initialValue = emptyList()
+            initialValue = AppLoad.Loaded(emptyList())
         )
 
-    override fun getInstalledApps(): Flow<List<AppInfo>> {
+    override fun getInstalledApps(): Flow<AppLoad> {
         return appsStateFlow
     }
 
@@ -142,7 +145,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun loadAppsFromPackageManager(): Flow<List<AppInfo>> = flow {
+    private fun loadAppsFromPackageManager(): Flow<AppLoad> = flow {
         try {
             Timber.d("!!! PROBE: Loading apps from PackageManager... Expensive operation is RUNNING!")
 
@@ -150,49 +153,43 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
 
-            val resolveInfoList = try {
-                packageManager.queryIntentActivities(
-                    intent,
-                    PackageManager.ResolveInfoFlags.of(0)
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error querying intent activities")
-                emptyList()
-            }
-
-            val freshApps = try {
-                processResolveInfoList(resolveInfoList)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error processing resolve info list")
-                emptyList()
-            }
+            // A PackageManager query / processing failure is a real LOAD failure,
+            // not "zero apps": let it throw straight to the outer catch, which turns
+            // the whole emission into AppLoad.Failed (no per-step silentError — that
+            // would report the same failure multiple times, INSTALLED_APPS_LOAD_SPEC
+            // Rule-9 / anti-flood). Per-item resilience lives inside
+            // processResolveInfoList (its for-loop continue).
+            val resolveInfoList = packageManager.queryIntentActivities(
+                intent,
+                PackageManager.ResolveInfoFlags.of(0)
+            )
+            val freshApps = processResolveInfoList(resolveInfoList)
 
             Timber.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
-            emit(freshApps)
+            emit(AppLoad.Loaded(freshApps))
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "CRITICAL: Error loading apps for Flow")
-            emit(emptyList())
+            // Expected transient failure → Failed as a VALUE, breadcrumb only
+            // (Timber.d, not reported). The report fires once, downstream, only when
+            // recovery from cache is impossible (use-case no-cache branch).
+            Timber.d(e, "Error loading apps; reporting Failed")
+            emit(AppLoad.Failed(e))
         }
     }
         .catch { e ->
             if (e is CancellationException) throw e
             try {
-                TimberWrapper.silentError(e, "Flow catch: Error in loadAppsFromPackageManager")
-                emit(emptyList())
+                Timber.d(e, "Flow catch: error in loadAppsFromPackageManager; reporting Failed")
+                emit(AppLoad.Failed(e))
             } catch (catchError: CancellationException) {
                 // Rethrow: emit() suspends, so a cancelled collector lands its
-                // CancellationException here — must propagate, not be logged as
-                // the CRITICAL error below.
+                // CancellationException here — must propagate, not be logged below.
                 throw catchError
             } catch (catchError: Throwable) {
-                TimberWrapper.silentError(catchError, "CRITICAL: Error in flow catch block")
+                // emit() itself failing IS genuinely unexpected — keep silentError.
+                TimberWrapper.silentError(catchError, "CRITICAL: emit failed in flow catch block")
             }
         }
         .flowOn(Dispatchers.IO)

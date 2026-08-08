@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -297,7 +298,7 @@ class ObserveInstalledAppsUseCaseTest {
         installedAppsStateRepository.updateApps(testApps)
 
         // Repository wirft Fehler
-        val errorRepository = ErrorThrowingInstalledAppsRepository(
+        val errorRepository = FailingInstalledAppsRepository(
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
@@ -326,7 +327,7 @@ class ObserveInstalledAppsUseCaseTest {
     @Test
     fun `invoke emits Error when no cache exists on failure`() = runTest {
         // Arrange: Kein Cache
-        val errorRepository = ErrorThrowingInstalledAppsRepository(
+        val errorRepository = FailingInstalledAppsRepository(
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
@@ -347,53 +348,10 @@ class ObserveInstalledAppsUseCaseTest {
         }
     }
 
-    // =========================================================================
-    // Retry-Counter — across invocations
-    // =========================================================================
-
-    /**
-     * Pins the regression: with the previous class-field counter that only
-     * reset on success, a fully failed first invocation left the counter at
-     * MAX_APP_LOAD_RETRIES; the second invocation's first retry then computed
-     * `delay = base * (max + 1)` instead of `base * 1`, scaling the linear
-     * backoff up across invocations. The counter is now a local var inside
-     * `flow { … }`, so each invocation starts fresh.
-     *
-     * Verified via runTest's virtual time: both invocations consume the same
-     * total duration. With the bug, the second would take ~2.5× as long
-     * (delays of 4+5+6 = 15× base vs. 1+2+3 = 6× base).
-     */
-    @Test
-    fun `retry counter resets between invocations on IOException backoff`() = runTest {
-        val errorRepository = ErrorThrowingInstalledAppsRepository(IOException("boom"))
-        val useCase = ObserveInstalledAppsUseCase(
-            errorRepository,
-            installedAppsStateRepository,
-            favoritesRepository,
-            swipeActionsRepository,
-            hiddenAppsRepository,
-            customNamesRepository,
-            packagePresence,
-        )
-
-        val firstStart = testScheduler.currentTime
-        useCase().test {
-            val result = awaitItem()
-            assertThat(result).isInstanceOf(AppLoadResult.Error::class.java)
-            cancelAndIgnoreRemainingEvents()
-        }
-        val firstDuration = testScheduler.currentTime - firstStart
-
-        val secondStart = testScheduler.currentTime
-        useCase().test {
-            val result = awaitItem()
-            assertThat(result).isInstanceOf(AppLoadResult.Error::class.java)
-            cancelAndIgnoreRemainingEvents()
-        }
-        val secondDuration = testScheduler.currentTime - secondStart
-
-        assertThat(secondDuration).isEqualTo(firstDuration)
-    }
+    // Retry across invocations: removed. The old .retry(IOException) was dead in
+    // production (a stateIn StateFlow never propagates an upstream exception) and
+    // the motivating PackageManager failures are not IOException; the retry was
+    // dropped in INSTALLED_APPS_LOAD_SPEC Commit 1, so there is nothing to pin.
 
     // =========================================================================
 // Test-Hilfsklassen
@@ -451,15 +409,16 @@ class ObserveInstalledAppsUseCaseTest {
     }
 
     /**
-     * Repository das sofort einen Fehler wirft.
+     * Repository that EMITS a load failure as [AppLoad.Failed] — it does NOT throw.
+     * This mirrors the impl contract (IAL-INV-7): the real loader catches its own
+     * errors and yields Failed as a value rather than propagating an exception. The
+     * old throw-based fake was exactly the green-wash pattern this refactor removes.
      */
-    private class ErrorThrowingInstalledAppsRepository(
-        private val error: Throwable
+    private class FailingInstalledAppsRepository(
+        private val cause: Throwable
     ) : InstalledAppsRepository, Purgeable {
 
-        override fun getInstalledApps(): Flow<List<AppInfo>> = flow {
-            throw error
-        }
+        override fun getInstalledApps(): Flow<AppLoad> = flowOf(AppLoad.Failed(cause))
 
         override suspend fun triggerAppsUpdate() {}
 

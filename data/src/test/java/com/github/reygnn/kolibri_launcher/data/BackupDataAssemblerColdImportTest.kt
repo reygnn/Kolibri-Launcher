@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -22,6 +23,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -121,7 +123,7 @@ class BackupDataAssemblerColdImportTest {
         // a 200 ms virtual-time delay. A bare .first() would have dropped
         // the favorite as not-installed.
         val installedAppsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
-        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow
+        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
 
         stubFavoritesFlowForPhase2(setOf(targetComponent))
 
@@ -152,7 +154,7 @@ class BackupDataAssemblerColdImportTest {
         // The first emission is non-empty, so the predicate matches
         // immediately and no virtual time elapses.
         val installedAppsFlow = MutableStateFlow(listOf(installedApp))
-        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow
+        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
 
         stubFavoritesFlowForPhase2(setOf(targetComponent))
 
@@ -178,7 +180,7 @@ class BackupDataAssemblerColdImportTest {
         // doesn't actually wait BACKUP_IMPORT_PRIME_TIMEOUT_MS in wall
         // time; runTest fast-forwards through it.
         val installedAppsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
-        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow
+        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
 
         // ── ACT + ASSERT
         val ex = assertFailsWith<IllegalStateException> {

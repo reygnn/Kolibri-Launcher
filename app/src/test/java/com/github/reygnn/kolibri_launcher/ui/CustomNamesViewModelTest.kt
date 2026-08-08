@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
@@ -13,7 +14,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -116,11 +117,12 @@ class CustomNamesViewModelTest {
     // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
-    fun `init - when installedApps flow throws IOException - handles gracefully`() = runTest {
+    fun `init - when installedApps load reports Failed (IOException) - shows empty gracefully`() = runTest {
+        // IAL-INV-7: the loader REPORTS failures as AppLoad.Failed (it never throws
+        // to the collector). GetInstalledAppsUseCase unwraps Failed → emptyList, so
+        // the picker is empty, not a crash.
         val crashingRepository = object : InstalledAppsRepository {
-            override fun getInstalledApps() = flow<List<AppInfo>> {
-                throw IOException("Cannot load apps")
-            }
+            override fun getInstalledApps() = flowOf<AppLoad>(AppLoad.Failed(IOException("Cannot load apps")))
 
             override suspend fun triggerAppsUpdate() {}
             override suspend fun purgeRepository() {}
@@ -144,11 +146,11 @@ class CustomNamesViewModelTest {
     }
 
     @Test
-    fun `init - when installedApps flow throws RuntimeException - handles gracefully`() = runTest {
+    fun `init - when installedApps load reports Failed (RuntimeException) - handles gracefully`() = runTest {
+        // A non-IO throwable during load is caught by the loader and reported as
+        // AppLoad.Failed too (the loader catches Throwable), so the fake reports it.
         val crashingRepository = object : InstalledAppsRepository {
-            override fun getInstalledApps() = flow<List<AppInfo>> {
-                throw RuntimeException("Database corrupted")
-            }
+            override fun getInstalledApps() = flowOf<AppLoad>(AppLoad.Failed(RuntimeException("Database corrupted")))
 
             override suspend fun triggerAppsUpdate() {}
             override suspend fun purgeRepository() {}
@@ -312,7 +314,7 @@ class CustomNamesViewModelTest {
     @Test
     fun `init - with empty app list - creates empty state`() = runTest {
         val emptyRepository = object : InstalledAppsRepository {
-            override fun getInstalledApps() = flow { emit(emptyList<AppInfo>()) }
+            override fun getInstalledApps() = flowOf<AppLoad>(AppLoad.Loaded(emptyList()))
             override suspend fun triggerAppsUpdate() {}
             override suspend fun purgeRepository() {}
         }

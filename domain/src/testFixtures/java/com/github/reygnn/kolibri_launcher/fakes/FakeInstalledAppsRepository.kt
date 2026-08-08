@@ -3,10 +3,12 @@ package com.github.reygnn.kolibri_launcher.fakes
 // 2025-12-04 20:13
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 /**
  * Universelles Fake für Unit- und Instrumented-Tests.
@@ -27,7 +29,13 @@ class FakeInstalledAppsRepository : InstalledAppsRepository, Purgeable {
         get() = appsFlow.value
         set(value) { appsFlow.value = value }
 
-    override fun getInstalledApps(): Flow<List<AppInfo>> = appsFlow
+    // Happy-path fake: always Loaded. The Failed branch is impl-only (like the
+    // DataStore fakes) — tests that need Failed emit AppLoad.Failed directly.
+    // Cached as one instance so getInstalledApps() returns the SAME flow across
+    // calls (contract: same instance, mirrors the impl's stateIn).
+    private val loadFlow: Flow<AppLoad> = appsFlow.map { AppLoad.Loaded(it) }
+
+    override fun getInstalledApps(): Flow<AppLoad> = loadFlow
 
     override suspend fun triggerAppsUpdate() {
         triggerUpdateCallCount++

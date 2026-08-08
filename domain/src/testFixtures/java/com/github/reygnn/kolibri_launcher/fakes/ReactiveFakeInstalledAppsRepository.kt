@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +27,7 @@ class ReactiveFakeInstalledAppsRepository(
     /** Direkter Zugriff auf den Flow für Tests die ihn brauchen */
     val appsFlow get() = delegate.appsFlow
 
-    override fun getInstalledApps(): Flow<List<AppInfo>> = delegate.getInstalledApps()
+    override fun getInstalledApps(): Flow<AppLoad> = delegate.getInstalledApps()
 
     override suspend fun triggerAppsUpdate() {
         val processedList = rawApps.map { app ->

@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
@@ -103,7 +104,7 @@ class BackupDataAssemblerImportOrderReuseTest {
         // ── ARRANGE
         // Both favorites are installed, so Phase 1 writes {A, B}.
         every { installedAppsRepository.getInstalledApps() } returns
-            MutableStateFlow(listOf(appA, appB))
+            MutableStateFlow(AppLoad.Loaded(listOf(appA, appB)))
 
         // Stub the flow to a DIVERGENT value (empty): it disagrees with the set
         // Phase 1 imports ({A, B}). If Phase 2 regressed to re-reading the flow it

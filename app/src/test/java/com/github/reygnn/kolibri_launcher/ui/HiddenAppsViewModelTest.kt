@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
@@ -201,7 +202,7 @@ class HiddenAppsViewModelTest {
         // Mock the interface for the failure path; the rest of the test
         // class uses the fake.
         val brokenInstalled = mockk<InstalledAppsRepository>(relaxed = true) {
-            every { getInstalledApps() } returns flow { throw IOException("DB error") }
+            every { getInstalledApps() } returns flowOf<AppLoad>(AppLoad.Failed(IOException("DB error")))
         }
 
         setupViewModel(installedAppsRepo = brokenInstalled)
@@ -240,9 +241,7 @@ class HiddenAppsViewModelTest {
     @Test
     fun `initialize - when both flows fail - emits error event`() = runTest {
         val brokenInstalled = mockk<InstalledAppsRepository>(relaxed = true) {
-            every { getInstalledApps() } returns flow {
-                throw RuntimeException("Database corrupted")
-            }
+            every { getInstalledApps() } returns flowOf<AppLoad>(AppLoad.Failed(RuntimeException("Database corrupted")))
         }
         val brokenVisibility = mockk<HiddenAppsRepository>(relaxed = true) {
             every { hiddenAppsFlow } returns flow {

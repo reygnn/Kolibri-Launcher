@@ -731,11 +731,14 @@ package com.github.reygnn.kolibri_launcher
  * TIME-BASED ASSERTIONS — pinning delays, retries, timeouts, throttles
  * ============================================================================
  *
- * Reference: `ObserveInstalledAppsUseCaseTest.retry counter resets between
- *             invocations on IOException backoff` (commit f8a578b).
+ * Reference: `GestureDelegate` lock-block-duration virtual-time test (a live
+ *             time-based assertion). The convention was originally motivated by the
+ *             ObserveInstalledAppsUseCase retry-counter bug below, but that retry
+ *             (and its test) were REMOVED in INSTALLED_APPS_LOAD_SPEC Commit 1 — the
+ *             narrative stays as the historical rationale, not a live example.
  *
  *
- * THE GAP THAT BIRTHED THIS CONVENTION
+ * THE GAP THAT BIRTHED THIS CONVENTION (historical — the retry has since been removed)
  * ------------------------------------
  * `ObserveInstalledAppsUseCase` had a class-field retry counter that only
  * reset on success — after a fully failed first invocation it stayed at
@@ -790,8 +793,9 @@ package com.github.reygnn.kolibri_launcher
  *
  *     assertEquals(firstDuration, secondDuration)
  *
- *   Source: `ObserveInstalledAppsUseCaseTest.retry counter resets…`.
- *   Pins symmetric timing without locking down the exact constants.
+ *   Source (historical): the removed `ObserveInstalledAppsUseCaseTest.retry counter
+ *   resets…` test. Pins symmetric timing without locking down the exact constants.
+ *   Kept as the illustrative shape; the test itself is gone (retry removed, C1).
  *
  *
  *   `advanceTimeBy(specific)` + boundary asserts
@@ -835,8 +839,8 @@ package com.github.reygnn.kolibri_launcher
  * production code; the column shows whether a virtual-time assertion
  * exists today.
  *
- *   ObserveInstalledAppsUseCase  — retry/backoff       ✓ pinned
  *   GestureDelegate              — lock-block-duration ✓ pinned
+ *   (ObserveInstalledAppsUseCase — retry/backoff       REMOVED in INSTALLED_APPS_LOAD_SPEC C1)
  *   InstalledAppsRepositoryImpl  — share-in timeout    ✗ no isolated test
  *   WallpaperDelegate            — share-in timeout    ✗ no isolated test
  *   AppManagementDelegate        — initial-load delay  ✗ low-risk (100ms)

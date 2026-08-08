@@ -128,14 +128,16 @@ object AppConstants {
      * The fix pattern at every consumer site is:
      *   ```
      *   withTimeoutOrNull(INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-     *       repo.getInstalledApps().first { it.isNotEmpty() }
+     *       repo.getInstalledApps()
+     *           .filterIsInstance<AppLoad.Loaded>()
+     *           .first { it.apps.isNotEmpty() }
      *   } ?: error("...")
      *   ```
      *
-     * 10 s accommodates the upstream's own retry policy
-     * (`MAX_APP_LOAD_RETRIES * APP_LOAD_RETRY_BASE_DELAY_MS`
-     * cumulative ≈ 6 s worst case) plus PackageManager latency on slow
-     * devices. If those retry constants change, this value should follow.
+     * 10 s accommodates PackageManager latency on slow devices (a cold
+     * enumeration + per-app loadLabel). A persistent load failure surfaces as
+     * AppLoad.Failed, which never satisfies the predicate, so this timeout is the
+     * bound on that case too.
      *
      * Used by: `BackupDataAssembler.performImport`,
      * `HiddenAppsViewModel.initialize`, `SwipeActionsViewModel.initialize`.
@@ -257,11 +259,10 @@ object AppConstants {
 
     const val INITIAL_APP_LOAD_DELAY_MS = 100L
 
-    // App-load retry policy (ObserveInstalledAppsUseCase). Total upstream attempts =
-    // 1 + MAX_APP_LOAD_RETRIES. Backoff is linear: APP_LOAD_RETRY_BASE_DELAY_MS *
-    // attempt-index — so retry 1 waits 1 s, retry 2 waits 2 s, retry 3 waits 3 s.
-    const val MAX_APP_LOAD_RETRIES = 3
-    const val APP_LOAD_RETRY_BASE_DELAY_MS = 1000L
+    // (The app-load retry policy was removed with INSTALLED_APPS_LOAD_SPEC Commit 1:
+    // the .retry sat on a stateIn StateFlow that never propagates upstream
+    // exceptions, so it never fired; the loader now yields AppLoad.Failed and
+    // keep-last-good covers the transient window.)
 
     // SavedStateHandle Keys
     const val KEY_SEARCH_QUERY = "KEY_SEARCH_QUERY"

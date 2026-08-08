@@ -20,6 +20,8 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -186,15 +188,18 @@ class BackupDataAssembler @Inject constructor(
     ): ImportResult {
         // InstalledAppsRepository.getInstalledApps() is a StateFlow shared
         // via WhileSubscribed(FLOW_SHARING_TIMEOUT_MS) with
-        // initialValue = emptyList(). A bare .first() from a cold subscriber
-        // sees the initialValue immediately and unsubscribes before the
-        // upstream PackageManager query runs — every restored component
-        // would then fail the "is installed?" filter below and the import
-        // would silently drop everything. Wait for the first non-empty
-        // emission, bounded by a timeout that accommodates the upstream's
-        // own retry budget.
+        // initialValue = AppLoad.Loaded(emptyList()). A bare .first() from a cold
+        // subscriber sees the initial (empty) value immediately and unsubscribes
+        // before the upstream PackageManager query runs — every restored component
+        // would then fail the "is installed?" filter below and the import would
+        // silently drop everything. Wait for the first successful, non-empty load
+        // (INSTALLED_APPS_LOAD_SPEC: a Failed emission is NOT a populated list, so
+        // it must not satisfy the priming), bounded by a timeout.
         val installedApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-            installedAppsRepository.getInstalledApps().first { it.isNotEmpty() }
+            installedAppsRepository.getInstalledApps()
+                .filterIsInstance<AppLoad.Loaded>()
+                .first { it.apps.isNotEmpty() }
+                .apps
         } ?: error("Timed out waiting for InstalledAppsRepository to populate during backup import")
         val installedComponents = installedApps.map { it.componentName }.toSet()
 

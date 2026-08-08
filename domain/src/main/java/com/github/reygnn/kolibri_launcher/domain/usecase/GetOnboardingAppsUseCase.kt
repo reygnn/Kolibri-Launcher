@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -17,14 +18,20 @@ class GetOnboardingAppsUseCase @Inject constructor(
 
     val onboardingAppsFlow: Flow<List<AppInfo>> =
         installedAppsRepository.getInstalledApps()
-            .map { apps ->
-                // String.isNotBlank() auf Non-Null-Properties einer
-                // Datenklasse — kann nicht werfen. Programmierfehler
-                // (sollten nie auftreten) propagieren zum Flow-catch
-                // unten, der in DEBUG via silentError laut wird.
-                apps.filter { app ->
-                    app.packageName.isNotBlank() &&
-                            app.displayName.isNotBlank()
+            .map { load ->
+                when (load) {
+                    // Behavior-preserving compat boundary (INSTALLED_APPS_LOAD_SPEC
+                    // §3 Belang A b): a load failure shows an empty picker, exactly
+                    // as before AppLoad — NOT the live error path (that is Belang D,
+                    // decided separately). Deliberate, not an incidental collapse.
+                    is AppLoad.Failed -> emptyList()
+                    is AppLoad.Loaded -> load.apps.filter { app ->
+                        // isNotBlank() on non-null data-class properties cannot throw;
+                        // a programmer error would propagate to the Flow.catch below,
+                        // which surfaces it via silentError in DEBUG.
+                        app.packageName.isNotBlank() &&
+                                app.displayName.isNotBlank()
+                    }
                 }
             }
             .catch { e ->

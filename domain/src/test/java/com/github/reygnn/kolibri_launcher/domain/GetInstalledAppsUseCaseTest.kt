@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -35,12 +36,12 @@ class GetInstalledAppsUseCaseTest {
     }
 
     @Test
-    fun `invoke - delegates to repository and emits apps`() = runTest {
+    fun `invoke - unwraps Loaded to the app list`() = runTest {
         val testApps = listOf(
             AppInfo("App A", "App A", "pkg.a", "cls.a"),
             AppInfo("App B", "App B", "pkg.b", "cls.b")
         )
-        every { installedAppsRepository.getInstalledApps() } returns flowOf(testApps)
+        every { installedAppsRepository.getInstalledApps() } returns flowOf(AppLoad.Loaded(testApps))
 
         useCase().test {
             val result = awaitItem()
@@ -50,5 +51,16 @@ class GetInstalledAppsUseCaseTest {
         }
 
         verify { installedAppsRepository.getInstalledApps() }
+    }
+
+    @Test
+    fun `invoke - unwraps Failed to an empty list (compat boundary)`() = runTest {
+        every { installedAppsRepository.getInstalledApps() } returns
+            flowOf(AppLoad.Failed(RuntimeException("boom")))
+
+        useCase().test {
+            assertEquals(emptyList(), awaitItem())
+            awaitComplete()
+        }
     }
 }
