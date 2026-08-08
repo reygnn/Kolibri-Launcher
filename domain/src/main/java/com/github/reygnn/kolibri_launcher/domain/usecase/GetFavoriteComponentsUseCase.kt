@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import javax.inject.Inject
 
@@ -7,17 +8,16 @@ class GetFavoriteComponentsUseCase @Inject constructor(
     private val favoritesRepository: FavoritesRepository
 ) {
     /**
-     * Ruft die aktuellen favorisierten Komponenten-Namen einmalig ab.
-     *
-     * Authoritative FRESH read via [FavoritesRepository.getFavoriteComponentsSnapshot]:
-     * bypasses the hot-shared `favoriteComponentsFlow` replay cache. Sole caller is the
-     * Onboarding EDIT_FAVORITES pre-selection, which runs in a SEPARATE Activity with no
-     * warm Home subscriber — a `.first()` on the replay flow could return a stale set
-     * (e.g. after a backup restore). Same fix as the swipe-action fresh reads.
-     *
-     * @throws Exception wenn das Laden fehlschlägt
+     * Reads the current favorites for the Onboarding EDIT_FAVORITES pre-selection
+     * as a DISTINGUISHABLE result (DATASTORE_READ_SPEC Belang C): [FavoritesEditRead.Loaded]
+     * on success, [FavoritesEditRead.Unavailable] on an I/O failure — never an empty
+     * set masquerading as "no favorites". Fail-CLOSED, because the pre-selection feeds
+     * a subsequent SAVE and an unreadable store must not let the editor wipe the real
+     * favorites (DSR-INV-4). Delegates to
+     * [FavoritesRepository.readFavoritesForEdit]; a non-I/O programmer error still
+     * propagates, cancellation always propagates.
      */
-    suspend operator fun invoke(): Set<String> {
-        return favoritesRepository.getFavoriteComponentsSnapshot()
+    suspend operator fun invoke(): FavoritesEditRead {
+        return favoritesRepository.readFavoritesForEdit()
     }
 }

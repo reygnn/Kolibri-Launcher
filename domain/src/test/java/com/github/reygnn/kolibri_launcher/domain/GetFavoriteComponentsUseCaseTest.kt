@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -11,8 +12,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetFavoriteComponentsUseCaseTest {
@@ -32,20 +35,33 @@ class GetFavoriteComponentsUseCaseTest {
     }
 
     @Test
-    fun `invoke - returns set from repository snapshot`() = runTest {
-        // Pins the use case to the authoritative fresh read, not the hot replay flow.
-        val expectedSet = setOf("com.example.app/MainActivity", "com.test.app/HomeActivity")
-        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } returns expectedSet
+    fun `invoke - returns Loaded from repository readFavoritesForEdit`() = runTest {
+        // Pins the use case to the distinguishable editor read (Belang C), not the
+        // fail-open snapshot or the display flow.
+        val expected = FavoritesEditRead.Loaded(
+            setOf("com.example.app/MainActivity", "com.test.app/HomeActivity")
+        )
+        coEvery { favoritesRepository.readFavoritesForEdit() } returns expected
 
-        val result = useCase()
-
-        assertEquals(expectedSet, result)
+        assertEquals(expected, useCase())
     }
 
     @Test
-    fun `invoke - propagates exception from repository snapshot`() = runTest {
-        val expectedError = RuntimeException("Database load failed")
-        coEvery { favoritesRepository.getFavoriteComponentsSnapshot() } throws expectedError
+    fun `invoke - returns Unavailable when the repository read fails`() = runTest {
+        // A read failure must stay distinguishable — the ViewModel save-gate depends
+        // on it to block a wipe (DSR-INV-4).
+        coEvery { favoritesRepository.readFavoritesForEdit() } returns
+            FavoritesEditRead.Unavailable(IOException("read failed"))
+
+        assertTrue(useCase() is FavoritesEditRead.Unavailable)
+    }
+
+    @Test
+    fun `invoke - propagates a non-IO exception from the repository`() = runTest {
+        // readFavoritesForEdit maps IOException to Unavailable but rethrows everything
+        // else; the use case propagates a genuine programmer error unchanged.
+        val expectedError = RuntimeException("programmer error")
+        coEvery { favoritesRepository.readFavoritesForEdit() } throws expectedError
 
         val exception = assertFailsWith<RuntimeException> { useCase() }
         assertEquals(expectedError.message, exception.message)

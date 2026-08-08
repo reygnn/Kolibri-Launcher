@@ -6,10 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
+import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -174,6 +176,22 @@ class FavoritesRepositoryImpl @Inject constructor(
         // (backup export, Settings sort, Onboarding edit).
         dataStore.snapshotFailOpen("Error reading favorites snapshot; treating as empty") { preferences ->
             preferences[PreferencesKeys.FAVORITES] ?: emptySet()
+        }
+
+    override suspend fun readFavoritesForEdit(): FavoritesEditRead =
+        try {
+            // Fail-CLOSED, DISTINGUISHABLE read (DSR-INV-4): returns Unavailable on
+            // I/O rather than an empty Loaded, so the editor save-gate can block a
+            // wipe. Fresh point-read, same FAVORITES key as the flow/snapshot.
+            // CancellationException is rethrown FIRST (DSR-INV-5) — this file is not
+            // on cancel_files, so the arm is hand-maintained; scanCancelCandidates is
+            // the backstop.
+            FavoritesEditRead.Loaded(dataStore.data.first()[PreferencesKeys.FAVORITES] ?: emptySet())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            Timber.w(e, "Error reading favorites for edit; reporting Unavailable")
+            FavoritesEditRead.Unavailable(e)
         }
 
     override suspend fun reconcileFavoriteComponents(

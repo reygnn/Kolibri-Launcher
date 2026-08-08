@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
@@ -216,6 +217,9 @@ class ToggleFavoriteUseCaseTest {
         }
 
         override suspend fun getFavoriteComponentsSnapshot(): Set<String> = favorites
+
+        override suspend fun readFavoritesForEdit(): FavoritesEditRead =
+            FavoritesEditRead.Loaded(favorites)
 
         override suspend fun purgeRepository() {
             favorites = emptySet()

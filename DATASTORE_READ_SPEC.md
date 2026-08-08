@@ -240,7 +240,9 @@ interface FavoritesRepository : Purgeable {
 
 sealed interface FavoritesEditRead {
     data class Loaded(val components: Set<String>) : FavoritesEditRead
-    data object Unavailable : FavoritesEditRead
+    // Carries the caught Throwable (like ConsentReadResult.Unavailable) for optional
+    // caller-side logging; the save-gate branches on the TYPE, not the cause.
+    data class Unavailable(val cause: Throwable) : FavoritesEditRead
 }
 ```
 
@@ -312,7 +314,7 @@ Konstruktion" gegründet ist:
 override suspend fun readFavoritesForEdit(): FavoritesEditRead =
     try { FavoritesEditRead.Loaded(dataStore.data.first()[FAVORITES] ?: emptySet()) }
     catch (e: CancellationException) { throw e }   // rethrow FIRST — no swallow
-    catch (e: IOException) { Timber.w(e, "..."); FavoritesEditRead.Unavailable }
+    catch (e: IOException) { Timber.w(e, "..."); FavoritesEditRead.Unavailable(e) }
 ```
 
 **Achtung Cancellation-Gate:** `FavoritesRepositoryImpl.kt` steht **nicht** auf

@@ -14,6 +14,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
@@ -44,6 +45,22 @@ class OnboardingViewModel @Inject constructor(
     private val selectedComponents = MutableStateFlow<Set<String>>(emptySet())
     private val searchQuery = MutableStateFlow("")
     private var isInitialized = false
+
+    /**
+     * EDIT-favorites pre-selection state (DATASTORE_READ_SPEC Belang C). A boolean
+     * would NOT close the wipe: the load runs async, so "Done tapped before the read
+     * resolves" would still fire an empty save. This tri-state defaults to
+     * [PreselectState.NotLoaded] (save BLOCKED in EDIT mode) and only flips to
+     * [PreselectState.Loaded] once `selectedComponents` has been populated from a
+     * successful read. INITIAL_SETUP ignores it (an empty save is legitimate on first
+     * run).
+     */
+    private sealed interface PreselectState {
+        data object NotLoaded : PreselectState
+        data object Loaded : PreselectState
+        data object Unavailable : PreselectState
+    }
+    private var preselectState: PreselectState = PreselectState.NotLoaded
 
     // Helper function to send OnboardingEvents safely
     private fun sendOnboardingEvent(event: OnboardingEvent) {
@@ -109,14 +126,39 @@ class OnboardingViewModel @Inject constructor(
 
         launchSafe {
             try {
-                val initialSelection = when (launchMode) {
-                    LaunchMode.INITIAL_SETUP -> emptySet()
-                    LaunchMode.EDIT_FAVORITES -> getFavoriteComponentsUseCase()
+                when (launchMode) {
+                    LaunchMode.INITIAL_SETUP ->
+                        // First run: an empty selection is legitimate; the save-gate
+                        // exempts INITIAL_SETUP, so preselectState stays NotLoaded and
+                        // is never consulted for this mode.
+                        selectedComponents.value = emptySet()
+
+                    LaunchMode.EDIT_FAVORITES ->
+                        when (val read = getFavoriteComponentsUseCase()) {
+                            is FavoritesEditRead.Loaded -> {
+                                // DSR-INV-6: populate selectedComponents BEFORE flipping the
+                                // state, with no suspension point between the two writes —
+                                // both run on Main, so a concurrent onDoneClicked can never
+                                // see Loaded with a not-yet-populated selection.
+                                selectedComponents.value = read.components
+                                preselectState = PreselectState.Loaded
+                            }
+                            is FavoritesEditRead.Unavailable -> {
+                                // Fail-CLOSED: keep the selection empty AND mark Unavailable
+                                // so the save-gate blocks a wipe; surface the failure now
+                                // (load time), not silently at save.
+                                preselectState = PreselectState.Unavailable
+                                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+                            }
+                        }
                 }
-                selectedComponents.value = initialSelection
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // readFavoritesForEdit returns Unavailable for I/O rather than throwing;
+                // a throw here is a non-I/O programmer error — treat it fail-closed too,
+                // so the EDIT-mode save stays blocked.
+                preselectState = PreselectState.Unavailable
                 TimberWrapper.silentError(e, "Error loading initial favorites.")
                 sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
             }
@@ -146,6 +188,16 @@ class OnboardingViewModel @Inject constructor(
 
     fun onDoneClicked() {
         launchSafe {
+            // Save-gate (DATASTORE_READ_SPEC Belang C, DSR-INV-4): in EDIT mode, only
+            // persist when the pre-selection loaded successfully. NotLoaded (read not
+            // finished — e.g. Done tapped mid-load) or Unavailable (read failed) must
+            // NOT save, or an empty/default selection would overwrite the real
+            // favorites. INITIAL_SETUP is exempt: an empty save is legitimate on first
+            // run. Correctness lives HERE, not just in the distinguishable read.
+            if (launchMode == LaunchMode.EDIT_FAVORITES && preselectState != PreselectState.Loaded) {
+                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+                return@launchSafe
+            }
             try {
                 completeOnboardingUseCase(
                     componentNames = selectedComponents.value.toList(),

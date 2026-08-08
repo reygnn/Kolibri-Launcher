@@ -4,6 +4,7 @@ import java.io.IOException
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.CancellationException
@@ -344,15 +345,13 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
-    fun `getFavoriteComponentsSnapshot - reads current value without a warm flow subscriber`() = runTest {
-        // Backup-stale-replay fix: the backup export reads favorites via the
-        // authoritative getFavoriteComponentsSnapshot, NOT the hot
-        // favoriteComponentsFlow (shareIn, replay=1). Here the favorites are
-        // changed with NO active collector on the flow — exactly the situation
-        // while the backup screen is open — and the read must return the NEW set,
-        // not a stale replay. (The runtime replay race is timing-based and not
-        // reproduced deterministically here; this pins the authoritative-read
-        // contract.)
+    fun `getFavoriteComponentsSnapshot - reads the latest stored value`() = runTest {
+        // Authoritative fresh point-read: getFavoriteComponentsSnapshot reads
+        // dataStore.data.first() and runs the SAME transform as the cold
+        // favoriteComponentsFlow (DSR-INV-1), so a save with NO active collector —
+        // the backup-screen situation — is reflected immediately. Since the
+        // hot-share teardown (DATASTORE_READ_SPEC Belang A) there is no replay cache
+        // left to go stale; this pins that both read paths agree on the latest value.
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.old/Component")))
         val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
@@ -379,6 +378,25 @@ class FavoritesRepositoryImplTest {
         Assert.assertEquals(
             emptySet<String>(),
             favoritesRepositoryImpl.getFavoriteComponentsSnapshot()
+        )
+    }
+
+    @Test
+    fun `readFavoritesForEdit - when the store read fails - returns Unavailable (fail-closed)`() = runTest {
+        // Belang C: the editor pre-selection read is DISTINGUISHABLE — a transient
+        // read IOException surfaces as Unavailable, NOT an empty Loaded, so the
+        // OnboardingViewModel save-gate can block a wipe (DSR-INV-4). Impl-only: the
+        // fake never fails I/O, so this branch cannot be a contract test.
+        val fakeDataStore = FakeDataStore()
+        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
+        fakeDataStore.makeReadFail()
+
+        val result = favoritesRepositoryImpl.readFavoritesForEdit()
+
+        Assert.assertTrue(
+            "read failure must be Unavailable, not an empty Loaded",
+            result is FavoritesEditRead.Unavailable
         )
     }
 

@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 // TIMESTAMP 2025-12-04 05:01
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +58,11 @@ class FakeFavoritesRepository : FavoritesRepository {
     }
 
     override suspend fun getFavoriteComponentsSnapshot(): Set<String> = favorites
+
+    // The fake never fails I/O, so the edit read is always Loaded. The Unavailable
+    // branch is impl-only (IOException) and lives in FavoritesRepositoryImplTest.
+    override suspend fun readFavoritesForEdit(): FavoritesEditRead =
+        FavoritesEditRead.Loaded(favorites)
 
     override suspend fun purgeRepository() {
         favorites = emptySet()

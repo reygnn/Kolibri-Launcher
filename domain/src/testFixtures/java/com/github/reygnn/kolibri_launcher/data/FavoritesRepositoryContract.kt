@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -112,6 +113,33 @@ abstract class FavoritesRepositoryContract {
     fun `getFavoriteComponentsSnapshot on fresh repository is empty`() = runTest {
         val repo = createRepository()
         assertEquals(emptySet<String>(), repo.getFavoriteComponentsSnapshot())
+    }
+
+    // ---------- readFavoritesForEdit (distinguishable editor read, Belang C) ----------
+    // Only the Loaded (success) shape is in the contract; the Unavailable (IOException)
+    // branch is impl-only I/O and lives in FavoritesRepositoryImplTest.
+
+    @Test
+    fun `readFavoritesForEdit returns Loaded with the current favorites`() = runTest {
+        val repo = createRepository()
+        repo.addFavoriteComponent(compA)
+        repo.addFavoriteComponent(compB)
+        assertEquals(FavoritesEditRead.Loaded(setOf(compA, compB)), repo.readFavoritesForEdit())
+    }
+
+    @Test
+    fun `readFavoritesForEdit on fresh repository returns Loaded empty`() = runTest {
+        val repo = createRepository()
+        assertEquals(FavoritesEditRead.Loaded(emptySet()), repo.readFavoritesForEdit())
+    }
+
+    @Test
+    fun `readFavoritesForEdit reflects the LATEST change, never a previous one`() = runTest {
+        val repo = createRepository()
+        repo.addFavoriteComponent(compA)
+        repo.removeFavoriteComponent(compA)
+        repo.addFavoriteComponent(compB)
+        assertEquals(FavoritesEditRead.Loaded(setOf(compB)), repo.readFavoritesForEdit())
     }
 
     // ---------- addFavoriteComponent ----------

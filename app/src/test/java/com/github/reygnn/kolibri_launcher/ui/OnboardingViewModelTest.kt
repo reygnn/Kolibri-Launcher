@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
@@ -135,7 +136,7 @@ class OnboardingViewModelTest {
     fun `onDoneClicked - in EDIT_FAVORITES mode - calls CompleteOnboardingUseCase correctly`() =
         runTest {
             // Mocke den GetFavoriteComponentsUseCase für loadInitialData (suspend → coEvery)
-            coEvery { getFavoriteComponentsUseCase() } returns emptySet()
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
 
             setupViewModel()
             viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
@@ -258,10 +259,12 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `initialize - in EDIT_FAVORITES mode when GetFavoriteComponentsUseCase fails - handles gracefully`() =
+    fun `initialize - in EDIT_FAVORITES mode when GetFavoriteComponentsUseCase is Unavailable - handles gracefully`() =
         runTest {
-            // 1. Mock Setup (suspend → coEvery throws)
-            coEvery { getFavoriteComponentsUseCase() } throws IOException("Cannot read favorites")
+            // 1. Mock Setup: the read reports Unavailable (I/O failure) — Belang C's
+            //    fail-closed result, NOT a thrown exception.
+            coEvery { getFavoriteComponentsUseCase() } returns
+                FavoritesEditRead.Unavailable(IOException("Cannot read favorites"))
 
             // 2. ViewModel Setup
             setupViewModel()
@@ -348,7 +351,7 @@ class OnboardingViewModelTest {
     fun `initialize - EDIT_FAVORITES mode pre-selects existing favorites`() = runTest {
         val existingFavorites = setOf(app1.componentName, app3.componentName)
         // Mocke den GetFavoriteComponentsUseCase (suspend → coEvery)
-        coEvery { getFavoriteComponentsUseCase() } returns existingFavorites
+        coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(existingFavorites)
 
         setupViewModel()
         viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
@@ -366,7 +369,7 @@ class OnboardingViewModelTest {
         runTest {
             val existingFavorites = setOf(app1.componentName)
             // Mocke den GetFavoriteComponentsUseCase (suspend → coEvery)
-            coEvery { getFavoriteComponentsUseCase() } returns existingFavorites
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(existingFavorites)
 
             setupViewModel()
             viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
@@ -502,7 +505,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `loadInitialData - called multiple times - only loads once`() = runTest {
-        coEvery { getFavoriteComponentsUseCase() } returns emptySet()
+        coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
 
         setupViewModel()
         viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
@@ -756,6 +759,72 @@ class OnboardingViewModelTest {
 
             coVerify(exactly = 2) { completeOnboardingUseCase(any(), any()) }
         }
+    }
+
+    // ========== SAVE-GATE (DATASTORE_READ_SPEC Belang C, DSR-INV-4) ==========
+
+    @Test
+    fun `onDoneClicked - EDIT mode with Unavailable preselect - does NOT save and emits error`() =
+        runTest {
+            // The EDIT read failed → Unavailable. Saving would overwrite the real
+            // favorites with the empty default. The save-gate must block the save.
+            coEvery { getFavoriteComponentsUseCase() } returns
+                FavoritesEditRead.Unavailable(IOException("read failed"))
+
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+
+            viewModel.event.test {
+                viewModel.loadInitialData()
+                advanceUntilIdle()
+                assertTrue(awaitItem() is OnboardingEvent.ShowError) // load-time failure
+
+                viewModel.onDoneClicked()
+                advanceUntilIdle()
+                assertTrue(awaitItem() is OnboardingEvent.ShowError) // save-gate blocked
+            }
+
+            coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
+        }
+
+    @Test
+    fun `onDoneClicked - EDIT mode when preselect read throws a non-IO error - does NOT save`() =
+        runTest {
+            // The fail-closed catch(Throwable) branch (a non-I/O programmer error, not
+            // an IOException->Unavailable) must ALSO mark the state Unavailable so the
+            // save-gate blocks — otherwise a thrown read error would leave the default
+            // and (if it were Loaded) let an empty save through.
+            coEvery { getFavoriteComponentsUseCase() } throws RuntimeException("programmer error")
+
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+
+            viewModel.event.test {
+                viewModel.loadInitialData()
+                advanceUntilIdle()
+                assertTrue(awaitItem() is OnboardingEvent.ShowError) // load-time (catch branch)
+
+                viewModel.onDoneClicked()
+                advanceUntilIdle()
+                assertTrue(awaitItem() is OnboardingEvent.ShowError) // save-gate blocked
+            }
+
+            coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
+        }
+
+    @Test
+    fun `onDoneClicked - EDIT mode with Done before preselect resolves - does NOT save`() = runTest {
+        // In-flight race (round-2 finding 2.1): Done tapped while the EDIT read has
+        // not resolved → state is NotLoaded (the default) → the save must be blocked,
+        // so an empty selection can never wipe the real favorites. loadInitialData is
+        // deliberately never driven here, leaving the state at NotLoaded.
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+
+        viewModel.onDoneClicked()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
     }
 
 }

@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
@@ -438,6 +439,9 @@ class ObserveInstalledAppsUseCaseTest {
         }
 
         override suspend fun getFavoriteComponentsSnapshot(): Set<String> = flow.value
+
+        override suspend fun readFavoritesForEdit(): FavoritesEditRead =
+            FavoritesEditRead.Loaded(flow.value)
 
         override suspend fun purgeRepository() {
             flow.value = emptySet()
