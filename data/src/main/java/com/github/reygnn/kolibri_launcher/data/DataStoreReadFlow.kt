@@ -109,6 +109,23 @@ internal suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
     }
 
 /**
+ * The decide half, fail-CLOSED: an authoritative fresh point-read that does NOT
+ * recover from [IOException] — a read error propagates to the caller. For
+ * DESTRUCTIVE reads where a fail-open default would be dangerous: the reconcile
+ * candidate read (RECONCILE_FIX_SPEC R-INV-2), where the candidate read and the
+ * delete must be the same authority, so a transient read failure must delete
+ * nothing rather than silently treat the store as empty and prune live entries.
+ *
+ * No `catch` at all: [IOException] and every other non-cancellation Throwable
+ * propagate, and [kotlinx.coroutines.CancellationException] propagates naturally
+ * (DSR-INV-5). Contrast [snapshotFailOpen] (Anzeige / backup) which recovers
+ * IOException to the empty default.
+ */
+internal suspend fun <T> DataStore<Preferences>.snapshotFailClosed(
+    transform: suspend (Preferences) -> T,
+): T = transform(data.first())
+
+/**
  * Hot-sharing tail shared by the `shareIn`-backed repositories: shares the
  * flow across collectors when an [externalScope] is present (production),
  * or returns the cold flow unchanged when it is `null` (the test path — see

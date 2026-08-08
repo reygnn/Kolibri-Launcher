@@ -1,9 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import java.io.IOException
-import io.mockk.mockk
-
-import android.content.Context
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -11,7 +8,6 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
@@ -35,11 +31,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.favorite.app/ComponentA")))
 
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("com.favorite.app/ComponentA")
 
@@ -50,11 +42,7 @@ class FavoritesRepositoryImplTest {
     fun `isFavoriteComponent returns false for a non-favorite component`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.another.app/ComponentB")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         Assert.assertFalse(favoritesRepositoryImpl.isFavoriteComponent("com.not.favorite/ComponentC"))
     }
@@ -62,11 +50,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `addFavoriteComponent adds component and returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.new.favorite/ComponentD")
 
@@ -83,11 +67,7 @@ class FavoritesRepositoryImplTest {
                 (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }
                     .toSet()
             fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
-            val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                this.backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+            val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
             val result = favoritesRepositoryImpl.addFavoriteComponent("com.over.limit/ComponentE")
 
@@ -101,11 +81,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         val initialFavorites = setOf("com.app1/ComponentF", "com.to.remove/ComponentG")
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to initialFavorites))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         favoritesRepositoryImpl.removeFavoriteComponent("com.to.remove/ComponentG")
 
@@ -121,11 +97,7 @@ class FavoritesRepositoryImplTest {
         val installedComponents =
             listOf("com.installed.app/ComponentH", "com.another.installed.app/ComponentJ")
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to currentFavorites))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         favoritesRepositoryImpl.reconcileFavoriteComponents(installedComponents) { false }
 
@@ -143,11 +115,7 @@ class FavoritesRepositoryImplTest {
                 (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" }
                     .toSet()
             fakeDataStore.setInitialData(preferencesOf(favoritesKey to fullSet))
-            val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                this.backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+            val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
             val result = favoritesRepositoryImpl.addFavoriteComponent("com.app1/AnotherComponent")
 
@@ -165,11 +133,7 @@ class FavoritesRepositoryImplTest {
     fun `addFavoriteComponent - when DataStore edit fails - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeEditFail()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.test/Component")
 
@@ -180,11 +144,7 @@ class FavoritesRepositoryImplTest {
     fun `addFavoriteComponent - when CancellationException - propagates it`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeCancellable()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         assertFailsWith<CancellationException> {
             favoritesRepositoryImpl.addFavoriteComponent("com.test/Component")
@@ -194,11 +154,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `addFavoriteComponent - with empty componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("")
 
@@ -209,11 +165,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `addFavoriteComponent - with blank componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val resultEmpty = favoritesRepositoryImpl.addFavoriteComponent("")
         val resultBlank = favoritesRepositoryImpl.addFavoriteComponent("   ")
@@ -227,11 +179,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))
         fakeDataStore.makeEditFail()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("com.test/Component")
 
@@ -244,11 +192,7 @@ class FavoritesRepositoryImplTest {
         // Initialize with the component already in favorites
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))
         fakeDataStore.makeCancellable()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         assertFailsWith<CancellationException> {
             favoritesRepositoryImpl.removeFavoriteComponent("com.test/Component")
@@ -258,11 +202,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `removeFavoriteComponent - with empty componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("")
 
@@ -272,11 +212,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `removeFavoriteComponent - with blank componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("")
 
@@ -287,11 +223,7 @@ class FavoritesRepositoryImplTest {
     fun `isFavoriteComponent - when DataStore read fails - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeReadFail()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")
 
@@ -301,11 +233,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `isFavoriteComponent - with null componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.isFavoriteComponent(null)
 
@@ -315,11 +243,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `isFavoriteComponent - with blank componentName - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("  ")
 
@@ -330,11 +254,7 @@ class FavoritesRepositoryImplTest {
     fun `saveFavoriteComponents - with empty list - clears all favorites`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // KEIN result mehr - gibt Unit zurück
         favoritesRepositoryImpl.saveFavoriteComponents(emptyList())
@@ -347,11 +267,7 @@ class FavoritesRepositoryImplTest {
     fun `saveFavoriteComponents - when DataStore edit fails - does not crash`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeEditFail()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // KEIN result mehr - sollte nur nicht crashen
         favoritesRepositoryImpl.saveFavoriteComponents(listOf("com.test/Component"))
@@ -372,11 +288,7 @@ class FavoritesRepositoryImplTest {
                     )
                 )
             )
-            val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-                fakeDataStore,
-                this.backgroundScope,
-                SharingStarted.Companion.Lazily
-            )
+            val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
             favoritesRepositoryImpl.reconcileFavoriteComponents(emptyList()) { false }
 
@@ -389,11 +301,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         val initialFavorites = setOf("com.app1/Component")
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to initialFavorites))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Wait for initialization
         favoritesRepositoryImpl.favoriteComponentsFlow.first()
@@ -427,11 +335,7 @@ class FavoritesRepositoryImplTest {
         // the throw distinguishes fail-closed from the M1 regression (§6.1).
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
         fakeDataStore.makeReadFail()
 
         assertFailsWith<IOException> {
@@ -451,11 +355,7 @@ class FavoritesRepositoryImplTest {
         // contract.)
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.old/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         favoritesRepositoryImpl.saveFavoriteComponents(listOf("com.new/Component"))
 
@@ -473,11 +373,7 @@ class FavoritesRepositoryImplTest {
         // reconcile path, which is fail-CLOSED and propagates.)
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
         fakeDataStore.makeReadFail()
 
         Assert.assertEquals(
@@ -490,11 +386,7 @@ class FavoritesRepositoryImplTest {
     fun `addFavoriteComponent - when already favorite - still returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.test/Component")
 
@@ -504,11 +396,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `removeFavoriteComponent - when not favorite - still returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("com.not.favorite/Component")
 
@@ -520,11 +408,7 @@ class FavoritesRepositoryImplTest {
     @Test
     fun `toggleFavoriteComponent - when not favorite - adds it and returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            externalScope = null,  // <-- KEIN shareIn()
-            SharingStarted.Eagerly
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Initial leer
         Assert.assertFalse(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
@@ -542,11 +426,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/Component")))
 
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            externalScope = null,  // <-- KEIN shareIn()
-            SharingStarted.Eagerly
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Verify initial state
         Assert.assertTrue(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
@@ -567,11 +447,7 @@ class FavoritesRepositoryImplTest {
         // Vorher: App A ist Favorit
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.old/AppA")))
 
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         val newFavorites = listOf("com.new/AppB", "com.new/AppC")
 
@@ -591,11 +467,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/App")))
 
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Act
         favoritesRepositoryImpl.purgeRepository()
@@ -610,11 +482,7 @@ class FavoritesRepositoryImplTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeEditFail()
 
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(
-            fakeDataStore,
-            this.backgroundScope,
-            SharingStarted.Companion.Lazily
-        )
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Act - should not crash
         favoritesRepositoryImpl.purgeRepository()

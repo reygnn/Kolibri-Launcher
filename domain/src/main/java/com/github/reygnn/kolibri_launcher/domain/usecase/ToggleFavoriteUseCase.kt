@@ -41,9 +41,9 @@ class ToggleFavoriteUseCase @Inject constructor(
      * @param currentMaxFavorites Das aktuelle UI-Limit (wird vom VM übergeben).
      */
     suspend operator fun invoke(app: AppInfo, currentMaxFavorites: Int): Result {
-        // stale-replay ok: invoked from AppManagementDelegate in the Home
-        // foreground, where a warm subscriber on favoriteComponentsFlow keeps the
-        // replay cache current — the count is read fresh, not from a cold cache.
+        // Cold flow (DATASTORE_READ_SPEC Belang A): favoriteComponentsFlow.first()
+        // is a fresh read of the store — the count is always current, no replay
+        // cache and no warm-subscriber assumption.
         val realFavoritesCount = favoritesRepository.favoriteComponentsFlow.first().size
 
         if (!favoritesRepository.isFavoriteComponent(app.componentName) &&

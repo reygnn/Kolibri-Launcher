@@ -244,12 +244,10 @@ class BackupDataAssembler @Inject constructor(
 
         // ===== PHASE 2: Import Order =====
         if (options.importOrder) {
-            // Prefer the set Phase 1 just wrote (authoritative, no cache lag).
-            // Only when favorites weren't imported this run do we read the
-            // current favorites from the flow — that path performs no favorites
-            // write, so the replay cache cannot lag an in-import edit()
-            // (favorites otherwise only mutate from the subscribed Home path).
-            // stale-replay ok: write-free import-order fallback branch.
+            // Prefer the set Phase 1 just wrote; otherwise read the current
+            // favorites from the flow. Since the hot-share teardown
+            // (DATASTORE_READ_SPEC Belang A) favoriteComponentsFlow is cold, so
+            // .first() is a fresh read of the store — no replay cache to lag.
             val currentFavoritesSet = importedFavorites
                 ?: favoritesRepository.favoriteComponentsFlow.first().toHashSet()
 

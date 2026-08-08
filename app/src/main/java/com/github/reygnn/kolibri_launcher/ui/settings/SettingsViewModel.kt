@@ -90,14 +90,16 @@ class SettingsViewModel @Inject constructor(
     /**
      * Builds the ordered favorites list for the sort dialog.
      *
-     * Reads favorites and their order via authoritative FRESH snapshots
+     * Reads favorites and their order via the authoritative snapshots
      * ([FavoritesRepository.getFavoriteComponentsSnapshot] /
-     * [FavoritesOrderRepository.getFavoriteComponentsOrderSnapshot]), NEVER the hot
-     * `favoriteComponentsFlow` / `favoriteComponentsOrderFlow` replay caches:
-     * Settings is a separate Activity, so MainActivity is STOPPED and holds no warm
-     * subscriber — a `.first()` on the replay flow could sort a stale set right
-     * after a backup restore (AUDIT-13). Lifted out of the fragment (Rule 10) so
-     * this decision is JVM-testable.
+     * [FavoritesOrderRepository.getFavoriteComponentsOrderSnapshot]) — the explicit
+     * decide-path point-reads, not the display flows. This was the AUDIT-13 fix
+     * (Settings is a separate Activity with no warm Home subscriber, so a `.first()`
+     * on the then-hot replay flow could sort a stale set after a backup restore);
+     * since the DATASTORE_READ_SPEC Belang A teardown those flows are cold, so the
+     * snapshots and the flows now agree — the snapshot call stays as the clear
+     * decide-path contract. Lifted out of the fragment (Rule 10) so this decision
+     * is JVM-testable.
      *
      * Fail-open per read (mirrors the fragment it replaced): a non-cancellation
      * read/sort error degrades to empty / unsorted rather than aborting the dialog;

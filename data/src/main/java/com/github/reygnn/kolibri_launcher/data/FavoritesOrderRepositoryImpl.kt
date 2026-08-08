@@ -53,7 +53,7 @@ import javax.inject.Singleton
  * @see HiddenAppsRepositoryImpl for a similar Flow-based state repository
  */
 @Singleton
-open class FavoritesOrderRepositoryImpl @Inject constructor(
+class FavoritesOrderRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : FavoritesOrderRepository {
 
@@ -172,7 +172,7 @@ open class FavoritesOrderRepositoryImpl @Inject constructor(
         }
     }
 
-    open suspend fun removeComponentFromOrder(componentName: String): Boolean {
+    suspend fun removeComponentFromOrder(componentName: String): Boolean {
         return try {
             // Read-modify-write inside a single edit{} transaction so a
             // concurrent saveOrder can't wedge a stale snapshot between the

@@ -1,132 +1,63 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manager for favorite apps with reactive Flow-based architecture and package limits.
+ * Manager for favorite apps: which apps are pinned to the home screen, by
+ * component identifier (`"packageName/activityClassName"`), persisted in
+ * DataStore and enforced against a package-based limit.
  *
- * This singleton manages which apps are marked as favorites (pinned to home screen)
- * by persisting component identifiers in DataStore and exposing them as a hot,
- * shared Flow. It enforces a package-based limit to prevent home screen overcrowding
- * while allowing multiple activities from the same package.
+ * **Cold read + snapshot, one authoritative path (DATASTORE_READ_SPEC Belang A).**
+ * [favoriteComponentsFlow] is a plain cold flow via [readFlowFailOpen];
+ * [getFavoriteComponentsSnapshot] is a fresh point-read via [snapshotFailOpen].
+ * Both run the SAME transform (`prefs[FAVORITES] ?: emptySet()`) over the store,
+ * so they cannot drift (DSR-INV-1), and there is no `shareIn(replay=1)` cache to
+ * go stale — the AUDIT-13 hazard is gone by construction. The constructor takes
+ * just the [DataStore]; no `externalScope` / `sharingStrategy` / test factory.
  *
- * **Core Functionality:**
- * - Add/remove/toggle favorite apps by component name
- * - Check if specific app is favorited
- * - Batch save favorite components
- * - Cleanup orphaned favorites (from uninstalled apps)
- * - Enforce package limit for favorites
- * - Expose complete favorites set reactively via hot Flow
+ * **Three read policies, all via named envelopes (DSR-INV-3):**
+ * - continuous / point-read for DISPLAY → fail-open ([favoriteComponentsFlow],
+ *   [getFavoriteComponentsSnapshot], [isFavoriteComponent]): an I/O error yields
+ *   the empty default, never throws.
+ * - the reconcile candidate read → fail-CLOSED ([snapshotFailClosed]): an I/O
+ *   error propagates so a transient failure deletes nothing (RECONCILE_FIX_SPEC
+ *   R-INV-2).
+ * - every WRITE (add/remove/save/reconcile-delete) is a read-modify-write INSIDE
+ *   `edit{}`, so a concurrent change can't be clobbered by a stale outside
+ *   snapshot.
  *
- * **Architecture: Hot Shared Flow with Dual Constructor Pattern**
+ * **Package-based limit.** `MAX_FAVORITES_ON_HOME` caps distinct PACKAGES, not
+ * components, so multiple activities of one app (Gmail + Gmail Compose) are
+ * allowed while bloat from too many different apps is prevented.
  *
- * This manager uses a sophisticated Flow setup optimized for production and testing;
- * the shared read/share plumbing lives in [SharedDataStoreFlowRepository]:
+ * **Error handling.** Operations return Boolean success or a default on failure;
+ * [java.util.concurrent.CancellationException] is always re-thrown.
  *
- * **Production (Primary Constructor):**
- * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
- * - Single shared subscription to DataStore across all collectors
- * - 5-second replay timeout prevents unnecessary DataStore reads
- * - Optimized for multiple UI collectors (HomeScreen, BottomSheet, etc.)
- *
- * **Testing (Secondary Constructor):**
- * - Accepts custom `SharingStarted` strategy parameter
- * - Tests can use `SharingStarted.Eagerly` for synchronous behavior
- * - Marked `@VisibleForTesting` to signal test-only usage
- *
- * **Why Flow-Based (Like AppVisibilityManager)?**
- * - Favorites are holistic STATE (complete set needed for home screen)
- * - Multiple UI components observe the same favorites simultaneously
- * - Set membership checks are O(1) and efficient
- * - DataStore naturally provides Flow—preserve that reactivity
- * - Unlike `AppNamesManager` (granular events), this is perfect for Flow
- *
- * **Package-Based Limit Enforcement:**
- * The manager enforces `MAX_FAVORITES_ON_HOME` as a **package limit**, not a
- * component limit. This design allows:
- * - Multiple activities from the same package (e.g., Gmail + Gmail Compose)
- * - Prevents bloat from too many different apps
- * - `addFavoriteComponent()` checks unique package count before adding new packages
- *
- * **Component Identifier Format:**
- * Components are identified by their full component name string:
- * `"packageName/activityClassName"` (e.g., "com.android.chrome/.MainActivity")
- *
- * **Reconcile Mechanism:**
- * `reconcileFavoriteComponents()` removes favorites for uninstalled apps by:
- * - Computing orphans (favorites absent from the loaded app list)
- * - Gating each orphan through the injected presence predicate; a still-present
- *   one is vetoed (kept) — RECONCILE_FIX_SPEC R-INV-2
- * - Reading candidate and deleting from the SAME fail-closed store read (a read
- *   error propagates and deletes nothing), and removing value-scoped in `edit{}`
- *
- * **Data Flow:**
- * 1. User toggles favorite via UI
- * 2. Manager updates DataStore (add/remove from set)
- * 3. DataStore emits new set via `favoriteComponentsFlow`
- * 4. All observers receive update simultaneously (hot sharing)
- * 5. UI updates via DiffUtil
- *
- * **Error Handling:**
- * All operations return Boolean success indicators or use default values on failure.
- * IOException from DataStore is caught and results in empty set emission.
- * [java.util.concurrent.CancellationException] is always re-thrown for proper coroutine cancellation.
- * `reconcileFavoriteComponents()` is deliberately fail-closed: a read/edit error
- * propagates (no swallow) so the caller's runCleanup skips it and deletes nothing.
- *
- * @property dataStore Preferences DataStore for persisting favorites set
- * @property externalScope Application scope for hot Flow sharing (null in tests)
- * @property favoriteComponentsFlow Hot shared Flow of currently favorited component identifiers
- *
- * @see HiddenAppsRepositoryImpl for similar Flow-based state management pattern
- * @see CustomNamesRepositoryImpl for contrast with event-based architecture
+ * @see FavoritesOrderRepositoryImpl for the ORDER of favorites (how they sort)
  */
 @Singleton
-class FavoritesRepositoryImpl
-@VisibleForTesting
-constructor(
-    dataStore: DataStore<Preferences>,
-    externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted,
-) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
-    FavoritesRepository {
+class FavoritesRepositoryImpl @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+) : FavoritesRepository {
 
     private object PreferencesKeys {
         val FAVORITES = stringSetPreferencesKey("favorites_components_set")
     }
 
-    /**
-     * Primärer Konstruktor für Dagger/Hilt.
-     */
-    @Inject
-    constructor(
-        dataStore: DataStore<Preferences>,
-        @ApplicationScope externalScope: CoroutineScope?
-    ) : this(
-        dataStore = dataStore,
-        externalScope = externalScope,
-        sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
-    )
-
     override val favoriteComponentsFlow: Flow<Set<String>> =
-        sharedReadFlow("Error reading favorites preferences") { preferences ->
+        dataStore.readFlowFailOpen("Error reading favorites preferences") { preferences ->
             preferences[PreferencesKeys.FAVORITES] ?: emptySet()
         }
 
@@ -211,9 +142,9 @@ constructor(
         if (componentName.isNullOrBlank()) return false
 
         return try {
-            // stale-replay ok: called from the Home path (AppManagementDelegate),
-            // where GetFavoriteAppsUseCase keeps a warm subscriber on this hot
-            // flow, so the replay cache is current — not a cold cross-Activity read.
+            // Cold flow (DATASTORE_READ_SPEC Belang A): favoriteComponentsFlow.first()
+            // is a fresh read of dataStore.data, so this is always current — no
+            // replay cache, no warm-subscriber assumption needed.
             favoriteComponentsFlow.first().contains(componentName)
         } catch (e: CancellationException) {
             throw e
@@ -236,37 +167,25 @@ constructor(
         }
     }
 
-    override suspend fun getFavoriteComponentsSnapshot(): Set<String> {
-        return try {
-            // Authoritative FRESH read (not the hot favoriteComponentsFlow replay
-            // cache): the backup export runs while Home holds no subscriber, so a
-            // .first() on the shared flow could return a stale replayed set.
-            dataStore.data.first()[PreferencesKeys.FAVORITES] ?: emptySet()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            // Fail-open to empty on a transient read error — non-destructive: a
-            // backup that can't read favorites records empty rather than crashing
-            // the user-initiated export. Matches the flow's RELEASE behavior
-            // (safeReadFlow → empty on IOException). Deliberately Timber.w, NOT
-            // silentError: an IOException here is a real I/O failure, not a
-            // programmer error, so it must not throw in DEBUG — this is a conscious
-            // divergence from the flow (whose safeReadFlow DOES throw in DEBUG via
-            // silentError), so a DEBUG backup doesn't crash on a store hiccup.
-            Timber.w(e, "Error reading favorites snapshot; treating as empty")
-            emptySet()
+    override suspend fun getFavoriteComponentsSnapshot(): Set<String> =
+        // Authoritative FRESH read via snapshotFailOpen: same transform as the cold
+        // favoriteComponentsFlow (DSR-INV-1), fail-open to empty on IOException.
+        // Used by point-reads from a context without a warm Home subscriber
+        // (backup export, Settings sort, Onboarding edit).
+        dataStore.snapshotFailOpen("Error reading favorites snapshot; treating as empty") { preferences ->
+            preferences[PreferencesKeys.FAVORITES] ?: emptySet()
         }
-    }
 
     override suspend fun reconcileFavoriteComponents(
         installedComponentNames: List<String>,
         isStillPresent: suspend (String) -> Boolean,
     ) {
-        // FAIL-CLOSED read (propagates IOException; deliberately NOT the fail-open
-        // shared flow / safeReadFlow): candidate read and delete are the same
-        // authority (RECONCILE_FIX_SPEC R-INV-2). No try/catch here — errors
-        // propagate to the caller's runCleanup, which skips this store.
-        val current = dataStore.data.first()[PreferencesKeys.FAVORITES] ?: emptySet()
+        // FAIL-CLOSED read via snapshotFailClosed (propagates IOException;
+        // deliberately NOT the fail-open cold flow / snapshotFailOpen): the
+        // candidate read and the delete are the same authority
+        // (RECONCILE_FIX_SPEC R-INV-2). No try/catch here — errors propagate to
+        // the caller's runCleanup, which skips this store.
+        val current = dataStore.snapshotFailClosed { it[PreferencesKeys.FAVORITES] ?: emptySet() }
         val orphans = current - installedComponentNames.toSet()
         if (orphans.isEmpty()) return
 

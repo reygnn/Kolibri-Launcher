@@ -39,38 +39,36 @@ awkf="$script_dir/check-stale-replay-read.awk"
 
 # -----------------------------------------------------------------------------
 # HOT FLOWS — properties exposed as a hot, replay-caching Flow that are also
-# `.first()`-readable. Kept as an explicit list (not auto-discovered) because the
-# multi-line `= … .shareIn(…)` initializer has no reliable one-line shape. The
-# scan companion reads this same list to know which names to look for.
+# `.first()`-readable.
 #
-#   favoriteComponentsFlow       FavoritesRepositoryImpl  (sharedReadFlow, replay=1)
+# EMPTY as of commit 3 (DATASTORE_READ_SPEC Belang A). All three DataStore-backed
+# flows were flipped to cold flows across commits 1-3: fabPositionFlow (1),
+# favoriteComponentsOrderFlow (2), favoriteComponentsFlow (3). A cold flow has no
+# replay cache, so no `.first()` on it can return a stale value — the entire
+# stale-replay class this gate guards is now structurally ABSENT. The gate is kept
+# DORMANT (nothing to check), not deleted: if a DataStore repo ever re-introduces
+# a `shareIn(replay>=1)` hot flow, its name goes back into hot_flows and its
+# point-readers into stale_files.
 #
-# fabPositionFlow (commit 1) and favoriteComponentsOrderFlow (commit 2) were
-# removed here as each repo was flipped to a cold flow (DATASTORE_READ_SPEC
-# Belang A): a cold flow is no longer a hot, replay-caching flow, so listing it
-# would be untruthful. favoriteComponentsFlow follows in commit 3; the whole
-# hot_flows list retires once FavoritesRepositoryImpl is flipped.
+# NOTE: this gate detects hot-flow point-reads BY NAME; it does NOT see the
+# `shareIn` construction itself, so it is no lock against re-introducing a hot
+# share. A construction-shape check ("shareIn(replay>=1) in a DataStore repo")
+# would be a separate gate — see DATASTORE_READ_SPEC §8.
+#
+# NOTE: keep the `(` and `)` on their own lines even while empty — the report-only
+# companion scan-stale-replay-candidates.sh extracts this block with
+# `sed '/^hot_flows=(/,/^)/p'`, which needs a `^)` terminator line.
 hot_flows=(
-  favoriteComponentsFlow
 )
 
 # -----------------------------------------------------------------------------
-# WHITELIST — files that legitimately point-read a hot flow, REVIEWED as
-# warm-context (or write-free) reads. Each hot-flow read inside these files must
-# carry a `stale-replay ok` marker; this gate verifies that. Full paths, like the
-# sibling `cancel_files` / `oom_files`.
-#
-#   FavoritesRepositoryImpl.kt  isFavoriteComponent(): runs from the Home path
-#                               (AppManagementDelegate / Home UI), warm.
-#   ToggleFavoriteUseCase.kt    :44 count read; invoked from AppManagementDelegate
-#                               (Home foreground), warm.
-#   BackupDataAssembler.kt      import-order FALLBACK — taken only when the run
-#                               imports NO favorites, so that branch performs no
-#                               favorites write and the cache cannot lag it.
+# WHITELIST — files that legitimately point-read a hot flow. EMPTY as of commit 3
+# (see above): the three former point-readers
+# (FavoritesRepositoryImpl.isFavoriteComponent, ToggleFavoriteUseCase,
+# BackupDataAssembler) now read cold flows, so their `stale-replay ok` markers
+# were removed in the same commit. (Kept `(`/`)` on their own lines — see the
+# hot_flows note above about the sed-based companion extraction.)
 stale_files=(
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesRepositoryImpl.kt"
-  "$repo_root/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/ToggleFavoriteUseCase.kt"
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupDataAssembler.kt"
 )
 
 hot_alt="$(IFS='|'; echo "${hot_flows[*]}")"

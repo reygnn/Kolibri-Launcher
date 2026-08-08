@@ -62,16 +62,14 @@ abstract class FavoritesRepositoryContract {
     /**
      * Baut eine frische Repository-Instanz für genau diesen Test.
      *
-     * Wird aus dem `runTest { … }`-Block heraus aufgerufen. Aktuell braucht
-     * keine der Implementierungen einen externen Coroutine-Scope:
-     *  - `FakeFavoritesRepository` arbeitet rein auf `MutableStateFlow`.
-     *  - `FavoritesRepositoryImpl` bekommt `externalScope = null` und überspringt
-     *    damit den `shareIn`-Layer. Grund: `shareIn` + Replay-Buffer liefert
-     *    unter `UnconfinedTestDispatcher` für Write-then-Read-Sequenzen im
-     *    selben `runTest`-Block den alten Replay-Wert zurück, bevor der
-     *    Upstream-Collector den neuen Wert verarbeitet hat. Der
-     *    Contract-Test will Interface-Semantik prüfen, nicht die
-     *    `shareIn`-Pipeline — dafür gibt es Manager-spezifische Tests.
+     * Called from within the `runTest { … }` block. No implementation needs an
+     * external coroutine scope: `FakeFavoritesRepository` works purely on a
+     * `MutableStateFlow`, and since the DATASTORE_READ_SPEC Belang A teardown
+     * `FavoritesRepositoryImpl` exposes a plain COLD flow (no `shareIn` layer),
+     * so a `.first()` after a write is already a fresh read of `dataStore.data`
+     * — there is no replay cache to return a stale value and nothing to route
+     * around. (Previously the impl took `externalScope = null` to skip the
+     * `shareIn` layer; that constructor is gone.)
      */
     protected abstract fun createRepository(): FavoritesRepository
 
