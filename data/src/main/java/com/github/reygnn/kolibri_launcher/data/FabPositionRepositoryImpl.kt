@@ -1,19 +1,14 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,49 +20,29 @@ import javax.inject.Singleton
  * already gives type-safe round-tripping and avoids a parser.
  *
  * Defaults: when neither key has been written yet (fresh install,
- * post-purge), the flow emits [FabPosition.DEFAULT]. No
- * out-of-range protection — see [FabPosition] for why clamping is the
- * consumer's job.
+ * post-purge), the flow emits [FabPosition.DEFAULT]. No out-of-range
+ * protection — see [FabPosition] for why clamping is the consumer's job.
  *
- * Read/share plumbing comes from [SharedDataStoreFlowRepository]: `shareIn`
- * with `WhileSubscribed(FLOW_SHARING_TIMEOUT_MS)` in production, raw flow
- * when [externalScope] is `null` (test path).
+ * **Cold read, no hot share (DATASTORE_READ_SPEC Belang A).** [fabPositionFlow]
+ * is a plain cold flow via [readFlowFailOpen]; there is no
+ * `shareIn(WhileSubscribed)` replay cache. The FAB position is rendered
+ * continuously on edit-mode entry, never point-read for a decision, so the
+ * hot share bought nothing here and only carried the stale-replay hazard.
+ * The constructor takes just the [DataStore] — no `externalScope` /
+ * `sharingStrategy`, no dual constructor, no test factory.
  */
 @Singleton
-open class FabPositionRepositoryImpl private constructor(
-    dataStore: DataStore<Preferences>,
-    externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted,
-) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
-    FabPositionRepository {
+class FabPositionRepositoryImpl @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+) : FabPositionRepository {
 
     private object PreferencesKeys {
         val FAB_X_FRACTION = floatPreferencesKey("wallpaper_edit_fab_x_fraction")
         val FAB_Y_FRACTION = floatPreferencesKey("wallpaper_edit_fab_y_fraction")
     }
 
-    companion object {
-        @VisibleForTesting
-        fun createForTesting(
-            dataStore: DataStore<Preferences>,
-            externalScope: CoroutineScope?,
-            sharingStrategy: SharingStarted,
-        ): FabPositionRepositoryImpl =
-            FabPositionRepositoryImpl(dataStore, externalScope, sharingStrategy)
-    }
-
-    @Inject
-    constructor(
-        dataStore: DataStore<Preferences>,
-        @ApplicationScope externalScope: CoroutineScope?,
-    ) : this(
-        dataStore = dataStore,
-        externalScope = externalScope,
-        sharingStrategy = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-    )
-
     override val fabPositionFlow: Flow<FabPosition> =
-        sharedReadFlow("Error reading FAB position preferences") { preferences ->
+        dataStore.readFlowFailOpen("Error reading FAB position preferences") { preferences ->
             FabPosition(
                 xFraction = preferences[PreferencesKeys.FAB_X_FRACTION]
                     ?: FabPosition.DEFAULT.xFraction,

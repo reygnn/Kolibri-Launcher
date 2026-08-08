@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
-import kotlinx.coroutines.flow.SharingStarted
 
 /**
  * Contract-Test-Ausführung gegen die echte Produktionsklasse
@@ -10,21 +9,15 @@ import kotlinx.coroutines.flow.SharingStarted
  *
  * Setup-Details:
  *   - [FakeDataStore] als DataStore-Double.
- *   - `externalScope = null` umgeht den `shareIn`-Layer aus den im
- *     [FavoritesRepositoryImplContractTest] dokumentierten Gründen
- *     (Write-then-Read-Sequenzen unter `UnconfinedTestDispatcher` würden
- *     sonst stale Replay-Werte sehen).
- *   - Konstruiert über `createForTesting()`, weil der primäre Konstruktor
- *     `private` ist.
+ *   - Constructed directly via the single `@Inject constructor(dataStore)`.
+ *     Since the hot-share teardown (DATASTORE_READ_SPEC Belang A), the flow is
+ *     cold — there is no `externalScope` / `sharingStrategy` / `createForTesting`
+ *     factory to route around, and no stale replay to guard against.
  */
 class FabPositionRepositoryImplContractTest : FabPositionRepositoryContract() {
 
     override fun createRepository(): FabPositionRepository {
         val fakeDataStore = FakeDataStore()
-        return FabPositionRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Lazily,
-        )
+        return FabPositionRepositoryImpl(dataStore = fakeDataStore)
     }
 }

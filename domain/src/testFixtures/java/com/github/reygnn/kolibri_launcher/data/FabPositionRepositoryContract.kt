@@ -30,9 +30,9 @@ import org.junit.Test
  *   - The impl rethrows save exceptions for `launchSafe` wrapping in
  *     the ViewModel; the fake never throws. Error-propagation is
  *     implementation detail.
- *   - `shareIn` lifecycle would warrant a separate
- *     `FabPositionRepositoryImplShareInTest` if observable starvation
- *     ever shows up — not needed today.
+ *   - No hot-share lifecycle to pin: since DATASTORE_READ_SPEC Belang A
+ *     the flow is a plain cold flow (no `shareIn`), so there is no
+ *     observable-starvation / stale-replay case a ShareInTest would cover.
  *
  * @see FakeFabPositionRepositoryContractTest
  * @see FabPositionRepositoryImplContractTest

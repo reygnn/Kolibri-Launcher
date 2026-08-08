@@ -45,11 +45,14 @@ awkf="$script_dir/check-stale-replay-read.awk"
 #
 #   favoriteComponentsFlow       FavoritesRepositoryImpl  (sharedReadFlow, replay=1)
 #   favoriteComponentsOrderFlow  FavoritesOrderRepositoryImpl
-#   fabPositionFlow              FabPositionRepositoryImpl
+#
+# fabPositionFlow was removed here when FabPositionRepositoryImpl was flipped to a
+# cold flow (DATASTORE_READ_SPEC Belang A, commit 1): it is no longer a hot,
+# replay-caching flow, so listing it would be untruthful. Favorites + order follow
+# in later commits of the same refactor.
 hot_flows=(
   favoriteComponentsFlow
   favoriteComponentsOrderFlow
-  fabPositionFlow
 )
 
 # -----------------------------------------------------------------------------
