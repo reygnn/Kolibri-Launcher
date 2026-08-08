@@ -21,13 +21,12 @@ interface FavoritesOrderRepository : Purgeable {
     suspend fun saveOrder(orderedComponentNames : List<String>): Boolean
 
     /**
-     * Reads the CURRENT favorites order straight from the store (fresh
-     * `dataStore.data.first()` + the same JSON parsing as the flow), bypassing
-     * the hot-shared [favoriteComponentsOrderFlow] replay cache. Used by any
-     * point-read from a context without a warm Home subscriber — backup export
-     * and Settings sort-favorites — each of which could otherwise capture a
-     * stale replayed list (e.g. right after a backup restore). Fail-open on I/O (empty list),
-     * mirroring the flow.
+     * Reads the CURRENT favorites order straight from the store as a fresh
+     * authoritative point-read (`dataStore.data.first()`), running the SAME JSON
+     * parsing as the cold [favoriteComponentsOrderFlow] so the two cannot drift
+     * (DATASTORE_READ_SPEC DSR-INV-1). Used by point-reads from a context without
+     * a warm Home subscriber — backup export and Settings sort-favorites.
+     * Fail-open on I/O (empty list), mirroring the flow.
      */
     suspend fun getFavoriteComponentsOrderSnapshot(): List<String>
 }

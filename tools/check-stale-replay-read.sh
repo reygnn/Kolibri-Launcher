@@ -44,15 +44,14 @@ awkf="$script_dir/check-stale-replay-read.awk"
 # scan companion reads this same list to know which names to look for.
 #
 #   favoriteComponentsFlow       FavoritesRepositoryImpl  (sharedReadFlow, replay=1)
-#   favoriteComponentsOrderFlow  FavoritesOrderRepositoryImpl
 #
-# fabPositionFlow was removed here when FabPositionRepositoryImpl was flipped to a
-# cold flow (DATASTORE_READ_SPEC Belang A, commit 1): it is no longer a hot,
-# replay-caching flow, so listing it would be untruthful. Favorites + order follow
-# in later commits of the same refactor.
+# fabPositionFlow (commit 1) and favoriteComponentsOrderFlow (commit 2) were
+# removed here as each repo was flipped to a cold flow (DATASTORE_READ_SPEC
+# Belang A): a cold flow is no longer a hot, replay-caching flow, so listing it
+# would be untruthful. favoriteComponentsFlow follows in commit 3; the whole
+# hot_flows list retires once FavoritesRepositoryImpl is flipped.
 hot_flows=(
   favoriteComponentsFlow
-  favoriteComponentsOrderFlow
 )
 
 # -----------------------------------------------------------------------------

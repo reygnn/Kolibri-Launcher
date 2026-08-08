@@ -1,8 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import io.mockk.mockk
-
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.preferencesOf
@@ -12,7 +10,6 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -34,22 +31,20 @@ class FavoritesOrderRepositoryImplTest {
     // ========== getFavoriteComponentsOrderSnapshot (authoritative read for backup) ==========
 
     @Test
-    fun `getFavoriteComponentsOrderSnapshot reads current order without a warm flow subscriber`() = runTest {
-        // Backup-stale-replay fix: the backup export reads the order via the
-        // authoritative getFavoriteComponentsOrderSnapshot, NOT the hot
-        // favoriteComponentsOrderFlow (shareIn, replay=1). Changed with NO active
-        // collector — the backup-screen situation — the read must return the NEW
-        // order, not a stale replay. (Runtime replay race is timing-based and not
-        // reproduced deterministically here; this pins the authoritative-read
-        // contract, including the shared JSON parsing.)
+    fun `getFavoriteComponentsOrderSnapshot reads the latest stored order`() = runTest {
+        // Authoritative fresh point-read: getFavoriteComponentsOrderSnapshot reads
+        // dataStore.data.first() and runs the SAME parseOrderString as the cold
+        // favoriteComponentsOrderFlow (DSR-INV-1), so a save with NO active
+        // collector — the backup-screen situation — is reflected immediately.
+        // Since the hot-share teardown (DATASTORE_READ_SPEC Belang A) there is no
+        // replay cache left to go stale; this pins that both read paths agree on
+        // the latest store value and share the JSON parsing.
         val orderKey = stringPreferencesKey("favorites_order_components_list_json")
         val store = FakeDataStore()
         store.setInitialData(
             preferencesOf(orderKey to JSONArray(listOf("com.old/Component")).toString())
         )
-        val repo = FavoritesOrderRepositoryImpl.createForTesting(
-            store, this.backgroundScope, SharingStarted.Companion.Lazily
-        )
+        val repo = FavoritesOrderRepositoryImpl(dataStore = store)
 
         repo.saveOrder(listOf("com.new.a/Component", "com.new.b/Component"))
 
@@ -69,9 +64,7 @@ class FavoritesOrderRepositoryImplTest {
         store.setInitialData(
             preferencesOf(orderKey to JSONArray(listOf("com.app1/Component")).toString())
         )
-        val repo = FavoritesOrderRepositoryImpl.createForTesting(
-            store, this.backgroundScope, SharingStarted.Companion.Lazily
-        )
+        val repo = FavoritesOrderRepositoryImpl(dataStore = store)
         store.makeReadFail()
 
         Assert.assertEquals(emptyList<String>(), repo.getFavoriteComponentsOrderSnapshot())
@@ -81,11 +74,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder with saved order sorts apps correctly`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val unsortedApps = listOf(
             AppInfo(
@@ -121,11 +110,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder with no saved order sorts alphabetically by displayName`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val unsortedApps = listOf(
             AppInfo(
@@ -160,11 +145,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder with outdated order handles it gracefully`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val installedApps = listOf(
             AppInfo(
@@ -195,11 +176,7 @@ class FavoritesOrderRepositoryImplTest {
     @Test
     fun `sortAppsWithGivenOrder with new apps appends them alphabetically by displayName`() =
         runTest {
-            val manager = FavoritesOrderRepositoryImpl.createForTesting(
-                dataStore = dataStore,
-                externalScope = this.backgroundScope,
-                sharingStrategy = SharingStarted.Companion.Lazily
-            )
+            val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
             val apps = listOf(
                 AppInfo(
@@ -244,11 +221,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with empty input list - returns empty list`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val result = manager.sortAppsWithGivenOrder(emptyList(), listOf("com.a/a"))
 
@@ -257,11 +230,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with null saved order - falls back to alphabetical`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val apps = listOf(
             AppInfo("Z", "Z", "com.z", "z"),
@@ -276,11 +245,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with duplicate componentNames in order - handles gracefully`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val apps = listOf(
             AppInfo("A", "A", "com.a", "a"),
@@ -296,11 +261,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with malformed componentNames in order - skips them`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val apps = listOf(
             AppInfo("A", "A", "com.a", "a"),
@@ -317,11 +278,7 @@ class FavoritesOrderRepositoryImplTest {
     /*    @Test
     fun `saveOrder - when successful - returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         val result = manager.saveOrder(listOf("com.a/a", "com.b/b"))
 
@@ -332,11 +289,7 @@ class FavoritesOrderRepositoryImplTest {
     fun `saveOrder - when DataStore edit fails - returns false`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeEditFail()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         val result = manager.saveOrder(listOf("com.a/a"))
 
@@ -347,11 +300,7 @@ class FavoritesOrderRepositoryImplTest {
     fun `saveOrder - when CancellationException - propagates it`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.makeCancellable()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         assertFailsWith<CancellationException> {
             manager.saveOrder(listOf("com.a/a"))
@@ -361,11 +310,7 @@ class FavoritesOrderRepositoryImplTest {
     @Test
     fun `saveOrder - with empty list - clears saved order`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         val result = manager.saveOrder(emptyList())
 
@@ -377,11 +322,7 @@ class FavoritesOrderRepositoryImplTest {
     @Test
     fun `sortFavoriteComponents - with empty favorites - returns empty list`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         val result = manager.sortFavoriteComponents(emptyList(), emptyList())
 
@@ -393,11 +334,7 @@ class FavoritesOrderRepositoryImplTest {
         runTest {
             val fakeDataStore = FakeDataStore()
             fakeDataStore.makeReadFail()
-            val manager = FavoritesOrderRepositoryImpl.createForTesting(
-                dataStore = fakeDataStore,
-                externalScope = this.backgroundScope,
-                sharingStrategy = SharingStarted.Companion.Lazily
-            )
+            val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
             val apps = listOf(
                 AppInfo("Z", "Z", "com.z", "z"),
@@ -412,11 +349,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with apps that have identical displayNames - maintains stable order`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val apps = listOf(
             AppInfo("Same", "Same", "com.a", "a"),
@@ -432,11 +365,7 @@ class FavoritesOrderRepositoryImplTest {
 
     @Test
     fun `sortAppsWithGivenOrder - with very large order list - handles efficiently`() {
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = dataStore,
-            externalScope = null,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
 
         val apps = (1..100).map {
             AppInfo("App $it", "App $it", "com.app$it", "class$it")
@@ -453,11 +382,7 @@ class FavoritesOrderRepositoryImplTest {
     @Test
     fun `saveOrder - when successful - returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Companion.Lazily
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         println("Before saveOrder call")
         val result = manager.saveOrder(listOf("com.a/a", "com.b/b"))
@@ -489,11 +414,7 @@ class FavoritesOrderRepositoryImplTest {
         )
         fakeDataStore.setInitialData(prefs)
 
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = null,  // <-- KEIN shareIn()
-            sharingStrategy = SharingStarted.Eagerly
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         // Debug: Prüfen ob Daten korrekt geladen wurden
         val current = manager.favoriteComponentsOrderFlow.first()
@@ -522,11 +443,7 @@ class FavoritesOrderRepositoryImplTest {
             )
             fakeDataStore.setInitialData(prefs)
 
-            val manager = FavoritesOrderRepositoryImpl.createForTesting(
-                dataStore = fakeDataStore,
-                externalScope = null,  // <-- KEIN shareIn()
-                sharingStrategy = SharingStarted.Eagerly
-            )
+            val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
             // Act
             val result = manager.removeComponentFromOrder("com.z/z")
@@ -545,11 +462,7 @@ class FavoritesOrderRepositoryImplTest {
     @Test
     fun `saveOrder - enforces size limit - truncates list`() = runTest {
         val fakeDataStore = FakeDataStore()
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Eagerly
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         val hugeList = (1..300).map { "com.app$it/Component" }
 
@@ -577,11 +490,7 @@ class FavoritesOrderRepositoryImplTest {
         )
         fakeDataStore.setInitialData(prefs)
 
-        val manager = FavoritesOrderRepositoryImpl.createForTesting(
-            dataStore = fakeDataStore,
-            externalScope = this.backgroundScope,
-            sharingStrategy = SharingStarted.Eagerly
-        )
+        val manager = FavoritesOrderRepositoryImpl(dataStore = fakeDataStore)
 
         advanceUntilIdle()
 

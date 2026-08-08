@@ -4,10 +4,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import timber.log.Timber
@@ -77,6 +79,34 @@ internal fun <T> DataStore<Preferences>.readFlowFailOpen(
             }
         }
         .map(transform)
+
+/**
+ * The decide half of [readFlowFailOpen], fail-open: an authoritative fresh
+ * point-read (`dataStore.data.first()`) that runs the SAME [transform] as the
+ * repository's cold flow, so a `getXSnapshot()` and its `xFlow` cannot drift
+ * (DSR-INV-1). Bypasses no cache — there is none — it simply reads the current
+ * store value from a context that has no warm collector (backup export, Settings
+ * sort), where the old hot-share replay could have gone stale.
+ *
+ * Fail-open on [IOException]: the fallback is [transform] over [emptyPreferences]
+ * — NOT a separately passed default — so it agrees with [readFlowFailOpen]'s
+ * IOException recovery by construction. [Timber.w], not `silentError`: a disk
+ * read failure is environmental, not a programmer error, so it must not throw in
+ * DEBUG (DSR-INV-3). [CancellationException] is rethrown first, before the
+ * IOException arm, so cooperative cancellation always propagates (DSR-INV-5).
+ */
+internal suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
+    errorMessage: String,
+    transform: suspend (Preferences) -> T,
+): T =
+    try {
+        transform(data.first())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: IOException) {
+        Timber.w(e, errorMessage)
+        transform(emptyPreferences())
+    }
 
 /**
  * Hot-sharing tail shared by the `shareIn`-backed repositories: shares the

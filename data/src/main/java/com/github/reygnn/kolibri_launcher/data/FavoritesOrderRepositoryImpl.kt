@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -8,129 +7,58 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONException
 import timber.log.Timber
-import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manager for custom ordering of favorite apps with JSON persistence and hot Flow.
+ * Manager for the custom ordering of favorite apps, persisted as a JSON array
+ * in DataStore. Works in tandem with `FavoritesRepositoryImpl`, which owns the
+ * SET of favorites (what is favorited); this owns their SEQUENCE (how they are
+ * ordered).
  *
- * This singleton manages the display order of favorited apps on the home screen,
- * persisting the order as a JSON array in DataStore and exposing it as a hot,
- * shared Flow. It works in tandem with `FavoritesRepositoryImpl` to provide both the
- * set of favorites (what) and their order (how).
+ * **Cold read + snapshot, one authoritative path (DATASTORE_READ_SPEC Belang A).**
+ * [favoriteComponentsOrderFlow] is a plain cold flow via [readFlowFailOpen];
+ * [getFavoriteComponentsOrderSnapshot] is a fresh point-read via
+ * [snapshotFailOpen]. Both run the SAME [parseOrderString] over the store, so
+ * they cannot drift (DSR-INV-1), and there is no `shareIn(replay=1)` cache to go
+ * stale — the AUDIT-13 hazard the snapshot was originally bolted on to dodge is
+ * gone by construction. The constructor takes just the [DataStore]; no
+ * `externalScope` / `sharingStrategy` / test factory.
  *
- * **Core Functionality:**
- * - Save custom order of favorite components
- * - Sort favorite apps according to saved order
- * - Remove components from order when unfavorited
- * - Expose complete order list reactively via hot Flow
- * - Enforce size limits to prevent storage/performance issues
+ * **JSON persistence.** DataStore Preferences has no native `List<String>`, so
+ * the order is a JSON array string — compact, debuggable, trivially
+ * (de)serialized via `JSONArray`. `MAX_ORDER_LIST_SIZE` is a defensive ceiling
+ * (see the companion), applied on both save and load, guarding only against a
+ * bug producing a runaway list — not an expected size.
  *
- * **Architecture: Hot Shared Flow with Factory Pattern**
+ * **Sorting.** `sortAppsWithGivenOrder` is a two-phase sort: apps in the saved
+ * order first (in sequence), remaining apps appended alphabetically by
+ * `displayName`. This preserves the user's custom order while placing
+ * newly-favorited apps (not yet in the order) at the end, and gracefully
+ * ignores order entries for apps that are no longer favorites.
  *
- * Similar to `FavoritesRepositoryImpl`, this uses a sophisticated dual-constructor pattern;
- * the shared read/share plumbing lives in [SharedDataStoreFlowRepository]:
+ * **Error handling.** Reads are fail-open (empty on `IOException`); JSON parse
+ * failures fall back to empty; sort failures cascade to alphabetical then
+ * unsorted; save failures return false without crashing.
+ * [java.util.concurrent.CancellationException] is always re-thrown.
  *
- * **Production (Primary Constructor via @Inject):**
- * - Uses `shareIn()` with `WhileSubscribed(5000)` for hot sharing
- * - Single shared subscription to DataStore across collectors
- * - 5-second replay timeout optimizes repeated accesses
- * - Multiple UI components observe same order simultaneously
- *
- * **Testing (Factory Method):**
- * - `createForTesting()` accepts custom `SharingStarted` strategy
- * - Private primary constructor prevents direct instantiation
- * - Marked `@VisibleForTesting` and uses `internal` visibility
- * - Tests can use `SharingStarted.Eagerly` for synchronous behavior
- *
- * **Why Flow-Based?**
- * - Order is holistic STATE (complete list needed for sorting)
- * - Multiple collectors observe same order (HomeScreen, DragDrop UI)
- * - Natural fit with DataStore's reactive nature
- * - Consistent with `FavoritesRepositoryImpl` and `AppVisibilityManager` patterns
- *
- * **JSON Persistence Strategy:**
- * Order is stored as a JSON array string for several reasons:
- * - DataStore Preferences doesn't support List<String> natively
- * - JSON is compact, human-readable, and well-supported
- * - Easy to debug in DataStore inspector
- * - Simple serialization/deserialization with JSONArray
- *
- * **Size Limit Protection:**
- * Enforces `MAX_ORDER_LIST_SIZE`, a defensive ceiling of 3002 entries derived
- * from the favorites cap (`MAX_FAVORITES_ON_HOME` × `AVG_COMPONENTS_PER_PACKAGE`
- * + `SAFETY_BUFFER`). Not an expected size — real favorite counts are far lower;
- * it only guards against bugs producing runaway lists:
- * - Excessive storage usage from bugs
- * - Performance degradation in JSON parsing
- * - Memory issues from accidentally huge lists
- * Limits are applied both on save and load for defense-in-depth.
- *
- * **Sorting Algorithm:**
- * `sortAppsWithGivenOrder()` implements a two-phase sort:
- * 1. **Ordered phase**: Apps in saved order appear first, in specified sequence
- * 2. **Alphabetical phase**: Remaining apps appended alphabetically
- *
- * This ensures:
- * - User's custom order is preserved for favorited apps
- * - Newly favorited apps (not yet in order) appear alphabetically at end
- * - Graceful handling of order list containing unfavorited apps
- *
- * **Integration with FavoritesRepositoryImpl:**
- * - `FavoritesRepositoryImpl` determines WHICH apps are favorites (Set<String>)
- * - `FavoritesOrderRepositoryImpl` determines HOW they are ordered (List<String>)
- * - Separation of concerns: membership vs. sequence
- * - Order list may contain extra entries (cleaned up lazily)
- *
- * **Component Identifier Format:**
- * Components are identified by their full component name string:
- * `"packageName/activityClassName"` (e.g., "com.google.android.gm/.ConversationListActivity")
- *
- * **Data Flow:**
- * 1. User drags to reorder favorites in UI
- * 2. UI calls `saveOrder()` with new sequence
- * 3. Manager persists JSON to DataStore
- * 4. DataStore emits new list via `favoriteComponentsOrderFlow`
- * 5. HomeScreen observes and re-sorts displayed favorites
- * 6. UI updates via DiffUtil with smooth animations
- *
- * **Error Handling:**
- * - JSON parsing errors result in empty list fallback
- * - Sorting failures cascade to alphabetical fallback, then unsorted fallback
- * - Save failures return false but don't crash
- * - IOException from DataStore caught and results in empty list
- * - [java.util.concurrent.CancellationException] always re-thrown for proper coroutine cancellation
- * - Multiple fallback layers ensure UI never breaks
- *
- * @property dataStore Preferences DataStore for persisting order as JSON
- * @property externalScope Application scope for hot Flow sharing (null in tests)
- * @property favoriteComponentsOrderFlow Hot shared Flow of ordered component identifiers
- *
- * @see FavoritesRepositoryImpl for favorite membership management (what is favorited)
- * @see HiddenAppsRepositoryImpl for similar Flow-based state management pattern
+ * @see FavoritesRepositoryImpl for favorite membership (what is favorited)
+ * @see HiddenAppsRepositoryImpl for a similar Flow-based state repository
  */
 @Singleton
-open class FavoritesOrderRepositoryImpl private constructor(
-    dataStore: DataStore<Preferences>,
-    externalScope: CoroutineScope?,
-    sharingStrategy: SharingStarted,
-) : SharedDataStoreFlowRepository(dataStore, externalScope, sharingStrategy),
-    FavoritesOrderRepository {
+open class FavoritesOrderRepositoryImpl @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+) : FavoritesOrderRepository {
 
     override val favoriteComponentsOrderFlow: Flow<List<String>> =
-        sharedReadFlow("Error reading favorites order") { preferences ->
+        dataStore.readFlowFailOpen("Error reading favorites order") { preferences ->
             parseOrderString(preferences[PreferencesKeys.ORDER_LIST])
         }
 
@@ -153,32 +81,13 @@ open class FavoritesOrderRepositoryImpl private constructor(
         private const val SAFETY_BUFFER = 2
         private const val MAX_ORDER_LIST_SIZE =
             AppConstants.MAX_FAVORITES_ON_HOME * AVG_COMPONENTS_PER_PACKAGE + SAFETY_BUFFER
-
-
-        @VisibleForTesting
-        fun createForTesting(
-            dataStore: DataStore<Preferences>,
-            externalScope: CoroutineScope?,
-            sharingStrategy: SharingStarted
-        ): FavoritesOrderRepositoryImpl {
-            return FavoritesOrderRepositoryImpl(dataStore, externalScope, sharingStrategy)
-        }
     }
-
-    @Inject
-    constructor(
-        dataStore: DataStore<Preferences>,
-        @ApplicationScope externalScope: CoroutineScope?
-    ) : this(
-        dataStore = dataStore,
-        externalScope = externalScope,
-        sharingStrategy = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS)
-    )
 
     /**
      * Parses the persisted JSON order string into a bounded component list.
-     * Shared by the read flow and the atomic [removeComponentFromOrder] so
-     * both agree on parsing + the MAX_ORDER_LIST_SIZE ceiling.
+     * Shared by the read flow, [getFavoriteComponentsOrderSnapshot] and the
+     * atomic [removeComponentFromOrder] so all agree on parsing + the
+     * MAX_ORDER_LIST_SIZE ceiling.
      */
     private fun parseOrderString(orderString: String?): List<String> {
         if (orderString.isNullOrBlank()) return emptyList()
@@ -288,29 +197,14 @@ open class FavoritesOrderRepositoryImpl private constructor(
         }
     }
 
-    override suspend fun getFavoriteComponentsOrderSnapshot(): List<String> {
-        return try {
-            // Authoritative FRESH read (not the hot favoriteComponentsOrderFlow
-            // replay cache): the backup export runs while Home holds no
-            // subscriber, so a .first() on the shared flow could return a stale
-            // replayed list. Same JSON parsing (+ MAX_ORDER_LIST_SIZE cap) as the
-            // flow, via the shared parseOrderString.
-            parseOrderString(dataStore.data.first()[PreferencesKeys.ORDER_LIST])
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            // Fail-open to empty on a transient read error — non-destructive: a
-            // backup that can't read the order records empty rather than crashing
-            // the user-initiated export. Matches the flow's RELEASE behavior
-            // (safeReadFlow → empty on IOException). Deliberately Timber.w, NOT
-            // silentError: an IOException here is a real I/O failure, not a
-            // programmer error, so it must not throw in DEBUG — a conscious
-            // divergence from the flow (whose safeReadFlow DOES throw in DEBUG via
-            // silentError), so a DEBUG backup doesn't crash on a store hiccup.
-            Timber.w(e, "Error reading favorites order snapshot; treating as empty")
-            emptyList()
+    override suspend fun getFavoriteComponentsOrderSnapshot(): List<String> =
+        // Authoritative FRESH read (DSR-INV-1): same parseOrderString as the flow,
+        // fail-open to empty on IOException. Used by point-reads from a context
+        // without a warm Home subscriber (backup export, Settings sort) where the
+        // old hot-share replay could have gone stale.
+        dataStore.snapshotFailOpen("Error reading favorites order snapshot; treating as empty") { preferences ->
+            parseOrderString(preferences[PreferencesKeys.ORDER_LIST])
         }
-    }
 
     override suspend fun purgeRepository() {
         dataStore.safePurge("FavoritesOrderRepositoryImpl") { preferences ->
