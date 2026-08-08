@@ -320,6 +320,43 @@ class ObserveInstalledAppsUseCaseTest {
         assertThat(installedAppsStateRepository.rawAppsFlow.value).isEqualTo(testApps)
     }
 
+    @Test
+    fun `invoke does not revive a stale list on failure after a genuinely empty load`() = runTest {
+        // Belang B / IAL-INV-4: keep-last-good lives in ONE home (the state holder).
+        // On Failed the use case writes NOTHING, so the holder keeps its last emitted
+        // state. Here a genuine Loaded(empty) precedes the Failed, so the drawer must
+        // stay empty — the Commit-1 updateApps(cachedApps) re-write would wrongly
+        // revive the stale non-empty list from the holder's point-read cache.
+        val sequencedRepository = object : InstalledAppsRepository {
+            override fun getInstalledApps(): Flow<AppLoad> = flowOf(
+                AppLoad.Loaded(testApps),
+                AppLoad.Loaded(emptyList()),
+                AppLoad.Failed(RuntimeException("load glitch after empty"))
+            )
+            override suspend fun triggerAppsUpdate() {}
+            override suspend fun purgeRepository() {}
+        }
+        val useCaseWithSequence = ObserveInstalledAppsUseCase(
+            sequencedRepository,
+            installedAppsStateRepository,
+            favoritesRepository,
+            swipeActionsRepository,
+            hiddenAppsRepository,
+            customNamesRepository,
+            packagePresence
+        )
+
+        useCaseWithSequence().test {
+            // Loaded(testApps) → Success; Loaded(empty) → no emit; Failed (cache in
+            // the point-read backing) → no error emit, no re-write.
+            assertThat(awaitItem()).isEqualTo(AppLoadResult.Success)
+            awaitComplete()
+        }
+
+        // Holder kept the genuinely-empty state; the stale list was NOT revived.
+        assertThat(installedAppsStateRepository.rawAppsFlow.value).isEmpty()
+    }
+
     // =========================================================================
     // Fehler ohne Cache
     // =========================================================================

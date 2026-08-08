@@ -48,25 +48,30 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                     try {
                         when (load) {
                             is AppLoad.Failed -> {
-                                // Load failed (distinguishable value, not an empty
-                                // list). Keep the last good list. This recovery was
-                                // dead before AppLoad (unreachable behind a StateFlow
-                                // .catch) and is now reachable via the typed Failed.
+                                // Load failed (a distinguishable value, not an empty
+                                // list). Keep-last-good now has exactly ONE home
+                                // (INSTALLED_APPS_LOAD_SPEC Belang B / IAL-INV-4): the
+                                // state holder. Its rawAppsFlow (a StateFlow) already
+                                // retains the last emitted list, and its own last-good
+                                // cache backs the point-read consumers (swipe/recent),
+                                // so a transient failure writes NOTHING here — it just
+                                // leaves the last known state in place. Not re-writing
+                                // also restores the pre-AppLoad behavior for the
+                                // Loaded(empty) → Failed corner, where the Commit-1
+                                // updateApps(cachedApps) would wrongly revive a stale
+                                // list over a genuinely-empty device.
                                 //
-                                // Report ONLY when recovery is impossible (no cache):
-                                // a glitch fully recovered from cache stays silent, so
-                                // a package settling during a system update does not
-                                // flood ACRA (INSTALLED_APPS_LOAD_SPEC Rule-9). The
+                                // Report ONLY when the holder has genuinely never held
+                                // apps (a cold start that failed): a glitch recovered
+                                // from cache stays silent, so a package settling during
+                                // a system update does not flood ACRA (Rule-9). The
                                 // loader logs a debug breadcrumb only; this no-cache
                                 // branch is the single report site.
-                                val cachedApps = installedAppsStateRepository.getCurrentApps()
-                                if (cachedApps.isNotEmpty()) {
-                                    KolibriLog.d("App load failed; using ${cachedApps.size} cached apps")
-                                    installedAppsStateRepository.updateApps(cachedApps)
-                                } else {
+                                if (installedAppsStateRepository.getCurrentApps().isEmpty()) {
                                     KolibriLog.w(load.cause, "App load failed and no cache available")
-                                    installedAppsStateRepository.updateApps(emptyList())
                                     emit(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
+                                } else {
+                                    KolibriLog.d("App load failed; keeping last good list")
                                 }
                             }
 
