@@ -8,7 +8,10 @@ Delta **und** debounced Reload), Add = replace-by-package gegen Update-Duplikate
 ADR-Marker korrigiert. Präzisierung nach Auslieferung von Debounce-only: der
 Debounce sitzt in C2b **nur** auf der Sturm-Quelle (`appUpdateSignal.events`),
 `appsUpdateTrigger` wird sofort → C2b fixt den Debounce-only-Custom-Name-Nit
-automatisch (§2, §8-Schritt-3, C2b-INV-6). Löst das frühere C0-Options-Fundament ab:
+automatisch (§2, §8-Schritt-3, C2b-INV-6). Der harte Punkt (der Fold, C2b-1) ist per
+Wegwerf-Spike (4/4, inkl. Money-Test) **entschärft**: `flatMapLatest` + gehaltener
+Zustand trägt latest-wins ohne Generations-Guard; Rest = Thread-Sicherheit von
+`current` (§4 knot #2, C2b-1). Löst das frühere C0-Options-Fundament ab:
 **C2a** (Cleanup-Targeting) ist **verworfen** (das Veto machte den Cleanup schon
 billig), **Debounce** ist ausgelagert nach `DEBOUNCE_SPEC.md` (zugleich Commit 1
 von C2b). Dies ist Option **(iii)** der Entscheidung `SPEC-DECISION C-0`. Erst
@@ -159,17 +162,17 @@ Der Fold ersetzt `flatMapLatest`. Zu erhalten bzw. zu klären:
    braucht es Struktur (`SPEC-DECISION C2b-1`: z.B. den `Reload`-Zweig weiter über
    `flatMapLatest` führen und Deltas separat foldern, statt eines einzigen
    Operators).
-2. **Ordnung `Reload` vs Delta (cross-source).** Ein `Reload`, dessen Enumeration
-   **vor** einem `Removed(pkg)` startete (pkg damals noch in der PM), kann **nach**
-   dem Delta durchlaufen und `pkg` transient wieder einfügen — auch ein
-   **unabhängiger** Reload (App-Klick-Refresh `AppManagementDelegate:130`,
-   Custom-Name-Edit), den das Delta nicht cancelt. Zwei Verteidigungen: **(a)** das
-   Event **selbst** plant den debounced Backstop-`Reload` (§2, vierter merge-Zweig),
-   der **nach** dem Uninstall enumeriert (`pkg` weg) und endgültig korrigiert; das
-   transiente Wieder-Einblenden ist reine Anzeige-Staleness (`RECONCILE_SPEC §1`,
-   tolerierbar). **(b)** Optionale Härtung: eine Generations-/Sequenz-Marke, die ein
-   spät fertig gewordenes Reload-Ergebnis verwirft, wenn zwischenzeitlich ein neueres
-   Delta/Reload lief (`SPEC-DECISION C2b-1`).
+2. **Ordnung `Reload` vs Delta — GELÖST durch die Fold-Struktur (Spike-bewiesen).**
+   Weil **alle** Commands (Reload aus jeder Quelle + Deltas) durch **einen** gemergten
+   Stream und **ein** `flatMapLatest` laufen, canceled jeder neue Command den
+   laufenden inneren Flow. Ein langsamer, veralteter `Reload` (der `pkg` noch
+   enthielte) wird von einem später eintreffenden `Remove(pkg)` **gecancelt**, bevor
+   er den gehaltenen Zustand schreibt — er kann `pkg` also nicht wieder einfügen. Im
+   Wegwerf-Spike (2026-08-09, Money-Test „remove during a slow reload wins", 4/4)
+   bewiesen. **Kein Generations-Guard nötig** (die früher hier vermutete Härtung
+   entfällt). Einzige Voraussetzung: der Single-Stream-Funnel (kein zweiter,
+   nebenläufiger Schreiber). Produktions-Detail: den gehaltenen Zustand thread-sicher
+   machen (`SPEC-DECISION C2b-1`).
 3. **`WhileSubscribed`-Teardown:** Re-Subscribe re-initialisiert den Fold → erstes
    Command ist der Priming-`Reload` (volle Wahrheit). Unkritisch.
 4. **Delta gegen leeren Zustand:** ein `Remove`/`Add` vor dem ersten `Reload`
@@ -290,10 +293,20 @@ C2b-Gewinn. Jeder Schritt mergefähig.
 
 ## 10. Offene Entscheidungen
 
-- **`SPEC-DECISION C2b-1`:** Fold-Struktur für latest-wins `Reload`
-  (`Reload`-Zweig via `flatMapLatest` + Deltas via `scan`, oder ein gemeinsamer
-  stateful Operator) **plus** ob eine Generations-/Sequenz-Marke gegen den
-  cross-source stale-Reload (§4 knot #2b) nötig ist. Im Review festzurren.
+- **`SPEC-DECISION C2b-1` — GELÖST durch Wegwerf-Spike (2026-08-09).** Der Fold ist
+  `flatMapLatest` über **einen** gemergten Command-Stream (Reload + Deltas) mit einem
+  gehaltenen `current`, das **nur bei Vollendung** des inneren Flows geschrieben wird.
+  Bewiesen (4/4 Spike-Tests, inkl. Money-Test): ein neuer Command canceled den
+  laufenden inneren Flow, ein langsamer/veralteter `Reload` überschreibt ein späteres
+  `Remove` nicht → **kein Generations-Guard** (§4 knot #2 entfällt). Zwei Rest-Punkte
+  für die Umsetzung: **(i)** `current` muss thread-sicher sein
+  (`@Volatile`/`MutableStateFlow`/`AtomicReference`) — der Prod-`stateIn`-Scope läuft
+  auf `Dispatchers.IO` (Multi-Thread); der Spike lief single-thread und hat die
+  Sichtbarkeit nicht abgedeckt. **(ii)** ein `Add` kann mitten im scoped-Load von
+  einem Folgecommand gecancelt werden (suspend) → das Paket erscheint dann erst über
+  den Backstop-Reload; Latenz-Kante, keine Korrektheit (`Remove` ist pur, nie
+  betroffen). Beides ist bekannt und akzeptabel, muss aber in der Umsetzung
+  angefasst/dokumentiert werden.
 - **`SPEC-DECISION C2b-2`:** Delta-vor-erstem-`Reload` (no-op vs. `Reload`-Fallback).
 - **`SPEC-DECISION D-1`:** Debounce-Fenster T (erbt `DEBOUNCE_SPEC`).
 - **`SPEC-DECISION C-2`:** Bus-Konsolidierung — `appsUpdateTrigger` (`Unit`) bleibt
