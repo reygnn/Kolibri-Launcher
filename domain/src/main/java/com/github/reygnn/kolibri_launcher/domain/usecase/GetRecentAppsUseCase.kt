@@ -13,6 +13,7 @@ import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import kotlinx.coroutines.CancellationException
@@ -42,6 +43,7 @@ class GetRecentAppsUseCase @Inject constructor(
     private val appUsageRepository: AppUsageRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
+    private val customNamesRepository: CustomNamesRepository,
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(limit: Int = 8): List<AppInfo> = withContext(dispatcher) {
@@ -58,10 +60,18 @@ class GetRecentAppsUseCase @Inject constructor(
             }
             .first()
 
+        // Custom names folded in over the last-known-good point-read
+        // (REACTIVE_APPLIST_SPEC Site 3): getCurrentApps() keeps its
+        // lastSuccessfulAppList fallback (no transient-empty window), applyNames
+        // resolves the label via a snapshot. A no-op overlay while the
+        // enumeration still bakes the name in.
+        val customNames = customNamesRepository.getAllCustomNames()
+        val currentApps = applyNames(installedAppsStateRepository.getCurrentApps(), customNames)
+
         // First visible AppInfo per package (launcher apps typically expose
         // one launchable activity; putIfAbsent keeps that deterministic).
         val visibleByPackage = LinkedHashMap<String, AppInfo>()
-        for (app in installedAppsStateRepository.getCurrentApps()) {
+        for (app in currentApps) {
             if (app.componentName !in hidden) visibleByPackage.putIfAbsent(app.packageName, app)
         }
 

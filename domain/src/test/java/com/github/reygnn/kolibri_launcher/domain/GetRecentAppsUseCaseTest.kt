@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -27,6 +28,7 @@ class GetRecentAppsUseCaseTest {
     private lateinit var usage: FakeAppUsageRepository
     private lateinit var installed: FakeInstalledAppsStateRepository
     private lateinit var hidden: FakeHiddenAppsRepository
+    private lateinit var customNames: FakeCustomNamesRepository
     private lateinit var useCase: GetRecentAppsUseCase
 
     private val appA = AppInfo("A", "A", "pkg.a", "cls.a")
@@ -38,7 +40,8 @@ class GetRecentAppsUseCaseTest {
         usage = FakeAppUsageRepository()
         installed = FakeInstalledAppsStateRepository()
         hidden = FakeHiddenAppsRepository()
-        useCase = GetRecentAppsUseCase(usage, installed, hidden, mainDispatcherRule.testDispatcher)
+        customNames = FakeCustomNamesRepository()
+        useCase = GetRecentAppsUseCase(usage, installed, hidden, customNames, mainDispatcherRule.testDispatcher)
     }
 
     private fun names(apps: List<AppInfo>) = apps.map { it.displayName }
