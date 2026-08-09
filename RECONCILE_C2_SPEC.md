@@ -1,5 +1,36 @@
 # RECONCILE_C2_SPEC.md — Sauberer C2b (Repository-lokalisiertes Display-Targeting)
 
+> ## ⛔ VERWORFEN (2026-08-09) — nach vollständigem Bau + Code-Review
+>
+> C2b wurde vollständig gebaut (Branch `feature/c2b-display-targeting`, 4 Commits,
+> Multi-Agent-Code-Review bestanden, ein Major gefixt) und danach **verworfen** —
+> der Branch wurde gelöscht, **nichts davon ist auf `main`**.
+>
+> **Grund (der Denkfehler im Design):** C2bs Effizienz-Prämisse — bei einem
+> Install/Uninstall die teure Voll-Enumeration sparen — hält **nicht**, weil der
+> für die Selbstheilung nötige **debounced Backstop-Reload** (§2, vierter
+> merge-Zweig) genau diese Enumeration weiterhin fährt. Das Fast-Delta **ersetzt**
+> die Enumeration also nicht, es kommt **obendrauf**:
+> - **1 Event:** main = 1 Enumeration; C2b = 1 Enumeration (Backstop) **+ 1 Delta**
+>   (reconcile×4 + Re-Render). → C2b macht *mehr*, nicht weniger.
+> - **Sturm (N Events):** main = 1 (coalesced) Enumeration; C2b = 1 (coalesced)
+>   Backstop **+ N Deltas**. → deutlich mehr Downstream-Arbeit.
+>
+> C2b spart also **nie** eine Enumeration; der einzige reale Gewinn ist **Latenz**
+> (~250 ms schnelleres Erscheinen bei *einem* Event) plus der Custom-Name-Nit-Fix —
+> beides marginal und billiger anders zu haben (der Custom-Name-Nit ist auf `main`
+> mit *einer* Zeile behebbar: Custom-Name-Trigger un-debounced). Kosten: mehr Arbeit
+> (v.a. im Sturm), die ganze Fold-/Event-Komplexität + Wartungslast. **Netto ein
+> Minus gegenüber Debounce-only-`main`.**
+>
+> **Falls der Effizienz-Gewinn je wirklich gewollt ist**, bräuchte es eine *andere*
+> Variante: den **per-Event-Backstop weglassen** (nur Delta; Anzeige-Selbstheilung
+> über den ohnehin bei jedem Resume/Cold-Start laufenden Reconcile, Persistenz bleibt
+> über das Veto sicher). Dann spart ein Einzel-Event die Enumeration real — aber mit
+> schwächerer Anzeige-Selbstheilung (eine spurious-`Removed`-Zeile bliebe bis zum
+> nächsten Resume falsch). Eigenes Projekt, eigener Review. Der Rest dieses Dokuments
+> bleibt als **Design-Record** der verworfenen Variante.
+
 **Status: ENTWURF v3 (2026-08-09), Spec-Review-Runde 1 eingearbeitet.** Konkretisiert
 **C2b** (Display-Targeting) in der **Repository-lokalisierten** Form. Review-Fixes:
 Veto-Modell korrigiert (§3 — das Veto läuft auf jedem `Loaded`, auch Fast-Path-
