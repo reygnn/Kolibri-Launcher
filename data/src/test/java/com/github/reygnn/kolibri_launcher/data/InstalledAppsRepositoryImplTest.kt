@@ -7,7 +7,6 @@ import android.content.pm.ResolveInfo
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
@@ -30,8 +29,6 @@ class InstalledAppsRepositoryImplTest {
 
     @MockK
     private lateinit var packageManager: PackageManager
-    @MockK
-    private lateinit var customNamesRepository: CustomNamesRepository
     @MockK
     private lateinit var appsUpdateTrigger: MutableSharedFlow<Unit>
     @MockK(relaxed = true)
@@ -76,7 +73,6 @@ class InstalledAppsRepositoryImplTest {
         installedAppsRepositoryImpl = InstalledAppsRepositoryImpl(
             context,
             packageManager,
-            customNamesRepository,
             appsUpdateTrigger
         )
     }
@@ -94,9 +90,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList correctly converts and sorts a list of ResolveInfo`() = runTest {
-        // getDisplayNameForPackage gibt den originalName (2. Argument) zurück
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("App B", "com.b", "com.b.MainActivity"),
             FakeResolveInfo("App A", "com.a", "com.a.MainActivity")
@@ -116,8 +109,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with null activityInfo - skips item`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good App", "com.good", "com.good.MainActivity"),
             NullActivityInfoResolveInfo()
@@ -131,8 +122,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with duplicate packages - keeps all entries`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("App A", "com.a", "com.a.MainActivity"),
             FakeResolveInfo("App A Activity2", "com.a", "com.a.SecondActivity")
@@ -147,8 +136,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with empty label - uses package name as fallback`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(FakeResolveInfo("", "com.test", "com.test.MainActivity"))
 
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(fakeResolveInfoList)
@@ -160,8 +147,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with very long app names - handles correctly`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val veryLongName = "A".repeat(500)
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(
             listOf(FakeResolveInfo(veryLongName, "com.test", "com.test.MainActivity"))
@@ -173,8 +158,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with special characters in names - handles correctly`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val specialName = "App 🚀 Test & <Special> \"Chars\""
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(
             listOf(FakeResolveInfo(specialName, "com.test", "com.test.MainActivity"))
@@ -186,8 +169,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with large list - handles efficiently`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val largeList = (1..1000).map {
             FakeResolveInfo("App $it", "com.app$it", "com.app$it.MainActivity")
         }
@@ -200,8 +181,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - when multiple items fail - continues processing others`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good 1", "com.good1", "com.good1.MainActivity"),
             FailingResolveInfo("com.bad1", "com.bad1.MainActivity"),
@@ -231,8 +210,6 @@ class InstalledAppsRepositoryImplTest {
 
     @Test
     fun `processResolveInfoList - with null package name - skips item`() = runTest {
-        coEvery { customNamesRepository.getDisplayNameForPackage(any(), any()) } answers { secondArg() }
-
         val fakeResolveInfoList = listOf(
             FakeResolveInfo("Good App", "com.good", "com.good.MainActivity"),
             FakeResolveInfo("Test", "", "class")

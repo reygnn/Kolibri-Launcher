@@ -9,7 +9,6 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
-import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -75,7 +74,6 @@ import javax.inject.Singleton
  *
  * @property context Application context for accessing system services
  * @property packageManager Android PackageManager for querying installed apps
- * @property customNamesRepository Repository for custom app name mappings
  * @property appsUpdateTrigger Shared flow for triggering refresh operations
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -83,7 +81,6 @@ import javax.inject.Singleton
 class InstalledAppsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val packageManager: PackageManager,
-    private val customNamesRepository: CustomNamesRepository,
     private val appsUpdateTrigger: MutableSharedFlow<Unit>
 ) : InstalledAppsRepository {
 
@@ -233,19 +230,15 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                     packageName
                 }
 
-                val displayName = try {
-                    customNamesRepository.getDisplayNameForPackage(packageName, originalName)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error getting display name for $packageName")
-                    originalName
-                }
-
+                // Custom names are no longer baked in here (REACTIVE_APPLIST_SPEC
+                // migration step 2b): the enumeration emits the ORIGINAL label, and
+                // every display site folds the custom name in reactively via
+                // applyNames(customNamesFlow). A rename no longer forces a
+                // re-enumeration.
                 appInfoList.add(
                     AppInfo(
                         originalName = originalName,
-                        displayName = displayName,
+                        displayName = originalName,
                         packageName = packageName,
                         className = className
                     )
