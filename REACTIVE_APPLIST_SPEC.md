@@ -10,6 +10,11 @@ die Name-Anwendung ist EIN Helfer an ~3 Quell-Grenzen, nicht „ein zentraler Fl
 ehrlich ~14–18 Dateien. Selbst-Audit danach: zwei Rest-Widersprüche gefixt (RAL-INV-4 +
 §9 trugen noch die pre-Runde-2-Formulierung) und eine sicherere inkrementelle Migration
 (§7, `applyNames` idempotent → Consumer einzeln, dann winziger Flip-Commit) ergänzt.
+**Finale Verifikations-Runde:** ein echter Major, den alle drei vorherigen Pässe
+übersahen — die **Sortier-Kopplung** (`processResolveInfoList:261` sortiert nach
+`displayName`; nach dem Flip verlören CustomNames/Settings die Custom-Name-Reihenfolge)
+→ `applyNames` re-sortiert (§0/§2a/§6/§7); plus vier Minor/Nit (RAL-3 gelöst, §2b-Dedup-
+Mechanismus korrigiert, `triggerCustomNameUpdate`-Aufrufer 4/3-Pfade, RAL-INV-4-Gloss).
 Ziel: jede unnötige PackageManager-Enumeration
 und jeden dadurch verursachten Lag beseitigen, indem **Name, Sortierung, Ausblenden
 und Favorit als reaktive `combine`-Eingänge** modelliert werden — statt die
@@ -38,6 +43,7 @@ verdrahtet** und erzwingen deshalb volle Enumerationen:
 |---|---|---|
 | **Custom-Name in die Enumeration gebacken** | `InstalledAppsRepositoryImpl.processResolveInfoList:235` (`getDisplayNameForPackage` → `AppInfo.displayName`) | Rename **muss** neu enumerieren, um den Namen neu einzubacken → der 250-ms-Nit |
 | **Nutzung als Sync-Call, kein Flow** | `GetDrawerAppsUseCase:68` (`sortAppsByTimeWeightedUsage(...)`), `AppUsageRepository` hat **keinen** Flow | App-Start feuert den combine nicht selbst → man erzwingt einen Reload (`onAppClicked` → `refreshAppsUseCase`) nur zum Neu-Sortieren |
+| **Sortierung nach `displayName` in der Enumeration** (Verifikations-Major) | `processResolveInfoList:261` (`sortedBy { displayName.lowercase() }`) | hängt am Custom-Name → nach dem Flip sortiert die Enumeration nach Original-Name; Consumer **ohne eigene Sortierung** (CustomNames-/Settings-VM) verlieren die Custom-Name-Reihenfolge. Fix: `applyNames` re-sortiert (§2a/§6) |
 
 Beide sind **DataStore-backed** und tragen bereits `AppInfo.originalName` **und**
 `displayName` — die Entkopplung ist also sauber möglich, ohne neue APIs.
@@ -74,10 +80,18 @@ Beide sind **DataStore-backed** und tragen bereits `AppInfo.originalName` **und*
   `.data` bei jedem Settings-Write auch hier eine (gleiche) Map — `distinctUntilChanged`
   verhindert, dass der combine bei jedem App-Launch unnötig neu feuert.
 - **Name-Anwendung als reiner Helfer:** `fun applyNames(apps, names) = apps.map {
-  it.copy(displayName = names[it.packageName] ?: it.originalName) }` — die **Logik** an
-  **einer** Stelle, aber **an jeder Quell-Grenze angewandt** (`SPEC-DECISION RAL-1`),
-  weil die Consumer über **zwei** Quell-Familien laufen (`getInstalledApps()` vs.
-  `rawAppsFlow`) plus Recents Point-Read. Also 2–3 Anwendungs-Sites, EIN Helfer (R2).
+  it.copy(displayName = names[it.packageName] ?: it.originalName) }
+  .sortedBy { it.displayName.lowercase() }` — die **Logik** an **einer** Stelle, aber
+  **an jeder Quell-Grenze angewandt** (`SPEC-DECISION RAL-1`), weil die Consumer über
+  **zwei** Quell-Familien laufen (`getInstalledApps()` vs. `rawAppsFlow`) plus Recents
+  Point-Read. Also 2–3 Anwendungs-Sites, EIN Helfer (R2). **Das `.sortedBy`
+  (Verifikations-Major) ist zwingend:** `processResolveInfoList:261` sortiert heute
+  nach `displayName` (= Custom-Name); nach dem Flip auf `originalName` würde die
+  Enumeration nach Original-Name sortieren, und CustomNames-/Settings-VM re-sortieren
+  **nicht** → umbenannte Apps stünden dauerhaft an der Original-Position. `applyNames`
+  re-sortiert nach dem finalen `displayName` und stellt so die heutige Sortier-
+  Nachbedingung an **jeder** Site wieder her (Drawer/Favoriten/Hidden/Swipe/Onboarding
+  überschreiben sie mit ihrer eigenen Sortierung — harmlos).
 - **`triggerCustomNameUpdate()` entfällt** (Rename triggert keinen Reload mehr; der
   DataStore-Write treibt `customNamesFlow`).
 
@@ -86,9 +100,12 @@ Beide sind **DataStore-backed** und tragen bereits `AppInfo.originalName` **und*
   **R5-Präzisierung:** Usage liegt im **geteilten** `settingsDataStore`
   (`AppUsageRepositoryImpl:71`, Keys `KEY_USAGE_PREFIX` neben favorites/hidden/sort);
   `DataStore.data` emittiert bei **jedem** Write darauf. `usageFlow` feuert also auch
-  bei Rename/Hide/Favorit/Sort mit — funktional harmlos (idempotentes Re-Sort, das
-  terminale `stateIn` dedupt, **keine** Enumeration), aber optional auf die
-  Usage-Keys eingrenzen.
+  bei Rename/Hide/Favorit/Sort mit — funktional harmlos (idempotentes Re-Sort, **keine**
+  Enumeration). **Korrektur (Verifikation):** der Drawer-Pfad hat **kein** terminales
+  `stateIn`/`distinctUntilChanged` (`GetDrawerAppsUseCase` endet in `.flowOn` →
+  `AppManagementDelegate:80 .asLiveData()`); der redundante Tick ist harmlos, weil der
+  RecyclerView-**Adapter-DiffUtil** einen No-Op-Diff erzeugt, nicht durch Flow-Dedup.
+  Optional den `usageFlow` auf die Usage-Keys eingrenzen, um die Ticks zu reduzieren.
 - **combine-Eingang:** `GetDrawerAppsUseCase` nimmt `usageFlow` als weiteren Eingang;
   der bestehende `sortAppsByTimeWeightedUsage(...)`-Aufruf bleibt (combine-Transform
   ist `suspend`), feuert aber jetzt reaktiv bei Start neu.
@@ -197,8 +214,9 @@ ohne diese Fallback-Erhaltung.
   `FactoryResetUseCase`) — aber **keine** bewussten Einzelaktionen (Rename/Start)
   mehr. Debounce darauf trifft die Sturm-Quelle; die verbleibenden Force-Reloads sind
   seltene, gewollte Voll-Reloads (kein Nutzer-Lag).
-- **RAL-INV-4:** Das Veto läuft auf jeder `getInstalledApps()`-Emission (Paket-Event +
-  Cold-Start) und **schreibt** danach `rawAppsFlow` (`updateApps`), per-Ziel
+- **RAL-INV-4:** Das Veto läuft auf jeder `getInstalledApps()`-Emission (Paket-Event,
+  Cold-Start, + seltene Force-Reloads Resume/Factory-Reset) und **schreibt** danach
+  `rawAppsFlow` (`updateApps`), per-Ziel
   `PackagePresence`-gegated — Korrektheit unverändert. (Es reagiert NICHT auf
   `rawAppsFlow`, es speist ihn.)
 - **RAL-INV-5:** Der `getInstalledApps(): Flow<AppLoad>`-Vertrag bleibt; nur die
@@ -223,6 +241,7 @@ val usageFlow: Flow<Unit>                         // settingsDataStore.data (Än
 // EIN reiner Helfer (die Logik), an JEDER Quell-Grenze angewandt (SPEC-DECISION RAL-1, R2):
 fun applyNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
+        .sortedBy { it.displayName.lowercase() }   // Sortier-Kopplung: heutige Nachbedingung von processResolveInfoList:261
 
 // Site 1 — getInstalledApps-Familie (pre-Veto): GetInstalledAppsUseCase, geteilt via stateIn/shareIn
 //   combine(getInstalledApps().map{unwrap}, customNamesFlow) { a, n -> applyNames(a, n) }
@@ -256,8 +275,11 @@ fun applyNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
    selben Commit umziehen **und** Drawer/Favoriten auf `rawAppsFlow` bleiben (sonst:
    Custom-Namen verschwinden von nicht-migrierten Screens / CustomNames-Sektion leer =
    R1-Blocker, oder Drawer wandert vom Veto-Holder weg = R2-Blocker/Transient-Empty).
-   **Pflicht-Tests:** die `originalName != displayName`-Erkennung nach der Anwendung,
-   und Drawer/Favoriten weiterhin über `rawAppsFlow` (keep-last-good erhalten).
+   **Pflicht-Tests:** (a) die `originalName != displayName`-Erkennung nach der
+   Anwendung; (b) Drawer/Favoriten weiterhin über `rawAppsFlow` (keep-last-good
+   erhalten); (c) **die Sortierung** — CustomNames/Settings zeigen umbenannte Apps
+   nach dem Flip weiter an der Custom-Name-Position (dank `applyNames`-`.sortedBy`),
+   nicht an der Original-Position (Verifikations-Major).
 
    > **Sicherere Reihenfolge (empfohlen statt eines ~10-Datei-Atomic-Commits, G3):**
    > `applyNames` ist **idempotent, solange die Enumeration den Namen noch einbackt** —
@@ -290,8 +312,14 @@ klar benannten Punkten.
 
 - **Contract-Tests** für die zwei neuen Flows (`customNamesFlow`, `usageFlow`) — Teil
   des Contract-Triples pro Repo (Rule 2). Die **Entfernung** von
-  `triggerCustomNameUpdate` aus `CustomNamesRepository` berührt ebenfalls Interface +
-  Fake + Contract (Aufrufer sind nur der Rename-Pfad).
+  `triggerCustomNameUpdate` aus `CustomNamesRepository` berührt Interface + Fake +
+  Contract (inkl. der zwei Contract-Test-Methoden `CustomNamesRepositoryContract:256/262`).
+  **Korrektur (Verifikation): vier Aufruf-Stellen über drei Pfade**, nicht nur Rename:
+  `setCustomNameForPackage:125` + `removeCustomNameForPackage:139` (Rename),
+  `setCustomNamesInBatch:256` (Backup-Import), `purgeRepository:302` (Reset) — alle vier
+  fallen weg. Die Anzeige-Refreshes für Import + Reset bleiben abgedeckt, weil
+  `settingsDataStore.data` bei diesen Writes ohnehin re-emittiert → `customNamesFlow`
+  (Import/Reset ändern die Map real, also greift `distinctUntilChanged` nicht).
 - **`usageFlow` betrifft nur den Drawer-Usage-Sort** — Favoriten (user-gepinnt bzw.
   alphabetischer Top-N-Fallback) und Recent (Point-Read, liest Usage bei jedem Aufruf
   via `getRecentlyLaunchedPackages`/`getAllCustomNames`) brauchen ihn **nicht**.
@@ -353,9 +381,10 @@ genau das, was den Umfang klein *wirken* ließ.
 - **`SPEC-DECISION RAL-2`:** `usageFlow` als nacktes `Unit`-Signal (Trigger, Sort
   bleibt Suspend-Call) vs. als Daten-Flow (Sort wird pure Funktion). Empfehlung: das
   billigere **Unit-Signal**, solange die Suspend-Sort-im-combine bleibt.
-- **`SPEC-DECISION RAL-3`:** Braucht `InstalledAppsRepositoryImpl` `CustomNamesRepository`
-  nach 2a noch (dann nur für Nicht-Enumerations-Zwecke)? Wenn nein: Konstruktor-Param
-  entfernen.
+- **`SPEC-DECISION RAL-3` — GELÖST:** `InstalledAppsRepositoryImpl` nutzt
+  `CustomNamesRepository` **nur** für `getDisplayNameForPackage` (Impl:237) — genau der
+  Aufruf, den 2a entfernt. Danach ist der Konstruktor-Param nachweislich ungenutzt →
+  entfernen (deckungsgleich mit §2a).
 
 ---
 
