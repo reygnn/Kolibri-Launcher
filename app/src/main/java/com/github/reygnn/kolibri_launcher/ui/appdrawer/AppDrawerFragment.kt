@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -672,20 +673,20 @@ class AppDrawerFragment : Fragment() {
                 return
             }
 
-            val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE)
-                    as? InputMethodManager
-
-            if (imm == null) {
-                Timber.w("InputMethodManager not available")
-                return
-            }
-
             if (view.requestFocus()) {
                 view.isFocusableInTouchMode = true  // Für nachfolgende Touch-Events
-                // SHOW_IMPLICIT: System entscheidet, ob Keyboard passt
-                // Alternative: SHOW_FORCED wäre aggressiver, aber weniger "höflich"
-                val shown = imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
-                Timber.d("Keyboard showSoftInput result: $shown")
+                // WindowInsetsController is the non-deprecated IME-show path
+                // (replaces InputMethodManager.SHOW_IMPLICIT, deprecated); the
+                // system still decides whether the keyboard fits. The platform
+                // controller (API 30+, always present at minSdk 36) avoids the
+                // now-deprecated ViewCompat.getWindowInsetsController helper.
+                val controller = view.windowInsetsController
+                if (controller != null) {
+                    controller.show(WindowInsets.Type.ime())
+                    Timber.d("Keyboard shown via WindowInsetsController")
+                } else {
+                    Timber.w("WindowInsetsController not available")
+                }
             } else {
                 Timber.w("View could not request focus")
             }
