@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -42,11 +43,14 @@ class GetFavoriteAppsUseCaseTest {
     private lateinit var favoritesOrderRepository: FavoritesOrderRepository
     @MockK
     private lateinit var hiddenAppsRepository: HiddenAppsRepository
+    @MockK
+    private lateinit var customNamesRepository: CustomNamesRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var favoritesFlow: MutableStateFlow<Set<String>>
     private lateinit var hiddenAppsFlow: MutableStateFlow<Set<String>>
     private lateinit var orderFlow: MutableStateFlow<List<String>>
+    private lateinit var customNamesFlow: MutableStateFlow<Map<String, String>>
 
     private lateinit var useCase: GetFavoriteAppsUseCase
 
@@ -63,17 +67,20 @@ class GetFavoriteAppsUseCaseTest {
         favoritesFlow = MutableStateFlow(emptySet())
         hiddenAppsFlow = MutableStateFlow(emptySet())
         orderFlow = MutableStateFlow(emptyList())
+        customNamesFlow = MutableStateFlow(emptyMap())
 
         every { installedAppsStateRepository.rawAppsFlow } returns rawAppsFlow
         every { favoritesRepository.favoriteComponentsFlow } returns favoritesFlow
         every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
         every { favoritesOrderRepository.favoriteComponentsOrderFlow } returns orderFlow
+        every { customNamesRepository.customNamesFlow } returns customNamesFlow
 
         useCase = GetFavoriteAppsUseCase(
             installedAppsStateRepository,
             favoritesRepository,
             favoritesOrderRepository,
-            hiddenAppsRepository
+            hiddenAppsRepository,
+            customNamesRepository
         )
     }
 
@@ -193,7 +200,8 @@ class GetFavoriteAppsUseCaseTest {
             installedAppsStateRepository,
             favoritesRepository,
             favoritesOrderRepository,
-            hiddenAppsRepository
+            hiddenAppsRepository,
+            customNamesRepository
         )
 
         crashingUseCase.favoriteApps.test {
@@ -223,7 +231,8 @@ class GetFavoriteAppsUseCaseTest {
             installedAppsStateRepository,
             favoritesRepository,
             favoritesOrderRepository,
-            hiddenAppsRepository
+            hiddenAppsRepository,
+            customNamesRepository
         )
 
         crashingUseCase.favoriteApps.test {

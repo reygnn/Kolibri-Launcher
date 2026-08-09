@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -45,10 +46,13 @@ class GetDrawerAppsUseCaseTest {
     private lateinit var hiddenAppsRepository: HiddenAppsRepository
     @MockK
     private lateinit var settingsRepository: SettingsRepository
+    @MockK
+    private lateinit var customNamesRepository: CustomNamesRepository
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var hiddenAppsFlow: MutableStateFlow<Set<String>>
     private lateinit var sortOrderFlow: MutableStateFlow<SortOrder>
+    private lateinit var customNamesFlow: MutableStateFlow<Map<String, String>>
 
     private lateinit var useCase: GetDrawerAppsUseCase
 
@@ -64,16 +68,19 @@ class GetDrawerAppsUseCaseTest {
         rawAppsFlow = MutableStateFlow(emptyList())
         hiddenAppsFlow = MutableStateFlow(emptySet())
         sortOrderFlow = MutableStateFlow(SortOrder.ALPHABETICAL)
+        customNamesFlow = MutableStateFlow(emptyMap())
 
         every { installedAppsStateRepository.rawAppsFlow } returns rawAppsFlow
         every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
         every { settingsRepository.sortOrderFlow } returns sortOrderFlow
+        every { customNamesRepository.customNamesFlow } returns customNamesFlow
 
         useCase = GetDrawerAppsUseCase(
             appUsageRepository,
             installedAppsStateRepository,
             hiddenAppsRepository,
             settingsRepository,
+            customNamesRepository,
             dispatcher = mainDispatcherRule.testDispatcher
         )
     }

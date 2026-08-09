@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -24,11 +25,15 @@ class GetDrawerAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val settingsRepository: SettingsRepository,
+    private val customNamesRepository: CustomNamesRepository,
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) {
 
     val drawerApps: Flow<List<AppInfo>> = combine(
         // Critical Flow: rawApps darf nicht crashen (kein .catch())
+        // Stays on the post-veto keep-last-good rawAppsFlow (REACTIVE_APPLIST_SPEC
+        // Site 2, NOT getInstalledApps) so the transient-empty-drawer flicker
+        // cannot return.
         installedAppsStateRepository.rawAppsFlow,
 
         // Non-critical Flows: Mit individuellen Fallbacks
@@ -42,18 +47,30 @@ class GetDrawerAppsUseCase @Inject constructor(
             KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
             emit(emptySet())
         },
-    ) { rawApps, sortOrder, hiddenComponents ->
+        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 2): a
+        // rename re-derives here instead of re-enumerating. Non-critical → on a
+        // read failure fall back to original names.
+        customNamesRepository.customNamesFlow.catch { e ->
+            if (e is CancellationException) throw e
+            KolibriLog.w(e, "customNamesFlow error - using original names")
+            emit(emptyMap())
+        },
+    ) { rawApps, sortOrder, hiddenComponents, customNames ->
         KolibriLog.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
         )
+
+        // Custom names applied over the veto-held raw list (no-op overlay while
+        // the enumeration still bakes the name in — migration step 2a).
+        val namedApps = applyNames(rawApps, customNames)
 
         // Filter + alphabetischer Sort sind reine Operationen auf
         // String/Set/List — können nicht werfen. Frühere Throwable-Catches
         // hier entfernt (Throwable-Audit Pilot, §2): Programmierfehler
         // sollen via Rule 9 in DEBUG laut werden (über den Flow-catch
         // unten propagiert silentError und wirft).
-        val visibleApps = rawApps.filter { app ->
+        val visibleApps = namedApps.filter { app ->
             !hiddenComponents.contains(app.componentName)
         }
 

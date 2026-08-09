@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
@@ -60,10 +61,13 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
     private val favoritesRepository: FavoritesRepository,
     private val favoritesOrderRepository: FavoritesOrderRepository,
-    private val hiddenAppsRepository: HiddenAppsRepository
+    private val hiddenAppsRepository: HiddenAppsRepository,
+    private val customNamesRepository: CustomNamesRepository
 ) {
 
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
+        // Stays on the post-veto keep-last-good rawAppsFlow (REACTIVE_APPLIST_SPEC
+        // Site 2, NOT getInstalledApps) so the transient-empty flicker cannot return.
         installedAppsStateRepository.rawAppsFlow,
         favoritesRepository.favoriteComponentsFlow.catch { e ->
             if (e is CancellationException) throw e
@@ -79,16 +83,25 @@ class GetFavoriteAppsUseCase @Inject constructor(
             if (e is CancellationException) throw e
             KolibriLog.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
+        },
+        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 2); a
+        // no-op overlay while the enumeration still bakes the name in.
+        customNamesRepository.customNamesFlow.catch { e ->
+            if (e is CancellationException) throw e
+            KolibriLog.w(e, "customNamesFlow error - using original names")
+            emit(emptyMap())
         }
-    ) { rawApps, favorites, hiddenApps, savedOrder ->
+    ) { rawApps, favorites, hiddenApps, savedOrder, customNames ->
         KolibriLog.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
+        val namedApps = applyNames(rawApps, customNames)
+
         // Leere App-Liste → Loading state
-        if (rawApps.isEmpty()) {
+        if (namedApps.isEmpty()) {
             return@combine UiState.Loading
         }
 
-        processApps(rawApps, favorites, hiddenApps, savedOrder)
+        processApps(namedApps, favorites, hiddenApps, savedOrder)
     }.catch { e ->
         if (e is CancellationException) throw e
         TimberWrapper.silentError(e, "Critical error in favoriteApps flow")
