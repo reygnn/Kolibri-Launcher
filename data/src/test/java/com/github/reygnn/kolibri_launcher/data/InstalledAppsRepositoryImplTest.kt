@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -11,13 +13,16 @@ import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class InstalledAppsRepositoryImplTest {
 
     @get:Rule
@@ -236,6 +241,47 @@ class InstalledAppsRepositoryImplTest {
         val actualAppList = installedAppsRepositoryImpl.processResolveInfoList(fakeResolveInfoList)
 
         Assert.assertTrue(actualAppList.isNotEmpty())
+    }
+
+    // ========== DEBOUNCE (DEBOUNCE_SPEC) ==========
+
+    @Test
+    fun `reloadTriggers primes immediately and is not delayed by the window`() = runTest {
+        val trigger = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
+        val scheduler = testScheduler
+
+        installedAppsRepositoryImpl.reloadTriggers(trigger).test {
+            Assert.assertEquals(Unit, awaitItem())
+            // DBNC-INV-1: the priming emit lands at virtual t=0 — NOT after the
+            // debounce window. Asserting the value alone is NOT enough: runTest
+            // auto-advances the virtual clock while parked on awaitItem(), so a
+            // delayed-priming regression (`merge(flowOf(Unit), trigger).debounce(T)`
+            // or `trigger.debounce(T).onStart { emit(Unit) }` done wrong) would still
+            // deliver Unit and pass green. The clock assertion is the actual guard.
+            Assert.assertEquals(0L, scheduler.currentTime)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `reloadTriggers coalesces a burst of triggers into one reload`() = runTest {
+        val trigger = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
+
+        installedAppsRepositoryImpl.reloadTriggers(trigger).test {
+            Assert.assertEquals("priming", Unit, awaitItem())
+
+            // A burst within the window: nothing until the quiet period elapses.
+            repeat(5) { trigger.emit(Unit) }
+            expectNoEvents()
+
+            // DBNC-INV-4: exactly one reload after the window.
+            advanceTimeBy(AppConstants.APP_RELOAD_DEBOUNCE_MS + 1)
+            Assert.assertEquals("one coalesced reload", Unit, awaitItem())
+            expectNoEvents()
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ========== MISSING PURGE TEST ==========

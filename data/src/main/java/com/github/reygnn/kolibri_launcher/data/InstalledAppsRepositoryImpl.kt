@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -20,10 +21,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import java.util.concurrent.CancellationException
@@ -86,18 +89,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val appsStateFlow: StateFlow<AppLoad> = appsUpdateTrigger
-        .onStart {
-            try {
-                emit(Unit)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error emitting initial trigger")
-                // Trotzdem versuchen weiterzumachen
-                emit(Unit)
-            }
-        }
+    private val appsStateFlow: StateFlow<AppLoad> = reloadTriggers(appsUpdateTrigger)
         .flatMapLatest {
             loadAppsFromPackageManager()
         }
@@ -126,6 +118,27 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             scope = scope,
             started = SharingStarted.Companion.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
             initialValue = AppLoad.Loaded(emptyList())
+        )
+
+    /**
+     * The reload-trigger stream that feeds the loader: an immediate priming emit
+     * plus the external [trigger]s debounced (DEBOUNCE_SPEC). The priming
+     * [flowOf] `Unit` bypasses the debounce, so the initial / cold-start load is
+     * NOT delayed by the window (DBNC-INV-1); a burst of triggers within the
+     * window collapses to a single reload (DBNC-INV-4). Re-emitted on every
+     * (re-)subscription of the sharing [StateFlow], matching the previous
+     * `onStart { emit(Unit) }` priming. Latest-wins (the downstream
+     * `flatMapLatest`) is unchanged.
+     *
+     * `@VisibleForTesting internal` so the debounce/priming behavior can be
+     * pinned in isolation — the production [appsStateFlow] shares on an internal
+     * `Dispatchers.IO` scope that a virtual-time test cannot drive directly.
+     */
+    @VisibleForTesting
+    internal fun reloadTriggers(trigger: Flow<Unit>): Flow<Unit> =
+        merge(
+            flowOf(Unit),
+            trigger.debounce(AppConstants.APP_RELOAD_DEBOUNCE_MS),
         )
 
     override fun getInstalledApps(): Flow<AppLoad> {

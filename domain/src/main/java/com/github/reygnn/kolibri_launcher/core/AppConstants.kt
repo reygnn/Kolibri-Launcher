@@ -108,6 +108,15 @@ object AppConstants {
      */
     const val FLOW_SHARING_TIMEOUT_MS = 5000L
 
+    /**
+     * Debounce window for external app-list reload triggers (DEBOUNCE_SPEC).
+     * A burst of package broadcasts during a system update / batch install
+     * collapses to one reload after this quiet period. The initial/priming
+     * load is NOT subject to it. Trade-off: a single install/uninstall updates
+     * the drawer at most this much later.
+     */
+    const val APP_RELOAD_DEBOUNCE_MS = 250L
+
     // URLs
     const val URL_ABOUT_PAGE = "https://docs.kolibri-launcher.ch/about.html"
 
