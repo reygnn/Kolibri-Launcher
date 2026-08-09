@@ -3,9 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -26,7 +24,6 @@ class HandleSwipeActionUseCaseTest {
     private lateinit var swipeActionsRepository: FakeSwipeActionsRepository
     private lateinit var installedAppsStateRepository: FakeInstalledAppsStateRepository
     private lateinit var appUsageRepository: FakeAppUsageRepository
-    private lateinit var installedAppsRepository: FakeInstalledAppsRepository
     private lateinit var useCase: HandleSwipeActionUseCase
 
     private val testApp = AppInfo("TestApp", "TestApp", "com.test", "com.test.Main")
@@ -37,16 +34,13 @@ class HandleSwipeActionUseCaseTest {
         swipeActionsRepository = FakeSwipeActionsRepository()
         installedAppsStateRepository = FakeInstalledAppsStateRepository()
         appUsageRepository = FakeAppUsageRepository()
-        installedAppsRepository = FakeInstalledAppsRepository()
 
         val recordAppLaunchUseCase = RecordAppLaunchUseCase(appUsageRepository)
-        val refreshAppsUseCase = RefreshAppsUseCase(installedAppsRepository)
 
         useCase = HandleSwipeActionUseCase(
             swipeActionsRepository,
             installedAppsStateRepository,
-            recordAppLaunchUseCase,
-            refreshAppsUseCase
+            recordAppLaunchUseCase
         )
     }
 
@@ -79,19 +73,6 @@ class HandleSwipeActionUseCaseTest {
 
         // Assert
         assertThat(appUsageRepository.launchedPackages).contains(testApp.packageName)
-    }
-
-    @Test
-    fun `invoke LEFT triggers apps refresh`() = runTest {
-        // Arrange
-        installedAppsStateRepository.updateApps(listOf(testApp))
-        swipeActionsRepository.swipeLeftApp = testApp.componentName
-
-        // Act
-        useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
-
-        // Assert
-        assertThat(installedAppsRepository.triggerUpdateCallCount).isEqualTo(1)
     }
 
     // =========================================================================

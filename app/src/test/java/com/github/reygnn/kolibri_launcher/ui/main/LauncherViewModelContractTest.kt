@@ -362,7 +362,9 @@ class LauncherViewModelContractTest {
         assertEquals(testApp, launchEvent!!.app)
 
         coVerify { recordAppLaunchUseCase.invoke(testApp) }
-        coVerify { refreshAppsUseCase.invoke() }
+        // A launch no longer forces a re-enumeration (REACTIVE_APPLIST_SPEC): the
+        // recorded launch ticks usageFlow and the drawer re-sorts reactively.
+        coVerify(exactly = 0) { refreshAppsUseCase.invoke() }
 
         job.cancel()
     }

@@ -397,7 +397,9 @@ class MonolithicLauncherViewModelTest {
 
         // Überprüfe, ob die UseCases aufgerufen wurden
         coVerify { recordAppLaunchUseCase.invoke(app1) }
-        coVerify { refreshAppsUseCase.invoke() }
+        // A launch no longer forces a re-enumeration (REACTIVE_APPLIST_SPEC): the
+        // recorded launch ticks usageFlow and the drawer re-sorts reactively.
+        coVerify(exactly = 0) { refreshAppsUseCase.invoke() }
     }
 
     @Test
@@ -920,7 +922,8 @@ class MonolithicLauncherViewModelTest {
 
         // Sollte 10x recordAppLaunch aufrufen
         coVerify(exactly = 10) { recordAppLaunchUseCase.invoke(app1) }
-        coVerify(exactly = 10) { refreshAppsUseCase.invoke() }
+        // No re-enumeration per click any more (REACTIVE_APPLIST_SPEC).
+        coVerify(exactly = 0) { refreshAppsUseCase.invoke() }
     }
 
     @Test
@@ -1126,9 +1129,9 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
         }
 
-        // Beide Aufrufe sollten passiert sein
         coVerify { recordAppLaunchUseCase.invoke(app1) }
-        coVerify { refreshAppsUseCase.invoke() }
+        // A launch no longer forces a re-enumeration (REACTIVE_APPLIST_SPEC).
+        coVerify(exactly = 0) { refreshAppsUseCase.invoke() }
     }
 
     @Test

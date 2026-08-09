@@ -126,8 +126,12 @@ class AppManagementDelegate(
     fun onAppClicked(app: AppInfo) = scope.launchSafe("Error handling app click") {
         try {
             scope.sendEvent(UiEvent.LaunchApp(app))
+            // Recording the launch changes the usage store, which ticks
+            // AppUsageRepository.usageFlow → the drawer's TIME_WEIGHTED_USAGE order
+            // re-derives reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase()
+            // here any more: a launch must not force a full PackageManager
+            // re-enumeration.
             recordAppLaunchUseCase(app)
-            refreshAppsUseCase()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

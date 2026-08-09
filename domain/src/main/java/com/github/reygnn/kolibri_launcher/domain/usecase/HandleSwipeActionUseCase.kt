@@ -10,8 +10,7 @@ import javax.inject.Inject
 class HandleSwipeActionUseCase @Inject constructor(
     private val swipeActionsRepository: SwipeActionsRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val recordAppLaunchUseCase: RecordAppLaunchUseCase,
-    private val refreshAppsUseCase: RefreshAppsUseCase
+    private val recordAppLaunchUseCase: RecordAppLaunchUseCase
 ) {
     /**
      * Definiert das Ergebnis: Entweder eine App zum Starten oder nichts.
@@ -43,8 +42,10 @@ class HandleSwipeActionUseCase @Inject constructor(
         }
 
         return if (appToLaunch != null) {
+            // Recording the launch ticks AppUsageRepository.usageFlow → the drawer
+            // re-sorts reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase():
+            // a swipe-launch must not force a full re-enumeration.
             recordAppLaunchUseCase(appToLaunch)
-            refreshAppsUseCase()
             Result.LaunchApp(appToLaunch)
         } else {
             // App not in the current list. We do NOT clear the assignment here:

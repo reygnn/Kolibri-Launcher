@@ -227,9 +227,10 @@ class LauncherViewModelDoomsdayTest {
     // ===========================================
 
     @Test
-    fun `doomsday - app uninstalled during click - double exception handled`() = runTest {
+    fun `doomsday - app uninstalled during click - recording exception handled`() = runTest {
+        // A click no longer calls refreshAppsUseCase (REACTIVE_APPLIST_SPEC), so
+        // the only failure mode on this path is recordAppLaunch throwing.
         coEvery { recordAppLaunchUseCase(any()) } throws IllegalArgumentException("App gone")
-        coEvery { refreshAppsUseCase() } throws IllegalStateException("Package manager died")
 
         val vm = createViewModel()
         advanceUntilIdle()
@@ -243,7 +244,7 @@ class LauncherViewModelDoomsdayTest {
             // Dann Error-Toast (wegen recordAppLaunch Failure)
             assertTrue(awaitItem() is UiEvent.ShowToast)
 
-            // Kein Crash, obwohl ZWEI Exceptions flogen
+            // No crash despite the recording exception.
         }
     }
 

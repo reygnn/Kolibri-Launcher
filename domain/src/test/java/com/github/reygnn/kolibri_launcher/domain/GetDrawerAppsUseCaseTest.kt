@@ -53,6 +53,7 @@ class GetDrawerAppsUseCaseTest {
     private lateinit var hiddenAppsFlow: MutableStateFlow<Set<String>>
     private lateinit var sortOrderFlow: MutableStateFlow<SortOrder>
     private lateinit var customNamesFlow: MutableStateFlow<Map<String, String>>
+    private lateinit var usageFlow: MutableStateFlow<Unit>
 
     private lateinit var useCase: GetDrawerAppsUseCase
 
@@ -69,11 +70,13 @@ class GetDrawerAppsUseCaseTest {
         hiddenAppsFlow = MutableStateFlow(emptySet())
         sortOrderFlow = MutableStateFlow(SortOrder.ALPHABETICAL)
         customNamesFlow = MutableStateFlow(emptyMap())
+        usageFlow = MutableStateFlow(Unit)
 
         every { installedAppsStateRepository.rawAppsFlow } returns rawAppsFlow
         every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
         every { settingsRepository.sortOrderFlow } returns sortOrderFlow
         every { customNamesRepository.customNamesFlow } returns customNamesFlow
+        every { appUsageRepository.usageFlow } returns usageFlow
 
         useCase = GetDrawerAppsUseCase(
             appUsageRepository,

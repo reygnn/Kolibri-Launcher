@@ -205,14 +205,17 @@ class AppManagementDelegateTest {
     }
 
     @Test
-    fun `onAppClicked records launch and refreshes`() = runTest {
+    fun `onAppClicked records launch but does NOT refresh`() = runTest {
         val delegate = createDelegate()
 
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
         coVerify { recordAppLaunchUseCase.invoke(testApp) }
-        coVerify { refreshAppsUseCase.invoke() }
+        // A launch must not force a re-enumeration (REACTIVE_APPLIST_SPEC): the
+        // recorded launch ticks AppUsageRepository.usageFlow and the drawer
+        // re-sorts reactively instead.
+        coVerify(exactly = 0) { refreshAppsUseCase.invoke() }
     }
 
     @Test

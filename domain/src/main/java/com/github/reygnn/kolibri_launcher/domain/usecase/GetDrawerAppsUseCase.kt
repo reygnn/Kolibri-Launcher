@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
@@ -55,7 +56,16 @@ class GetDrawerAppsUseCase @Inject constructor(
             KolibriLog.w(e, "customNamesFlow error - using original names")
             emit(emptyMap())
         },
-    ) { rawApps, sortOrder, hiddenComponents, customNames ->
+        // Usage change-signal (REACTIVE_APPLIST_SPEC): a launch re-fires the
+        // combine so the TIME_WEIGHTED_USAGE order re-derives reactively, instead
+        // of the launch site forcing a full re-enumeration. Value ignored — it is
+        // a pure trigger. Non-critical → on a read failure keep ticking once.
+        appUsageRepository.usageFlow.catch { e ->
+            if (e is CancellationException) throw e
+            KolibriLog.w(e, "usageFlow error - proceeding without a usage tick")
+            emit(Unit)
+        },
+    ) { rawApps, sortOrder, hiddenComponents, customNames, _ ->
         KolibriLog.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
@@ -97,6 +107,10 @@ class GetDrawerAppsUseCase @Inject constructor(
         KolibriLog.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
         sortedApps
     }
+        // Collapse spurious re-emissions: a usageFlow tick in ALPHABETICAL mode
+        // (or any input change that leaves the sorted list identical) must not
+        // churn the adapter with an equal list.
+        .distinctUntilChanged()
         .catch { e ->
             if (e is CancellationException) throw e
             // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
