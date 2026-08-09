@@ -8,6 +8,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsReposit
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -42,6 +43,7 @@ class HiddenAppsViewModelTest {
 
     private lateinit var fakeInstalledApps: FakeInstalledAppsRepository
     private lateinit var fakeVisibility: FakeHiddenAppsRepository
+    private lateinit var fakeCustomNames: FakeCustomNamesRepository
 
     private lateinit var viewModel: HiddenAppsViewModel
 
@@ -54,6 +56,7 @@ class HiddenAppsViewModelTest {
     fun setup() {
         fakeInstalledApps = FakeInstalledAppsRepository()
         fakeVisibility = FakeHiddenAppsRepository()
+        fakeCustomNames = FakeCustomNamesRepository()
     }
 
     /**
@@ -66,7 +69,7 @@ class HiddenAppsViewModelTest {
         installedAppsRepo: InstalledAppsRepository = fakeInstalledApps,
         visibilityRepo: HiddenAppsRepository = fakeVisibility,
     ) {
-        val getInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepo)
+        val getInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepo, fakeCustomNames)
         val getHiddenAppsUseCase = GetHiddenAppsUseCase(visibilityRepo)
         val updateHiddenAppsUseCase = UpdateHiddenAppsUseCase(visibilityRepo)
 

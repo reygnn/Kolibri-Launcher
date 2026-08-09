@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
+import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
@@ -19,6 +20,7 @@ class GetOnboardingAppsUseCaseTest {
     val timberRule = TimberRule()
 
     private lateinit var installedAppsRepository: FakeInstalledAppsRepository
+    private lateinit var customNamesRepository: FakeCustomNamesRepository
     private lateinit var useCase: GetOnboardingAppsUseCase
 
     private val validApps = listOf(
@@ -30,7 +32,8 @@ class GetOnboardingAppsUseCaseTest {
     @Before
     fun setup() {
         installedAppsRepository = FakeInstalledAppsRepository()
-        useCase = GetOnboardingAppsUseCase(installedAppsRepository)
+        customNamesRepository = FakeCustomNamesRepository()
+        useCase = GetOnboardingAppsUseCase(installedAppsRepository, customNamesRepository)
     }
 
     // =========================================================================
@@ -94,10 +97,14 @@ class GetOnboardingAppsUseCaseTest {
     @Test
     fun `onboardingAppsFlow filters out apps with blank displayName`() = runTest {
         // Arrange
+        // Blank effective label = blank originalName AND no custom name. applyNames
+        // derives displayName = customName ?: originalName, so to model an app that
+        // ends up with a blank label its originalName must be blank too (a non-blank
+        // originalName would be restored into displayName by applyNames).
         val appsWithBlankName = listOf(
             AppInfo("Valid", "Valid", "com.valid", "com.valid.Main"),
-            AppInfo("NoName", "", "com.noname", "com.noname.Main"),  // displayName leer
-            AppInfo("Whitespace", "   ", "com.whitespace", "com.whitespace.Main")  // displayName nur Whitespace
+            AppInfo("", "", "com.noname", "com.noname.Main"),  // blank label
+            AppInfo("   ", "   ", "com.whitespace", "com.whitespace.Main")  // whitespace label
         )
         installedAppsRepository.installedApps = appsWithBlankName
 
@@ -141,10 +148,10 @@ class GetOnboardingAppsUseCaseTest {
         // Arrange
         val mixedApps = listOf(
             AppInfo("Valid1", "Valid1", "com.valid1", "com.valid1.Main"),
-            AppInfo("NoName", "", "com.noname", "com.noname.Main"),  // displayName leer
+            AppInfo("", "", "com.noname", "com.noname.Main"),  // blank label
             AppInfo("NoPackage", "NoPackage", "", "com.nopackage.Main"),
             AppInfo("Valid2", "Valid2", "com.valid2", "com.valid2.Main"),
-            AppInfo("AllBlank", "   ", "   ", "com.allblank.Main")  // beide blank
+            AppInfo("   ", "   ", "   ", "com.allblank.Main")  // beide blank
         )
         installedAppsRepository.installedApps = mixedApps
 

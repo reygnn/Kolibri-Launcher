@@ -50,7 +50,7 @@ class CustomNamesViewModelTest {
         // Initialize UseCases with Fakes
         setCustomNameUseCase = SetCustomNameUseCase(fakeCustomNamesRepository)
         removeCustomNameUseCase = RemoveCustomNameUseCase(fakeCustomNamesRepository)
-        getInstalledAppsUseCase = GetInstalledAppsUseCase(fakeInstalledAppsRepository)
+        getInstalledAppsUseCase = GetInstalledAppsUseCase(fakeInstalledAppsRepository, fakeCustomNamesRepository)
 
         viewModel = CustomNamesViewModel(
             setCustomNameUseCase,
@@ -128,7 +128,7 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
-        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository)
+        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository, fakeCustomNamesRepository)
 
         val vm = CustomNamesViewModel(
             setCustomNameUseCase,
@@ -156,7 +156,7 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
-        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository)
+        val crashingUseCase = GetInstalledAppsUseCase(crashingRepository, fakeCustomNamesRepository)
 
         val vm = CustomNamesViewModel(
             setCustomNameUseCase,
@@ -319,7 +319,7 @@ class CustomNamesViewModelTest {
             override suspend fun purgeRepository() {}
         }
 
-        val emptyUseCase = GetInstalledAppsUseCase(emptyRepository)
+        val emptyUseCase = GetInstalledAppsUseCase(emptyRepository, fakeCustomNamesRepository)
 
         val vm = CustomNamesViewModel(
             setCustomNameUseCase,

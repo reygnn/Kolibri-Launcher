@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -27,12 +28,18 @@ class GetInstalledAppsUseCaseTest {
     @MockK
     private lateinit var installedAppsRepository: InstalledAppsRepository
 
+    @MockK
+    private lateinit var customNamesRepository: CustomNamesRepository
+
     private lateinit var useCase: GetInstalledAppsUseCase
 
     @Before
     fun setup() {
         MockKAnnotations.init(this)
-        useCase = GetInstalledAppsUseCase(installedAppsRepository)
+        // No custom names: applyNames sets displayName = originalName. A COMPLETING
+        // flow (flowOf), so the combined flow still completes for awaitComplete().
+        every { customNamesRepository.customNamesFlow } returns flowOf(emptyMap())
+        useCase = GetInstalledAppsUseCase(installedAppsRepository, customNamesRepository)
     }
 
     @Test
