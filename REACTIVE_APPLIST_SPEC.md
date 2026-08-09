@@ -1,6 +1,21 @@
 # REACTIVE_APPLIST_SPEC.md — Anzeige rein reaktiv, Enumeration nur bei echter Änderung
 
-**Status: ENTWURF (2026-08-09), Spec-Review-Runden 1+2 eingearbeitet — Richtung SOUND,
+**Status: UMGESETZT (2026-08-09, Branch `refactor/reactive-applist`).** Gebaut in der
+sicheren G3-Reihenfolge, je Commit `:domain:test :data:test :app:test checkConventions
+checkRule13` grün: Commit 1 = `customNamesFlow` + `usageFlow` (verhaltensneutral);
+2a-1/2a-2/2a-3 = `applyNames`-Overlay an Site 1 (getInstalledApps-Familie) / Site 2
+(Drawer+Favoriten auf `rawAppsFlow`) / Site 3 (Recents), No-Op solange die Enumeration
+noch backt; 2b-i = Flip `processResolveInfoList → displayName = originalName`; 2b-ii =
+`triggerCustomNameUpdate` entfernt (Rename ohne Enumeration, Gewinn 1); Commit 3 =
+`usageFlow` in den Drawer-combine + `refreshAppsUseCase()` an beiden Launch-Stellen
+entfernt (Start ohne Enumeration, Gewinn 2); Commit 4 = Cleanup/Doku. `appsUpdateTrigger`
+trägt jetzt nur noch Paket-Events + Force-Reloads (Resume/Factory-Reset) — die Debounce
+sitzt korrekt auf der Sturm-Quelle. `RECONCILE_C2_SPEC` / Option-B endgültig überflüssig.
+Der Rest dieses Dokuments ist der (unveränderte) Entwurf, der zu dieser Umsetzung führte.
+
+<details><summary>Ursprünglicher Entwurfs-Status (Spec-Review-Runden 1+2 + finale Verifikation)</summary>
+
+**ENTWURF (2026-08-09), Spec-Review-Runden 1+2 eingearbeitet — Richtung SOUND,
 Inventur vollständig, alle Findings gefixt.** Runde 1: R1 (Blocker, vollständige
 displayName-Consumer-Inventur §3), R2 (Swipe-Launch entkoppelt), R3–R5 (Invarianten/
 Recent-Fallback/DataStore). Runde 2: die zwei Quell-Familien entwirrt
@@ -21,6 +36,8 @@ und Favorit als reaktive `combine`-Eingänge** modelliert werden — statt die
 Enumeration als Universal-Hammer für jede Änderung zu missbrauchen. Erst reviewen
 (mehrere Multi-Agent-Runden), dann bauen; nicht auf `main` mergen, bevor der Rewrite
 sie überstanden hat.
+
+</details>
 
 Schwester-Dokumente: `RECONCILE_SPEC.md` (das Verifikations-Veto — bleibt), 
 `DEBOUNCE_SPEC.md` / `RECONCILE_C2_SPEC.md` (werden durch diesen Spec **überflüssig**,

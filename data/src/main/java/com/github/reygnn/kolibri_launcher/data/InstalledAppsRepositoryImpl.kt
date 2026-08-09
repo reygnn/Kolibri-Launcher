@@ -127,6 +127,13 @@ class InstalledAppsRepositoryImpl @Inject constructor(
      * `onStart { emit(Unit) }` priming. Latest-wins (the downstream
      * `flatMapLatest`) is unchanged.
      *
+     * Since REACTIVE_APPLIST_SPEC the [trigger] carries ONLY real reload causes —
+     * package broadcasts (the debounce storm source) plus the rare, deliberate
+     * force-reloads (Resume via `AppManagementDelegate.refreshInstalledApps`,
+     * factory reset) (RAL-INV-3). Renames and app launches no longer feed it:
+     * they re-derive reactively via `customNamesFlow` / `usageFlow`. So the
+     * debounce now sits exactly on the storm source it was written for.
+     *
      * `@VisibleForTesting internal` so the debounce/priming behavior can be
      * pinned in isolation — the production [appsStateFlow] shares on an internal
      * `Dispatchers.IO` scope that a virtual-time test cannot drive directly.
