@@ -5,7 +5,10 @@
 Veto-Modell korrigiert (§3 — das Veto läuft auf jedem `Loaded`, auch Fast-Path-
 Deltas; kein „null Persistenz"), Backstop erhalten (§2/§4/§7/§8 — Events speisen
 Delta **und** debounced Reload), Add = replace-by-package gegen Update-Duplikate,
-ADR-Marker korrigiert. Löst das frühere C0-Options-Fundament ab:
+ADR-Marker korrigiert. Präzisierung nach Auslieferung von Debounce-only: der
+Debounce sitzt in C2b **nur** auf der Sturm-Quelle (`appUpdateSignal.events`),
+`appsUpdateTrigger` wird sofort → C2b fixt den Debounce-only-Custom-Name-Nit
+automatisch (§2, §8-Schritt-3, C2b-INV-6). Löst das frühere C0-Options-Fundament ab:
 **C2a** (Cleanup-Targeting) ist **verworfen** (das Veto machte den Cleanup schon
 billig), **Debounce** ist ausgelagert nach `DEBOUNCE_SPEC.md` (zugleich Commit 1
 von C2b). Dies ist Option **(iii)** der Entscheidung `SPEC-DECISION C-0`. Erst
@@ -29,7 +32,7 @@ gewinnt daher **nur Effizienz/Latenz**: es vermeidet die teure Voll-Enumeration 
 `PackageEvent`(`Added`/`Removed`)-Bus (`de021520`) ist der bewusst geparkte Hook.
 
 **Ehrliche Kosten/Nutzen-Grenze.** Paket-Events sind selten (nutzergetrieben).
-Der Sturm-Fall (System-Update) ist **allein durch Debounge** (`DEBOUNCE_SPEC`)
+Der Sturm-Fall (System-Update) ist **allein durch Debounce** (`DEBOUNCE_SPEC`)
 gezähmt. C2b liefert *zusätzlich* die Latenz-/Kosten-Ersparnis bei jedem
 Einzel-Event. Ob dieser Zusatz die Komplexität wert ist, ist die eigentliche
 Frage — nicht die Machbarkeit (die ist gut, siehe §1).
@@ -72,10 +75,10 @@ private sealed interface ListCommand {
 }
 
 merge(
-    flowOf(ListCommand.Reload),                                    // Priming, sofort
-    appsUpdateTrigger.debounce(T).map { ListCommand.Reload },      // custom-name edit, app-click refresh (:130)
+    flowOf(ListCommand.Reload),                                    // Priming — sofort
+    appsUpdateTrigger.map { ListCommand.Reload },                  // custom-name edit, app-click refresh (:130) — SOFORT (nicht-Sturm)
     appUpdateSignal.events.map { it.toListCommand() },             // FAST delta — sofort
-    appUpdateSignal.events.debounce(T).map { ListCommand.Reload }, // BACKSTOP — dieselben Events, debounced Reload
+    appUpdateSignal.events.debounce(T).map { ListCommand.Reload }, // BACKSTOP — Paket-Broadcasts (die Sturm-Quelle), debounced
 )
     .foldIntoList()   // hält List<AppInfo>, wendet Command an → emittiert AppLoad
     .catch { … AppLoad.Failed(e) … }                              // wie heute
@@ -103,6 +106,18 @@ Der vierte `merge`-Zweig ist der **Self-Healing-Backstop**: jedes Paket-Event pl
 Broadcast→Reload darf also **nicht** ersatzlos verschwinden (siehe §7/§8 — der
 Consumer wandert aus dem Delegate in den Repo, verliert die Reload-Wirkung aber
 nicht).
+
+**Debounce sitzt in C2b nur auf der Sturm-Quelle — das ist der Unterschied zum
+ausgelieferten Debounce-only.** Heute (DEBOUNCE_SPEC, `main`) debounct der Repo den
+**ganzen** `appsUpdateTrigger`, weil dort *alle* Quellen zusammenlaufen — inkl. der
+Paket-Broadcasts (die stürmen). Preis: der einzelne Custom-Name-Edit
+(`CustomNamesRepositoryImpl.triggerCustomNameUpdate`) und der App-Klick-Refresh
+(`:130`) zahlen die 250 ms mit, obwohl sie nie stürmen (der akzeptierte
+Debounce-only-Nit). In C2b wandert die **Sturm-Quelle** auf `appUpdateSignal.events`
+(vierter Zweig, dort debounced), und `appsUpdateTrigger` trägt danach **nur noch**
+diese Einzelaktionen → er wird **un-debounced/sofort** (zweiter Zweig). Damit **fixt
+C2b den Debounce-only-Nit automatisch**, statt ihn zu erben: nur was stürmt wird
+debounced, bewusste Einzelaktionen sind sofort.
 
 ---
 
@@ -191,6 +206,10 @@ Der Fold ersetzt `flatMapLatest`. Zu erhalten bzw. zu klären:
 - **C2b-INV-5:** Verpasstes/gedropptes/spurious Event → **kein** permanenter Drift:
   der event-getriebene debounced Reload (INV-3) plus die Cold-Start-Aufholung
   (`RECONCILE_SPEC §0.3`) konvergieren Anzeige **und** Persistenz zur Wahrheit.
+- **C2b-INV-6:** Debounce sitzt **nur** auf der Sturm-Quelle (`appUpdateSignal.events`,
+  Paket-Broadcasts). `appsUpdateTrigger` (Custom-Name-Edit, App-Klick — bewusste
+  Einzelaktionen) ist **sofort**, nie debounced. So zahlt keine Einzelaktion die
+  Sturm-Latenz (fixt den Debounce-only-Nit).
 
 ---
 
@@ -231,7 +250,11 @@ Der Fold ersetzt `flatMapLatest`. Zu erhalten bzw. zu klären:
    verschwinden, sonst planen Paket-Events keinen Reload mehr → Self-Healing-Lücke,
    Spec-Review-Finding 1). Kern-Test: `Removed` → `pkg` sofort raus aus `Loaded`
    **ohne** `queryIntentActivities`-Aufruf (Zähler == 0 auf dem Delta), UND ein
-   debounced Reload feuert danach.
+   debounced Reload feuert danach. **Hier zieht der Debounce um:** da die Sturm-Quelle
+   (Paket-Broadcasts) jetzt auf `appUpdateSignal.events` liegt (dort debounced), wird
+   `appsUpdateTrigger` **un-debounced/sofort** — er trägt nur noch Custom-Name-Edit +
+   App-Klick. Damit ist der Debounce-only-Nit weg. Regressions-Test: ein
+   `triggerCustomNameUpdate` → Reload **ohne** 250 ms-Verzögerung.
 4. **`Add(pkg)`-Fast-Path** (scoped Load + **replace-by-package** einsortieren). Test:
    `Added` → `pkg` in `Loaded`, korrekt sortiert, ohne Voll-Enumeration; **zwei**
    `Added(pkg)` bzw. ein Update (`EXTRA_REPLACING`) → **keine** Duplikat-Zeilen.
