@@ -10,6 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,7 +27,18 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class WallpaperViewBinderSingleLayerTest {
 
-    private fun view() = ZoomableImageView(ApplicationProvider.getApplicationContext())
+    // Laid out so the binder takes the measured (synchronous) transform path —
+    // the real drawer→home scenario. Without a layout the view is unmeasured
+    // (width == 0), so the binder defers the transform + reveal to a View.post
+    // that Robolectric's paused looper would never run, and the VISIBLE
+    // assertion below could not be observed.
+    private fun view() = ZoomableImageView(ApplicationProvider.getApplicationContext()).apply {
+        measure(
+            View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+        )
+        layout(0, 0, 1080, 1920)
+    }
 
     @Test
     fun `single-image wallpaper loads through the bounded loader and sets the bitmap`() = runTest {
@@ -44,6 +56,18 @@ class WallpaperViewBinderSingleLayerTest {
         assertFalse("single-layer mode, not multi-layer", view.isMultiLayerMode)
         assertEquals("bitmap set on the view", bmp, (view.drawable as? BitmapDrawable)?.bitmap)
         assertEquals(View.VISIBLE, view.visibility)
+        // Pins the actual fix, not just its side effect: on the measured path the
+        // transform runs SYNCHRONOUSLY (centerCrop scales the 8x8 bitmap to cover
+        // the 1080x1920 view → currentScale >> 1). A revert to the buggy
+        // `visibility = VISIBLE; view.post { transform }` shape leaves this at
+        // DEFAULT_SCALE (1.0) — the post never runs under Robolectric's paused
+        // looper — and turns this assertion red. Without it the test would stay
+        // green through a full revert (it only re-asserts VISIBLE, which the buggy
+        // code also produced).
+        assertTrue(
+            "transform applied synchronously on the measured path — got scale ${view.currentScale}",
+            view.currentScale > 1f
+        )
     }
 
     @Test

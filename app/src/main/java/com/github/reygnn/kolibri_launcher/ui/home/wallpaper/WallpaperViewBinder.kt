@@ -97,7 +97,8 @@ class WallpaperViewBinder(
 
             is RebuildPlan.SwitchToSingleLayer -> applySingleLayer(view, plan, onRebuildComplete)
 
-            is RebuildPlan.UpdatePropertiesOnly -> applyUpdates(view, plan.updates, onRebuildComplete)
+            is RebuildPlan.UpdatePropertiesOnly ->
+                applyUpdates(view, plan.updates, onRebuildComplete, revealWhenDone = false)
 
             is RebuildPlan.FullRebuild -> applyFullRebuild(view, plan, onRebuildComplete)
         }
@@ -177,10 +178,15 @@ class WallpaperViewBinder(
             return
         }
         try {
+            // Option A (wallpaper rebuild flicker): hide before swapping the
+            // bitmap so the pre-transform frame (image at the identity matrix:
+            // native 1:1, anchored top-left) is never drawn. Revealed again in
+            // the finally below, after the transform. INVISIBLE (not GONE)
+            // preserves the measured size so Option B's sync path still fires.
+            view.visibility = View.INVISIBLE
             view.setImageBitmap(bitmap)
-            view.visibility = View.VISIBLE
 
-            view.post {
+            runWhenMeasured(view) {
                 try {
                     // Decision: saved transform or default. See
                     // applySingleTransformOrDefault for the policy
@@ -189,9 +195,15 @@ class WallpaperViewBinder(
                     applySingleTransformOrDefault(view, plan.transform)
                     onRebuildComplete?.invoke()
                 } catch (e: Throwable) {
-                    // No suspension point: this is a plain Runnable handed to
-                    // View.post, outside any coroutine.
+                    // No suspension point: the block is pure view mutation, run
+                    // synchronously when measured or as a plain View.post
+                    // Runnable otherwise — never from a coroutine suspension.
                     TimberWrapper.silentError(e, "Error applying single-layer transform")
+                } finally {
+                    // Reveal only now, after the transform attempt: happy path is
+                    // already correct (no flicker); on the error path showing the
+                    // identity render still beats a permanently blank home.
+                    view.visibility = View.VISIBLE
                 }
             }
         } catch (e: Throwable) {
@@ -208,6 +220,13 @@ class WallpaperViewBinder(
         plan: RebuildPlan.FullRebuild,
         onRebuildComplete: (() -> Unit)?
     ) {
+        // Option A (wallpaper rebuild flicker): hide before mutating so the
+        // intermediate state — freshly added layers still at the identity matrix
+        // (native 1:1, top-left) — is never drawn. Revealed again only after the
+        // transforms are applied (in applyUpdates, revealWhenDone = true).
+        // INVISIBLE (not GONE) preserves the measured size so Option B's
+        // synchronous-when-measured path still fires.
+        view.visibility = View.INVISIBLE
         view.clearLayers()
 
         // Track which specs actually made it into the view. A bitmap that
@@ -245,7 +264,9 @@ class WallpaperViewBinder(
             }
         }
 
-        view.visibility = if (view.layerCount > 0) View.VISIBLE else View.GONE
+        // Visibility is set later, inside applyUpdates' apply step, AFTER the
+        // transforms are applied (Option A) — so a fresh rebuild never flashes
+        // the untransformed layers. GONE-when-empty is handled there too.
 
         // Restore active selection by ID, fall back to topmost layer
         // (matches the UX expectation that a fresh "add layer" selects
@@ -262,15 +283,16 @@ class WallpaperViewBinder(
         // updates are remapped onto the actually-added layers first, so a
         // skipped load can't scramble the property assignment.
         val effectiveUpdates = remapUpdatesToAddedLayers(plan.layers, plan.updates, addedLayerIds)
-        applyUpdates(view, effectiveUpdates, onRebuildComplete)
+        applyUpdates(view, effectiveUpdates, onRebuildComplete, revealWhenDone = true)
     }
 
     private fun applyUpdates(
         view: ZoomableImageView,
         updates: List<LayerPropertyUpdate>,
-        onRebuildComplete: (() -> Unit)?
+        onRebuildComplete: (() -> Unit)?,
+        revealWhenDone: Boolean,
     ) {
-        view.post {
+        runWhenMeasured(view) {
             try {
                 for (update in updates) {
                     if (update.layerIndex >= view.layerCount) break
@@ -291,9 +313,44 @@ class WallpaperViewBinder(
                 view.invalidate()
                 onRebuildComplete?.invoke()
             } catch (e: Throwable) {
-                // No suspension point: plain Runnable handed to View.post.
+                // No suspension point: the block is pure view mutation, run
+                // synchronously when measured or as a plain View.post Runnable
+                // otherwise — never from a coroutine suspension.
                 TimberWrapper.silentError(e, "Error applying layer updates")
+            } finally {
+                // Option A: reveal the view only now, after the transforms are
+                // applied, so a fresh full rebuild never paints the identity
+                // frame. Only the rebuild path reveals (revealWhenDone); a
+                // property-only update leaves visibility untouched as before.
+                // GONE when a rebuild produced zero layers (all loads failed).
+                if (revealWhenDone) {
+                    view.visibility = if (view.layerCount > 0) View.VISIBLE else View.GONE
+                }
             }
+        }
+    }
+
+    /**
+     * Runs [block] against [view] once it is measured. Option B of the
+     * wallpaper-rebuild-flicker fix: when the view is already laid out (the
+     * drawer→home rebuild always is), the transform is applied in the SAME
+     * frame, so the intermediate identity-matrix state never reaches the
+     * screen. Only a not-yet-measured view (first inflate, width == 0) defers
+     * to the next frame via [View.post], where the caller's Option-A reveal
+     * keeps that frame blank rather than wrong.
+     *
+     * [block] MUST contain no coroutine suspension point: it can run
+     * synchronously inside a suspending caller (applySingleLayer /
+     * applyFullRebuild), so a suspend call here could land a
+     * CancellationException in its broad catch. It is pure view mutation today
+     * — keep it that way (this file is on the checkConventions cancel_files
+     * whitelist).
+     */
+    private fun runWhenMeasured(view: View, block: () -> Unit) {
+        if (view.isLaidOut && view.width > 0 && view.height > 0) {
+            block()
+        } else {
+            view.post { block() }
         }
     }
 
