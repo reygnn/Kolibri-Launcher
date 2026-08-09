@@ -7,7 +7,10 @@ Recent-Fallback/DataStore). Runde 2: die zwei Quell-Familien entwirrt
 (`getInstalledApps()` pre-Veto vs. `rawAppsFlow` post-Veto keep-last-good) — **Drawer/
 Favoriten bleiben auf `rawAppsFlow`** (sonst kehrt der Transient-Empty-Flicker zurück);
 die Name-Anwendung ist EIN Helfer an ~3 Quell-Grenzen, nicht „ein zentraler Flow"; Umfang
-ehrlich ~14–18 Dateien. Ziel: jede unnötige PackageManager-Enumeration
+ehrlich ~14–18 Dateien. Selbst-Audit danach: zwei Rest-Widersprüche gefixt (RAL-INV-4 +
+§9 trugen noch die pre-Runde-2-Formulierung) und eine sicherere inkrementelle Migration
+(§7, `applyNames` idempotent → Consumer einzeln, dann winziger Flip-Commit) ergänzt.
+Ziel: jede unnötige PackageManager-Enumeration
 und jeden dadurch verursachten Lag beseitigen, indem **Name, Sortierung, Ausblenden
 und Favorit als reaktive `combine`-Eingänge** modelliert werden — statt die
 Enumeration als Universal-Hammer für jede Änderung zu missbrauchen. Erst reviewen
@@ -161,8 +164,8 @@ heute `getCurrentApps()`, das im transient-leeren Reload-Fenster auf
 `lastSuccessfulAppList` zurückfällt (`InstalledAppsStateRepositoryImpl:80-85`). Es darf
 **nicht** naiv auf ein `.first()` eines raw-Flows umgestellt werden (kein
 `ifEmpty`-Guard → Recent zeigt im Fenster null). → Recent **behält den
-`getCurrentApps()`-Point-Read** und wendet `applyNames` mit einem Snapshot von
-`customNamesFlow` obendrauf an. Damit ist Recents Umstellung ebenfalls nicht Teil des „verhaltensneutral"-Anspruchs
+`getCurrentApps()`-Point-Read** und wendet `applyNames` mit einem Snapshot
+(`getAllCustomNames()`, existiert schon suspend) obendrauf an. Damit ist Recents Umstellung ebenfalls nicht Teil des „verhaltensneutral"-Anspruchs
 ohne diese Fallback-Erhaltung.
 
 ---
@@ -194,8 +197,10 @@ ohne diese Fallback-Erhaltung.
   `FactoryResetUseCase`) — aber **keine** bewussten Einzelaktionen (Rename/Start)
   mehr. Debounce darauf trifft die Sturm-Quelle; die verbleibenden Force-Reloads sind
   seltene, gewollte Voll-Reloads (kein Nutzer-Lag).
-- **RAL-INV-4:** Das Veto läuft auf jeder `rawAppsFlow`-Änderung (Paket-Event +
-  Cold-Start), per-Ziel `PackagePresence`-gegated — Korrektheit unverändert.
+- **RAL-INV-4:** Das Veto läuft auf jeder `getInstalledApps()`-Emission (Paket-Event +
+  Cold-Start) und **schreibt** danach `rawAppsFlow` (`updateApps`), per-Ziel
+  `PackagePresence`-gegated — Korrektheit unverändert. (Es reagiert NICHT auf
+  `rawAppsFlow`, es speist ihn.)
 - **RAL-INV-5:** Der `getInstalledApps(): Flow<AppLoad>`-Vertrag bleibt; nur die
   *Trigger-Menge* schrumpft und der `displayName` ist jetzt Original (Namen kommen
   im Display-combine dazu).
@@ -253,6 +258,20 @@ fun applyNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
    R1-Blocker, oder Drawer wandert vom Veto-Holder weg = R2-Blocker/Transient-Empty).
    **Pflicht-Tests:** die `originalName != displayName`-Erkennung nach der Anwendung,
    und Drawer/Favoriten weiterhin über `rawAppsFlow` (keep-last-good erhalten).
+
+   > **Sicherere Reihenfolge (empfohlen statt eines ~10-Datei-Atomic-Commits, G3):**
+   > `applyNames` ist **idempotent, solange die Enumeration den Namen noch einbackt** —
+   > `applyNames(apps, names)` setzt `displayName = names[pkg] ?: originalName`, was bei
+   > schon-eingebackenem `displayName` derselbe Wert ist. Deshalb:
+   > - **2a:** `customNamesFlow` + `applyNames` an **allen** Sites einziehen, **während**
+   >   `processResolveInfoList` den Namen noch einbackt → jeder Consumer einzeln, jeder
+   >   Commit grün (No-Op-Overlay).
+   > - **2b:** in **einem winzigen** Commit `processResolveInfoList` → `displayName =
+   >   originalName` flippen **und** `triggerCustomNameUpdate` entfernen. Jetzt kommt der
+   >   Name aus dem combine — und weil ALLE Sites ihn schon anwenden, bricht kein Screen.
+   >
+   > So ist der gefährliche Moment (der Flip) **ein** kleiner Commit statt eines großen,
+   > und die Consumer-Migration ist inkrementell + einzeln reviewbar.
 3. **Nutzung entkoppeln:** `usageFlow` in den Drawer-combine; `refreshAppsUseCase()` an
    **beiden** Launch-Stellen entfernen (`onAppClicked` **und**
    `HandleSwipeActionUseCase:47`, R2) → **Start (Tap + Swipe) ohne Enumeration**
@@ -270,7 +289,12 @@ klar benannten Punkten.
 ## 8. Test-Auswirkung
 
 - **Contract-Tests** für die zwei neuen Flows (`customNamesFlow`, `usageFlow`) — Teil
-  des Contract-Triples pro Repo (Rule 2).
+  des Contract-Triples pro Repo (Rule 2). Die **Entfernung** von
+  `triggerCustomNameUpdate` aus `CustomNamesRepository` berührt ebenfalls Interface +
+  Fake + Contract (Aufrufer sind nur der Rename-Pfad).
+- **`usageFlow` betrifft nur den Drawer-Usage-Sort** — Favoriten (user-gepinnt bzw.
+  alphabetischer Top-N-Fallback) und Recent (Point-Read, liest Usage bei jedem Aufruf
+  via `getRecentlyLaunchedPackages`/`getAllCustomNames`) brauchen ihn **nicht**.
 - **Name-Anwendung (Kern-Regressionstest gegen den Nit):** ein `customNamesFlow`-Change
   → `displayName` ändert sich an jeder Site **ohne** `queryIntentActivities`-Aufruf
   (Zähler == 0). Plus: die `originalName != displayName`-Erkennung greift nach
@@ -293,7 +317,9 @@ klar benannten Punkten.
   Enumeration ohnehin nur noch bei *echten* (seltenen, debounced) Paket-Events, eine
   volle Enumeration dort ist billig genug.
 - **Der Debounce (v1, geliefert auf `main`)** wird **korrekt** as-is: `appsUpdateTrigger`
-  trägt dann nur die Sturm-Quelle (RAL-INV-3). Nichts umzuverdrahten.
+  trägt dann die Sturm-Quelle (Paket-Broadcasts) **plus die seltenen Force-Reloads**
+  (Resume/Factory-Reset) — keine bewussten Einzelaktionen mehr (RAL-INV-3). Debounce
+  darauf lagt also nichts Nutzer-Sichtbares. Nichts umzuverdrahten.
 
 ---
 
