@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -203,6 +204,34 @@ abstract class CustomNamesRepositoryContract {
         assertFalse(repo.hasCustomNameForPackage(pkgA))
         assertTrue(repo.hasCustomNameForPackage(pkgB))
         assertEquals("Name B", repo.getDisplayNameForPackage(pkgB, "Original"))
+    }
+
+    // ---------- customNamesFlow ----------
+
+    /**
+     * REACTIVE_APPLIST_SPEC RAL-1: the reactive `packageName -> customName` view
+     * emits the current mapping and re-emits on every change. Pins that both
+     * fake and impl expose the SAME reactive contract, so a rename shows up as a
+     * flow emission (the mechanism that lets consumers fold names in via
+     * `combine` instead of re-enumerating).
+     */
+    @Test
+    fun `customNamesFlow emits current mapping and updates on change`() = runTest {
+        val repo = createRepository()
+        repo.customNamesFlow.test {
+            assertEquals(emptyMap<String, String>(), awaitItem())
+
+            repo.setCustomNameForPackage(pkgA, "Name A")
+            assertEquals(mapOf(pkgA to "Name A"), awaitItem())
+
+            repo.setCustomNameForPackage(pkgB, "Name B")
+            assertEquals(mapOf(pkgA to "Name A", pkgB to "Name B"), awaitItem())
+
+            repo.removeCustomNameForPackage(pkgA)
+            assertEquals(mapOf(pkgB to "Name B"), awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ---------- getDisplayNameForPackage ----------

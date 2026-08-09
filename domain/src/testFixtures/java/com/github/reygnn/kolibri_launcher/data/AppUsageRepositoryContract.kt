@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -293,6 +294,27 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgB)
         repo.removeUsageDataForPackage(pkgA)
         assertEquals(setOf(pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
+    }
+
+    // ---------- usageFlow ----------
+
+    /**
+     * REACTIVE_APPLIST_SPEC: the change-signal ticks once initially (so a
+     * consumer runs the initial sort) and again after a usage change. Only ONE
+     * change is asserted deliberately — a repeat launch may not alter the stored
+     * set within the same millisecond on the impl (`System.currentTimeMillis`),
+     * so asserting a second tick would be timing-dependent. Both fake and impl
+     * must expose this reactive shape.
+     */
+    @Test
+    fun `usageFlow signals initially and after a usage change`() = runTest {
+        val repo = createRepository()
+        repo.usageFlow.test {
+            awaitItem() // initial signal
+            repo.recordPackageLaunch(pkgA)
+            awaitItem() // signal after the usage change
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     // ---------- purgeRepository ----------

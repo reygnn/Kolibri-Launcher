@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.util.concurrent.CancellationException
@@ -94,6 +96,18 @@ class CustomNamesRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val appsUpdateTrigger: MutableSharedFlow<Unit>
 ) : CustomNamesRepository {
+
+    /**
+     * Reactive `packageName -> customName` view (REACTIVE_APPLIST_SPEC RAL-1).
+     * Cold, fail-open read (DATASTORE_READ_SPEC): an [java.io.IOException] on the
+     * store recovers to the empty mapping rather than killing the flow.
+     * [distinctUntilChanged] suppresses re-emission when the mapping is
+     * unchanged. The [toCustomNamesMap] transform is shared with
+     * [getAllCustomNames], so flow and snapshot cannot drift (DSR-INV-1).
+     */
+    override val customNamesFlow: Flow<Map<String, String>> =
+        dataStore.readFlowFailOpen("Error reading custom names flow") { it.toCustomNamesMap() }
+            .distinctUntilChanged()
 
     /**
      * Setzt einen benutzerdefinierten Namen für eine App. Wenn der Name leer ist, wird er entfernt.
@@ -216,11 +230,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
     override suspend fun getAllCustomNames(): Map<String, String> {
         return try {
             val preferences = dataStore.data.first()
-            // Single pass over the snapshot: read key + value together instead
-            // of re-fetching each value via preferences[key].
-            val customNames = preferences.asMap().entries.mapNotNull { (key, value) ->
-                if (key.isCustomNameKey() && value is String) key.customNamePackage() to value else null
-            }.toMap()
+            val customNames = preferences.toCustomNamesMap()
 
             Timber.d("Retrieved ${customNames.size} custom app names")
             customNames
@@ -318,6 +328,18 @@ class CustomNamesRepositoryImpl @Inject constructor(
     /** The package name encoded in a `name_<packageName>` key. */
     private fun Preferences.Key<*>.customNamePackage(): String =
         name.removePrefix(AppConstants.KEY_NAME_PREFIX)
+
+    /**
+     * The single `Preferences -> Map<packageName, customName>` decode, shared by
+     * the reactive [customNamesFlow] and the [getAllCustomNames] snapshot so the
+     * two read paths cannot drift (DSR-INV-1). Single pass over the snapshot:
+     * read key + value together instead of re-fetching each value via
+     * `preferences[key]`.
+     */
+    private fun Preferences.toCustomNamesMap(): Map<String, String> =
+        asMap().entries.mapNotNull { (key, value) ->
+            if (key.isCustomNameKey() && value is String) key.customNamePackage() to value else null
+        }.toMap()
 
     /**
      * All keys holding a custom name. Shared by cleanup/purge. Works on both a

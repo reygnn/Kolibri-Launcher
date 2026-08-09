@@ -4,10 +4,20 @@ package com.github.reygnn.kolibri_launcher.fakes
 // TIMESTAMP 2025-12-04 19:22
 
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.IOException
 
 class FakeCustomNamesRepository : CustomNamesRepository {
     private val customNames = mutableMapOf<String, String>()
+
+    private val customNamesState = MutableStateFlow<Map<String, String>>(emptyMap())
+    override val customNamesFlow: Flow<Map<String, String>> = customNamesState
+
+    /** Republish the backing map onto [customNamesFlow] after every mutation. */
+    private fun syncFlow() {
+        customNamesState.value = customNames.toMap()
+    }
 
     // Für CustomNamesViewModelTest
     var onUpdateTrigger: (suspend () -> Unit)? = null
@@ -32,6 +42,7 @@ class FakeCustomNamesRepository : CustomNamesRepository {
             customNames[packageName] = customName.trim()
         }
 
+        syncFlow()
         triggerCustomNameUpdate()
         return true
     }
@@ -46,6 +57,7 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         // FakeFavoritesRepository.removeFavoriteComponent und
         // FakeHiddenAppsRepository.showComponent.
         customNames.remove(packageName)
+        syncFlow()
         triggerCustomNameUpdate()
         return true
     }
@@ -77,6 +89,7 @@ class FakeCustomNamesRepository : CustomNamesRepository {
                 customNames[packageName] = customName.trim()
             }
         }
+        syncFlow()
         triggerCustomNameUpdate()
         return true
     }
@@ -93,10 +106,12 @@ class FakeCustomNamesRepository : CustomNamesRepository {
             .filter { it !in installedSet }
             .filterTo(HashSet()) { !isStillPresent(it) }
         customNames.keys.removeAll(verifiedAbsent)
+        syncFlow()
     }
 
     override suspend fun purgeRepository() {
         customNames.clear()
+        syncFlow()
         onUpdateTrigger = null
         shouldFailOnSet = false
         shouldFailOnBatch = false

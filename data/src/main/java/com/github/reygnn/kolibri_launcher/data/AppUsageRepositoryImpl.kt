@@ -14,8 +14,11 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -71,6 +74,21 @@ class AppUsageRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @param:ApplicationContext private val context: Context
 ) : AppUsageRepository {
+
+    /**
+     * Usage change-signal (REACTIVE_APPLIST_SPEC). Cold, fail-open read
+     * (DATASTORE_READ_SPEC): an [IOException] recovers to the empty usage set.
+     * The transform projects only the [AppConstants.KEY_USAGE_PREFIX] key subset,
+     * so [distinctUntilChanged] fires solely on a real usage change — a write to
+     * an unrelated preference in the shared store does not signal. The trailing
+     * `map { }` collapses the projected subset to a payload-free tick.
+     */
+    override val usageFlow: Flow<Unit> =
+        dataStore.readFlowFailOpen("Error reading usage flow") { preferences ->
+            preferences.asMap().filterKeys { it.name.startsWith(AppConstants.KEY_USAGE_PREFIX) }
+        }
+            .distinctUntilChanged()
+            .map { }
 
     /**
      * Zeichnet einen App-Start mit dem aktuellen Zeitstempel auf.

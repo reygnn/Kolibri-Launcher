@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Der Vertrag für die Verwaltung von App-Nutzungsdaten.
@@ -8,6 +9,16 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * gesamtes App-Paket aggregiert werden soll.
  */
 interface AppUsageRepository : Purgeable {
+    /**
+     * Change-signal that emits once initially and again whenever the stored
+     * usage data changes (REACTIVE_APPLIST_SPEC). It carries no payload — a
+     * consumer reacts by re-running [sortAppsByTimeWeightedUsage]. This lets the
+     * drawer re-sort on a launch reactively instead of forcing a full
+     * PackageManager re-enumeration. Distinct on the usage key-set: a change to
+     * an unrelated preference does not signal.
+     */
+    val usageFlow: Flow<Unit>
+
     /**
      * Zeichnet einen Start für ein App-Paket auf.
      */

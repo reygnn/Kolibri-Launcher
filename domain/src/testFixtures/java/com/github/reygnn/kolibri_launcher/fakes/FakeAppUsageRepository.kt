@@ -5,13 +5,23 @@ package com.github.reygnn.kolibri_launcher.fakes
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.Purgeable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 class FakeAppUsageRepository : AppUsageRepository, Purgeable {
     val launchedPackages = mutableListOf<String>()
 
+    // A monotonically-bumped version backs the change-signal: each usage
+    // mutation advances it, so the mapped Unit flow re-emits (a StateFlow of
+    // Unit would collapse — the version is what makes repeated ticks distinct).
+    private val usageVersion = MutableStateFlow(0)
+    override val usageFlow: Flow<Unit> = usageVersion.map { }
+
     override suspend fun recordPackageLaunch(packageName: String?) {
         if (packageName.isNullOrBlank()) return
         launchedPackages.add(packageName)
+        usageVersion.value++
     }
 
     override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> = apps
@@ -19,6 +29,7 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
     override suspend fun removeUsageDataForPackage(packageName: String?) {
         if (packageName.isNullOrBlank()) return
         launchedPackages.removeAll { it == packageName }
+        usageVersion.value++
     }
 
     override suspend fun hasUsageDataForPackage(packageName: String?): Boolean {
@@ -36,5 +47,6 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
 
     override suspend fun purgeRepository() {
         launchedPackages.clear()
+        usageVersion.value++
     }
 }
