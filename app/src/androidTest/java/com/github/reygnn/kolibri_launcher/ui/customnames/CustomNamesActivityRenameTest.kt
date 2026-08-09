@@ -143,11 +143,11 @@ class CustomNamesActivityRenameTest {
             // ── ASSERT: chip-strip got a new entry, proving the UI-state
             // Flow saw the repo update and rebuilt the chip strip. The
             // chain is: setCustomNameUseCase → DataStore edit →
-            // CustomNamesRepository.triggerCustomNameUpdate →
-            // appsUpdateTrigger.emit → InstalledAppsRepository's
-            // flatMapLatest re-runs PackageManager query → new AppInfo
-            // list → CustomNamesViewModel's collect → updateUiFromMasterList
-            // → updateCustomNameChips.
+            // CustomNamesRepository.customNamesFlow re-emits →
+            // GetInstalledAppsUseCase combine folds the name in via
+            // applyNames (no PackageManager re-enumeration,
+            // REACTIVE_APPLIST_SPEC) → CustomNamesViewModel's collect →
+            // updateUiFromMasterList → updateCustomNameChips.
             //
             // We assert by chip-group child count (withId path) instead of
             // by chip text (withText path). The withText matcher routes

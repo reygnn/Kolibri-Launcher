@@ -9,13 +9,10 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
@@ -34,8 +31,6 @@ class CustomNamesRepositoryImplTest {
     // DataStore.edit() ist eine Extension Function — MockK kann sie nicht stubben.
     private lateinit var fakeDataStore: FakeDataStore
 
-    @MockK
-    private lateinit var appsUpdateTrigger: MutableSharedFlow<Unit>
     @MockK(relaxed = true)
     private lateinit var context: Context
 
@@ -45,7 +40,7 @@ class CustomNamesRepositoryImplTest {
     fun setup() {
         MockKAnnotations.init(this)
         fakeDataStore = FakeDataStore()
-        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore, appsUpdateTrigger)
+        customNamesManager = CustomNamesRepositoryImpl(fakeDataStore)
     }
 
     @Test
@@ -161,7 +156,7 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw RuntimeException("Corrupted data") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger)
+        val manager = CustomNamesRepositoryImpl(brokenStore)
 
         val result = manager.getDisplayNameForPackage("com.test.app", "Original")
 
@@ -196,20 +191,11 @@ class CustomNamesRepositoryImplTest {
         // Lokales Mock nur für data-Property (kein edit → kein Extension-Function-Problem)
         val brokenStore = mockk<DataStore<Preferences>>()
         every { brokenStore.data } returns flow { throw CancellationException("Flow cancelled") }
-        val manager = CustomNamesRepositoryImpl(brokenStore, appsUpdateTrigger)
+        val manager = CustomNamesRepositoryImpl(brokenStore)
 
         assertFailsWith<CancellationException> {
             manager.hasCustomNameForPackage("com.test.app")
         }
-    }
-
-    @Test
-    fun `triggerCustomNameUpdate - calls emit on trigger flow`() = runTest {
-        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
-
-        customNamesManager.triggerCustomNameUpdate()
-
-        coVerify { appsUpdateTrigger.emit(Unit) }
     }
 
     // ========== MISSING TESTS (Batch & Cleanup) ==========
@@ -241,30 +227,31 @@ class CustomNamesRepositoryImplTest {
     }
 
     @Test
-    fun `setCustomNamesInBatch - saves multiple names and triggers ONCE`() = runTest {
-        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
-
+    fun `setCustomNamesInBatch - saves multiple names in a single DataStore edit`() = runTest {
         val result = customNamesManager.setCustomNamesInBatch(
             mapOf("com.app1" to "Name 1", "com.app2" to "Name 2")
         )
 
         Assert.assertTrue(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
-        // WICHTIG: Trigger darf nur exakt 1x aufgerufen werden!
-        coVerify(exactly = 1) { appsUpdateTrigger.emit(Unit) }
+        // IMPORTANT: exactly ONE DataStore transaction for the whole batch (so
+        // customNamesFlow also re-emits exactly once).
+        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        Assert.assertEquals(
+            mapOf("com.app1" to "Name 1", "com.app2" to "Name 2"),
+            customNamesManager.getAllCustomNames()
+        )
     }
 
     @Test
-    fun `setCustomNamesInBatch - with empty map - does nothing and NO trigger`() = runTest {
+    fun `setCustomNamesInBatch - with empty map - does nothing`() = runTest {
         val result = customNamesManager.setCustomNamesInBatch(emptyMap())
 
         Assert.assertTrue(result)
         Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
-        coVerify(exactly = 0) { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
-    fun `reconcileCustomNames - removes orphans but does NOT trigger update`() = runTest {
+    fun `reconcileCustomNames - removes orphans`() = runTest {
         val validKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.installed")
         val orphanKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
         fakeDataStore.setInitialData(preferencesOf(validKey to "Keep", orphanKey to "Drop"))
@@ -273,21 +260,18 @@ class CustomNamesRepositoryImplTest {
 
         // Orphan gone, valid kept.
         Assert.assertEquals(mapOf("com.installed" to "Keep"), customNamesManager.getAllCustomNames())
-        // Must NOT emit: cleanup runs inside the app-load pipeline, so a trigger
-        // would re-enter the reload path (loop / churn). Guards the impl's
-        // deliberate no-trigger comment. (Strict mock: an accidental emit would
-        // also fail here for lack of a stub.)
-        coVerify(exactly = 0) { appsUpdateTrigger.emit(Unit) }
     }
 
     @Test
-    fun `purgeRepository - removes keys and triggers update`() = runTest {
-        coEvery { appsUpdateTrigger.emit(Unit) } returns Unit
+    fun `purgeRepository - removes keys`() = runTest {
+        fakeDataStore.setInitialData(
+            preferencesOf(stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.app1") to "Name 1")
+        )
 
         customNamesManager.purgeRepository()
 
         Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
-        coVerify { appsUpdateTrigger.emit(Unit) }
+        Assert.assertTrue(customNamesManager.getAllCustomNames().isEmpty())
     }
 
     @Test

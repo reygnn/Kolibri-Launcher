@@ -8,7 +8,6 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
@@ -17,84 +16,34 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manager for custom app name overrides with event-driven architecture.
+ * DataStore-backed store for custom app-name overrides.
  *
- * This singleton allows users to set personalized display names for installed apps,
- * persisting them in DataStore. Instead of exposing state via a Flow, it uses an
- * event-based trigger system to notify consumers of changes—a deliberate architectural
- * decision optimized for this specific use case.
+ * Users set personalized display names for installed apps; they are persisted in
+ * DataStore keyed by package name (`name_<packageName>`).
  *
- * **Core Functionality:**
- * - Store/retrieve custom app names keyed by package name
- * - Remove custom names (reverting to original names)
- * - Check existence of custom names
- * - Trigger global update events on changes
+ * **Reactive by [customNamesFlow] (REACTIVE_APPLIST_SPEC).** State is exposed as a
+ * cold `Flow<Map<packageName, customName>>`. A rename is a single DataStore edit;
+ * DataStore re-emits, [customNamesFlow] ticks, and every display site folds the
+ * name in via `applyNames` (`combine`) — no PackageManager re-enumeration is
+ * triggered. This replaced the previous `MutableSharedFlow<Unit>` event-bus design
+ * (which forced a full re-enumeration on every rename); the enumeration no longer
+ * bakes custom names in at all (see `InstalledAppsRepositoryImpl.processResolveInfoList`).
  *
- * **Architecture: Event-Based Design (Not Flow-Based)**
- *
- * Unlike `AppVisibilityManager` which exposes `Flow<Set<String>>`, this manager
- * uses `MutableSharedFlow<Unit>` as a lightweight event bus. This design choice
- * is intentional and superior for the following reasons:
- *
- * **1. Events vs. State:**
- * - Visibility management is holistic STATE (entire hidden set needed at once)
- * - Name management involves granular EVENTS (single name changes)
- * - Consumers only need a signal to refresh, not the entire name map
- *
- * **2. Performance:**
- * - Flow approach would require reading ALL preferences and building a complete
- *   Map on every single name change—expensive and wasteful
- * - Current approach: emit one lightweight `Unit` event, then consumers perform
- *   fast, targeted on-demand lookups via `getDisplayNameForPackage()`
- * - Overall: emit(Unit) + N×fast_lookup >> emit(Map) for this use case
- *
- * **3. Already Reactive:**
- * - `appsUpdateTrigger` acts as a decoupled event bus
- * - Publisher (this manager) emits events without knowing subscribers
- * - Subscriber (`InstalledAppsRepositoryImpl`) reacts by rebuilding its state
- * - Achieves reactivity without Flow complexity or performance penalty
- *
- * **Why Not Granular Events (emit packageName)?**
- *
- * While emitting the specific changed package seems more efficient, it would
- * actually harm the architecture:
- *
- * **The Sorting Problem:**
- * - App list is sorted alphabetically by display name
- * - Renaming "Zebra" → "Apple" requires moving the item from end to beginning
- * - A granular patch would create unsorted list, requiring full re-sort anyway
- * - Result: added complexity with zero performance gain
- *
- * **Single Source of Truth:**
- * - Modern reactive UI (Compose, ListAdapter) expects immutable state objects
- * - "Patching" turns manager into fragile stateful cache with race conditions
- * - "Rebuild from scratch" guarantees atomic correctness and proper sorting
- *
- * **UI Layer Optimization:**
- * - `DiffUtil` is specifically designed to handle new list emissions efficiently
- * - It calculates minimal UI changes (onItemChanged + onItemMoved)
- * - We delegate optimization to the UI layer where it belongs
- *
- * **Data Flow:**
- * 1. User changes app name via ViewModel
- * 2. Manager persists to DataStore
- * 3. Manager emits Unit event via `appsUpdateTrigger`
- * 4. `InstalledAppsRepositoryImpl` receives event and rebuilds app list
- * 5. UI updates via DiffUtil with smooth animations
+ * Point-read helpers ([getDisplayNameForPackage], [hasCustomNameForPackage],
+ * [getAllCustomNames]) remain for callers that need a one-shot answer (backup
+ * export, reconcile). [getAllCustomNames] shares its decode with [customNamesFlow]
+ * ([toCustomNamesMap]) so the two read paths cannot drift (DSR-INV-1).
  *
  * **Error Handling:**
- * All operations return Boolean success indicators and log failures silently.
- * [java.util.concurrent.CancellationException] is always re-thrown for proper coroutine cancellation.
+ * All mutating operations return Boolean success indicators and log failures
+ * silently. [java.util.concurrent.CancellationException] is always re-thrown for
+ * proper coroutine cancellation.
  *
  * @property dataStore Preferences DataStore for persisting custom names
- * @property appsUpdateTrigger Shared event bus for notifying consumers of changes
- *
- * @see HiddenAppsRepositoryImpl for an example where Flow-based state exposure is correct
  */
 @Singleton
 class CustomNamesRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>,
-    private val appsUpdateTrigger: MutableSharedFlow<Unit>
+    private val dataStore: DataStore<Preferences>
 ) : CustomNamesRepository {
 
     /**
@@ -111,7 +60,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
 
     /**
      * Setzt einen benutzerdefinierten Namen für eine App. Wenn der Name leer ist, wird er entfernt.
-     * Nach einer erfolgreichen Änderung wird ein globales Update angestoßen.
+     * A successful edit re-emits [customNamesFlow] via DataStore; consumers re-derive reactively.
      */
     override suspend fun setCustomNameForPackage(packageName: String, customName: String): Boolean {
         // Die Logik, ob ein Name entfernt oder gesetzt wird, ist hier gekapselt.
@@ -134,10 +83,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
             }
         }
 
-        // Wenn die Operation (Setzen oder Entfernen) erfolgreich war, benachrichtige die Listener.
-        if (isSuccessful) {
-            triggerCustomNameUpdate()
-        }
+        // A successful edit re-emits customNamesFlow via DataStore, so consumers
+        // re-derive the display reactively — no PackageManager re-enumeration is
+        // triggered any more (REACTIVE_APPLIST_SPEC).
         return isSuccessful
     }
 
@@ -146,18 +94,12 @@ class CustomNamesRepositoryImpl @Inject constructor(
      * Diese Methode wird vom ViewModel aufgerufen.
      */
     override suspend fun removeCustomNameForPackage(packageName: String): Boolean {
-        val isSuccessful = removeCustomNameInternal(packageName)
-
-        // Wenn die Operation erfolgreich war, benachrichtige die Listener.
-        if (isSuccessful) {
-            triggerCustomNameUpdate()
-        }
-        return isSuccessful
+        return removeCustomNameInternal(packageName)
     }
 
     /**
-     * Die eigentliche Logik zum Entfernen, ohne den Trigger auszulösen,
-     * um von anderen Funktionen wiederverwendet zu werden.
+     * Die eigentliche Logik zum Entfernen, wiederverwendet von setCustomName
+     * (Blank-Pfad) und removeCustomNameForPackage.
      */
     private suspend fun removeCustomNameInternal(packageName: String): Boolean {
         return try {
@@ -208,22 +150,6 @@ class CustomNamesRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Stösst ein Event im zentralen Update-Trigger an.
-     * Dies signalisiert anderen Teilen der App (wie dem InstalledAppsRepositoryImpl),
-     * dass sie ihre Daten neu laden sollten.
-     */
-    override suspend fun triggerCustomNameUpdate() {
-        try {
-            Timber.d("[DATAFLOW] AppNamesManager is emitting an update event.")
-            appsUpdateTrigger.emit(Unit)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error triggering custom name update")
-        }
-    }
-
-    /**
      * Gibt alle benutzerdefinierten App-Namen als Map zurück.
      * Für Backup/Export-Zwecke.
      */
@@ -262,8 +188,8 @@ class CustomNamesRepositoryImpl @Inject constructor(
 
             Timber.i("Batch set ${names.size} custom app names")
 
-            // Trigger nur einmal am Ende
-            triggerCustomNameUpdate()
+            // The single DataStore edit re-emits customNamesFlow once; no
+            // enumeration trigger (REACTIVE_APPLIST_SPEC).
             true
         } catch (e: CancellationException) {
             throw e
@@ -300,8 +226,8 @@ class CustomNamesRepositoryImpl @Inject constructor(
                 toRemove.forEach { preferences.remove(it) }
             }
         }
-        // Intentionally NO triggerCustomNameUpdate(): this runs inside the
-        // app-load pipeline; emitting an update here would re-trigger a reload.
+        // Runs inside the app-load pipeline; the DataStore edit alone re-emits
+        // customNamesFlow, which is the only reactive channel now.
     }
 
     override suspend fun purgeRepository() {
@@ -309,7 +235,6 @@ class CustomNamesRepositoryImpl @Inject constructor(
             dataStore.edit { preferences ->
                 preferences.customNameKeys().forEach { preferences.remove(it) }
             }
-            triggerCustomNameUpdate()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

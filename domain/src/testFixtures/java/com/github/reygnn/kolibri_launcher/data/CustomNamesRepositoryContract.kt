@@ -60,12 +60,7 @@ import org.junit.Test
  *   bereits so festgeschrieben sind.
  *
  * NICHT IM CONTRACT (Implementierungs-Details):
- *   - Konkretes Verhalten von `triggerCustomNameUpdate()` — Manager emittiert
- *     auf einen `MutableSharedFlow<Unit>`, Fake ruft einen Test-Hook auf.
- *     Vertrag ist nur: "wirft nicht, ist idempotent aufrufbar".
  *   - DataStore-IOException-Recovery (Manager-Detail).
- *   - Test-Hooks im Fake (`shouldFailOnSet`, `shouldFailOnBatch`,
- *     `batchSetCalled`, `onUpdateTrigger`) — sind kein Interface-Vertrag.
  *
  * @see FakeCustomNamesRepositoryContractTest
  * @see CustomNamesRepositoryImplContractTest
@@ -272,27 +267,6 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNameForPackage(pkgA, "Custom")
         repo.removeCustomNameForPackage(pkgA)
         assertFalse(repo.hasCustomNameForPackage(pkgA))
-    }
-
-    // ---------- triggerCustomNameUpdate ----------
-
-    /**
-     * Konkretes Trigger-Verhalten ist Implementation-Detail (Manager emittiert
-     * auf einen SharedFlow, Fake ruft einen Test-Hook). Vertrag ist nur: der
-     * Aufruf wirft nicht und ist idempotent aufrufbar.
-     */
-    @Test
-    fun `triggerCustomNameUpdate does not throw on fresh repository`() = runTest {
-        val repo = createRepository()
-        repo.triggerCustomNameUpdate()
-    }
-
-    @Test
-    fun `triggerCustomNameUpdate can be called multiple times without throwing`() = runTest {
-        val repo = createRepository()
-        repo.triggerCustomNameUpdate()
-        repo.triggerCustomNameUpdate()
-        repo.triggerCustomNameUpdate()
     }
 
     // ---------- getAllCustomNames ----------

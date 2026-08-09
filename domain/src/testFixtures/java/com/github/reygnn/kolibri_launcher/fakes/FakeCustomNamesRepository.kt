@@ -19,8 +19,6 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         customNamesState.value = customNames.toMap()
     }
 
-    // Für CustomNamesViewModelTest
-    var onUpdateTrigger: (suspend () -> Unit)? = null
     var shouldFailOnSet = false
 
     // Für BackupRepositoryImplTest
@@ -43,7 +41,6 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         }
 
         syncFlow()
-        triggerCustomNameUpdate()
         return true
     }
 
@@ -51,23 +48,16 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         // Idempotent — analog zu CustomNamesRepositoryImpl.removeCustomNameForPackage:
         // der Zielzustand "kein Custom-Name für packageName" ist nach dem Aufruf
         // erreicht, also Erfolg, unabhängig davon ob vorher ein Eintrag da war.
-        // Trigger erfolgt immer, weil der Manager das auch tut (DataStore.edit
-        // ist immer "successful", auch ohne effektive Änderung).
         // Konsistent zur gleichen Idempotenz-Regel bei
         // FakeFavoritesRepository.removeFavoriteComponent und
         // FakeHiddenAppsRepository.showComponent.
         customNames.remove(packageName)
         syncFlow()
-        triggerCustomNameUpdate()
         return true
     }
 
     override suspend fun hasCustomNameForPackage(packageName: String): Boolean {
         return customNames.containsKey(packageName)
-    }
-
-    override suspend fun triggerCustomNameUpdate() {
-        onUpdateTrigger?.invoke()
     }
 
     override suspend fun getAllCustomNames(): Map<String, String> {
@@ -90,7 +80,6 @@ class FakeCustomNamesRepository : CustomNamesRepository {
             }
         }
         syncFlow()
-        triggerCustomNameUpdate()
         return true
     }
 
@@ -112,7 +101,6 @@ class FakeCustomNamesRepository : CustomNamesRepository {
     override suspend fun purgeRepository() {
         customNames.clear()
         syncFlow()
-        onUpdateTrigger = null
         shouldFailOnSet = false
         shouldFailOnBatch = false
         batchSetCalled = false

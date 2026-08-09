@@ -86,10 +86,6 @@ class CustomNamesViewModelTest {
 
     @Test
     fun `setCustomName - calls repository and triggers update`() = runTest {
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
 
@@ -211,10 +207,6 @@ class CustomNamesViewModelTest {
 
     @Test
     fun `setCustomName - with empty custom name - removes custom name`() = runTest {
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
 
@@ -240,10 +232,6 @@ class CustomNamesViewModelTest {
         // Typing the app's own original name ("Clock") must CLEAR any override, not
         // persist a redundant one. Only the empty-string sub-case was pinned before;
         // dropping the `!= originalName` clause would regress silently.
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
             fakeInstalledAppsRepository.triggerAppsUpdate()
@@ -266,10 +254,6 @@ class CustomNamesViewModelTest {
         // Pins that the guard uses isNotBlank(), not isNotEmpty(): "   " is not
         // empty but is blank, so it must clear the override. A regression to
         // isNotEmpty() would persist a whitespace override and this turns red.
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
             fakeInstalledAppsRepository.triggerAppsUpdate()
@@ -288,10 +272,6 @@ class CustomNamesViewModelTest {
 
     @Test
     fun `setCustomName - called multiple times rapidly - handles correctly`() = runTest {
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
 
@@ -336,10 +316,6 @@ class CustomNamesViewModelTest {
 
     @Test
     fun `setCustomName - with very long name - handles correctly`() = runTest {
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            fakeInstalledAppsRepository.triggerAppsUpdate()
-        }
-
         viewModel.uiState.test {
             awaitItem()
 
@@ -395,35 +371,10 @@ class CustomNamesViewModelTest {
     }
 
     @Test
-    fun `setCustomNamesInBatch - triggers update only once`() = runTest {
-        var triggerCount = 0
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            triggerCount++
-        }
-
-        val names = mapOf(
-            "com.android.clock" to "Name1",
-            "com.android.camera" to "Name2",
-            "com.android.calculator" to "Name3"
-        )
-
-        fakeCustomNamesRepository.setCustomNamesInBatch(names)
-
-        // Should trigger only once, not 3 times
-        Truth.assertThat(triggerCount).isEqualTo(1)
-    }
-
-    @Test
-    fun `setCustomNamesInBatch - with empty map - returns true and triggers once`() = runTest {
-        var triggerCount = 0
-        fakeCustomNamesRepository.onUpdateTrigger = {
-            triggerCount++
-        }
-
+    fun `setCustomNamesInBatch - with empty map - returns true`() = runTest {
         val success = fakeCustomNamesRepository.setCustomNamesInBatch(emptyMap())
 
         Truth.assertThat(success).isTrue()
-        Truth.assertThat(triggerCount).isEqualTo(0) // Empty batch should not trigger
     }
 
     @Test

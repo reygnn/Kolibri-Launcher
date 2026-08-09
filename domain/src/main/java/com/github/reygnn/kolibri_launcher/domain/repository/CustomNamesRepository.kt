@@ -18,7 +18,6 @@ interface CustomNamesRepository : Purgeable {
     suspend fun setCustomNameForPackage(packageName: String, customName: String): Boolean
     suspend fun removeCustomNameForPackage(packageName: String): Boolean
     suspend fun hasCustomNameForPackage(packageName: String): Boolean
-    suspend fun triggerCustomNameUpdate()
     suspend fun getAllCustomNames(): Map<String, String>
     suspend fun setCustomNamesInBatch(names: Map<String, String>): Boolean
 

@@ -20,10 +20,10 @@ import kotlinx.coroutines.CancellationException
  * Repositories whose state lives outside DataStore (system APIs, pure
  * runtime state) implement `purgeRepository()` as a documented no-op and
  * never reach this helper. Repositories whose `purgeRepository` body has
- * post-edit ordering requirements (e.g. `triggerCustomNameUpdate()` after
- * the edit, where a silent edit failure must NOT fire the trigger) keep
- * their inline try/catch shape — the helper would change the
- * commit-then-trigger semantics.
+ * post-edit ordering requirements (a follow-up step that must run only after
+ * a successful edit, never after a silent edit failure) keep their inline
+ * try/catch shape — the helper would change the commit-then-follow-up
+ * semantics.
  *
  * Introduced for AUDIT.md §8.7 to consolidate the six purgeRepository
  * implementations that share this exact body.
