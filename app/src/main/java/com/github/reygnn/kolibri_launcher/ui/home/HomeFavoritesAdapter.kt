@@ -147,48 +147,129 @@ class HomeFavoritesAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         try {
-            val app = getItem(position)
-            // Position the button within the row. Wrap-content + layout
-            // gravity keeps the click/long-press hit area on the text only,
-            // leaving empty space for the wrapper's own long-press handler.
-            val params = holder.button.layoutParams as FrameLayout.LayoutParams
-            val newGravity = styling.alignment.toHorizontalGravity() or Gravity.CENTER_VERTICAL
-            if (params.gravity != newGravity) {
-                params.gravity = newGravity
-                holder.button.layoutParams = params
-            }
-            with(holder.button) {
-                text = app.displayName
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, styling.textSizePx)
-                setPadding(
-                    styling.horizPaddingPx,
-                    styling.verticalPaddingPx,
-                    styling.horizPaddingPx,
-                    styling.verticalPaddingPx,
-                )
-                typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                setTextColor(subtlePressColor(styling.textColor))
-                setShadowLayer(
-                    AppConstants.SHADOW_RADIUS_APPS,
-                    AppConstants.SHADOW_DX,
-                    AppConstants.SHADOW_DY,
-                    styling.shadowColor,
-                )
-                setOnClickListener { onAppClick(app) }
-                setOnLongClickListener {
-                    onAppLongClick(app)
-                    true
-                }
-            }
+            // Text is the only per-item property; the click/long-click listeners
+            // are hoisted into the ViewHolder init (AUDIT-14 F3, part 3), so a
+            // full bind sets text + styling only.
+            holder.button.text = getItem(position).displayName
+            applyStyling(holder)
         } catch (e: Throwable) {
+            // Catch kept: view setters on a torn-down/recycled holder plus the
+            // getItem race are the real failure modes (system-callback boundary,
+            // Rule 11 four-category frame). no suspension point.
             TimberWrapper.silentError(e, "Error binding favorite at position $position")
         }
     }
 
-    class ViewHolder(
+    /**
+     * Partial rebind for [STYLING_PAYLOAD] (AUDIT-14 F3, part 1): a
+     * theme/alignment/layout change re-applies styling only, without re-setting
+     * the text or re-wiring listeners. Empty payloads fall through to the full
+     * [onBindViewHolder].
+     */
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
+        try {
+            // Every payload this adapter emits is STYLING_PAYLOAD; apply styling
+            // once regardless of how many coalesced.
+            applyStyling(holder)
+        } catch (e: Throwable) {
+            // Catch kept: same view-setter boundary as the full bind above.
+            // no suspension point.
+            TimberWrapper.silentError(e, "Error applying styling payload at position $position")
+        }
+    }
+
+    /**
+     * Applies the current [styling] to [holder]'s button: alignment gravity,
+     * text size, padding, typeface, press-state color and shadow. Shared by the
+     * full bind and the payload rebind so both stay in lockstep.
+     */
+    private fun applyStyling(holder: ViewHolder) {
+        // Position the button within the row. Wrap-content + layout gravity keeps
+        // the click/long-press hit area on the text only, leaving empty space for
+        // the wrapper's own long-press handler.
+        val params = holder.button.layoutParams as FrameLayout.LayoutParams
+        val newGravity = styling.alignment.toHorizontalGravity() or Gravity.CENTER_VERTICAL
+        if (params.gravity != newGravity) {
+            params.gravity = newGravity
+            holder.button.layoutParams = params
+        }
+        with(holder.button) {
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, styling.textSizePx)
+            setPadding(
+                styling.horizPaddingPx,
+                styling.verticalPaddingPx,
+                styling.horizPaddingPx,
+                styling.verticalPaddingPx,
+            )
+            typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            setTextColor(subtlePressColor(styling.textColor))
+            setShadowLayer(
+                AppConstants.SHADOW_RADIUS_APPS,
+                AppConstants.SHADOW_DX,
+                AppConstants.SHADOW_DY,
+                styling.shadowColor,
+            )
+        }
+    }
+
+    /**
+     * Listeners are wired once here (AUDIT-14 F3, part 3) instead of per-bind,
+     * so no lambda is allocated on every rebind. They live on the WRAP_CONTENT
+     * [button] (NOT the container), so `isLongClickable` — the signal
+     * [HomeGestureLayout.hasOwnTouchPipelineDescendantAt] reads — is set on the
+     * button only, preserving the "empty row space stays the wrapper's
+     * long-press area" hit-test contract (see [onCreateViewHolder]). The bound
+     * item is resolved via [bindingAdapterPosition] at click time rather than
+     * captured, so a list change between bind and tap cannot fire a stale item.
+     */
+    inner class ViewHolder(
         container: FrameLayout,
         val button: Button,
-    ) : RecyclerView.ViewHolder(container)
+    ) : RecyclerView.ViewHolder(container) {
+
+        init {
+            button.setOnClickListener {
+                val app = currentItemOrNull(bindingAdapterPosition) ?: return@setOnClickListener
+                try {
+                    // User callback — may throw anything (system-callback boundary).
+                    onAppClick(app)
+                } catch (e: Throwable) {
+                    // Catch kept: callback boundary, Rule 11. no suspension point.
+                    TimberWrapper.silentError(e, "Error in onAppClick for ${app.packageName}")
+                }
+            }
+            button.setOnLongClickListener {
+                val app = currentItemOrNull(bindingAdapterPosition)
+                    ?: return@setOnLongClickListener false
+                try {
+                    onAppLongClick(app)
+                } catch (e: Throwable) {
+                    // Catch kept: callback boundary, Rule 11. no suspension point.
+                    TimberWrapper.silentError(e, "Error in onAppLongClick for ${app.packageName}")
+                }
+                true
+            }
+        }
+    }
+
+    /**
+     * Resolves the item at [position], or null when the row is unbound
+     * ([RecyclerView.NO_POSITION]) or a concurrent list swap makes the read race
+     * out of bounds — so a click during teardown fires nothing instead of crashing.
+     */
+    private fun currentItemOrNull(position: Int): AppInfo? {
+        if (position == RecyclerView.NO_POSITION) return null
+        return try {
+            getItem(position)
+        } catch (e: IndexOutOfBoundsException) {
+            TimberWrapper.silentError(e, "Favorite item read out of bounds at position $position")
+            null
+        }
+    }
 
     private companion object {
         // Marker payload for notifyItemRangeChanged — see setStyling KDoc.
