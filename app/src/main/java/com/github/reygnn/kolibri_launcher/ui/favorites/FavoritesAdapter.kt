@@ -30,7 +30,6 @@ class FavoritesAdapter(
         fun bind(app: AppInfo) {
             // Reine TextView/View-Setter auf Non-Null-Binding — werfen nicht.
             binding.appName.text = app.displayName
-            binding.appIcon.visibility = View.GONE
             binding.dragHandle.visibility = View.VISIBLE
         }
 
