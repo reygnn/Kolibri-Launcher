@@ -47,11 +47,15 @@ testing reference.
 Gradle is bundled via wrapper. `androidTest/` was empty for ~6 months
 after a flakiness-driven deletion event (~500 tests removed — see
 Rule 10 below and `HISTORY.md`). Since late April 2026 it is being
-reintroduced selectively, under a stricter bar: only genuinely
-important paths that either deliver value JVM tests can't reach or
-can't be covered reliably by Robolectric. Robolectric itself is
-already in use in the JVM `test/` set for `android.net.Uri`-touching
-code (e.g. `WallpaperRepositoryImplTest`).
+reintroduced under a **value bar, not a cost bar** (Rule 10): a path
+earns a place in `androidTest/` when it exercises real-device behaviour
+JVM/Robolectric genuinely can't reach. The authoring/maintenance cost
+that drove the original purge has since collapsed, so the deciding
+question is signal, not effort — reach for it when a device is needed to
+make the behaviour true, skip it when it would only duplicate JVM/
+Robolectric coverage. Robolectric itself is already in use in the JVM
+`test/` set for `android.net.Uri`-touching code (e.g.
+`WallpaperRepositoryImplTest`).
 
 ---
 
@@ -347,12 +351,28 @@ activities.
     everything the rule above puts there. `androidTest/` was abandoned
     for ~6 months after a deletion event of ~500 instrumented tests
     (constant flakiness, debug sessions that ate days; full account in
-    `HISTORY.md`). Since late April 2026 it is being reintroduced under
-    a stricter bar: a path earns a place in `androidTest/` only if it
-    is genuinely important AND either (a) delivers value that JVM tests
-    can't reach, or (b) cannot be covered reliably by Robolectric. The
-    previous "anything worth testing on a device" mode is over —
-    instrumented tests are now the exception, not a parallel default.
+    `HISTORY.md`). That purge was driven by AUTHORING and MAINTENANCE
+    cost under an older toolchain and assistant generation — and that
+    cost has since collapsed (AGP orchestrator + `clearPackageData`
+    isolation + `numFlakyTestAttempts` + `awaitUntil`, plus AI-assisted
+    authoring/diagnosis; the AUDIT-14 F3 hit-test pair was written and
+    root-caused in minutes, not days). So the bar is now a **value bar,
+    not a cost bar**: reach for `androidTest/` whenever a path needs a
+    real device to be true — touch dispatch / gesture priority
+    (`HomeGestureLayout` hit-test), real `Canvas`/`Bitmap` semantics,
+    genuine framework/OEM callbacks — and don't hold back on effort
+    grounds; the maintenance tax that made the old bar strict is gone.
+
+    The one thing that has NOT changed is the **redundancy guardrail**:
+    an instrumented test that only re-checks pure in-memory or
+    framework-data logic already pinned on the JVM/Robolectric adds no
+    signal, however cheap it is to write — so it still doesn't belong.
+    AUDIT-14 F3 is the worked example of the line: the long-press
+    hit-test (favorite vs. wrapper customize dialog) earned two
+    instrumented tests because touch priority only exists on a device;
+    the `ColorStateList` memo did NOT, because Robolectric pins its
+    identity + colours identically. The deciding question is "does this
+    need a device to be true?", never "is a device test affordable?".
     Robolectric (already used in `test/` for `android.net.Uri`-touching
     code) remains the first stop when leaving the JVM.
 
