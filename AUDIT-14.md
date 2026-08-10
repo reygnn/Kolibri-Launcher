@@ -17,6 +17,41 @@
 
 ---
 
+## Status: GESCHLOSSEN (2026-08-10)
+
+Alles mit tatsächlichem Impact ist umgesetzt und in `main`. Der Rest ist
+ausschließlich `low` und bewusst vertagt an die §7-Re-Evaluierungs-Trigger
+(nicht offen im Sinne von „vergessen").
+
+**Umgesetzt:**
+
+| Finding | Was | Version |
+|---|---|---|
+| **F1** (a/b/c, `low–moderate`) | `favoriteApps` off-Main + `distinctUntilChanged`; `distinctUntilChanged` an den vier geteilten DataStore-Quell-Flows | 0.99.153 / 0.99.154 |
+| **F2** Bullet 1 + 3 | `usageFlow` nur im TIME_WEIGHTED-Modus (`flatMapLatest`); `sortOrderFlow`/`hiddenAppsFlow`-Dedupe | 0.99.154 |
+| **Nit §208** | `AppInfo.displayNameLower` (vorberechneter Sort-Key) | 0.99.154 |
+| **F3** (alle drei Teile) | `ColorStateList`-Cache; Payload-`onBindViewHolder`; gehoistete Listener — Hit-Test-Contract beidseitig per Emulator-Instrumented-Test verifiziert | 0.99.155 / 0.99.156 |
+| **Nit §212** | `AppInfo.componentName` als vorberechneter Body-`val` | (dieser Change) |
+
+**Bewusst vertagt (alle `low`, an §7-Trigger gebunden):**
+
+- **F2 Bullet 2** (TIME_WEIGHTED-Recompute pro Tick) — semantisch nötig, „erst
+  messen"; ernster nehmen, wenn die installierte App-Zahl spürbar wächst.
+- **F4** (`getWallpaperColors`-Binder in `onCreate`) — Cold-Start-Mikro, „messen".
+- **F5** (Wallpaper-Memory: Budget × Multi-Layer, kein `recycle()`) — „messen,
+  dann entscheiden"; `recycle()` ist aktiv riskant. Trigger: steigende
+  Multi-Layer-OOM-Reports.
+- **F1 §5.3** (`applyNames` ohne Sort für den Favoriten-Pfad) — Mikro-Gewinn an
+  einer breit genutzten Funktion; nur mitnehmen, wenn die Pipeline ohnehin
+  angefasst wird.
+- **Nit §215** (`SimpleDateFormat` pro Minuten-Tick) — vernachlässigbar (1×/min).
+
+**Nebenprodukt:** Die androidTest-Arbeit an F3 (echtes Touch-Dispatch, das
+JVM/Robolectric nicht erreicht) hat die androidTest-Philosophie in `CLAUDE.md`
+von einer Cost-Bar auf eine Value-Bar umgestellt.
+
+---
+
 ## 1. Wo Launcher generell laggen — und Kolibris Stand dagegen
 
 Die klassischen Lag-/Bloat-Quellen eines Home-Launchers, und wo Kolibri jeweils
