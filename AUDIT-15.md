@@ -44,7 +44,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 | # | Ort | Was | Severity |
 |---|---|---|---|
 | **F1** | `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` | O(n·m) `List.find`+`remove` in Schleife über die Favoriten | `low` |
-| **F2** | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
+| **F2** ✅ | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
@@ -76,8 +76,14 @@ Ordering über die Map + ein `HashSet` konsumierter Keys → O(n+m). Der Contrac
 `FavoritesOrderRepositoryContract` deckt Duplikate/fehlende Order-Einträge bereits
 ab, pinnt das Verhalten also gegen einen Umbau.
 
-### F2 — Suche ignoriert den vorberechneten Lower-Key
+### F2 — Suche ignoriert den vorberechneten Lower-Key · ✅ umgesetzt
 `app/.../ui/appdrawer/AppSearchFilter.kt:30-37`
+
+> **Erledigt:** Query einmal `lowercase()`, Match gegen `displayNameLower`
+> statt `contains(ignoreCase=true)` pro App. `AppSearchFilterTest` (9 JVM)
+> grün, `AppDrawerFragmentSearchTest` (instrumented) deckt das
+> End-to-End-Matching ab.
+
 
 ```kotlin
 allApps.filter { app -> app.displayName.contains(query, ignoreCase = true) }
