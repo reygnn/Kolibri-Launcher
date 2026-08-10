@@ -867,3 +867,51 @@ package com.github.reygnn.kolibri_launcher
  * regression actually lands.
  * ============================================================================
  */
+
+/**
+ * ============================================================================
+ * MUTATION-CHECK A CHARACTERIZATION NET ONCE, AT AUTHORING TIME
+ * ============================================================================
+ *
+ * Reference: [com.github.reygnn.kolibri_launcher.ui.appcontextmenu
+ *             .AppContextMenuAdapterBindingTest] (AUDIT-15 F6 net).
+ *
+ * A *characterization net* is a test written to pin EXISTING behaviour
+ * before a refactor, so the refactor is safe (as opposed to a red-green
+ * TDD test, which was already born from a failing state). Its whole value
+ * is that it goes red if the refactor changes behaviour it claimed to
+ * hold — so a net that is silently TAUTOLOGICAL (green no matter what the
+ * production code does) is worse than none: it stays green THROUGH the
+ * very refactor it was meant to guard, and hands out false confidence.
+ *
+ * You cannot see a tautological assertion by reading it — a green test
+ * looks identical whether it has teeth or not. The only proof is to break
+ * the behaviour and watch the test fail. So:
+ *
+ * WHEN you write or materially change a characterization net, mutation-
+ * check it ONCE:
+ *   1. Deliberately break the production behaviour the net claims to pin
+ *      (e.g. stub the routing: `setOnClickListener { onItemClicked(item) }`
+ *      -> `setOnClickListener { }`).
+ *   2. Run the net. The pinning test MUST go red. If it stays green, the
+ *      assertion has no teeth — fix the test, not the mutation.
+ *   3. Revert the mutation. The net MUST go green again.
+ *
+ * This is an AUTHORING DISCIPLINE, run by hand, not a standing gate —
+ * deliberately:
+ *   - A hardcoded mutation target (a `sed` on one line) is brittle: it
+ *     breaks at exactly the refactor it guards, because that refactor
+ *     moves or deletes the mutated line. The F6 net is the worked example
+ *     — the hoist deletes the very `setOnClickListener { onItemClicked }`
+ *     line the mutation stubs.
+ *   - A real mutation framework (Pitest) is a poor fit here: every mutant
+ *     reboots Robolectric (~9s first-boot, see the Robolectric section),
+ *     so a full run is slow/flaky, and it is a heavyweight dependency
+ *     against the lean-deps baseline.
+ *
+ * So the check lives in the author's hands and in the commit message
+ * ("mutation-checked: breaking X turns test Y red"), not in CI. Not every
+ * unit test needs it — only nets whose job is refactor-safety, where a
+ * false green is the specific failure mode.
+ * ============================================================================
+ */
