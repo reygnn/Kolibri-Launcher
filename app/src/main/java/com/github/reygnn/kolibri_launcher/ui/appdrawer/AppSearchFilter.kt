@@ -27,12 +27,17 @@ class AppSearchFilter {
             return FilterResult.ShowList(emptyList())
         }
 
-        // 2. Filtern (Case insensitive)
+        // 2. Filtern (Case insensitive). Match against the precomputed
+        // AppInfo.displayNameLower (AUDIT-14 Nit §208, locale-invariant) and
+        // lower-case the query once, instead of re-folding every displayName
+        // per app on every keystroke via contains(ignoreCase = true).
+        // AUDIT-15 F2.
         val filteredList = if (query.isBlank()) {
             allApps
         } else {
+            val queryLower = query.lowercase()
             allApps.filter { app ->
-                app.displayName.contains(query, ignoreCase = true)
+                app.displayNameLower.contains(queryLower)
             }
         }
 
