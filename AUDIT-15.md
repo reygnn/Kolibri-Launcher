@@ -48,7 +48,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
-| **F6** | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
+| **F6** ✅(a) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
 
 ### F1 — O(n·m) in `sortAppsWithGivenOrder`
 `data/.../data/FavoritesOrderRepositoryImpl.kt:153-172`
@@ -137,7 +137,7 @@ sauber über den Adapter), nur die Chip-Leiste; die Anzahl ist durch die
 sichtbaren Events begrenzt. `low`; ein diffendes Update oder ein kleiner
 `ListAdapter` wäre die saubere Form, lohnt aber erst bei spürbar vielen Chips.
 
-### F6 — Context-Menu-Adapter: Per-Bind-Allokationen
+### F6 — Context-Menu-Adapter: Per-Bind-Allokationen · ✅ (a) umgesetzt, (b)/(c) bewusst belassen
 `app/.../ui/appcontextmenu/AppContextMenuAdapter.kt:30,70,88`
 
 Drei kleine Ränder: (a) `setOnClickListener` in `onBindViewHolder` (`:70`)
@@ -147,6 +147,21 @@ payloadloses `notifyItemRangeChanged(0, itemCount)` (`:30`) → voller Rebind de
 sichtbaren Zeilen. Die Liste ist winzig (ein Kontextmenü), daher `low` — aber es
 ist der einzige Adapter mit Per-Bind-Allokation/-Lookup; Listener ins Holder-`init`
 hoisten (wie im Drawer-Adapter) wäre der konsistente Fix.
+
+> **Erledigt (a):** Listener aus `onBindViewHolder` in `onCreateViewHolder`
+> gehoistet — eine Allokation pro Holder statt pro Bind, Item-Auflösung via
+> `bindingAdapterPosition` zur Klick-Zeit (Idiom von `AppDrawerAdapter` /
+> `HomeFavoritesAdapter`). Abgesichert durch ein vorab gebautes
+> Charakterisierungs-Netz (`AppContextMenuAdapterBindingTest`, 9 Tests,
+> mutations-geprüft) — der Refactor lief grün gegen das Netz.
+>
+> **Bewusst belassen (b)/(c):** Das Label variiert echt pro Item, ein
+> `getString`-Cache wäre künstlich. Ein Farb-Payload lohnt auf einem Menü
+> mit ~5–8 kurz sichtbaren Zeilen nicht — die Sibling-Adapter nutzen
+> Payloads nur, weil ihre Listen groß sind. Beide `low`, kein Signal.
+>
+> **Nebenprodukt:** Der einmalige Mutations-Check des Netzes ist als
+> Autoren-Disziplin in `TESTING_CONVENTIONS.kt` verankert.
 
 ---
 
@@ -179,10 +194,15 @@ hoisten (wie im Drawer-Adapter) wäre der konsistente Fix.
 Nach AUDIT-14 ist die eigentliche Lag-Front geräumt. Was AUDIT-15 findet, sind
 sechs `low`-Deltas — ein O(n·m)-Loop über eine kleine Liste (F1), zwei
 Reaktiv-Pipeline-Mikros (F2, F3), zwei Adapter-Ränder (F4, F6) und ein
-Chip-Rebuild (F5). Nichts davon ist dringend. Die natürliche Bündelung: **F1 + F3**
-zusammen mit dem schon vertagten AUDIT-14 F1 §5.3 angehen, sobald die
-Favoriten-/Naming-Pipeline ohnehin mal offen ist; F2 als Ein-Zeilen-Mitnahme bei
-nächster Arbeit an der Suche; F4/F5/F6 nur bei Berührung der jeweiligen Datei.
+Chip-Rebuild (F5). Nichts davon ist dringend.
+
+**Umgesetzt:** F4 (totes `app_icon` entfernt), F2 (Suche gegen `displayNameLower`)
+und F6 (a) (Listener-Hoist, abgesichert durch ein mutations-geprüftes
+Charakterisierungs-Netz). F6 (b)/(c) bewusst belassen (siehe §1).
+
+**Offen** (alle `low`, kein Druck): **F1 + F3** am besten zusammen mit dem
+vertagten AUDIT-14 F1 §5.3 angehen, sobald die Favoriten-/Naming-Pipeline
+ohnehin mal offen ist; **F5** (Chip-Diffing) nur bei spürbar vielen Chips.
 
 ## 4. Korrekturen an den Sub-Agent-Zurufen (Transparenz)
 
