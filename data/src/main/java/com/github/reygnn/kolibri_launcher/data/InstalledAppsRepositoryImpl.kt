@@ -258,7 +258,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             }
         }
 
-        return appInfoList.sortedBy { it.displayName.lowercase() }
+        return appInfoList.sortedBy { it.displayNameLower }
     }
 
     override suspend fun purgeRepository() {

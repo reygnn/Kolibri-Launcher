@@ -139,7 +139,7 @@ class GetDrawerAppsUseCase @Inject constructor(
         }
 
         val sortedApps = when (sortOrder) {
-            SortOrder.ALPHABETICAL -> visibleApps.sortedBy { it.displayName.lowercase() }
+            SortOrder.ALPHABETICAL -> visibleApps.sortedBy { it.displayNameLower }
 
             SortOrder.TIME_WEIGHTED_USAGE -> try {
                 // Echte externe Abhängigkeit (UsageStats / System-Clock /
@@ -154,7 +154,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                     e,
                     "Error in time-weighted sort, falling back to alphabetical",
                 )
-                visibleApps.sortedBy { it.displayName.lowercase() }
+                visibleApps.sortedBy { it.displayNameLower }
             }
         }
 

@@ -142,7 +142,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error sorting favorite components, falling back to alphabetical")
             try {
-                favoriteApps.sortedBy { it.displayName.lowercase() }
+                favoriteApps.sortedBy { it.displayNameLower }
             } catch (e2: Throwable) {
                 TimberWrapper.silentError(e2, "Critical error in fallback sorting, returning unsorted list")
                 favoriteApps
@@ -153,7 +153,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
     fun sortAppsWithGivenOrder(appsToSort: List<AppInfo>, order: List<String>): List<AppInfo> {
         try {
             if (order.isEmpty()) {
-                return appsToSort.sortedBy { it.displayName.lowercase() }
+                return appsToSort.sortedBy { it.displayNameLower }
             }
 
             val orderedApps = mutableListOf<AppInfo>()
@@ -168,7 +168,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
             }
 
             // Restliche Apps alphabetisch sortiert anhängen
-            orderedApps.addAll(remainingApps.sortedBy { it.displayName.lowercase() })
+            orderedApps.addAll(remainingApps.sortedBy { it.displayNameLower })
             return orderedApps
 
         } catch (e: Throwable) {

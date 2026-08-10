@@ -25,4 +25,4 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  */
 fun applyNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
-        .sortedBy { it.displayName.lowercase() }
+        .sortedBy { it.displayNameLower }

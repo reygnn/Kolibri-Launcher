@@ -15,6 +15,22 @@ data class AppInfo(
     val isFavorite: Boolean = false
 ) {
     /**
+     * Precomputed lowercase sort key for [displayName].
+     *
+     * Computed once per instance (and correctly recomputed on
+     * `copy(displayName = …)`, since `copy` runs through the constructor), so name
+     * sorts do not reallocate a `lowercase()` per comparison — the O(N·log N)
+     * allocations in the comparator collapse to O(N) at instance creation
+     * (AUDIT-14 Nit §208).
+     *
+     * Deliberately a body `val` and **not** a constructor parameter, so it stays
+     * out of `equals`/`hashCode`/`toString`/`componentN`; the equals-based Flow
+     * `distinctUntilChanged` therefore behaves unchanged. `lowercase()` is
+     * locale-invariant, so the ordering is identical to the former comparator calls.
+     */
+    val displayNameLower: String = displayName.lowercase()
+
+    /**
      * Ein eindeutiger Bezeichner für einen spezifischen Launcher-Eintrag.
      * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
      * (z.B. "Google" und "Voice Search").

@@ -146,7 +146,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
             throw e
         } catch (e: Throwable) {
             KolibriLog.w(e, "Sorting failed - using alphabetical fallback")
-            favoriteApps.sortedBy { it.displayName.lowercase() }
+            favoriteApps.sortedBy { it.displayNameLower }
         }
 
         val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FAVORITES_ON_HOME)
@@ -182,7 +182,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // Filter / sortedBy / take auf String-Properties — kann nicht werfen.
         return rawApps
             .filter { !hiddenApps.contains(it.componentName) }
-            .sortedBy { it.displayName.lowercase() }
+            .sortedBy { it.displayNameLower }
             .take(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 }

@@ -64,7 +64,7 @@ class HiddenAppsViewModel @Inject constructor(
 
                 val selectedAppInfos = allApps
                     .filter { selected.contains(it.componentName) }
-                    .sortedBy { it.displayName.lowercase() }
+                    .sortedBy { it.displayNameLower }
 
                 _uiState.value.copy(
                     titleResId = R.string.hidden_apps_title_screen,
@@ -102,7 +102,7 @@ class HiddenAppsViewModel @Inject constructor(
                 // bounded timeout — same pattern as BackupDataAssembler.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
-                }?.sortedBy { it.displayName.lowercase() }
+                }?.sortedBy { it.displayNameLower }
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in HiddenAppsViewModel")
 
                 // Load the selection BEFORE publishing the master list, then

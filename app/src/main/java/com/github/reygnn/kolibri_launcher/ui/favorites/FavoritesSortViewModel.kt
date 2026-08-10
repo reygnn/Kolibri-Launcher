@@ -79,7 +79,7 @@ class FavoritesSortViewModel @Inject constructor(
      * tell but still re-persists, matching the pre-extraction behavior.
      */
     fun onSortAlphabetically() {
-        val sorted = _apps.value.sortedBy { it.displayName.lowercase() }
+        val sorted = _apps.value.sortedBy { it.displayNameLower }
         _apps.value = sorted
         persistOrder(sorted, successToastResId = R.string.favorites_sorted_alphabetically)
     }

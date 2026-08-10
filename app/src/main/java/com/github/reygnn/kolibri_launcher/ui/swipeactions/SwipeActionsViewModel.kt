@@ -117,7 +117,7 @@ class SwipeActionsViewModel @Inject constructor(
                 // HiddenAppsViewModel.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
-                }?.sortedBy { it.displayName.lowercase() }
+                }?.sortedBy { it.displayNameLower }
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in SwipeActionsViewModel")
 
                 // Load the stored slot assignments BEFORE publishing the master

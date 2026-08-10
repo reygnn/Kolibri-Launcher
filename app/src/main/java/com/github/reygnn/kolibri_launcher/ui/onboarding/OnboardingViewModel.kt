@@ -92,7 +92,7 @@ class OnboardingViewModel @Inject constructor(
 
                     val selectedAppInfos = allApps
                         .filter { selected.contains(it.componentName) }
-                        .sortedBy { it.displayName.lowercase() }
+                        .sortedBy { it.displayNameLower }
 
                     _uiState.value.copy(
                         selectableApps = selectableList,

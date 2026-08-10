@@ -168,7 +168,7 @@ class AppUsageRepositoryImpl @Inject constructor(
             }
                 .sortedWith(
                     compareByDescending<Pair<AppInfo, Double>> { it.second }
-                        .thenBy { it.first.displayName.lowercase() }
+                        .thenBy { it.first.displayNameLower }
                 )
                 .map { it.first }
 
@@ -176,7 +176,7 @@ class AppUsageRepositoryImpl @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error sorting by time-weighted usage, falling back to alphabetical sort")
-            apps.sortedBy { it.displayName.lowercase() }
+            apps.sortedBy { it.displayNameLower }
         }
     }
 
