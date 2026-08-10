@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -20,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -466,6 +468,45 @@ class SettingsRepositoryImplTest {
 
         val finalValue = settingsManager.showAlarmFlow.first()
         assertFalse("Final state should be false after odd number of toggles", finalValue)
+    }
+
+    // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
+
+    @Test
+    fun `sortOrderFlow - unrelated shared-store write does not re-emit identical value`() = runTest {
+        // sortOrderFlow drives the drawer combine on the hot tap-to-launch path.
+        // distinctUntilChanged (per-flow, NOT in the shared enumFlow helper) must
+        // suppress a re-emission caused by an unrelated write to the shared store.
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
+
+        settingsManager.sortOrderFlow.test {
+            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+
+            val usageKey = longPreferencesKey("usage_count_com.other/App")
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply { set(usageKey, 1L) }
+            }
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `sortOrderFlow - still emits when the sort order actually changes`() = runTest {
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
+
+        settingsManager.sortOrderFlow.test {
+            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    set(SORT_ORDER_KEY, SortOrder.TIME_WEIGHTED_USAGE.name)
+                }
+            }
+
+            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+        }
     }
 
 }

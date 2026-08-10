@@ -3,8 +3,10 @@ package com.github.reygnn.kolibri_launcher.data
 import io.mockk.mockk
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
@@ -508,5 +510,55 @@ class FavoritesOrderRepositoryImplTest {
         // Assert
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
         Assert.assertTrue("Order list should be empty after purge", savedOrder.isEmpty())
+    }
+
+    // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
+
+    @Test
+    fun `favoriteComponentsOrderFlow - unrelated shared-store write does not re-emit identical order`() =
+        runTest {
+            // The order lives in the shared settingsDataStore, so DataStore.data
+            // re-emits on EVERY write. distinctUntilChanged must suppress an unrelated
+            // write (e.g. the per-launch usage tick) that leaves the order unchanged.
+            val orderKey = stringPreferencesKey("favorites_order_components_list_json")
+            val store = FakeDataStore()
+            store.setInitialData(
+                preferencesOf(orderKey to JSONArray(listOf("com.a/A", "com.b/B")).toString()),
+            )
+            val repo = FavoritesOrderRepositoryImpl(store)
+
+            repo.favoriteComponentsOrderFlow.test {
+                Assert.assertEquals(listOf("com.a/A", "com.b/B"), awaitItem())
+
+                val usageKey = longPreferencesKey("usage_count_com.other/App")
+                store.updateData { prefs ->
+                    prefs.toMutablePreferences().apply { set(usageKey, 1L) }
+                }
+                advanceUntilIdle()
+
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `favoriteComponentsOrderFlow - still emits when the order actually changes`() = runTest {
+        val orderKey = stringPreferencesKey("favorites_order_components_list_json")
+        val store = FakeDataStore()
+        store.setInitialData(
+            preferencesOf(orderKey to JSONArray(listOf("com.a/A", "com.b/B")).toString()),
+        )
+        val repo = FavoritesOrderRepositoryImpl(store)
+
+        repo.favoriteComponentsOrderFlow.test {
+            Assert.assertEquals(listOf("com.a/A", "com.b/B"), awaitItem())
+
+            store.updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    set(orderKey, JSONArray(listOf("com.b/B", "com.a/A")).toString())
+                }
+            }
+
+            Assert.assertEquals(listOf("com.b/B", "com.a/A"), awaitItem())
+        }
     }
 }

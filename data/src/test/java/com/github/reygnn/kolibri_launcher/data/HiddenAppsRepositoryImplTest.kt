@@ -3,8 +3,10 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
@@ -13,6 +15,7 @@ import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -281,5 +284,45 @@ class HiddenAppsRepositoryImplTest {
         hiddenAppsManager.purgeRepository()
 
         Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+    }
+
+    // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
+
+    @Test
+    fun `hiddenAppsFlow - unrelated shared-store write does not re-emit identical set`() = runTest {
+        // hiddenAppsFlow feeds three combines (drawer, favorites, recents) off the
+        // shared settingsDataStore. distinctUntilChanged must stop an unrelated write
+        // (per-launch usage tick, sort change, …) from re-running all three for an
+        // identical hidden set.
+        fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.a/A")))
+
+        hiddenAppsManager.hiddenAppsFlow.test {
+            Assert.assertEquals(setOf("com.a/A"), awaitItem())
+
+            val usageKey = longPreferencesKey("usage_count_com.other/App")
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply { set(usageKey, 1L) }
+            }
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `hiddenAppsFlow - still emits when the hidden set actually changes`() = runTest {
+        fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.a/A")))
+
+        hiddenAppsManager.hiddenAppsFlow.test {
+            Assert.assertEquals(setOf("com.a/A"), awaitItem())
+
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    set(hiddenComponentsKey, setOf("com.a/A", "com.b/B"))
+                }
+            }
+
+            Assert.assertEquals(setOf("com.a/A", "com.b/B"), awaitItem())
+        }
     }
 }
