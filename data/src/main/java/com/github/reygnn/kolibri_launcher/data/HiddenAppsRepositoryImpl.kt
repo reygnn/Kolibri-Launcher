@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
@@ -96,11 +97,16 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         val HIDDEN_COMPONENTS = stringSetPreferencesKey("hidden_components_set")
     }
 
+    // distinctUntilChanged: shared settingsDataStore re-emits on every write to
+    // ANY key. This flow feeds three combines (drawer, favorites, recents); dedupe
+    // the decoded Set so an unrelated write (usage tick per launch, sort change …)
+    // does not re-run all three for an identical hidden set (AUDIT-14 F1c/F2).
     override val hiddenAppsFlow: Flow<Set<String>>
         get() = dataStore.safeReadFlow("Error reading hidden components preferences")
             .map { preferences ->
                 preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
             }
+            .distinctUntilChanged()
 
     override suspend fun isComponentHidden(componentName: String?): Boolean {
         if (componentName.isNullOrBlank()) return false

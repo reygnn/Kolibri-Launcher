@@ -19,6 +19,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -130,8 +131,14 @@ class SettingsRepositoryImpl @Inject constructor(
 
     // --- IMPLEMENTATION ---
 
+    // distinctUntilChanged only on sortOrderFlow (NOT the shared valueFlow/enumFlow
+    // helper): this is the one settings flow that drives the drawer combine on the
+    // hot tap-to-launch path, where the shared store's per-write re-emission causes
+    // a redundant full re-sort. Other settings flows are UI-cheap; leaving the
+    // helper untouched keeps the blast radius to this key (AUDIT-14 F2).
     override val sortOrderFlow: Flow<SortOrder> =
         enumFlow(PreferenceKeys.SORT_ORDER_KEY, AppConstants.DEFAULT_SORT_ORDER)
+            .distinctUntilChanged()
 
     override suspend fun setSortOrder(sortOrder: SortOrder) =
         putValue(PreferenceKeys.SORT_ORDER_KEY, sortOrder.name)

@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.json.JSONArray
 import org.json.JSONException
 import timber.log.Timber
@@ -57,10 +58,14 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : FavoritesOrderRepository {
 
+    // distinctUntilChanged: shared settingsDataStore re-emits on every write to
+    // ANY key; dedupe the decoded order List so unrelated writes (usage tick on
+    // each launch, etc.) no longer re-fire the favorites combine (AUDIT-14 F1c).
     override val favoriteComponentsOrderFlow: Flow<List<String>> =
         dataStore.readFlowFailOpen("Error reading favorites order") { preferences ->
             parseOrderString(preferences[PreferencesKeys.ORDER_LIST])
         }
+            .distinctUntilChanged()
 
     private object PreferencesKeys {
         val ORDER_LIST = stringPreferencesKey("favorites_order_components_list_json")

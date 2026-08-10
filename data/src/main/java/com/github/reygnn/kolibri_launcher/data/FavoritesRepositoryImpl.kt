@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.io.IOException
@@ -58,10 +59,16 @@ class FavoritesRepositoryImpl @Inject constructor(
         val FAVORITES = stringSetPreferencesKey("favorites_components_set")
     }
 
+    // distinctUntilChanged: this key lives in the shared settingsDataStore, so
+    // DataStore.data re-emits on EVERY write to that store (usage, sort order,
+    // custom names, …), not just favorites edits. Deduping here stops those
+    // unrelated writes from re-triggering the favorites/drawer combines with an
+    // identical Set. Mirrors customNamesFlow / usageFlow (AUDIT-14 F1c/F2).
     override val favoriteComponentsFlow: Flow<Set<String>> =
         dataStore.readFlowFailOpen("Error reading favorites preferences") { preferences ->
             preferences[PreferencesKeys.FAVORITES] ?: emptySet()
         }
+            .distinctUntilChanged()
 
     override suspend fun toggleFavoriteComponent(componentName: String): Boolean {
         return try {

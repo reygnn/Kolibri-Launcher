@@ -1,8 +1,10 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import java.io.IOException
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
@@ -10,6 +12,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Rule
@@ -508,4 +511,61 @@ class FavoritesRepositoryImplTest {
         // Assert
         Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
     }
+
+    // ========== AUDIT-14 F1c/F2: distinctUntilChanged regression ==========
+
+    @Test
+    fun `favoriteComponentsFlow - unrelated shared-store write does not re-emit identical set`() =
+        runTest {
+            // favorites and usage share one settingsDataStore, so a usage write
+            // re-emits DataStore.data. Without distinctUntilChanged the favorites
+            // combine would re-run on every app launch for an unchanged set.
+            val fakeDataStore = FakeDataStore()
+            fakeDataStore.setInitialData(
+                preferencesOf(favoritesKey to setOf("com.test/Component")),
+            )
+            val repo = FavoritesRepositoryImpl(fakeDataStore)
+
+            repo.favoriteComponentsFlow.test {
+                Assert.assertEquals(setOf("com.test/Component"), awaitItem())
+
+                // Simulate the per-launch usage tick: write an UNRELATED key.
+                val usageKey = longPreferencesKey("usage_count_com.other/App")
+                fakeDataStore.updateData { prefs ->
+                    prefs.toMutablePreferences().apply { set(usageKey, 1L) }
+                }
+                // Force the upstream emission to be delivered to the collector.
+                // Without distinctUntilChanged the decoded (identical) Set would
+                // surface here and expectNoEvents() would fail — that is the guard.
+                advanceUntilIdle()
+
+                // The favorites set is unchanged -> no downstream emission.
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `favoriteComponentsFlow - still emits when the favorites set actually changes`() =
+        runTest {
+            val fakeDataStore = FakeDataStore()
+            fakeDataStore.setInitialData(
+                preferencesOf(favoritesKey to setOf("com.test/Component")),
+            )
+            val repo = FavoritesRepositoryImpl(fakeDataStore)
+
+            repo.favoriteComponentsFlow.test {
+                Assert.assertEquals(setOf("com.test/Component"), awaitItem())
+
+                fakeDataStore.updateData { prefs ->
+                    prefs.toMutablePreferences().apply {
+                        set(favoritesKey, setOf("com.test/Component", "com.test/Other"))
+                    }
+                }
+
+                Assert.assertEquals(
+                    setOf("com.test/Component", "com.test/Other"),
+                    awaitItem(),
+                )
+            }
+        }
 }
