@@ -17,6 +17,7 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -26,6 +27,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -440,6 +442,154 @@ class GetDrawerAppsUseCaseTest {
             // In TIME_WEIGHTED mode usageFlow IS an input, so the order re-derives
             // reactively on a tick.
             verify(atLeast = 1) { appUsageRepository.usageFlow }
+        } finally {
+            collectorJob.cancel()
+        }
+    }
+
+    // ========== AUDIT-14 F2: behavioral pinning of the flatMapLatest refactor ==========
+    // The two tests above only prove SUBSCRIPTION (getter accessed / not accessed).
+    // These pin the actual reactive behavior the refactor promises. A real usage
+    // tick needs a SharedFlow: a MutableStateFlow<Unit> conflates repeated Unit and
+    // cannot re-emit, whereas production usageFlow is a Flow<Unit> that ticks per
+    // real usage change.
+
+    @Test
+    fun `drawerApps - in TIME_WEIGHTED mode - a usage tick re-derives the order`() = runTest {
+        val usageTicks = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
+        usageTicks.emit(Unit) // initial value so the inner combine can proceed
+        every { appUsageRepository.usageFlow } returns usageTicks
+
+        // The mock ignores its input; a captured var flips the returned order so the
+        // second (tick-driven) derivation differs from the first.
+        var weightedOrder = listOf(app2, app3, app1) // App C, App B, App A
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } answers { weightedOrder }
+
+        sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+        rawAppsFlow.value = allApps
+
+        val results = mutableListOf<List<AppInfo>>()
+        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            useCase.drawerApps.collect { results.add(it) }
+        }
+
+        try {
+            advanceUntilIdle()
+            assertEquals("App C", results.last()[0].displayName)
+
+            // A usage tick must re-run the pipeline and surface the new order.
+            weightedOrder = listOf(app1, app3, app2) // App A, App B, App C
+            usageTicks.emit(Unit)
+            advanceUntilIdle()
+
+            assertEquals("App A", results.last()[0].displayName)
+            coVerify(atLeast = 2) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
+        } finally {
+            collectorJob.cancel()
+        }
+    }
+
+    @Test
+    fun `drawerApps - in ALPHABETICAL mode - a real usage tick causes no re-emission`() = runTest {
+        val usageTicks = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
+        usageTicks.emit(Unit)
+        every { appUsageRepository.usageFlow } returns usageTicks
+
+        rawAppsFlow.value = allApps // sortOrder stays ALPHABETICAL (default)
+
+        val results = mutableListOf<List<AppInfo>>()
+        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            useCase.drawerApps.collect { results.add(it) }
+        }
+
+        try {
+            advanceUntilIdle()
+            val emissionsBefore = results.size
+            assertEquals(3, results.last().size)
+
+            // Even a DELIVERABLE tick (SharedFlow emits every value) must not reach
+            // the ALPHABETICAL pipeline — usageFlow is not one of its inputs (F2 #1).
+            repeat(3) { usageTicks.emit(Unit) }
+            advanceUntilIdle()
+
+            assertEquals(emissionsBefore, results.size)
+            coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
+        } finally {
+            collectorJob.cancel()
+        }
+    }
+
+    @Test
+    fun `drawerApps - switching TIME_WEIGHTED to ALPHABETICAL tears down the usage subscription`() =
+        runTest {
+            val usageTicks = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
+            usageTicks.emit(Unit)
+            every { appUsageRepository.usageFlow } returns usageTicks
+
+            val weightedCalls = AtomicInteger(0)
+            coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } answers {
+                weightedCalls.incrementAndGet()
+                listOf(app2, app3, app1)
+            }
+
+            sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+            rawAppsFlow.value = allApps
+
+            val results = mutableListOf<List<AppInfo>>()
+            val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+                useCase.drawerApps.collect { results.add(it) }
+            }
+
+            try {
+                advanceUntilIdle()
+                assertEquals("App C", results.last()[0].displayName)
+
+                // flatMapLatest cancels the 4-way inner combine (incl. usage) and
+                // builds the 3-way one.
+                sortOrderFlow.value = SortOrder.ALPHABETICAL
+                advanceUntilIdle()
+                assertEquals("App A", results.last()[0].displayName)
+
+                val callsAfterSwitch = weightedCalls.get()
+                val emissionsAfterSwitch = results.size
+
+                // Ticks now hit a torn-down subscription: no recompute, no emission.
+                repeat(3) { usageTicks.emit(Unit) }
+                advanceUntilIdle()
+
+                assertEquals(callsAfterSwitch, weightedCalls.get())
+                assertEquals(emissionsAfterSwitch, results.size)
+            } finally {
+                collectorJob.cancel()
+            }
+        }
+
+    @Test
+    fun `drawerApps - mode switch that yields identical ordering emits nothing`() = runTest {
+        // TIME_WEIGHTED returns exactly the alphabetical order of allApps
+        // (App A, App B, App C = app1, app3, app2), so the switch changes nothing.
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } returns
+            listOf(app1, app3, app2)
+
+        rawAppsFlow.value = allApps // ALPHABETICAL default
+
+        val results = mutableListOf<List<AppInfo>>()
+        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            useCase.drawerApps.collect { results.add(it) }
+        }
+
+        try {
+            advanceUntilIdle()
+            val emissionsBefore = results.size
+            assertEquals(listOf("App A", "App B", "App C"), results.last().map { it.displayName })
+
+            sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+            advanceUntilIdle()
+
+            // The terminal distinctUntilChanged sits downstream of flatMapLatest, so
+            // its last value persists across the inner-flow rebuild: an identical
+            // ordering is suppressed rather than churning the adapter.
+            assertEquals(emissionsBefore, results.size)
         } finally {
             collectorJob.cancel()
         }
