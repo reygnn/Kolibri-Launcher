@@ -40,14 +40,17 @@ data class AppInfo(
      *
      * z.B. "com.android.chrome/com.google.android.apps.chrome.Main"
      */
-    val componentName: String
-        get() {
-            // Normalisiere className: Wenn es mit "." beginnt, ist es Kurzform
-            val normalizedClassName = if (className.startsWith(".")) {
-                "$packageName$className"
-            } else {
-                className
-            }
-            return "$packageName/$normalizedClassName"
-        }
+    // Precomputed once per instance (body val, so it stays out of
+    // equals/hashCode/copy just like displayNameLower) — the former getter
+    // recomputed the concat on every read, and componentName is read on
+    // essentially every AppInfo (hidden-filter, favorites membership, DiffUtil
+    // identity), including twice per AppInfoDiffCallback comparison (AUDIT-14
+    // Nit §212).
+    val componentName: String = run {
+        // Normalize the short form (.Activity) to the long form
+        // (package.Activity); Android accepts both spellings.
+        val normalizedClassName =
+            if (className.startsWith(".")) "$packageName$className" else className
+        "$packageName/$normalizedClassName"
+    }
 }
