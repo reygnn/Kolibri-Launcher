@@ -738,17 +738,11 @@ The non-negotiable points only:
 
 ### The dispatcher rule (non-negotiable)
 
-```kotlin
-@get:Rule val mainDispatcherRule = MainDispatcherRule()
-
-@Test fun whatever() = runTest(mainDispatcherRule.dispatcher) {
-    // ...
-}
-```
-
-Plain `runTest { }` creates its own `TestCoroutineScheduler`, so
-`advanceUntilIdle()` / `advanceTimeBy()` will not drive code that runs on
-`Dispatchers.Main`. Tests become flaky.
+Not restated here — the authoritative version lives in the test docs, and
+duplicating it only invites drift (AUDIT-13). See the top-of-file
+`COROUTINE TEST DISPATCHER` block in `TESTING_CONVENTIONS.kt` (rules 1–6) and
+`app/src/test/CLAUDE.md`. TL;DR from there: **use ONE dispatcher source
+(`mainDispatcherRule.testDispatcher`) everywhere — never a second instance.**
 
 ### Other mandatory points
 

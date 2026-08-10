@@ -196,6 +196,15 @@ Dokumente liest, verliert Zeit an derselben Stelle wie diese Untersuchung.
 Mindestens zu korrigieren ist in jedem Fall das nicht übersetzende
 `.dispatcher` in `CLAUDE.md:744`.
 
+> **ERLEDIGT (2026-08-10).** Nicht Option A (Angleichen), sondern die
+> drift-sichere Variante: Der Root-`CLAUDE.md`-Abschnitt „The dispatcher rule
+> (non-negotiable)" wurde von der duplizierten (und falschen) Erklärung
+> **befreit** und zeigt jetzt nur noch auf die führenden Quellen
+> (`TESTING_CONVENTIONS.kt`, Regeln 1–6, + `app/src/test/CLAUDE.md`) plus die
+> korrekte Ein-Zeilen-TL;DR („eine Dispatcher-Quelle, nie eine zweite Instanz").
+> Damit entfallen der nicht kompilierende `.dispatcher`-Block, die falsche
+> Kausalaussage und die zweite driftfähige Quelle in einem.
+
 ---
 
 ## Kein Linter
@@ -298,6 +307,11 @@ Argument dagegen, nur gegen die Erwartung, das aktuelle Problem damit zu lösen.
 Bewusst **nicht** ungefragt eingebaut, als die Action-Bumps entstanden — eine
 Trigger-Erweiterung verändert, wer den Workflow unter welchen Umständen starten
 kann, und gehörte damit nicht in einen Commit, der etwas anderes tut.
+
+> **ERLEDIGT (2026-08-10).** `workflow_dispatch:` in `.github/workflows/android.yml`
+> ergänzt. Greift bekanntlich erst, sobald der Trigger auf dem Default-Branch
+> (`main`) liegt, und wirkt dann ab der *nächsten* Workflow-Änderung — reine
+> Vorsorge, nicht rückwirkend für die damaligen Action-Bumps.
 
 ---
 
@@ -564,4 +578,12 @@ gewünscht ist.
 
 ### Abschluss
 
-Nach dem Merge diesen AUDIT-Abschnitt auf „behoben in `<commit>`" aktualisieren.
+**Behoben in `0966cef5`** (fix(favorites): Stale-Replay bei Settings-Sort +
+Onboarding-Edit). Umgesetzt wurde die empfohlene Rule-10-Variante: Snapshot-Lesung
++ Filter/Sort aus dem Fragment nach `SettingsViewModel.prepareFavoritesForSorting()`
+gehoben (beide Consumer lesen jetzt `getFavoriteComponentsSnapshot()` /
+`getFavoriteComponentsOrderSnapshot()` statt der Hot-Flow-`.first()`), mit
+gepinnten `SettingsViewModelTest`-Fällen. Zusätzlich — über den Plan hinaus — der
+`checkStaleReplayRead`-Gate (`tools/check-stale-replay-read.awk`, `dependsOn` von
+`checkConventions`) gebaut, der genau diese Bug-Klasse für gelistete Point-Reader
+absichert.
