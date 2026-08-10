@@ -46,7 +46,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 | **F1** | `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` | O(n·m) `List.find`+`remove` in Schleife über die Favoriten | `low` |
 | **F2** | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
-| **F4** | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
+| **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
 | **F6** | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
 
@@ -105,8 +105,14 @@ Real bleibt: (a) der Terminal-Sort in `applyNames` ist auf diesem Pfad verworfen
 ließen sich zu einem Durchlauf zusammenziehen (Name + `isFavorite` in einem
 `copy`). Gehört sinnvollerweise mit F1 §5.3 aus AUDIT-14 zusammen angefasst.
 
-### F4 — Totes `app_icon` im Favoriten-Item
+### F4 — Totes `app_icon` im Favoriten-Item · ✅ umgesetzt
 `app/.../res/layout/item_favorite.xml:10-14`, `FavoritesAdapter.kt:32`
+
+> **Erledigt:** `app_icon`-`ImageView` aus dem Layout entfernt, den
+> `binding.appIcon.visibility = GONE`-Setter im Adapter gelöscht;
+> `drag_handle` bleibt (echtes Reorder-Icon). ViewBinding regeneriert
+> ohne das `appIcon`-Feld, `:app:assembleDebug` grün.
+
 
 `item_favorite.xml` inflatet ein `ImageView app_icon`, das der Adapter bei **jedem**
 Bind auf `GONE` setzt (`:32`). Das View wird trotzdem pro Zeile inflatet und
