@@ -48,7 +48,18 @@ class AppContextMenuAdapter(
         return when (viewType) {
             VIEW_TYPE_ACTION -> {
                 val view = inflater.inflate(R.layout.item_context_menu_action, parent, false)
-                ActionViewHolder(view)
+                val holder = ActionViewHolder(view)
+                // Listener hoisted to creation instead of re-wired on every
+                // bind (AUDIT-15 F6): one allocation per holder, and the click
+                // resolves its item via bindingAdapterPosition at click time.
+                // Same idiom as AppDrawerAdapter / HomeFavoritesAdapter.
+                holder.itemView.setOnClickListener {
+                    val position = holder.bindingAdapterPosition
+                    if (position != RecyclerView.NO_POSITION) {
+                        onItemClicked(getItem(position))
+                    }
+                }
+                holder
             }
             VIEW_TYPE_SEPARATOR -> {
                 val view = inflater.inflate(R.layout.item_context_menu_separator, parent, false)
@@ -62,13 +73,8 @@ class AppContextMenuAdapter(
      * Bindet die Daten an den jeweiligen ViewHolder.
      */
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val item = getItem(position)
         when (holder) {
-            is ActionViewHolder -> {
-                holder.bind(item, actionTextColor)
-                // Wichtig: Nur klickbare Elemente bekommen einen OnClickListener.
-                holder.itemView.setOnClickListener { onItemClicked(item) }
-            }
+            is ActionViewHolder -> holder.bind(getItem(position), actionTextColor)
             is SeparatorViewHolder -> {
                 // Keine Daten zu binden, keine Klicks zu behandeln.
             }
