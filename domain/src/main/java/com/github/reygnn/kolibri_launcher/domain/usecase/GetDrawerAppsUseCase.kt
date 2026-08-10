@@ -11,10 +11,12 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRe
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
@@ -30,42 +32,94 @@ class GetDrawerAppsUseCase @Inject constructor(
     @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) {
 
-    val drawerApps: Flow<List<AppInfo>> = combine(
-        // Critical Flow: rawApps darf nicht crashen (kein .catch())
-        // Stays on the post-veto keep-last-good rawAppsFlow (REACTIVE_APPLIST_SPEC
-        // Site 2, NOT getInstalledApps) so the transient-empty-drawer flicker
-        // cannot return.
-        installedAppsStateRepository.rawAppsFlow,
+    // sortOrder drives the pipeline via flatMapLatest so that usageFlow is an
+    // input ONLY in TIME_WEIGHTED_USAGE mode. In ALPHABETICAL mode the usage
+    // order is irrelevant, so a per-launch usage tick must NOT re-run applyNames +
+    // filter + sort just to have the terminal distinctUntilChanged discard an
+    // identical list (AUDIT-14 F2, bullet 1). Switching sort mode is a rare user
+    // action; flatMapLatest cancels the previous inner flow and rebuilds, which
+    // only re-reads the cheap DataStore flows once.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val drawerApps: Flow<List<AppInfo>> =
+        settingsRepository.sortOrderFlow
+            .catch { e ->
+                if (e is CancellationException) throw e
+                KolibriLog.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
+                emit(SortOrder.ALPHABETICAL)
+            }
+            // Dedupe so a duplicate sortOrder emission does not cancel+restart the
+            // inner pipeline. Correct independently of the source-flow dedupe.
+            .distinctUntilChanged()
+            .flatMapLatest { sortOrder ->
+                if (sortOrder == SortOrder.TIME_WEIGHTED_USAGE) {
+                    combine(
+                        // Critical Flow: rawApps must not crash (no .catch());
+                        // a failure propagates to the outer safety net below.
+                        installedAppsStateRepository.rawAppsFlow,
+                        hiddenAppsRepository.hiddenAppsFlow.catch { e ->
+                            if (e is CancellationException) throw e
+                            KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
+                            emit(emptySet())
+                        },
+                        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC
+                        // Site 2): a rename re-derives here instead of re-enumerating.
+                        customNamesRepository.customNamesFlow.catch { e ->
+                            if (e is CancellationException) throw e
+                            KolibriLog.w(e, "customNamesFlow error - using original names")
+                            emit(emptyMap())
+                        },
+                        // Usage change-signal (REACTIVE_APPLIST_SPEC): a launch
+                        // re-derives the TIME_WEIGHTED_USAGE order reactively. Value
+                        // ignored — pure trigger. Collected ONLY in this mode.
+                        appUsageRepository.usageFlow.catch { e ->
+                            if (e is CancellationException) throw e
+                            KolibriLog.w(e, "usageFlow error - proceeding without a usage tick")
+                            emit(Unit)
+                        },
+                    ) { rawApps, hiddenComponents, customNames, _ ->
+                        sortVisibleApps(rawApps, hiddenComponents, customNames, sortOrder)
+                    }
+                } else {
+                    combine(
+                        installedAppsStateRepository.rawAppsFlow,
+                        hiddenAppsRepository.hiddenAppsFlow.catch { e ->
+                            if (e is CancellationException) throw e
+                            KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
+                            emit(emptySet())
+                        },
+                        customNamesRepository.customNamesFlow.catch { e ->
+                            if (e is CancellationException) throw e
+                            KolibriLog.w(e, "customNamesFlow error - using original names")
+                            emit(emptyMap())
+                        },
+                    ) { rawApps, hiddenComponents, customNames ->
+                        sortVisibleApps(rawApps, hiddenComponents, customNames, sortOrder)
+                    }
+                }
+            }
+            // Collapse spurious re-emissions: any input change that leaves the
+            // sorted list identical must not churn the adapter with an equal list.
+            .distinctUntilChanged()
+            .catch { e ->
+                if (e is CancellationException) throw e
+                // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
+                // was die obigen Catches nicht abdecken (Programmierfehler).
+                // silentError macht das in DEBUG laut, in RELEASE landet
+                // emptyList() im Flow.
+                TimberWrapper.silentError(e, "Critical error in drawerApps flow, emitting empty list")
+                emit(emptyList())
+            }
+            .flowOn(dispatcher)
 
-        // Non-critical Flows: Mit individuellen Fallbacks
-        settingsRepository.sortOrderFlow.catch { e ->
-            if (e is CancellationException) throw e
-            KolibriLog.w(e, "sortOrderFlow error - using ALPHABETICAL fallback")
-            emit(SortOrder.ALPHABETICAL)
-        },
-        hiddenAppsRepository.hiddenAppsFlow.catch { e ->
-            if (e is CancellationException) throw e
-            KolibriLog.w(e, "hiddenAppsFlow error - showing all apps")
-            emit(emptySet())
-        },
-        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 2): a
-        // rename re-derives here instead of re-enumerating. Non-critical → on a
-        // read failure fall back to original names.
-        customNamesRepository.customNamesFlow.catch { e ->
-            if (e is CancellationException) throw e
-            KolibriLog.w(e, "customNamesFlow error - using original names")
-            emit(emptyMap())
-        },
-        // Usage change-signal (REACTIVE_APPLIST_SPEC): a launch re-fires the
-        // combine so the TIME_WEIGHTED_USAGE order re-derives reactively, instead
-        // of the launch site forcing a full re-enumeration. Value ignored — it is
-        // a pure trigger. Non-critical → on a read failure keep ticking once.
-        appUsageRepository.usageFlow.catch { e ->
-            if (e is CancellationException) throw e
-            KolibriLog.w(e, "usageFlow error - proceeding without a usage tick")
-            emit(Unit)
-        },
-    ) { rawApps, sortOrder, hiddenComponents, customNames, _ ->
+    // Name-apply + hidden-filter + sort, shared by both flatMapLatest branches so
+    // the logic differs only by which upstream flows feed it. Byte-identical to the
+    // former combine body — behaviour per sort mode is unchanged.
+    private suspend fun sortVisibleApps(
+        rawApps: List<AppInfo>,
+        hiddenComponents: Set<String>,
+        customNames: Map<String, String>,
+        sortOrder: SortOrder,
+    ): List<AppInfo> {
         KolibriLog.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
@@ -105,20 +159,6 @@ class GetDrawerAppsUseCase @Inject constructor(
         }
 
         KolibriLog.d("[DATAFLOW] 7. UseCase is providing a new sorted list. Size: ${sortedApps.size}")
-        sortedApps
+        return sortedApps
     }
-        // Collapse spurious re-emissions: a usageFlow tick in ALPHABETICAL mode
-        // (or any input change that leaves the sorted list identical) must not
-        // churn the adapter with an equal list.
-        .distinctUntilChanged()
-        .catch { e ->
-            if (e is CancellationException) throw e
-            // Letztes Sicherheitsnetz: rawAppsFlow-Failures plus alles,
-            // was die obigen Catches nicht abdecken (Programmierfehler).
-            // silentError macht das in DEBUG laut, in RELEASE landet
-            // emptyList() im Flow.
-            TimberWrapper.silentError(e, "Critical error in drawerApps flow, emitting empty list")
-            emit(emptyList())
-        }
-        .flowOn(dispatcher)
 }

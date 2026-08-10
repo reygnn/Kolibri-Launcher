@@ -15,6 +15,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -395,6 +396,50 @@ class GetDrawerAppsUseCaseTest {
             val result = results.last()
             assertEquals(2, result.size)
             assertFalse(result.any { it.componentName == app1.componentName })
+        } finally {
+            collectorJob.cancel()
+        }
+    }
+
+    // ========== AUDIT-14 F2 bullet 1: usageFlow only in TIME_WEIGHTED mode ==========
+
+    @Test
+    fun `drawerApps - in ALPHABETICAL mode - does not collect usageFlow`() = runTest {
+        // Default sortOrder is ALPHABETICAL. usageFlow must not be an input here,
+        // so a per-launch usage tick cannot re-run the pipeline (F2 bullet 1).
+        val results = mutableListOf<List<AppInfo>>()
+        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            useCase.drawerApps.collect { results.add(it) }
+        }
+
+        try {
+            rawAppsFlow.value = allApps
+            advanceUntilIdle()
+
+            assertEquals(3, results.last().size)
+            verify(exactly = 0) { appUsageRepository.usageFlow }
+            coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any()) }
+        } finally {
+            collectorJob.cancel()
+        }
+    }
+
+    @Test
+    fun `drawerApps - in TIME_WEIGHTED mode - collects usageFlow`() = runTest {
+        coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any()) } returns allApps
+        val results = mutableListOf<List<AppInfo>>()
+        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            useCase.drawerApps.collect { results.add(it) }
+        }
+
+        try {
+            sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
+            rawAppsFlow.value = allApps
+            advanceUntilIdle()
+
+            // In TIME_WEIGHTED mode usageFlow IS an input, so the order re-derives
+            // reactively on a tick.
+            verify(atLeast = 1) { appUsageRepository.usageFlow }
         } finally {
             collectorJob.cancel()
         }
