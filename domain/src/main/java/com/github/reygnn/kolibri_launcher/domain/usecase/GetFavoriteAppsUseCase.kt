@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
@@ -11,9 +12,12 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import com.github.reygnn.kolibri_launcher.core.KolibriLog
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,7 +66,8 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val favoritesOrderRepository: FavoritesOrderRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
-    private val customNamesRepository: CustomNamesRepository
+    private val customNamesRepository: CustomNamesRepository,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher
 ) {
 
     val favoriteApps: Flow<UiState<FavoriteAppsResult>> = combine(
@@ -107,6 +112,12 @@ class GetFavoriteAppsUseCase @Inject constructor(
         TimberWrapper.silentError(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }
+        // Mirror GetDrawerAppsUseCase: collapse redundant re-emissions (the shared
+        // settingsDataStore re-emits favorites/hidden/order flows on every write,
+        // e.g. a usage write on every app launch — AUDIT-14 F1) and run the
+        // applyNames map+sort off the Main collector via flowOn(Default).
+        .distinctUntilChanged()
+        .flowOn(dispatcher)
 
     private suspend fun processApps(
         rawApps: List<AppInfo>,

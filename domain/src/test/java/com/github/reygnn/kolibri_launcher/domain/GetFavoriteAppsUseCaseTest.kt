@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
+import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import io.mockk.MockKAnnotations
@@ -31,6 +32,9 @@ import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetFavoriteAppsUseCaseTest {
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     @get:Rule
     val timberRule = TimberRule()
@@ -80,7 +84,8 @@ class GetFavoriteAppsUseCaseTest {
             favoritesRepository,
             favoritesOrderRepository,
             hiddenAppsRepository,
-            customNamesRepository
+            customNamesRepository,
+            dispatcher = mainDispatcherRule.testDispatcher
         )
     }
 
@@ -95,7 +100,9 @@ class GetFavoriteAppsUseCaseTest {
             assertEquals(UiState.Loading, awaitItem())
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            assertEquals(UiState.Loading, awaitItem())
+            // No second Loading here any more: the favorites-set re-emission over
+            // the still-empty raw list is identical to the first Loading and is
+            // now collapsed by distinctUntilChanged (AUDIT-14 F1).
 
             rawAppsFlow.value = allApps
 
@@ -155,7 +162,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
             rawAppsFlow.value = allApps
-            assertEquals(UiState.Loading, awaitItem())
+            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -178,7 +185,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app3.componentName)
             rawAppsFlow.value = allApps
-            assertEquals(UiState.Loading, awaitItem())
+            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -201,7 +208,8 @@ class GetFavoriteAppsUseCaseTest {
             favoritesRepository,
             favoritesOrderRepository,
             hiddenAppsRepository,
-            customNamesRepository
+            customNamesRepository,
+            dispatcher = mainDispatcherRule.testDispatcher
         )
 
         crashingUseCase.favoriteApps.test {
@@ -232,7 +240,8 @@ class GetFavoriteAppsUseCaseTest {
             favoritesRepository,
             favoritesOrderRepository,
             hiddenAppsRepository,
-            customNamesRepository
+            customNamesRepository,
+            dispatcher = mainDispatcherRule.testDispatcher
         )
 
         crashingUseCase.favoriteApps.test {
@@ -240,7 +249,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app1.componentName)
             rawAppsFlow.value = allApps
-            assertEquals(UiState.Loading, awaitItem())
+            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -262,9 +271,11 @@ class GetFavoriteAppsUseCaseTest {
             val firstEmission = awaitItem()
             assertTrue(firstEmission is UiState.Success)
 
+            // Marking these two favorites produces the SAME fallback output as
+            // before (sortFavoriteComponents is mocked to empty → still fallback,
+            // hidden set unchanged), so distinctUntilChanged emits nothing here
+            // (AUDIT-14 F1). The observable change comes from the hide below.
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            val secondEmission = awaitItem()
-            assertTrue(secondEmission is UiState.Success)
 
             hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
             val successState = awaitItem()
@@ -288,7 +299,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = setOf(app1.componentName, "", "invalid", app2.componentName)
             rawAppsFlow.value = allApps
-            assertEquals(UiState.Loading, awaitItem())
+            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -313,7 +324,7 @@ class GetFavoriteAppsUseCaseTest {
 
             favoritesFlow.value = largeFavoritesList.map { it.componentName }.toSet()
             rawAppsFlow.value = largeFavoritesList
-            assertEquals(UiState.Loading, awaitItem())
+            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
 
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
@@ -378,8 +389,8 @@ class GetFavoriteAppsUseCaseTest {
             assertEquals(UiState.Loading, awaitItem())
 
             favoritesFlow.value = setOf(app1.componentName)
-            assertEquals(UiState.Loading, awaitItem())
-
+            // Raw list still empty → the re-emission is another identical Loading,
+            // now collapsed by distinctUntilChanged, so nothing new arrives.
             expectNoEvents()
         }
     }
