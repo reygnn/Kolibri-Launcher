@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
+import androidx.annotation.VisibleForTesting
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -65,6 +66,30 @@ class HomeFavoritesAdapter(
     )
 
     private var styling: Styling = INITIAL_STYLING
+
+    // Single-entry memo for the press-state ColorStateList. A styling rebind
+    // (notifyItemRangeChanged) binds every visible row with the SAME
+    // styling.textColor, so caching the last (color -> ColorStateList) collapses
+    // N allocations per styling emit to one; a textColor change invalidates on
+    // the first row (AUDIT-14 F3, part 2). Adapter binds run on the main thread
+    // only, so no synchronization is needed.
+    private var pressColorKey: Int? = null
+    private var pressColor: ColorStateList? = null
+
+    /**
+     * Returns the press-state [ColorStateList] for [normalColor], reusing the
+     * cached instance when [normalColor] matches the previous call. Single-entry
+     * by design — see [pressColor].
+     */
+    @VisibleForTesting
+    internal fun subtlePressColor(normalColor: Int): ColorStateList {
+        val cached = pressColor
+        if (cached != null && pressColorKey == normalColor) return cached
+        val created = createSubtlePressColor(normalColor)
+        pressColorKey = normalColor
+        pressColor = created
+        return created
+    }
 
     fun setStyling(newStyling: Styling) {
         if (styling == newStyling) return
@@ -142,7 +167,7 @@ class HomeFavoritesAdapter(
                     styling.verticalPaddingPx,
                 )
                 typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                setTextColor(createSubtlePressColor(styling.textColor))
+                setTextColor(subtlePressColor(styling.textColor))
                 setShadowLayer(
                     AppConstants.SHADOW_RADIUS_APPS,
                     AppConstants.SHADOW_DX,
