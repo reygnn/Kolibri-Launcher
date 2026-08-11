@@ -240,7 +240,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                 // Custom names are no longer baked in here (REACTIVE_APPLIST_SPEC
                 // migration step 2b): the enumeration emits the ORIGINAL label, and
                 // every display site folds the custom name in reactively via
-                // applyNames(customNamesFlow). A rename no longer forces a
+                // applyCustomNames(customNamesFlow). A rename no longer forces a
                 // re-enumeration.
                 appInfoList.add(
                     AppInfo(

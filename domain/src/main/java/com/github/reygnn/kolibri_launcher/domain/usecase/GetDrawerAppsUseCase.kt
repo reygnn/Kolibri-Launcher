@@ -34,7 +34,7 @@ class GetDrawerAppsUseCase @Inject constructor(
 
     // sortOrder drives the pipeline via flatMapLatest so that usageFlow is an
     // input ONLY in TIME_WEIGHTED_USAGE mode. In ALPHABETICAL mode the usage
-    // order is irrelevant, so a per-launch usage tick must NOT re-run applyNames +
+    // order is irrelevant, so a per-launch usage tick must NOT re-run applyCustomNames +
     // filter + sort just to have the terminal distinctUntilChanged discard an
     // identical list (AUDIT-14 F2, bullet 1). Switching sort mode is a rare user
     // action; flatMapLatest cancels the previous inner flow and rebuilds, which
@@ -128,10 +128,10 @@ class GetDrawerAppsUseCase @Inject constructor(
         // Custom names applied over the veto-held raw list; since migration step 2b
         // the enumeration emits the original label, so this is the operative
         // name-application point.
-        // applyNames' terminal sort is DEAD here: sortVisibleApps re-sorts
-        // (alpha / time-weighted) below. Deliberate -- see applyNames KDoc
+        // applyCustomNames' terminal sort is DEAD here: sortVisibleApps re-sorts
+        // (alpha / time-weighted) below. Deliberate -- see applyCustomNames KDoc
         // (SPEC-DECISION RAL-1a).
-        val namedApps = applyNames(rawApps, customNames)
+        val namedApps = applyCustomNames(rawApps, customNames)
 
         // Filter + alphabetischer Sort sind reine Operationen auf
         // String/Set/List — können nicht werfen. Frühere Throwable-Catches

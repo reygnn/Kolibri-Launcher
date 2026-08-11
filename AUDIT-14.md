@@ -41,7 +41,7 @@ ausschließlich `low` und bewusst vertagt an die §7-Re-Evaluierungs-Trigger
 - **F5** (Wallpaper-Memory: Budget × Multi-Layer, kein `recycle()`) — „messen,
   dann entscheiden"; `recycle()` ist aktiv riskant. Trigger: steigende
   Multi-Layer-OOM-Reports.
-- **F1 §5.3** (`applyNames` ohne Sort für den Favoriten-Pfad) — Mikro-Gewinn an
+- **F1 §5.3** (`applyCustomNames` ohne Sort für den Favoriten-Pfad) — Mikro-Gewinn an
   einer breit genutzten Funktion; nur mitnehmen, wenn die Pipeline ohnehin
   angefasst wird.
 - **Nit §215** (`SimpleDateFormat` pro Minuten-Tick) — vernachlässigbar (1×/min).
@@ -99,7 +99,7 @@ ineinander; einzeln harmlos, zusammen ein vermeidbarer Main-Thread-Stall.
 
 **(a) `favoriteApps` hat weder `flowOn` noch `distinctUntilChanged`.**
 `GetFavoriteAppsUseCase.favoriteApps` (`domain/…/usecase/GetFavoriteAppsUseCase.kt:68-109`)
-ist ein 5-Quellen-`combine`, dessen Block `applyNames(rawApps, customNames)`
+ist ein 5-Quellen-`combine`, dessen Block `applyCustomNames(rawApps, customNames)`
 (`:97`) plus `processApps` (`:104`) ausführt — **ohne** abschließendes
 `.flowOn(...)` und **ohne** `.distinctUntilChanged()`. Zum Vergleich der
 Zwilling: `GetDrawerAppsUseCase` hat **beides** (`GetDrawerAppsUseCase.kt:113`
@@ -112,8 +112,8 @@ den Favoriten.
 (`app/…/delegate/AppManagementDelegate.kt:117-121`) kollektiert, und `launchSafe`
 dispatcht auf `mainDispatcher` (`app/…/delegate/DelegateScope.kt:53`,
 `coroutineScope.launch(mainDispatcher)`). Ohne `flowOn` läuft der `combine`-
-Transform **im Collector-Kontext = Main**. `applyNames`
-(`domain/…/usecase/ApplyNames.kt:26-28`) macht `.map { it.copy(...) }
+Transform **im Collector-Kontext = Main**. `applyCustomNames`
+(`domain/…/usecase/ApplyCustomNames.kt:26-28`) macht `.map { it.copy(...) }
 .sortedBy { it.displayName.lowercase() }` über die **gesamte** installierte
 Liste (alle N Apps, nicht nur die Favoriten) — voller O(N log N)-String-Sort +
 N Objekt-Copies + N `lowercase()`-Allokationen, auf Main. Der Sort ist für die
@@ -160,7 +160,7 @@ Kein Jank (läuft auf `Default`), aber redundante CPU/Batterie pro Start:
 
 - `usageFlow` ist `combine`-Eingang des Drawers auch im `ALPHABETICAL`-Modus
   (`GetDrawerAppsUseCase.kt:63-67`), wo die Nutzungs-Reihenfolge irrelevant ist.
-  Ein Usage-Tick re-läuft dort trotzdem `applyNames` (Full-Sort) + Filter + Alpha-
+  Ein Usage-Tick re-läuft dort trotzdem `applyCustomNames` (Full-Sort) + Filter + Alpha-
   Sort; das terminale `distinctUntilChanged` (`:113`) verwirft danach das
   identische Ergebnis — die **Arbeit** lief bereits.
 - Im `TIME_WEIGHTED_USAGE`-Modus macht `sortAppsByTimeWeightedUsage`
@@ -241,7 +241,7 @@ Der Render-Pfad ist sonst stark (§4). Zwei Memory-Hebel:
 ### Nits (jeweils `low`, der Vollständigkeit halber)
 
 - **Kein gecachter Sort-Key.** `displayName.lowercase()` wird im Sort-Comparator
-  jedes Mal neu berechnet (`ApplyNames.kt:28`, `GetDrawerAppsUseCase.kt:88,103`,
+  jedes Mal neu berechnet (`ApplyCustomNames.kt:28`, `GetDrawerAppsUseCase.kt:88,103`,
   `AppUsageRepositoryImpl.kt:171`, `InstalledAppsRepositoryImpl.kt:261`) statt
   einmal pro `AppInfo` vorberechnet. Multipliziert sich mit F1/F2.
 - **`AppInfo.componentName`** ist ein berechneter Getter (`startsWith` +
@@ -293,7 +293,7 @@ trotz F1–F5 flüssig ist:
    dass kein Consumer auf Re-Emission gleicher Werte baut (Point-Reads nutzen
    `.first()`, nicht den Flow → sehr wahrscheinlich sicher). Fixt die redundanten
    Re-Fires beider combines.
-3. **Optional:** `applyNames`-Variante ohne `.sortedBy` für den Favoriten-Pfad
+3. **Optional:** `applyCustomNames`-Variante ohne `.sortedBy` für den Favoriten-Pfad
    (der Sort wird dort ohnehin durch `savedOrder`/`take` verworfen).
 
 **Dann F3:** Payload-`onBindViewHolder`-Override in `HomeFavoritesAdapter`

@@ -21,10 +21,10 @@ import javax.inject.Inject
  * The distinguishable failure lives only where it is acted on (the reconcile
  * pipeline in `ObserveInstalledAppsUseCase`), keeping the type change local.
  *
- * Custom names are folded in reactively via [applyNames] (REACTIVE_APPLIST_SPEC
+ * Custom names are folded in reactively via [applyCustomNames] (REACTIVE_APPLIST_SPEC
  * Site 1), so a rename re-derives through [CustomNamesRepository.customNamesFlow]
  * instead of forcing a re-enumeration. Since migration step 2b the enumeration
- * emits the original label, so [applyNames] is the operative name-application
+ * emits the original label, so [applyCustomNames] is the operative name-application
  * point for this Site-1 family.
  */
 class GetInstalledAppsUseCase @Inject constructor(
@@ -40,7 +40,7 @@ class GetInstalledAppsUseCase @Inject constructor(
                 }
             },
             customNamesRepository.customNamesFlow
-        ) { apps, names -> applyNames(apps, names) }
+        ) { apps, names -> applyCustomNames(apps, names) }
             // Collapse redundant identical re-derivations: a customNamesFlow tick
             // that leaves the applied list unchanged (post step-2b the enumeration
             // no longer re-bakes the name, so only the reactive overlay changes it).

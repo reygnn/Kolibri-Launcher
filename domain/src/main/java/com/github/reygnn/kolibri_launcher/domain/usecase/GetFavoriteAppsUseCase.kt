@@ -100,10 +100,10 @@ class GetFavoriteAppsUseCase @Inject constructor(
     ) { rawApps, favorites, hiddenApps, savedOrder, customNames ->
         KolibriLog.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
-        // applyNames' terminal sort is DEAD here: processApps re-sorts by
+        // applyCustomNames' terminal sort is DEAD here: processApps re-sorts by
         // savedOrder below. Deliberate, not an oversight -- do not "optimize"
-        // it away. See applyNames KDoc (SPEC-DECISION RAL-1a).
-        val namedApps = applyNames(rawApps, customNames)
+        // it away. See applyCustomNames KDoc (SPEC-DECISION RAL-1a).
+        val namedApps = applyCustomNames(rawApps, customNames)
 
         // Leere App-Liste → Loading state
         if (namedApps.isEmpty()) {
@@ -119,7 +119,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // Mirror GetDrawerAppsUseCase: collapse redundant re-emissions (the shared
         // settingsDataStore re-emits favorites/hidden/order flows on every write,
         // e.g. a usage write on every app launch — AUDIT-14 F1) and run the
-        // applyNames map+sort off the Main collector via flowOn(Default).
+        // applyCustomNames map+sort off the Main collector via flowOn(Default).
         .distinctUntilChanged()
         .flowOn(dispatcher)
 

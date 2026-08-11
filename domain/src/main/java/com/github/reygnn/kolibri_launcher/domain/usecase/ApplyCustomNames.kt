@@ -19,7 +19,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  *
  * **This is now the sole name-application point (migration step 2b landed):**
  * the enumeration emits the ORIGINAL label (`InstalledAppsRepositoryImpl`
- * `processResolveInfoList`), so `applyNames` is what actually sets a custom
+ * `processResolveInfoList`), so `applyCustomNames` is what actually sets a custom
  * `displayName` — no longer the behavior-neutral no-op overlay it was during
  * step 2a, when the enumeration still baked the name in.
  *
@@ -48,10 +48,10 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * forgets it gets a SILENT mis-order).
  *
  * If you arrived here from a "dead sort, optimize it away" observation: that is the
- * expected path, and the answer is no -- unless applyNames is being split for some
+ * expected path, and the answer is no -- unless applyCustomNames is being split for some
  * OTHER reason anyway, in which case the dead-sort removal rides along free. The
  * three self-sorting call sites carry a thin pointer back to this block. Closed.
  */
-fun applyNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
+fun applyCustomNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
         .sortedBy { it.displayNameLower }

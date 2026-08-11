@@ -145,7 +145,7 @@ class CustomNamesActivityRenameTest {
             // chain is: setCustomNameUseCase → DataStore edit →
             // CustomNamesRepository.customNamesFlow re-emits →
             // GetInstalledAppsUseCase combine folds the name in via
-            // applyNames (no PackageManager re-enumeration,
+            // applyCustomNames (no PackageManager re-enumeration,
             // REACTIVE_APPLIST_SPEC) → CustomNamesViewModel's collect →
             // updateUiFromMasterList → updateCustomNameChips.
             //

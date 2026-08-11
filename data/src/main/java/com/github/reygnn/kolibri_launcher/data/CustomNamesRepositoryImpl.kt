@@ -24,7 +24,7 @@ import javax.inject.Singleton
  * **Reactive by [customNamesFlow] (REACTIVE_APPLIST_SPEC).** State is exposed as a
  * cold `Flow<Map<packageName, customName>>`. A rename is a single DataStore edit;
  * DataStore re-emits, [customNamesFlow] ticks, and every display site folds the
- * name in via `applyNames` (`combine`) — no PackageManager re-enumeration is
+ * name in via `applyCustomNames` (`combine`) — no PackageManager re-enumeration is
  * triggered. This replaced the previous `MutableSharedFlow<Unit>` event-bus design
  * (which forced a full re-enumeration on every rename); the enumeration no longer
  * bakes custom names in at all (see `InstalledAppsRepositoryImpl.processResolveInfoList`).

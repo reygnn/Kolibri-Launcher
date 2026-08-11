@@ -97,10 +97,10 @@ class GetOnboardingAppsUseCaseTest {
     @Test
     fun `onboardingAppsFlow filters out apps with blank displayName`() = runTest {
         // Arrange
-        // Blank effective label = blank originalName AND no custom name. applyNames
+        // Blank effective label = blank originalName AND no custom name. applyCustomNames
         // derives displayName = customName ?: originalName, so to model an app that
         // ends up with a blank label its originalName must be blank too (a non-blank
-        // originalName would be restored into displayName by applyNames).
+        // originalName would be restored into displayName by applyCustomNames).
         val appsWithBlankName = listOf(
             AppInfo("Valid", "Valid", "com.valid", "com.valid.Main"),
             AppInfo("", "", "com.noname", "com.noname.Main"),  // blank label

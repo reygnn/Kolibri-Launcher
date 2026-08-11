@@ -33,7 +33,7 @@ class GetOnboardingAppsUseCase @Inject constructor(
                 // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 1);
                 // since migration step 2b the enumeration emits the original label,
                 // so this is the operative name-application point.
-                is AppLoad.Loaded -> applyNames(load.apps, names).filter { app ->
+                is AppLoad.Loaded -> applyCustomNames(load.apps, names).filter { app ->
                     // isNotBlank() on non-null data-class properties cannot throw;
                     // a programmer error would propagate to the Flow.catch below,
                     // which surfaces it via silentError in DEBUG.

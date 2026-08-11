@@ -28,7 +28,7 @@ Kern-Lag-Frage bereits und ist `GESCHLOSSEN`. Die dortigen Findings sind hier
 | `usageFlow` nur im TIME_WEIGHTED-Modus (F2 Bullet 1/3) | umgesetzt |
 | `AppInfo.displayNameLower` / `componentName` vorberechnet (Nit §208/§212) | umgesetzt |
 | `ColorStateList`-Cache, Payload-`onBind`, gehoistete Listener im Drawer/Home-Adapter (F3) | umgesetzt |
-| `applyNames`-Terminal-Sort auf dem Favoriten-Pfad überflüssig (F1 §5.3) | **bewusst vertagt** |
+| `applyCustomNames`-Terminal-Sort auf dem Favoriten-Pfad überflüssig (F1 §5.3) | **bewusst vertagt** |
 | `SimpleDateFormat` pro Minuten-Tick im `ClockDelegate` (Nit §215) | **bewusst vertagt** |
 
 AUDIT-15 sammelt ausschließlich das, was in AUDIT-14 **nicht** vorkommt
@@ -114,22 +114,22 @@ ordnet, also konsistent.
 ### F3 — Doppelter Voll-Listen-Copy pro Favoriten-Emission · ⛔ wird nicht umgesetzt
 `domain/.../usecase/GetFavoriteAppsUseCase.kt:102,137`
 
-`applyNames(rawApps, …)` (`:102`) allokiert `N` `copy()` **und** sortiert; danach
+`applyCustomNames(rawApps, …)` (`:102`) allokiert `N` `copy()` **und** sortiert; danach
 mappt `processApps` (`:137`) erneut über die volle Liste für `isFavorite`. Zwei
 volle Kopien pro Emission. **Korrektur zum Sub-Agent-Report:** die Custom-Names
 gehen dabei *nicht* verloren — `processApps(namedApps, …)` wird mit der benannten
 Liste aufgerufen, der Parameter heißt innen nur wieder `rawApps` (Shadowing).
-Real bleibt: (a) der Terminal-Sort in `applyNames` ist auf diesem Pfad verworfen
+Real bleibt: (a) der Terminal-Sort in `applyCustomNames` ist auf diesem Pfad verworfen
 (= AUDIT-14 F1 §5.3, dort schon vertagt), und (b) die beiden Voll-Listen-`.map`
 ließen sich zu einem Durchlauf zusammenziehen (Name + `isFavorite` in einem
 `copy`).
 
 > **Entscheidung: nicht umsetzen — Invarianten-Integrität > Mikro-Sort.**
-> Teil (a) fasst `applyNames` an, das per `SPEC-DECISION RAL-1`
+> Teil (a) fasst `applyCustomNames` an, das per `SPEC-DECISION RAL-1`
 > (`REACTIVE_APPLIST_SPEC.md`) als **ein** reiner Helfer **an jeder
 > Quell-Grenze inkl. Sort** festgeschrieben ist — der Sort reproduziert dort
 > bewusst die Enumeration-Post-Condition für nicht-nachsortierende Consumer
-> (CustomNames/Settings, s. `applyNames`-KDoc). Der Sort ist zwar auf dem
+> (CustomNames/Settings, s. `applyCustomNames`-KDoc). Der Sort ist zwar auf dem
 > Favoriten- **und** Recents-Pfad (`GetRecentAppsUseCase:69`) tot, läuft aber
 > `flowOn(Default)` off-Main über ~50–200 Strings — µs, im Rauschen (AUDIT-14
 > nennt es selbst „Mikro-Gewinn"). Ein „sortiert hier, unsortiert da"
@@ -141,7 +141,7 @@ ließen sich zu einem Durchlauf zusammenziehen (Name + `isFavorite` in einem
 > nur eine Listen-Kopie off-Main pro Emission — marginal, Churn real; die
 > Trennlinie wird **nicht** durch F3 gezogen, F3 wird als Ganzes geschlossen.
 > Damit ist auch der vertagte **AUDIT-14 F1 §5.3** hiermit abschließend als
-> „nicht verfolgt" beantwortet. Re-Evaluierung nur, falls `applyNames` aus
+> „nicht verfolgt" beantwortet. Re-Evaluierung nur, falls `applyCustomNames` aus
 > anderem Grund ohnehin gesplittet wird.
 
 ### F4 — Totes `app_icon` im Favoriten-Item · ✅ umgesetzt
@@ -221,7 +221,7 @@ hoisten (wie im Drawer-Adapter) wäre der konsistente Fix.
 
 ## 2. Gegengeprüft & bewusst NICHT als Finding gemeldet
 
-- **`applyNames`-Terminal-Sort / `SimpleDateFormat` pro Tick** — bereits AUDIT-14
+- **`applyCustomNames`-Terminal-Sort / `SimpleDateFormat` pro Tick** — bereits AUDIT-14
   F1 §5.3 bzw. Nit §215 (dort vertagt), siehe §0. Kein Doppeleintrag.
 - **`SwipeActionsAppListAdapter` bindet ein Icon** (`:53/:57`) — das ist der
   Slot-Indikator, gewollt, kein text-only-Verstoß.
@@ -260,7 +260,7 @@ malformed Input dokumentiert + gepinnt). F6 (b) bewusst belassen (siehe §1).
 entweder umgesetzt oder bewusst deklinniert.
 
 **Nicht umgesetzt (bewusst):**
-- **F3** (Doppel-Copy / `applyNames`-Sort) — Invarianten-Integrität (`RAL-1`)
+- **F3** (Doppel-Copy / `applyCustomNames`-Sort) — Invarianten-Integrität (`RAL-1`)
   > Mikro-Sort off-Main; schließt zugleich AUDIT-14 F1 §5.3 ab. Siehe §1.
 - **F5** (Chip-Diffing) — Aufwand/Risiko/Wert dauerhaft schief; Re-Evaluierung
   nur bei viel mehr gleichzeitigen Chips. Siehe §1.

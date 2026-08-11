@@ -36,7 +36,7 @@ class GetInstalledAppsUseCaseTest {
     @Before
     fun setup() {
         MockKAnnotations.init(this)
-        // No custom names: applyNames sets displayName = originalName. A COMPLETING
+        // No custom names: applyCustomNames sets displayName = originalName. A COMPLETING
         // flow (flowOf), so the combined flow still completes for awaitComplete().
         every { customNamesRepository.customNamesFlow } returns flowOf(emptyMap())
         useCase = GetInstalledAppsUseCase(installedAppsRepository, customNamesRepository)
