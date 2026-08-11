@@ -52,7 +52,13 @@ class HiddenAppsViewModel @Inject constructor(
                 val filteredApps = if (query.isBlank()) {
                     allApps
                 } else {
-                    allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                    // Fold the query once and match against the precomputed
+                    // displayNameLower instead of contains(ignoreCase=true) per
+                    // app — same fix as the drawer's AppSearchFilter (AUDIT-15 F2,
+                    // AUDIT-16 N2). displayNameLower is locale-invariant, so this
+                    // matches exactly as the alphabetical sort already orders.
+                    val lowerQuery = query.lowercase()
+                    allApps.filter { it.displayNameLower.contains(lowerQuery) }
                 }
 
                 val selectableList = filteredApps.map { app ->

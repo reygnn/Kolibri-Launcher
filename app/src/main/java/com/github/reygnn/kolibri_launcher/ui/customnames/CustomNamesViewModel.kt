@@ -112,9 +112,17 @@ class CustomNamesViewModel @Inject constructor(
             val filteredList = if (query.isBlank()) {
                 masterAppList
             } else {
-                masterAppList.filter {
-                    it.displayName.contains(query, ignoreCase = true) ||
-                            it.originalName.contains(query, ignoreCase = true)
+                // Fold the query once and match the precomputed displayNameLower
+                // instead of contains(ignoreCase=true) per app (AUDIT-15 F2 /
+                // AUDIT-16 N2). originalName has no precomputed lower key, but it
+                // only differs from displayName for custom-named apps — the same
+                // predicate used for appsWithCustomNames below — so fold it only
+                // for that small subset rather than for every app on every keystroke.
+                val lowerQuery = query.lowercase()
+                masterAppList.filter { app ->
+                    app.displayNameLower.contains(lowerQuery) ||
+                        (app.displayName != app.originalName &&
+                            app.originalName.lowercase().contains(lowerQuery))
                 }
             }
 

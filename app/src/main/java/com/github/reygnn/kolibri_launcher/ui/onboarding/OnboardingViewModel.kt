@@ -80,7 +80,11 @@ class OnboardingViewModel @Inject constructor(
                     val filteredApps = if (query.isBlank()) {
                         allApps
                     } else {
-                        allApps.filter { it.displayName.contains(query, ignoreCase = true) }
+                        // Fold the query once, match the precomputed displayNameLower
+                        // instead of contains(ignoreCase=true) per app (AUDIT-15 F2 /
+                        // AUDIT-16 N2).
+                        val lowerQuery = query.lowercase()
+                        allApps.filter { it.displayNameLower.contains(lowerQuery) }
                     }
 
                     val selectableList = filteredApps.map { app ->
