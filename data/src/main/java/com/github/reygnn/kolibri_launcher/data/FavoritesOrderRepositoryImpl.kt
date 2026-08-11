@@ -156,19 +156,37 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
                 return appsToSort.sortedBy { it.displayNameLower }
             }
 
-            val orderedApps = mutableListOf<AppInfo>()
-            val remainingApps = appsToSort.toMutableList()
+            // Component-name lookup + a consumed-key set turns the former
+            // O(n·m) find+remove loop (AUDIT-15 F1) into O(n+m). putIfAbsent
+            // keeps the FIRST app per componentName, matching the old `find()`
+            // (first match wins). componentName is meant to be unique across
+            // favorites; on malformed input the set gives two behaviours:
+            //   - a repeated componentName in `order` places the app once
+            //     (add() returns false on the second hit) — same as the old
+            //     `remove()` draining it on first match.
+            //   - two apps sharing a componentName collapse to one: the second
+            //     lands in `consumed`, so filterNot drops it from the remainder
+            //     below. The old loop instead emitted that second copy in the
+            //     alphabetical remainder (the app appeared twice). Deduping a
+            //     malformed double-entry is the intended, safer result — pinned
+            //     by FavoritesOrderRepositoryImplTest.
+            val byComponent = HashMap<String, AppInfo>(appsToSort.size)
+            for (app in appsToSort) {
+                byComponent.putIfAbsent(app.componentName, app)
+            }
+            val consumed = HashSet<String>(order.size)
+            val orderedApps = ArrayList<AppInfo>(appsToSort.size)
 
             for (componentName in order) {
-                val app = remainingApps.find { it.componentName == componentName }
-                if (app != null) {
-                    orderedApps.add(app)
-                    remainingApps.remove(app)
+                if (consumed.add(componentName)) {
+                    byComponent[componentName]?.let(orderedApps::add)
                 }
             }
 
             // Restliche Apps alphabetisch sortiert anhängen
-            orderedApps.addAll(remainingApps.sortedBy { it.displayNameLower })
+            orderedApps.addAll(
+                appsToSort.filterNot { it.componentName in consumed }.sortedBy { it.displayNameLower },
+            )
             return orderedApps
 
         } catch (e: Throwable) {

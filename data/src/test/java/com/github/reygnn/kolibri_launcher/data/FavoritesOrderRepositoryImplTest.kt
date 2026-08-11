@@ -278,6 +278,26 @@ class FavoritesOrderRepositoryImplTest {
         Assert.assertEquals(2, result.size)
     }
 
+    @Test
+    fun `sortAppsWithGivenOrder - duplicate componentName in appsToSort - dedupes to the first`() {
+        val manager = FavoritesOrderRepositoryImpl(dataStore = dataStore)
+
+        // componentName ("com.a/a") is supposed to be unique across favorites;
+        // this pins the impl's behaviour if it ever isn't. The AUDIT-15 F1
+        // map-based rewrite collapses a duplicate componentName to the FIRST
+        // instance. The pre-refactor find+remove loop would additionally have
+        // emitted the second copy in the alphabetical remainder — the app would
+        // appear twice. Deduping the malformed double-entry is the intended,
+        // safer result, and this test locks it against a silent regression.
+        val first = AppInfo("First", "First", "com.a", "a")
+        val second = AppInfo("Second", "Second", "com.a", "a") // same componentName com.a/a
+        val apps = listOf(first, second)
+
+        val result = manager.sortAppsWithGivenOrder(apps, listOf("com.a/a"))
+
+        Assert.assertEquals(listOf(first), result)
+    }
+
     /*    @Test
     fun `saveOrder - when successful - returns true`() = runTest {
         val fakeDataStore = FakeDataStore()
