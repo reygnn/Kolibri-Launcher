@@ -514,17 +514,39 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // Observer 3: Time, date, battery
+        // Observer 3: Time, date, battery — one per-field collector each.
+        // uiState is a combine of time/date/battery/events, so a battery tick
+        // (frequent while charging) re-emits a distinct HomeUiState even when
+        // time/date are unchanged. A single collector setting all three would
+        // then re-run setText (measure/layout/invalidate) on the unchanged
+        // time/date fields. Per-field map + distinctUntilChanged sets each
+        // TextView only when its own string actually changes — same idiom as
+        // Observer 4 below. (AUDIT-16 N1.)
         collectOnStarted(
-            flow = viewModel.uiState,
-            errorTag = "uiState",
+            flow = viewModel.uiState.map { it.timeString }.distinctUntilChanged(),
+            errorTag = "timeString",
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { state ->
+        ) { timeString ->
             if (_binding == null) return@collectOnStarted
+            binding.timeText.text = timeString
+        }
 
-            binding.timeText.text = state.timeString
-            binding.dateText.text = state.dateString
-            binding.batteryText.text = state.batteryString
+        collectOnStarted(
+            flow = viewModel.uiState.map { it.dateString }.distinctUntilChanged(),
+            errorTag = "dateString",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { dateString ->
+            if (_binding == null) return@collectOnStarted
+            binding.dateText.text = dateString
+        }
+
+        collectOnStarted(
+            flow = viewModel.uiState.map { it.batteryString }.distinctUntilChanged(),
+            errorTag = "batteryString",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { batteryString ->
+            if (_binding == null) return@collectOnStarted
+            binding.batteryText.text = batteryString
         }
 
         // Observer 4: TimeBasedEvents
