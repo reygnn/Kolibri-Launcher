@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerAdapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -94,16 +95,39 @@ class HomeFavoritesAdapterBindingTest {
         adapter.onBindViewHolder(holder, 0)
         assertEquals(40f, holder.button.textSize, 0.5f)
 
-        // A styling change flows through the payload override (part 1).
+        // A styling change flows through the payload override (part 1). Use the
+        // REAL STYLING_PAYLOAD: after AUDIT-17 F1 only that instance takes the
+        // styling-only path; any other payload falls through to the full bind.
         val stylingB = styling(textSizePx = 60f, bold = false, color = 0xFF445566.toInt())
         adapter.setStyling(stylingB)
-        adapter.onBindViewHolder(holder, 0, mutableListOf<Any>(Any()))
+        adapter.onBindViewHolder(holder, 0, mutableListOf(HomeFavoritesAdapter.STYLING_PAYLOAD))
 
         assertEquals(60f, holder.button.textSize, 0.5f)
         assertEquals(Typeface.DEFAULT, holder.button.typeface)
         assertEquals(stylingB.textColor, holder.button.textColors.defaultColor)
         // Text is untouched by the payload path.
         assertEquals("Camera", holder.button.text.toString())
+    }
+
+    @Test
+    fun `name-change payload falls through to the full bind and refreshes the text (F1)`() {
+        // AUDIT-17 F1: the shared AppInfoDiffCallback emits PAYLOAD_NAME_CHANGE on a
+        // rename (same componentName, new displayName) through the SAME payload
+        // entry point as STYLING_PAYLOAD. The old override treated any non-empty
+        // payload as styling-only, so the renamed favorite kept its old name.
+        val adapter = HomeFavoritesAdapter(onAppClick = {}, onAppLongClick = {})
+        val renamed = camera.copy(displayName = "Cam") // same componentName, new name
+        adapter.submitList(listOf(renamed)) // empty -> commits synchronously
+        adapter.setStyling(styling(textSizePx = 40f, bold = true, color = 0xFF112233.toInt()))
+
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        // Simulate the holder currently showing the pre-rename text.
+        holder.button.text = "Camera"
+
+        adapter.onBindViewHolder(holder, 0, mutableListOf<Any>(AppDrawerAdapter.PAYLOAD_NAME_CHANGE))
+
+        // Full bind ran -> text refreshed to the current item's displayName.
+        assertEquals("Cam", holder.button.text.toString())
     }
 
     @Test

@@ -163,23 +163,28 @@ class HomeFavoritesAdapter(
     /**
      * Partial rebind for [STYLING_PAYLOAD] (AUDIT-14 F3, part 1): a
      * theme/alignment/layout change re-applies styling only, without re-setting
-     * the text or re-wiring listeners. Empty payloads fall through to the full
-     * [onBindViewHolder].
+     * the text or re-wiring listeners.
+     *
+     * Styling-only applies ONLY when every payload is [STYLING_PAYLOAD]. The
+     * shared [AppInfoDiffCallback] also routes [AppDrawerAdapter.PAYLOAD_NAME_CHANGE]
+     * through this same entry point on a rename (same componentName, new
+     * displayName); that — and anything else, including a coalesced mix or an
+     * unknown payload — must fall through to the full [onBindViewHolder] so the
+     * button text is refreshed. Treating any non-empty payload as styling-only
+     * was AUDIT-17 F1: a renamed favorite kept its old name on the home screen.
      */
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isEmpty()) {
-            super.onBindViewHolder(holder, position, payloads)
+        if (payloads.isNotEmpty() && payloads.all { it === STYLING_PAYLOAD }) {
+            try {
+                applyStyling(holder)
+            } catch (e: Throwable) {
+                // Catch kept: same view-setter boundary as the full bind below.
+                // no suspension point.
+                TimberWrapper.silentError(e, "Error applying styling payload at position $position")
+            }
             return
         }
-        try {
-            // Every payload this adapter emits is STYLING_PAYLOAD; apply styling
-            // once regardless of how many coalesced.
-            applyStyling(holder)
-        } catch (e: Throwable) {
-            // Catch kept: same view-setter boundary as the full bind above.
-            // no suspension point.
-            TimberWrapper.silentError(e, "Error applying styling payload at position $position")
-        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     /**
@@ -271,11 +276,14 @@ class HomeFavoritesAdapter(
         }
     }
 
-    private companion object {
+    companion object {
         // Marker payload for notifyItemRangeChanged — see setStyling KDoc.
-        private val STYLING_PAYLOAD = Any()
+        // Internal + @VisibleForTesting so the payload-routing test (AUDIT-17 F1)
+        // can pass the real instance rather than a stand-in Any().
+        @VisibleForTesting
+        internal val STYLING_PAYLOAD: Any = Any()
 
-        val INITIAL_STYLING = Styling(
+        private val INITIAL_STYLING = Styling(
             textSizePx = AppConstants.FALLBACK_TEXT_SIZE_PX,
             verticalPaddingPx = AppConstants.FALLBACK_VERTICAL_PADDING_PX,
             horizPaddingPx = AppConstants.FALLBACK_DIMEN_PX,
@@ -285,7 +293,7 @@ class HomeFavoritesAdapter(
             alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
         )
 
-        fun createSubtlePressColor(normalColor: Int): ColorStateList {
+        private fun createSubtlePressColor(normalColor: Int): ColorStateList {
             val pressedColor = ColorUtils.setAlphaComponent(
                 normalColor,
                 AppConstants.PRESSED_STATE_ALPHA,
