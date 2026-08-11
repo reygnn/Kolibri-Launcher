@@ -102,7 +102,7 @@ class OnboardingViewModel @Inject constructor(
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Failed to load apps.")
-                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load apps. Please try again."))
+                sendOnboardingEvent(OnboardingEvent.ShowError(R.string.error_loading_apps))
             }
         }
     }
@@ -145,7 +145,7 @@ class OnboardingViewModel @Inject constructor(
                                 // so the save-gate blocks a wipe; surface the failure now
                                 // (load time), not silently at save.
                                 preselectState = PreselectState.Unavailable
-                                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+                                sendOnboardingEvent(OnboardingEvent.ShowError(R.string.error_loading_favorites))
                             }
                         }
                 }
@@ -157,7 +157,7 @@ class OnboardingViewModel @Inject constructor(
                 // so the EDIT-mode save stays blocked.
                 preselectState = PreselectState.Unavailable
                 TimberWrapper.silentError(e, "Error loading initial favorites.")
-                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+                sendOnboardingEvent(OnboardingEvent.ShowError(R.string.error_loading_favorites))
             }
         }
     }
@@ -192,7 +192,7 @@ class OnboardingViewModel @Inject constructor(
             // favorites. INITIAL_SETUP is exempt: an empty save is legitimate on first
             // run. Correctness lives HERE, not just in the distinguishable read.
             if (launchMode == LaunchMode.EDIT_FAVORITES && preselectState != PreselectState.Loaded) {
-                sendOnboardingEvent(OnboardingEvent.ShowError("Could not load favorites."))
+                sendOnboardingEvent(OnboardingEvent.ShowError(R.string.error_loading_favorites))
                 return@launchSafe
             }
             try {
@@ -209,7 +209,7 @@ class OnboardingViewModel @Inject constructor(
                     e,
                     "CRITICAL: Failed to save favorites or complete onboarding."
                 )
-                sendOnboardingEvent(OnboardingEvent.ShowError("Save failed. Please try again."))
+                sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_error_save_failed))
             }
         }
     }

@@ -177,6 +177,8 @@
     <string name="error_fallback_intent_failed">Fallback intent also failed</string>
     <string name="error_app_not_available">App is no longer available</string>
     <string name="error_loading_apps">Failed to load apps</string>
+    <string name="error_loading_favorites">Could not load favorites.</string>
+    <string name="onboarding_error_save_failed">Save failed. Please try again.</string>
     <string name="crash_dialog_title">App Crashed</string>
     <string name="crash_dialog_text">Would you like to send a crash report to help us improve the app?</string>
     <string name="crash_dialog_send">Send</string>

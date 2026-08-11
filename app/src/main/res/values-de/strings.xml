@@ -155,6 +155,8 @@
     <string name="error_fallback_intent_failed">Auch der Fallback-Intent ist fehlgeschlagen</string>
     <string name="error_app_not_available">App ist nicht mehr verfügbar</string>
     <string name="error_loading_apps">Apps konnten nicht geladen werden</string>
+    <string name="error_loading_favorites">Favoriten konnten nicht geladen werden.</string>
+    <string name="onboarding_error_save_failed">Speichern fehlgeschlagen. Bitte erneut versuchen.</string>
 
     <string name="crash_dialog_title">App abgestürzt</string>
     <string name="crash_dialog_text">Möchten Sie einen Fehlerbericht senden, um uns bei der Verbesserung zu helfen?</string>

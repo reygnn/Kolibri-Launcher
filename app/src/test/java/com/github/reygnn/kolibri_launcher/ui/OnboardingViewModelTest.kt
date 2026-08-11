@@ -174,7 +174,7 @@ class OnboardingViewModelTest {
 
             val event = awaitItem()
             assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals("Save failed. Please try again.", event.message)
+            assertEquals(R.string.onboarding_error_save_failed, (event as OnboardingEvent.ShowError).messageResId)
         }
     }
 

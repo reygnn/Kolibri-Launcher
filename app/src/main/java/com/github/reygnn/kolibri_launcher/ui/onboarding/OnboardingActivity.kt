@@ -249,7 +249,7 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 }
             }
             is OnboardingEvent.ShowError -> {
-                showToastSafe(event.message, Toast.LENGTH_LONG)
+                showToastSafe(getString(event.messageResId), Toast.LENGTH_LONG)
             }
             is OnboardingEvent.ShowLimitReachedToast -> {
                 showToastSafe(getString(R.string.favorites_limit_reached, event.limit))
