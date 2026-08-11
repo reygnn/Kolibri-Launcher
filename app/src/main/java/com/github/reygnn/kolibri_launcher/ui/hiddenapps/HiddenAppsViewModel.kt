@@ -157,6 +157,12 @@ class HiddenAppsViewModel @Inject constructor(
                 throw e
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Error saving hidden apps")
+                // Surface the failure before leaving (AUDIT-18 F3): the sibling
+                // selection screens toast on save error too. Without this the Done
+                // tap silently no-ops -- the screen closes as if it worked but the
+                // apps were not hidden. error_saving_hidden_apps was defined (both
+                // locales) for exactly this catch and had never been wired.
+                sendEvent(UiEvent.ShowToast(R.string.error_saving_hidden_apps))
                 sendEvent(UiEvent.NavigateUp)
             }
         }

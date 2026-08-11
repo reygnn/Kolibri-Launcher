@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
@@ -290,7 +291,11 @@ class HiddenAppsViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // The ViewModel must catch and still navigate up.
+            // AUDIT-18 F3: surface the failure, THEN navigate up. Previously the
+            // save error was completely silent (only NavigateUp).
+            val toast = awaitItem()
+            assertTrue(toast is UiEvent.ShowToast)
+            assertEquals(R.string.error_saving_hidden_apps, (toast as UiEvent.ShowToast).messageResId)
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
@@ -468,7 +473,10 @@ class HiddenAppsViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            // Should still navigate despite errors.
+            // AUDIT-18 F3: error toast first, then navigate up despite the error.
+            val toast = awaitItem()
+            assertTrue(toast is UiEvent.ShowToast)
+            assertEquals(R.string.error_saving_hidden_apps, (toast as UiEvent.ShowToast).messageResId)
             assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
