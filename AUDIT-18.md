@@ -14,7 +14,10 @@
 > **bewusst minimalistischen text-only Launcher** wurde „mehr UI/Deko" NICHT als
 > Defekt gewertet; nur echte Korrektheits-/a11y-Fehler.
 >
-> **Status: BERICHTEND.** Drei verifizierte Defekte + Low-Notes. Fixes stehen aus.
+> **Status: VOLLSTÄNDIG UMGESETZT.** Drei verifizierte Defekte + Low-Notes; alle
+> drei auf Branch `fix/audit-18-ux` gefixt (F1/F3 mit Test, F2 als
+> View-Inflation/a11y-Attribut per Compile verifiziert). Low-Notes bewusst nicht
+> eingeplant (§2). Compile/Linter/Tests grün.
 
 ---
 
@@ -35,12 +38,18 @@ solide; die drei Funde sind punktuelle Ausreißer, keine systemische Lücke.
 
 | # | Achse | Ort | Was | Severity |
 |---|---|---|---|---|
-| **F1** 🔎 | L10n | `OnboardingViewModel` (5 Sites) | hartcodierte **englische** Fehler-Toasts → Deutsch-Nutzer sieht Englisch | `medium` |
-| **F2** 🔎 | a11y | `item_color_swatch.xml` + `ColorCustomizationDialogFragment` | Farb-Swatches **ohne Label** + **40dp** Touch-Target (<48dp) | `medium` |
-| **F3** 🔎 | UX | `HiddenAppsViewModel.onDoneClicked` | Save-Fehler **komplett stumm** (bereits übersetzter String nie verdrahtet) | `low–medium` |
+| **F1** ✅ | L10n | `OnboardingViewModel` (5 Sites) | hartcodierte **englische** Fehler-Toasts → Deutsch-Nutzer sieht Englisch | `medium` |
+| **F2** ✅ | a11y | `item_color_swatch.xml` + `ColorCustomizationDialogFragment` | Farb-Swatches **ohne Label** + **40dp** Touch-Target (<48dp) | `medium` |
+| **F3** ✅ | UX | `HiddenAppsViewModel.onDoneClicked` | Save-Fehler **komplett stumm** (bereits übersetzter String nie verdrahtet) | `low–medium` |
 
-### F1 — Onboarding: hartcodierte englische Fehler-Strings · 🔎 gemeldet
+### F1 — Onboarding: hartcodierte englische Fehler-Strings · ✅ umgesetzt
 `app/.../ui/onboarding/OnboardingViewModel.kt:105,148,160,195,212`
+
+> **Erledigt** (Branch `fix/audit-18-ux`): `OnboardingEvent.ShowError` trägt jetzt
+> ein `@StringRes Int` (wie `UiEvent.ShowToast`), die Activity löst via `getString`
+> auf. `error_loading_apps` wiederverwendet; `error_loading_favorites` und
+> `onboarding_error_save_failed` in beiden Locales neu. VM-Test asserted den
+> resId statt des Literals. Strings-Parity + Rule 13 grün.
 
 **Verifiziert am Code.** `OnboardingEvent.ShowError(val message: String)`
 (`OnboardingEvent.kt:4`) trägt einen **Roh-String**, und `OnboardingActivity.kt:251-252`
@@ -64,8 +73,14 @@ ungenutzter `error_loading_apps` würde den `:105`-Fall abdecken.)
 `@StringRes Int` umstellen (wie `UiEvent.ShowToast` in `ui/base/UiEvent.kt:10`
 es bereits macht), Activity zieht via `getString`.
 
-### F2 — Farb-Swatches: kein Label + Touch-Target unter 48dp · 🔎 gemeldet
+### F2 — Farb-Swatches: kein Label + Touch-Target unter 48dp · ✅ umgesetzt
 `app/.../res/layout/item_color_swatch.xml:9-28` · `app/.../ui/colorcustomization/ColorCustomizationDialogFragment.kt` (`populatePalette`)
+
+> **Erledigt** (Branch `fix/audit-18-ux`): `contentDescription` je Swatch gesetzt
+> (Auto → bestehendes `color_automatic`; Farbe → Hex-Wert), und Klick + a11y-Fokus
+> von der 40dp-Card auf den 56dp-Zellen-Root verlagert → Touch-Target ≥48dp, ein
+> gelabelter TalkBack-Knoten pro Swatch. Keine neuen Strings. View-Inflation/
+> a11y-Attribut (Rule 10) → per Compile verifiziert, kein Unit-Test extrahiert.
 
 **Verifiziert am Layout.** Jede Farbwahl ist eine `MaterialCardView`
 (`color_swatch_card`), im Code klickbar gemacht, **ohne** Text und **ohne**
@@ -83,8 +98,12 @@ im ganzen Item-Layout; das `auto_icon`-`ImageView` hat auch keins). Zwei Defekte
 den Auto-Eintrag — braucht evtl. neue Strings) und das Touch-Target auf ≥48dp
 bringen (Listener auf den 56dp-Frame legen oder `minWidth/minHeight`).
 
-### F3 — HiddenApps: Save-Fehler komplett stumm · 🔎 gemeldet
+### F3 — HiddenApps: Save-Fehler komplett stumm · ✅ umgesetzt
 `app/.../ui/hiddenapps/HiddenAppsViewModel.kt:159-164` (`onDoneClicked`-Catch)
+
+> **Erledigt** (Branch `fix/audit-18-ux`): `ShowToast(error_saving_hidden_apps)`
+> vor `NavigateUp` (bereits übersetzter String verdrahtet). Die zwei bestehenden
+> Failure-Tests asserten jetzt den Toast (mit korrektem String) vor NavigateUp.
 
 **Verifiziert am Code.** Der Catch loggt und navigiert weg — **kein** Toast:
 
@@ -174,8 +193,11 @@ richtig macht:
   Screens toasten (der übersetzte String liegt ungenutzt bereit).
 
 Alle drei sind **user-sichtbar** (Nicht-Englisch- / TalkBack- / Fehlerpfad-
-Nutzer), keine Kosmetik. Empfohlene Reihenfolge: **F3 zuerst** (Ein-Zeilen-Fix,
-String liegt bereit), dann **F1** (String-Extraktion + `@StringRes`-Umstellung),
-dann **F2** (Label + Touch-Target, evtl. neue Strings).
+Nutzer), keine Kosmetik.
 
-**Offen:** alle drei — als verifizierte Findings festgehalten, noch nicht umgesetzt.
+**Umgesetzt:** alle drei auf Branch `fix/audit-18-ux`, in der Reihenfolge F3 → F1
+→ F2. F1/F3 mit Regressions-Test; F2 als View-Inflation/a11y-Attribut per Compile
+verifiziert (Rule 10). Compile/Linter/Tests grün.
+
+**Offen:** keine der drei Findings. Die Low-Notes (§2) bleiben bewusst offen
+(design-inhärent bzw. kosmetisch) — Re-Evaluierung nur bei Bedarf.
