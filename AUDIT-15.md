@@ -47,7 +47,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 | **F2** ✅ | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
-| **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
+| **F5** ⛔ | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
 | **F6** ✅(a)(c) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
 
 ### F1 — O(n·m) in `sortAppsWithGivenOrder` · ✅ umgesetzt
@@ -140,7 +140,7 @@ gemessen — tote Inflation. (`drag_handle` daneben ist ein echtes, sichtbares I
 `app_icon` aus dem Layout entfernen erspart die Inflation. `low`, weil die
 Reorder-Liste kurzlebig und selten offen ist.
 
-### F5 — Chip-Leiste wird komplett neu gebaut
+### F5 — Chip-Leiste wird komplett neu gebaut · ⛔ wird nicht umgesetzt
 `app/.../ui/home/HomeFragment.kt:953,976-985`
 
 `updateTimeBasedChips` macht `removeAllViews()` und baut die Kalender-/Zeit-Chips
@@ -149,6 +149,15 @@ Diffing, bei jedem Time-Event-Tick. Betrifft **nicht** die Favoriten (die laufen
 sauber über den Adapter), nur die Chip-Leiste; die Anzahl ist durch die
 sichtbaren Events begrenzt. `low`; ein diffendes Update oder ein kleiner
 `ListAdapter` wäre die saubere Form, lohnt aber erst bei spürbar vielen Chips.
+
+> **Entscheidung: nicht umsetzen.** Aufwand/Risiko/Wert stehen dauerhaft
+> schief. Der Umbau (stabile Keys, In-Place-Update vs. Add/Remove-Deltas oder
+> ein `ListAdapter`) fasst eine **user-sichtbare** Fläche in `HomeFragment`
+> an (Rule 10: Android-Runtime, schwer JVM-testbar), während der Nutzen sich
+> erst „bei spürbar vielen Chips" materialisiert — die Chipzahl ist aber durch
+> die sichtbaren Events gedeckelt (eine Handvoll), der Rebuild läuft auf
+> Time-Ticks, nicht pro Frame. Kein realer Lag-Beitrag. Re-Evaluierung nur,
+> falls die Chip-Leiste je auf viele gleichzeitige Events wächst.
 
 ### F6 — Context-Menu-Adapter: Per-Bind-Allokationen · ✅ (a)+(c) umgesetzt, (b) bewusst belassen
 `app/.../ui/appcontextmenu/AppContextMenuAdapter.kt:30,70,88`
@@ -227,9 +236,13 @@ Sibling-Adapter-Idiom, abgesichert durch ein mutations-geprüftes
 Charakterisierungs-Netz) und F1 (O(n+m)-Map-Lookup, Verhaltensdifferenz an
 malformed Input dokumentiert + gepinnt). F6 (b) bewusst belassen (siehe §1).
 
-**Offen** (alle `low`, kein Druck): **F3** am besten zusammen mit dem
+**Offen** (`low`, kein Druck): nur noch **F3** — am besten zusammen mit dem
 vertagten AUDIT-14 F1 §5.3 angehen, sobald die Favoriten-/Naming-Pipeline
-ohnehin mal offen ist; **F5** (Chip-Diffing) nur bei spürbar vielen Chips.
+ohnehin mal offen ist.
+
+**Nicht umgesetzt (bewusst):** **F5** (Chip-Diffing) — Aufwand/Risiko/Wert
+dauerhaft schief, siehe §1; Re-Evaluierung nur bei viel mehr gleichzeitigen
+Chips.
 
 ## 4. Korrekturen an den Sub-Agent-Zurufen (Transparenz)
 
