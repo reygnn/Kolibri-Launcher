@@ -5,11 +5,12 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 /**
  * PURE LOGIC - Missing Apps Formatter
  *
- * Formatiert eine Menge von "packageName/className"-Strings zu einer
- * untereinander-gelisteten Darstellung. Überzählige Einträge werden abgeschnitten
- * und per [Result.overflowCount] gemeldet, damit das Fragment den
- * "... und X weitere"-Suffix aus einer StringResource (inkl. Pluralisierung)
- * zusammenbauen kann.
+ * Formats a set of "packageName/className" strings into a newline-listed display.
+ * Overflow entries are truncated and reported via [Result.overflowCount] so the
+ * Fragment can build the "... und X weitere" suffix from a StringResource
+ * (backup_and_more). That suffix is a plain formatted string, NOT a <plurals>:
+ * neither the English "more" nor the German "weitere" inflects here, so a
+ * one/other split would be identical in both shipped locales (AUDIT-18 §2).
  *
  * Behält nur den packageName-Teil vor dem "/".
  *

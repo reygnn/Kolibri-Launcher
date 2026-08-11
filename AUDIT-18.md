@@ -145,9 +145,15 @@ Write-Fehler) ist selten → `low–medium`. **Fix trivial:**
 - **Datums-Feldreihenfolge fix** (`ClockDelegate.kt:139`, `"E, d MMM"`) — Wörter
   lokalisiert, Reihenfolge nicht; für en/de fine, `DateFormat.getBestDateTimePattern`
   wäre robust. `low`.
-- **`backup_and_more`** ist `%1$d`-formatiert statt `<plurals>` (liest „und 1
-  weitere" schief) — inkonsistent zu den korrekt genutzten `<plurals>` nebenan.
-  Kosmetik.
+- **`backup_and_more`** ist `%1$d`-formatiert statt `<plurals>`. **Nachgeprüft:**
+  Zähler = 1 ist zwar erreichbar (`maxDisplayed + 1` fehlende Apps), aber der
+  gerenderte Text ist in **beiden** ausgelieferten Locales grammatisch korrekt —
+  weder das englische „more" noch das deutsche „weitere" (feminin, elidiertes
+  „App") flektiert hier, ein `<plurals>` hätte also `one == other` und wäre ein
+  No-op. **Kein Defekt** (die frühere „liest schief"-Einschätzung war für en/de
+  falsch); nur der KDoc in `MissingAppsFormatter.kt` behauptete fälschlich
+  „inkl. Pluralisierung" — korrigiert. Eine `<plurals>`-Umstellung bliebe rein
+  strukturelles Future-proofing für eine dritte Sprache, bewusst nicht gemacht.
 - **`CustomNamesUiState.isLoading`** wird gesetzt aber nie gerendert
   (`CustomNamesActivity.updateUi` liest es nicht) — Load ist sub-Sekunde, kein
   hängender State. Kosmetik.
