@@ -63,9 +63,12 @@ class GetRecentAppsUseCase @Inject constructor(
         // Custom names folded in over the last-known-good point-read
         // (REACTIVE_APPLIST_SPEC Site 3): getCurrentApps() keeps its
         // lastSuccessfulAppList fallback (no transient-empty window), applyNames
-        // resolves the label via a snapshot. A no-op overlay while the
-        // enumeration still bakes the name in.
+        // resolves the label via a snapshot. Since migration step 2b the
+        // enumeration emits the original label, so this is the operative
+        // name-application point.
         val customNames = customNamesRepository.getAllCustomNames()
+        // applyNames' terminal sort is DEAD here: recents orders by recency
+        // below. Deliberate -- see applyNames KDoc (SPEC-DECISION RAL-1a).
         val currentApps = applyNames(installedAppsStateRepository.getCurrentApps(), customNames)
 
         // First visible AppInfo per package (launcher apps typically expose

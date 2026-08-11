@@ -89,8 +89,9 @@ class GetFavoriteAppsUseCase @Inject constructor(
             KolibriLog.w(e, "favoriteComponentsOrderFlow error - using empty order")
             emit(emptyList())
         },
-        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 2); a
-        // no-op overlay while the enumeration still bakes the name in.
+        // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 2); since
+        // migration step 2b the enumeration emits the original label, so this is
+        // the operative name-application point.
         customNamesRepository.customNamesFlow.catch { e ->
             if (e is CancellationException) throw e
             KolibriLog.w(e, "customNamesFlow error - using original names")
@@ -99,6 +100,9 @@ class GetFavoriteAppsUseCase @Inject constructor(
     ) { rawApps, favorites, hiddenApps, savedOrder, customNames ->
         KolibriLog.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
+        // applyNames' terminal sort is DEAD here: processApps re-sorts by
+        // savedOrder below. Deliberate, not an oversight -- do not "optimize"
+        // it away. See applyNames KDoc (SPEC-DECISION RAL-1a).
         val namedApps = applyNames(rawApps, customNames)
 
         // Leere App-Liste → Loading state

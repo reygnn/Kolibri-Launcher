@@ -395,6 +395,19 @@ genau das, was den Umfang klein *wirken* ließ.
   Quell-Grenzen angewandt (getInstalledApps-Familie via GetInstalledAppsUseCase;
   Drawer/Favoriten auf `rawAppsFlow`; Recents Point-Read) — nicht „ein zentraler Flow".
   Drawer/Favoriten dürfen NICHT vom Veto-Holder weg (§3/§6).
+- **`SPEC-DECISION RAL-1a` — der terminale Sort in `applyNames` bleibt bewusst
+  gebündelt, NICHT gesplittet.** Load-bearing nur für die nicht-nachsortierenden
+  Consumer (CustomNames/Settings-VMs + Onboarding-Hauptliste); für die drei
+  selbst-nachsortierenden reaktiven Consumer (Drawer / Favoriten / Recents) — und
+  auch für die selbst-sortierenden Hidden/Swipe-VMs — ist der Sort tote Arbeit.
+  Ein Split würde die RAL-1-Invariante „Quell-Grenze liefert die sortierte
+  Post-Condition" für Wert ~= 0 fragmentieren. Dreimal aufgeworfen (vertagt
+  AUDIT-14 F1 §5.3, abschließend geschlossen AUDIT-15 F3) — volle Begründung im
+  `applyNames`-KDoc.
+- **`SPEC-DECISION RAL-4`:** ein Split von `applyNames` in ein
+  sortiert/unsortiert-Paar bräuchte zuerst dieses Spec-Amendment (Änderung über
+  ≥2 Use Cases, alle Call-Sites). Offen, bewusst nicht verfolgt, solange kein
+  anderer Grund `applyNames` ohnehin anfasst.
 - **`SPEC-DECISION RAL-2`:** `usageFlow` als nacktes `Unit`-Signal (Trigger, Sort
   bleibt Suspend-Call) vs. als Daten-Flow (Sort wird pure Funktion). Empfehlung: das
   billigere **Unit-Signal**, solange die Suspend-Sort-im-combine bleibt.

@@ -23,8 +23,9 @@ import javax.inject.Inject
  *
  * Custom names are folded in reactively via [applyNames] (REACTIVE_APPLIST_SPEC
  * Site 1), so a rename re-derives through [CustomNamesRepository.customNamesFlow]
- * instead of forcing a re-enumeration. While the enumeration still bakes the name
- * in (migration step 2a) this is a behavior-neutral no-op overlay.
+ * instead of forcing a re-enumeration. Since migration step 2b the enumeration
+ * emits the original label, so [applyNames] is the operative name-application
+ * point for this Site-1 family.
  */
 class GetInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
@@ -41,8 +42,7 @@ class GetInstalledAppsUseCase @Inject constructor(
             customNamesRepository.customNamesFlow
         ) { apps, names -> applyNames(apps, names) }
             // Collapse redundant identical re-derivations: a customNamesFlow tick
-            // that leaves the applied list unchanged, or the transient duplicate
-            // during migration step 2a where both the enumeration re-bake and the
-            // name overlay produce the same list.
+            // that leaves the applied list unchanged (post step-2b the enumeration
+            // no longer re-bakes the name, so only the reactive overlay changes it).
             .distinctUntilChanged()
 }

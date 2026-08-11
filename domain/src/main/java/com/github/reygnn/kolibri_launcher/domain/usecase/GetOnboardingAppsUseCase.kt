@@ -31,7 +31,8 @@ class GetOnboardingAppsUseCase @Inject constructor(
                 // decided separately). Deliberate, not an incidental collapse.
                 is AppLoad.Failed -> emptyList()
                 // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 1);
-                // a no-op overlay while the enumeration still bakes the name in.
+                // since migration step 2b the enumeration emits the original label,
+                // so this is the operative name-application point.
                 is AppLoad.Loaded -> applyNames(load.apps, names).filter { app ->
                     // isNotBlank() on non-null data-class properties cannot throw;
                     // a programmer error would propagate to the Flow.catch below,

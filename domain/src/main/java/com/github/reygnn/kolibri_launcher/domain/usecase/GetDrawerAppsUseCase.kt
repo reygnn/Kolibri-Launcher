@@ -125,8 +125,12 @@ class GetDrawerAppsUseCase @Inject constructor(
                 "SortOrder: $sortOrder, Hidden components size: ${hiddenComponents.size}",
         )
 
-        // Custom names applied over the veto-held raw list (no-op overlay while
-        // the enumeration still bakes the name in — migration step 2a).
+        // Custom names applied over the veto-held raw list; since migration step 2b
+        // the enumeration emits the original label, so this is the operative
+        // name-application point.
+        // applyNames' terminal sort is DEAD here: sortVisibleApps re-sorts
+        // (alpha / time-weighted) below. Deliberate -- see applyNames KDoc
+        // (SPEC-DECISION RAL-1a).
         val namedApps = applyNames(rawApps, customNames)
 
         // Filter + alphabetischer Sort sind reine Operationen auf
