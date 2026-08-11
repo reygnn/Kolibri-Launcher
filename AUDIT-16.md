@@ -11,9 +11,11 @@
 >
 > **Status dieses Dokuments: BERICHTEND, Umsetzung im Gang.** Ursprünglich als
 > reiner Befundbericht angelegt (die Aufgabe war, die Findings zu notieren).
-> Inzwischen ist **N1** umgesetzt (✅, Branch `fix/home-redundant-settext`); die
-> übrigen (N2–N5) sind mit 🔎 **gemeldet, nicht umgesetzt** markiert. Statusskala
-> wie in den Schwester-Audits.
+> Inzwischen umgesetzt: **N1** (✅, Branch `fix/home-redundant-settext`) und
+> **N2** (✅, Branch `refactor/settings-vm-search`); **N3** bewusst nicht
+> umgesetzt (⛔, Emissions-Invariante > Mikro-Scan); **N4/N5** mit
+> 🔎 **gemeldet, nicht umgesetzt** markiert. Statusskala wie in den
+> Schwester-Audits.
 >
 > **Kein akuter Defekt.** Wie AUDIT-14/15: nichts ruckelt hart, nichts leakt,
 > nichts blockiert den ersten Frame. Alle Findings sind `low`. Der Code ist nach
@@ -53,8 +55,8 @@ erneut geprüft und sind **sauber** — Details in §2.
 | # | Ort | Was | Severity |
 |---|---|---|---|
 | **N1** ✅ | `HomeFragment` Observer 3 + `LauncherViewModel.uiState` | dreifaches `setText` (Zeit/Datum/Akku) bei **jedem** Akku-Broadcast, inkl. unveränderter Zeit/Datum-Strings | `low` |
-| **N2** 🔎 | Vier Settings-VMs (Hidden/Onboarding/Swipe/CustomNames) | Suche nutzt `contains(ignoreCase=true)` statt `displayNameLower` — das **F2-Muster in den Dateien, die F2 nicht angefasst hat** | `low` |
-| **N3** 🔎 | dieselben Settings-VMs | `combine` re-sortiert/re-scannt die Auswahl-Liste bei jedem Keystroke, obwohl nur `query` sich änderte | `low` |
+| **N2** ✅ | Vier Settings-VMs (Hidden/Onboarding/Swipe/CustomNames) | Suche nutzt `contains(ignoreCase=true)` statt `displayNameLower` — das **F2-Muster in den Dateien, die F2 nicht angefasst hat** | `low` |
+| **N3** ⛔ | dieselben Settings-VMs | `combine` re-sortiert/re-scannt die Auswahl-Liste bei jedem Keystroke, obwohl nur `query` sich änderte | `low` |
 | **N4** 🔎 | `InstalledAppsRepositoryImpl.processResolveInfoList` | `mutableListOf()` wächst elementweise, Endgröße ist vorab bekannt | `low` (sub-nit) |
 | **N5** 🔎 | `SwipeActionsAppListAdapter`, `OnboardingAppListAdapter` | kein `getChangePayload` → Selection-Toggle macht Full-Rebind statt Partial | `low` |
 
@@ -108,11 +110,24 @@ jeder Prozent-Änderung neu, und Zeit/Datum reiten unverändert mit.
 Die `onStart`-Einmal-Injektion bei `:1500-1502` bleibt unverändert (kein
 Per-Broadcast-Pfad, s. o.). Der billigste Fix des Audits, höchster realer Nutzen.
 
-### N2 — Settings-Suche ignoriert den vorberechneten Lower-Key · 🔎 gemeldet
+### N2 — Settings-Suche ignoriert den vorberechneten Lower-Key · ✅ umgesetzt
 - `app/.../ui/hiddenapps/HiddenAppsViewModel.kt:55`
 - `app/.../ui/onboarding/OnboardingViewModel.kt:83`
 - `app/.../ui/swipeactions/SwipeActionsViewModel.kt:68`
 - `app/.../ui/customnames/CustomNamesViewModel.kt:116-117` (zwei Faltungen/App)
+
+> **Erledigt** (Branch `refactor/settings-vm-search`): in allen vier VMs
+> `query.lowercase()` einmal aus dem Filter-Lambda gezogen und gegen
+> `AppInfo.displayNameLower` gematcht — exakt der F2-Fix, nur in den vier
+> Geschwister-Dateien. CustomNames matcht zusätzlich `originalName`: der hat
+> keinen vorberechneten Lower-Key, unterscheidet sich aber nur bei
+> custom-benannten Apps von `displayName` (dasselbe Prädikat wie
+> `appsWithCustomNames`), also wird `originalName` nur für diese kleine
+> Teilmenge gefaltet statt für jede App pro Keystroke — **bewusst keine
+> Domain-Änderung** (`originalNameLower` als `AppInfo`-Body-`val` würde app-weit
+> pro `copy()` gefaltet, für ein einziges Screen). `:app:testDebugUnitTest`
+> (die vier VM-Tests inkl. Such-Filter + `selectedApps`-Sortierung),
+> `checkConventions` und `checkRule13` grün.
 
 ```kotlin
 allApps.filter { it.displayName.contains(query, ignoreCase = true) }   // HiddenApps:55
@@ -133,7 +148,7 @@ pro Keystroke). Entschärft durch den Debounce an den jeweiligen Activities (z. 
 `HiddenAppsActivity.kt:150`), daher `low` — aber es ist dieselbe Fold-Arbeit über
 die ganze Liste, die F2 bereits als vermeidbar eingestuft hat.
 
-### N3 — `combine` re-sortiert die Auswahl-Liste bei reiner Query-Änderung · 🔎 gemeldet
+### N3 — `combine` re-sortiert die Auswahl-Liste bei reiner Query-Änderung · ⛔ wird nicht umgesetzt
 - `HiddenAppsViewModel.kt:65-67` — `allApps.filter { selected.contains(...) }.sortedBy { it.displayNameLower }`
 - `OnboardingViewModel.kt:93-95` — gleiche Form
 - `SwipeActionsViewModel.kt:61-62` — zusätzlich zwei O(n)-`find` (`allApps.find { it.componentName == leftComp/rightComp }`)
@@ -144,11 +159,26 @@ Auswahl-Liste wird neu gefiltert **und neu sortiert** (Hidden/Onboarding), bei
 Swipe zusätzlich die Liste zweimal linear nach den Slot-Komponenten durchsucht —
 obwohl `selected`/`leftComp`/`rightComp` sich beim Tippen gar nicht ändern.
 
-**Fix:** die query-abhängige Filterung in eine eigene `map`-Stufe splitten und die
-Auswahl-Sortierung (bzw. die Slot-`find`s) in einen `combine` legen, der nur auf
-`masterList` + `selected`/Slot-Components keyt. Dann kostet ein Keystroke nur noch
-das Filtern der sichtbaren Liste, nicht das Re-Sortieren/Re-Scannen der Auswahl.
-`low`, weil debounced und die Listen praxisnah klein sind.
+Der naheliegende Fix wäre, die query-abhängige Filterung von der
+Auswahl-Sortierung (bzw. den Slot-`find`s) in getrennte `combine`-Stufen zu
+splitten, sodass letztere nur auf `masterList` + `selected`/Slot-Components keyen.
+
+> **Entscheidung: nicht umsetzen — Emissions-Invariante > Mikro-Scan.**
+> Der Split fragmentiert genau die **atomare Single-Emission**, die diese VMs
+> bewusst halten: die dokumentierten Guards (`HiddenAppsViewModel` /
+> `SwipeActionsViewModel`, „Load … BEFORE publishing the master list … without a
+> suspend point between them, so the init-block combine collector never emits a
+> transient state (sub-frame flash)") existieren genau dafür. Ein
+> verschachteltes `combine(selectableFlow, selectedFlow)` kann bei einer
+> `selected`-Änderung transiente Doppel-Emissionen erzeugen (eine innere Stufe
+> aktualisiert vor der anderen) — und die VM-Tests asserten **Endzustände**,
+> würden einen transienten Flicker also nicht zuverlässig fangen. Dem steht als
+> Nutzen ein O(n)-Filter/Scan über eine **kleine** Auswahl-Liste pro
+> **gesettelten** (an der jeweiligen Activity debounced) Keystroke gegenüber —
+> µs, `low`. Value ≈ 0 gegen ein reales Regressionsrisiko in
+> invarianten-sensiblen VMs: dieselbe Wert-vs-Risiko-Abwägung, die AUDIT-15 F3/F5
+> geschlossen hat. Re-Evaluierung nur, falls diese Screens je eine spürbar große
+> Auswahl-Liste ohne Debounce bekommen.
 
 ### N4 — Un-presizte Liste in der Enumeration · 🔎 gemeldet (sub-nit)
 `data/.../data/InstalledAppsRepositoryImpl.kt:215`
@@ -216,15 +246,22 @@ findet **einen** genuin neuen, real spürbaren Punkt und vier kleine Deltas:
 
 - **N1** (Triple-`setText` beim Laden) — der einzige mit echtem Micro-Lag-Beitrag,
   billigster Fix, klares Muster direkt nebenan (Observer 4).
-- **N2/N3** — das F2-Suchmuster + der zugehörige `combine`-Re-Sort in den vier
-  Settings-VMs, die AUDIT-15 F2 nicht mit umgestellt hat. Konsequente Nachziehung.
+- **N2** — das F2-Suchmuster in den vier Settings-VMs, die AUDIT-15 F2 nicht mit
+  umgestellt hat. Konsequente Nachziehung.
+- **N3** — der zugehörige `combine`-Re-Sort. Bewusst **nicht** umgesetzt: der
+  saubere Split fragmentiert die atomare Single-Emission dieser VMs (Risiko
+  transienter Doppel-Emissionen) gegen µs-Ersparnis über eine kleine, debounced
+  Liste. Wert-vs-Risiko wie AUDIT-15 F3/F5.
 - **N4/N5** — Presize-Nit und zwei fehlende Adapter-Payloads. Kosmetik.
 
-**Umgesetzt:** **N1** (Branch `fix/home-redundant-settext`, Per-Feld-`distinctUntilChanged`;
-Compile/Linter/Tests grün). Empfohlene Reihenfolge für den Rest: N2/N3 als
-zusammenhängender Settings-VM-Refactor, N4/N5 optional als Aufräum-Beifang.
+**Umgesetzt:** **N1** (Branch `fix/home-redundant-settext`, Per-Feld-`distinctUntilChanged`)
+und **N2** (Branch `refactor/settings-vm-search`, Suche gegen `displayNameLower`)
+— Compile/Linter/Tests grün.
 
-**Offen:** N2–N5, als Findings festgehalten, noch nicht umgesetzt.
+**Bewusst nicht umgesetzt:** **N3** (Emissions-Invariante > Mikro-Scan, siehe §1).
+
+**Offen:** N4/N5 — als Findings festgehalten, noch nicht umgesetzt (optionaler
+Aufräum-Beifang).
 
 ---
 
