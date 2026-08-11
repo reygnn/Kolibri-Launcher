@@ -406,6 +406,46 @@ class UsageExportRepositoryImplTest {
     }
 
     @Test
+    fun `importFromJson - replace mode - keeps the NEWEST when the file exceeds the cap in ascending order`() = runTest {
+        // AUDIT-17 F3: performImport must sort BEFORE truncating. A foreign/hand-
+        // edited file may list more than MAX_TIMESTAMPS_PER_APP valid timestamps for
+        // a package in ascending (oldest-first) order; validateJsonStructure permits
+        // up to MAX * 2. take() before sort would keep the file-order first (=oldest)
+        // MAX and drop the newest. Verify the newest MAX survive, the oldest drop.
+        val limit = AppConstants.MAX_TIMESTAMPS_PER_APP
+        val overflow = 50
+        val count = limit + overflow // <= MAX * 2, so validation passes
+        val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
+
+        // `count` distinct valid timestamps listed OLDEST-FIRST (ascending): index 1
+        // is the oldest, index `count` the newest, all within the last ~hour.
+        val ascending = (1..count).map { i ->
+            currentTime - TimeUnit.HOURS.toMillis(1) - (count - i) * 1000L
+        }
+        val ascIso = ascending.joinToString(", ") { "\"${Instant.ofEpochMilli(it)}\"" }
+        val json = """
+            {
+                "version": "1.0.0",
+                "usage_data": { "com.test": [$ascIso] }
+            }
+        """.trimIndent()
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
+        assertIs<UsageImportResult.Success>(result)
+
+        val stored = fakeDataStore.data.first()[key] ?: emptySet()
+        assertEquals(limit, stored.size)
+        // The newest `limit` all survive...
+        ascending.sortedDescending().take(limit).forEach {
+            assertTrue("newest must survive, ts=$it", stored.contains(it.toString()))
+        }
+        // ...and the oldest `overflow` are dropped (would have been kept by take-before-sort).
+        ascending.sorted().take(overflow).forEach {
+            assertFalse("oldest must be dropped, ts=$it", stored.contains(it.toString()))
+        }
+    }
+
+    @Test
     fun `importFromJson - filters invalid timestamps (future or old)`() = runTest {
         // Arrange
         val validTs = currentTime - TimeUnit.HOURS.toMillis(1)

@@ -236,9 +236,16 @@ class UsageExportRepositoryImpl @Inject constructor(
 
                     val usageKey = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + packageName)
 
-                    // Validiere und filtere importierte Timestamps
+                    // Validiere und filtere importierte Timestamps.
+                    // Sort BEFORE take (AUDIT-17 F3): importedTimestamps preserves the
+                    // JSON file order (parseUsageData does not sort) and
+                    // validateJsonStructure permits up to MAX_TIMESTAMPS_PER_APP * 2
+                    // entries per package. Truncating before sorting would keep the
+                    // file-order first MAX and drop newer entries for a non-descending
+                    // (e.g. foreign/hand-edited) file. Keep the newest MAX instead.
                     val validImportedTimestamps = importedTimestamps
                         .filter { isValidTimestamp(it, currentTime) }
+                        .sortedDescending()
                         .take(AppConstants.MAX_TIMESTAMPS_PER_APP)
 
                     if (validImportedTimestamps.isEmpty()) {
@@ -258,8 +265,9 @@ class UsageExportRepositoryImpl @Inject constructor(
                             .sortedDescending()
                             .take(AppConstants.MAX_TIMESTAMPS_PER_APP)
                     } else {
-                        // Replace: Nur importierte verwenden
-                        validImportedTimestamps.sortedDescending()
+                        // Replace: only the imported ones. validImportedTimestamps is
+                        // already sorted descending and truncated to the newest MAX.
+                        validImportedTimestamps
                     }
 
                     preferences[usageKey] = finalTimestamps.map { it.toString() }.toSet()
