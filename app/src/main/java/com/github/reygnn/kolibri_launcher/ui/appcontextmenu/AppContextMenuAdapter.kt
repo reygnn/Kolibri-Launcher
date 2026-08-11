@@ -27,7 +27,11 @@ class AppContextMenuAdapter(
     fun setActionTextColor(color: Int) {
         if (actionTextColor == color) return
         actionTextColor = color
-        notifyItemRangeChanged(0, itemCount)
+        // Colour-only payload: rebind just the label colour on the visible
+        // rows instead of re-running the full bind (label lookup incl.
+        // getString). Mirrors AppDrawerAdapter.setUiColors /
+        // HomeFavoritesAdapter.setStyling — the consistency half of AUDIT-15 F6.
+        notifyItemRangeChanged(0, itemCount, COLOR_PAYLOAD)
     }
 
     /**
@@ -82,6 +86,28 @@ class AppContextMenuAdapter(
     }
 
     /**
+     * Partial rebind for [COLOR_PAYLOAD]: re-applies the label colour only,
+     * without re-resolving the label text (the per-bind getString for a
+     * LauncherAction). Empty payloads fall through to the full
+     * [onBindViewHolder]. Same shape as AppDrawerAdapter's payload override.
+     */
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>,
+    ) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
+        // The only payload this adapter emits is COLOR_PAYLOAD; the separator
+        // holder has no label to recolour.
+        if (holder is ActionViewHolder) {
+            holder.applyColor(actionTextColor)
+        }
+    }
+
+    /**
      * ViewHolder für klickbare Aktionen (Shortcuts und LauncherActions).
      */
     class ActionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -95,6 +121,11 @@ class AppContextMenuAdapter(
                 // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
                 is AppContextMenuAction.Separator -> ""
             }
+            applyColor(textColor)
+        }
+
+        /** Applies the label colour only. Shared by [bind] and the [COLOR_PAYLOAD] rebind. */
+        fun applyColor(textColor: Int?) {
             textColor?.let(labelView::setTextColor)
         }
     }
@@ -139,5 +170,8 @@ class AppContextMenuAdapter(
     companion object {
         private const val VIEW_TYPE_ACTION = 0
         private const val VIEW_TYPE_SEPARATOR = 1
+
+        // Marker payload for the colour-only partial rebind (see setActionTextColor).
+        private val COLOR_PAYLOAD = Any()
     }
 }

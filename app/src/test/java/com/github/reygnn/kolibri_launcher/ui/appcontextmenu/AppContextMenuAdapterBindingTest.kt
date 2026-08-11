@@ -31,7 +31,8 @@ import org.robolectric.RobolectricTestRunner
  * position→action click routing, separators being non-interactive, the
  * label text (Shortcut `shortLabel` vs. the `R.string.*` mapped from a
  * [LauncherActionLabel]), and the colour push including its same-colour
- * no-op. Deliberately NOT pinned is whether an unbound holder's
+ * no-op, its colour-only payload rebind, and the empty-payload full-bind
+ * fall-through. Deliberately NOT pinned is whether an unbound holder's
  * `performClick()` returns true or false: the current code sets no listener
  * until bind (so it returns false), while the hoisted-listener design would
  * register a listener that no-ops on `NO_POSITION` (returning true). Only
@@ -150,6 +151,40 @@ class AppContextMenuAdapterBindingTest {
         adapter.onBindViewHolder(holder, 0)
 
         assertEquals(color, (holder.itemView as TextView).textColors.defaultColor)
+    }
+
+    @Test
+    fun `a colour payload rebind updates the colour without re-resolving the label`() {
+        val adapter = adapter()
+        adapter.submitList(listOf(launcherAction(label = LauncherActionLabel.AddToFavorites)))
+
+        val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
+        adapter.onBindViewHolder(holder, 0)
+        val boundText = (holder.itemView as TextView).text.toString()
+
+        val color = 0xFF778899.toInt()
+        adapter.setActionTextColor(color)
+        // Non-empty payload -> colour-only branch (the marker's identity is
+        // irrelevant; the override applies the current colour for any payload).
+        adapter.onBindViewHolder(holder, 0, mutableListOf(Any()))
+
+        val labelView = holder.itemView as TextView
+        assertEquals(color, labelView.textColors.defaultColor)
+        assertEquals(boundText, labelView.text.toString())
+    }
+
+    @Test
+    fun `an empty payload falls through to a full bind`() {
+        val adapter = adapter()
+        adapter.submitList(listOf(launcherAction(label = LauncherActionLabel.AddToFavorites)))
+
+        val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
+        adapter.onBindViewHolder(holder, 0, mutableListOf())
+
+        assertEquals(
+            context.getString(R.string.add_to_favorites),
+            (holder.itemView as TextView).text.toString(),
+        )
     }
 
     @Test
