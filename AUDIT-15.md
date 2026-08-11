@@ -45,7 +45,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 |---|---|---|---|
 | **F1** ✅ | `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` | O(n·m) `List.find`+`remove` in Schleife über die Favoriten | `low` |
 | **F2** ✅ | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
-| **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
+| **F3** ⛔ | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** ⛔ | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
 | **F6** ✅(a)(c) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
@@ -111,7 +111,7 @@ Kleiner Semantik-Hinweis: `displayNameLower` ist locale-invariant — die Suche
 würde damit exakt so (nicht locale-aware) matchen wie der Sort ohnehin schon
 ordnet, also konsistent.
 
-### F3 — Doppelter Voll-Listen-Copy pro Favoriten-Emission
+### F3 — Doppelter Voll-Listen-Copy pro Favoriten-Emission · ⛔ wird nicht umgesetzt
 `domain/.../usecase/GetFavoriteAppsUseCase.kt:102,137`
 
 `applyNames(rawApps, …)` (`:102`) allokiert `N` `copy()` **und** sortiert; danach
@@ -122,7 +122,27 @@ Liste aufgerufen, der Parameter heißt innen nur wieder `rawApps` (Shadowing).
 Real bleibt: (a) der Terminal-Sort in `applyNames` ist auf diesem Pfad verworfen
 (= AUDIT-14 F1 §5.3, dort schon vertagt), und (b) die beiden Voll-Listen-`.map`
 ließen sich zu einem Durchlauf zusammenziehen (Name + `isFavorite` in einem
-`copy`). Gehört sinnvollerweise mit F1 §5.3 aus AUDIT-14 zusammen angefasst.
+`copy`).
+
+> **Entscheidung: nicht umsetzen — Invarianten-Integrität > Mikro-Sort.**
+> Teil (a) fasst `applyNames` an, das per `SPEC-DECISION RAL-1`
+> (`REACTIVE_APPLIST_SPEC.md`) als **ein** reiner Helfer **an jeder
+> Quell-Grenze inkl. Sort** festgeschrieben ist — der Sort reproduziert dort
+> bewusst die Enumeration-Post-Condition für nicht-nachsortierende Consumer
+> (CustomNames/Settings, s. `applyNames`-KDoc). Der Sort ist zwar auf dem
+> Favoriten- **und** Recents-Pfad (`GetRecentAppsUseCase:69`) tot, läuft aber
+> `flowOn(Default)` off-Main über ~50–200 Strings — µs, im Rauschen (AUDIT-14
+> nennt es selbst „Mikro-Gewinn"). Ein „sortiert hier, unsortiert da"
+> fragmentiert genau die Invariante, für die die Spec existiert, verlangt ein
+> Spec-Amendment (RAL-4) + Änderung über ≥2 Use Cases + Test-Churn und birgt
+> ein subtiles Regressionsrisiko (ein Caller, der den Sort doch braucht,
+> verliert ihn) — gegen **null** Korrektheits-Motivation. Value ≈ 0, Cost
+> real: Büchse bleibt zu. Teil (b) (lokaler Map-Merge, RAL-1-neutral) spart
+> nur eine Listen-Kopie off-Main pro Emission — marginal, Churn real; die
+> Trennlinie wird **nicht** durch F3 gezogen, F3 wird als Ganzes geschlossen.
+> Damit ist auch der vertagte **AUDIT-14 F1 §5.3** hiermit abschließend als
+> „nicht verfolgt" beantwortet. Re-Evaluierung nur, falls `applyNames` aus
+> anderem Grund ohnehin gesplittet wird.
 
 ### F4 — Totes `app_icon` im Favoriten-Item · ✅ umgesetzt
 `app/.../res/layout/item_favorite.xml:10-14`, `FavoritesAdapter.kt:32`
@@ -236,13 +256,16 @@ Sibling-Adapter-Idiom, abgesichert durch ein mutations-geprüftes
 Charakterisierungs-Netz) und F1 (O(n+m)-Map-Lookup, Verhaltensdifferenz an
 malformed Input dokumentiert + gepinnt). F6 (b) bewusst belassen (siehe §1).
 
-**Offen** (`low`, kein Druck): nur noch **F3** — am besten zusammen mit dem
-vertagten AUDIT-14 F1 §5.3 angehen, sobald die Favoriten-/Naming-Pipeline
-ohnehin mal offen ist.
+**Offen:** keine. AUDIT-15 ist vollständig triagiert — jedes Finding ist
+entweder umgesetzt oder bewusst deklinniert.
 
-**Nicht umgesetzt (bewusst):** **F5** (Chip-Diffing) — Aufwand/Risiko/Wert
-dauerhaft schief, siehe §1; Re-Evaluierung nur bei viel mehr gleichzeitigen
-Chips.
+**Nicht umgesetzt (bewusst):**
+- **F3** (Doppel-Copy / `applyNames`-Sort) — Invarianten-Integrität (`RAL-1`)
+  > Mikro-Sort off-Main; schließt zugleich AUDIT-14 F1 §5.3 ab. Siehe §1.
+- **F5** (Chip-Diffing) — Aufwand/Risiko/Wert dauerhaft schief; Re-Evaluierung
+  nur bei viel mehr gleichzeitigen Chips. Siehe §1.
+- **F6 (b)** (`getString`-Lookup pro Bind) — Label variiert echt pro Item, ein
+  Cache wäre künstlich. Siehe §1.
 
 ## 4. Korrekturen an den Sub-Agent-Zurufen (Transparenz)
 
