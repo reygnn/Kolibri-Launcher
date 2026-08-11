@@ -275,6 +275,7 @@ class SwipeActionsViewModelTest {
     @Test
     fun `onDoneClicked - navigates up after save`() = runTest {
         viewModel.initialize()
+        advanceUntilIdle() // load must complete so the save-gate (F2) opens
 
         viewModel.event.test {
             viewModel.onDoneClicked()
@@ -288,6 +289,7 @@ class SwipeActionsViewModelTest {
         // Arrange
         coEvery { setSwipeActionUseCase(any<SwipeSlot>(), any()) } throws RuntimeException("Save failed")
         viewModel.initialize()
+        advanceUntilIdle() // load must complete so onDoneClicked reaches the save
 
         viewModel.event.test {
             viewModel.onDoneClicked()
@@ -298,6 +300,23 @@ class SwipeActionsViewModelTest {
 
             val event2 = awaitItem()
             assertEquals(UiEvent.NavigateUp, event2)
+        }
+    }
+
+    @Test
+    fun `onDoneClicked - before load completes does NOT overwrite stored actions`() = runTest {
+        // AUDIT-17 F2: swipeLeft/Right default to null and are only populated at the
+        // end of initialize(). A Done tap in that pre-load window (isLoaded == false)
+        // must NOT persist null/null over the user's stored swipe actions. Here we
+        // never let the load complete (no initialize) — the save-gate stays closed.
+        viewModel.event.test {
+            viewModel.onDoneClicked()
+            advanceUntilIdle()
+
+            // No write happened...
+            coVerify(exactly = 0) { setSwipeActionUseCase(any<SwipeSlot>(), any()) }
+            // ...but the tap is still not a dead end.
+            assertEquals(UiEvent.NavigateUp, awaitItem())
         }
     }
 }

@@ -46,6 +46,16 @@ class SwipeActionsViewModel @Inject constructor(
     private val swipeRightComponent = MutableStateFlow<String?>(null)
     private var isInitialized = false
 
+    // Save-gate (AUDIT-17 F2). swipeLeftComponent/swipeRightComponent default to
+    // null and are only populated at the END of initialize(), after the apps list
+    // resolves. During that window the chips render "empty" but the Done button is
+    // already enabled, so a Done tap would persist null/null over the stored
+    // assignments -- the same save-over-empty class the sibling selection screens
+    // guard (OnboardingViewModel PreselectState, HiddenAppsViewModel diff-against-
+    // initial). Only persist once the initial read has populated the slots; a
+    // legitimate user-cleared null (isLoaded == true) still saves.
+    private var isLoaded = false
+
     init {
         launchSafe {
             // Kombiniere alle Datenströme, um den finalen UI-State zu erstellen
@@ -138,6 +148,9 @@ class SwipeActionsViewModel @Inject constructor(
                 allAppsMasterList.value = allApps
                 swipeLeftComponent.value = left
                 swipeRightComponent.value = right
+                // Slots are now populated from the store -- a Done tap may persist
+                // (AUDIT-17 F2). Set last, after the assignments above.
+                isLoaded = true
 
             } catch (e: CancellationException) {
                 throw e
@@ -203,9 +216,14 @@ class SwipeActionsViewModel @Inject constructor(
     fun onDoneClicked() {
         launchSafe {
             try {
-                // Speichere via UseCase
-                setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, swipeLeftComponent.value)
-                setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, swipeRightComponent.value)
+                // Save-gate (AUDIT-17 F2): only persist once initialize() has loaded
+                // the stored slots. A Done tap in the pre-load window would otherwise
+                // overwrite the stored assignments with the default null/null. Still
+                // navigate up either way, so an early tap isn't a dead end.
+                if (isLoaded) {
+                    setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, swipeLeftComponent.value)
+                    setSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, swipeRightComponent.value)
+                }
 
                 sendEvent(UiEvent.NavigateUp)
             } catch (e: CancellationException) {
