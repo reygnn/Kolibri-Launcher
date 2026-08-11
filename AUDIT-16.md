@@ -9,12 +9,13 @@
 > Sub-Agents. Zwei Sub-Agent-Fehlframings sind in §4 korrigiert und **nicht** als
 > neue Findings übernommen.
 >
-> **Status dieses Dokuments: BERICHTEND, Umsetzung im Gang.** Ursprünglich als
-> reiner Befundbericht angelegt (die Aufgabe war, die Findings zu notieren).
-> Inzwischen umgesetzt: **N1** (✅, Branch `fix/home-redundant-settext`) und
-> **N2** (✅, Branch `refactor/settings-vm-search`); **N3** bewusst nicht
-> umgesetzt (⛔, Emissions-Invariante > Mikro-Scan); **N4/N5** mit
-> 🔎 **gemeldet, nicht umgesetzt** markiert. Statusskala wie in den
+> **Status dieses Dokuments: VOLLSTÄNDIG TRIAGIERT.** Ursprünglich als reiner
+> Befundbericht angelegt (die Aufgabe war, die Findings zu notieren); inzwischen
+> ist jedes Finding entweder umgesetzt oder bewusst dekliniert.
+> Umgesetzt: **N1** (✅, `fix/home-redundant-settext`), **N2**
+> (✅, `refactor/settings-vm-search`), **N4** (✅, `chore/presize-enumeration-list`).
+> Bewusst nicht umgesetzt: **N3** (⛔, Emissions-Invariante > Mikro-Scan) und
+> **N5** (⛔, nicht risikolos, Wert marginal). Statusskala wie in den
 > Schwester-Audits.
 >
 > **Kein akuter Defekt.** Wie AUDIT-14/15: nichts ruckelt hart, nichts leakt,
@@ -57,8 +58,8 @@ erneut geprüft und sind **sauber** — Details in §2.
 | **N1** ✅ | `HomeFragment` Observer 3 + `LauncherViewModel.uiState` | dreifaches `setText` (Zeit/Datum/Akku) bei **jedem** Akku-Broadcast, inkl. unveränderter Zeit/Datum-Strings | `low` |
 | **N2** ✅ | Vier Settings-VMs (Hidden/Onboarding/Swipe/CustomNames) | Suche nutzt `contains(ignoreCase=true)` statt `displayNameLower` — das **F2-Muster in den Dateien, die F2 nicht angefasst hat** | `low` |
 | **N3** ⛔ | dieselben Settings-VMs | `combine` re-sortiert/re-scannt die Auswahl-Liste bei jedem Keystroke, obwohl nur `query` sich änderte | `low` |
-| **N4** 🔎 | `InstalledAppsRepositoryImpl.processResolveInfoList` | `mutableListOf()` wächst elementweise, Endgröße ist vorab bekannt | `low` (sub-nit) |
-| **N5** 🔎 | `SwipeActionsAppListAdapter`, `OnboardingAppListAdapter` | kein `getChangePayload` → Selection-Toggle macht Full-Rebind statt Partial | `low` |
+| **N4** ✅ | `InstalledAppsRepositoryImpl.processResolveInfoList` | `mutableListOf()` wächst elementweise, Endgröße ist vorab bekannt | `low` (sub-nit) |
+| **N5** ⛔ | `SwipeActionsAppListAdapter`, `OnboardingAppListAdapter` | kein `getChangePayload` → Selection-Toggle macht Full-Rebind statt Partial | `low` |
 
 ### N1 — Home-Textblock: dreifaches `setText` bei jedem Akku-Broadcast · ✅ umgesetzt
 `app/.../ui/home/HomeFragment.kt:517-528`, `app/.../ui/main/LauncherViewModel.kt:234-250`
@@ -180,7 +181,7 @@ splitten, sodass letztere nur auf `masterList` + `selected`/Slot-Components keye
 > geschlossen hat. Re-Evaluierung nur, falls diese Screens je eine spürbar große
 > Auswahl-Liste ohne Debounce bekommen.
 
-### N4 — Un-presizte Liste in der Enumeration · 🔎 gemeldet (sub-nit)
+### N4 — Un-presizte Liste in der Enumeration · ✅ umgesetzt (sub-nit)
 `data/.../data/InstalledAppsRepositoryImpl.kt:215`
 
 ```kotlin
@@ -195,17 +196,41 @@ das gilt weiter; dies ist nur die Presize-Feinheit obendrauf. Läuft nur bei
 Enumeration (Cold-Start / Paket-Broadcast / Force-Reload), nicht pro Keystroke →
 minimal.
 
-### N5 — Fehlendes `getChangePayload` in zwei Settings-Adaptern · 🔎 gemeldet
+> **Erledigt** (Branch `chore/presize-enumeration-list`):
+> `ArrayList<AppInfo>(resolveInfoList.size)`. Reiner Kapazitäts-Hint, identische
+> Semantik (die `continue`-Zweige auf null `activityInfo` machen die Endgröße
+> ≤ Obergrenze — Über-Reservieren ist harmlos), keine Verhaltens- oder
+> Testauswirkung. `:data:compileDebugKotlin` grün.
+
+### N5 — Fehlendes `getChangePayload` in zwei Settings-Adaptern · ⛔ wird nicht umgesetzt
 `app/.../ui/swipeactions/SwipeActionsAppListAdapter.kt:67-74`,
 `app/.../ui/onboarding/OnboardingAppListAdapter.kt:50-58`
 
 Beide `DiffUtil.ItemCallback` überschreiben `getChangePayload` nicht. Ein
-Selection-Toggle (`isSelected`) fällt damit durch `areContentsTheSame`
-(Data-Class-`equals`) und erzwingt einen **Full-Bind**, der u. a. `appLabel.text`
-(unverändert) neu setzt statt nur die Checkbox / den Slot-Indikator. **Fix:** ein
-`isSelected`-only-Payload, damit ein Toggle nur das Delta-View rebindet — wie es
-`AppDrawerAdapter` (`PAYLOAD_*`) und (seit AUDIT-15 F6c) `AppContextMenuAdapter`
-schon tun. `low`: kleine, nicht-scrollende Auswahl-Listen.
+Selection-Toggle (`isSelected` bzw. `assignedSlot`) fällt damit durch
+`areContentsTheSame` (Data-Class-`equals`) und erzwingt einen **Full-Bind**, der
+u. a. `appLabel.text` (unverändert) neu setzt statt nur die Checkbox / den
+Slot-Indikator. Der Fix wäre ein Delta-Payload, damit ein Toggle nur das
+betroffene View rebindet — wie `AppDrawerAdapter` (`PAYLOAD_*`) und (seit
+AUDIT-15 F6c) `AppContextMenuAdapter`.
+
+> **Entscheidung: nicht umsetzen — nicht risikolos, Wert marginal.** Anders als
+> N4 (reiner Kapazitäts-Hint, null Verhaltensänderung) verlangt N5 **zwei** neue
+> Overrides pro Adapter — `getChangePayload` **und** ein
+> `onBindViewHolder(…, payloads)`, das nur das Delta anwendet und bei leerem
+> Payload sauber auf den Voll-Bind durchfällt. Das ist eine echte Änderung an der
+> Rebind-Dispatch-Logik mit realer Korrektheits-Fläche (unvollständiges
+> Payload-Handling → **stale View**: Checkbox/Icon zeigt nach dem Toggle den
+> alten Zustand), die kein Compiler/Linter fängt und die vorab ein
+> Charakterisierungs-Test-Netz bräuchte — genau der Weg, den AUDIT-15 F6c für
+> `AppContextMenuAdapter` gegangen ist (9 Tests zuerst). Dem steht als Nutzen
+> ein eingespartes `setText` auf **denselben** String beim Toggle gegenüber, auf
+> kleinen, **nicht-scrollenden** Auswahl-Listen. AUDIT-15 F6c hielt schon fest,
+> dass die **Perf-Begründung** für so einen Adapter **bewusst nicht trägt** — es
+> war dort ein reiner *Konsistenz*-Fix; bei diesen zwei noch kälteren Adaptern
+> ist selbst das Konsistenz-Argument schwächer. Risiko/Wert steht schief, gleiche
+> Abwägung wie N3/F5. Re-Evaluierung nur, falls eine dieser Listen je scrollend
+> groß wird.
 
 ---
 
@@ -252,16 +277,22 @@ findet **einen** genuin neuen, real spürbaren Punkt und vier kleine Deltas:
   saubere Split fragmentiert die atomare Single-Emission dieser VMs (Risiko
   transienter Doppel-Emissionen) gegen µs-Ersparnis über eine kleine, debounced
   Liste. Wert-vs-Risiko wie AUDIT-15 F3/F5.
-- **N4/N5** — Presize-Nit und zwei fehlende Adapter-Payloads. Kosmetik.
+- **N4** — Presize-Nit in der Enumeration. Risikoloser Kapazitäts-Hint.
+- **N5** — zwei fehlende Adapter-Payloads. Kosmetik, aber nicht risikolos.
 
-**Umgesetzt:** **N1** (Branch `fix/home-redundant-settext`, Per-Feld-`distinctUntilChanged`)
-und **N2** (Branch `refactor/settings-vm-search`, Suche gegen `displayNameLower`)
-— Compile/Linter/Tests grün.
+**Umgesetzt:** **N1** (`fix/home-redundant-settext`, Per-Feld-`distinctUntilChanged`),
+**N2** (`refactor/settings-vm-search`, Suche gegen `displayNameLower`) und **N4**
+(`chore/presize-enumeration-list`, `ArrayList`-Presize) — Compile/Linter/Tests grün.
 
-**Bewusst nicht umgesetzt:** **N3** (Emissions-Invariante > Mikro-Scan, siehe §1).
+**Bewusst nicht umgesetzt:**
+- **N3** (Emissions-Invariante > Mikro-Scan) — der Combine-Split riskiert
+  transiente Doppel-Emissionen gegen µs-Ersparnis. Siehe §1.
+- **N5** (Adapter-Payloads) — nicht risikolos (Rebind-Dispatch-Änderung,
+  stale-View-Fläche, bräuchte Test-Netz), Wert marginal auf nicht-scrollenden
+  Listen. Siehe §1.
 
-**Offen:** N4/N5 — als Findings festgehalten, noch nicht umgesetzt (optionaler
-Aufräum-Beifang).
+**Offen:** keine. AUDIT-16 ist vollständig triagiert — jedes Finding ist umgesetzt
+oder bewusst dekliniert.
 
 ---
 
