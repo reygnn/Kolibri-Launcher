@@ -13,9 +13,11 @@
 > verifiziert** — kein Befund steht hier auf Sub-Agent-Zuruf. Die Sub-Agenten
 > erbten das Session-Modell (Opus 4.8).
 >
-> **Status: BERICHTEND, noch nicht triagiert.** Drei verifizierte Defekte, alle
-> **echte Verhaltensfehler** (nicht Style/Perf) und von **keinem** Linter oder
-> AUDIT-*/SPEC-Dokument abgedeckt. Fixes stehen aus (separater Schritt, Branch).
+> **Status: VOLLSTÄNDIG UMGESETZT.** Drei verifizierte Defekte, alle **echte
+> Verhaltensfehler** (nicht Style/Perf) und von **keinem** Linter oder
+> AUDIT-*/SPEC-Dokument abgedeckt. Alle drei auf Branch
+> `fix/audit-17-correctness` gefixt, **jeder mit Test** (F2 Gate-Test, F1
+> Payload-Routing-Test, F3 Sort-vor-Take-Test); Compile/Linter/Tests grün.
 
 ---
 
@@ -37,12 +39,20 @@ Teardown-Checks) haben genau diese Fehlerklasse bereits hart abgesichert.
 
 | # | Achse | Ort | Was | Severity |
 |---|---|---|---|---|
-| **F1** 🔎 | UI | `HomeFavoritesAdapter` + `AppInfoDiffCallback` | umbenannter Favorit behält auf dem Home-Screen den **alten Namen** | `medium` |
-| **F2** 🔎 | UI | `SwipeActionsViewModel.onDoneClicked` | „Done" im Ladefenster **überschreibt gespeicherte Swipe-Actions mit `null`** | `medium` |
-| **F3** 🔎 | Daten | `UsageExportRepositoryImpl.performImport` | Usage-Import kürzt **vor** dem Sortieren → verwirft die neuesten Timestamps | `low` |
+| **F1** ✅ | UI | `HomeFavoritesAdapter` + `AppInfoDiffCallback` | umbenannter Favorit behält auf dem Home-Screen den **alten Namen** | `medium` |
+| **F2** ✅ | UI | `SwipeActionsViewModel.onDoneClicked` | „Done" im Ladefenster **überschreibt gespeicherte Swipe-Actions mit `null`** | `medium` |
+| **F3** ✅ | Daten | `UsageExportRepositoryImpl.performImport` | Usage-Import kürzt **vor** dem Sortieren → verwirft die neuesten Timestamps | `low` |
 
-### F1 — Umbenannter Favorit zeigt auf dem Home-Screen den alten Namen · 🔎 gemeldet
+### F1 — Umbenannter Favorit zeigt auf dem Home-Screen den alten Namen · ✅ umgesetzt
 `app/.../ui/home/HomeFavoritesAdapter.kt:169-183` (Payload-Override) · `app/.../ui/util/AppInfoDiffCallback.kt:21-26` (`getChangePayload`)
+
+> **Erledigt** (`fix/home-...` → Branch `fix/audit-17-correctness`): der
+> Payload-Override nimmt den styling-only-Pfad jetzt **nur**, wenn jeder Payload
+> `=== STYLING_PAYLOAD` ist; `PAYLOAD_NAME_CHANGE`, eine koaleszierte Mischung
+> oder ein unbekannter Payload fallen auf den Voll-Bind durch (setzt den Text).
+> `STYLING_PAYLOAD` ist jetzt `@VisibleForTesting internal`, damit der Test die
+> echte Instanz fährt. Neuer Namens-Payload-Test + der bestehende Styling-Test
+> auf die echte Konstante umgestellt. Robolectric-Netz grün.
 
 **Verifiziert am Code.** `HomeFavoritesAdapter` nutzt das geteilte
 `AppInfoDiffCallback` (`:51`). Dessen `getChangePayload` liefert
@@ -93,8 +103,15 @@ Payloads `STYLING_PAYLOAD` sind — sonst auf den Voll-Bind durchfallen (der Tex
 Styling setzt). Das behandelt `PAYLOAD_NAME_CHANGE` und jede koaleszierte
 Mischung korrekt.
 
-### F2 — „Done" vor Ladeende löscht gespeicherte Swipe-Actions · 🔎 gemeldet
+### F2 — „Done" vor Ladeende löscht gespeicherte Swipe-Actions · ✅ umgesetzt
 `app/.../ui/swipeactions/SwipeActionsViewModel.kt:203-215` (`onDoneClicked`) gegen `initialize()` `:109-145` · Button `app/.../ui/swipeactions/SwipeActionsActivity.kt:141`
+
+> **Erledigt** (Branch `fix/audit-17-correctness`): `isLoaded`-Flag, am Ende von
+> `initialize()` nach den Slot-Zuweisungen gesetzt; `onDoneClicked` persistiert
+> nur bei `isLoaded`, navigiert aber immer hoch (früher Tap kein Dead-End). Ein
+> legitimer user-cleared `null` (`isLoaded == true`) speichert weiterhin. Neuer
+> Gate-Test (Done vor Load → kein Write, trotzdem NavigateUp); die zwei
+> bestehenden `onDoneClicked`-Tests `advanceUntilIdle`n jetzt nach `initialize`.
 
 **Verifiziert am Code.** `onDoneClicked` persistiert bedingungslos die
 In-Memory-Slot-Werte:
@@ -129,8 +146,15 @@ Ladefenster begrenzt (`medium`), aber ein echter, stiller Datenverlust.
 (sonst NavigateUp ohne Write, oder Fehler-Toast). Boolean genügt: schlägt
 `initialize()` fehl/timeouts, bleibt `isLoaded=false` und Done schreibt nicht.
 
-### F3 — Usage-Import kürzt vor dem Sortieren, verwirft die neuesten Timestamps · 🔎 gemeldet
+### F3 — Usage-Import kürzt vor dem Sortieren, verwirft die neuesten Timestamps · ✅ umgesetzt
 `data/.../data/UsageExportRepositoryImpl.kt:240-263` (`performImport`)
+
+> **Erledigt** (Branch `fix/audit-17-correctness`): `.sortedDescending()` vor
+> `.take(...)` gezogen, sodass die neuesten MAX überleben; der Replace-Zweig gibt
+> die bereits sortierte Liste zurück, der Merge-Zweig ist automatisch mit
+> korrigiert (Import war vor dem Merge gekürzt). Neuer Test: Replace-Import von
+> MAX+50 Timestamps in aufsteigender Reihenfolge → neueste MAX überleben, älteste
+> 50 fallen weg.
 
 **Verifiziert am Code.** `.take(MAX_TIMESTAMPS_PER_APP)` (`:242`) läuft **vor**
 `.sortedDescending()` (`:262`):
@@ -210,7 +234,10 @@ Härtung bestätigt. Übrig bleiben drei echte Defekte in weniger belaufenen Eck
 - **F3** (`low`) — Usage-Import truncate-before-sort, nur bei fremden Dateien.
 
 Alle drei sind **user-sichtbar bzw. datenverlustrelevant**, keine Kosmetik — anders
-als die AUDIT-16-`low`-Deltas. Empfohlene Reihenfolge bei Umsetzung: **F2 zuerst**
-(Datenverlust), dann **F1** (sichtbare Inkonsistenz), dann **F3** (Edge-Case).
+als die AUDIT-16-`low`-Deltas.
 
-**Offen:** alle drei — als verifizierte Findings festgehalten, noch nicht umgesetzt.
+**Umgesetzt:** alle drei auf Branch `fix/audit-17-correctness`, in der Reihenfolge
+F2 (Datenverlust) → F1 (sichtbare Inkonsistenz) → F3 (Edge-Case), jeder mit einem
+Regressions-Test und grünem Linter.
+
+**Offen:** keine. AUDIT-17 ist vollständig umgesetzt.
