@@ -43,15 +43,28 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 
 | # | Ort | Was | Severity |
 |---|---|---|---|
-| **F1** | `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` | O(n·m) `List.find`+`remove` in Schleife über die Favoriten | `low` |
+| **F1** ✅ | `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` | O(n·m) `List.find`+`remove` in Schleife über die Favoriten | `low` |
 | **F2** ✅ | `AppSearchFilter.filterAndDecide` | Suche nutzt `contains(ignoreCase=true)` statt des vorberechneten `displayNameLower` | `low` |
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
 | **F6** ✅(a)(c) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
 
-### F1 — O(n·m) in `sortAppsWithGivenOrder`
+### F1 — O(n·m) in `sortAppsWithGivenOrder` · ✅ umgesetzt
 `data/.../data/FavoritesOrderRepositoryImpl.kt:153-172`
+
+> **Erledigt:** Loop auf `HashMap<componentName, AppInfo>` (`putIfAbsent`,
+> first-wins wie das alte `.find`) + ein `HashSet` konsumierter Keys → O(n+m).
+> Beim Umbau fiel eine **Verhaltensdifferenz an malformed Input** auf: zwei
+> Apps mit gleichem `componentName` in `appsToSort` — der alte Loop emittierte
+> die zweite Kopie im alphabetischen Rest (App doppelt), die Map-Variante
+> dedupliziert auf eine (first-wins). `componentName` ist die Komponenten-
+> Identität, der Fall ist also nur malformed-state; die Dedup ist die sicherere
+> Wahl, im Code dokumentiert und per neuem Impl-Test festgenagelt (`… -
+> duplicate componentName in appsToSort - dedupes to the first`,
+> mutations-geprüft). Contract-Tests (18 Fake + 18 Impl) grün, keine
+> Extraktion nötig — die Funktion war über den relaxed-Mock-DataStore bereits
+> direkt testbar.
 
 ```kotlin
 for (componentName in order) {                                  // O(n)
@@ -208,12 +221,13 @@ sechs `low`-Deltas — ein O(n·m)-Loop über eine kleine Liste (F1), zwei
 Reaktiv-Pipeline-Mikros (F2, F3), zwei Adapter-Ränder (F4, F6) und ein
 Chip-Rebuild (F5). Nichts davon ist dringend.
 
-**Umgesetzt:** F4 (totes `app_icon` entfernt), F2 (Suche gegen `displayNameLower`)
-und F6 (a)+(c) (Listener-Hoist + Farb-Payload zur Angleichung an das
+**Umgesetzt:** F4 (totes `app_icon` entfernt), F2 (Suche gegen `displayNameLower`),
+F6 (a)+(c) (Listener-Hoist + Farb-Payload zur Angleichung an das
 Sibling-Adapter-Idiom, abgesichert durch ein mutations-geprüftes
-Charakterisierungs-Netz). F6 (b) bewusst belassen (siehe §1).
+Charakterisierungs-Netz) und F1 (O(n+m)-Map-Lookup, Verhaltensdifferenz an
+malformed Input dokumentiert + gepinnt). F6 (b) bewusst belassen (siehe §1).
 
-**Offen** (alle `low`, kein Druck): **F1 + F3** am besten zusammen mit dem
+**Offen** (alle `low`, kein Druck): **F3** am besten zusammen mit dem
 vertagten AUDIT-14 F1 §5.3 angehen, sobald die Favoriten-/Naming-Pipeline
 ohnehin mal offen ist; **F5** (Chip-Diffing) nur bei spürbar vielen Chips.
 
