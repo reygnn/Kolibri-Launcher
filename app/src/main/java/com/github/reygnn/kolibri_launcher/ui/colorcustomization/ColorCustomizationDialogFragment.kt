@@ -168,22 +168,31 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             val cardView = swatchBinding.colorSwatchCard
             val autoIcon = swatchBinding.autoIcon
 
+            // AUDIT-18 F2: label each swatch for TalkBack — the auto entry reads
+            // "Automatic", a colour reads its hex value. Set on the 56dp cell root
+            // (below), the node that is actually focused/clicked.
+            val cell = swatchBinding.root
             if (color == AppConstants.DEFAULT_TEXT_COLOR) { // "Auto"-Knopf
                 autoIcon.isVisible = true
                 val backgroundColor = requireContext().getColor(R.color.material_dynamic_neutral90)
                 cardView.setCardBackgroundColor(backgroundColor)
                 val iconTintColor = ResolvedBackground.SolidColor(backgroundColor).foregroundColor()
                 autoIcon.imageTintList = ColorStateList.valueOf(iconTintColor)
+                cell.contentDescription = getString(R.string.color_automatic)
             } else { // Echter Farbknopf
                 autoIcon.isVisible = false
                 cardView.setCardBackgroundColor(color)
+                cell.contentDescription = String.format("#%06X", 0xFFFFFF and color)
             }
 
-            cardView.setOnClickListener {
+            // AUDIT-18 F2: click + a11y focus on the 56dp cell, not the 40dp card,
+            // so the touch target meets the 48dp minimum and TalkBack focuses one
+            // labelled node per swatch.
+            cell.setOnClickListener {
                 onColorSelected(color)
             }
 
-            container.addView(swatchBinding.root)
+            container.addView(cell)
             swatchMap[color] = cardView
         }
     }
