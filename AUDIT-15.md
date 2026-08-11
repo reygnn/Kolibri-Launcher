@@ -48,7 +48,7 @@ off-IO, Single-Pass) nach AUDIT-14 **sauber** sind — kein neuer Befund dort.
 | **F3** | `GetFavoriteAppsUseCase.processApps` | zwei volle `.map{copy()}`-Durchläufe pro Emission (Naming + isFavorite) | `low` |
 | **F4** ✅ | `item_favorite.xml` / `FavoritesAdapter` | totes `app_icon`-`ImageView`, pro Zeile inflatet und jedes Bind auf `GONE` gesetzt | `low` |
 | **F5** | `HomeFragment.updateTimeBasedChips` | `removeAllViews()` + Per-Event-`addView`-Rebuild der Chip-Leiste ohne Diffing | `low` |
-| **F6** ✅(a) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
+| **F6** ✅(a)(c) | `AppContextMenuAdapter` | Per-Bind-Lambda-Allokation + `getString`-Lookup; Farb-Update via payloadloses `notifyItemRangeChanged` | `low` |
 
 ### F1 — O(n·m) in `sortAppsWithGivenOrder`
 `data/.../data/FavoritesOrderRepositoryImpl.kt:153-172`
@@ -137,7 +137,7 @@ sauber über den Adapter), nur die Chip-Leiste; die Anzahl ist durch die
 sichtbaren Events begrenzt. `low`; ein diffendes Update oder ein kleiner
 `ListAdapter` wäre die saubere Form, lohnt aber erst bei spürbar vielen Chips.
 
-### F6 — Context-Menu-Adapter: Per-Bind-Allokationen · ✅ (a) umgesetzt, (b)/(c) bewusst belassen
+### F6 — Context-Menu-Adapter: Per-Bind-Allokationen · ✅ (a)+(c) umgesetzt, (b) bewusst belassen
 `app/.../ui/appcontextmenu/AppContextMenuAdapter.kt:30,70,88`
 
 Drei kleine Ränder: (a) `setOnClickListener` in `onBindViewHolder` (`:70`)
@@ -155,10 +155,22 @@ hoisten (wie im Drawer-Adapter) wäre der konsistente Fix.
 > Charakterisierungs-Netz (`AppContextMenuAdapterBindingTest`, 9 Tests,
 > mutations-geprüft) — der Refactor lief grün gegen das Netz.
 >
-> **Bewusst belassen (b)/(c):** Das Label variiert echt pro Item, ein
-> `getString`-Cache wäre künstlich. Ein Farb-Payload lohnt auf einem Menü
-> mit ~5–8 kurz sichtbaren Zeilen nicht — die Sibling-Adapter nutzen
-> Payloads nur, weil ihre Listen groß sind. Beide `low`, kein Signal.
+> **Erledigt (c) — als Konsistenz-, nicht Perf-Fix:** `setActionTextColor`
+> feuert jetzt `notifyItemRangeChanged(0, itemCount, COLOR_PAYLOAD)`; ein
+> `onBindViewHolder(…, payloads)`-Override recolort nur das Label (kein
+> erneuter `getString`), leerer Payload fällt auf den vollen Bind durch.
+> **Perf-Begründung trägt hier bewusst nicht** — bei ~5–8 kurz sichtbaren
+> Zeilen ist das Signal null; die Sibling-Adapter (`AppDrawerAdapter`,
+> `HomeFavoritesAdapter`) nutzen Payloads, weil *ihre* Listen groß werden
+> (bis ~50 Favoriten), und die sind seit AUDIT-14 F3 bereits payload-
+> optimiert. Umgesetzt wurde (c) rein zur **Angleichung an das Sibling-
+> Idiom**: derselbe Marker-Payload-Mechanismus in allen drei Adaptern, kein
+> Sonderfall mehr im kleinsten. Abgesichert durch zwei zusätzliche Tests im
+> Charakterisierungs-Netz (Farb-only-Rebind ohne Label-Neuauflösung; leerer
+> Payload → voller Bind).
+>
+> **Bewusst belassen (b):** Das Label variiert echt pro Item, ein
+> `getString`-Cache wäre künstlich. `low`, kein Signal.
 >
 > **Nebenprodukt:** Der einmalige Mutations-Check des Netzes ist als
 > Autoren-Disziplin in `TESTING_CONVENTIONS.kt` verankert.
@@ -197,8 +209,9 @@ Reaktiv-Pipeline-Mikros (F2, F3), zwei Adapter-Ränder (F4, F6) und ein
 Chip-Rebuild (F5). Nichts davon ist dringend.
 
 **Umgesetzt:** F4 (totes `app_icon` entfernt), F2 (Suche gegen `displayNameLower`)
-und F6 (a) (Listener-Hoist, abgesichert durch ein mutations-geprüftes
-Charakterisierungs-Netz). F6 (b)/(c) bewusst belassen (siehe §1).
+und F6 (a)+(c) (Listener-Hoist + Farb-Payload zur Angleichung an das
+Sibling-Adapter-Idiom, abgesichert durch ein mutations-geprüftes
+Charakterisierungs-Netz). F6 (b) bewusst belassen (siehe §1).
 
 **Offen** (alle `low`, kein Druck): **F1 + F3** am besten zusammen mit dem
 vertagten AUDIT-14 F1 §5.3 angehen, sobald die Favoriten-/Naming-Pipeline
