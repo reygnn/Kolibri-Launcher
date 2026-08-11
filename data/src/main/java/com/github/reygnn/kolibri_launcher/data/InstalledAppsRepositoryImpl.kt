@@ -212,7 +212,10 @@ class InstalledAppsRepositoryImpl @Inject constructor(
         .flowOn(Dispatchers.IO)
 
     suspend fun processResolveInfoList(resolveInfoList: List<ResolveInfo>): List<AppInfo> {
-        val appInfoList = mutableListOf<AppInfo>()
+        // Presize to the known upper bound (a few entries drop on null
+        // activityInfo, so the final size is <= this) to avoid backing-array
+        // reallocations while filling the list below (AUDIT-16 N4).
+        val appInfoList = ArrayList<AppInfo>(resolveInfoList.size)
 
         for (info in resolveInfoList) {
             try {
