@@ -13,6 +13,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
@@ -109,22 +110,9 @@ class CustomNamesViewModel @Inject constructor(
         ) {
             val query = _uiState.value.searchQuery
 
-            val filteredList = if (query.isBlank()) {
-                masterAppList
-            } else {
-                // Fold the query once and match the precomputed displayNameLower
-                // instead of contains(ignoreCase=true) per app (AUDIT-15 F2 /
-                // AUDIT-16 N2). originalName has no precomputed lower key, but it
-                // only differs from displayName for custom-named apps — the same
-                // predicate used for appsWithCustomNames below — so fold it only
-                // for that small subset rather than for every app on every keystroke.
-                val lowerQuery = query.lowercase()
-                masterAppList.filter { app ->
-                    app.displayNameLower.contains(lowerQuery) ||
-                        (app.displayName != app.originalName &&
-                            app.originalName.lowercase().contains(lowerQuery))
-                }
-            }
+            // Custom Names also matches the original name (see filterByName's
+            // includeOriginalName): the only search surface that does.
+            val filteredList = masterAppList.filterByName(query, includeOriginalName = true)
 
             val customNameApps = masterAppList.filter { it.originalName != it.displayName }
 

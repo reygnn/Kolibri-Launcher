@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 
 /**
  * PURE LOGIC - App Search Decision Engine
@@ -27,19 +28,10 @@ class AppSearchFilter {
             return FilterResult.ShowList(emptyList())
         }
 
-        // 2. Filtern (Case insensitive). Match against the precomputed
-        // AppInfo.displayNameLower (AUDIT-14 Nit §208, locale-invariant) and
-        // lower-case the query once, instead of re-folding every displayName
-        // per app on every keystroke via contains(ignoreCase = true).
-        // AUDIT-15 F2.
-        val filteredList = if (query.isBlank()) {
-            allApps
-        } else {
-            val queryLower = query.lowercase()
-            allApps.filter { app ->
-                app.displayNameLower.contains(queryLower)
-            }
-        }
+        // 2. Filter (case-insensitive) via the shared name filter (AUDIT-15 F2 /
+        // AUDIT-16 N2): fold-once + precomputed displayNameLower, one source for
+        // every search surface.
+        val filteredList = allApps.filterByName(query)
 
         // 3. Auto-Launch Entscheidung
         // Nur wenn: Query nicht leer UND genau 1 Treffer UND Setting aktiv

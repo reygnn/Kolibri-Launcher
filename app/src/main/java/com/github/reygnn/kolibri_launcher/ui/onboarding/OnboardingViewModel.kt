@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
@@ -77,15 +78,7 @@ class OnboardingViewModel @Inject constructor(
                     selectedComponents,
                     searchQuery
                 ) { allApps, selected, query ->
-                    val filteredApps = if (query.isBlank()) {
-                        allApps
-                    } else {
-                        // Fold the query once, match the precomputed displayNameLower
-                        // instead of contains(ignoreCase=true) per app (AUDIT-15 F2 /
-                        // AUDIT-16 N2).
-                        val lowerQuery = query.lowercase()
-                        allApps.filter { it.displayNameLower.contains(lowerQuery) }
-                    }
+                    val filteredApps = allApps.filterByName(query)
 
                     val selectableList = filteredApps.map { app ->
                         SelectableAppInfo(

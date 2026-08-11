@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
@@ -49,17 +50,7 @@ class HiddenAppsViewModel @Inject constructor(
                 selectedComponents,
                 searchQuery
             ) { allApps, selected, query ->
-                val filteredApps = if (query.isBlank()) {
-                    allApps
-                } else {
-                    // Fold the query once and match against the precomputed
-                    // displayNameLower instead of contains(ignoreCase=true) per
-                    // app — same fix as the drawer's AppSearchFilter (AUDIT-15 F2,
-                    // AUDIT-16 N2). displayNameLower is locale-invariant, so this
-                    // matches exactly as the alphabetical sort already orders.
-                    val lowerQuery = query.lowercase()
-                    allApps.filter { it.displayNameLower.contains(lowerQuery) }
-                }
+                val filteredApps = allApps.filterByName(query)
 
                 val selectableList = filteredApps.map { app ->
                     SelectableAppInfo(

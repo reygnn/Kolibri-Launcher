@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeActionComponentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetSwipeActionUseCase
@@ -71,16 +72,8 @@ class SwipeActionsViewModel @Inject constructor(
                 val appForLeft = allApps.find { it.componentName == leftComp }
                 val appForRight = allApps.find { it.componentName == rightComp }
 
-                // 2. Erstelle die gefilterte App-Liste
-                val filteredApps = if (query.isBlank()) {
-                    allApps
-                } else {
-                    // Fold the query once, match the precomputed displayNameLower
-                    // instead of contains(ignoreCase=true) per app (AUDIT-15 F2 /
-                    // AUDIT-16 N2).
-                    val lowerQuery = query.lowercase()
-                    allApps.filter { it.displayNameLower.contains(lowerQuery) }
-                }
+                // 2. Filter the app list via the shared name filter.
+                val filteredApps = allApps.filterByName(query)
 
                 // 3. Erstelle die "Selectable" Liste für den Adapter
                 val selectableList = filteredApps.map { app ->
