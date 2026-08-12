@@ -37,6 +37,10 @@ pass/fail line** (your host will differ):
 | `applyCustomNames`   | 200     | ~0.055 ops/µs (~18 µs/call) |
 | `luminancePass`      | 1024 px | ~0.009 ops/µs (~111 µs/call) |
 | `luminancePass`      | 4096 px | ~0.0023 ops/µs (~444 µs/call) |
+| `filterDisplayName`      | 50  | ~2.5 ops/µs (~0.4 µs/call) |
+| `filterDisplayName`      | 200 | ~0.61 ops/µs (~1.6 µs/call) |
+| `filterWithOriginalName` | 50  | ~0.85 ops/µs (~1.2 µs/call) |
+| `filterWithOriginalName` | 200 | ~0.21 ops/µs (~4.7 µs/call) |
 
 `applyCustomNames` confirms its KDoc (REACTIVE_APPLIST_SPEC RAL-1a / AUDIT-15
 F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps, i.e. "in the
@@ -47,6 +51,14 @@ runs per opaque pixel (`WallpaperBitmapLuminanceImpl.classify`, 32×32 = 1024
 sampled pixels). At the production sample size the `pow`-heavy pass alone is
 ~0.1 ms per layer (before the Android bitmap decode/scale), scaling linearly —
 off-Main on wallpaper change, so not hot, but now pinned.
+
+`filterByName` is the per-keystroke search predicate (`AppInfoSearch.filterByName`),
+the hottest per-interaction pure loop — it runs on every character typed in the
+drawer search and four settings screens. The numbers confirm the fold-once
+optimisation (AUDIT-15 F2 / AUDIT-16 N2): the common `filterDisplayName` path
+stays under ~2 µs even at 200 apps, and the Custom-Names `includeOriginalName`
+path (extra per-app `originalName.lowercase()` on the renamed subset) is ~3×
+that but still single-digit µs.
 
 ## Adding a benchmark
 
