@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Trace
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -176,11 +177,25 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             // would report the same failure multiple times, INSTALLED_APPS_LOAD_SPEC
             // Rule-9 / anti-flood). Per-item resilience lives inside
             // processResolveInfoList (its for-loop continue).
-            val resolveInfoList = packageManager.queryIntentActivities(
-                intent,
-                PackageManager.ResolveInfoFlags.of(0)
-            )
-            val freshApps = processResolveInfoList(resolveInfoList)
+            // Traced: the full launcher-app enumeration — queryIntentActivities
+            // plus one loadLabel IPC per app in processResolveInfoList. This is
+            // the "first drawer open" cost under scrutiny; the section's
+            // timestamp on the Perfetto timeline also reveals whether the
+            // enumeration runs at startup priming or lazily on drawer open.
+            // Synchronous on the flowOn(IO) thread (processResolveInfoList has
+            // no suspension point), so begin/end stay on one thread. android.os.Trace
+            // directly: :data cannot import :app's LaunchTrace across the module
+            // boundary. finally-balanced, not a swallowing catch (Rule 11).
+            val freshApps = try {
+                Trace.beginSection("drawer_apps_enumerate")
+                val resolveInfoList = packageManager.queryIntentActivities(
+                    intent,
+                    PackageManager.ResolveInfoFlags.of(0)
+                )
+                processResolveInfoList(resolveInfoList)
+            } finally {
+                Trace.endSection()
+            }
 
             Timber.d("[DATAFLOW] 3. Manager is emitting a new list. Size: ${freshApps.size}")
             emit(AppLoad.Loaded(freshApps))
