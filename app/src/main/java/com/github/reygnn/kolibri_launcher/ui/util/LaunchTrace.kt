@@ -88,6 +88,21 @@ object LaunchTrace {
         /** The reveal/transform/invalidate block (`applyUpdates`) — the
          * Main-thread work that produces the first rebuilt frame. */
         const val WALLPAPER_APPLY = "wallpaper_apply"
+
+        // --- Wallpaper pinch/pan gesture redraw (jank investigation) ---
+        // The wallpaper-rebuild trace showed a few janky frames during
+        // continuous zoom/pan gestures (a separate path from the rebuild).
+        // These pin the per-gesture Main-thread cost so it can be told apart
+        // from GPU/RenderThread texture sampling of large bitmaps.
+
+        /** `ZoomableImageView.onTouchEvent` gesture dispatch — matrix math +
+         * invalidate per MotionEvent. */
+        const val GESTURE_TOUCH = "gesture_touch"
+
+        /** `ZoomableImageView.onDraw` multi-layer draw loop — per-frame
+         * `drawBitmap` command recording during a gesture (fires only on
+         * invalidate, i.e. during gestures/rebuilds, not when idle). */
+        const val GESTURE_ONDRAW = "gesture_ondraw"
     }
 
     /**

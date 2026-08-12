@@ -18,6 +18,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -759,29 +760,35 @@ class ZoomableImageView @JvmOverloads constructor(
             return
         }
 
-        if (layerBackgroundColor != Color.TRANSPARENT) {
-            bgPaint.color = layerBackgroundColor
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        }
+        // Traced (jank): the per-frame multi-layer draw loop. Fires only on
+        // invalidate (during gestures / rebuilds, not when idle), so it
+        // measures the Main-thread draw-command recording cost of a gesture
+        // redraw — distinct from the GPU texture sampling on the RenderThread.
+        LaunchTrace.section(LaunchTrace.Names.GESTURE_ONDRAW) {
+            if (layerBackgroundColor != Color.TRANSPARENT) {
+                bgPaint.color = layerBackgroundColor
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+            }
 
-        for ((index, layer) in layers.withIndex()) {
-            if (!layer.isVisible) continue
-            val bmp = layer.bitmap ?: continue
+            for ((index, layer) in layers.withIndex()) {
+                if (!layer.isVisible) continue
+                val bmp = layer.bitmap ?: continue
 
-            // Guard: Recycled Bitmap überspringen
-            if (bmp.isRecycled) continue
+                // Guard: skip a recycled bitmap
+                if (bmp.isRecycled) continue
 
-            bitmapPaint.alpha = layer.alphaInt
-            bitmapPaint.blendMode = layer.blendMode
+                bitmapPaint.alpha = layer.alphaInt
+                bitmapPaint.blendMode = layer.blendMode
 
-            layer.buildMatrixInto(drawMatrix)
-            canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
+                layer.buildMatrixInto(drawMatrix)
+                canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
 
-            bitmapPaint.alpha = 255
-            bitmapPaint.blendMode = null
+                bitmapPaint.alpha = 255
+                bitmapPaint.blendMode = null
 
-            if (isEditMode && index == activeLayerIndex) {
-                drawSelectionHighlight(canvas, layer)
+                if (isEditMode && index == activeLayerIndex) {
+                    drawSelectionHighlight(canvas, layer)
+                }
             }
         }
     }
@@ -809,8 +816,12 @@ class ZoomableImageView @JvmOverloads constructor(
         if (isMultiLayerMode && layers.isEmpty()) return false
 
         return try {
-            if (isMultiLayerMode) handleMultiLayerTouch(event)
-            else handleSingleLayerTouch(event)
+            // Traced (jank): gesture matrix math + invalidate per MotionEvent.
+            // Synchronous, no suspension point.
+            LaunchTrace.section(LaunchTrace.Names.GESTURE_TOUCH) {
+                if (isMultiLayerMode) handleMultiLayerTouch(event)
+                else handleSingleLayerTouch(event)
+            }
             true
         } catch (e: Throwable) {
             // Catch kept (Unrecoverable / HOME-Activity-resilience boundary,
