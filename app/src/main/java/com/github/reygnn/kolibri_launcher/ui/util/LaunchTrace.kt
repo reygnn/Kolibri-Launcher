@@ -4,7 +4,8 @@ import android.os.Trace
 
 /**
  * Thin wrapper around [android.os.Trace] for measuring the tap→app-launch
- * latency path on-device with Perfetto / Macrobenchmark.
+ * latency path and the launcher's own process cold-start on-device with
+ * Perfetto / Macrobenchmark.
  *
  * The launcher's own share of "tap a favorite/drawer entry → the target app's
  * process is asked to start" is a Main-thread pipeline that hops across a
@@ -27,7 +28,8 @@ import android.os.Trace
  */
 object LaunchTrace {
 
-    /** Stable slice names for the launch pipeline. Referenced by tooling. */
+    /** Stable slice names for the launch + cold-start paths. Referenced by
+     * tooling (matched verbatim by `TraceSectionMetric`). */
     object Names {
         /** The tap reached the ViewModel-side handler (`onAppClicked`). */
         const val TAP = "app_launch_tap"
@@ -41,6 +43,32 @@ object LaunchTrace {
 
         /** `NavController.navigate` into the app drawer (drawer-open path). */
         const val DRAWER_OPEN = "drawer_open_navigate"
+
+        // --- Launcher process cold start (Application bootstrap) ---
+        // These pin the synchronous Main-thread bootstrap chain that runs
+        // before the first launcher frame. The `android_startups` trace metric
+        // already gives total startup; these break down the launcher's own
+        // share. Nesting: COLD_START_ATTACH wraps ACRA_INIT + CONSENT_READ.
+
+        /** The whole `CrashReportingBootstrap.attachBaseContext` delegate
+         * (runs before `onCreate`, blocks the Main thread). */
+        const val COLD_START_ATTACH = "cold_start_attach"
+
+        /** `initAcra { … }` — ACRA config build + init (reflection-heavy). */
+        const val COLD_START_ACRA_INIT = "cold_start_acra_init"
+
+        /** `runBlocking { ConsentBootstrap.readDecision(base) }` — the
+         * synchronous DataStore consent read on the Main thread. Prime
+         * suspect for cold-start latency. */
+        const val COLD_START_CONSENT_READ = "cold_start_consent_read"
+
+        /** `CrashReportingBootstrap.onCreate` — plant delivery tree, drain
+         * post-mortem ANRs, arm the watchdog. */
+        const val COLD_START_ONCREATE_BOOTSTRAP = "cold_start_oncreate_bootstrap"
+
+        /** `registerSystemWallpaperColorsListener` — WallpaperManager IPC
+         * (getInstance + getWallpaperColors) on the Main thread. */
+        const val COLD_START_WALLPAPER_COLORS = "cold_start_wallpaper_colors"
     }
 
     /**

@@ -25,6 +25,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReporti
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +77,12 @@ class KolibriLauncherApp : Application() {
             try {
                 // Owns ACRA init + the X2-gated consent read + the uncaught
                 // handler install, in the §12 order. See CrashReportingBootstrap.
-                CrashReportingBootstrap.attachBaseContext(this, base)
+                // Traced (cold-start): synchronous, runs before onCreate and
+                // blocks the Main thread; wraps the ACRA-init + consent-read
+                // sub-sections inside the delegate.
+                LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
+                    CrashReportingBootstrap.attachBaseContext(this, base)
+                }
             } catch (e: Throwable) {
                 // Ultra paranoid: even crash-reporting init must not crash the
                 // app. Android Log fallback since Timber may not be wired yet.
@@ -141,7 +147,10 @@ class KolibriLauncherApp : Application() {
 
         // Plant the delivery tree, drain post-mortem ANRs, start the watchdog
         // (§12·3). See CrashReportingBootstrap.
-        CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
+        // Traced (cold-start): synchronous Main-thread work in onCreate.
+        LaunchTrace.section(LaunchTrace.Names.COLD_START_ONCREATE_BOOTSTRAP) {
+            CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
+        }
 
         // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
         // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
@@ -156,7 +165,11 @@ class KolibriLauncherApp : Application() {
         // applies, and Rule 9's plain-Timber.e exception covers this file.
         // No unregister: Application.onTerminate isn't called on real
         // devices, and the signal is a process-lifetime singleton.
-        registerSystemWallpaperColorsListener()
+        // Traced (cold-start): WallpaperManager IPC (getInstance +
+        // getWallpaperColors) on the Main thread — a potential blocker.
+        LaunchTrace.section(LaunchTrace.Names.COLD_START_WALLPAPER_COLORS) {
+            registerSystemWallpaperColorsListener()
+        }
     }
 
     private fun registerPackageUpdateReceiver() {

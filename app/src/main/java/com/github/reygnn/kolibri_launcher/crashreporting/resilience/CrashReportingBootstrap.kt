@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -72,19 +73,22 @@ object CrashReportingBootstrap {
      * read would be a wasted cross-process DataStore hit.
      */
     fun attachBaseContext(app: Application, base: Context) {
-        app.initAcra {
-            buildConfigClass = BuildConfig::class.java
-            reportFormat = StringFormat.JSON
+        // Traced (cold-start): ACRA config build + init, reflection-heavy.
+        LaunchTrace.section(LaunchTrace.Names.COLD_START_ACRA_INIT) {
+            app.initAcra {
+                buildConfigClass = BuildConfig::class.java
+                reportFormat = StringFormat.JSON
 
-            httpSender {
-                uri = BuildConfig.ACRA_URL
-                basicAuthLogin = BuildConfig.ACRA_LOGIN
-                basicAuthPassword = BuildConfig.ACRA_PASSWORD
-                httpMethod = HttpSender.Method.POST
-                tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
+                httpSender {
+                    uri = BuildConfig.ACRA_URL
+                    basicAuthLogin = BuildConfig.ACRA_LOGIN
+                    basicAuthPassword = BuildConfig.ACRA_PASSWORD
+                    httpMethod = HttpSender.Method.POST
+                    tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
+                }
+
+                reportContent = REPORT_CONTENT
             }
-
-            reportContent = REPORT_CONTENT
         }
 
         // §12·1: immediately after init, disable first, then read consent (A1).
@@ -94,7 +98,11 @@ object CrashReportingBootstrap {
             // sender process (errorReporter is a stub there) stays disabled.
             readDecision = {
                 if (ACRA.isACRASenderServiceProcess()) null
-                else runBlocking { ConsentBootstrap.readDecision(base) }
+                // Traced (cold-start): synchronous DataStore consent read on
+                // the Main thread — prime suspect for cold-start latency.
+                else LaunchTrace.section(LaunchTrace.Names.COLD_START_CONSENT_READ) {
+                    runBlocking { ConsentBootstrap.readDecision(base) }
+                }
             },
         )
 
