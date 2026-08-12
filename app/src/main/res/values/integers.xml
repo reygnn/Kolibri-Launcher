@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Animation Durations -->
-    <integer name="anim_duration_app_open">350</integer>
+    <!-- app_open / app_open_exit: the launch transition (makeCustomAnimation
+         in AppLauncherImpl). Shortened 350->190 to reduce felt tap->app
+         latency; the Perfetto launch-latency trace showed the launcher's own
+         code is <1ms and this animation is the dominant self-controlled tail
+         (chore/faster-launch-animations). -->
+    <integer name="anim_duration_app_open">190</integer>
     <integer name="anim_duration_app_close">300</integer>
     <integer name="anim_duration_launcher_fade_in">200</integer>
     <integer name="anim_duration_launcher_fade_out">150</integer>
-    <integer name="anim_duration_app_open_exit">350</integer>
+    <integer name="anim_duration_app_open_exit">190</integer>
     <integer name="anim_duration_app_close_enter">250</integer>
     <integer name="anim_duration_screen_lock">300</integer>
-    
+    <!-- Drawer open/close slide (slide_in_up / slide_out_down). Was hardcoded
+         300 in both anim XMLs; extracted here and shortened to 180 for a
+         snappier drawer. -->
+    <integer name="anim_duration_drawer_slide">180</integer>
+
     <!-- Start Offsets -->
     <integer name="anim_offset_app_close_enter">100</integer>
 </resources>
