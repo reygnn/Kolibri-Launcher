@@ -1565,11 +1565,13 @@ class HomeFragment : Fragment() {
         longClickedApp = null
         lastSpacingInput = null
 
-        binding.wallpaperTouchInterceptor.setOnTouchListener(null)
-        // FAB cluster + commands panel are reset by
-        // WallpaperEditController.clearEditModeListeners on edit-mode
-        // exit; nulling them again here would be redundant and the
-        // controller is about to be released anyway.
+        // The wallpaper-edit overlay (touch interceptor + FAB cluster +
+        // commands panel) now lives behind a ViewStub and may never have been
+        // inflated. Its listeners are cleared by
+        // WallpaperEditController.clearEditModeListeners on edit-mode exit, and
+        // the controller (released just below) holds the only reference to the
+        // inflated overlay binding — so no direct null-out is possible or
+        // needed here.
 
         // Clear wallpaper callbacks.
         binding.wallpaperView.onTransformChanged = null

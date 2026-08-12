@@ -121,58 +121,21 @@
 
     </com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
 
-    <!-- Layer 2: Edit-Mode Overlay -->
-    <FrameLayout
-        android:id="@+id/wallpaperEditOverlay"
+    <!--
+      Layer 2: Edit-Mode Overlay — lazily inflated.
+
+      Behind a ViewStub so the CommandsPanel + SpeedDialFabCluster (~47ms
+      of layout inflation) are NOT built on every launcher cold start;
+      this UI is only ever shown in wallpaper-edit mode. WallpaperEditController
+      inflates the stub on first edit-mode entry and toggles VISIBLE/GONE
+      afterwards. Placed at the same (last) child index as the former
+      overlay so its z-order above Layer 1 is unchanged. See the
+      cold_start_* Perfetto measurement (feature/lazy-wallpaper-fab).
+    -->
+    <ViewStub
+        android:id="@+id/wallpaperEditOverlayStub"
+        android:layout="@layout/view_wallpaper_edit_overlay"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone">
-
-        <View
-            android:id="@+id/wallpaperTouchInterceptor"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <TextView
-            android:id="@+id/wallpaperEditHint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="@dimen/spacing_xlarge"
-            android:text="@string/wallpaper_edit_hint"
-            android:textColor="@color/wallpaper_edit_foreground"
-            android:textSize="@dimen/text_size_hint"
-            android:background="@drawable/bg_hint_rounded"
-            android:paddingHorizontal="@dimen/spacing_large"
-            android:paddingVertical="@dimen/spacing_medium"
-            android:elevation="@dimen/elevation_card" />
-
-        <!--
-          Overflow panel for snap controls + layer-reorder. Hidden by
-          default; the SpeedDialFabCluster's ☰ FAB toggles it.
-        -->
-        <com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
-            android:id="@+id/wallpaperCommandsPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:layout_marginHorizontal="@dimen/spacing_large"
-            android:layout_marginBottom="@dimen/spacing_large"
-            android:elevation="@dimen/elevation_card" />
-
-        <!--
-          Speed-dial cluster: Save (main, draggable) plus five mini-FABs
-          stacked above it. The user-dragged position persists via
-          LauncherViewModel.fabPosition / onFabPositionChanged.
-        -->
-        <com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
-            android:id="@+id/wallpaperFabCluster"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_marginEnd="@dimen/spacing_large"
-            android:layout_marginBottom="@dimen/spacing_large" />
-
-    </FrameLayout>
+        android:layout_height="match_parent" />
 
 </FrameLayout>

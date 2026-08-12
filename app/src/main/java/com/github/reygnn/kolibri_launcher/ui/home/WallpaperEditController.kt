@@ -3,7 +3,9 @@ package com.github.reygnn.kolibri_launcher.ui.home
 import android.view.View
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
+import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
@@ -33,15 +35,51 @@ internal class WallpaperEditController(
     private val rerenderWallpaper: () -> Unit,
 ) {
 
-    private val fabCluster: SpeedDialFabCluster get() = binding.wallpaperFabCluster
-    private val commandsPanel get() = binding.wallpaperCommandsPanel
+    // The edit overlay (interceptor, hint, CommandsPanel, SpeedDialFabCluster)
+    // lives behind a <ViewStub> in fragment_home and is inflated lazily on the
+    // first entry into edit mode — see [ensureOverlayInflated]. Null until then;
+    // ~47ms of inflation is thus kept off every launcher cold start (the UI is
+    // only ever used in edit mode). All view access goes through the accessors
+    // below, which are only reached after inflation — every entry point that can
+    // run earlier (applyEditMode(false), applyFabPosition, the layer-state
+    // updates) is guarded.
+    private var overlay: ViewWallpaperEditOverlayBinding? = null
 
-    init {
-        // Drag callback wires straight to the ViewModel — does not need
-        // to be reattached per edit session.
-        fabCluster.onPositionChanged = { x, y ->
+    // A FAB position emitted by the ViewModel before the overlay exists is
+    // stashed here and applied at inflation time (see [applyFabPosition]).
+    private var pendingFabPosition: FabPosition? = null
+
+    private val fabCluster: SpeedDialFabCluster get() = requireNotNull(overlay).wallpaperFabCluster
+    private val commandsPanel: CommandsPanel get() = requireNotNull(overlay).wallpaperCommandsPanel
+    private val touchInterceptor: View get() = requireNotNull(overlay).wallpaperTouchInterceptor
+
+    /**
+     * Inflates the edit-overlay ViewStub exactly once and wires the
+     * session-independent drag callback (formerly the `init` block). Idempotent:
+     * returns the existing binding on later calls. Called only from
+     * [applyEditMode]`(true)`, so the overlay is built when edit mode is first
+     * entered — not at cold start.
+     */
+    private fun ensureOverlayInflated(): ViewWallpaperEditOverlayBinding {
+        overlay?.let { return it }
+
+        val root = binding.wallpaperEditOverlayStub.inflate()
+        val bound = ViewWallpaperEditOverlayBinding.bind(root)
+        overlay = bound
+
+        // Drag callback wires straight to the ViewModel — session-independent,
+        // so it is set once at inflation.
+        bound.wallpaperFabCluster.onPositionChanged = { x, y ->
             viewModel.onFabPositionChanged(x, y)
         }
+
+        // Apply a FAB position that arrived before the overlay existed.
+        pendingFabPosition?.let {
+            bound.wallpaperFabCluster.applyPosition(it.xFraction, it.yFraction)
+            pendingFabPosition = null
+        }
+
+        return bound
     }
 
     // ============================================================================
@@ -55,7 +93,10 @@ internal class WallpaperEditController(
         wallpaperView.isHorizontalSnapEnabled = state.horizontalSnapEnabled
         wallpaperView.isVerticalSnapEnabled = state.verticalSnapEnabled
         wallpaperView.snapMode = state.snapMode
-        binding.wallpaperEditOverlay.visibility =
+        // Overlay visibility only applies once the stub is inflated. Before
+        // that "not inflated" already IS the GONE state, so a null overlay is a
+        // correct no-op (the safe-call assignment does nothing).
+        overlay?.root?.visibility =
             if (state.overlayVisible) View.VISIBLE else View.GONE
         binding.rootLayout.alpha = state.rootLayoutAlpha
     }
@@ -66,7 +107,15 @@ internal class WallpaperEditController(
      * emits — currently driven by the Fragment's lifecycle observer.
      */
     fun applyFabPosition(position: FabPosition) {
-        fabCluster.applyPosition(position.xFraction, position.yFraction)
+        val o = overlay
+        if (o != null) {
+            o.wallpaperFabCluster.applyPosition(position.xFraction, position.yFraction)
+        } else {
+            // Overlay not built yet (never entered edit mode) — the ViewModel's
+            // fabPosition flow emits its initial value at startup. Stash it;
+            // [ensureOverlayInflated] applies it when the overlay is built.
+            pendingFabPosition = position
+        }
     }
 
     // ============================================================================
@@ -75,16 +124,25 @@ internal class WallpaperEditController(
 
     fun applyEditMode(isEditMode: Boolean) {
         try {
-            applyEditState(
+            val targetState =
                 WallpaperEditTransition.targetState(WallpaperEditTransition.forMode(isEditMode))
-            )
 
             if (isEditMode) {
+                // Build the overlay on first entry, BEFORE applyEditState (which
+                // sets the now-inflated overlay VISIBLE) and the listener wiring.
+                ensureOverlayInflated()
+                applyEditState(targetState)
                 wireEditModeListeners()
                 Timber.d("Wallpaper edit mode: ON (multiLayer=${viewModel.wallpaperState.value.isMultiLayer}, layers=${binding.wallpaperView.layerCount})")
             } else {
-                clearEditModeListeners()
-                commandsPanel.hidePanel()
+                applyEditState(targetState)
+                // If the overlay was never inflated (never entered edit mode),
+                // there is nothing to unwire or hide — the non-overlay off-state
+                // above is all that applies.
+                if (overlay != null) {
+                    clearEditModeListeners()
+                    commandsPanel.hidePanel()
+                }
                 Timber.d("Wallpaper edit mode: OFF")
             }
         } catch (e: Throwable) {
@@ -109,7 +167,7 @@ internal class WallpaperEditController(
         // taps that fall outside the FAB cluster / CommandsPanel.
         // Forward to the underlying view so its existing edit-mode
         // gesture handling kicks in.
-        binding.wallpaperTouchInterceptor.setOnTouchListener { _, event ->
+        touchInterceptor.setOnTouchListener { _, event ->
             wallpaperView.onTouchEvent(event)
         }
 
@@ -227,7 +285,7 @@ internal class WallpaperEditController(
     }
 
     private fun clearEditModeListeners() {
-        binding.wallpaperTouchInterceptor.setOnTouchListener(null)
+        touchInterceptor.setOnTouchListener(null)
 
         fabCluster.setOnSaveClicked { /* no-op */ }
         fabCluster.setOnCancelClicked { /* no-op */ }
@@ -325,6 +383,9 @@ internal class WallpaperEditController(
     // ============================================================================
 
     fun updateLayerIndicator() {
+        // Only meaningful in edit mode (overlay inflated). Guard so a layer
+        // change arriving off edit-mode can't touch a null overlay.
+        overlay ?: return
         val wallpaperView = binding.wallpaperView
         val count = wallpaperView.layerCount
         val active = wallpaperView.activeLayerIndex
@@ -337,6 +398,8 @@ internal class WallpaperEditController(
     }
 
     fun applyLayerButtonsState() {
+        // Only meaningful in edit mode (overlay inflated). Guard as above.
+        overlay ?: return
         val wallpaperView = binding.wallpaperView
         val state = LayerButtonsState.from(
             isMultiLayerMode = wallpaperView.isMultiLayerMode,
