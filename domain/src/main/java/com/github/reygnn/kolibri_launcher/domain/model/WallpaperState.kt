@@ -33,7 +33,18 @@ data class WallpaperLayerState(
     val isVisible: Boolean = true,
 
     /** Optionaler Label (z.B. "Oben", "Unten") */
-    val label: String? = null
+    val label: String? = null,
+
+    /**
+     * The bitmap `inSampleSize` this layer's [scale]/[translateX]/[translateY]
+     * were captured against — the decode downsample factor in force when the
+     * transform was saved. Lets a later render-budget change compensate the
+     * bitmap-absolute [scale] via the ratio `S_render / captureSampleSize`
+     * (WALLPAPER_RENDER_RES_SPEC §4-Y). `null` = legacy transform with no
+     * recorded factor; the loader backfills it from the original image
+     * dimensions + the old 24 MP budget (spec §7).
+     */
+    val captureSampleSize: Int? = null
 ) {
     companion object {
         const val DEFAULT_SCALE = 1.0f
@@ -120,7 +131,14 @@ data class WallpaperState(
     // --- Multi-Layer Felder ---
 
     /** Liste der Layer-States. Leer = Single-Layer-Modus. */
-    val layers: List<WallpaperLayerState> = emptyList()
+    val layers: List<WallpaperLayerState> = emptyList(),
+
+    /**
+     * Single-layer twin of [WallpaperLayerState.captureSampleSize]: the decode
+     * downsample factor the single-layer [scale]/[translateX]/[translateY] were
+     * captured against. MUSS `null` sein wenn [layers] nicht leer. See spec §4-Y.
+     */
+    val captureSampleSize: Int? = null
 ) {
     companion object {
         const val DEFAULT_SCALE = WallpaperLayerState.DEFAULT_SCALE
@@ -256,6 +274,7 @@ data class WallpaperState(
             scale = scale,
             translateX = translateX,
             translateY = translateY,
+            captureSampleSize = captureSampleSize,
             label = "Layer 1"
         )
 
@@ -264,6 +283,7 @@ data class WallpaperState(
             scale = DEFAULT_SCALE,
             translateX = 0f,
             translateY = 0f,
+            captureSampleSize = null,
             layers = listOf(singleLayer)
         )
     }
