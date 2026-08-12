@@ -52,6 +52,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * OTHER reason anyway, in which case the dead-sort removal rides along free. The
  * three self-sorting call sites carry a thin pointer back to this block. Closed.
  */
-fun applyCustomNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
-    apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
+fun applyCustomNames(apps: List<AppInfo>, customNames: Map<String, String>): List<AppInfo> =
+    apps.map { it.copy(displayName = customNames[it.packageName] ?: it.originalName) }
         .sortedBy { it.displayNameLower }
