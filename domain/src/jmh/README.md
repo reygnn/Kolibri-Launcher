@@ -41,6 +41,8 @@ pass/fail line** (your host will differ):
 | `filterDisplayName`      | 200 | ~0.61 ops/µs (~1.6 µs/call) |
 | `filterWithOriginalName` | 50  | ~0.85 ops/µs (~1.2 µs/call) |
 | `filterWithOriginalName` | 200 | ~0.21 ops/µs (~4.7 µs/call) |
+| `score` (usage)      | 20 ts  | ~1.3 ops/µs (~0.8 µs/call) |
+| `score` (usage)      | 100 ts | ~0.25 ops/µs (~4.0 µs/call) |
 
 `applyCustomNames` confirms its KDoc (REACTIVE_APPLIST_SPEC RAL-1a / AUDIT-15
 F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps, i.e. "in the
@@ -59,6 +61,13 @@ optimisation (AUDIT-15 F2 / AUDIT-16 N2): the common `filterDisplayName` path
 stays under ~2 µs even at 200 apps, and the Custom-Names `includeOriginalName`
 path (extra per-app `originalName.lowercase()` on the renamed subset) is ~3×
 that but still single-digit µs.
+
+`score` is the exponential-decay usage score (`UsageScore.timeWeightedUsageScore`,
+extracted from `AppUsageRepositoryImpl` so the math is pure `:domain`). It runs
+once per visible app inside `sortAppsByTimeWeightedUsage`, so per drawer refresh
+in TIME_WEIGHTED mode the scoring cost is roughly this × the app count — ~0.15 ms
+for 200 apps at ~20 timestamps each (~0.8 µs/app), on top of the DataStore read.
+The `exp()` per timestamp keeps it the priciest per-element math after luminance.
 
 ## Adding a benchmark
 

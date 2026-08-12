@@ -8,8 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
-import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.exp
 
 /**
  * Manager for tracking and analyzing app usage patterns with time-weighted scoring.
@@ -163,7 +161,7 @@ class AppUsageRepositoryImpl @Inject constructor(
                     ?.filter { isValidTimestamp(it, currentTime) }
                     ?: emptyList()
 
-                val score = calculateTimeWeightedScore(timestamps, currentTime)
+                val score = timeWeightedUsageScore(timestamps, currentTime)
                 Pair(appInfo, score)
             }
                 .sortedWith(
@@ -212,33 +210,6 @@ class AppUsageRepositoryImpl @Inject constructor(
             TimberWrapper.silentError(e, "Error reading recently launched packages")
             emptyList()
         }
-    }
-
-    /**
-     * Berechnet den zeitgewichteten Score mit Safe-Math-Operations
-     */
-    private fun calculateTimeWeightedScore(timestamps: List<Long>, currentTime: Long): Double {
-        if (timestamps.isEmpty()) return 0.0
-
-        // Pure Long/Double arithmetic plus `kotlin.math.exp` (returns NaN
-        // instead of throwing) and the safe-coerce extensions. The former
-        // Throwable catches here had nothing to catch.
-        return timestamps.distinct().sumOf { launchTime ->
-            val timeDifferenceMs = currentTime - launchTime
-
-            // Zukunfts-Schutz: Ignoriere Timestamps aus der Zukunft (Uhr umgestellt?)
-            if (timeDifferenceMs < 0) return@sumOf 0.0
-
-            val timeDifferenceSec = (timeDifferenceMs / 1000.0).coerceAtLeastSafe(0.0)
-            val exponent = -AppConstants.USAGE_DECAY_LAMBDA * timeDifferenceSec
-
-            // Overflow-Schutz für exp()
-            when {
-                exponent < -100.0 -> 0.0 // Zu alt, Score ist praktisch 0
-                exponent > 100.0 -> 1.0  // Sollte mathematisch bei negativem Lambda nicht passieren, aber sicher ist sicher
-                else -> kotlin.math.exp(exponent).coerceInSafe(0.0, 1.0)
-            }
-        }.coerceAtLeastSafe(0.0)
     }
 
     /**
