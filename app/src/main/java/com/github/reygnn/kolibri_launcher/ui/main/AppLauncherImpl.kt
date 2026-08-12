@@ -8,6 +8,7 @@ import android.content.pm.LauncherApps
 import android.os.Process
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import javax.inject.Inject
 
 /**
@@ -39,12 +40,16 @@ class AppLauncherImpl @Inject constructor() : AppLauncher {
                 R.anim.app_open_enter,
                 R.anim.app_open_exit,
             )
-            launcherApps.startMainActivity(
-                componentName,
-                Process.myUserHandle(),
-                null,
-                options.toBundle(),
-            )
+            // Traced: the actual startMainActivity binder call — the last slice
+            // the launcher owns before the target app's cold start takes over.
+            LaunchTrace.section(LaunchTrace.Names.START_MAIN_ACTIVITY) {
+                launcherApps.startMainActivity(
+                    componentName,
+                    Process.myUserHandle(),
+                    null,
+                    options.toBundle(),
+                )
+            }
         }
     }
 }

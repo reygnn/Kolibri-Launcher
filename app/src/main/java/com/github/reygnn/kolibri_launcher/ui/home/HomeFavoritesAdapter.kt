@@ -17,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 
 /**
@@ -241,7 +242,10 @@ class HomeFavoritesAdapter(
                 val app = currentItemOrNull(bindingAdapterPosition) ?: return@setOnClickListener
                 try {
                     // User callback — may throw anything (system-callback boundary).
-                    onAppClick(app)
+                    // Traced: pins the tap timestamp for the launch-latency path.
+                    LaunchTrace.section(LaunchTrace.Names.TAP) {
+                        onAppClick(app)
+                    }
                 } catch (e: Throwable) {
                     // Catch kept: callback boundary, Rule 11. no suspension point.
                     TimberWrapper.silentError(e, "Error in onAppClick for ${app.packageName}")

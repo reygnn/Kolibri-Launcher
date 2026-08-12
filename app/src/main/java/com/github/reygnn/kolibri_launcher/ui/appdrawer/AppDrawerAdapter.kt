@@ -14,6 +14,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 
 /**
@@ -172,7 +173,10 @@ class AppDrawerAdapter(
                             // User-Code-Callback — kann beliebig werfen.
                             // §9.15-Sweep: Throwable per Rule 11
                             // four-category-frame (system-callback boundary).
-                            onAppClicked(item)
+                            // Traced: pins the tap timestamp for the launch-latency path.
+                            LaunchTrace.section(LaunchTrace.Names.TAP) {
+                                onAppClicked(item)
+                            }
                         } catch (e: Throwable) {
                             TimberWrapper.silentError(e, "Error in onAppClicked callback for ${item.packageName}")
                         }

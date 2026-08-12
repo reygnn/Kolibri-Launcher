@@ -3,6 +3,10 @@
 *.aab
 *.ap_
 
+# Perfetto / systrace captures (launch-latency benchmarking)
+*.trace
+*.perfetto-trace
+
 # Files for the ART/Dalvik VM
 *.dex
 

@@ -45,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -716,7 +717,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             when (event) {
                 is UiEvent.ShowAppDrawer -> {
                     if (navController?.currentDestination?.id == R.id.homeFragment) {
-                        navController?.navigate(R.id.appDrawerFragment)
+                        // Traced: the drawer-open navigation. The 300ms
+                        // slide_in_up transition runs after this returns — the
+                        // fragment transaction cost itself is what this pins.
+                        LaunchTrace.section(LaunchTrace.Names.DRAWER_OPEN) {
+                            navController?.navigate(R.id.appDrawerFragment)
+                        }
                         if (BuildConfig.DEBUG) {
                             Timber.d("[MAIN] Navigated to app drawer")
                         }
@@ -772,39 +778,45 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
 
                 is UiEvent.LaunchApp -> {
-                    val action = AppLaunchAction.decide(
-                        currentDestinationId = navController?.currentDestination?.id,
-                        drawerDestinationId = R.id.appDrawerFragment,
-                        app = event.app,
-                    )
-
-                    if (BuildConfig.DEBUG) {
-                        Timber.d(
-                            "[MAIN] Processing LaunchApp for: ${event.app.displayName}, " +
-                                "action: ${action::class.simpleName}",
+                    // Traced: the synchronous Main-thread dispatch of a launch
+                    // (decide + optional drawer popBackStack + launchApp). The
+                    // GAP before this section on the Perfetto timeline (from the
+                    // app_launch_tap slice) is the SharedFlow hop latency.
+                    LaunchTrace.section(LaunchTrace.Names.DISPATCH) {
+                        val action = AppLaunchAction.decide(
+                            currentDestinationId = navController?.currentDestination?.id,
+                            drawerDestinationId = R.id.appDrawerFragment,
+                            app = event.app,
                         )
-                    }
 
-                    if (action is AppLaunchAction.PopThenLaunch) {
-                        try {
-                            navController?.popBackStack()
-                            if (BuildConfig.DEBUG) {
-                                Timber.d("[MAIN] Drawer closed")
-                            }
-                        } catch (e: Throwable) {
-                            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-                            // Inner catch kept (Expected error, four-
-                            // category frame): scoped log "Error popping
-                            // back stack" preserves diagnostic context
-                            // that the outer Catchall would flatten to
-                            // "Error in handleSpecificEvent". Even if
-                            // popBackStack fails, launchApp below still
-                            // runs (correct user-visible behaviour).
-                            TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
+                        if (BuildConfig.DEBUG) {
+                            Timber.d(
+                                "[MAIN] Processing LaunchApp for: ${event.app.displayName}, " +
+                                    "action: ${action::class.simpleName}",
+                            )
                         }
-                    }
 
-                    launchApp(action.app)
+                        if (action is AppLaunchAction.PopThenLaunch) {
+                            try {
+                                navController?.popBackStack()
+                                if (BuildConfig.DEBUG) {
+                                    Timber.d("[MAIN] Drawer closed")
+                                }
+                            } catch (e: Throwable) {
+                                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
+                                // Inner catch kept (Expected error, four-
+                                // category frame): scoped log "Error popping
+                                // back stack" preserves diagnostic context
+                                // that the outer Catchall would flatten to
+                                // "Error in handleSpecificEvent". Even if
+                                // popBackStack fails, launchApp below still
+                                // runs (correct user-visible behaviour).
+                                TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
+                            }
+                        }
+
+                        launchApp(action.app)
+                    }
                 }
 
                 is UiEvent.OpenWallpaperPicker -> {

@@ -39,6 +39,16 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:largeHeap="false">
 
+        <!--
+            Makes the app's android.os.Trace sections + system traces
+            readable by Perfetto / Macrobenchmark on a non-debuggable
+            (release) build, without granting debugger access. Required to
+            measure the tap->launch latency path (the app_launch_* Trace
+            sections in the launch pipeline). No runtime cost when nobody
+            is tracing.
+        -->
+        <profileable android:shell="true" tools:targetApi="29" />
+
         <!-- MainActivity mit Splash Screen Support und DayNight -->
         <!--
             android:configChanges suppresses Activity recreation on
