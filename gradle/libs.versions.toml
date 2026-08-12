@@ -120,6 +120,10 @@ androidx-test-junit = "1.3.0"  # Recheck 2026-Q3: current = latest stable.
 espresso = "3.7.0"  # Recheck 2026-Q3: current = latest stable.
 orchestrator = "1.6.1"  # Recheck 2026-Q3: current = latest stable.
 
+# Benchmark (JMH — :domain pure-Kotlin microbenchmarks)
+jmh = "1.37"  # JMH core/generator version, pinned via the jmh { } block in :domain. Recheck: current latest stable of the 1.x line.
+jmh-gradle-plugin = "0.7.3"  # me.champeau.jmh Gradle plugin (owns the src/jmh/ source set + jmh task). Latest stable.
+
 
 [libraries]
 # UI & Material
@@ -194,3 +198,4 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+jmh = { id = "me.champeau.jmh", version.ref = "jmh-gradle-plugin" }

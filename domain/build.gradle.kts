@@ -25,6 +25,12 @@ plugins {
     alias(libs.plugins.ksp)
     `java-test-fixtures`
     alias(libs.plugins.kotlin.serialization)
+    // JMH microbenchmarks for pure-Kotlin hot paths (applyCustomNames, …).
+    // Adds an isolated `src/jmh/` source set + a `:domain:jmh` task; it does
+    // NOT touch `test` / jacoco / checkConventions. Run with `./gradlew
+    // :domain:jmh`. JVM-only by design — this is the reproducible-benchmark
+    // counterpart to the JVM-first test philosophy (no androidTest, no device).
+    alias(libs.plugins.jmh)
     // Produces build/jacoco/test.exec — note the task is `test`, not
     // `testDebugUnitTest`: this is a pure-JVM module with no build variants,
     // the same asymmetry that kept it out of the CI test step. :app's
@@ -51,6 +57,23 @@ tasks.withType<JavaCompile>().configureEach {
             languageVersion.set(JavaLanguageVersion.of(21))
         }
     )
+}
+
+// JMH run configuration. Pins the harness version to the catalog and emits a
+// machine-readable JSON alongside the console table, so a committed baseline
+// can be diffed by hand (there is no hard CI gate — JMH numbers are
+// host-dependent; the JSON is the reproducible artefact, not an auto-fail).
+jmh {
+    // .asProvider() disambiguates the `jmh` version group (it also holds
+    // `jmh-gradle-plugin`) down to the leaf `jmh` version.
+    jmhVersion.set(libs.versions.jmh.asProvider().get())
+    resultFormat.set("JSON")
+    resultsFile.set(layout.buildDirectory.file("reports/jmh/results.json"))
+    // Modest defaults — enough to stabilise a µs-scale pure function without a
+    // multi-minute run. Override per-benchmark via annotations if needed.
+    warmupIterations.set(3)
+    iterations.set(5)
+    fork.set(1)
 }
 
 dependencies {
