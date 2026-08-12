@@ -31,14 +31,22 @@ run against it by hand when investigating a suspected regression.
 Captured once on the author's build host — **for shape, not as an absolute
 pass/fail line** (your host will differ):
 
-| Benchmark             | size | Score            |
-|-----------------------|------|------------------|
-| `applyCustomNames`    | 50   | ~0.27 ops/µs (~3.7 µs/call) |
-| `applyCustomNames`    | 200  | ~0.055 ops/µs (~18 µs/call) |
+| Benchmark            | size    | Score            |
+|----------------------|---------|------------------|
+| `applyCustomNames`   | 50      | ~0.27 ops/µs (~3.7 µs/call) |
+| `applyCustomNames`   | 200     | ~0.055 ops/µs (~18 µs/call) |
+| `luminancePass`      | 1024 px | ~0.009 ops/µs (~111 µs/call) |
+| `luminancePass`      | 4096 px | ~0.0023 ops/µs (~444 µs/call) |
 
-These confirm the `applyCustomNames` KDoc (REACTIVE_APPLIST_SPEC RAL-1a /
-AUDIT-15 F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps,
-i.e. "in the noise" off the Main thread.
+`applyCustomNames` confirms its KDoc (REACTIVE_APPLIST_SPEC RAL-1a / AUDIT-15
+F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps, i.e. "in the
+noise" off the Main thread.
+
+`luminancePass` is the pure WCAG luminance math the wallpaper AUTO-classifier
+runs per opaque pixel (`WallpaperBitmapLuminanceImpl.classify`, 32×32 = 1024
+sampled pixels). At the production sample size the `pow`-heavy pass alone is
+~0.1 ms per layer (before the Android bitmap decode/scale), scaling linearly —
+off-Main on wallpaper change, so not hot, but now pinned.
 
 ## Adding a benchmark
 
