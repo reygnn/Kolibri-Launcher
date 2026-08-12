@@ -146,12 +146,24 @@ data class LayerPropertyUpdate(
     val blendMode: BlendMode?,
     val isVisible: Boolean
 ) {
-    data class Transform(val scale: Float, val translateX: Float, val translateY: Float)
+    /**
+     * @property captureSampleSize the decode downsample factor the [scale] was
+     *     saved against (WALLPAPER_RENDER_RES_SPEC §4-Y). `null` = legacy
+     *     field-less transform; the binder backfills it from the original
+     *     dimensions at restore time. Carried here so the binder can compensate
+     *     the bitmap-absolute [scale] for a render-budget change.
+     */
+    data class Transform(
+        val scale: Float,
+        val translateX: Float,
+        val translateY: Float,
+        val captureSampleSize: Int? = null,
+    )
 
     companion object {
         fun fromLayerState(index: Int, state: WallpaperLayerState): LayerPropertyUpdate {
             val transform = if (state.isTransformed) {
-                Transform(state.scale, state.translateX, state.translateY)
+                Transform(state.scale, state.translateX, state.translateY, state.captureSampleSize)
             } else {
                 null
             }
@@ -228,7 +240,8 @@ object WallpaperViewDiff {
                 LayerPropertyUpdate.Transform(
                     target.scale,
                     target.translateX,
-                    target.translateY
+                    target.translateY,
+                    target.captureSampleSize
                 )
             } else {
                 null

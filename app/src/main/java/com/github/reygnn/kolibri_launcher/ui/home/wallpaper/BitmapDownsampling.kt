@@ -43,8 +43,8 @@ const val MAX_WALLPAPER_PIXELS = 24_000_000
  *    S_captured against it (spec §7). Lowering the render budget must leave this
  *    one untouched, or every legacy transform mis-compensates.
  *
- * TODO(spec §5): the exact value is a Zoom-Schärfe↔Jank trade-off to confirm by
- * Perfetto re-trace + a visual max-zoom check; kept a constant for now.
+ * TODO(spec §5): the exact value is a zoom-sharpness vs. jank trade-off to
+ * confirm by Perfetto re-trace + a visual max-zoom check; kept a constant for now.
  */
 const val RENDER_WALLPAPER_PIXELS = 10_500_000
 

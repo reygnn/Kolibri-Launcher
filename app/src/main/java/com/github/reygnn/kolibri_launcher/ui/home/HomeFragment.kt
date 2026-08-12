@@ -41,6 +41,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperRenderScheduler
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
@@ -1489,7 +1490,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun loadBitmapFromUri(uri: android.net.Uri): android.graphics.Bitmap? {
+    private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
         // Catch kept per Rule 11: this is the I/O boundary for bitmap
         // loading. Real failure modes are FileNotFoundException +
         // SecurityException (revoked content-URI permission, missing

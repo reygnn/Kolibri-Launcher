@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
@@ -60,6 +61,11 @@ class WallpaperRepositoryImpl @Inject constructor(
         private val KEY_WALLPAPER_SCALE = floatPreferencesKey("wallpaper_scale")
         private val KEY_WALLPAPER_TRANSLATE_X = floatPreferencesKey("wallpaper_translate_x")
         private val KEY_WALLPAPER_TRANSLATE_Y = floatPreferencesKey("wallpaper_translate_y")
+
+        // Decode downsample factor the single-layer transform was captured at
+        // (WALLPAPER_RENDER_RES_SPEC §4-Y). Absent = legacy field-less transform.
+        private val KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE =
+            intPreferencesKey("wallpaper_capture_sample_size")
 
         // --- Multi-Layer Key ---
         private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
@@ -184,7 +190,8 @@ class WallpaperRepositoryImpl @Inject constructor(
                 imageUri = uriString,
                 scale = preferences[KEY_WALLPAPER_SCALE] ?: DEFAULT_SCALE,
                 translateX = preferences[KEY_WALLPAPER_TRANSLATE_X] ?: DEFAULT_TRANSLATE,
-                translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE
+                translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE,
+                captureSampleSize = preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE]
             )
         }
     }
@@ -246,6 +253,9 @@ class WallpaperRepositoryImpl @Inject constructor(
             preferences[KEY_WALLPAPER_SCALE] = firstLayer.scale
             preferences[KEY_WALLPAPER_TRANSLATE_X] = firstLayer.translateX
             preferences[KEY_WALLPAPER_TRANSLATE_Y] = firstLayer.translateY
+            firstLayer.captureSampleSize
+                ?.let { preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
+                ?: preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
         } else {
             // Kein Layer hat ein Bild → Legacy-Keys räumen, sonst würde
             // ein späterer Korruptions-Fallback in parseWallpaperState
@@ -255,6 +265,7 @@ class WallpaperRepositoryImpl @Inject constructor(
             preferences.remove(KEY_WALLPAPER_SCALE)
             preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
             preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
+            preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
         }
 
         Timber.d("Saved ${state.layers.size} wallpaper layers")
@@ -270,6 +281,9 @@ class WallpaperRepositoryImpl @Inject constructor(
         preferences[KEY_WALLPAPER_SCALE] = state.scale
         preferences[KEY_WALLPAPER_TRANSLATE_X] = state.translateX
         preferences[KEY_WALLPAPER_TRANSLATE_Y] = state.translateY
+        state.captureSampleSize
+            ?.let { preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
+            ?: preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
 
         // Multi-Layer Key entfernen (wir sind im Single-Modus)
         preferences.remove(KEY_LAYERS_JSON)
@@ -314,6 +328,7 @@ class WallpaperRepositoryImpl @Inject constructor(
         preferences.remove(KEY_WALLPAPER_SCALE)
         preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
         preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
+        preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
         preferences.remove(KEY_LAYERS_JSON)
     }
 
@@ -348,6 +363,9 @@ class WallpaperRepositoryImpl @Inject constructor(
                 put("scale", layer.scale.toDouble())
                 put("translateX", layer.translateX.toDouble())
                 put("translateY", layer.translateY.toDouble())
+                // -1 sentinel = absent (JSON has no null int here); read back as
+                // null via takeIf { it > 0 } — a legacy field-less transform.
+                put("captureSampleSize", layer.captureSampleSize ?: -1)
                 put("alpha", layer.alpha.toDouble())
                 put("blendModeName", layer.blendModeName ?: "")
                 put("isVisible", layer.isVisible)
@@ -379,6 +397,7 @@ class WallpaperRepositoryImpl @Inject constructor(
                         scale = obj.optDouble("scale", DEFAULT_SCALE.toDouble()).toFloat(),
                         translateX = obj.optDouble("translateX", DEFAULT_TRANSLATE.toDouble()).toFloat(),
                         translateY = obj.optDouble("translateY", DEFAULT_TRANSLATE.toDouble()).toFloat(),
+                        captureSampleSize = obj.optInt("captureSampleSize", -1).takeIf { it > 0 },
                         alpha = obj.optDouble("alpha", 1.0).toFloat(),
                         blendModeName = obj.optString("blendModeName", "").takeIf { it.isNotBlank() },
                         isVisible = obj.optBoolean("isVisible", true),

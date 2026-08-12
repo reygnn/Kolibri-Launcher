@@ -20,6 +20,19 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
  * call sites — this class does not know about it. Keeps the class dumb,
  * the callers explicit.
  */
+/**
+ * A view-read transform plus the decode downsample factor the bitmap it was
+ * measured against is currently at (WALLPAPER_RENDER_RES_SPEC §4-Y). [sampleSize]
+ * (S_render) is persisted as the layer's `captureSampleSize` so a later
+ * render-budget change can compensate the bitmap-absolute [scale].
+ */
+data class LayerTransform(
+    val scale: Float,
+    val translateX: Float,
+    val translateY: Float,
+    val sampleSize: Int,
+)
+
 sealed interface WallpaperSaveAction {
 
     /**
@@ -27,7 +40,7 @@ sealed interface WallpaperSaveAction {
      * input is `true`, regardless of `hasWallpaper`.
      */
     data class SaveAllLayers(
-        val transforms: List<Triple<Float, Float, Float>>,
+        val transforms: List<LayerTransform>,
     ) : WallpaperSaveAction
 
     /**
@@ -38,6 +51,7 @@ sealed interface WallpaperSaveAction {
         val scale: Float,
         val translateX: Float,
         val translateY: Float,
+        val sampleSize: Int,
     ) : WallpaperSaveAction
 
     /**
@@ -65,14 +79,15 @@ sealed interface WallpaperSaveAction {
         fun decide(
             isMultiLayer: Boolean,
             hasWallpaper: Boolean,
-            allLayerTransforms: List<Triple<Float, Float, Float>>,
-            singleTransform: Triple<Float, Float, Float>,
+            allLayerTransforms: List<LayerTransform>,
+            singleTransform: LayerTransform,
         ): WallpaperSaveAction = when {
             isMultiLayer -> SaveAllLayers(allLayerTransforms)
             hasWallpaper -> SaveSingle(
-                scale = singleTransform.first,
-                translateX = singleTransform.second,
-                translateY = singleTransform.third,
+                scale = singleTransform.scale,
+                translateX = singleTransform.translateX,
+                translateY = singleTransform.translateY,
+                sampleSize = singleTransform.sampleSize,
             )
             else -> NoOp
         }

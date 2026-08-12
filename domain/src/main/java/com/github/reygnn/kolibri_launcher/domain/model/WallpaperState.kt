@@ -136,7 +136,7 @@ data class WallpaperState(
     /**
      * Single-layer twin of [WallpaperLayerState.captureSampleSize]: the decode
      * downsample factor the single-layer [scale]/[translateX]/[translateY] were
-     * captured against. MUSS `null` sein wenn [layers] nicht leer. See spec §4-Y.
+     * captured against. MUST be `null` when [layers] is non-empty. See spec §4-Y.
      */
     val captureSampleSize: Int? = null
 ) {

@@ -28,13 +28,15 @@ class SaveWallpaperStateUseCase @Inject constructor(
         currentState: WallpaperState,
         scale: Float,
         translateX: Float,
-        translateY: Float
+        translateY: Float,
+        captureSampleSize: Int? = null
     ) {
         repository.saveWallpaperState(
             currentState.copy(
                 scale = scale,
                 translateX = translateX,
-                translateY = translateY
+                translateY = translateY,
+                captureSampleSize = captureSampleSize
             )
         )
     }

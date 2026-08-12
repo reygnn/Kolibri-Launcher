@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
@@ -340,24 +341,30 @@ internal class WallpaperEditController(
         dispatchSaveAction(action)
     }
 
+    // Each read carries the layer's current decode factor (sampleSize) so the
+    // save can tag the transform with captureSampleSize (WALLPAPER_RENDER_RES_SPEC
+    // §4-Y). getLayer(i) is null-guarded (race with a not-yet-rebuilt view); a
+    // null layer falls back to sampleSize 1 (full-res), matching its 1f scale.
     private fun readAllLayerTransforms(
         wallpaperView: ZoomableImageView,
-    ): List<Triple<Float, Float, Float>> =
+    ): List<LayerTransform> =
         (0 until wallpaperView.layerCount).map { i ->
             val layer = wallpaperView.getLayer(i)
-            Triple(
-                layer?.scale ?: 1f,
-                layer?.translateX ?: 0f,
-                layer?.translateY ?: 0f,
+            LayerTransform(
+                scale = layer?.scale ?: 1f,
+                translateX = layer?.translateX ?: 0f,
+                translateY = layer?.translateY ?: 0f,
+                sampleSize = layer?.sampleSize ?: 1,
             )
         }
 
     private fun readSingleTransform(
         wallpaperView: ZoomableImageView,
-    ): Triple<Float, Float, Float> = Triple(
-        wallpaperView.currentScale,
-        wallpaperView.currentTranslateX,
-        wallpaperView.currentTranslateY,
+    ): LayerTransform = LayerTransform(
+        scale = wallpaperView.currentScale,
+        translateX = wallpaperView.currentTranslateX,
+        translateY = wallpaperView.currentTranslateY,
+        sampleSize = wallpaperView.singleSampleSize,
     )
 
     private fun dispatchSaveAction(action: WallpaperSaveAction) {
@@ -369,6 +376,7 @@ internal class WallpaperEditController(
                     action.scale,
                     action.translateX,
                     action.translateY,
+                    action.sampleSize,
                 )
             is WallpaperSaveAction.NoOp -> {
                 // Nothing to save. The caller decides whether a follow-up

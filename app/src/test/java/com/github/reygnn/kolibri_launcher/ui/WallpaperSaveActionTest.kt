@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -18,10 +19,10 @@ class WallpaperSaveActionTest {
     val timberRule = TimberRule()
 
     private val sampleAllTransforms = listOf(
-        Triple(1.5f, 10f, 20f),
-        Triple(2.0f, 30f, 40f),
+        LayerTransform(1.5f, 10f, 20f, 1),
+        LayerTransform(2.0f, 30f, 40f, 2),
     )
-    private val sampleSingleTransform = Triple(1.25f, 5f, 7f)
+    private val sampleSingleTransform = LayerTransform(1.25f, 5f, 7f, 3)
 
     // ------------------------------------------------------------------------
     // Three base branches, one test each.
@@ -47,7 +48,7 @@ class WallpaperSaveActionTest {
             singleTransform = sampleSingleTransform,
         )
         assertEquals(
-            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f),
+            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3),
             result,
         )
     }
@@ -58,7 +59,7 @@ class WallpaperSaveActionTest {
             isMultiLayer = false,
             hasWallpaper = false,
             allLayerTransforms = emptyList(),
-            singleTransform = Triple(1f, 0f, 0f),
+            singleTransform = LayerTransform(1f, 0f, 0f, 1),
         )
         assertEquals(WallpaperSaveAction.NoOp, result)
     }
@@ -91,11 +92,11 @@ class WallpaperSaveActionTest {
         val result = WallpaperSaveAction.decide(
             isMultiLayer = false,
             hasWallpaper = true,
-            allLayerTransforms = listOf(Triple(99f, 99f, 99f)),  // garbage
+            allLayerTransforms = listOf(LayerTransform(99f, 99f, 99f, 1)),  // garbage
             singleTransform = sampleSingleTransform,
         )
         assertEquals(
-            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f),
+            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3),
             result,
         )
     }
@@ -106,7 +107,7 @@ class WallpaperSaveActionTest {
             isMultiLayer = true,
             hasWallpaper = true,
             allLayerTransforms = sampleAllTransforms,
-            singleTransform = Triple(99f, 99f, 99f),  // garbage
+            singleTransform = LayerTransform(99f, 99f, 99f, 1),  // garbage
         )
         assertEquals(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms), result)
     }

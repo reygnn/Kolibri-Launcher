@@ -114,7 +114,8 @@ class WallpaperViewBinderCancellationTest {
         runTest {
             val view = view()
             val binder = WallpaperViewBinder { uri ->
-                if (uri.toString().endsWith("L0.jpg")) throw IOException("unreadable") else bitmap()
+                if (uri.toString().endsWith("L0.jpg")) throw IOException("unreadable")
+                else DecodedWallpaperBitmap(bitmap(), 1, 8, 8)
             }
 
             binder.bind(view, twoLayerState())

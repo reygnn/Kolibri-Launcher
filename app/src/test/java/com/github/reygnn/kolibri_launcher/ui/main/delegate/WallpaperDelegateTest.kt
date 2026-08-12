@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
@@ -798,8 +799,8 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         val transforms = listOf(
-            Triple(1.0f, 0f, 0f),
-            Triple(2.0f, 10f, 20f)
+            LayerTransform(1.0f, 0f, 0f, 1),
+            LayerTransform(2.0f, 10f, 20f, 2)
         )
         delegate.onSaveAllLayerTransforms(transforms)
         advanceUntilIdle()

@@ -140,6 +140,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -454,7 +455,8 @@ class WallpaperDelegate(
     fun onSaveWallpaperTransform(
         scale: Float,
         translateX: Float,
-        translateY: Float
+        translateY: Float,
+        captureSampleSize: Int? = null
     ) = scope.launchSafe("Error saving wallpaper transform") {
         val currentState = _wallpaperState.value
         if (currentState.hasWallpaper) {
@@ -462,7 +464,8 @@ class WallpaperDelegate(
                 currentState = currentState,
                 scale = scale,
                 translateX = translateX,
-                translateY = translateY
+                translateY = translateY,
+                captureSampleSize = captureSampleSize
             )
         }
     }
@@ -711,18 +714,32 @@ class WallpaperDelegate(
         layerIndex: Int,
         scale: Float,
         translateX: Float,
-        translateY: Float
+        translateY: Float,
+        captureSampleSize: Int? = null
     ) = mutateLayerAndPersist("Error saving layer transform", layerIndex) {
-        it.copy(scale = scale, translateX = translateX, translateY = translateY)
+        it.copy(
+            scale = scale,
+            translateX = translateX,
+            translateY = translateY,
+            captureSampleSize = captureSampleSize
+        )
     }
 
     fun onSaveAllLayerTransforms(
-        transforms: List<Triple<Float, Float, Float>>
+        transforms: List<LayerTransform>
     ) {
         var state = _wallpaperState.value
-        transforms.forEachIndexed { index, (scale, tx, ty) ->
+        transforms.forEachIndexed { index, t ->
             state = state.withUpdatedLayer(index) {
-                it.copy(scale = scale, translateX = tx, translateY = ty)
+                // Store the view scale RAW + tag captureSampleSize (Ansatz Y is
+                // tag-only, spec §4-Y): no ÷S on save, the load side multiplies
+                // the S_render/S_captured ratio.
+                it.copy(
+                    scale = t.scale,
+                    translateX = t.translateX,
+                    translateY = t.translateY,
+                    captureSampleSize = t.sampleSize
+                )
             }
         }
         commit("Error saving all layer transforms", Mutation(state))

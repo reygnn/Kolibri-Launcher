@@ -31,6 +31,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
@@ -373,8 +374,12 @@ class LauncherViewModel @Inject constructor(
     // ===========================================
 
     fun onSetWallpaperImage(imageUri: Uri) = wallpaperDelegate.onSetWallpaperImage(imageUri)
-    fun onSaveWallpaperTransform(scale: Float, translateX: Float, translateY: Float) =
-        wallpaperDelegate.onSaveWallpaperTransform(scale, translateX, translateY)
+    fun onSaveWallpaperTransform(
+        scale: Float,
+        translateX: Float,
+        translateY: Float,
+        captureSampleSize: Int? = null
+    ) = wallpaperDelegate.onSaveWallpaperTransform(scale, translateX, translateY, captureSampleSize)
     fun onClearWallpaper() = wallpaperDelegate.onClearWallpaper()
     fun onSetWallpaperEditMode(enabled: Boolean) = wallpaperDelegate.onSetWallpaperEditMode(enabled)
     fun onToggleWallpaperEditMode() = wallpaperDelegate.onToggleWallpaperEditMode()
@@ -383,9 +388,14 @@ class LauncherViewModel @Inject constructor(
     fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) = wallpaperDelegate.onAddWallpaperLayer(imageUri, label)
     fun onRemoveWallpaperLayer(layerIndex: Int) = wallpaperDelegate.onRemoveWallpaperLayer(layerIndex)
     fun onSwapWallpaperLayers(indexA: Int, indexB: Int) = wallpaperDelegate.onSwapWallpaperLayers(indexA, indexB)
-    fun onSaveLayerTransform(layerIndex: Int, scale: Float, translateX: Float, translateY: Float) =
-        wallpaperDelegate.onSaveLayerTransform(layerIndex, scale, translateX, translateY)
-    fun onSaveAllLayerTransforms(transforms: List<Triple<Float, Float, Float>>) =
+    fun onSaveLayerTransform(
+        layerIndex: Int,
+        scale: Float,
+        translateX: Float,
+        translateY: Float,
+        captureSampleSize: Int? = null
+    ) = wallpaperDelegate.onSaveLayerTransform(layerIndex, scale, translateX, translateY, captureSampleSize)
+    fun onSaveAllLayerTransforms(transforms: List<LayerTransform>) =
         wallpaperDelegate.onSaveAllLayerTransforms(transforms)
     fun onSetLayerAlpha(layerIndex: Int, alpha: Float) = wallpaperDelegate.onSetLayerAlpha(layerIndex, alpha)
     fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) = wallpaperDelegate.onSetLayerBlendMode(layerIndex, blendModeName)

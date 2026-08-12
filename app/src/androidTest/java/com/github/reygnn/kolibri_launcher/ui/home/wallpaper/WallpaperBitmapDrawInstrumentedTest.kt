@@ -85,11 +85,12 @@ class WallpaperBitmapDrawInstrumentedTest {
         // over both the 24 MP budget and the ~100 MB Canvas limit.
         val testAssets = InstrumentationRegistry.getInstrumentation().context.assets
 
-        val bmp = decodeBoundedWallpaperBitmap { testAssets.open("oversized_wallpaper.jpg") }
+        val decoded = decodeBoundedWallpaperBitmap { testAssets.open("oversized_wallpaper.jpg") }
 
-        assertNotNull("asset must decode", bmp)
+        assertNotNull("asset must decode", decoded)
+        val bmp = decoded!!.bitmap
         try {
-            assertTrue("must be downsampled from 6000 px", bmp!!.width < 6000)
+            assertTrue("must be downsampled from 6000 px", bmp.width < 6000)
             assertTrue(
                 "decoded bitmap must be under the Canvas draw limit (${bmp.byteCount} B)",
                 bmp.byteCount < canvasLimitBytes,
@@ -97,7 +98,7 @@ class WallpaperBitmapDrawInstrumentedTest {
             // And the real proof: it draws on a RecordingCanvas without throwing.
             onRecordingCanvas { it.drawBitmap(bmp, 0f, 0f, null) }
         } finally {
-            bmp?.recycle()
+            bmp.recycle()
         }
     }
 }

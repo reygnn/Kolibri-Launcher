@@ -46,7 +46,7 @@ class WallpaperViewBinderSingleLayerTest {
         val bmp = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
         val binder = WallpaperViewBinder { _ ->
             loaderCalls++
-            bmp
+            DecodedWallpaperBitmap(bmp, 1, bmp.width, bmp.height)
         }
         val view = view()
 

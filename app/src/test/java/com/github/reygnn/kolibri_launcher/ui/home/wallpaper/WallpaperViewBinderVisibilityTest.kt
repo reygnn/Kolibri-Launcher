@@ -56,7 +56,7 @@ class WallpaperViewBinderVisibilityTest {
 
     @Test
     fun `single-layer on an unmeasured view stays hidden with the transform deferred`() = runTest {
-        val binder = WallpaperViewBinder { _ -> bitmap() }
+        val binder = WallpaperViewBinder { _ -> DecodedWallpaperBitmap(bitmap(), 1, 8, 8) }
         val view = unmeasuredView()
 
         binder.bind(view, WallpaperState(imageUri = "file:///wallpaper.jpg"))
@@ -82,7 +82,7 @@ class WallpaperViewBinderVisibilityTest {
 
     @Test
     fun `full rebuild with surviving layers reveals the view`() = runTest {
-        val binder = WallpaperViewBinder { _ -> bitmap() }
+        val binder = WallpaperViewBinder { _ -> DecodedWallpaperBitmap(bitmap(), 1, 8, 8) }
         val view = laidOutView()
 
         binder.bind(view, WallpaperState.multiLayer(listOf(layer("L0"), layer("L1"))))

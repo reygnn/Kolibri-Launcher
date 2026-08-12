@@ -39,7 +39,7 @@ class WallpaperViewBinder(
      * failure (caller treats null as "skip this layer").
      */
     fun interface BitmapLoader {
-        suspend fun load(uri: Uri): Bitmap?
+        suspend fun load(uri: Uri): DecodedWallpaperBitmap?
     }
 
     /**
@@ -134,10 +134,39 @@ class WallpaperViewBinder(
         transform: LayerPropertyUpdate.Transform?,
     ) {
         if (transform != null) {
-            view.applyTransform(transform.scale, transform.translateX, transform.translateY)
+            val scale = compensatedScale(
+                transform,
+                view.singleSampleSize,
+                view.singleOriginalWidth,
+                view.singleOriginalHeight,
+            )
+            view.applyTransform(scale, transform.translateX, transform.translateY)
         } else {
             view.centerCrop()
         }
+    }
+
+    /**
+     * Resolution-compensates a restored [transform]'s bitmap-absolute scale
+     * (WALLPAPER_RENDER_RES_SPEC §3.2/§4-Y): a scale saved against a bitmap
+     * downsampled by `S_captured` must be multiplied by `S_render / S_captured`
+     * to render identically against the freshly-decoded bitmap (downsampled by
+     * [sRender]). `S_captured` comes from the persisted `captureSampleSize`, or
+     * — for a legacy field-less transform — is backfilled from the original
+     * image dimensions (§7). Translate is view-space and unchanged.
+     */
+    private fun compensatedScale(
+        transform: LayerPropertyUpdate.Transform,
+        sRender: Int,
+        originalWidth: Int,
+        originalHeight: Int,
+    ): Float {
+        val sCaptured = resolveCaptureSampleSize(
+            transform.captureSampleSize,
+            originalWidth,
+            originalHeight,
+        )
+        return compensateScaleForSampleSize(transform.scale, sCaptured, sRender)
     }
 
     /**
@@ -150,9 +179,15 @@ class WallpaperViewBinder(
         transform: LayerPropertyUpdate.Transform?,
     ) {
         if (transform != null) {
+            val layer = view.getLayer(layerIndex)
+            val scale = if (layer != null) {
+                compensatedScale(transform, layer.sampleSize, layer.originalWidth, layer.originalHeight)
+            } else {
+                transform.scale
+            }
             view.applyTransform(
                 layerIndex,
-                transform.scale,
+                scale,
                 transform.translateX,
                 transform.translateY,
             )
@@ -173,8 +208,8 @@ class WallpaperViewBinder(
         // instead of setImageURI: setImageURI decodes at full resolution, so a
         // huge camera photo (e.g. POCO 108 MP) overruns the Canvas ~100 MB draw
         // limit and crashes ZoomableImageView.onDraw. The loader downsamples.
-        val bitmap = bitmapLoader.load(plan.imageUri)
-        if (bitmap == null) {
+        val loaded = bitmapLoader.load(plan.imageUri)
+        if (loaded == null) {
             view.visibility = View.GONE
             return
         }
@@ -185,7 +220,14 @@ class WallpaperViewBinder(
             // the finally below, after the transform. INVISIBLE (not GONE)
             // preserves the measured size so Option B's sync path still fires.
             view.visibility = View.INVISIBLE
-            view.setImageBitmap(bitmap)
+            // setWallpaperBitmap (not setImageBitmap): records S_render + the
+            // full-res dims so applySingleTransformOrDefault can compensate.
+            view.setWallpaperBitmap(
+                loaded.bitmap,
+                loaded.sampleSize,
+                loaded.originalWidth,
+                loaded.originalHeight,
+            )
 
             runWhenMeasured(view) {
                 try {
@@ -240,19 +282,22 @@ class WallpaperViewBinder(
 
         for (spec in plan.layers) {
             try {
-                val bitmap = bitmapLoader.load(spec.imageUri) ?: continue
+                val loaded = bitmapLoader.load(spec.imageUri) ?: continue
                 // Traced (jank): addLayer is synchronous Main-thread view
                 // mutation — one section per decoded layer. No suspension
                 // point inside, so the sync section is balanced on one thread.
                 LaunchTrace.section(LaunchTrace.Names.WALLPAPER_ADD_LAYER) {
                     view.addLayer(
-                        bitmap = bitmap,
+                        bitmap = loaded.bitmap,
                         label = spec.label,
                         centerCrop = spec.centerCrop,
                         alpha = spec.alpha,
                         blendMode = spec.blendMode,
                         sourceUri = spec.imageUri,
-                        id = spec.id
+                        id = spec.id,
+                        sampleSize = loaded.sampleSize,
+                        originalWidth = loaded.originalWidth,
+                        originalHeight = loaded.originalHeight,
                     )
                 }
                 addedLayerIds.add(spec.id)

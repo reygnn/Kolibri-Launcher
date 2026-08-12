@@ -44,6 +44,22 @@ data class WallpaperLayer(
     /** Intrinsische Höhe des Originals (vor Scaling beim Laden) */
     var intrinsicHeight: Int = 0,
 
+    /**
+     * Decode downsample factor of the currently loaded [bitmap] — S_render
+     * (WALLPAPER_RENDER_RES_SPEC §4-Y). A save tags the transform with this as
+     * `captureSampleSize`; a restore compensates the stored scale by
+     * `S_render / S_captured`. `1` = full-res (or unknown / legacy default).
+     */
+    var sampleSize: Int = 1,
+
+    /**
+     * FULL-resolution source dimensions (independent of [sampleSize]/[bitmap]),
+     * needed to backfill S_captured for a legacy field-less transform (spec §7).
+     * `0` = unknown (older in-memory layer built without decode metadata).
+     */
+    var originalWidth: Int = 0,
+    var originalHeight: Int = 0,
+
     // --- Transform State ---
 
     var scale: Float = 1f,

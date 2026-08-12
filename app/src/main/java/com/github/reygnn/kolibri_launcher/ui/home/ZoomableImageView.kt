@@ -229,6 +229,42 @@ class ZoomableImageView @JvmOverloads constructor(
     private var _singleTranslateX = 0f
     private var _singleTranslateY = 0f
 
+    // Decode metadata for the single-layer bitmap (WALLPAPER_RENDER_RES_SPEC
+    // §4-Y). S_render + full-res dims of the current single bitmap; used by the
+    // binder to compensate a restored transform and to tag a saved one.
+    private var _singleSampleSize = 1
+    private var _singleOriginalWidth = 0
+    private var _singleOriginalHeight = 0
+
+    /** S_render of the current single-layer bitmap (see [setWallpaperBitmap]). */
+    val singleSampleSize: Int get() = _singleSampleSize
+
+    /** Full-resolution width of the current single-layer bitmap (0 = unknown). */
+    val singleOriginalWidth: Int get() = _singleOriginalWidth
+
+    /** Full-resolution height of the current single-layer bitmap (0 = unknown). */
+    val singleOriginalHeight: Int get() = _singleOriginalHeight
+
+    /**
+     * Single-layer twin of [addLayer]'s decode-metadata capture: sets the
+     * bitmap via the inherited [setImageBitmap] AND records S_render + the
+     * full-resolution dims, so a restored transform can be resolution-
+     * compensated and a saved one tagged (spec §4-Y). Callers that route a
+     * wallpaper through the bounded decoder MUST use this instead of the plain
+     * [setImageBitmap], or the single-layer path loses its S metadata.
+     */
+    fun setWallpaperBitmap(
+        bitmap: Bitmap,
+        sampleSize: Int,
+        originalWidth: Int,
+        originalHeight: Int,
+    ) {
+        _singleSampleSize = sampleSize
+        _singleOriginalWidth = if (originalWidth > 0) originalWidth else bitmap.width * sampleSize
+        _singleOriginalHeight = if (originalHeight > 0) originalHeight else bitmap.height * sampleSize
+        setImageBitmap(bitmap)
+    }
+
     // ===========================================
     // STATE: MULTI-LAYER
     // ===========================================
@@ -404,15 +440,21 @@ class ZoomableImageView @JvmOverloads constructor(
      * Im Multi-Layer-Modus wirkt es auf das aktive Layer.
      */
     fun showOriginalSize() {
+        // "Original size" = 1:1 ORIGINAL pixels. The bitmap is decoded
+        // downsampled by S, so scale = S draws it at its original resolution,
+        // and the centering term must use the drawn size bmp.width*S — not
+        // bmp.width, or the image lands off-centre by bmp.width*(S-1)/2
+        // (WALLPAPER_RENDER_RES_SPEC §6.1).
         if (isMultiLayerMode) {
             val layer = activeLayer ?: return
             val bmp = layer.bitmap ?: return
             if (width == 0 || height == 0) return
 
             cancelSnapBackAnimation()
-            layer.scale = 1.0f
-            layer.translateX = (width - bmp.width) / 2f
-            layer.translateY = (height - bmp.height) / 2f
+            val s = layer.sampleSize.toFloat()
+            layer.scale = s
+            layer.translateX = (width - bmp.width * s) / 2f
+            layer.translateY = (height - bmp.height * s) / 2f
             invalidate()
             return
         }
@@ -421,9 +463,10 @@ class ZoomableImageView @JvmOverloads constructor(
         if (width == 0 || height == 0) return
 
         cancelSnapBackAnimation()
-        _singleScale = 1.0f
-        _singleTranslateX = (width - drawable.intrinsicWidth) / 2f
-        _singleTranslateY = (height - drawable.intrinsicHeight) / 2f
+        val s = _singleSampleSize.toFloat()
+        _singleScale = s
+        _singleTranslateX = (width - drawable.intrinsicWidth * s) / 2f
+        _singleTranslateY = (height - drawable.intrinsicHeight * s) / 2f
         rebuildSingleMatrix()
     }
 
@@ -484,7 +527,10 @@ class ZoomableImageView @JvmOverloads constructor(
         alpha: Float = 1.0f,
         blendMode: BlendMode? = null,
         sourceUri: Uri? = null,
-        id: String? = null
+        id: String? = null,
+        sampleSize: Int = 1,
+        originalWidth: Int = 0,
+        originalHeight: Int = 0
     ): Int {
         // Beim ersten Layer: Native Drawable entfernen
         if (layers.isEmpty()) {
@@ -497,6 +543,11 @@ class ZoomableImageView @JvmOverloads constructor(
             bitmap = bitmap,
             intrinsicWidth = bitmap.width,
             intrinsicHeight = bitmap.height,
+            sampleSize = sampleSize,
+            // Fall back to the loaded bitmap dims * sampleSize when the caller
+            // supplies no original dims, so the backfill still has a sane input.
+            originalWidth = if (originalWidth > 0) originalWidth else bitmap.width * sampleSize,
+            originalHeight = if (originalHeight > 0) originalHeight else bitmap.height * sampleSize,
             alpha = alpha.coerceIn(0f, 1f),
             blendMode = blendMode,
             label = label
