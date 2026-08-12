@@ -1,19 +1,25 @@
 # WALLPAPER_RENDER_RES_SPEC.md
 
-**Status: ENTWURF v2 (2026-08-12), Review-Runde 1 eingearbeitet.** Fokus: den
+**Status: ENTWURF v3 (2026-08-12), Review-Runden 1+2 eingearbeitet.** Fokus: den
 GPU-gebundenen Gesten-Jank beim Zoom/Pan im Wallpaper-Edit-Mode beseitigen, indem
 die **Render-Auflösung** der Wallpaper-Bitmaps von der **Crash-Schutz-Grenze**
 entkoppelt wird — ohne gespeicherte Zoom/Pan-Transforms zu verschieben. Erst
 reviewen, dann bauen; nicht auf `main` mergen, bevor der Ansatz (§4/§5) bestätigt
 und der Korrektheits-Constraint (§3) abgesichert ist.
 
-> **v2-Änderungen gegenüber v1** (Review-Runde 1, §10): (1) Kompensation ist ein
-> **Verhältnis** `S_render/S_captured`, nicht `·S` — große Bilder sind *heute
-> schon* downsampled, der #21-Decode ist live. (2) Die S-Umrechnung sitzt an der
-> **Persistenz-Grenze** (zweiseitig: save/load), NICHT im Draw-Matrix-Bau — die
-> View bleibt komplett in loaded-bitmap-space, sonst brechen Snap/Edge/Zoom.
-> (3) `showOriginalSize` braucht auch einen Translate-Fix. (4) Export-Sorge
-> gestrichen: `composeToBitmap` ist toter Code → reiner Gewinn.
+> **v3-Änderungen gegenüber v2** (Review-Runde 2, §10): (1) **S-Plumbing
+> spezifiziert** (§4.0) — der Decoder verwirft S/Original-Dims heute; Ansatz Y
+> ist ohne diese Verkabelung nicht baubar. (2) §3.3-Überaussage korrigiert: S
+> *betritt* Layer/View (für `showOriginalSize` + Save/Load), nur die
+> Scale-**Mathematik** bleibt loaded-bitmap-space. (3) §7-Backfill: das
+> **Pre-#21-24–26-MP-Band** ist mehrdeutig (akzeptierte Limitation). (4) §5:
+> Headroom an **`ZOOM_IN_MULTIPLIER` (3,0) × Cover** festgemacht, nicht am
+> dynamischen `effectiveMaxScale`; und der Trade-off Zoom-Schärfe↔Jank ehrlich
+> benannt. (5) §4-Y als **tag-only** klargestellt (kein `÷S` beim Speichern).
+>
+> **v2-Änderungen gegenüber v1** (Review-Runde 1): Kompensation `S_render/S_captured`
+> statt `·S`; Persistenz-Grenze statt Draw-Matrix; `showOriginalSize`-Translate;
+> Export-Sorge gestrichen (`composeToBitmap` tot).
 
 Schwester-Dokumente: keine direkten. Berührt `BitmapDownsampling.kt`
 (`MAX_WALLPAPER_PIXELS`, #21-Crash-Fix), `BoundedBitmapDecoder.kt`,
@@ -108,17 +114,49 @@ Bitmap-Größe verwenden — sie dürfen NICHT angefasst werden:
   (:1068, :1130, :1217, :1279)
 - `centerCropLayer` / `applyFitWidth` (:186, :388)
 
-**Daher:** S NUR an der Persistenz-Grenze anwenden, die View unverändert lassen.
-v1s „S beim Draw-Matrix-Bau multiplizieren" hätte all diese Rechnungen um Faktor
-S gebrochen — verworfen.
+**Daher:** die Scale-**Mathematik** der View bleibt loaded-bitmap-space. v1s „S
+beim Draw-Matrix-Bau multiplizieren" hätte all diese Rechnungen um Faktor S
+gebrochen — verworfen.
+
+**Präzisierung (v3):** „S betritt die View nie" (so v2) ist zu stark. S ist ein
+**Per-Layer-Datum**, das sehr wohl in Layer/View liegt — aber nur an zwei
+Stellen genutzt: (a) `showOriginalSize` (§6.1, braucht `scale = S`), (b) die
+Save/Load-Grenze (§4). Die oben gelisteten Scale-Consumer sehen S **nicht**; für
+sie bleibt alles loaded-bitmap-relativ. „S nur an der Persistenz-Grenze
+*anwenden*" bleibt richtig; „S existiert nicht im Layer" war falsch — es MUSS
+dort als Feld liegen (§4.0).
 
 ---
 
 ## 4. Ansätze
 
-Alle halten die View in loaded-bitmap-space; sie unterscheiden sich nur darin,
-**wie die auflösungs-unabhängige Persistenz** hergestellt wird. Die Umrechnung
-ist **zweiseitig**: eine Transformation beim Speichern, die inverse beim Laden.
+### 4.0 Voraussetzung: S-Plumbing (v3, Runde-2-Finding 1)
+
+Alle Ansätze brauchen an der Persistenz-Grenze entweder den **Sample-Faktor S**
+oder die **Original-Dimensionen** pro Layer. Beides existiert im heutigen
+Datenfluss NICHT und muss verkabelt werden — der Kern-Implementierungsaufwand:
+
+- `decodeBoundedWallpaperBitmap` berechnet `inSampleSize` intern und gibt **nur
+  die `Bitmap`** zurück (BoundedBitmapDecoder.kt:22) — S und `bounds.outWidth/
+  outHeight` werden verworfen. Muss S (oder origW/origH) mit-zurückgeben.
+- `WallpaperLayer.intrinsicWidth/Height` = **geladene** Bitmap-Größe
+  (`bitmap.width`, ZoomableImageView.kt:498) — die Original-Größe ist aus dem
+  Layer nicht rekonstruierbar. `WallpaperLayer` braucht ein neues Feld
+  (`sampleSize: Int` bzw. `originalWidth/Height`).
+- Der Save-Pfad (`WallpaperDelegate.onSave*Transform`) muss das Feld
+  durchreichen; der Load/Backfill-Pfad (§7) braucht einen Bounds-Pass für
+  origW/origH.
+
+**Wichtig — S ist PER LAYER.** Jeder Layer hat eigene Original-Dimensionen →
+eigenen `S_captured`/`S_render`. Weder das gespeicherte Feld noch der Backfill
+noch die `·(S_render/S_captured)`-Kompensation dürfen ein globales S annehmen;
+alles läuft pro Layer.
+
+### 4.1 Die eigentlichen Ansätze
+
+Alle halten die Scale-Mathematik der View in loaded-bitmap-space; sie
+unterscheiden sich darin, **wie die auflösungs-unabhängige Persistenz**
+hergestellt wird.
 
 ### X — Persistenz auf Original-Auflösung normalisieren
 Gespeichert wird die **Original-Bild→View**-Scale: `stored = view_scale /
@@ -132,8 +170,14 @@ Budget-unabhängig, überlebt beliebig viele Budget-Wechsel.
 
 ### Y — Erfassungs-Sample-Faktor als ADDITIVES Feld + Bounds-Backfill (empfohlen)
 `WallpaperLayerState` (WallpaperState.kt:10) bekommt ein **optionales**
-`captureSampleSize: Int?` (bzw. `captureBudgetPx`). Beim Speichern wird das
-aktuelle `S` mitgeschrieben; beim Laden `view_scale · (S_render/S_captured)`.
+`captureSampleSize: Int?` (bzw. `captureBudgetPx`).
+
+**Y ist tag-only (v3, Runde-2-Finding 4).** Beim Speichern wird der `view_scale`
+**roh** abgelegt (KEIN `÷S`) und lediglich das Feld `captureSampleSize = S_render`
+dazugeschrieben. Beim Laden: `view_scale · (S_render / S_captured)`. Anders als
+Ansatz X (der beim Speichern `÷S` und beim Laden `×S` rechnet) transformiert Y
+den gespeicherten Scale **nicht** — wer bei Y trotzdem `÷S` beim Speichern
+anwendet, dividiert doppelt (`view_scale · S_render / S_captured²`).
 - **Legacy-Backfill (Pflicht, §7):** Fehlt das Feld, ist `S_captured` zur
   Ladezeit **neu berechenbar** — der Bounds-Pass in `BoundedBitmapDecoder`
   (`inJustDecodeBounds`, BoundedBitmapDecoder.kt:26) liefert die *Original*-
@@ -163,11 +207,28 @@ Wechsel überlebt, und (c) die CLAUDE.md-§5-Vorgabe (additiv, kein
 DataMigrationManager) einhält. X ist konzeptuell am saubersten, scheitert aber am
 Migrations-Constraint; Z ist zu fragil.
 
-**Budget-Vorschlag (per Re-Trace zu bestätigen):** Ziel-Fläche ≈ **4× Screen**
-(≈ 10,5 MP bei 1080×2424). Der Zoom-Headroom MUSS aus `effectiveMaxScale`
-(ZoomableImageView.kt:165) abgeleitet werden — der maximale Zoom bestimmt, wie
-viele Original-Pixel bei Vollzoom auf den Screen fallen; darunter wird es
-sichtbar unscharf. Nicht raten.
+**Budget-Herleitung (v3, Runde-2-Finding 3).** `effectiveMaxScale` ist **keine
+feste Decke** — sie ratcht mit jedem Reinzoomen hoch (`maxOf(MAX_SCALE,
+maxOf(base, current)·ZOOM_IN_MULTIPLIER)`, ZoomableImageView.kt:165; der
+`applyTransform`-Kommentar bei :344 nennt das dynamische Wachstum explizit). Es
+gibt also kein „maximaler Zoom", aus dem man ableiten könnte. Die feste Größe ist
+**`ZOOM_IN_MULTIPLIER = 3,0`** (ZoomableImageView.kt:113): das Bild darf bis
+**3× über Cover** hineingezoomt werden.
+
+**Der ehrliche Trade-off.** Damit die Textur bei 3× Cover-Zoom noch pixelscharf
+ist, bräuchte sie ~3× linear = **~9× Screen-Fläche** — und das ist ziemlich genau
+die heutige 24-MP-Grenze (≈9× von 2,6 MP). Die 24 MP sind also **nicht nur** ein
+Crash-Artefakt, sondern zufällig auch der Zoom-Schärfe-Puffer. Das Budget zu
+senken bedeutet daher zwangsläufig: **weniger Schärfe bei starkem Reinzoomen**,
+im Tausch gegen flüssige Gesten. Das ist die eigentliche Produkt-Entscheidung,
+nicht ein reiner Free-Win.
+
+**Vorschlag (per Re-Trace UND visueller Zoom-Prüfung zu bestätigen):** Budget =
+Screen × K. `K = 4` (≈ 10,5 MP) hält Schärfe bis ~2× Cover-Zoom und rechnet
+darüber hoch; `K = 9` wäre der Status quo (kein Jank-Gewinn). Der Sweet Spot
+liegt dazwischen und ist **subjektiv** — die Re-Messung (§8) liefert die
+Jank-Seite, ein Blick bei Vollzoom die Schärfe-Seite. Nicht allein aus einer
+Zahl ableitbar.
 
 ---
 
@@ -214,6 +275,28 @@ Beim Laden eines feldlosen Layers:
 Ohne diesen Backfill würde Ys „×(S_render/S_captured)" auf Altdaten mit
 implizitem, aber nicht-1-`S_captured` falsch angewandt.
 
+**Mehrdeutiges Pre-#21-Band (v3, Runde-2-Finding 2 — akzeptierte Limitation).**
+Schritt 2 nimmt an, dass 24 MP das Budget war, als der Wert erfasst wurde. Das
+gilt nur **post-#21**. *Vor* dem #21-Fix gab es gar kein Downsampling — dekodiert
+wurde voll aufgelöst, begrenzt nur durch das Canvas-Limit (~100 MB ≈ **26,2 MP**;
+das 24-MP-Budget liegt bewusst mit Marge darunter, BitmapDownsampling.kt:17). Für
+Bilder im schmalen Band **24 MP < X ≲ 26 MP** (z. B. ein 6016×4000 = 24,06-MP-
+APS-C-Foto) ist ein feldloser Transform:
+
+- **pre-#21** bei S=1 erfasst (Full-Res, zeichnete unter 100 MB), aber
+- der Backfill berechnet `calc(X, 24 MP) = 2` → das Bild wird **2× falsch**
+  gezeichnet.
+
+Pre- und Post-#21 sind feldlos **nicht unterscheidbar** (byte-identisch). Das
+betrifft nur genau-über-24-MP-Bilder, die vor dem #21-Update gespeichert wurden —
+ein schmaler Rand-Fall. **Akzeptierte Limitation:** der Nutzer justiert diese
+eine (seltene) Wallpaper-Position einmalig neu. Alternativ (nicht empfohlen, mehr
+Aufwand): das Backfill-Budget auf das Canvas-Limit (26 MP) statt 24 MP setzen —
+dann ist das Band S=1 auf beiden Seiten, aber post-#21-24–26-MP-Transforms
+(die real bei S=2 stehen) würden dann falsch. Es gibt keine feldlose Auflösung,
+die BEIDE Seiten trifft; das Feld selbst (ab erstem Re-Save) ist die einzige
+saubere Lösung, und die greift automatisch.
+
 ---
 
 ## 8. Test-Plan
@@ -245,6 +328,14 @@ implizitem, aber nicht-1-`S_captured` falsch angewandt.
 
 ## 10. Änderungshistorie
 
+- **v3 (2026-08-12):** Review-Runde 2 (Agent) eingearbeitet. §4.0 S-Plumbing
+  (Decoder → Layer-Feld → Save/Load) als Bau-Voraussetzung; §3.3-Präzisierung
+  (S ist Per-Layer-Datum in Layer/View, nur die Scale-Mathematik bleibt
+  loaded-bitmap-space); §7 Pre-#21-24–26-MP-Band als akzeptierte Limitation;
+  §5 Headroom an `ZOOM_IN_MULTIPLIER = 3` × Cover statt am dynamischen
+  `effectiveMaxScale`, plus der Zoom-Schärfe↔Jank-Trade-off ehrlich benannt;
+  §4-Y als tag-only klargestellt (Doppel-Dividier-Falle). Runde 2 bestätigte
+  F1/F2/F3 aus Runde 1 als echt gelöst.
 - **v2 (2026-08-12):** Review-Runde 1 (Agent) eingearbeitet. Kompensation
   Verhältnis statt `·S`; Persistenz-Grenzen-Ansatz statt Draw-Matrix; additives
   `captureSampleSize`-Feld + Bounds-Backfill (Ansatz Y) statt v1s Ansatz B;
