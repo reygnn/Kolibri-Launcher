@@ -42,6 +42,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
@@ -353,7 +354,16 @@ class HomeFragment : Fragment() {
         // suspend loader: the decode runs off the main thread. The binder only
         // calls it for plans that actually load bitmaps (SwitchToSingleLayer /
         // FullRebuild), so a property-only update never hits I/O.
-        bitmapLoader = { uri -> withContext(Dispatchers.IO) { loadBitmapFromUri(uri) } }
+        // Traced (jank): the bounded BitmapFactory decode, off-main inside
+        // withContext(IO). The biggest time cost of a rebuild, but not a
+        // Main-thread frame-drop source. Synchronous on the IO thread.
+        bitmapLoader = { uri ->
+            withContext(Dispatchers.IO) {
+                LaunchTrace.section(LaunchTrace.Names.WALLPAPER_DECODE) {
+                    loadBitmapFromUri(uri)
+                }
+            }
+        }
     )
 
     /**

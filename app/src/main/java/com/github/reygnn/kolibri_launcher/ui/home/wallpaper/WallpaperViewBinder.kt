@@ -7,6 +7,7 @@ import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -240,15 +241,20 @@ class WallpaperViewBinder(
         for (spec in plan.layers) {
             try {
                 val bitmap = bitmapLoader.load(spec.imageUri) ?: continue
-                view.addLayer(
-                    bitmap = bitmap,
-                    label = spec.label,
-                    centerCrop = spec.centerCrop,
-                    alpha = spec.alpha,
-                    blendMode = spec.blendMode,
-                    sourceUri = spec.imageUri,
-                    id = spec.id
-                )
+                // Traced (jank): addLayer is synchronous Main-thread view
+                // mutation — one section per decoded layer. No suspension
+                // point inside, so the sync section is balanced on one thread.
+                LaunchTrace.section(LaunchTrace.Names.WALLPAPER_ADD_LAYER) {
+                    view.addLayer(
+                        bitmap = bitmap,
+                        label = spec.label,
+                        centerCrop = spec.centerCrop,
+                        alpha = spec.alpha,
+                        blendMode = spec.blendMode,
+                        sourceUri = spec.imageUri,
+                        id = spec.id
+                    )
+                }
                 addedLayerIds.add(spec.id)
             } catch (e: CancellationException) {
                 // Rethrow per canonical: bitmapLoader.load is a suspension
@@ -293,38 +299,43 @@ class WallpaperViewBinder(
         revealWhenDone: Boolean,
     ) {
         runWhenMeasured(view) {
-            try {
-                for (update in updates) {
-                    if (update.layerIndex >= view.layerCount) break
+            // Traced (jank): the synchronous Main-thread reveal/transform/
+            // invalidate that produces the first rebuilt frame. No suspension
+            // point (pure view mutation), so the sync section is balanced.
+            LaunchTrace.section(LaunchTrace.Names.WALLPAPER_APPLY) {
+                try {
+                    for (update in updates) {
+                        if (update.layerIndex >= view.layerCount) break
 
-                    // Decision: saved transform or default. Shared policy
-                    // with the single-layer path; the bounds-check above,
-                    // the property setters below, and the single
-                    // invalidate() outside this loop stay caller-side
-                    // because they are not part of the decision.
-                    applyLayerTransformOrDefault(view, update.layerIndex, update.transform)
+                        // Decision: saved transform or default. Shared policy
+                        // with the single-layer path; the bounds-check above,
+                        // the property setters below, and the single
+                        // invalidate() outside this loop stay caller-side
+                        // because they are not part of the decision.
+                        applyLayerTransformOrDefault(view, update.layerIndex, update.transform)
 
-                    view.getLayer(update.layerIndex)?.let { layer ->
-                        layer.alpha = update.alpha
-                        layer.blendMode = update.blendMode
-                        layer.isVisible = update.isVisible
+                        view.getLayer(update.layerIndex)?.let { layer ->
+                            layer.alpha = update.alpha
+                            layer.blendMode = update.blendMode
+                            layer.isVisible = update.isVisible
+                        }
                     }
-                }
-                view.invalidate()
-                onRebuildComplete?.invoke()
-            } catch (e: Throwable) {
-                // No suspension point: the block is pure view mutation, run
-                // synchronously when measured or as a plain View.post Runnable
-                // otherwise — never from a coroutine suspension.
-                TimberWrapper.silentError(e, "Error applying layer updates")
-            } finally {
-                // Option A: reveal the view only now, after the transforms are
-                // applied, so a fresh full rebuild never paints the identity
-                // frame. Only the rebuild path reveals (revealWhenDone); a
-                // property-only update leaves visibility untouched as before.
-                // GONE when a rebuild produced zero layers (all loads failed).
-                if (revealWhenDone) {
-                    view.visibility = if (view.layerCount > 0) View.VISIBLE else View.GONE
+                    view.invalidate()
+                    onRebuildComplete?.invoke()
+                } catch (e: Throwable) {
+                    // No suspension point: the block is pure view mutation, run
+                    // synchronously when measured or as a plain View.post Runnable
+                    // otherwise — never from a coroutine suspension.
+                    TimberWrapper.silentError(e, "Error applying layer updates")
+                } finally {
+                    // Option A: reveal the view only now, after the transforms are
+                    // applied, so a fresh full rebuild never paints the identity
+                    // frame. Only the rebuild path reveals (revealWhenDone); a
+                    // property-only update leaves visibility untouched as before.
+                    // GONE when a rebuild produced zero layers (all loads failed).
+                    if (revealWhenDone) {
+                        view.visibility = if (view.layerCount > 0) View.VISIBLE else View.GONE
+                    }
                 }
             }
         }

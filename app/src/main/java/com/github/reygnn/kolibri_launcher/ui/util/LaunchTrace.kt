@@ -69,6 +69,25 @@ object LaunchTrace {
         /** `registerSystemWallpaperColorsListener` — WallpaperManager IPC
          * (getInstance + getWallpaperColors) on the Main thread. */
         const val COLD_START_WALLPAPER_COLORS = "cold_start_wallpaper_colors"
+
+        // --- Wallpaper full rebuild (jank investigation) ---
+        // The rebuild is a suspend flow: bitmap decode off-main (IO), then
+        // view mutation on the Main thread. These pin the two Main-thread
+        // chunks (add_layer, apply) that can drop frames, plus the off-main
+        // decode cost. Frame drops themselves come from the frametimeline
+        // data source, not these slices.
+
+        /** Per-layer `BitmapFactory` decode inside `withContext(IO)` — the
+         * biggest time cost of a rebuild, but off the Main thread. */
+        const val WALLPAPER_DECODE = "wallpaper_decode"
+
+        /** `ZoomableImageView.addLayer` — Main-thread view mutation per
+         * decoded layer. */
+        const val WALLPAPER_ADD_LAYER = "wallpaper_add_layer"
+
+        /** The reveal/transform/invalidate block (`applyUpdates`) — the
+         * Main-thread work that produces the first rebuilt frame. */
+        const val WALLPAPER_APPLY = "wallpaper_apply"
     }
 
     /**
