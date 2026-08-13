@@ -418,8 +418,11 @@ genau das, was den Umfang klein *wirken* ließ.
   geprüft): Drawer/Favoriten-Steady-State beweisbar NULL-Änderung; zwei
   Favoriten-Fehler-Fallbacks unsortiert (OOM-only Degrade); Recents braucht einen
   expliziten Alpha-Tie-Break im `putIfAbsent`; `SettingsViewModel` ordnungs-agnostisch.
-  Verdikt: Design geschlossen, standalone-Bau jetzt eine echte Vereinfachung (kein
-  lateraler Tausch mehr) — bauen, wenn der Bereich angefasst wird.
+  Runde 3 (gegen v4) bestätigte: keine Korrektheits-Regression, aber es ist ein
+  *Trade* (Sort-Invariante wandert strukturell → test-enforced), kein strikter
+  Gewinn, plus ein vakuumer CustomNames-Test-Guard (Fake prä-sortiert). Verdikt:
+  Design geschlossen, **fünftes Mal vertagt** — v5 als geprüfter Bauplan (Test-Plan
+  repariert); bauen, wenn der Bereich ohnehin angefasst wird, dann M1-Fake-Fix Pflicht.
 - **`SPEC-DECISION RAL-2`:** `usageFlow` als nacktes `Unit`-Signal (Trigger, Sort
   bleibt Suspend-Call) vs. als Daten-Flow (Sort wird pure Funktion). Empfehlung: das
   billigere **Unit-Signal**, solange die Suspend-Sort-im-combine bleibt.
