@@ -404,17 +404,22 @@ genau das, was den Umfang klein *wirken* ließ.
   Post-Condition" für Wert ~= 0 fragmentieren. Dreimal aufgeworfen (vertagt
   AUDIT-14 F1 §5.3, abschließend geschlossen AUDIT-15 F3) — volle Begründung im
   `applyCustomNames`-KDoc.
-- **`SPEC-DECISION RAL-4` — AUSGEBAUT (2026-08-13):** ein Split von
-  `applyCustomNames` in ein sortiert/unsortiert-Paar bräuchte zuerst dieses
-  Spec-Amendment (Änderung über ≥2 Use Cases, alle Call-Sites). Der Bauplan liegt
-  jetzt als **`APPLIST_SORT_SPLIT_SPEC.md`** vor (greenfield ENTWURF, noch nicht
-  gebaut): sortierter `applyCustomNames` bleibt der Default und delegiert an einen
-  `applyCustomNamesUnsorted`-Kern; nur die drei selbst-nachsortierenden Sites
-  (Drawer/Favoriten/Recents) opten explizit aus. Kern-Finding dort: der Sort ist
-  für Drawer/Favoriten nachweislich total (kein Input-Order-Effekt), für Recents
-  nur mit einem expliziten Alpha-Tie-Break im `putIfAbsent` verhaltensneutral.
-  Weiter bewusst nicht *gebaut*, solange kein anderer Grund `applyCustomNames`
-  ohnehin anfasst — aber jetzt review-fertig statt nur „offen".
+- **`SPEC-DECISION RAL-4` — AUSGEBAUT + GEWENDET (2026-08-13):** Der Bauplan liegt
+  als **`APPLIST_SORT_SPLIT_SPEC.md`** vor (greenfield ENTWURF, noch nicht gebaut).
+  v1–v3 versuchten einen sortiert/unsortiert-*Split* (sortierter Default +
+  `internal`-Opt-in); der Multi-Agent-Review nannte das „lateral". **v4 wendet das
+  Modell:** der Sort war Migrations-Gerüst (RAL-1s Drop-in-Neutralität), nicht
+  Architektur — Namensauflösung ist geteilt, Sortierung war es nie. Der Helfer wird
+  **map-only**, und **jeder anzeigende Consumer sortiert selbst** (die meisten tun
+  es schon; nur CustomNames + Onboarding bekommen eine explizite Sortierzeile).
+  Damit gibt es keine sortierte Post-Condition mehr zu fragmentieren — die
+  RAL-1a-Sorge löst sich auf, statt umgangen zu werden, und Hidden/Swipes vorher
+  „gefangener" Doppel-Sort wird mit-befreit. Kern-Findings (Runde 2, gegen Code
+  geprüft): Drawer/Favoriten-Steady-State beweisbar NULL-Änderung; zwei
+  Favoriten-Fehler-Fallbacks unsortiert (OOM-only Degrade); Recents braucht einen
+  expliziten Alpha-Tie-Break im `putIfAbsent`; `SettingsViewModel` ordnungs-agnostisch.
+  Verdikt: Design geschlossen, standalone-Bau jetzt eine echte Vereinfachung (kein
+  lateraler Tausch mehr) — bauen, wenn der Bereich angefasst wird.
 - **`SPEC-DECISION RAL-2`:** `usageFlow` als nacktes `Unit`-Signal (Trigger, Sort
   bleibt Suspend-Call) vs. als Daten-Flow (Sort wird pure Funktion). Empfehlung: das
   billigere **Unit-Signal**, solange die Suspend-Sort-im-combine bleibt.

@@ -1,450 +1,340 @@
-# APPLIST_SORT_SPLIT_SPEC.md — den toten Sort auf dem Hot-Path entfernen (RAL-4)
+# APPLIST_SORT_SPLIT_SPEC.md — Sortierung dem Consumer geben, nicht dem Namens-Helfer (RAL-4)
 
-**Status: ENTWURF v3 (2026-08-13), greenfield — noch nicht gebaut. VERDIKT: ein
-viertes Mal vertagen (§8, review-bestätigt) — dies ist ein fertiger Bauplan,
-keine anstehende Änderung.** Review-Runde 2 (Multi-Agent, 5 Linsen je gegen den
-Code verifiziert) eingearbeitet: der §3.2-Favoriten-Beweis war nachweislich
-falsch (zwei Fehler-Fallbacks geben unsortiert zurück, M1); der Deadness-Guard
-für TIME_WEIGHTED/Favoriten liegt auf Impl-Test-Ebene, nicht Use-Case (M2); die
-Recents-Fixture muss nicht-alpha-erst sein, sonst beweist sie nichts (M3);
-`SettingsViewModel` ist ordnungs-agnostisch, nicht sort-abhängig (M4); plus
-Minors (jmh-Sichtbarkeit, `mapOnly`-Drift, „geteilter Flow"). Runde 1
-(Architektur-Selbstprüfung) hatte die `internal`-Variante (§1), das
-Recents-Reframe (§3.3) und die abgelehnte Inverse (§8) gebracht.
+**Status: ENTWURF v4 (2026-08-13), greenfield — noch nicht gebaut. DESIGN-WENDE
+gegenüber v1–v3.** Die ersten drei Fassungen versuchten, den in `applyCustomNames`
+gebündelten Sort per *Zwei-Funktionen-Split* (sortierter Default +
+`internal`-Opt-in) zu umgehen, und der Multi-Agent-Review (Runde 2) nannte das
+zu Recht „lateral" — Komplexität rein, Komplexität raus, kein strikter Gewinn.
+v4 wechselt das Modell auf den Vorschlag, der die vier gescheiterten Anläufe
+erklärt: **Namensauflösung ist geteilt (identische Logik, DRY), Sortierung war
+nie geteilt** — jeder anzeigende Consumer sortiert seine Liste selbst. Der Helfer
+wird eine **reine Map ohne Ordnungs-Post-Condition**. Kein Funktionspaar, kein
+`internal`/`public`-Tanz, keine „welcher Default ist sicher"-Frage — der tote
+Sort verschwindet, statt umgehängt zu werden.
 
-Dies ist die ausgebaute Form von `SPEC-DECISION RAL-4` (REACTIVE_APPLIST_SPEC.md
-§11), das bisher nur als „offen, bewusst nicht verfolgt" dastand. Fokus: den in
-`applyCustomNames` gebündelten terminalen `sortedBy` für die drei
-selbst-nachsortierenden Hot-Path-Consumer (Drawer / Favoriten / Recents)
-entfernen, **ohne** die RAL-1-Invariante zu fragmentieren oder eine stille
-Fehlsortierung für künftige Consumer zu riskieren.
+> **Erst reviewen, dann bauen.** Der gefährliche Teil ist NICHT der Helfer
+> (er wird trivialer, nicht komplexer), sondern der Nachweis (§3), dass **jeder**
+> anzeigende Consumer schon selbst sortiert oder es explizit dazubekommt — kein
+> Screen darf nach dem Flip still in Enumerations-Ordnung landen.
 
-> **Erst reviewen, dann bauen. Nicht auf `main` mergen, bevor §3
-> (Tie-Break-Determiniertheit) und §6 (Test-Impact) bestätigt sind.** Der
-> gefährliche Teil ist NICHT die Codeänderung (drei Call-Sites, ein neuer
-> Helfer), sondern der Nachweis, dass der Sort für Drawer/Favoriten wirklich
-> tot ist und für Recents nur mit einem expliziten Tie-Break tot *wird*.
-> **Runde 2 hat genau hier einen falschen Satz gefunden** (M1, §3.2) — das Gate
-> hat funktioniert, aber es zeigt, wie leicht ein tragender „total"-Satz kippt.
+## Historie — warum vier Anläufe scheiterten (und v4 nicht dasselbe ist)
 
-**Vorgeschichte (die Entscheidung wurde 3× vertagt, nicht aus Unwissen):**
-- `SPEC-DECISION RAL-1a` (REACTIVE_APPLIST §11, volle Begründung im
-  `applyCustomNames`-KDoc): der Sort bleibt gebündelt, ein Split fragmentiert die
-  RAL-1-Invariante „Quell-Grenze liefert die sortierte Post-Condition" für
-  Wert ≈ 0. Vertagt AUDIT-14 F1 §5.3, geschlossen AUDIT-15 F3.
-- **Was sich seither geändert hat:** der `mapOnly`-JMH-Arm
-  (`ApplyCustomNamesBenchmark`) hat den Sort **gemessen** — bei 200 Apps ist er
-  ~9,7 µs von ~15,8 µs, also **~62 %** der Funktionskosten, nicht der kleine
-  Schwanz. Das kippt die Entscheidung *nicht* (62 % einer vernachlässigbaren
-  Größe bleibt vernachlässigbar, off-Main hinter dem DataStore-Read). Dieser
-  Spec existiert also NICHT, weil die Zahl das Urteil umgeworfen hätte, sondern
-  weil der Nutzer die andere Hälfte der Eskape-Klausel zieht: „*unless
-  applyCustomNames is being split for some OTHER reason anyway*". Wenn wir den
-  Split ohnehin sauber spezifizieren, fährt die Dead-Sort-Entfernung gratis mit —
-  und der Spec ist der Preis dafür, dass „sauber" heißt: keine Invarianten-
-  Fragmentierung, kein maskierter Verhaltens-Change.
+- **Der gebündelte Sort war Migrations-Gerüst, nicht Architektur.** RAL-1
+  (REACTIVE_APPLIST_SPEC §3) baute den `.sortedBy` in `applyCustomNames` ein,
+  damit der Umstieg von der sortierenden Enumeration (`processResolveInfoList`)
+  **verhaltensneutral** blieb — kein Consumer musste angefasst werden
+  (Drop-in-Eigenschaft). Richtig für die Migration. Aber die ist längst durch;
+  seither bedient der Sort eine Neutralität, die niemand mehr braucht.
+- **RAL-1a** (volle Begründung im `applyCustomNames`-KDoc) hielt den Sort
+  gebündelt: ein Split fragmentiere die Invariante „Quell-Grenze liefert die
+  sortierte Post-Condition". Dreimal vertagt (AUDIT-14 F1 §5.3, AUDIT-15 F3), der
+  `mapOnly`-JMH-Arm bezifferte den Sort auf ~62 % der Funktionskosten (~9,7 µs
+  @200, off-Main — vernachlässigbar).
+- **v1–v3 + der Multi-Agent-Review** hielten am *sortierten Zustand als geteilte
+  Post-Condition* fest und suchten einen sicheren Weg, ihn zu splitten. Jeder
+  Weg fragmentierte die Invariante → „lateral, vertagen".
+- **v4 gibt die Prämisse auf.** Nicht „wie teile ich den geteilten Sort sicher",
+  sondern „der Sort war nie ein geteilter Belang". Damit gibt es keine sortierte
+  Post-Condition mehr zu fragmentieren — die RAL-1a-Sorge löst sich auf, statt
+  umgangen zu werden.
 
-Schwester-Dokumente: **`REACTIVE_APPLIST_SPEC.md`** (definiert RAL-1/RAL-1a/RAL-4
-und die Quell-Grenzen-Inventur §3), der **`applyCustomNames`-KDoc** (die
-RAL-1a-Langbegründung + jetzt der Messwert), und
-**`ApplyCustomNamesBenchmark.kt`** (`mapOnly`-Arm = die Messung).
+Verifizierte Code-Fakten aus Runde 2 (Multi-Agent, gegen den Code geprüft) leben
+in v4 weiter: die Favoriten-Fehler-Fallbacks (§3.2), der Recents-Tie-Break
+(§3.3), `SettingsViewModel` ordnungs-agnostisch (§2). Schwester-Dokumente:
+**`REACTIVE_APPLIST_SPEC.md`** (RAL-1/-1a/-4, §3-Inventur), der
+**`applyCustomNames`-KDoc**, **`ApplyCustomNamesBenchmark.kt`** (`mapOnly`).
 
 ---
 
 ## 0. Das Problem in einem Satz
 
-`applyCustomNames(apps, names)` endet auf `.sortedBy { it.displayNameLower }`.
-Drei Consumer rufen es direkt in ihrem eigenen Transform und **sortieren sofort
-danach selbst neu** — für sie ist dieser Sort tote Arbeit, die auf jedem
-`settingsDataStore`-Write mitläuft (AUDIT-14 F1). Wir wollen ihn genau dort
-weglassen, ohne ihn dort zu verlieren, wo er tragend ist.
+`applyCustomNames` tut zwei Dinge — Custom-Namen auflösen (echt geteilt) UND
+alphabetisch sortieren (nie geteilt, jeder Consumer will eine andere Ordnung).
+Die Bündelung dieser zwei Verantwortungen ist die Wurzel: der Sort ist für drei
+Consumer tot, für zwei tragend, und jeder Versuch, ihn herauszulösen, kollidiert
+mit der geteilten Post-Condition. v4 entbündelt: Helfer löst nur Namen auf,
+Sortieren ist Sache des Anzeigenden.
 
 ---
 
-## 1. Zielbild — zwei Helfer, ein Map-Kern
+## 1. Zielbild — EIN reiner Map-Helfer, kein Sort
 
 ```kotlin
-// Der Map-Kern: reine Namensauflösung, KEINE Ordnungs-Post-Condition.
-// `internal` zum :domain-Modul: die Warnung ist NICHT bloß der `Unsorted`-Name,
-// sie ist die Sichtbarkeit — alle drei Opt-in-Sites sind :domain-Use-Cases, also
-// braucht die Variante keine modulübergreifende Sichtbarkeit, und der :app-Layer
-// KANN sie nicht greifen. Der gefürchtete Fehlgriff wird compiler-erzwungen
-// unmöglich, nicht nur konvention-unwahrscheinlich.
-internal fun applyCustomNamesUnsorted(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
-    apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
-
-// Die RAL-1-Grenze: Namensauflösung MIT sortierter Post-Condition.
-// Delegiert an den Kern → EINE Map-Implementierung (keine RAL-3-Drift).
-// BLEIBT public + der Default-Name → wer den offensichtlichen Helfer greift,
-// bekommt die sichere sortierte Garantie gratis.
+// Löst Custom-Namen auf. KEINE Ordnungs-Post-Condition — die Liste kommt in
+// Eingabe-Reihenfolge zurück. WER ANZEIGT, SORTIERT SELBST (siehe KDoc).
+// Kein internal/public-Paar mehr: es gibt nur diese eine Funktion.
 fun applyCustomNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
-    applyCustomNamesUnsorted(apps, names).sortedBy { it.displayNameLower }
+    apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
 ```
 
-**Warum diese Form die RAL-1a-Einwände neutralisiert (der ganze Grund für den Spec):**
+Das ist der gesamte Helfer. Der frühere `.sortedBy { it.displayNameLower }`
+entfällt hier und wandert an die Anzeige-Sites, die ihn ohnehin größtenteils
+schon haben (§2).
 
-1. **Der sichere Helfer behält den Default-Namen.** `applyCustomNames`
-   (sortiert, public) ist weiter der Name, den man reflexartig greift. Ein
-   künftiger Site-N-Consumer, der ihn nimmt, erbt RAL-1s sortierte Post-Condition
-   automatisch. Die Optimierung ist **explizites Opt-in** — nicht der Default.
-   Das dreht das Risiko um: der Default ist sicher, der schnelle Pfad ist die
-   bewusste Ausnahme.
-2. **Der Hazard ist STRUKTUR, nicht nur Konvention.** `applyCustomNamesUnsorted`
-   ist `internal` zu `:domain` (CLAUDE.md: „internal does not cross module
-   boundaries"). Alle drei Opt-in-Sites sind Domain-Use-Cases, also reicht
-   Modul-Sichtbarkeit — und ein `:app`-Consumer, der genau den Fehlgriff täte,
-   den die dreifache Vertagung fürchtete, sieht die Funktion gar nicht. Der
-   `Unsorted`-Name ist die Warnung für den, der SIE schon greifen darf; die
-   `internal`-Grenze verhindert, dass die Falschen sie überhaupt sehen. Die
-   Tests (`:domain/src/test`) sehen `internal` über den automatischen
-   Friend-Pfad. **Der `mapOnly`-Benchmark (`:domain/src/jmh`) NICHT
-   automatisch** (Runde-2-Korrektur): `me.champeau.jmh` assoziiert seinen
-   Source-Set nicht mit `main`, `internal` ist von dort also vermutlich
-   unsichtbar. Heute egal (der Benchmark inlint `mapOnly` und ruft die *public*
-   `applyCustomNames` nicht die interne Variante) — aber vor einem `mapOnly →
-   applyCustomNamesUnsorted`-Dedup (Minor unten) muss ein `associateWith`
-   verifiziert werden. v2 behauptete die Sichtbarkeit als Faktum; das war falsch.
-3. **Eine Map-Implementierung — im Produktionscode.** `applyCustomNames`
-   delegiert an `applyCustomNamesUnsorted`; die Namensauflösungs-Zeile existiert
-   in `:domain/main` genau einmal (killt die RAL-3-Drift dort). **Caveat:** der
-   `mapOnly`-Benchmark hält weiter eine **inline-Kopie** derselben Zeile
-   (`ApplyCustomNamesBenchmark.kt`), weil er sie mangels jmh-Sichtbarkeit (Punkt
-   2) nicht aufrufen kann. Es bleiben also zwei Kopien, eine davon im
-   Benchmark — bewusst hingenommen, nicht „Drift komplett weg". §6 hält den
-   Benchmark unverändert; ein echtes Dedup bräuchte erst den jmh-Friend-Pfad.
-4. **Opt-in nur an nachweislich sicheren Sites**, jede mit einer
-   Re-Sort-Assertion (§2), die auf ihre eigene Downstream-Sortierzeile zeigt.
-5. **Tests pinnen die finale Ordnung jedes Consumers** (§6) — das Sicherheitsnetz
-   gegen die Maskierungs-Umkehr aus §4.
+**Warum das die RAL-1a-Sorge auflöst statt sie zu umgehen:**
+
+1. **Es gibt keine sortierte Post-Condition mehr, die man fragmentieren könnte.**
+   RAL-1a fürchtete, ein Split zerreiße „Quell-Grenze liefert sortiert". v4
+   *behauptet das gar nicht mehr*: die Quell-Grenze liefert Namen, Punkt.
+   Sortieren ist Präsentation und gehört zum Präsentierenden — die normale
+   Trennung, dass eine Daten-Formungs-Funktion keine Anzeige-Ordnung aufzwingt.
+2. **Der Fehlermodus wird SICHTBAR statt maskiert.** Heute ist die
+   Sort-Abhängigkeit unsichtbar — versteckt in einem Helfer, der `apply…` heißt,
+   nicht `…AndSorts`. Ein Consumer, der sich darauf verlässt, weiß nicht, dass er
+   es tut (die Maskierung, §4). Bei einem Helfer, dessen KDoc laut sagt
+   „Reihenfolge = Input, für Anzeige selbst sortieren", ist ein fehlendes
+   `.sortedBy` am Call-Site eine **sichtbare Entscheidung**, kein verborgener Bug.
+   Unsichtbar → sichtbar ist strikt besser, nicht nur anders. Das ist genau der
+   Einwand, an dem v1–v3 hingen („ein neuer Consumer greift den sortierten
+   Default und verlässt sich still darauf") — hier gibt es keinen sortierten
+   Default, auf den man sich still verlassen kann.
+3. **Eine Impl, echt.** Anders als der v3-Zwei-Funktionen-Ansatz (der die
+   Map-Zeile de facto doppelte — Helfer + Benchmark-Inline-Kopie) gibt es hier
+   genau eine Map-Funktion. Der `mapOnly`-Benchmark misst weiterhin genau diesen
+   Pfad (er IST jetzt die ganze Funktion).
+4. **Die Erkennungs-Invariante bleibt.** `originalName != displayName` erkennt
+   umbenannte Apps — das ist Namens-*Auflösung*, unberührt von der Sortierung.
+
+**Naming (offene Kleinentscheidung, §8):** der Name `applyCustomNames` impliziert
+keine Sortierung, also darf er bleiben — mit einem KDoc, der die
+Nicht-Sort-Zusage explizit macht. Alternativ ein sprechenderer Name
+(`resolveCustomNames`). Empfehlung: Name behalten, KDoc schärfen (minimaler Churn;
+die Call-Sites werden ohnehin angefasst, aber ein Rename an allen fünf ist rein
+kosmetisch).
 
 ---
 
-## 2. Scope — wer umzieht, wer NICHT, und warum
+## 2. Scope — wer sortiert schon, wer bekommt einen Sort dazu
 
-`applyCustomNames` hat fünf Call-Sites (REACTIVE_APPLIST §3-Inventur). Nur drei
-sind saubere Ziele.
+`applyCustomNames` hat fünf Call-Sites (REACTIVE_APPLIST §3-Inventur). Unter v4
+sortiert **jeder anzeigende Consumer selbst**; die meisten tun es bereits.
 
-| Site | Consumer | Sort danach? | RAL-4-Ziel? |
+| Site | Consumer | sortiert heute? | v4-Änderung |
 |---|---|---|---|
-| Site 2 | `GetDrawerAppsUseCase.sortVisibleApps` | alpha **oder** time-weighted, sofort | **JA** — `Unsorted` |
-| Site 2 | `GetFavoriteAppsUseCase.processApps` | `sortFavoriteComponents(savedOrder)` | **JA** — `Unsorted` |
-| Site 3 | `GetRecentAppsUseCase` | Recency-Order (+ §3-Fix) | **JA** — `Unsorted` |
-| Site 1 | `GetInstalledAppsUseCase` (geteilt) | gemischt (s.u.) | **NEIN** — bleibt sortiert |
-| — | `GetOnboardingAppsUseCase` | nur `.filter{}` (ordnungserhaltend) | **NEIN** — bleibt sortiert |
+| Site 2 | `GetDrawerAppsUseCase` | ja (alpha / time-weighted) | keine (nur Helfer liefert unsortiert) |
+| Site 2 | `GetFavoriteAppsUseCase` | ja (`sortFavoriteComponents`) | keine |
+| Site 3 | `GetRecentAppsUseCase` | Recency + Dedup | + expliziter Alpha-Tie-Break (§3.3) |
+| Site 1 | `GetInstalledAppsUseCase` → CustomNames | **nein — verlässt sich** | **+ `.sortedBy { displayNameLower }`** in CustomNamesVM |
+| Site 1 | `GetInstalledAppsUseCase` → Hidden | ja (eigener Sort) | keine — **spart** jetzt den toten Upstream-Sort |
+| Site 1 | `GetInstalledAppsUseCase` → Swipe | ja (eigener Sort) | keine — **spart** den toten Upstream-Sort |
+| Site 1 | `GetInstalledAppsUseCase` → Settings | ordnungs-agnostisch (nur `isNotEmpty`/`size`) | keine |
+| — | `GetOnboardingAppsUseCase` | **nein — verlässt sich** (`filter` erhält Ordnung) | **+ `.sortedBy { displayNameLower }`** |
 
-**Warum Site 1 NICHT umzieht — der entscheidende Nicht-Zug.**
-`GetInstalledAppsUseCase` ist **ein geteilter Use-Case, dessen sortierte
-Post-Condition vier Consumer verbrauchen** (präzise: `invoke()` gibt einen
-*kalten* `combine(...).distinctUntilChanged()` zurück — kein `shareIn`/`stateIn`;
-geteilt ist die Use-Case-Klasse, nicht ein heißer Flow. Fürs Argument unten
-unerheblich, aber „geteilter Flow" wäre falsch). Die vier zerfallen in **drei**
-Klassen (M4-korrigiert — v2 zählte Settings falsch mit):
-- `CustomNamesViewModel` (`collect { fullyProcessedList }`) — **verlässt sich**
-  auf den Sort (der einzige, der es tut).
-- `HiddenAppsViewModel` (`.sortedBy { displayNameLower }` auf der Master-Liste) — sortiert selbst.
-- `SwipeActionsViewModel` (`.sortedBy { displayNameLower }` auf der Master-Liste) — sortiert selbst.
-- `SettingsViewModel` — **ordnungs-agnostisch**: speichert die Liste nur
-  (`_installedApps.value = apps`) und nutzt sie fürs `isNotEmpty()`/`size`-Gating
-  (`SettingsFragment`), nie ordnungssensibel. (Sein `sortFavoriteComponents`-Aufruf
-  ist ein anderer Pfad — das Favoriten-Order-Feature, nicht diese Liste.)
+**Konkret ändern sich nur zwei Anzeige-Sites** (CustomNames, Onboarding) — sie
+bekommen je eine explizite Sortierzeile —, plus der Helfer wird map-only und
+Recents bekommt seinen Tie-Break. Alle anderen sortieren schon.
 
-Würde man Site 1 auf `Unsorted` stellen, müsste **nur CustomNames** einen Sort
-hinzufügen (Hidden/Swipe sortieren eh, Settings ist egal) — die Sort-Arithmetik
-ist also günstiger als v2 behauptete (−1, nicht netto-null). **Trotzdem bleibt
-Site 1 sortiert**, aber der Grund ist **nicht** die Arithmetik, sondern der
-**Safe-Default**: `GetInstalledAppsUseCase` ist ein pre-Veto-Quell-Boundary im
-Sinne von RAL-1, dessen sortierte Post-Condition der Vertrag IST. Ihn auf
-unsortiert zu stellen, um einem einzigen Consumer (CustomNames) einen Sort
-aufzubürden, verlegt genau die „muss selbst sortieren"-Pflicht an die schwächere
-Stelle, vor der RAL-1a warnt — für den Gegenwert eines toten Sorts an einem
-kalten Pfad. Die Grenze steht auf dem Invarianten-Grund, nicht auf der Zählung.
+**Bonus gegenüber v3: Hidden/Swipe werden mit-befreit.** In v3 blieb Site 1
+sortiert, also zahlten Hidden/Swipe weiter einen toten Upstream-Sort *und* ihren
+eigenen — „strukturell eingesperrt", hieß es. Unter v4 emittiert
+`GetInstalledAppsUseCase` unsortiert; Hidden/Swipe sortieren nur noch einmal
+(ihren eigenen), CustomNames sortiert neu, Settings ist egal. Der v3-„gefangene"
+Doppel-Sort löst sich also auch — ein Punkt, den der Zwei-Funktionen-Ansatz nicht
+erreichte.
 
-**Konsequenz — Hidden/Swipe behalten ihren toten Upstream-Sort.** Sie zahlen
-weiter den Site-1-Sort *und* ihren eigenen. Das ist strukturell hinter dem
-Site-1-Vertrag eingesperrt (er muss für CustomNames sortiert bleiben) und liegt
-bewusst außerhalb dieses Specs — der Preis des Teilens, nicht ein übersehener
-Gewinn. (Beide VMs öffnen sich nur auf Nutzer-Aktion, kalter Pfad.)
-
-**Onboarding:** `applyCustomNames(load.apps, names).filter { … }` — `filter`
-erhält die Reihenfolge, verlässt sich also auf den Sort. Bleibt `applyCustomNames`.
+**`GetInstalledAppsUseCase` wird map-only.** Sein einziger sort-abhängiger
+Consumer (CustomNames) sortiert dann selbst; die drei anderen sind egal oder
+sortieren eh. Das ist der Kern der Wende: der geteilte Use-Case liefert Namen,
+nicht Ordnung.
 
 ---
 
-## 3. Der Kern-Nachweis: ist der Sort für die drei Ziele WIRKLICH tot?
+## 3. Der Kern-Nachweis: sortiert jeder anzeigende Consumer wirklich (total)?
 
-Das ist die eigentliche Arbeit des Specs. „Selbst-nachsortierend" reicht nicht —
-die Frage ist, ob der Downstream-Sort **total** ist oder heimlich die
-Input-Reihenfolge (aus dem Alpha-Sort) als Tie-Break / First-Wins nutzt. Ein
-nicht-totaler Downstream-Sort würde beim Umstieg auf `Unsorted` still das
-Verhalten ändern (die Maskierungs-Umkehr, §4).
+Die Beweislast dreht sich gegenüber v3 leicht: nicht „ist der Downstream-Sort der
+drei Ziele total", sondern „sortiert **jeder** anzeigende Consumer, und ist
+dieser Sort input-unabhängig". Ein Consumer, der nach dem Flip nicht (total)
+sortiert, landet still in Enumerations-Ordnung (§4).
 
-> **Präzision der „total"-Behauptungen unten (Runde-2-geschärft).** Für Drawer
-> und Favoriten-Steady-State ist der Umstieg auf `Unsorted` **beweisbar
-> NULL-Änderung**, nicht nur „kosmetisch": Kotlins `sortedBy`/`sortedWith` sind
-> **stabil**, und sowohl der alte (`applyCustomNames`-sortiert) als auch der neue
-> (`Unsorted`) Pfad reduzieren einen `displayNameLower`-Gleichstand auf dieselbe
-> `rawApps`-Reihenfolge — der stabile Sort verschiebt gleiche Schlüssel nicht.
-> Die frühere „könnte zwei namensgleiche Einträge drehen"-Sorge war zu vorsichtig;
-> sie tritt hier gar nicht auf. Die **eine** Stelle, wo die Input-Ordnung real
-> durchschlägt, ist Recents' Paket-Repräsentant (§3.3, ein `putIfAbsent` statt
-> eines stabilen Sorts) — dort wird sie explizit behoben, nicht weggeredet. Die
-> zweite reale Stelle sind die Favoriten-**Fehler-Fallbacks** (§3.2, M1): dort
-> ist es kein Tie-Flip, sondern ein voller Reorder — akzeptiert, weil OOM-only.
+> **Präzision der „total"-Behauptungen.** Alle stützen sich auf `displayNameLower`
+> und Kotlins **stabilen** `sortedBy`. Für jeden Consumer, dessen Sort im Code
+> steht, reduziert sowohl der alte (Helfer-sortiert) als auch der neue
+> (Consumer-sortiert) Pfad einen Schlüssel-Gleichstand auf dieselbe
+> `rawApps`-Ordnung → **beweisbar NULL-Änderung**, kein kosmetischer Tie-Flip.
+> Die zwei realen Kanten sind Recents' Dedup (§3.3, expliziter Fix) und die
+> Favoriten-Fehler-Fallbacks (§3.2, OOM-only Degrade).
 
-### 3.1 Drawer — sicher, kein Fix nötig
-- **ALPHABETICAL:** `visibleApps.sortedBy { it.displayNameLower }` — total,
-  input-unabhängig. ✓
-- **TIME_WEIGHTED_USAGE:** `AppUsageRepositoryImpl.sortAppsByTimeWeightedUsage`
-  sortiert `compareByDescending { score }.thenBy { it.displayNameLower }` —
-  **expliziter** Tie-Break auf `displayNameLower`. Score-Gleichstände brechen
-  also schon heute deterministisch alphabetisch, NICHT über die Input-Ordnung.
-  Fallback-Pfad ist `apps.sortedBy { displayNameLower }` — ebenfalls total. ✓
+### 3.1 Drawer — sortiert schon total, keine Änderung
+- **ALPHABETICAL:** `visibleApps.sortedBy { it.displayNameLower }` — total. ✓
+- **TIME_WEIGHTED:** `AppUsageRepositoryImpl.sortAppsByTimeWeightedUsage` →
+  `compareByDescending { score }.thenBy { it.displayNameLower }` — **expliziter**
+  Tie-Break, Gleichstände brechen alphabetisch, nicht über Input. Fallback
+  `apps.sortedBy { displayNameLower }` — total. ✓
 
-Drawer hängt an keiner Stelle von der Input-Reihenfolge ab → `Unsorted` ist
-verhaltensneutral.
+### 3.2 Favoriten — Steady-State total, ZWEI Fehler-Fallbacks nicht (M1)
+`FavoritesOrderRepositoryImpl`:
+- **Steady-State (sicher):** geordneter Teil über `order`/`componentName`-Lookup
+  (input-unabhängig); Rest-Anhang `.sortedBy { displayNameLower }` (total);
+  `order.isEmpty()` → `sortedBy` (total); `putIfAbsent(componentName)` nur bei
+  malformed identischem `componentName` input-sensitiv (Dedupe dokumentiert/
+  getestet, im Normalbetrieb nie). ✓
+- **NICHT total — zwei Fehler-Fallbacks (M1, Runde-2-Fund):**
+  `sortAppsWithGivenOrder`s `catch` gibt `appsToSort` **unsortiert** zurück
+  (`FavoritesOrderRepositoryImpl:194`); `sortFavoriteComponents`s
+  Doppel-Fault-`catch` gibt `favoriteApps` **unsortiert** zurück (`:148`). Der
+  `applyCustomNames`-KDoc dokumentiert genau das schon. **Bewertung: akzeptierter
+  OOM-only kosmetischer Degrade** — beide Catches umschließen reine `sortedBy` auf
+  Non-Null-Strings (per Rule 11 nicht werfbar), feuern also nur bei
+  `OutOfMemoryError`; in dem Moment ist „kurz Enumerations- statt Alpha-Ordnung"
+  belanglos.
 
-### 3.2 Favoriten — Steady-State sicher, ZWEI Fehler-Fallbacks nicht total (M1)
-`FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder` + `sortFavoriteComponents`:
-- **Steady-State (sicher):**
-  - Geordneter Teil: getrieben von `order` über `componentName`-Lookup — input-unabhängig.
-  - Rest-Anhang: `.filterNot { … in consumed }.sortedBy { displayNameLower }` — total.
-  - `order.isEmpty()`: `sortedBy { displayNameLower }` — total.
-  - `putIfAbsent(componentName, app)`: Input-Order zählt nur bei **zwei Apps mit
-    identischem `componentName`** — malformed, Dedupe schon heute dokumentiert/getestet;
-    `componentName` ist per Konstruktion eindeutig, im Normalbetrieb nie getroffen. ✓
-- **NICHT total — die zwei Fehler-Fallbacks (M1, Runde-2-Fund; v2 behauptete hier
-  fälschlich „alle Fallbacks total"):**
-  - `sortAppsWithGivenOrder`s eigener `catch (Throwable)` gibt `appsToSort`
-    **unsortiert** zurück (`FavoritesOrderRepositoryImpl:194`).
-  - `sortFavoriteComponents`s Doppel-Fault-`catch` gibt `favoriteApps`
-    **unsortiert** zurück (`:148`).
-  Auf diesen Pfaden surfaced heute `applyCustomNames`' Alpha-Ordnung; unter
-  `Unsorted` surfaced die Enumerations-Ordnung — ein **voller Reorder**, kein
-  Namens-Tie-Flip. Der `applyCustomNames`-KDoc dokumentiert genau diesen Caveat
-  bereits („Sole caveat: the favorites error-fallback paths … return the list
-  unsorted") — v2 hatte ihn hier übersehen.
+### 3.3 Recents — EIN echter Effekt, braucht einen expliziten Tie-Break
 
-**Bewertung:** akzeptiert als **OOM-only kosmetischer Degrade.** Beide Catches
-umschließen reine Sorts (`sortedBy` auf Non-Null-Strings), die per Rule 11 nicht
-werfen *können* — sie feuern nur bei `OutOfMemoryError`. In diesem ohnehin
-degenerierten Moment ist „Favoriten kurz in Enumerations- statt Alpha-Ordnung"
-gegenüber dem OOM belanglos. Also: Favoriten-Steady-State ist verhaltensneutral,
-der Fallback-Reorder ist ein bewusst akzeptierter OOM-Degrade — **nicht** die
-blanke „verhaltensneutral"-Behauptung aus v2.
+> **Kein Split-*Preis*, ein Klarheits-*Gewinn*.** Der Sort tat hier Doppeldienst:
+> Listen-Ordnung (die Recents wegwirft — final zählt `recentPackages`/Recency)
+> UND Dedup-Determiniertheit (welche Activity ein Multi-Activity-Paket
+> repräsentiert). Recents nutzte nur die zweite, still. Sie explizit zu machen ist
+> sauberer als sie aus einem Upstream-Sort zu erben — v4 macht diese vorher
+> versteckte Kopplung lokal und sichtbar.
 
-### 3.3 Recents — EIN echter maskierter Effekt, braucht einen expliziten Tie-Break
+`GetRecentAppsUseCase`: `putIfAbsent(packageName, app)` behält die **erste**
+`AppInfo` pro Paket — bei mehreren launchbaren Activities entscheidet die
+Iterations-Reihenfolge. Heute alpha-sortiert (aus `applyCustomNames`), also
+deterministisch die alphabetisch erste. Der Code-Kommentar sagt selbst „keeps
+that deterministic" — die Determiniertheit kommt vom Sort. Map-only → Enumerations-
+Ordnung entscheidet → realer (kosmetischer) Change bei Multi-Activity-Paketen.
 
-> **Dieser Fix ist kein Split-*Preis*, er ist ein Klarheits-*Gewinn*.** Der Sort
-> tat hier Doppeldienst: Listen-Ordnung (die Recents ohnehin wegwirft — die finale
-> Reihenfolge kommt aus `recentPackages`/Recency) UND Dedup-Determiniertheit
-> (welche Activity ein Multi-Activity-Paket repräsentiert). Recents nutzte nur die
-> zweite Eigenschaft, still, als Nebenwirkung. Diese zwei Eigenschaften zu trennen
-> und die Dedup-Determiniertheit **explizit** in den `putIfAbsent` zu schreiben,
-> ist architektonisch sauberer als sie aus einem Upstream-Sort zu erben — genau
-> die Art impliziter Kopplung, vor der RAL-1a warnte, nur hier VORHER unsichtbar,
-> weil sie hinter dem gebündelten Sort steckte. Der Split legt sie frei und macht
-> sie lokal; er fragmentiert nichts, er ent-koppelt.
-
-`GetRecentAppsUseCase`:
+**Fix (verhaltenserhaltend, O(1)/Kollision statt O(N·log N)-Sort):**
 ```kotlin
-val visibleByPackage = LinkedHashMap<String, AppInfo>()
-for (app in currentApps) {                       // currentApps = applyCustomNames(...) → heute alpha-sortiert
-    if (app.componentName !in hidden) visibleByPackage.putIfAbsent(app.packageName, app)
-}
-recentPackages.mapNotNull { visibleByPackage[it] }.take(limit)
-```
-`putIfAbsent(packageName, app)` behält die **erste** `AppInfo` pro **Paket**. Ein
-Paket kann mehrere launchbare Activities haben (mehrere `AppInfo`, gleiches
-`packageName`, verschiedene `className`). „Erste" = Iterationsreihenfolge von
-`currentApps`. Heute alpha-sortiert → die alphabetisch erste Activity gewinnt,
-**deterministisch**. Der Code-Kommentar sagt es selbst: „*putIfAbsent keeps that
-deterministic*" — die Determiniertheit kommt aus dem Alpha-Sort. Mit `Unsorted`
-entscheidet die Enumerations-Reihenfolge (rawApps / PackageManager) → für
-Multi-Activity-Pakete ein **realer, wenn auch kosmetischer** Verhaltens-Change.
-
-**Behebung (verhaltenserhaltend, ersetzt den O(N·log N)-Sort durch O(1)/Kollision):**
-```kotlin
-val visibleByPackage = HashMap<String, AppInfo>()     // Iterations-Order egal: finale Order kommt aus recentPackages
+val visibleByPackage = HashMap<String, AppInfo>()   // Iterations-Order egal, finale Order aus recentPackages
 for (app in currentApps) {
     if (app.componentName in hidden) continue
     val existing = visibleByPackage[app.packageName]
-    // Determiniert die alphabetisch erste Activity pro Paket — input-unabhängig,
-    // reproduziert die heutige (vom Alpha-Sort gelieferte) Auswahl ohne die Liste
-    // zu sortieren.
+    // Alphabetisch ersten Repräsentanten pro Paket — input-unabhängig,
+    // reproduziert die heutige (vom Sort gelieferte) Auswahl.
     if (existing == null || app.displayNameLower < existing.displayNameLower) {
         visibleByPackage[app.packageName] = app
     }
 }
 recentPackages.mapNotNull { visibleByPackage[it] }.take(limit)
 ```
-Die finale Reihenfolge kommt ohnehin aus `recentPackages` (Recency), also ist die
-interne Map-Ordnung irrelevant → `LinkedHashMap` wird zu `HashMap`. Der einzige
-ordnungssensible Punkt (welche Activity ein Paket repräsentiert) ist jetzt
-**explizit** alphabetisch, nicht implizit über den Input.
+Der `displayNameLower`-Tie-Break-Kommentar bindet auf denselben Schlüssel zurück,
+den die Anzeige-Sorts nutzen, damit die zwei nicht still divergieren. (Alternative:
+Change akzeptieren, `ACCEPTED_LIMITATIONS.md`. Empfehlung: Fix — drei Zeilen.)
 
-> **Alternative (falls der Fix zu viel ist):** den Multi-Activity-Auswahl-Change
-> akzeptieren und in `ACCEPTED_LIMITATIONS.md` notieren (Re-Eval-Trigger:
-> Nutzer meldet „falsches Icon/Label" für ein Mehr-Activity-Paket in Recents).
-> Empfehlung dieses Specs: **den Fix nehmen** — er ist drei Zeilen, streng
-> billiger als der Sort und lässt „verhaltensneutral" wörtlich stimmen.
+### 3.4 Die zwei NEUEN Sorts (CustomNames, Onboarding) — trivial total
+Beide bekommen `.sortedBy { it.displayNameLower }` an der Anzeige-Grenze
+(CustomNames beim `collect`/Master-Listen-Aufbau, Onboarding nach dem `filter`).
+`sortedBy` auf einer Non-Null-String-Property ist total und kann nicht werfen —
+kein neues Catch, kein neuer Convention-Gate. Damit sortiert **jeder** anzeigende
+Consumer explizit.
 
 ---
 
 ## 4. Die Maskierungs-Umkehr (warum §6-Tests Pflicht sind)
 
-Heute **maskiert** der gebündelte Sort einen latenten Bug: würde man aus Drawer
-versehentlich den Downstream-Sort entfernen, käme die Liste immer noch
-alpha-sortiert heraus (aus `applyCustomNames`) — der Fehler bliebe unsichtbar.
-Mit `Unsorted` produziert derselbe Fehler **sichtbar unsortierten** Output.
-
-Das schneidet in beide Richtungen:
-- **Pro Split:** eine Maskierungs-Schicht verschwindet; echte Bugs werden lauter.
-- **Contra / Risiko:** der Split könnte eine *heute maskierte* Abhängigkeit
-  **freilegen**. §3 hat genau danach gesucht und genau eine gefunden (Recents).
-  Aber der Beweis ist nur so gut wie die Tests, die die finale Ordnung
-  **vor** dem Umstieg festnageln.
-
-Deshalb ist die Reihenfolge in §5 nicht verhandelbar: erst die
-Ordnungs-Assertions, dann der Helfer-Split, dann der Recents-Fix.
+Heute maskiert der gebündelte Sort einen latenten Bug: entfernte man aus einem
+Consumer versehentlich den Downstream-Sort, käme die Liste trotzdem alpha-sortiert
+(aus dem Helfer). Map-only entfernt diese Maskierung **vollständig** — jeder Sort
+ist explizit und sichtbar, ein fehlender fällt auf. Das ist der Vorteil; das
+Risiko ist die Kehrseite: der Flip könnte eine heute-maskierte Abhängigkeit
+freilegen. §3 hat gesucht und genau zwei reale gefunden (Recents-Dedup,
+Favoriten-Fallbacks); der Rest ist beweisbar NULL-Änderung. Aber der Beweis ist
+nur so gut wie die Tests, die die finale Ordnung **vor** dem Flip festnageln —
+besonders für die zwei Consumer, die einen Sort NEU bekommen.
 
 ---
 
 ## 5. Migrationsreihenfolge (je ein revertierbarer Commit)
 
-1. **Ordnungs-Assertions zuerst — aber auf der RICHTIGEN Ebene (Runde-2, M2).**
-   Der Guard „Test bleibt grün ⟺ Sort war tot" hält NUR dort, wo die Ordnung
-   **im Use-Case selbst** berechnet wird. Wo der Use-Case an einen Collaborator
-   delegiert, ist ein Use-Case-Test mit Fixed-Return-Mock **blind** (bleibt unter
-   sortiert UND unsortiert grün → beweist nichts) und mit Identity-Fake **falsch
-   rot** (obwohl Produktion sicher ist). Deshalb:
-   - **Drawer ALPHABETICAL** (`sortedBy` im Use-Case) + **Recents** (Dedup-Loop im
-     Use-Case): Use-Case-Test-Ebene, echte Ordnungs-Assertion. ✓
-   - **Drawer TIME_WEIGHTED** + **Favoriten**: die Ordnung lebt im **Impl**
-     (`AppUsageRepositoryImpl.sortAppsByTimeWeightedUsage` mit `thenBy`;
-     `FavoritesOrderRepositoryImpl.sortAppsWithGivenOrder`). Der Deadness-Nachweis
-     liegt hier auf **Impl-Test-Ebene** (`AppUsageRepositoryImplTest`,
-     `FavoritesOrderRepositoryImplTest` — beide existieren, §6). Der Use-Case-Test
-     darf NICHT gegen einen Fixed-Return-Mock behaupten, die Ordnung zu prüfen;
-     wo er die Ordnung modelliert, muss er den ordnungs-*modellierenden* Fake/Impl
-     nutzen. Die „Score-Tie → Alpha"-/„Alpha-Rest"-Assertion ist Impl-Verhalten
-     und auf Use-Case-Ebene gar nicht formulierbar.
-   - **Recents mit einem Multi-Activity-Paket — die Fixture muss NICHT-ALPHA-ERST
-     liefern (M3).** Der Test beweist nur dann etwas, wenn die Activities so
-     eingespeist werden, dass die enumerations-erste ≠ die alphabetisch-erste ist
-     (z.B. Activities „Zed"/„Alpha", „Zed" zuerst geliefert; `getCurrentApps()`
-     gibt die Update-Reihenfolge wörtlich zurück). Bei alpha-erst-Fixture bliebe
-     naives `Unsorted` grün → Nachweis wertlos, §4-Maskierung ungewacht. Mit einem
-     Negativ-Kontroll-Kommentar pinnen, dass die Fixture-Ordnung bewusst von Alpha
-     abweicht. Dieser Test IST der Nachweis für die eine reale Kante.
-2. **Den Split einführen, verhaltensneutral.** `applyCustomNamesUnsorted`
-   hinzufügen; `applyCustomNames` an den Kern delegieren lassen. Noch **kein**
-   Call-Site-Wechsel. Bestehende Tests bleiben grün (der Default ist byte-gleich).
-3. **Recents-Fix (§3.3).** `putIfAbsent` → expliziter alphabetischer Tie-Break,
-   `LinkedHashMap` → `HashMap`. Der Schritt-1-Recents-Test bleibt grün — beweist,
-   dass der Fix auf **bereits alpha-sortiertem Input** dieselbe Auswahl trifft.
-   (Die eigentliche Order-Unabhängigkeit beweist erst Schritt 4: der `Unsorted`-
-   Call-Site füttert den Fix mit der nicht-alpha-Fixture; M3-Korrektur der v2-
-   Attribution, die Schritt 3 zu viel zuschrieb.)
-4. **Die drei Call-Sites umstellen** auf `applyCustomNamesUnsorted`, jede mit
-   einer Re-Sort-Assertion im Kommentar, die auf ihre Downstream-Sortierzeile
-   zeigt. Für Recents zusätzlich: den `displayNameLower`-Tie-Break-Kommentar auf
-   `applyCustomNames`' Sortier-Schlüssel zurückbinden, damit die zwei nicht still
-   divergieren (die eine neue Kopplung, die der Split einführt — §3.3/§8).
-5. **Doku angleichen:** `applyCustomNames`-KDoc (RAL-1a → „gelöst via RAL-4,
-   siehe Spec"), REACTIVE_APPLIST §11 (RAL-4 → gelöst), die drei „thin pointer
-   back"-Kommentare aktualisieren, `mapOnly`-Arm-KDoc ergänzen.
+Die idempotente-Overlay-Reihenfolge von RAL-1 (2a/2b) wird gespiegelt: erst die
+Sorts an die Consumer ziehen, **während der Helfer noch sortiert** (redundant,
+aber grün), dann den Helfer-Sort entfernen — der gefährliche Flip ist ein winziger
+letzter Commit.
 
-Schritte 2–4 sind einzeln grün und revertierbar. Der einzige verhaltensberührende
-Schritt ist 3 (und der ist durch den Schritt-1-Recents-Test + den nicht-alpha-
-Call-Site in Schritt 4 abgesichert).
+1. **Ordnungs-Assertions zuerst, auf der richtigen Ebene (M2).** Guard „Test grün
+   ⟺ Consumer sortiert selbst" hält nur, wo die Ordnung IM Consumer/Use-Case
+   berechnet wird:
+   - *Use-Case/VM-Ebene:* Drawer-ALPHABETICAL, Recents (Multi-Activity,
+     **nicht-alpha-erste** Fixture — M3, sonst beweist der Test nichts), und die
+     zwei NEUEN Sorts (CustomNamesVM, OnboardingUseCase).
+   - *Impl-Ebene (delegierte Sorts):* `AppUsageRepositoryImplTest` (Score-Tie →
+     `thenBy`), `FavoritesOrderRepositoryImplTest` (Alpha-Rest + die zwei
+     unsortierten Fallbacks). Ein Fixed-Return-Mock auf Use-Case-Ebene beweist
+     hier nichts und darf es nicht vorgeben.
+2. **Die zwei Consumer sortieren lassen — während der Helfer noch sortiert.**
+   `.sortedBy { displayNameLower }` in CustomNamesVM + OnboardingUseCase ergänzen.
+   No-Op-Overlay (Liste ist schon sortiert), jeder Commit grün. Ab jetzt sortiert
+   jeder anzeigende Consumer selbst.
+3. **Recents-Fix (§3.3).** `putIfAbsent` → expliziter Alpha-Tie-Break,
+   `LinkedHashMap` → `HashMap`. Der Schritt-1-Recents-Test bleibt grün (auf
+   alpha-Input dieselbe Auswahl).
+4. **Den Helfer-Sort entfernen — der eine Flip.** `applyCustomNames` →
+   map-only; `GetInstalledAppsUseCase` emittiert damit unsortiert (CustomNames
+   sortiert seit Schritt 2 selbst, Hidden/Swipe eh, Settings egal). Die
+   Schritt-1-Tests sind der Wächter: bleiben sie grün, hat jeder Consumer seinen
+   Sort. Erst hier wird die Order-Unabhängigkeit real (Recents-Test läuft jetzt
+   auf der nicht-alpha-Fixture durch den map-only-Pfad).
+5. **Doku angleichen:** `applyCustomNames`-KDoc (RAL-1a → „gelöst via RAL-4 v4:
+   map-only, Consumer sortieren"; die Nicht-Sort-Zusage explizit), REACTIVE_APPLIST
+   §11 (RAL-4 → gelöst), die „thin pointer back"-Kommentare, `mapOnly`-Arm-KDoc.
+
+Jeder Schritt einzeln grün und revertierbar. Der einzige verhaltensberührende ist
+Schritt 4, abgesichert durch die Schritt-1-Tests + den Recents-Fix aus Schritt 3.
 
 ---
 
 ## 6. Test-Impact
 
-- **Neu (Pflicht, Schritt 1), nach Ebene getrennt (M2):**
-  - *Use-Case-Ebene, echte Order-Assertion:* Drawer-ALPHABETICAL, Recents
-    (Multi-Activity, **nicht-alpha-erste** Fixture — der wertvollste Test, die
-    einzige reale Verhaltens-Kante, rot ohne §3.3-Fix).
-  - *Impl-Ebene (der Deadness-Nachweis für die delegierten Sorts):*
-    `AppUsageRepositoryImplTest` (Score-Tie → `thenBy`-Alpha) und
-    `FavoritesOrderRepositoryImplTest` (Alpha-Rest-Anhang) — beide existieren
-    bereits und modellieren die Ordnung; ein Use-Case-Test mit Fixed-Return-Mock
-    kann diese Deadness NICHT nachweisen und darf es nicht vorgeben.
-- **Bestehend, muss grün bleiben:** `ApplyCustomNamesBenchmark` (unverändert —
-  `mapOnly` misst genau den Pfad, den drei Consumer nehmen; behält aber seine
-  Inline-Map-Kopie, §1 Punkt 3), `FavoritesOrderRepositoryImplTest`
-  (Dedupe + Fallback-Verhalten), die Drawer/Favoriten/Recents-UseCase-Tests.
-- **DistinctUntilChanged bleibt unberührt:** jeder der drei Flows endet in
-  `.distinctUntilChanged()`, aber die FINALE (nach-re-sortierte) Liste ist
-  byte-gleich zu heute — nur die Zwischenordnung am `applyCustomNames`-Schritt
-  ändert sich, die der Downstream-Sort sofort überschreibt. DUC vergleicht das
-  Endergebnis → kein verändertes Emissions-Verhalten. (Recents hat ohnehin kein
-  DUC, es ist ein Suspend-Point-Read.)
-- **Kein neuer `checkConventions`-Gate nötig:** der Split fügt keine `combine`/
-  `.catch`/broad-catch-Sites hinzu; `applyCustomNamesUnsorted` ist eine reine
-  Funktion ohne Suspension. (Falls ein Call-Site-Umbau eine bestehende Catch in
-  einen Suspend-Frame zöge — tut er nicht — wäre `scanCancelCandidates` der
-  Trigger. Hier n/a.)
+- **Neu (Pflicht):** Order-Assertions für die zwei NEUEN Sorts (CustomNamesVM,
+  OnboardingUseCase) und für Recents (Multi-Activity, **nicht-alpha-erste**
+  Fixture — der wertvollste Test, die einzige reale Verhaltens-Kante).
+- **Impl-Ebene (Deadness/Ordnungs-Nachweis für delegierte Sorts):**
+  `AppUsageRepositoryImplTest`, `FavoritesOrderRepositoryImplTest` — existieren,
+  müssen grün bleiben (inkl. der zwei unsortierten Fallback-Pfade, M1).
+- **Bestehend grün:** `ApplyCustomNamesBenchmark` (`mapOnly` IST jetzt die ganze
+  Funktion — keine Inline-Drift mehr), die Drawer/Favoriten/Recents-Tests.
+- **DistinctUntilChanged unberührt:** jeder der drei Flows endet in `.distinctUntilChanged()`,
+  aber die finale (nach-sortierte) Liste ist byte-gleich zu heute — nur die
+  Zwischenordnung am Helfer ändert sich, die der Consumer-Sort sofort setzt.
+- **Kein neuer Convention-Gate:** keine neuen `combine`/`.catch`/broad-catch;
+  die zwei neuen `sortedBy` sind reine, nicht-werfbare Operationen.
 
 ---
 
-## 7. Ehrlich: was dieser Spec NICHT einlöst
+## 7. Ehrlich: Kosten und was NICHT auf null geht
 
-- **Kein spürbarer Performance-Gewinn.** ~9,7 µs × 3 Consumer, off-Main, hinter
-  dem DataStore-Read. Wer den Spec als Performance-Fix verkauft, hat ihn falsch
-  gelesen — das war die ganze RAL-1a-Begründung, und sie bleibt wahr.
-- **Der „Klarheits-Gewinn" ist bescheiden, nicht strikt (Runde-2, M5).** Die tote
-  Arbeit ist bereits im 70-Zeilen-`applyCustomNames`-KDoc (RAL-1a) exhaustiv
-  benannt — die *Verständnis*-Klarheit liefert also schon Prosa. Was der Split
-  *hinzufügt*, ist zählbare Fläche: ein public/`internal`-Funktionspaar, drei
-  Opt-in-Kommentare, drei bis vier Tests, vier Doku-Rewrites — gegen das Entfernen
-  eines `.sortedBy`-Tokens. Netto ist das **lateral**, nicht strikt weniger. Und
-  die Recents-„Ent-Kopplung" (§3.3) löst eine Kopplung, die der Split **selbst
-  erzeugt** (heute ist Recents durch den Alpha-Input deterministisch, kein Bug) —
-  und re-koppelt Recents an `applyCustomNames`' Sortier-Schlüssel an einer dritten
-  Stelle. Das ist ehrlich der Grund, warum das Verdikt „vertagen" ist.
-- **Hidden/Swipe bleiben auf ihrem toten Upstream-Sort** (§2, hinter dem
-  geteilten Flow eingesperrt).
-- **`AppInfo` unverändert**, `getInstalledApps`-Vertrag unverändert, keine neue
-  Schicht, keine erfundene API.
-- **RAL-1 wird NICHT aufgeweicht.** Die sortierte Post-Condition bleibt der
-  Default-Helfer; nur drei nachweislich-nachsortierende Sites opten explizit aus.
+- **Kein spürbarer Performance-Gewinn.** ~9,7 µs × 3 (+ jetzt der befreite
+  Hidden/Swipe-Doppelsort), off-Main, hinter dem DataStore-Read. Der Grund ist
+  Sauberkeit, nicht Speed.
+- **Blast-Radius moderat.** v4 fasst MEHR Call-Sites an als der v3-Zwei-Funktionen-
+  Split (CustomNames, Onboarding, GetInstalledAppsUseCase ändern sich, nicht nur
+  Drawer/Favoriten/Recents). Dafür ist das Endergebnis *einfacher* als heute
+  (Helfer tut eine Sache) statt komplexer — der Tausch ist „mehr berührte Dateien
+  jetzt" gegen „weniger konzeptuelle Last dauerhaft".
+- **Sortierschlüssel an ~6 Sites statt einem.** `displayNameLower` steht heute
+  schon an vieren (Drawer/Favoriten/Hidden/Swipe); v4 macht +2 (CustomNames,
+  Onboarding). Er lebt als Property auf `AppInfo`, ist also zentralisiert; die
+  `.sortedBy { it.displayNameLower }` sind dünne Aufrufe.
+- **`AppInfo` unverändert, `getInstalledApps`-Vertrag unverändert** (nur die
+  *Post-Condition-Zusage* „sortiert" fällt — sie war Migrations-Gerüst).
+- **Recents' Tie-Break ist eine neue lokale Kopplung** an `displayNameLower` —
+  bewusst sichtbar gemacht (§3.3), mit Rückbind-Kommentar.
 
 ---
 
 ## 8. Offene Entscheidungen + Verdikt
 
-> **VERDIKT (Runde 2, Multi-Agent-Review, alle 5 Linsen): ein viertes Mal
-> vertagen.** Der Mechanismus ist korrekt und der §3-Nachweis hält gegen den Code
-> (nach den M1–M4-Korrekturen oben) — aber die adversariale Linse hat recht: netto
-> ist der Split eine laterale Komplexitäts-Verschiebung (dokumentierte tote Arbeit
-> → strukturell entfernte Arbeit + neue API), kein strikter Gewinn (§7, M5). Der
-> Spec bleibt als **fertiger, review-geprüfter Bauplan** liegen; die
-> `applyCustomNames`-KDoc-Eskape-Klausel („unless applyCustomNames is touched for
-> some OTHER reason anyway") zieht ihn gratis ein, sobald diese Datei aus anderem
-> Grund geöffnet wird. NICHT als eigenständige Änderung bauen.
+> **VERDIKT (v4): Design GESCHLOSSEN zugunsten des map-only-Modells. Build-Frage
+> neu offen — und stärker als je zuvor.** Der Multi-Agent-Review nannte den
+> v3-Split „lateral" (Komplexität rein/raus). v4 ist das NICHT: es ist eine
+> **Vereinfachung** (eine Funktion, die eine Sache tut; Sortieren dort, wo es
+> hingehört — an der Anzeige), die zusätzlich den in v3 „gefangenen"
+> Hidden/Swipe-Doppelsort mitlöst. Damit ist es defensibler als eigenständige
+> Änderung als alle Vorfassungen. ABER: immer noch null Nutzer-Nutzen und
+> moderater Blast-Radius. Ehrliche Empfehlung: **kein Muss, aber bauen-wenn-berührt
+> ist jetzt bauen-lohnt-sich** — wer diesen Bereich das nächste Mal anfasst, sollte
+> v4 mitnehmen; und anders als v1–v3 wäre es auch standalone eine echte
+> Verbesserung, kein lateraler Tausch.
 
 - **RAL-4-a — Recents-Fix vs. akzeptierte Limitation (§3.3).** Empfehlung: Fix.
-  Bestätigen oder auf `ACCEPTED_LIMITATIONS.md` umschwenken.
-- **RAL-4-b — API-Form (zwei entschiedene Achsen).**
-  - *Welche Variante ist Default?* Dieser Spec macht **sortiert** zum Default und
-    unsortiert zur `internal` Opt-in-Variante. Die **Inverse** — unsortiert als
-    Default, die zwei Cold-Path-Consumer (`GetInstalledAppsUseCase`, Onboarding)
-    sortieren explizit nach — hat dieselbe Sort-Anzahl, wird aber **abgelehnt**:
-    ihr Default wäre der *unsichere* (ein neuer Consumer, der `applyCustomNames`
-    greift, bekäme unsortiert → exakt der stille Fehlsortier, den RAL-1a fürchtet).
-    Safe-Default schlägt Symmetrie.
-  - *Zwei Funktionen vs. ein `sort`-Parameter?* Zwei benannte Funktionen statt
-    `applyCustomNames(apps, names, sort = false)`, weil (a) ein `false` am
-    Call-Site leiser ist als ein `Unsorted`-Name, und (b) — der stärkere Grund —
-    ein Boolean-Parameter sich NICHT `internal`-gaten lässt: die unsichere Achse
-    säße dann in derselben public Funktion und wäre modulübergreifend erreichbar.
-    Zwei Funktionen erst machen die `internal`-Gate aus §1 (Mitigation 2)
-    möglich. Bestätigen.
-- **RAL-4-c — lohnt es sich überhaupt? GESCHLOSSEN: nein, nicht eigenständig.**
-  Die Review hat genau die Antwort bestätigt, die der Spec sich offengehalten
-  hatte (und die schon zwei Gesprächsrunden vorher stand): der Gewinn ist
-  bescheidene Klarheit, nicht Speed, und die neue API-Fläche + die selbst-erzeugte
-  Recents-Kopplung machen ihn lateral. Vierter dokumentierter Deferral — jetzt mit
-  fertigem, gegen-den-Code-geprüftem Bauplan (siehe Verdikt oben).
+- **RAL-4-b — Helfer-Name.** `applyCustomNames` behalten (impliziert keine
+  Sortierung, minimaler Churn, KDoc macht die Nicht-Sort-Zusage laut) vs. Rename
+  auf `resolveCustomNames`. Empfehlung: behalten + KDoc schärfen.
+- **RAL-4-c — Ganz oder gestaffelt?** Man KÖNNTE nur Site 2/3
+  (Drawer/Favoriten/Recents) map-only-mäßig bedienen und Site 1 sortiert lassen
+  (näher an v3). Aber das gibt den Hidden/Swipe-Gewinn auf und behält die
+  Zwei-Wege-Asymmetrie. Empfehlung: ganz — die Einfachheit ist der Punkt.
+- **RAL-4-d — Superseded.** Der v3-`internal`-Zwei-Funktionen-Ansatz ist mit v4
+  hinfällig; falls jemand ihn doch will (z.B. um Site 1 sortiert zu halten), lebt
+  er in der Git-Historie dieses Files.
