@@ -43,6 +43,16 @@ pass/fail line** (your host will differ):
 | `filterWithOriginalName` | 200 | ~0.21 ops/µs (~4.7 µs/call) |
 | `score` (usage)      | 20 ts  | ~1.3 ops/µs (~0.8 µs/call) |
 | `score` (usage)      | 100 ts | ~0.25 ops/µs (~4.0 µs/call) |
+| `construct` (AppInfo)     | 50  | ~0.57 ops/µs (~1.8 µs/call) |
+| `construct` (AppInfo)     | 200 | ~0.14 ops/µs (~7.1 µs/call) |
+| `constructBare` (no vals) | 50  | ~2.3 ops/µs (~0.4 µs/call) |
+| `constructBare` (no vals) | 200 | ~0.62 ops/µs (~1.6 µs/call) |
+| `copyDisplayName`         | 200 | ~0.16 ops/µs (~6.3 µs/call) |
+| `copyIsFavorite`          | 200 | ~0.16 ops/µs (~6.4 µs/call) |
+| `equalContentSharedStrings`   | 200 | ~0.72 ops/µs (~1.4 µs/call) |
+| `equalContentDistinctStrings` | 200 | ~0.24 ops/µs (~4.1 µs/call) |
+| `firstElementDiffers`         | 200 | ~135 ops/µs (~0.007 µs/call) |
+| `sameListInstance`            | 200 | ~1474 ops/µs (~0.001 µs/call) |
 
 `applyCustomNames` confirms its KDoc (REACTIVE_APPLIST_SPEC RAL-1a / AUDIT-15
 F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps, i.e. "in the
@@ -68,6 +78,44 @@ once per visible app inside `sortAppsByTimeWeightedUsage`, so per drawer refresh
 in TIME_WEIGHTED mode the scoring cost is roughly this × the app count — ~0.15 ms
 for 200 apps at ~20 timestamps each (~0.8 µs/app), on top of the DataStore read.
 The `exp()` per timestamp keeps it the priciest per-element math after luminance.
+
+`construct` / `constructBare` price the cost SIDE of the AUDIT-14 §208/§212
+precompute trade — the reads those body vals speed up were the argument for
+them; this is the bill. The two precomputes (`displayNameLower` = `lowercase()`,
+`componentName` = a `startsWith(".")` check + concat) dominate construction:
+`constructBare` (same five fields, no body vals) is ~1.6 µs at 200 apps vs
+`construct`'s ~7.1 µs — so the vals are ~4× the from-scratch field-copy cost,
+~28 ns per instance. That is the price a `:data` enumeration pays per app. The
+trade still nets positive because the reads are more numerous than the writes
+(the sort comparator alone reads `displayNameLower` O(N·log N) times, the
+hidden-filter + DiffUtil read `componentName` O(N) each per derivation), so
+paying the fold once beats folding per comparison — the whole point of §208.
+
+`copyDisplayName` / `copyIsFavorite` are the two production `copy()` shapes, and
+they cost ~6.3–6.4 µs at 200 apps — essentially a full `construct`, because
+`copy()` runs the constructor and therefore re-derives BOTH body vals every
+time. `copyDisplayName` (the `applyCustomNames` map) at least needs the
+`displayNameLower` redo; `copyIsFavorite` (the `GetFavoriteAppsUseCase.processApps`
+`copy(isFavorite = …)`) redoes both for nothing — neither val's inputs changed.
+It is the clearest spot where the precompute works against itself, but it is
+accepted: a `copy()` cannot selectively keep a body val, and each favorites
+derivation does exactly one such pass off the Main thread — µs-scale, in the
+noise, same verdict as the RAL-1a dead sort. Pinned so the claim is a number,
+not a guess.
+
+The `equal*` set is the work `distinctUntilChanged()` does per emission on the
+drawer + favorites flows — and that guard fires on EVERY `settingsDataStore`
+write, including the usage write on every app launch (AUDIT-14 F1). The steady
+state is cheap: `equalContentSharedStrings` (~1.4 µs at 200) is the realistic
+case, because `copy()` carries the `String` fields over by reference so every
+comparison hits `String.equals`' identity fast path. `equalContentDistinctStrings`
+(~4.1 µs) is the post-re-enumeration case — equal content, fresh instances,
+character scan — ~3× costlier but still single-digit µs and far rarer.
+`firstElementDiffers` (~0.007 µs) shows the early-out is effectively free, and
+`sameListInstance` (~0.001 µs) is the unreachable identity floor. Net: the guard
+is worth it — even its worst realistic case is cheaper than the adapter churn it
+prevents. Note the cost is position-sensitive (a change to the LAST app costs a
+full traversal, same as the equal case), but the verdict holds at these sizes.
 
 ## Adding a benchmark
 
