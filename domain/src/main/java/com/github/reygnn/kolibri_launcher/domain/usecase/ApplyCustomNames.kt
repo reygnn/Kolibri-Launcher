@@ -47,6 +47,22 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * "must sort myself" knowledge to a weaker place (a future Site-N consumer that
  * forgets it gets a SILENT mis-order).
  *
+ * == Measured, so the next reviewer skips the "sounds like a lot" round ==
+ * `ApplyCustomNamesBenchmark` (JMH) pins the split against a number via its
+ * `mapOnly` arm (map without the terminal sort). At 200 apps the full function is
+ * ~15.8 µs and `mapOnly` ~6.0 µs, so the sort is ~9.7 µs -- i.e. the sort is the
+ * MAJORITY (~62%) of this function's cost, not a small tail. Two things follow,
+ * and NEITHER reopens the decision:
+ *   1. "62%" is a ratio of a negligible quantity: ~9.7 µs off-Main, behind the
+ *      DataStore read and below the DiffUtil / adapter work it feeds. The
+ *      comparison that matters is against those, not against `mapOnly`.
+ *   2. The sort is dead only for the three HOT-path consumers (drawer/favorites/
+ *      recents, re-derived on every settingsDataStore write -- AUDIT-14 F1); it is
+ *      load-bearing for the COLD-path ones (Settings/Onboarding, opened rarely).
+ *      So the real shape is "the frequently-run path subsidizes the rarely-run
+ *      one" -- still beneath the threshold where that subsidy is worth a spec
+ *      amendment. The measurement CONFIRMS "value ~= 0"; it does not overturn it.
+ *
  * If you arrived here from a "dead sort, optimize it away" observation: that is the
  * expected path, and the answer is no -- unless applyCustomNames is being split for some
  * OTHER reason anyway, in which case the dead-sort removal rides along free. The
