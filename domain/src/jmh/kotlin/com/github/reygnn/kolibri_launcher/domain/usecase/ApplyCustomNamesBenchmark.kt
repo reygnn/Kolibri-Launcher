@@ -21,6 +21,27 @@ import java.util.concurrent.TimeUnit
  * `copy(displayName = …)` and then `sortedBy { displayNameLower }`, so this pins
  * the cost of the map + the terminal sort at realistic list sizes.
  *
+ * Two arms:
+ * - [applyCustomNames] — the full production function (map + terminal sort).
+ * - [mapOnly] — the map alone, byte-identical to the production `map { … }`
+ *   step but WITHOUT the `.sortedBy`. The difference between the two arms is the
+ *   cost of that terminal sort — and for the three self-sorting reactive
+ *   consumers (drawer / favorites / recents) that sort is DEAD WORK (RAL-1a):
+ *   their own downstream sort discards it. Splitting `applyCustomNames` into a
+ *   sorted/unsorted pair to skip it has been deferred/closed three times
+ *   (AUDIT-14 F1 §5.3, AUDIT-15 F3) on the argument that the dead sort is "µs,
+ *   off-Main, in the noise". [mapOnly] turns that argument from an estimate into
+ *   a measured delta; it does NOT reopen the decision (a split fragments the
+ *   RAL-1 invariant — see the `applyCustomNames` KDoc), it just prices what the
+ *   split would save so the closure rests on a number.
+ *
+ * `mapOnly` replicates the production `map` body inline rather than calling a
+ * shared unsorted helper, because no such helper exists (splitting the function
+ * is exactly what RAL-1a rejected). It is therefore a benchmark-local mirror of
+ * one line, not a second copy of the name-resolution logic; if the `map` body in
+ * [applyCustomNames] ever changes, this arm must be updated in lockstep or the
+ * delta stops isolating the sort.
+ *
  * Reproducible-baseline harness, not a CI gate: `./gradlew :domain:jmh` writes
  * `build/reports/jmh/results.json`. JMH numbers are host-dependent, so a
  * committed baseline is diffed by hand rather than auto-failing a build.
@@ -67,4 +88,13 @@ open class ApplyCustomNamesBenchmark {
 
     @Benchmark
     fun applyCustomNames(): List<AppInfo> = applyCustomNames(apps, customNames)
+
+    /**
+     * The production `map` step without the terminal `.sortedBy`. Mirror of the
+     * one line in [applyCustomNames]; the [applyCustomNames] − [mapOnly] delta is
+     * the dead-sort cost (RAL-1a). Keep this body identical to the production map.
+     */
+    @Benchmark
+    fun mapOnly(): List<AppInfo> =
+        apps.map { it.copy(displayName = customNames[it.packageName] ?: it.originalName) }
 }
