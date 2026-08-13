@@ -1,8 +1,13 @@
 # APPLIST_SORT_SPLIT_SPEC.md — den toten Sort auf dem Hot-Path entfernen (RAL-4)
 
-**Status: ENTWURF v1 (2026-08-13), greenfield — noch nicht gebaut.** Dies ist die
-ausgebaute Form von `SPEC-DECISION RAL-4` (REACTIVE_APPLIST_SPEC.md §11), das
-bisher nur als „offen, bewusst nicht verfolgt" dastand. Fokus: den in
+**Status: ENTWURF v2 (2026-08-13), greenfield — noch nicht gebaut. Review-Runde 1
+(Architektur-Selbstprüfung) eingearbeitet:** die unsortierte Variante wird
+`internal` zum `:domain`-Modul (Hazard compiler-erzwungen statt konvention-
+gemildert, §1); der Recents-Tie-Break ist als Klarheits-*Gewinn* geframt, nicht
+als Split-Kosten (§3.3); die „total"-Behauptungen tragen ihre asymptotische Kante
+(§3.1/§3.2); die Inverse (unsortiert als Default) ist benannt und abgelehnt (§8).
+Dies ist die ausgebaute Form von `SPEC-DECISION RAL-4` (REACTIVE_APPLIST_SPEC.md
+§11), das bisher nur als „offen, bewusst nicht verfolgt" dastand. Fokus: den in
 `applyCustomNames` gebündelten terminalen `sortedBy` für die drei
 selbst-nachsortierenden Hot-Path-Consumer (Drawer / Favoriten / Recents)
 entfernen, **ohne** die RAL-1-Invariante zu fragmentieren oder eine stille
@@ -52,14 +57,18 @@ weglassen, ohne ihn dort zu verlieren, wo er tragend ist.
 
 ```kotlin
 // Der Map-Kern: reine Namensauflösung, KEINE Ordnungs-Post-Condition.
-// Der `Unsorted`-Suffix ist die laute Warnung: wer mich ruft, sortiert selbst.
-fun applyCustomNamesUnsorted(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
+// `internal` zum :domain-Modul: die Warnung ist NICHT bloß der `Unsorted`-Name,
+// sie ist die Sichtbarkeit — alle drei Opt-in-Sites sind :domain-Use-Cases, also
+// braucht die Variante keine modulübergreifende Sichtbarkeit, und der :app-Layer
+// KANN sie nicht greifen. Der gefürchtete Fehlgriff wird compiler-erzwungen
+// unmöglich, nicht nur konvention-unwahrscheinlich.
+internal fun applyCustomNamesUnsorted(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = names[it.packageName] ?: it.originalName) }
 
 // Die RAL-1-Grenze: Namensauflösung MIT sortierter Post-Condition.
 // Delegiert an den Kern → EINE Map-Implementierung (keine RAL-3-Drift).
-// BLEIBT der Default-Name → wer den offensichtlichen Helfer greift, bekommt
-// die sichere sortierte Garantie gratis.
+// BLEIBT public + der Default-Name → wer den offensichtlichen Helfer greift,
+// bekommt die sichere sortierte Garantie gratis.
 fun applyCustomNames(apps: List<AppInfo>, names: Map<String, String>): List<AppInfo> =
     applyCustomNamesUnsorted(apps, names).sortedBy { it.displayNameLower }
 ```
@@ -67,16 +76,23 @@ fun applyCustomNames(apps: List<AppInfo>, names: Map<String, String>): List<AppI
 **Warum diese Form die RAL-1a-Einwände neutralisiert (der ganze Grund für den Spec):**
 
 1. **Der sichere Helfer behält den Default-Namen.** `applyCustomNames`
-   (sortiert) ist weiter der Name, den man reflexartig greift. Ein künftiger
-   Site-N-Consumer, der ihn nimmt, erbt RAL-1s sortierte Post-Condition
-   automatisch. Die Optimierung ist **explizites Opt-in** über den längeren,
-   „gefährlicheren" Namen — nicht der Default. Das dreht das Risiko um: der
-   Default ist sicher, der schnelle Pfad ist die bewusste Ausnahme.
-2. **Eine Map-Implementierung.** Sortiert delegiert an unsortiert; die
+   (sortiert, public) ist weiter der Name, den man reflexartig greift. Ein
+   künftiger Site-N-Consumer, der ihn nimmt, erbt RAL-1s sortierte Post-Condition
+   automatisch. Die Optimierung ist **explizites Opt-in** — nicht der Default.
+   Das dreht das Risiko um: der Default ist sicher, der schnelle Pfad ist die
+   bewusste Ausnahme.
+2. **Der Hazard ist STRUKTUR, nicht nur Konvention.** `applyCustomNamesUnsorted`
+   ist `internal` zu `:domain` (CLAUDE.md: „internal does not cross module
+   boundaries"). Alle drei Opt-in-Sites sind Domain-Use-Cases, also reicht
+   Modul-Sichtbarkeit — und ein `:app`-Consumer, der genau den Fehlgriff täte,
+   den die dreifache Vertagung fürchtete, sieht die Funktion gar nicht. Der
+   `Unsorted`-Name ist die Warnung für den, der SIE schon greifen darf; die
+   `internal`-Grenze verhindert, dass die Falschen sie überhaupt sehen. Der
+   `mapOnly`-Benchmark (`:domain/src/jmh`) und die Tests (`:domain/src/test`)
+   liegen im selben Modul → weiterhin sichtbar.
+3. **Eine Map-Implementierung.** Sortiert delegiert an unsortiert; die
    Namensauflösungs-Zeile existiert genau einmal. Das killt die Drift-Sorge
    (RAL-3-Klasse: zwei Kopien, die auseinanderlaufen).
-3. **Der Hazard steht laut im Namen.** `Unsorted` im Bezeichner IST die Warnung.
-   Ein Aufruf ist eine Behauptung „ich sortiere downstream".
 4. **Opt-in nur an nachweislich sicheren Sites**, jede mit einer
    Re-Sort-Assertion (§2), die auf ihre eigene Downstream-Sortierzeile zeigt.
 5. **Tests pinnen die finale Ordnung jedes Consumers** (§6) — das Sicherheitsnetz
@@ -130,6 +146,16 @@ Input-Reihenfolge (aus dem Alpha-Sort) als Tie-Break / First-Wins nutzt. Ein
 nicht-totaler Downstream-Sort würde beim Umstieg auf `Unsorted` still das
 Verhalten ändern (die Maskierungs-Umkehr, §4).
 
+> **Präzision der „total"-Behauptungen unten.** Jede stützt sich letztlich auf
+> `displayNameLower` als Schlüssel, ist also total **bis auf zwei Einträge mit
+> identischem `displayNameLower`** (zwei Apps, deren Anzeigename lowercased gleich
+> ist). Dort bricht der stabile Sort den Rest über die Input-Reihenfolge, und der
+> Umstieg auf `Unsorted` könnte deren relative Position drehen. Das ist bewusst
+> als vernachlässigbar eingestuft, nicht übersehen: namensgleiche Einträge sind
+> in der Liste **visuell ununterscheidbar**, ihre Reihenfolge zueinander ist per
+> Definition nicht wahrnehmbar. Wo die Kante nicht rein kosmetisch ist — Recents'
+> Paket-Repräsentant, §3.3 — wird sie explizit behoben, nicht weggeredet.
+
 ### 3.1 Drawer — sicher, kein Fix nötig
 - **ALPHABETICAL:** `visibleApps.sortedBy { it.displayNameLower }` — total,
   input-unabhängig. ✓
@@ -156,6 +182,18 @@ Favoriten → `Unsorted` verhaltensneutral (bis auf den malformed-Duplikat-Edge,
 der schon heute undefiniert-aber-dedupet ist).
 
 ### 3.3 Recents — EIN echter maskierter Effekt, braucht einen expliziten Tie-Break
+
+> **Dieser Fix ist kein Split-*Preis*, er ist ein Klarheits-*Gewinn*.** Der Sort
+> tat hier Doppeldienst: Listen-Ordnung (die Recents ohnehin wegwirft — die finale
+> Reihenfolge kommt aus `recentPackages`/Recency) UND Dedup-Determiniertheit
+> (welche Activity ein Multi-Activity-Paket repräsentiert). Recents nutzte nur die
+> zweite Eigenschaft, still, als Nebenwirkung. Diese zwei Eigenschaften zu trennen
+> und die Dedup-Determiniertheit **explizit** in den `putIfAbsent` zu schreiben,
+> ist architektonisch sauberer als sie aus einem Upstream-Sort zu erben — genau
+> die Art impliziter Kopplung, vor der RAL-1a warnte, nur hier VORHER unsichtbar,
+> weil sie hinter dem gebündelten Sort steckte. Der Split legt sie frei und macht
+> sie lokal; er fragmentiert nichts, er ent-koppelt.
+
 `GetRecentAppsUseCase`:
 ```kotlin
 val visibleByPackage = LinkedHashMap<String, AppInfo>()
@@ -286,11 +324,21 @@ Schritt ist 3 (und der ist durch den Schritt-1-Test abgesichert).
 
 - **RAL-4-a — Recents-Fix vs. akzeptierte Limitation (§3.3).** Empfehlung: Fix.
   Bestätigen oder auf `ACCEPTED_LIMITATIONS.md` umschwenken.
-- **RAL-4-b — Helfer-Naming.** `applyCustomNamesUnsorted` vs. z.B. ein
-  `sort`-Parameter (`applyCustomNames(apps, names, sort = false)`). Dieser Spec
-  wählt **zwei benannte Funktionen**, weil der Default-Name dann die sichere
-  Variante bleibt (§1.1) — ein Boolean-Default `sort = true` täte das auch, aber
-  ein `false` am Call-Site ist leiser als ein `Unsorted`-Name. Bestätigen.
+- **RAL-4-b — API-Form (zwei entschiedene Achsen).**
+  - *Welche Variante ist Default?* Dieser Spec macht **sortiert** zum Default und
+    unsortiert zur `internal` Opt-in-Variante. Die **Inverse** — unsortiert als
+    Default, die zwei Cold-Path-Consumer (`GetInstalledAppsUseCase`, Onboarding)
+    sortieren explizit nach — hat dieselbe Sort-Anzahl, wird aber **abgelehnt**:
+    ihr Default wäre der *unsichere* (ein neuer Consumer, der `applyCustomNames`
+    greift, bekäme unsortiert → exakt der stille Fehlsortier, den RAL-1a fürchtet).
+    Safe-Default schlägt Symmetrie.
+  - *Zwei Funktionen vs. ein `sort`-Parameter?* Zwei benannte Funktionen statt
+    `applyCustomNames(apps, names, sort = false)`, weil (a) ein `false` am
+    Call-Site leiser ist als ein `Unsorted`-Name, und (b) — der stärkere Grund —
+    ein Boolean-Parameter sich NICHT `internal`-gaten lässt: die unsichere Achse
+    säße dann in derselben public Funktion und wäre modulübergreifend erreichbar.
+    Zwei Funktionen erst machen die `internal`-Gate aus §1 (Mitigation 2)
+    möglich. Bestätigen.
 - **RAL-4-c — lohnt es sich überhaupt?** Der Spec ist bewusst so geschrieben,
   dass die Antwort „nein, nicht als eigenständige Änderung" legitim bleibt: der
   Gewinn ist Klarheit, nicht Speed. Wenn die Review zum Schluss kommt „nicht
