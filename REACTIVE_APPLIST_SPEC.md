@@ -404,10 +404,17 @@ genau das, was den Umfang klein *wirken* ließ.
   Post-Condition" für Wert ~= 0 fragmentieren. Dreimal aufgeworfen (vertagt
   AUDIT-14 F1 §5.3, abschließend geschlossen AUDIT-15 F3) — volle Begründung im
   `applyCustomNames`-KDoc.
-- **`SPEC-DECISION RAL-4`:** ein Split von `applyCustomNames` in ein
-  sortiert/unsortiert-Paar bräuchte zuerst dieses Spec-Amendment (Änderung über
-  ≥2 Use Cases, alle Call-Sites). Offen, bewusst nicht verfolgt, solange kein
-  anderer Grund `applyCustomNames` ohnehin anfasst.
+- **`SPEC-DECISION RAL-4` — AUSGEBAUT (2026-08-13):** ein Split von
+  `applyCustomNames` in ein sortiert/unsortiert-Paar bräuchte zuerst dieses
+  Spec-Amendment (Änderung über ≥2 Use Cases, alle Call-Sites). Der Bauplan liegt
+  jetzt als **`APPLIST_SORT_SPLIT_SPEC.md`** vor (greenfield ENTWURF, noch nicht
+  gebaut): sortierter `applyCustomNames` bleibt der Default und delegiert an einen
+  `applyCustomNamesUnsorted`-Kern; nur die drei selbst-nachsortierenden Sites
+  (Drawer/Favoriten/Recents) opten explizit aus. Kern-Finding dort: der Sort ist
+  für Drawer/Favoriten nachweislich total (kein Input-Order-Effekt), für Recents
+  nur mit einem expliziten Alpha-Tie-Break im `putIfAbsent` verhaltensneutral.
+  Weiter bewusst nicht *gebaut*, solange kein anderer Grund `applyCustomNames`
+  ohnehin anfasst — aber jetzt review-fertig statt nur „offen".
 - **`SPEC-DECISION RAL-2`:** `usageFlow` als nacktes `Unit`-Signal (Trigger, Sort
   bleibt Suspend-Call) vs. als Daten-Flow (Sort wird pure Funktion). Empfehlung: das
   billigere **Unit-Signal**, solange die Suspend-Sort-im-combine bleibt.
