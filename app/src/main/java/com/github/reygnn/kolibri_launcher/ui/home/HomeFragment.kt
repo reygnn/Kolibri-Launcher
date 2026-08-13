@@ -720,10 +720,11 @@ class HomeFragment : Fragment() {
         // Resources.NotFoundException under ProGuard / themed-context).
         val baseMargin = try {
             resources.getDimensionPixelSize(R.dimen.spacing_medium)
-        } catch (e: Exception) {
-            // Catch kept (Expected error, four-category frame): getDimensionPixelSize
-            // can throw Resources.NotFoundException under ProGuard / a themed context.
-            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
+        } catch (e: Resources.NotFoundException) {
+            // Narrowed from Exception (matches the sibling catch above): the only
+            // realistic throw site is getDimensionPixelSize (a renamed/missing dimen
+            // under ProGuard / a themed context surfaces here). No allocation in this
+            // block, so no OutOfMemoryError to widen for.
             AppConstants.FALLBACK_DIMEN_PX
         }
 
