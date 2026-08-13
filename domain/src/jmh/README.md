@@ -8,11 +8,29 @@ so JMH measures it on the JVM directly.
 ## Run
 
 ```bash
-./gradlew :domain:jmh
+./gradlew :domain:jmh                              # full suite (canonical baseline)
 ```
 
 Console prints a summary table; a machine-readable copy lands at
 `domain/build/reports/jmh/results.json` (git-ignored, under `build/`).
+
+The full suite is 30+ min end-to-end (`luminancePass` alone is ~0.4 ms/call
+over two sizes with warmup + forks). For a one-off check of a single function,
+filter by a **regex over the benchmark's fully-qualified name**:
+
+```bash
+./gradlew :domain:jmh -PjmhInclude=ApplyCustomNames    # one class
+./gradlew :domain:jmh -PjmhInclude=filterByName,score  # several (comma-separated)
+./gradlew :domain:jmh -PjmhInclude=AppInfoSearchBenchmark.filterDisplayName  # one arm
+./gradlew :domain:jmh -PjmhExclude=Luminance           # everything except the slow one
+```
+
+`jmhInclude` / `jmhExclude` are the plugin's `includes` / `excludes` regex lists
+wired to a `-P` property (the me.champeau.jmh plugin has no built-in `-P` filter;
+`-Pjmh.includes` is a silent no-op). A **filtered run is partial**, so it writes
+to `results-filtered.json` instead of `results.json` — the committed baseline is
+never clobbered by a subset. Only the unfiltered full run updates the canonical
+`results.json`.
 
 Config lives in `domain/build.gradle.kts` (`jmh { }` block): 3 warmup + 5
 measurement iterations, 1 fork, JSON output. Per-benchmark annotations

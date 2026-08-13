@@ -68,12 +68,40 @@ jmh {
     // `jmh-gradle-plugin`) down to the leaf `jmh` version.
     jmhVersion.set(libs.versions.jmh.asProvider().get())
     resultFormat.set("JSON")
-    resultsFile.set(layout.buildDirectory.file("reports/jmh/results.json"))
     // Modest defaults — enough to stabilise a µs-scale pure function without a
     // multi-minute run. Override per-benchmark via annotations if needed.
     warmupIterations.set(3)
     iterations.set(5)
     fork.set(1)
+
+    // === Ad-hoc subset filter ===================================================
+    // The full suite runs 30+ min end-to-end because `luminancePass` alone is
+    // ~0.4 ms/call over two sizes with warmup+forks; a one-off check of a single
+    // pure function should not pay for that. `includes`/`excludes` are REGEXes
+    // matched against each benchmark's fully-qualified name, comma-separated for
+    // several patterns. There is NO `-P` filter built into the me.champeau.jmh
+    // plugin (the earlier `-Pjmh.includes` attempt was a no-op that only left a
+    // stale JMH lock behind) — these two properties are that missing knob:
+    //
+    //   ./gradlew :domain:jmh -PjmhInclude=ApplyCustomNames   # one class
+    //   ./gradlew :domain:jmh -PjmhInclude=filterByName,score # several
+    //   ./gradlew :domain:jmh -PjmhExclude=Luminance          # everything fast
+    //
+    // Unset → the full suite, which stays the canonical baseline run.
+    val includeFilter = (project.findProperty("jmhInclude") as String?)
+        ?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+    val excludeFilter = (project.findProperty("jmhExclude") as String?)
+        ?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+    includeFilter?.let { includes.set(it) }
+    excludeFilter?.let { excludes.set(it) }
+
+    // A filtered run is PARTIAL, so it must not clobber the committed-baseline
+    // JSON (`results.json`) with a subset — that footgun is the whole reason a
+    // filtered run is worth isolating. Redirect it to a sibling file instead;
+    // the unfiltered baseline run keeps writing the canonical path.
+    val filtered = includeFilter != null || excludeFilter != null
+    val resultsName = if (filtered) "results-filtered.json" else "results.json"
+    resultsFile.set(layout.buildDirectory.file("reports/jmh/$resultsName"))
 }
 
 dependencies {
