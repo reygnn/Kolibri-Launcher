@@ -9,6 +9,11 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Binds a [WallpaperState] to a [ZoomableImageView] by computing and
@@ -26,7 +31,16 @@ import kotlinx.coroutines.CancellationException
  * and reuse, or to construct per call — the cost is negligible.
  */
 class WallpaperViewBinder(
-    private val bitmapLoader: BitmapLoader
+    // maxParallelDecodes is declared BEFORE bitmapLoader on purpose: bitmapLoader is
+    // a `fun interface` and callers construct via trailing-lambda SAM
+    // (`WallpaperViewBinder { uri -> … }`), which binds to the LAST parameter. Keeping
+    // bitmapLoader last preserves every trailing-lambda call site; an Int last would
+    // break them. Production never passes it (default = DEFAULT_MAX_PARALLEL_DECODES);
+    // tests override the cap via the named first arg
+    // (`WallpaperViewBinder(maxParallelDecodes = 2) { uri -> … }`) — named args work
+    // regardless of the private visibility.
+    private val maxParallelDecodes: Int = DEFAULT_MAX_PARALLEL_DECODES,
+    private val bitmapLoader: BitmapLoader,
 ) {
 
     /**
@@ -272,46 +286,64 @@ class WallpaperViewBinder(
         view.visibility = View.INVISIBLE
         view.clearLayers()
 
-        // Track which specs actually made it into the view. A bitmap that
-        // fails to load is skipped (`continue`), which shifts every
-        // following layer's position down by one. The updates in
-        // plan.updates are indexed against the ORIGINAL spec positions, so
-        // they must be remapped onto the surviving layers' real positions
-        // before they are applied — see remapUpdatesToAddedLayers.
-        val addedLayerIds = ArrayList<String>(plan.layers.size)
+        // Phase 1: decode every layer in parallel, bounded to maxParallelDecodes
+        // concurrent decodes. awaitAll preserves input order — decoded[i] is the
+        // result for plan.layers[i] regardless of which decode finished first — so
+        // the add phase below rebuilds z-order exactly. Each decode isolates its own
+        // cancellation rethrow and its own failure-to-value catch (decodeLayer), so
+        // one bad layer never cancels the scope, while a supersede/onDestroyView
+        // cancellation propagates out of awaitAll to the caller (latest-wins). The
+        // semaphore is per-render: it bounds THIS render to maxParallelDecodes, not
+        // the whole system — a rapid supersede can briefly overlap up to 2×cap
+        // in-flight decodes (WALLPAPER_PARALLEL_DECODE_SPEC §5).
+        val decoded: List<LayerDecodeResult> = coroutineScope {
+            val gate = Semaphore(maxParallelDecodes)
+            plan.layers
+                .map { spec -> async { gate.withPermit { decodeLayer(spec) } } }
+                .awaitAll()
+        }
 
-        for (spec in plan.layers) {
-            try {
-                val loaded = bitmapLoader.load(spec.imageUri) ?: continue
-                // Traced (jank): addLayer is synchronous Main-thread view
-                // mutation — one section per decoded layer. No suspension
-                // point inside, so the sync section is balanced on one thread.
-                LaunchTrace.section(LaunchTrace.Names.WALLPAPER_ADD_LAYER) {
-                    view.addLayer(
-                        bitmap = loaded.bitmap,
-                        label = spec.label,
-                        centerCrop = spec.centerCrop,
-                        alpha = spec.alpha,
-                        blendMode = spec.blendMode,
-                        sourceUri = spec.imageUri,
-                        id = spec.id,
-                        sampleSize = loaded.sampleSize,
-                        originalWidth = loaded.originalWidth,
-                        originalHeight = loaded.originalHeight,
-                    )
+        // Phase 2: add the surviving layers to the view IN PLAN ORDER, on the
+        // caller's Main context. Pure synchronous view mutation, no suspension point
+        // — z-order = plan order because we iterate the index-ordered results, not
+        // completion order. A skipped layer (null bitmap or Failed) shifts every
+        // following layer's position down by one, exactly as the old `continue` did;
+        // the updates in plan.updates are indexed against the ORIGINAL spec
+        // positions, so they are remapped onto the surviving layers' real positions
+        // afterwards — see remapUpdatesToAddedLayers.
+        val addedLayerIds = ArrayList<String>(plan.layers.size)
+        for (result in decoded) {
+            when (result) {
+                is LayerDecodeResult.Loaded -> {
+                    // Loader returned null: it already logged (loadBitmapFromUri owns
+                    // that report), so skip silently — matches the old `?: continue`.
+                    val loaded = result.bitmap ?: continue
+                    // Traced (jank): addLayer is synchronous Main-thread view
+                    // mutation — one section per decoded layer. No suspension
+                    // point inside, so the sync section is balanced on one thread.
+                    LaunchTrace.section(LaunchTrace.Names.WALLPAPER_ADD_LAYER) {
+                        view.addLayer(
+                            bitmap = loaded.bitmap,
+                            label = result.spec.label,
+                            centerCrop = result.spec.centerCrop,
+                            alpha = result.spec.alpha,
+                            blendMode = result.spec.blendMode,
+                            sourceUri = result.spec.imageUri,
+                            id = result.spec.id,
+                            sampleSize = loaded.sampleSize,
+                            originalWidth = loaded.originalWidth,
+                            originalHeight = loaded.originalHeight,
+                        )
+                    }
+                    addedLayerIds.add(result.spec.id)
                 }
-                addedLayerIds.add(spec.id)
-            } catch (e: CancellationException) {
-                // Rethrow per canonical: bitmapLoader.load is a suspension
-                // point (HomeFragment wraps the decode in withContext(IO)),
-                // and cancellation is normal control flow on this path — the
-                // render job is cancelled by the next wallpaper state
-                // (latest-wins) and by onDestroyView. Letting it fall into
-                // the Throwable branch below reports a bogus crash AND keeps
-                // decoding the remaining layers on behalf of a dead job.
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error loading layer ${spec.id}")
+                // Loader threw a real (non-cancellation) error: report once and skip
+                // the layer. Logged here in the single-threaded Phase 2 (not inside
+                // the async) so reports stay deterministic in plan order and a
+                // DEBUG-only silentError throw (Rule 9) cannot escape a decode
+                // coroutine and cancel its siblings across threads.
+                is LayerDecodeResult.Failed ->
+                    TimberWrapper.silentError(result.error, "Error loading layer ${result.spec.id}")
             }
         }
 
@@ -335,6 +367,43 @@ class WallpaperViewBinder(
         // skipped load can't scramble the property assignment.
         val effectiveUpdates = remapUpdatesToAddedLayers(plan.layers, plan.updates, addedLayerIds)
         applyUpdates(view, effectiveUpdates, onRebuildComplete, revealWhenDone = true)
+    }
+
+    /**
+     * Decode a single layer, converting every outcome into a [LayerDecodeResult]
+     * value so [applyFullRebuild]'s parallel decode phase can collect results
+     * without one layer's failure tearing down the others.
+     *
+     * - `load` returning `null` → [LayerDecodeResult.Loaded] with a null bitmap; the
+     *   loader already reported it, so the add phase skips it silently.
+     * - `load` throwing a real error → [LayerDecodeResult.Failed]; the add phase logs
+     *   it once (in single-threaded Phase 2, not here) and skips the layer.
+     * - `CancellationException` → rethrown, never collapsed into [LayerDecodeResult.Failed]:
+     *   `bitmapLoader.load` is the suspension point (HomeFragment wraps the decode in
+     *   `withContext(IO)`), and cancellation is normal control flow here — a
+     *   latest-wins wallpaper switch or `onDestroyView` cancels the render. Swallowing
+     *   it would file a bogus ACRA report and keep decoding for a dead job. This is
+     *   the file's `cancel_files` contract (Rule 11 cancellation-rethrow linter): the
+     *   broad `catch (Throwable)` sits behind this `CancellationException`-first arm.
+     */
+    private suspend fun decodeLayer(spec: LayerLoadSpec): LayerDecodeResult =
+        try {
+            LayerDecodeResult.Loaded(spec, bitmapLoader.load(spec.imageUri))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            LayerDecodeResult.Failed(spec, e)
+        }
+
+    /**
+     * Outcome of one layer decode in [applyFullRebuild]'s parallel decode phase.
+     * [Loaded] carries the (possibly null) bitmap; [Failed] carries the error so the
+     * add phase can report it once. Cancellation is never modelled here — it is
+     * rethrown out of [decodeLayer] instead.
+     */
+    private sealed interface LayerDecodeResult {
+        data class Loaded(val spec: LayerLoadSpec, val bitmap: DecodedWallpaperBitmap?) : LayerDecodeResult
+        data class Failed(val spec: LayerLoadSpec, val error: Throwable) : LayerDecodeResult
     }
 
     private fun applyUpdates(
@@ -411,6 +480,16 @@ class WallpaperViewBinder(
     }
 
     companion object {
+        /**
+         * Default upper bound on concurrent layer decodes in [applyFullRebuild]'s
+         * parallel decode phase. BitmapFactory decode is CPU-heavy; capping at 4
+         * (≈ core count on the target device class) keeps the CPU from
+         * oversubscribing and bounds the concurrent decode-memory transient. The
+         * measured 4-layer case never hits the cap; it is the insurance against the
+         * high-layer-count re-eval case (WALLPAPER_PARALLEL_DECODE_SPEC §4.5).
+         */
+        const val DEFAULT_MAX_PARALLEL_DECODES = 4
+
         /**
          * Remap [updates] — whose `layerIndex` is expressed against the
          * planned layer positions in [plannedLayers] — onto the actual

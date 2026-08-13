@@ -81,28 +81,33 @@ class WallpaperViewBinderCancellationTest {
 
     @Test
     fun `cancelled decode propagates instead of being reported as an error`() = runTest {
-        val loadedUris = mutableListOf<String>()
-        val binder = WallpaperViewBinder { uri ->
-            loadedUris.add(uri.toString())
+        val binder = WallpaperViewBinder { _ ->
             throw CancellationException("render job superseded")
         }
 
         val thrown = runCatching { binder.bind(view(), twoLayerState()) }.exceptionOrNull()
 
+        // The two guarantees that actually matter, both under the parallel decode:
         assertTrue(
             "cancellation must reach the caller, not the silentError branch — got $thrown",
             thrown is CancellationException
-        )
-        assertEquals(
-            "the loop must abort on cancellation instead of decoding the next layer",
-            1,
-            loadedUris.size
         )
         assertEquals(
             "a cancelled render is not a crash — nothing may be reported",
             emptyList<String>(),
             loggedErrors
         )
+        // NOTE: the old `loadedUris.size == 1` assertion was intentionally dropped.
+        // The decode is now parallel: all layers' `async` bodies are pre-launched
+        // before awaitAll suspends, and a spontaneously-thrown CancellationException
+        // from one child does NOT cancel its siblings (JobSupport treats a
+        // CancellationException cause as handled), so every layer's load() runs
+        // before the cancellation surfaces at the caller. The honest bound would be
+        // `<= plan.layers.size`, which is trivially true and carries no signal — so
+        // the count is not asserted at all. (In production, latest-wins cancellation
+        // comes from an external job.cancel() that DOES propagate down and cancel
+        // in-flight children — a different mechanism than this fake models, but one
+        // that satisfies the same two invariants above.)
     }
 
     // ===========================================
