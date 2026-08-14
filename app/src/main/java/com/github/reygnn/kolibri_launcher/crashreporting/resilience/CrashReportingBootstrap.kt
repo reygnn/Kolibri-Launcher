@@ -91,6 +91,37 @@ object CrashReportingBootstrap {
             }
         }
 
+        // ⚠️ KNOWN BUG (confirmed on-device 2026-08-14, release 0.99.167, stack
+        // deobfuscated via mapping.txt) — the bootstrap consent read below throws
+        // NullPointerException on EVERY cold start. `base.consentDataStore` resolves
+        // the androidx `PreferenceDataStoreSingletonDelegate.getValue`, which
+        // dereferences `base.applicationContext` — NULL during attachBaseContext
+        // (the framework assigns LoadedApk.mApplication only AFTER newApplication()
+        // returns, i.e. after this method). The NPE aborts applyConsentGate.
+        //
+        // What that BREAKS (bootstrap-time reporting):
+        //   1. The Thread.setDefaultUncaughtExceptionHandler(UncaughtCrashHandler)
+        //      call BELOW is skipped (the throw escapes to KolibriLauncherApp's
+        //      outer catch) → the unified breadcrumb handler is never installed.
+        //   2. ACRA stays disabled through onCreate, so `reportPendingAnrsAsync`
+        //      drains post-mortem ANRs into a DISABLED reporter → ANR reports lost.
+        //   3. Crashes in the early cold-start window go unreported.
+        //
+        // What SURVIVES (do NOT overstate this as "ACRA is dead"): for a Granted
+        // user, `MainActivity.checkAndShowCrashReportConsent` → `reaffirmConsent`
+        // re-enables ACRA via the POST-Hilt repository (valid @ApplicationContext,
+        // works). That reaffirm was added as a net for EXACTLY this failed-bootstrap
+        // case (see its comment). So steady-state runtime crash/silentError
+        // reporting recovers once MainActivity starts; only the three bootstrap-time
+        // paths above are defeated.
+        //
+        // Invisible because: unit tests exercise readDecision(dataStore) with a FAKE
+        // store, never this context→extension path; Rule 7 swallows the throw
+        // ("CRITICAL: Failed to initialize crash reporting"); "ACRA off" is the
+        // privacy-safe default; and the MainActivity net masks the steady state.
+        // Present since the Cutover-B rewrite (83dbff00). FIX: gate consent where
+        // applicationContext exists + a regression test over the REAL extension
+        // path. See the fix/acra-consent-bootstrap-npe branch.
         // §12·1: immediately after init, disable first, then read consent (A1).
         applyConsentGate(
             setEnabled = { ACRA.errorReporter.setEnabled(it) },
