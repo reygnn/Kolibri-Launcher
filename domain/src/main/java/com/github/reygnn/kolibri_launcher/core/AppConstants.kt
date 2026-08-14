@@ -78,6 +78,32 @@ object AppConstants {
      */
     const val CONSENT_DATASTORE_NAME = "acra_consent"
 
+    /**
+     * Separate DataStore file for the time-weighted app-usage timestamps
+     * (the [KEY_USAGE_PREFIX] keys).
+     *
+     * Kept apart from [SETTINGS_DATASTORE_NAME] on purpose (AUDIT-19 F1): a
+     * usage timestamp is written on EVERY app launch, and Preferences DataStore
+     * re-serialises the WHOLE backing file per edit and re-emits it to every
+     * collector of that store. Co-locating the highest-frequency writer with
+     * all other user state therefore rewrote the full settings blob and woke
+     * every settings / favorites / custom-names collector on each launch. Its
+     * own file confines that churn to a small file with a single collector.
+     *
+     * No migration from the old settings-store keys (same choice as the
+     * consent split): on the update that ships this, usage history is not
+     * carried over — the store starts empty and the [SortOrder.TIME_WEIGHTED_USAGE]
+     * default sort rebuilds as apps are launched. The old usage keys are left
+     * untouched in the settings store; they are dead weight for existing
+     * installs but no longer written, so they no longer drive the per-launch
+     * churn this split removes.
+     *
+     * Included in Auto Backup / device-transfer once populated: the backup
+     * rules include the whole `datastore/` directory and exclude only the
+     * consent file, so this file travels with a restore like any other store.
+     */
+    const val USAGE_DATASTORE_NAME = "kolibri_usage"
+
     // App Usage Tracking Constants
     /**
      * Zerfallskonstante für zeitgewichtete Nutzungsstatistik.

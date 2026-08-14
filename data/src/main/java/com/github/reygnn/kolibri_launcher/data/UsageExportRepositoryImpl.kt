@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.di.UsageDataStore
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -49,7 +50,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class UsageExportRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>,
+    @param:UsageDataStore private val dataStore: DataStore<Preferences>,
     @param:ApplicationContext private val context: Context,
     @param:Named("appVersionName") private val appVersionName: String,
 ) : UsageExportRepository {

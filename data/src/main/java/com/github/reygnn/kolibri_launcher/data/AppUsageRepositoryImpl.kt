@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
+import com.github.reygnn.kolibri_launcher.di.UsageDataStore
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -70,7 +71,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class AppUsageRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>,
+    @param:UsageDataStore private val dataStore: DataStore<Preferences>,
     @param:ApplicationContext private val context: Context
 ) : AppUsageRepository {
 

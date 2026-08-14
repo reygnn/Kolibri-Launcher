@@ -45,6 +45,24 @@ internal val Context.consentDataStore: DataStore<Preferences> by preferencesData
     name = AppConstants.CONSENT_DATASTORE_NAME
 )
 
+/**
+ * Separate DataStore<Preferences> holding ONLY the time-weighted app-usage
+ * timestamps (the [AppConstants.KEY_USAGE_PREFIX] keys). Split out of
+ * [settingsDataStore] in AUDIT-19 F1 because usage is written on every app
+ * launch and Preferences DataStore re-serialises the whole file per edit —
+ * its own file confines that churn and its collector fan-out.
+ *
+ * No migration from the old settings-store keys (same choice as the consent
+ * store): on the update that ships this, usage history starts empty and
+ * rebuilds as apps are launched. `private`: nothing outside this file touches
+ * the extension — runtime consumers inject the qualified `DataStore<Preferences>`
+ * from [DataStoreModule.provideUsageDataStore], and unlike the consent store
+ * there is no pre-Hilt bootstrap path here.
+ */
+private val Context.usageDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = AppConstants.USAGE_DATASTORE_NAME
+)
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DataStoreModule {
@@ -67,5 +85,17 @@ object DataStoreModule {
     @ConsentDataStore
     fun provideConsentDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.consentDataStore
+    }
+
+    /**
+     * The usage [usageDataStore], qualified with [UsageDataStore] so it does
+     * not collide with the unqualified settings store. Injected by
+     * `AppUsageRepositoryImpl` and `UsageExportRepositoryImpl` (AUDIT-19 F1).
+     */
+    @Provides
+    @Singleton
+    @UsageDataStore
+    fun provideUsageDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return context.usageDataStore
     }
 }
