@@ -15,17 +15,18 @@
 > **bewusst minimalistischen text-only Launcher** wurde „mehr Caching/Deko" NICHT
 > als Defekt gewertet; nur echte, mess­bare Rechen-/IO-/Latenz-Verschwendung.
 >
-> **Status: F1–F4 gemergt; F5 auf Branch umgesetzt (Merge ausstehend); F6 bewusst
-> verworfen; F7–F8 offen.** Acht Funde in zwei Clustern (DataStore-Schreiblast,
-> Wallpaper-Luminanz) plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split),
-> **F2** (`wallpaperState`-Projektion), **F3 + F4** (bounded Luminanz-Decode +
-> Projektion + URI-Memo) sind nach `main` gemergt — F3/F4 zusätzlich per
-> On-Device-A/B (Perfetto-Alternative: Decode-Count) bestätigt. **F5**
-> (reaktive App-Liste statt Per-`onStart`-Enumeration) ist auf Branch
-> `refactor/reactive-applist-onstart` implementiert (mit Tests), noch **nicht**
-> gemergt. **F6** (`runBlocking`-Consent-Read) wurde nach Perfetto-Messung
-> (~4 ms warm / ~9,7 ms disk-cold; alter Trace sagte <1 ms) **bewusst verworfen**
-> — Aufwand/Nutzen zu gering. F7–F8 offen.
+> **Status: ABGESCHLOSSEN. F1–F5 umgesetzt & gemergt; F6–F8 bewusst verworfen.**
+> Acht Funde in zwei Clustern (DataStore-Schreiblast, Wallpaper-Luminanz) plus
+> Cold-Start-Latenz. **F1** (Usage-DataStore-Split), **F2**
+> (`wallpaperState`-Projektion), **F3 + F4** (bounded Luminanz-Decode + Projektion
+> + URI-Memo), **F5** (reaktive App-Liste statt Per-`onStart`-Enumeration) sind
+> nach `main` gemergt — F3/F4/F5 zusätzlich **on-device belegt** (F3/F4 per
+> Decode-Count-A/B; F5 per `drawer_apps_enumerate`-A/B: 0 Enumerationen/Foreground
+> vs. vorher ~1, Reaktivität intakt). **F6–F8 bewusst verworfen** nach Messung +
+> Race-Analyse (§Rest-Bilanz unter F8): die Cold-Start-Funde kosten Sub-ms bis
+> ~1 ms *und* die synchrone Main-Arbeit trägt zur Korrektheit des ersten Frames
+> bei — ein Fix würde einen user-sichtbaren Start-Flicker (F7) bzw. einen Eingriff
+> in den zentralen Home-State (F8) einhandeln. Schlechtes Risiko/Nutzen-Verhältnis.
 
 ---
 
@@ -290,7 +291,18 @@ sind also gering.
 `KolibriLauncherApp.kt:59`) verschieben und `reportPendingAnrsAsync` an dessen
 Abschluss hängen, statt `runBlocking` auf Main.
 
-### F7 — `WallpaperManager.getWallpaperColors` (Binder) auf Main in `onCreate`
+### F7 — `WallpaperManager.getWallpaperColors` (Binder) auf Main in `onCreate` · ⏹️ bewusst verworfen
+
+> **Verworfen** (Messung + Race-Analyse). Gemessen: `cold_start_wallpaper_colors`
+> ≈ **1 ms** (atrace). Risiko des Fixes: **MITTEL-HOCH**.
+> `SystemWallpaperColorsSignal` startet auf `null`, und der Poll läuft synchron in
+> `Application.onCreate` — also *vor* der ersten Klassifizierung in
+> `MainActivity`/`ThemingDelegate`, damit der Signal-Wert bereitsteht. Verschöbe
+> man ihn auf IO, klassifiziert der erste Frame für System-Wallpaper-Nutzer (kein
+> Kolibri-Wallpaper) mit `system=null` → DARK-Fallback, und korrigiert erst, wenn
+> der Async-Poll landet → **sichtbarer Dark→Light-Flash der AppDrawer-Surface pro
+> Cold-Start**. Der synchrone Poll ist damit *load-bearing* für ein flicker-freies
+> erstes Bild; ~1 ms dafür ist ein guter Tausch. Kein Defekt.
 `app/.../KolibriLauncherApp.kt:170-172,200-219`
 
 `registerSystemWallpaperColorsListener()` läuft in `onCreate` auf dem Main-Thread
@@ -305,7 +317,38 @@ Initial-Poll ist der blockierende Teil.
 `StateFlow.value =` des Signals ist idempotent (per bestehendem Kommentar), eine
 etwas spätere erste Emission ist harmlos.
 
-### F8 — Eager ViewModel-Init: Sticky-Battery-Binder + `Eagerly` `uiState`
+### F8 — Eager ViewModel-Init: Sticky-Battery-Binder + `Eagerly` `uiState` · ⏹️ bewusst verworfen
+
+> **Verworfen** (Risiko/Nutzen). Zwei Teile:
+> - **Sticky-Battery-Read auf Main** (`ClockDelegate.getInitialBatteryState`,
+>   `registerReceiver(null, ACTION_BATTERY_CHANGED)`): Sub-ms Binder-Read. Risiko
+>   **NIEDRIG-MITTEL** — verschöbe man ihn, zeigt der erste Frame den
+>   `DEFAULT_BATTERY`-Platzhalter bis der Async-Read landet → kurzer
+>   Battery-Text-Flicker. Nutzen marginal.
+> - **`uiState` `Eagerly` → `WhileSubscribed`**: Risiko **MITTEL**. `uiState` ist
+>   der *zentrale* Home-State (time/date/battery/events-`combine`), höchste
+>   Blast-Radius-Stelle. `Eagerly` ist für einen immer-präsenten Home
+>   argumentierbar korrekt (State sofort da bei Rückkehr, kein Re-Compute-Lag);
+>   `WhileSubscribed` würde Ticker/Battery/Events über Navigations-Lücken
+>   stoppen/neustarten → mögliche Re-Emission/Stale-Frame. Nutzen (nicht rechnen
+>   während der Drawer offen ist) ist ein Minuten-Tick → vernachlässigbar.
+>
+> Beide: Sub-ms-/marginaler Gewinn gegen sichtbaren Flicker bzw. Eingriff in den
+> zentralen State-Flow. Nicht wert. Wie F6/F7 „works as intended", kein Defekt.
+
+---
+
+## Rest-Bilanz (F6–F8 verworfen)
+
+Die drei Cold-Start-Funde teilen ein Muster: das statische Audit markierte sie als
+„Main-Thread-Binder/`runBlocking`/eager = schlecht", aber **Messung + Race-Analyse
+drehen das Urteil**. Alle kosten Sub-ms bis ~1 ms (F6: ~4 ms warm), *und* die
+synchrone Main-Arbeit trägt zur Korrektheit des ersten Frames bei (Consent-Gate,
+flicker-freie Surface-/Battery-Anzeige, sofort-präsenter Home-State). Ein Fix
+handelte user-sichtbare Regressionen ein (Start-Flicker) oder fasste den zentralen
+Home-State an — für einstellige Millisekunden ohne spürbaren Effekt. Bewusst
+belassen. Re-Evaluierungs-Trigger: falls eine der Slices unter I/O-Druck im Tail
+mal deutlich spikt (Perfetto-Re-Trace), einzeln neu bewerten.
 `app/.../LauncherViewModel.kt:292-299` (`init`), `:247-251` (`uiState`) ·
 `app/.../delegate/ClockDelegate.kt:62-82,166-180` · `app/.../ui/base/BaseActivity.kt:60,87`
 
@@ -405,16 +448,21 @@ mehrere Runden stark durchoptimiert (§3 ist lang), die Funde bündeln sich in
   (`runBlocking`-Consent), zwei Binder-Calls in `onCreate`, doppelte App-
   Enumeration.
 
-**Empfohlene Umsetzungs-Reihenfolge (höchster Hebel, minimales Risiko):**
+**Umgesetzt (in Reihenfolge, je eigener Branch → `main`):**
 
-1. **F1** — Usage-DataStore-Split. Erschlägt die Write-Amplification **und** den
-   Per-Launch-Trigger von F2 auf einen Schlag. (Branch z. B. `refactor/usage-datastore-split`)
-2. **F3 + F4** — bounded Luminanz-Decode + URI-Memo. Killt den größten
-   CPU/Memory-Peak. (Branch z. B. `fix/wallpaper-luminance-perf`)
-3. **F6** — Consent-Read von Main verschieben. Der eine garantierte Main-Thread-
-   Block vor dem ersten Frame. (Branch z. B. `fix/cold-start-consent-read`)
+1. **F1** — Usage-DataStore-Split (ohne Migration). Write-Amplification weg,
+   entschärft zugleich F2s Per-Launch-Trigger.
+2. **F3 + F4** — bounded Luminanz-Decode + Projektion + URI-Memo. On-Device-A/B:
+   ~192× weniger dekodierte Pixel/Cold-Start; Transform-Session ~12 Decodes → 0.
+3. **F2** — `wallpaperState`-Projektion (der übersehene AUDIT-14-Sibling).
+4. **F5** — reaktive App-Liste (`PACKAGE_CHANGED` + Locale-Hook) statt
+   Per-`onStart`-Enumeration. On-Device-A/B: 0 Enumerationen/Foreground (vorher
+   ~1), Reaktivität intakt.
 
-F2, F5, F7, F8 danach als Follow-ups im jeweiligen Cluster-Branch.
+**Bewusst verworfen:** F6 (`runBlocking`-Consent, ~4 ms warm — alter Trace <1 ms),
+F7 (`getWallpaperColors` ~1 ms, load-bearing gegen Surface-Flicker), F8
+(Sub-ms-Battery + `Eagerly` `uiState` = zentraler State) — siehe Rest-Bilanz.
+Einstellige ms *und* Korrektheits-tragend; Fix-Risiko > Nutzen.
 
-**Status: nichts umgesetzt** — reine Read-Only-Analyse, kein Code verändert. Jeder
-Cluster als eigener Branch, sobald Umsetzung freigegeben ist.
+**Status: ABGESCHLOSSEN.** F1–F5 gemergt & (F3/F4/F5) on-device belegt; F6–F8
+dokumentiert verworfen.
