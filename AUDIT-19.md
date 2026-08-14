@@ -15,13 +15,14 @@
 > **bewusst minimalistischen text-only Launcher** wurde „mehr Caching/Deko" NICHT
 > als Defekt gewertet; nur echte, mess­bare Rechen-/IO-/Latenz-Verschwendung.
 >
-> **Status: F1 gemergt; F3 + F4 auf Branch umgesetzt (Merge ausstehend); F2, F5–F8
+> **Status: F1, F3, F4 gemergt; F2 auf Branch umgesetzt (Merge ausstehend); F5–F8
 > offen.** Acht Funde in zwei Clustern (DataStore-Schreiblast, Wallpaper-Luminanz)
-> plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split, ohne Migration) ist nach
-> `main` gemergt. **F3 + F4** (bounded Luminanz-Decode + Projektion + URI-Memo)
-> sind auf Branch `fix/wallpaper-luminance-perf` implementiert (mit Tests), noch
-> **nicht** gemergt. F2, F5–F8 sind reine Read-Only-Analyse, kein Code verändert;
-> je ein eigener Branch pro Cluster empfohlen (§4).
+> plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split), **F3 + F4** (bounded
+> Luminanz-Decode + Projektion + URI-Memo) sind nach `main` gemergt — F3/F4
+> zusätzlich per On-Device-A/B (Perfetto-Alternative: Decode-Count) bestätigt.
+> **F2** (`wallpaperState`-Projektion) ist auf Branch `fix/wallpaper-state-reparse`
+> implementiert (mit Tests), noch **nicht** gemergt. F5–F8 sind reine Read-Only-
+> Analyse, kein Code verändert; je ein eigener Branch pro Cluster empfohlen (§4).
 
 ---
 
@@ -95,7 +96,20 @@ isoliert den Per-Launch-Write auf ein kleines File und nimmt die Usage-Churn aus
 jedem Settings-/Favoriten-/Names-Collector. **Einzelner wirkungsvollster Eingriff**
 — löst mechanisch auch den Trigger von F2 und den Großteil der DataStore-Low-Notes.
 
-### F2 — `wallpaperState` re-parst JSON + File-Stats bei jedem Launch, ×3
+### F2 — `wallpaperState` re-parst JSON + File-Stats bei jedem Launch, ×3 · 🔧 auf Branch umgesetzt
+
+> **Umgesetzt** (Branch `fix/wallpaper-state-reparse`, **noch nicht gemergt**):
+> `wallpaperState` projiziert jetzt via `filterToWallpaperKeys()` auf die sechs
+> Wallpaper-Keys und `distinctUntilChanged` **vor** dem `parseWallpaperState`-`map`
+> — Parse (JSON) + Per-Layer-`fileExists()`-Stat laufen nur noch bei echter
+> Wallpaper-Änderung. Zwei Regressionstests (unrelated Key → kein Re-Emit/Re-Stat;
+> Wallpaper-Key → doch). **Severity-Korrektur:** F1 hat den schlimmsten Trigger
+> bereits entfernt — der Usage-Tick (pro App-Start) lag im geteilten Store und
+> re-emittierte `wallpaperState`; seit dem Usage-Split feuert F2 nur noch bei
+> **user-getriebenen** Settings-Writes (Favorit/Hidden/Name/Farbe/Layout/Order/
+> FAB/Swipe), nicht mehr pro Launch. Damit real eher **Low/Konsistenz-Fix** als
+> die ursprünglich notierte MED-HIGH — der eine übersehene AUDIT-14-Sibling wird
+> jetzt konsistent mit den Geschwistern.
 `data/.../data/WallpaperRepositoryImpl.kt:82-92` (Flow), `:98-159` (`parseWallpaperState`)
 
 `wallpaperState` liegt auf demselben geteilten Settings-DataStore und ist der
@@ -135,10 +149,11 @@ Ein bloßes trailing `distinctUntilChanged` nach dem aktuellen `.map` reicht
 **nicht** — es dedupt nur den Output, der Parse+Stat läuft weiter bei jedem
 fremden Write. (F1s Store-Split entfernt zusätzlich den Per-Launch-*Trigger*.)
 
-### F3 — Unbounded Full-Res-Decode nur für ein 32×32-Sample · 🔧 auf Branch umgesetzt
+### F3 — Unbounded Full-Res-Decode nur für ein 32×32-Sample · ✅ gemergt
 `data/.../wallpaper/WallpaperBitmapLuminanceImpl.kt:95-99` (`loadBitmap`), `:107` (`classify`)
 
-> **Umgesetzt** (Branch `fix/wallpaper-luminance-perf`, **noch nicht gemergt**):
+> **Umgesetzt & gemergt** (Branch `fix/wallpaper-luminance-perf` → `main`; per
+> On-Device-A/B bestätigt):
 > `loadBitmap` macht jetzt einen Zwei-Pass-Decode (`inJustDecodeBounds` →
 > `inSampleSize`), die Power-of-two-Mathe als reine, JVM-testbare
 > `luminanceInSampleSize` (`data/.../wallpaper/LuminanceDownsampling.kt`, Budget
@@ -169,11 +184,12 @@ Echtes OOM-Risiko und der größte einzelne CPU/Memory-Peak dieses Bereichs.
 32×32. Reduziert die Decode-Kosten um Größenordnungen ohne Änderung des Median-
 Ergebnisses.
 
-### F4 — Klassifizierung feuert bei jedem Transform-Edit + läuft doppelt · 🔧 auf Branch umgesetzt
+### F4 — Klassifizierung feuert bei jedem Transform-Edit + läuft doppelt · ✅ gemergt
 `domain/.../usecase/ClassifyWallpaperUseCase.kt:82-85`, Consumer
 `ObserveUiColorsUseCase.kt:35` + `ResolveWallpaperSurfaceUseCase.kt:26`
 
-> **Umgesetzt** (Branch `fix/wallpaper-luminance-perf`, **noch nicht gemergt**):
+> **Umgesetzt & gemergt** (Branch `fix/wallpaper-luminance-perf` → `main`; per
+> On-Device-A/B bestätigt):
 > **F4.1** — `kolibriInternalFlow` projiziert jetzt vor dem `distinctUntilChanged`
 > auf `pickDominantUri(state)` (`.map { … }.distinctUntilChanged().map { uri → … }`),
 > Transform-only-Änderungen (gleiche URI) triggern keinen Decode mehr.

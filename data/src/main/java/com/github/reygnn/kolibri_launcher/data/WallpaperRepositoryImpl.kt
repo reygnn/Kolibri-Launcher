@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
@@ -16,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -81,15 +83,44 @@ class WallpaperRepositoryImpl @Inject constructor(
 
     override val wallpaperState: Flow<WallpaperState> =
         dataStore.safeReadFlow("Error reading wallpaper preferences")
-        .map { preferences ->
+        // Project to only the wallpaper keys and dedup BEFORE the parse
+        // (AUDIT-19 F2). parseWallpaperState does a JSON parse plus a per-layer
+        // fileExists() disk stat; the shared settings DataStore re-emits the
+        // whole Preferences on ANY write (a favorite toggle, a colour change,
+        // …), so without this projection every unrelated write re-ran that
+        // parse + N stats for an unchanged wallpaper — the one sibling flow
+        // that missed the AUDIT-14 projection+distinct fix. A trailing distinct
+        // would not help: it dedups the output but the parse+stat already ran.
+        .map { preferences -> preferences.filterToWallpaperKeys() }
+        .distinctUntilChanged()
+        .map { wallpaperPreferences ->
             try {
-                parseWallpaperState(preferences)
+                parseWallpaperState(wallpaperPreferences)
             } catch (e: Throwable) {
                 // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
                 TimberWrapper.silentError(e, "Error parsing wallpaper state")
                 WallpaperState.NONE
             }
         }
+
+    /**
+     * The subset of [this] holding only the wallpaper keys (AUDIT-19 F2). Gates
+     * [wallpaperState] via `distinctUntilChanged` so the parse + per-layer
+     * `fileExists()` stat runs only when a wallpaper key actually changed, not
+     * on every unrelated write to the shared settings store. Typed per key —
+     * no unchecked generic copy. [parseWallpaperState] reads only these keys,
+     * so it works on the filtered subset identically.
+     */
+    private fun Preferences.filterToWallpaperKeys(): Preferences {
+        val out = mutablePreferencesOf()
+        this[KEY_LAYERS_JSON]?.let { out[KEY_LAYERS_JSON] = it }
+        this[KEY_WALLPAPER_URI]?.let { out[KEY_WALLPAPER_URI] = it }
+        this[KEY_WALLPAPER_SCALE]?.let { out[KEY_WALLPAPER_SCALE] = it }
+        this[KEY_WALLPAPER_TRANSLATE_X]?.let { out[KEY_WALLPAPER_TRANSLATE_X] = it }
+        this[KEY_WALLPAPER_TRANSLATE_Y]?.let { out[KEY_WALLPAPER_TRANSLATE_Y] = it }
+        this[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE]?.let { out[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
+        return out.toPreferences()
+    }
 
     /**
      * Parst den WallpaperState aus den DataStore Preferences.

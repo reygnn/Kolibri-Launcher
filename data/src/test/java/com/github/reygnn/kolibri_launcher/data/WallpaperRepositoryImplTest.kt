@@ -20,6 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -502,6 +503,59 @@ class WallpaperRepositoryImplTest {
         val prefs = dataStore.data.first()
         assertEquals(-999f, prefs[KEY_WALLPAPER_TRANSLATE_X])
         assertEquals(-1500f, prefs[KEY_WALLPAPER_TRANSLATE_Y])
+    }
+
+    // ===========================================
+    // AUDIT-19 F2: projection + distinct before the parse. An unrelated
+    // write to the shared store must NOT re-run parseWallpaperState (JSON
+    // parse + per-layer fileExists stat); a wallpaper-key change must.
+    // ===========================================
+
+    @Test
+    fun `unrelated preference change does not re-parse wallpaper state`() = runTest {
+        dataStore.seed {
+            it[KEY_WALLPAPER_URI] = "file:///data/wp.jpg"
+            it[KEY_WALLPAPER_SCALE] = 1.0f
+        }
+
+        val emissions = mutableListOf<WallpaperState>()
+        val job = launch { manager.wallpaperState.collect { emissions.add(it) } }
+        advanceUntilIdle()
+
+        // Baseline: parsed once (one fileExists stat for the single layer).
+        assertEquals(1, emissions.size)
+        verify(exactly = 1) { fileManager.fileExists(any<Uri>()) }
+
+        // Merge in an UNRELATED key (edit() keeps the wallpaper keys intact).
+        dataStore.edit { it[stringPreferencesKey("some_unrelated_setting")] = "x" }
+        advanceUntilIdle()
+
+        job.cancel()
+
+        assertEquals("unrelated change must not re-emit wallpaper state", 1, emissions.size)
+        // No re-parse → no second disk stat.
+        verify(exactly = 1) { fileManager.fileExists(any<Uri>()) }
+    }
+
+    @Test
+    fun `wallpaper key change does re-parse and re-emit`() = runTest {
+        dataStore.seed {
+            it[KEY_WALLPAPER_URI] = "file:///data/wp.jpg"
+            it[KEY_WALLPAPER_SCALE] = 1.0f
+        }
+
+        val emissions = mutableListOf<WallpaperState>()
+        val job = launch { manager.wallpaperState.collect { emissions.add(it) } }
+        advanceUntilIdle()
+
+        // Change a WALLPAPER key — must pass the distinct gate.
+        dataStore.edit { it[KEY_WALLPAPER_SCALE] = 2.0f }
+        advanceUntilIdle()
+
+        job.cancel()
+
+        assertEquals("a real wallpaper change must re-emit", 2, emissions.size)
+        assertEquals(2.0f, emissions.last().scale)
     }
 }
 
