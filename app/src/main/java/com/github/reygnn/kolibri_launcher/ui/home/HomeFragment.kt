@@ -1390,10 +1390,9 @@ class HomeFragment : Fragment() {
 
     private fun setupHomeWindowInsets() {
         // No try/catch per Rule 11. Body is property reads (paddingLeft
-        // etc.), a safe `as?` cast (returns null on miss), and
-        // setOnApplyWindowInsetsListener registration. The lambda body
-        // running later is also pure: getInsets, setPadding, property
-        // writes. Programmer-error only.
+        // etc.) and setOnApplyWindowInsetsListener registration. The
+        // lambda body running later is also pure: getInsets, setPadding.
+        // Programmer-error only.
         val initialRootPadding = android.graphics.Rect(
             binding.rootLayout.paddingLeft,
             binding.rootLayout.paddingTop,
@@ -1401,38 +1400,27 @@ class HomeFragment : Fragment() {
             binding.rootLayout.paddingBottom
         )
 
-        val timeContainerParams =
-            binding.timeContainer.layoutParams as? ViewGroup.MarginLayoutParams
-        if (timeContainerParams == null) {
-            TimberWrapper.silentError("TimeContainer params not MarginLayoutParams")
-            ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                v.setPadding(
-                    initialRootPadding.left + systemBars.left,
-                    initialRootPadding.top + systemBars.top,
-                    initialRootPadding.right + systemBars.right,
-                    initialRootPadding.bottom + systemBars.bottom
-                )
-                insets
-            }
-            return
-        }
-
-        val initialTimeMarginTop = timeContainerParams.topMargin
-
+        // The status bar is hidden on home and shown only transiently by
+        // swipe (BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, see hideStatusBar()).
+        // Transient bars are overlays — they must NOT consume layout space.
+        // Feeding systemBars.top into the top margin/padding made the whole
+        // content block (clock + favorites) jump up by the status-bar height
+        // on every return to home: the first inset pass arrives while the bar
+        // is still visible (top ≈ status-bar height), then hideStatusBar() in
+        // onResume triggers a second pass with top = 0 after the first frame.
+        // So the top inset is deliberately ignored here; the designed top
+        // margin (timeContainer's spacing_xlarge) covers the top area, and a
+        // transiently swiped-in status bar overlays it as intended instead of
+        // reflowing the content. Left/right/bottom insets are still applied for
+        // the navigation bar / gesture areas.
         ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
             v.setPadding(
                 initialRootPadding.left + systemBars.left,
                 initialRootPadding.top,
                 initialRootPadding.right + systemBars.right,
                 initialRootPadding.bottom + systemBars.bottom
             )
-
-            timeContainerParams.topMargin = initialTimeMarginTop + systemBars.top
-            binding.timeContainer.layoutParams = timeContainerParams
-
             insets
         }
     }
