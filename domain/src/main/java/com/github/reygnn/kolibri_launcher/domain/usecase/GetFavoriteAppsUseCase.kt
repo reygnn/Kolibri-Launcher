@@ -101,9 +101,8 @@ class GetFavoriteAppsUseCase @Inject constructor(
     ) { rawApps, favorites, hiddenApps, savedOrder, customNames ->
         KolibriLog.d("[DATAFLOW-FAV] Combine triggered - rawApps: ${rawApps.size}, favorites: ${favorites.size}")
 
-        // applyCustomNames' terminal sort is DEAD here: processApps re-sorts by
-        // savedOrder below. Deliberate, not an oversight -- do not "optimize"
-        // it away. See applyCustomNames KDoc (SPEC-DECISION RAL-1a).
+        // applyCustomNames returns input order (map-only, RAL-4); processApps
+        // orders by savedOrder (+ alpha remainder) below.
         val namedApps = applyCustomNames(rawApps, customNames)
 
         // Leere App-Liste → Loading state

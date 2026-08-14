@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 
 /**
  * Applies custom names onto an app list as a pure, reactive re-derivation
@@ -11,64 +10,27 @@ import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
  * is a `combine` re-derivation instead of a full PackageManager re-enumeration.
  *
  * `displayName = names[packageName] ?: originalName`: a package with a custom
- * name shows it, everything else falls back to its original label. The result is
- * re-sorted by `displayName` — this reproduces the post-condition that the
- * enumeration used to guarantee (`processResolveInfoList` `sortedBy {
- * displayName.lowercase() }`), so consumers that do NOT re-sort themselves
- * (CustomNames / Settings screens and the Onboarding picker) keep renamed apps
- * at their custom-name position rather than their original-name position.
+ * name shows it, everything else falls back to its original label.
  *
- * **This is now the sole name-application point (migration step 2b landed):**
- * the enumeration emits the ORIGINAL label (`InstalledAppsRepositoryImpl`
- * `processResolveInfoList`), so `applyCustomNames` is what actually sets a custom
- * `displayName` — no longer the behavior-neutral no-op overlay it was during
- * step 2a, when the enumeration still baked the name in.
+ * **Returns the input order — this function does NOT sort (RAL-4, map-only).**
+ * Name resolution is a shared concern; display ORDER is not. Every displaying
+ * consumer sorts its own list at its display boundary:
+ *  - drawer: alphabetical / time-weighted (`GetDrawerAppsUseCase`);
+ *  - favorites: `savedOrder` + alpha remainder (`FavoritesOrderRepositoryImpl`);
+ *  - recents: recency, with an explicit per-package representative tie-break
+ *    (`pickRecentApps`);
+ *  - CustomNames / Onboarding: `sortedByDisplayName()` (`buildCustomNamesViews`,
+ *    `toOnboardingPicker`);
+ *  - Hidden / Swipe: their own `sortedByDisplayName()` on the master list.
+ * Settings is order-agnostic. The former terminal `.sortedByDisplayName()` was
+ * migration scaffolding — it reproduced the enumeration's sorted post-condition so
+ * consumers didn't have to change during the RAL-1 rollout; with every consumer
+ * now owning its order, that scaffolding is removed. The five-version RAL-4
+ * argument, the JMH `mapOnly` measurement and the two multi-agent reviews live in
+ * git history + `APPLIST_SORT_SPLIT_SPEC.md`.
  *
- * == SPEC-DECISION RAL-1a — the terminal sort is DELIBERATELY bundled; do NOT split ==
- * The `.sortedBy { displayNameLower }` below is load-bearing ONLY for consumers
- * that do NOT re-sort themselves: Site 1's CustomNames / Settings VMs and the
- * Onboarding picker's main list. (The other two Site-1 consumers -- Hidden and
- * Swipe VMs -- re-sort their master list themselves, so for them it is dead work
- * too.) For the three self-sorting reactive consumers -- drawer
- * (GetDrawerAppsUseCase: alpha / time-weighted), favorites (GetFavoriteAppsUseCase:
- * savedOrder), recents (GetRecentAppsUseCase: recency) -- the sort here is DEAD
- * WORK: their own downstream sort discards this order. (Sole caveat: the favorites
- * error-fallback paths in FavoritesOrderRepositoryImpl return the list unsorted, so
- * on those degenerate paths this alphabetical order does surface -- not the steady
- * state.) That dead sort is KNOWN and ACCEPTED, not an oversight.
- *
- * Splitting into a sorted / unsorted pair to skip the dead work has been raised
- * three times -- deferred at AUDIT-14 F1 §5.3, then closed at AUDIT-15 F3 (the
- * 2026-08 review, same decision): the sort runs flowOn(Default) over ~50-200
- * strings (µs, off-Main, in the noise) -> value ~= 0, while a split fragments the
- * RAL-1 invariant "name-application at a source boundary yields the sorted
- * post-condition" -- the exact property that makes the reactive re-derivation a
- * drop-in for the enumeration (which set the label AND sorted atomically). A split
- * therefore needs a spec amendment (RAL-4), touches all call sites, and moves the
- * "must sort myself" knowledge to a weaker place (a future Site-N consumer that
- * forgets it gets a SILENT mis-order).
- *
- * == Measured, so the next reviewer skips the "sounds like a lot" round ==
- * `ApplyCustomNamesBenchmark` (JMH) pins the split against a number via its
- * `mapOnly` arm (map without the terminal sort). At 200 apps the full function is
- * ~15.8 µs and `mapOnly` ~6.0 µs, so the sort is ~9.7 µs -- i.e. the sort is the
- * MAJORITY (~62%) of this function's cost, not a small tail. Two things follow,
- * and NEITHER reopens the decision:
- *   1. "62%" is a ratio of a negligible quantity: ~9.7 µs off-Main, behind the
- *      DataStore read and below the DiffUtil / adapter work it feeds. The
- *      comparison that matters is against those, not against `mapOnly`.
- *   2. The sort is dead only for the three HOT-path consumers (drawer/favorites/
- *      recents, re-derived on every settingsDataStore write -- AUDIT-14 F1); it is
- *      load-bearing for the COLD-path ones (Settings/Onboarding, opened rarely).
- *      So the real shape is "the frequently-run path subsidizes the rarely-run
- *      one" -- still beneath the threshold where that subsidy is worth a spec
- *      amendment. The measurement CONFIRMS "value ~= 0"; it does not overturn it.
- *
- * If you arrived here from a "dead sort, optimize it away" observation: that is the
- * expected path, and the answer is no -- unless applyCustomNames is being split for some
- * OTHER reason anyway, in which case the dead-sort removal rides along free. The
- * three self-sorting call sites carry a thin pointer back to this block. Closed.
+ * The detection invariant is unaffected: `originalName != displayName` still
+ * identifies renamed apps — that is name resolution, not order.
  */
 fun applyCustomNames(apps: List<AppInfo>, customNames: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = customNames[it.packageName] ?: it.originalName) }
-        .sortedByDisplayName()

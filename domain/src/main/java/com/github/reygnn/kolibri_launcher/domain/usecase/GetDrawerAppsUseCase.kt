@@ -128,10 +128,8 @@ class GetDrawerAppsUseCase @Inject constructor(
 
         // Custom names applied over the veto-held raw list; since migration step 2b
         // the enumeration emits the original label, so this is the operative
-        // name-application point.
-        // applyCustomNames' terminal sort is DEAD here: sortVisibleApps re-sorts
-        // (alpha / time-weighted) below. Deliberate -- see applyCustomNames KDoc
-        // (SPEC-DECISION RAL-1a).
+        // name-application point. applyCustomNames returns input order (map-only,
+        // RAL-4); sortVisibleApps sorts (alpha / time-weighted) below.
         val namedApps = applyCustomNames(rawApps, customNames)
 
         // Filter + alphabetischer Sort sind reine Operationen auf
