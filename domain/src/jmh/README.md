@@ -51,10 +51,8 @@ pass/fail line** (your host will differ):
 
 | Benchmark            | size    | Score            |
 |----------------------|---------|------------------|
-| `applyCustomNames`   | 50      | ~0.27 ops/µs (~3.7 µs/call) |
-| `applyCustomNames`   | 200     | ~0.055 ops/µs (~18 µs/call) |
-| `mapOnly` (no sort)  | 50      | ~0.67 ops/µs (~1.5 µs/call) |
-| `mapOnly` (no sort)  | 200     | ~0.17 ops/µs (~6.0 µs/call) |
+| `applyCustomNames` (map-only) | 50  | ~0.67 ops/µs (~1.5 µs/call) |
+| `applyCustomNames` (map-only) | 200 | ~0.17 ops/µs (~6.0 µs/call) |
 | `luminancePass`      | 1024 px | ~0.009 ops/µs (~111 µs/call) |
 | `luminancePass`      | 4096 px | ~0.0023 ops/µs (~444 µs/call) |
 | `filterDisplayName`      | 50  | ~2.5 ops/µs (~0.4 µs/call) |
@@ -74,24 +72,15 @@ pass/fail line** (your host will differ):
 | `firstElementDiffers`         | 200 | ~135 ops/µs (~0.007 µs/call) |
 | `sameListInstance`            | 200 | ~1474 ops/µs (~0.001 µs/call) |
 
-`applyCustomNames` confirms its KDoc (REACTIVE_APPLIST_SPEC RAL-1a / AUDIT-15
-F3): the map + terminal `sortedBy` is µs-scale over 50–200 apps, i.e. "in the
-noise" off the Main thread.
+`applyCustomNames` is now a pure name-resolution `map` (no terminal sort) since
+the RAL-4 map-only flip — ~1.5 µs @50, ~6.0 µs @200, µs-scale off the Main thread.
 
-`mapOnly` is the same function WITHOUT the terminal sort, so the
-`applyCustomNames − mapOnly` delta prices the "dead sort" RAL-1a documents — the
-sort the three self-sorting reactive consumers (drawer / favorites / recents)
-immediately discard. Measured on one run: at 200 apps `applyCustomNames` ~15.8 µs
-vs `mapOnly` ~6.0 µs → the sort is ~9.7 µs, and at 50 apps ~3.2 vs ~1.5 µs →
-~1.7 µs. Two things follow. First, the sort is not the map's sidekick: at 200
-apps it is the *larger* half (~62 % of `applyCustomNames`). Second — and this is
-why the split stays rejected across AUDIT-14 F1 §5.3 and AUDIT-15 F3 — that
-"larger half" is still ~10 µs off the Main thread, absolutely nothing; the
-closure now rests on a measured delta, not an estimate. (Use the delta from a
-SINGLE run: absolute scores drift a few µs between runs/hosts, so the
-table's ~18 µs and this paragraph's ~15.8 µs are the same benchmark on different
-days — the delta against `mapOnly` from the same run is the stable quantity, not
-the absolute.)
+*Historical:* the benchmark once carried a second `mapOnly` arm to price the
+former terminal sort (the "dead sort" for drawer/favorites/recents). The
+`applyCustomNames − mapOnly` delta measured the sort at ~9.7 µs @200 (~62 % of the
+then-`applyCustomNames`, ~15.8 µs). That is exactly the sort the map-only flip
+removed and every consumer now owns — so the arm became redundant and was dropped.
+Full account in `APPLIST_SORT_SPLIT_SPEC.md`.
 
 `luminancePass` is the pure WCAG luminance math the wallpaper AUTO-classifier
 runs per opaque pixel (`WallpaperBitmapLuminanceImpl.classify`, 32×32 = 1024

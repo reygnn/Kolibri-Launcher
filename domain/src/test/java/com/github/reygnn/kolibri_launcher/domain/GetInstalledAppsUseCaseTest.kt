@@ -43,17 +43,19 @@ class GetInstalledAppsUseCaseTest {
     }
 
     @Test
-    fun `invoke - unwraps Loaded to the app list`() = runTest {
+    fun `invoke - unwraps Loaded and PRESERVES input order (map-only, no sort)`() = runTest {
+        // Deliberately non-alphabetical input: post RAL-4 map-only the use case does
+        // NOT sort, so the output must stay in the SAME order (a sort would flip it
+        // to [Apple, Zebra]). This pins the unsortedInstalledAppsFlow contract.
         val testApps = listOf(
-            AppInfo("App A", "App A", "pkg.a", "cls.a"),
-            AppInfo("App B", "App B", "pkg.b", "cls.b")
+            AppInfo("Zebra", "Zebra", "pkg.z", "cls.z"),
+            AppInfo("Apple", "Apple", "pkg.a", "cls.a")
         )
         every { installedAppsRepository.getInstalledApps() } returns flowOf(AppLoad.Loaded(testApps))
 
         useCase.unsortedInstalledAppsFlow.test {
             val result = awaitItem()
-            assertEquals(2, result.size)
-            assertEquals("App A", result[0].displayName)
+            assertEquals(listOf("Zebra", "Apple"), result.map { it.displayName })
             awaitComplete()
         }
 
