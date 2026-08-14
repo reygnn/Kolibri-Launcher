@@ -10,9 +10,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLumin
 import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -235,5 +237,34 @@ class ClassifyWallpaperUseCaseTest {
             fakeWallpaperRepository.currentState = WallpaperState.NONE
             // systemColorsSignal stays at its initial null value
             assertEquals(LuminanceClassification.DARK, useCase().first())
+        }
+
+    // ============================================================
+    // AUDIT-19 F4: luminance depends only on the URI, so a
+    // transform-only change (same URI, different scale/translate)
+    // must NOT re-run the bitmap decode.
+    // ============================================================
+
+    @Test
+    fun `transform-only change does not re-run the bitmap decode`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val uri = "file:///wallpapers/x.png"
+            coEvery { bitmapLuminance.compute(uri) } returns 0.9f
+            fakeWallpaperRepository.currentState = WallpaperState(imageUri = uri, scale = 1.0f)
+
+            val seen = mutableListOf<LuminanceClassification>()
+            val job = launch { useCase().collect { seen.add(it) } }
+            testScheduler.runCurrent()
+
+            // Pan/zoom save: same URI, only the transform fields changed.
+            fakeWallpaperRepository.currentState = WallpaperState(imageUri = uri, scale = 2.0f)
+            testScheduler.runCurrent()
+
+            job.cancel()
+
+            // The projected-URI dedup collapses the two states → one decode,
+            // one downstream emission.
+            coVerify(exactly = 1) { bitmapLuminance.compute(uri) }
+            assertEquals(listOf(LuminanceClassification.LIGHT), seen)
         }
 }

@@ -79,10 +79,17 @@ class ClassifyWallpaperUseCase @Inject constructor(
         // upstream feeds an independent intermediate flow; the final
         // combine just picks Kolibri-internal when present, else
         // system, else fallback.
+        //
+        // Project to the dominant URI BEFORE dedup (AUDIT-19 F4): the
+        // luminance depends only on that URI, not on the layer's
+        // scale/translate. Dedup'ing the whole WallpaperState would
+        // re-run the bitmap decode on every pan/zoom save (a distinct
+        // state, same URI); dedup'ing the projected URI skips it.
         val kolibriInternalFlow: Flow<LuminanceClassification?> =
             observeWallpaperStateUseCase()
+                .map { pickDominantUri(it) }
                 .distinctUntilChanged()
-                .map { state -> classifyKolibriInternal(state) }
+                .map { uri -> uri?.let { classifyDominant(it) } }
 
         val systemFlow: Flow<LuminanceClassification?> =
             systemWallpaperColorsSignal.colors
@@ -93,10 +100,7 @@ class ClassifyWallpaperUseCase @Inject constructor(
         }
     }
 
-    private suspend fun classifyKolibriInternal(
-        state: WallpaperState,
-    ): LuminanceClassification? {
-        val uri = pickDominantUri(state) ?: return null
+    private suspend fun classifyDominant(uri: String): LuminanceClassification? {
         val luminance = wallpaperBitmapLuminance.compute(uri) ?: return null
         return classifyByLuminance(luminance)
     }

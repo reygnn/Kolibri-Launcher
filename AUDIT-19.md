@@ -15,12 +15,13 @@
 > **bewusst minimalistischen text-only Launcher** wurde „mehr Caching/Deko" NICHT
 > als Defekt gewertet; nur echte, mess­bare Rechen-/IO-/Latenz-Verschwendung.
 >
-> **Status: F1 auf Branch umgesetzt (Merge ausstehend), F2–F8 offen.** Acht Funde
-> in zwei Clustern (DataStore-Schreiblast, Wallpaper-Luminanz) plus Cold-Start-
-> Latenz. **F1** ist auf Branch `refactor/usage-datastore-split` implementiert
-> (Usage-DataStore-Split + additive Migration + Test); noch **nicht** nach `main`
-> gemergt. F2–F8 sind reine Read-Only-Analyse, kein Code verändert; je ein
-> eigener Branch pro Cluster empfohlen (§4).
+> **Status: F1 gemergt; F3 + F4 auf Branch umgesetzt (Merge ausstehend); F2, F5–F8
+> offen.** Acht Funde in zwei Clustern (DataStore-Schreiblast, Wallpaper-Luminanz)
+> plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split, ohne Migration) ist nach
+> `main` gemergt. **F3 + F4** (bounded Luminanz-Decode + Projektion + URI-Memo)
+> sind auf Branch `fix/wallpaper-luminance-perf` implementiert (mit Tests), noch
+> **nicht** gemergt. F2, F5–F8 sind reine Read-Only-Analyse, kein Code verändert;
+> je ein eigener Branch pro Cluster empfohlen (§4).
 
 ---
 
@@ -55,11 +56,11 @@ DataStore, Wallpaper-Luminanz) plus **Cold-Start-Latenz**, keine flächige Lück
 
 ---
 
-### F1 — Usage-Write re-serialisiert das ganze File pro App-Start · 🔧 auf Branch umgesetzt
+### F1 — Usage-Write re-serialisiert das ganze File pro App-Start · ✅ gemergt
 `data/.../data/AppUsageRepositoryImpl.kt:95-123` (`recordPackageLaunch`) ·
 `data/.../di/DataStoreModule.kt:52-55` (`provideSettingsDataStore`)
 
-> **Umgesetzt** (Branch `refactor/usage-datastore-split`, **noch nicht gemergt**):
+> **Umgesetzt & gemergt** (Branch `refactor/usage-datastore-split` → `main`):
 > eigener `@UsageDataStore`-DataStore (`kolibri_usage`, `AppConstants.USAGE_DATASTORE_NAME`)
 > nach dem Muster des Consent-Splits; `AppUsageRepositoryImpl` **und**
 > `UsageExportRepositoryImpl` (beide fassen die `KEY_USAGE_PREFIX`-Keys an) auf
@@ -134,8 +135,21 @@ Ein bloßes trailing `distinctUntilChanged` nach dem aktuellen `.map` reicht
 **nicht** — es dedupt nur den Output, der Parse+Stat läuft weiter bei jedem
 fremden Write. (F1s Store-Split entfernt zusätzlich den Per-Launch-*Trigger*.)
 
-### F3 — Unbounded Full-Res-Decode nur für ein 32×32-Sample
+### F3 — Unbounded Full-Res-Decode nur für ein 32×32-Sample · 🔧 auf Branch umgesetzt
 `data/.../wallpaper/WallpaperBitmapLuminanceImpl.kt:95-99` (`loadBitmap`), `:107` (`classify`)
+
+> **Umgesetzt** (Branch `fix/wallpaper-luminance-perf`, **noch nicht gemergt**):
+> `loadBitmap` macht jetzt einen Zwei-Pass-Decode (`inJustDecodeBounds` →
+> `inSampleSize`), die Power-of-two-Mathe als reine, JVM-testbare
+> `luminanceInSampleSize` (`data/.../wallpaper/LuminanceDownsampling.kt`, Budget
+> 256² px). Fällt bei unbekannten Bounds (`-1`) oder kleinen Bildern auf `1`
+> (Full-Decode) zurück. Bewusst NICHT mit dem `:app`-Render-Decoder geteilt
+> (anderes Modul, an Render-/Legacy-Budgets gekoppelt). Regression: reiner
+> JVM-Test der Mathe (`LuminanceDownsamplingTest`) **plus** ein Verdrahtungs-Test
+> im Robolectric-Impl-Test, der den Zwei-Pass pinnt (Bounds- + Decode-Pass = 2
+> `openInputStream` — ein Revert auf Ein-Pass fällt auf 1 und wird rot). Die
+> bestehenden Fixture-Tests (amoled/transparent) bleiben grün — der Median/
+> Coverage bleibt stabil, weil ohnehin final auf 32×32 skaliert wird.
 
 ```kotlin
 BitmapFactory.decodeStream(input)   // kein inSampleSize, kein bounds-Pass
@@ -155,9 +169,21 @@ Echtes OOM-Risiko und der größte einzelne CPU/Memory-Peak dieses Bereichs.
 32×32. Reduziert die Decode-Kosten um Größenordnungen ohne Änderung des Median-
 Ergebnisses.
 
-### F4 — Klassifizierung feuert bei jedem Transform-Edit + läuft doppelt
+### F4 — Klassifizierung feuert bei jedem Transform-Edit + läuft doppelt · 🔧 auf Branch umgesetzt
 `domain/.../usecase/ClassifyWallpaperUseCase.kt:82-85`, Consumer
 `ObserveUiColorsUseCase.kt:35` + `ResolveWallpaperSurfaceUseCase.kt:26`
+
+> **Umgesetzt** (Branch `fix/wallpaper-luminance-perf`, **noch nicht gemergt**):
+> **F4.1** — `kolibriInternalFlow` projiziert jetzt vor dem `distinctUntilChanged`
+> auf `pickDominantUri(state)` (`.map { … }.distinctUntilChanged().map { uri → … }`),
+> Transform-only-Änderungen (gleiche URI) triggern keinen Decode mehr.
+> Regressionstest in `ClassifyWallpaperUseCaseTest` (Transform-only → `compute`
+> exakt 1×). **F4.2** — 1-Entry-URI-Memo im `@Singleton WallpaperBitmapLuminanceImpl`
+> (Mutex, Lock spannt den Decode → zwei zeitgleiche identische Consumer-Aufrufe
+> deduplizieren auf einen Decode); `null` wird mitgecacht (deterministisch pro
+> URI). Memo-Tests im Robolectric-Impl-Test (gleiche URI → kein zweiter Open;
+> andere URI → neuer Decode). Zusammen neutralisiert das Memo auch F3s
+> redundante Re-Runs.
 
 Zwei Defekte:
 

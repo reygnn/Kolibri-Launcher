@@ -192,6 +192,63 @@ class WallpaperBitmapLuminanceImplTest {
         assertNull(result)
     }
 
+    // ============================================================
+    // Memoization (AUDIT-19 F4): the same URI is decoded once, a
+    // different URI busts the one-entry cache.
+    // ============================================================
+
+    @Test
+    fun `same URI computed twice decodes only once — memoized`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val opens = java.util.concurrent.atomic.AtomicInteger(0)
+            stubContentResolverCounting(solidBitmap(Color.WHITE), opens)
+
+            val first = luminance.compute("file:///same.png")
+            val opensAfterFirst = opens.get()
+            val second = luminance.compute("file:///same.png")
+
+            assertEquals(first, second)
+            assertTrue("first compute must have actually decoded", opensAfterFirst > 0)
+            assertEquals(
+                "second compute for the same URI must be a cache hit (no new open/decode)",
+                opensAfterFirst,
+                opens.get(),
+            )
+        }
+
+    @Test
+    fun `bounded decode makes two passes — bounds then downsampled decode`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // AUDIT-19 F3 wiring guard: loadBitmap opens the stream twice —
+            // once for the inJustDecodeBounds pass that sizes the downsample,
+            // once for the actual (downsampled) decode. A revert to a single
+            // unbounded `decodeStream(input)` drops this to one open. The pure
+            // sample-size math is covered separately by LuminanceDownsamplingTest;
+            // this pins that the impl actually runs the two-pass path.
+            val opens = java.util.concurrent.atomic.AtomicInteger(0)
+            stubContentResolverCounting(solidBitmap(Color.WHITE), opens)
+
+            luminance.compute("file:///wp.png")
+
+            assertEquals(2, opens.get())
+        }
+
+    @Test
+    fun `different URI busts the one-entry cache and re-decodes`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val opens = java.util.concurrent.atomic.AtomicInteger(0)
+            stubContentResolverCounting(solidBitmap(Color.WHITE), opens)
+
+            luminance.compute("file:///a.png")
+            val opensAfterA = opens.get()
+            luminance.compute("file:///b.png")
+
+            assertTrue(
+                "a different URI must trigger a fresh decode",
+                opens.get() > opensAfterA,
+            )
+        }
+
     private fun solidBitmap(@androidx.annotation.ColorInt color: Int): Bitmap {
         // 64×64 source — large enough that the impl's 32×32 downscale
         // is a real downscale rather than a no-op.
@@ -234,6 +291,26 @@ class WallpaperBitmapLuminanceImplTest {
         // return a fresh stream each time so multiple calls in one
         // test don't fail on a closed stream.
         every { contentResolver.openInputStream(any()) } answers { ByteArrayInputStream(bytes) }
+    }
+
+    /**
+     * Like [stubContentResolver] but increments [opens] on every
+     * `openInputStream` call, so a test can assert how many decodes actually
+     * happened (a memoized `compute` opens no stream at all). Note one
+     * `compute` opens the stream twice — the bounds pass + the downsampled
+     * decode — so tests compare deltas, not absolute counts.
+     */
+    private fun stubContentResolverCounting(
+        bitmap: Bitmap,
+        opens: java.util.concurrent.atomic.AtomicInteger,
+    ) {
+        val baos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+        val bytes = baos.toByteArray()
+        every { contentResolver.openInputStream(any()) } answers {
+            opens.incrementAndGet()
+            ByteArrayInputStream(bytes)
+        }
     }
 
     /**

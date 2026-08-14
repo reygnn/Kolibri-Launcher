@@ -9,6 +9,8 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,11 +51,18 @@ import javax.inject.Singleton
  * coverage falls through to the system signal; the same image's
  * AMOLED original at 100% coverage classifies DARK as expected.
  *
- * ## Sample size & threading
+ * ## Sample size, decode budget & threading
  *
  * Sample size is fixed at [SAMPLE_SIZE]² pixels — small enough that
  * the sort is essentially free, large enough that the median is
  * stable across reasonable wallpapers.
+ *
+ * The image is decoded DOWNSAMPLED (two-pass: bounds, then an
+ * `inSampleSize` from [luminanceInSampleSize]) rather than at full
+ * resolution — sampling a 32×32 grid never needs a 108 MP allocation
+ * (AUDIT-19 F3). Results are memoized per URI: the two classification
+ * consumers request the same wallpaper URI, so the one-entry cache
+ * collapses their two decodes into one (AUDIT-19 F4).
  *
  * Bitmap loading + decode happens on `Dispatchers.IO`. The
  * arithmetic is CPU-bound but tiny (≤1024 luminance computes + a
@@ -73,7 +82,35 @@ class WallpaperBitmapLuminanceImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : WallpaperBitmapLuminance {
 
-    override suspend fun compute(uri: String): Float? = withContext(Dispatchers.IO) {
+    // Single-entry memo keyed by the last URI (AUDIT-19 F4). The two
+    // classification consumers (home text colour + drawer surface) each
+    // build their own flow and call compute() for the SAME wallpaper URI,
+    // which decoded the same image twice per change. A wallpaper URI is
+    // immutable (WallpaperFileManager assigns a fresh filename per save, so
+    // content never changes in place), so URI → luminance is stable and a
+    // one-entry cache is sound. The lock deliberately spans the decode so two
+    // concurrent identical calls collapse to one decode (the second waits and
+    // hits the cache). `null` results are cached too: for a given URI the
+    // outcome is deterministic (low coverage) or a gone/unreadable file that
+    // won't be re-referenced, so a retry would only re-pay the decode.
+    private val cacheMutex = Mutex()
+    private var cachedUri: String? = null
+    private var cachedResult: Float? = null
+    private var hasCached = false
+
+    override suspend fun compute(uri: String): Float? = cacheMutex.withLock {
+        if (hasCached && cachedUri == uri) {
+            cachedResult
+        } else {
+            computeUncached(uri).also { result ->
+                cachedUri = uri
+                cachedResult = result
+                hasCached = true
+            }
+        }
+    }
+
+    private suspend fun computeUncached(uri: String): Float? = withContext(Dispatchers.IO) {
         val bitmap = loadBitmap(uri) ?: return@withContext null
         try {
             classify(bitmap)
@@ -94,8 +131,24 @@ class WallpaperBitmapLuminanceImpl @Inject constructor(
         // the right behaviour for any of those cases.
         return try {
             val parsed = Uri.parse(uri)
+
+            // Pass 1: bounds only (no allocation) to size the downsample.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.contentResolver.openInputStream(parsed)?.use { input ->
-                BitmapFactory.decodeStream(input)
+                BitmapFactory.decodeStream(input, null, bounds)
+            }
+
+            // Pass 2: decode DOWNSAMPLED (AUDIT-19 F3). A full-resolution
+            // decode just to sample SAMPLE_SIZE² pixels was the waste — a
+            // 108 MP wallpaper allocated ~400 MB (OOM risk) only to be scaled
+            // to 32×32. luminanceInSampleSize falls back to 1 (full decode)
+            // when bounds are unknown (outWidth/outHeight == -1) or already
+            // within budget, so small images are unaffected.
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = luminanceInSampleSize(bounds.outWidth, bounds.outHeight)
+            }
+            context.contentResolver.openInputStream(parsed)?.use { input ->
+                BitmapFactory.decodeStream(input, null, options)
             }
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
