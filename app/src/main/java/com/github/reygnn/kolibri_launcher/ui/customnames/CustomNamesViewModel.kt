@@ -47,7 +47,7 @@ class CustomNamesViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isLoading = true) }
 
-                getInstalledAppsUseCase().collect { fullyProcessedList ->
+                getInstalledAppsUseCase.unsortedInstalledAppsFlow.collect { fullyProcessedList ->
                     masterAppList = fullyProcessedList
                     updateUiFromMasterList()
                 }

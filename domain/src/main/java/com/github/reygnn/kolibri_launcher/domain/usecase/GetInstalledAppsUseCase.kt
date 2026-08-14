@@ -26,13 +26,24 @@ import javax.inject.Inject
  * instead of forcing a re-enumeration. Since migration step 2b the enumeration
  * emits the original label, so [applyCustomNames] is the operative name-application
  * point for this Site-1 family.
+ *
+ * **The flow is UNSORTED (RAL-4 map-only): [applyCustomNames] no longer imposes a
+ * display order.** The name says so — every collector sorts for itself (CustomNames
+ * via `buildCustomNamesViews`, Hidden / Swipe via `sortedByDisplayName()`) or is
+ * order-agnostic (Settings). Underneath, the enumeration still emits a deterministic
+ * order (`InstalledAppsRepositoryImpl` sorts by original name), so this flow's own
+ * `distinctUntilChanged` behaves identically — but collectors must NOT rely on that
+ * for what they DISPLAY.
  */
 class GetInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
     private val customNamesRepository: CustomNamesRepository
 ) {
-    operator fun invoke(): Flow<List<AppInfo>> =
-        combine(
+    // Computed getter (not a stored val): builds a fresh cold flow per access,
+    // exactly as the former operator invoke() did — the combine arguments are
+    // evaluated lazily on collection, not at construction.
+    val unsortedInstalledAppsFlow: Flow<List<AppInfo>>
+        get() = combine(
             installedAppsRepository.getInstalledApps().map { load ->
                 when (load) {
                     is AppLoad.Loaded -> load.apps

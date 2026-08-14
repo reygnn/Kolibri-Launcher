@@ -50,7 +50,7 @@ class GetInstalledAppsUseCaseTest {
         )
         every { installedAppsRepository.getInstalledApps() } returns flowOf(AppLoad.Loaded(testApps))
 
-        useCase().test {
+        useCase.unsortedInstalledAppsFlow.test {
             val result = awaitItem()
             assertEquals(2, result.size)
             assertEquals("App A", result[0].displayName)
@@ -65,7 +65,7 @@ class GetInstalledAppsUseCaseTest {
         every { installedAppsRepository.getInstalledApps() } returns
             flowOf(AppLoad.Failed(RuntimeException("boom")))
 
-        useCase().test {
+        useCase.unsortedInstalledAppsFlow.test {
             assertEquals(emptyList(), awaitItem())
             awaitComplete()
         }

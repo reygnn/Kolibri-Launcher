@@ -42,7 +42,7 @@ class SettingsViewModel @Inject constructor(
         launchSafe {
             try {
                 // Nutzung des UseCases statt des Repositories
-                getInstalledAppsUseCase().collect { apps ->
+                getInstalledAppsUseCase.unsortedInstalledAppsFlow.collect { apps ->
                     if (BuildConfig.DEBUG) {
                         Timber.d("[ViewModel] Collected ${apps.size} apps")
                     }

@@ -62,7 +62,7 @@ class SettingsViewModelTest {
         rawAppsFlow = MutableStateFlow(emptyList())
 
         // Stubbing: Der UseCase gibt den Flow zurück (nicht-suspend → every)
-        every { getInstalledAppsUseCase() } returns rawAppsFlow
+        every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns rawAppsFlow
     }
 
     // ========== EXISTING TESTS (Updated Constructor) ==========
@@ -112,7 +112,7 @@ class SettingsViewModelTest {
     @Test
     fun `installedApps - when usecase flow crashes - handles gracefully`() = runTest {
         // Stubbing: UseCase wirft Exception via Flow
-        every { getInstalledAppsUseCase() } returns flow {
+        every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns flow {
             throw IOException("Cannot load apps")
         }
 
@@ -135,7 +135,7 @@ class SettingsViewModelTest {
     @Test
     fun `installedApps - when usecase flow crashes with RuntimeException - handles gracefully`() =
         runTest {
-            every { getInstalledAppsUseCase() } returns flow {
+            every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns flow {
                 throw RuntimeException("Database corrupted")
             }
 
@@ -509,7 +509,7 @@ class SettingsViewModelTest {
         // SZENARIO: Zu viele Apps, Speicher voll beim Laden.
         // Ein Error (nicht Exception) wird geworfen.
 
-        every { getInstalledAppsUseCase() } returns flow {
+        every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns flow {
             delay(10) // WICHTIG: Verzögerung, damit Turbine subscriben kann, bevor der Crash passiert!
             throw OutOfMemoryError("Too many apps")
         }

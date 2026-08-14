@@ -124,7 +124,7 @@ class SwipeActionsViewModel @Inject constructor(
                 // timeout — same pattern as BackupDataAssembler and
                 // HiddenAppsViewModel.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-                    getInstalledAppsUseCase().first { it.isNotEmpty() }
+                    getInstalledAppsUseCase.unsortedInstalledAppsFlow.first { it.isNotEmpty() }
                 }?.sortedByDisplayName()
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in SwipeActionsViewModel")
 

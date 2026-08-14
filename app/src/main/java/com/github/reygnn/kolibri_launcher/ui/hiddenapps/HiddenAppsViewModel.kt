@@ -91,15 +91,15 @@ class HiddenAppsViewModel @Inject constructor(
 
         launchSafe {
             try {
-                // GetInstalledAppsUseCase exposes a WhileSubscribed StateFlow
-                // with initialValue=emptyList(). A bare .first() from a cold
-                // entry (process launched directly into Hidden-Apps after a
-                // process death, before HomeFragment ever subscribes) sees
-                // the initial empty list and unsubscribes, leaving the
-                // screen permanently empty. Wait for a real emission with a
-                // bounded timeout — same pattern as BackupDataAssembler.
+                // The flow can emit a transient empty list before the first real
+                // enumeration completes (cold entry: process launched directly into
+                // Hidden-Apps after a process death, before any priming load). A bare
+                // .first() would take that empty list and leave the screen permanently
+                // empty. Wait for a non-empty emission with a bounded timeout — same
+                // pattern as BackupDataAssembler. The list arrives UNSORTED
+                // (unsortedInstalledAppsFlow), so sort it here for display.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-                    getInstalledAppsUseCase().first { it.isNotEmpty() }
+                    getInstalledAppsUseCase.unsortedInstalledAppsFlow.first { it.isNotEmpty() }
                 }?.sortedByDisplayName()
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in HiddenAppsViewModel")
 

@@ -53,7 +53,7 @@ class SwipeActionsViewModelTest {
     @Before
     fun setup() {
         // Default stubs (each test may override them)
-        every { getInstalledAppsUseCase() } returns flowOf(testApps)
+        every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns flowOf(testApps)
         coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns null
         coEvery { getSwipeActionComponentUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns null
 
@@ -112,7 +112,7 @@ class SwipeActionsViewModelTest {
     @Test
     fun `initialize - handles loading error gracefully`() = runTest {
         // Arrange
-        every { getInstalledAppsUseCase() } returns flow { throw IOException("Load failed") }
+        every { getInstalledAppsUseCase.unsortedInstalledAppsFlow } returns flow { throw IOException("Load failed") }
 
         viewModel.event.test {
             viewModel.initialize()
