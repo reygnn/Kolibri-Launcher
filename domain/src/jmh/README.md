@@ -51,8 +51,8 @@ pass/fail line** (your host will differ):
 
 | Benchmark            | size    | Score            |
 |----------------------|---------|------------------|
-| `applyCustomNames` (map-only) | 50  | ~0.67 ops/µs (~1.5 µs/call) |
-| `applyCustomNames` (map-only) | 200 | ~0.17 ops/µs (~6.0 µs/call) |
+| `applyCustomNames` (map-only) | 50  | ~0.60 ops/µs (~1.7 µs/call) |
+| `applyCustomNames` (map-only) | 200 | ~0.15 ops/µs (~6.7 µs/call) |
 | `luminancePass`      | 1024 px | ~0.009 ops/µs (~111 µs/call) |
 | `luminancePass`      | 4096 px | ~0.0023 ops/µs (~444 µs/call) |
 | `filterDisplayName`      | 50  | ~2.5 ops/µs (~0.4 µs/call) |
@@ -73,7 +73,8 @@ pass/fail line** (your host will differ):
 | `sameListInstance`            | 200 | ~1474 ops/µs (~0.001 µs/call) |
 
 `applyCustomNames` is now a pure name-resolution `map` (no terminal sort) since
-the RAL-4 map-only flip — ~1.5 µs @50, ~6.0 µs @200, µs-scale off the Main thread.
+the RAL-4 map-only flip — measured ~1.7 µs @50, ~6.7 µs @200, µs-scale off the
+Main thread (fresh single-benchmark run via `-PjmhInclude=ApplyCustomNamesBenchmark`).
 
 *Historical:* the benchmark once carried a second `mapOnly` arm to price the
 former terminal sort (the "dead sort" for drawer/favorites/recents). The
