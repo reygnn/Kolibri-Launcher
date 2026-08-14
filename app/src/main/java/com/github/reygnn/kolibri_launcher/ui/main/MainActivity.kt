@@ -45,6 +45,9 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthNotifier
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
@@ -278,6 +281,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     lateinit var appLauncher: AppLauncher
     @Inject
     lateinit var crashReportConsentController: ConsentController
+    @Inject
+    lateinit var crashReportingHealthMonitor: CrashReportingHealthMonitor
+    @Inject
+    lateinit var crashReportingHealthNotifier: CrashReportingHealthNotifier
 
     /**
      * Latest wallpaper-surface classification emitted by
@@ -584,6 +591,16 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     currentDialog = consentDialog
                 }
             }
+        }
+
+        // Out-of-band ACRA-health check (after consent is settled). If consent is
+        // Granted but the bootstrap consent gate did not complete, ACRA's
+        // bootstrap-time reporting is broken (the reaffirm above masks it at
+        // runtime) — surface it via a notification + the Settings hint. Never via
+        // ACRA/silentError (circular). Clear the notification when healthy again.
+        when (crashReportingHealthMonitor.evaluate()) {
+            CrashReportingHealthState.BROKEN -> crashReportingHealthNotifier.showBroken()
+            else -> crashReportingHealthNotifier.clear()
         }
     }
 

@@ -222,6 +222,10 @@
     <string name="crash_report_setting_title">Send crash reports</string>
     <string name="crash_report_summary_enabled">Enabled. Thank you for helping improve the app!</string>
     <string name="crash_report_summary_disabled">Disabled. Tap to change your choice.</string>
+    <string name="crash_report_summary_broken">⚠️ Not working — the crash-report bootstrap failed, so reports aren\'t being sent.</string>
+    <string name="crash_report_health_channel_name">Crash-report health</string>
+    <string name="crash_report_health_notif_title">Kolibri: crash reporting inactive</string>
+    <string name="crash_report_health_notif_text">The crash-report bootstrap failed on startup, so crash and ANR reports aren\'t being sent. Check the logcat.</string>
 
     <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
     <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>

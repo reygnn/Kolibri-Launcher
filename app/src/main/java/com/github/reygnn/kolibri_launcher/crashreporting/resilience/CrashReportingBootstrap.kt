@@ -2,11 +2,13 @@ package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.app.Application
 import android.os.Handler
+import android.util.Log
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
@@ -179,7 +181,20 @@ object CrashReportingBootstrap {
         // Granted user's post-mortem ANRs report into an enabled reporter (ACRA was
         // left disabled at attachBaseContext). MainActivity.reaffirmConsent is now
         // a redundant backup, not the sole carrier.
-        applyConsentGate(setEnabled, readDecision)
+        //
+        // Wrapped so a consent-read failure (the 2026-08 cold-start NPE class) can
+        // never crash the app (Rule 7 — this call site is NOT try/catch-wrapped by
+        // KolibriLauncherApp.onCreate). On success the health flag flips healthy;
+        // on failure it stays UNHEALTHY, which CrashReportingHealthMonitor surfaces
+        // out-of-band (notification + Settings hint). Plain android.util.Log, never
+        // silentError (Rule 9 — silentError routes through the very ACRA we may
+        // have just failed to enable).
+        try {
+            applyConsentGate(setEnabled, readDecision)
+            CrashReportingHealth.markBootstrapGateCompleted()
+        } catch (e: Throwable) {
+            Log.e("KolibriLauncher", "ACRA consent gate failed in onCreate", e)
+        }
 
         plantDeliveryTree()
         reportPendingAnrsAsync(scope, anrReporter)

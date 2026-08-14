@@ -40,9 +40,10 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentReadResult
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
@@ -90,6 +91,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject
     lateinit var crashReportConsentController: ConsentController
+    @Inject
+    lateinit var crashReportingHealthMonitor: CrashReportingHealthMonitor
 
     @Inject
     lateinit var pipelineBacklogProbe: PipelineBacklogProbe
@@ -489,8 +492,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             // onResult runs on the main thread, so reflect the
                             // just-made choice directly instead of re-reading
                             // the store on a separate scope — which could race
-                            // the still-running persist write (AUDIT-10 #1).
-                            applyCrashReportSummary(userGaveConsent)
+                            // the still-running persist write (AUDIT-10 #1). Fold
+                            // in the in-memory bootstrap-health flag (no I/O) so a
+                            // fresh grant on a broken bootstrap shows BROKEN, not
+                            // a false "enabled".
+                            applyCrashReportSummary(
+                                when {
+                                    !userGaveConsent -> CrashReportingHealthState.NOT_APPLICABLE
+                                    CrashReportingHealth.isBootstrapHealthy -> CrashReportingHealthState.HEALTHY
+                                    else -> CrashReportingHealthState.BROKEN
+                                },
+                            )
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -589,18 +601,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private suspend fun updateCrashReportSummary() {
+        // evaluate() folds consent + the bootstrap-health flag into one verdict, so
+        // the summary is an HONEST health indicator, not the consent-only one (which
+        // would read "enabled" even when the bootstrap gate died — the 2026-08 bug).
+        // No throw for I/O (the repository reports Unavailable as a value); an
+        // UNKNOWN verdict leaves the summary as-is (A2 safe stale).
+        val state = crashReportingHealthMonitor.evaluate()
         withContext(Dispatchers.Main) {
-            // currentDecision() reports its outcome as a value (no throw for I/O),
-            // so the old try/catch is gone: an unreadable store is the Unavailable
-            // branch, which leaves the summary as-is — display only, no write
-            // follows, so a stale summary is the safe outcome (A2). The failure is
-            // already reported by the repository.
-            when (val result = crashReportConsentController.currentDecision()) {
-                is ConsentReadResult.Loaded ->
-                    applyCrashReportSummary(result.decision == ConsentDecision.Granted)
-
-                is ConsentReadResult.Unavailable -> Unit
-            }
+            if (state != CrashReportingHealthState.UNKNOWN) applyCrashReportSummary(state)
         }
     }
 
@@ -608,14 +616,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
      * Sets the crash-report preference summary from a known consent value —
      * no store read. Must be called on the main thread.
      */
-    private fun applyCrashReportSummary(isEnabled: Boolean) {
+    private fun applyCrashReportSummary(state: CrashReportingHealthState) {
         val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS) ?: return
         preference.summary = getString(
-            if (isEnabled) {
-                R.string.crash_report_summary_enabled
-            } else {
-                R.string.crash_report_summary_disabled
-            }
+            when (state) {
+                CrashReportingHealthState.HEALTHY -> R.string.crash_report_summary_enabled
+                CrashReportingHealthState.BROKEN -> R.string.crash_report_summary_broken
+                CrashReportingHealthState.NOT_APPLICABLE -> R.string.crash_report_summary_disabled
+                // UNKNOWN never reaches here (caller skips it), but the compiler needs it.
+                CrashReportingHealthState.UNKNOWN -> R.string.crash_report_summary_disabled
+            },
         )
     }
 
