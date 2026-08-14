@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.kolibri_launcher.core.toEnumOrNull
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -77,13 +78,7 @@ data class WallpaperLayerState(
      * `android.graphics.BlendMode` via `WallpaperBlendMode.toAndroidBlendMode()`.
      */
     val blendMode: WallpaperBlendMode?
-        get() = blendModeName?.let { name ->
-            try {
-                WallpaperBlendMode.valueOf(name)
-            } catch (e: IllegalArgumentException) {
-                null
-            }
-        }
+        get() = blendModeName.toEnumOrNull<WallpaperBlendMode>()
 
 }
 
