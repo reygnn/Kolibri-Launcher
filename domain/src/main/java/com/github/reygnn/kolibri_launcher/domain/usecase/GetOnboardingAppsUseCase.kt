@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import kotlinx.coroutines.CancellationException
@@ -33,13 +34,7 @@ class GetOnboardingAppsUseCase @Inject constructor(
                 // Custom names folded in reactively (REACTIVE_APPLIST_SPEC Site 1);
                 // since migration step 2b the enumeration emits the original label,
                 // so this is the operative name-application point.
-                is AppLoad.Loaded -> applyCustomNames(load.apps, names).filter { app ->
-                    // isNotBlank() on non-null data-class properties cannot throw;
-                    // a programmer error would propagate to the Flow.catch below,
-                    // which surfaces it via silentError in DEBUG.
-                    app.packageName.isNotBlank() &&
-                            app.displayName.isNotBlank()
-                }
+                is AppLoad.Loaded -> applyCustomNames(load.apps, names).toOnboardingPicker()
             }
         }
             .distinctUntilChanged()
@@ -50,3 +45,18 @@ class GetOnboardingAppsUseCase @Inject constructor(
             }
 
 }
+
+/**
+ * Pure shaping for the onboarding app picker: drop entries with a blank package or
+ * display name, then sort by display name.
+ *
+ * The sort is owned here at the display boundary (RAL-4 map-only: the shared
+ * name-resolution no longer imposes an order). Extracted as a pure function so it
+ * is unit-testable with an unsorted, already-name-applied list: a test feeds an
+ * unsorted list straight in and asserts sorted output, so a dropped sort fails the
+ * test independently of what the upstream helper does. `isNotBlank()` on non-null
+ * data-class properties cannot throw.
+ */
+fun List<AppInfo>.toOnboardingPicker(): List<AppInfo> =
+    filter { it.packageName.isNotBlank() && it.displayName.isNotBlank() }
+        .sortedByDisplayName()

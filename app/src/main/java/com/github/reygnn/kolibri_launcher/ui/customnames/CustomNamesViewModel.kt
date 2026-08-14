@@ -13,7 +13,6 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
@@ -110,16 +109,17 @@ class CustomNamesViewModel @Inject constructor(
         ) {
             val query = _uiState.value.searchQuery
 
-            // Custom Names also matches the original name (see filterByName's
-            // includeOriginalName): the only search surface that does.
-            val filteredList = masterAppList.filterByName(query, includeOriginalName = true)
-
-            val customNameApps = masterAppList.filter { it.originalName != it.displayName }
+            // Pure shaping (search-filter + display-sort of both views) lives in
+            // buildCustomNamesViews so it is unit-testable with an unsorted master
+            // list. The sort is owned here at the display boundary (RAL-4 map-only),
+            // not upstream. Custom Names also matches the original name (see
+            // filterByName's includeOriginalName): the only search surface that does.
+            val views = buildCustomNamesViews(masterAppList, query)
 
             _uiState.update {
                 it.copy(
-                    displayedApps = filteredList,
-                    appsWithCustomNames = customNameApps,
+                    displayedApps = views.displayedApps,
+                    appsWithCustomNames = views.appsWithCustomNames,
                     isLoading = false
                 )
             }
