@@ -67,17 +67,46 @@ class GetRecentAppsUseCase @Inject constructor(
         // enumeration emits the original label, so this is the operative
         // name-application point.
         val customNames = customNamesRepository.getAllCustomNames()
-        // applyCustomNames' terminal sort is DEAD here: recents orders by recency
-        // below. Deliberate -- see applyCustomNames KDoc (SPEC-DECISION RAL-1a).
+        // applyCustomNames' terminal sort does NOT determine the recents order
+        // (recency does, below) — but it DID silently determine the per-package
+        // representative for multi-activity packages (see pickRecentApps). That
+        // dependency is now explicit there, so this call site no longer relies on
+        // the helper's order at all.
         val currentApps = applyCustomNames(installedAppsStateRepository.getCurrentApps(), customNames)
 
-        // First visible AppInfo per package (launcher apps typically expose
-        // one launchable activity; putIfAbsent keeps that deterministic).
-        val visibleByPackage = LinkedHashMap<String, AppInfo>()
-        for (app in currentApps) {
-            if (app.componentName !in hidden) visibleByPackage.putIfAbsent(app.packageName, app)
-        }
-
-        recentPackages.mapNotNull { visibleByPackage[it] }.take(limit)
+        pickRecentApps(currentApps, hidden, recentPackages, limit)
     }
+}
+
+/**
+ * Builds the recents list: order by [recentPackages] (recency), one visible
+ * [AppInfo] per package, capped at [limit].
+ *
+ * When a package exposes several launchable activities, the **alphabetically
+ * first** by display name represents it — an EXPLICIT tie-break. Previously this
+ * fell out of iterating an alpha-sorted `currentApps` with `putIfAbsent`
+ * (first-seen wins); under RAL-4 map-only `currentApps` is no longer sorted here,
+ * so the choice is made directly rather than inherited from the shared helper's
+ * order. `displayNameLower` is the same key the display sorts use, so the
+ * representative stays consistent with what the app is shown as elsewhere.
+ *
+ * Pure and total — extracted so it is unit-testable with an unsorted
+ * `currentApps`: a fixture whose enumeration-first activity differs from the
+ * alpha-first one pins that the tie-break, not the input order, decides.
+ */
+fun pickRecentApps(
+    currentApps: List<AppInfo>,
+    hidden: Set<String>,
+    recentPackages: List<String>,
+    limit: Int,
+): List<AppInfo> {
+    val visibleByPackage = HashMap<String, AppInfo>()
+    for (app in currentApps) {
+        if (app.componentName in hidden) continue
+        val existing = visibleByPackage[app.packageName]
+        if (existing == null || app.displayNameLower < existing.displayNameLower) {
+            visibleByPackage[app.packageName] = app
+        }
+    }
+    return recentPackages.mapNotNull { visibleByPackage[it] }.take(limit)
 }
