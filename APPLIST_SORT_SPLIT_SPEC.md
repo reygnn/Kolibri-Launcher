@@ -1,15 +1,31 @@
 # APPLIST_SORT_SPLIT_SPEC.md — Sortierung dem Consumer geben, nicht dem Namens-Helfer (RAL-4)
 
-**Status: ENTWURF v5 (2026-08-13), greenfield — noch nicht gebaut. VERDIKT: ein
-FÜNFTES Mal vertagen (§8), v4/v5-Design als akzeptierter Bauplan.** Multi-Agent-
-Review-Runde 3 (5 Linsen gegen v4, gegen Code verifiziert) eingearbeitet: **keine
-Korrektheits-Regression** — der map-only-Flip ist verhaltensneutral, alle §3-
-Beweise halten. ABER zwei substanzielle Findings: der CustomNames-Order-Guard war
-**vakuum** (der Test-Fake prä-sortiert, fängt einen fehlenden VM-Sort nicht — M1,
-der eine „würde-grün-shippen"-Defekt); und „strikt einfacher" **überzieht** — v4
-tauscht eine *strukturell garantierte* Invariante gegen eine *test-/konvention-
-enforced* an ~6 Sites (M2). §5/§6 (Test-Plan) und §7/§8 (Framing/Verdikt)
-entsprechend korrigiert.
+**Status: ENTWURF v6 (2026-08-14), TEIL-GEBAUT. Step 1 (Weg B) ist umgesetzt und
+grün (Branch `refactor/map-only-step1-testguards`, noch nicht auf `main`).** v6
+korrigiert eine falsche Annahme in v5 §5, die erst beim Bauen sichtbar wurde:
+
+> **Der Doppel-Sortierer-Fund (Umsetzungs-Runde, 2026-08-14).** v5 §5 nahm an,
+> man könne „fehlschlagbare Order-Tests VOR dem Flip" schreiben, jeder Schritt
+> grün. Das ist für die zwei neu-sortierenden Consumer (CustomNames, Onboarding)
+> **teilweise illusorisch**: ihr Sort sitzt *downstream des inline-`applyCustomNames`*,
+> das in Step 1 noch sortiert — es maskiert jeden fehlenden Consumer-Sort. Ein
+> Test, der durch die echte Kette läuft (Fake → echtes `GetInstalledAppsUseCase`
+> → echtes `applyCustomNames` → VM), bleibt grün, egal ob der Consumer sortiert.
+> „Den Fake fixen" (v5 §5/M1) reicht daher NICHT — `applyCustomNames` re-sortiert
+> dahinter. **Lösung (Weg B):** die Sort-/Shape-Logik jedes neu-sortierenden
+> Consumers in eine **pure Funktion** ziehen und mit **unsortiertem Input direkt**
+> unit-testen — der Test umgeht die maskierende Kette. Das ist Rule-10-konform
+> (pure Logik raus aus Android-Klassen) und macht den Guard schon vor dem Flip
+> scharf. Umgesetzt in Step 1; Fehlschlagbarkeit bewiesen (Sort temporär
+> entfernt → Guards rot).
+
+Frühere Runden (stehen): Multi-Agent-Review-Runde 3 (5 Linsen gegen v4) fand
+**keine Korrektheits-Regression** (map-only-Flip verhaltensneutral, alle §3-Beweise
+halten), aber zwei Findings: M1 (CustomNames-Guard vakuum — jetzt via Weg B
+gelöst) und M2 („strikt einfacher" überzieht: strukturell-garantierte Invariante →
+test-enforced an ~6 Sites). VERDIKT unverändert: **ein fünftes Mal vertagen als
+eigenständige Änderung** (§8) — aber der Nutzer treibt den Bau jetzt trotzdem
+schrittweise, mit Guards zuerst.
 
 **DESIGN-WENDE gegenüber v1–v3** (steht, vom Review bestätigt als „genuinely
 cleaner than v3"): Die ersten drei Fassungen versuchten, den in `applyCustomNames`
@@ -271,38 +287,38 @@ Sorts an die Consumer ziehen, **während der Helfer noch sortiert** (redundant,
 aber grün), dann den Helfer-Sort entfernen — der gefährliche Flip ist ein winziger
 letzter Commit.
 
-1. **Ordnungs-Assertions zuerst — und sie müssen FEHLSCHLAGEN KÖNNEN (M1, der
-   kritischste Punkt).** Guard „Test grün ⟺ Consumer sortiert selbst" hält nur,
-   wenn der Test einen fehlenden Sort tatsächlich fangen KANN — und genau das war
-   in v4 für CustomNames falsch:
-   - **M1 — der Test-Fake prä-sortiert, also ist der Guard vakuum.**
-     `ReactiveFakeInstalledAppsRepository.triggerAppsUpdate()` löst Namen auf UND
-     `.sortedBy { it.displayName.lowercase() }`, bevor es emittiert. `CustomNamesVM`
-     sortiert heute nicht — der Test ist trotzdem grün, WEIL der Fake vorsortiert.
-     Auf echtem Gerät emittiert `getInstalledApps()` **original-namen-sortierte
-     Original-Label** (`InstalledAppsRepositoryImpl:279`), also landet eine
-     umbenannte App (Camera→„My Camera") an der Original-Position, wenn der VM-Sort
-     fehlt. Der Test MUSS das fangen, kann es aber nicht.
-     **Fix (Pflicht vor Bau):** `ReactiveFakeInstalledAppsRepository` so ändern,
-     dass es **original-namen-sortierte Original-Label** emittiert (Spiegel von
-     post-2b `processResolveInfoList`) — Prä-Sort + Prä-Auflösung raus. Erst dann
-     ist der CustomNames-Order-Test überhaupt fähig, rot zu werden. Assertion auf
-     **beide** Ansichten (`displayedApps` UND `appsWithCustomNames`, §3.4).
-   - *Nicht-alpha-Fixture-Disziplin gilt für BEIDE neuen Sorts (Minor):* nicht nur
-     Recents — auch der Onboarding-Test braucht eine Fixture, deren
-     Custom-Name-Anzeigeordnung ≠ Enumerations-Ordnung ist, sonst ist auch er
-     vakuum (heutige Onboarding-Tests sind order-insensitiv auf Alpha-Fixtures).
-   - *Use-Case/VM-Ebene:* Drawer-ALPHABETICAL, Recents (Multi-Activity,
-     **nicht-alpha-erste** Fixture — existiert noch nicht in der Suite), die zwei
-     neuen Sorts (mit den obigen Fixture-Fixes).
-   - *Impl-Ebene (delegierte Sorts):* `AppUsageRepositoryImplTest` (Score-Tie →
-     `thenBy`), `FavoritesOrderRepositoryImplTest` (Alpha-Rest + die zwei
-     unsortierten Fallbacks). Ein Fixed-Return-Mock auf Use-Case-Ebene beweist
-     hier nichts und darf es nicht vorgeben.
-2. **Die zwei Consumer sortieren lassen — während der Helfer noch sortiert.**
-   `.sortedBy { displayNameLower }` in CustomNamesVM (auf `masterAppList`, §3.4) +
-   OnboardingUseCase ergänzen. No-Op-Overlay (Liste ist schon sortiert), jeder
-   Commit grün. Ab jetzt sortiert jeder anzeigende Consumer selbst.
+1. **Consumer-Sort extrahieren + fehlschlagbar unit-testen (Weg B — UMGESETZT).**
+   Der v5-Plan „Order-Tests vor dem Flip, Fake fixen" war für die zwei
+   neu-sortierenden Consumer illusorisch: ihr Sort sitzt downstream des
+   inline-`applyCustomNames`, das in diesem Schritt noch sortiert und jeden
+   fehlenden Consumer-Sort maskiert. Ein Test durch die echte Kette bleibt grün,
+   egal was der Consumer tut — und den Fake zu fixen ändert das nicht, weil
+   `applyCustomNames` dahinter re-sortiert. **Lösung:** die Sort-/Shape-Logik in
+   eine **pure Funktion** ziehen und mit **unsortiertem Input direkt** testen
+   (umgeht die maskierende Kette, Rule 10):
+   - **CustomNames:** `buildCustomNamesViews(masterAppList, query)` (neu,
+     `CustomNamesShaping.kt`) → `displayedApps` + `appsWithCustomNames`, **beide**
+     `sortedByDisplayName()` (§3.4: Sort auf beide master-abgeleiteten Ansichten).
+     Der VM ruft es nur noch auf. Test füttert eine unsortierte Master-Liste mit
+     umbenannten Apps in Nicht-Alpha-Ordnung.
+   - **Onboarding:** `List<AppInfo>.toOnboardingPicker()` (neu, pure Extension) =
+     `filter { blank }`+`sortedByDisplayName()`. Test füttert unsortierte,
+     bereits-benannte Apps mit Blanks.
+   - **Fehlschlagbarkeit bewiesen, nicht behauptet:** Sort temporär aus beiden
+     puren Funktionen entfernt → alle vier Guard-Assertions rot; wieder rein → grün.
+   - *Der alte `ReactiveFakeInstalledAppsRepository`-„Fix" entfällt* — er hätte den
+     Guard nicht scharf gemacht (Kette maskiert). Der Fake bleibt wie er ist; die
+     puren Funktionstests sind der Guard, nicht der Fake.
+   - *Delegierte Sorts (unverändert von v5):* der Deadness-Nachweis für
+     Drawer-TIME_WEIGHTED / Favoriten liegt auf Impl-Test-Ebene
+     (`AppUsageRepositoryImplTest` Score-Tie→`thenBy`, `FavoritesOrderRepositoryImplTest`
+     Alpha-Rest + die zwei OOM-Fallbacks). Recents-Guard folgt in Step-2 (§3.3),
+     ebenfalls mit nicht-alpha-erster Multi-Activity-Fixture.
+2. **~~Die zwei Consumer sortieren lassen~~ — ERLEDIGT in Step 1.** Die Extraktion
+   in Step 1 fügt den `sortedByDisplayName()`-Aufruf schon ein. Er ist in
+   Produktion ein No-op (der Helfer sortiert noch), aber im isolierten Test scharf.
+   Damit sortiert jeder anzeigende Consumer selbst — der frühere separate
+   Overlay-Schritt fällt mit Weg B mit Step 1 zusammen.
 3. **Recents-Fix (§3.3).** `putIfAbsent` → expliziter Alpha-Tie-Break,
    `LinkedHashMap` → `HashMap`. Der Schritt-1-Recents-Test bleibt grün (auf
    alpha-Input dieselbe Auswahl).
@@ -330,15 +346,16 @@ Schritt 4, abgesichert durch die Schritt-1-Tests + den Recents-Fix aus Schritt 3
 
 ## 6. Test-Impact
 
-- **Neu (Pflicht), und sie müssen fehlschlagen können (M1):** Order-Assertions
-  für die zwei neuen Sorts (CustomNamesVM — nach dem Fake-Fix, Assertion auf
-  `displayedApps` UND `appsWithCustomNames`; OnboardingUseCase — nicht-alpha-
-  Fixture) und für Recents (Multi-Activity, nicht-alpha-erste Fixture, existiert
-  noch nicht). **Der `ReactiveFakeInstalledAppsRepository`-Fix ist Teil des
-  Test-Impacts, nicht optional** — ohne ihn ist der CustomNames-Guard vakuum
-  (§5 Schritt 1). Vorsicht: das existierende `CustomNamesViewModelTest.inOrder(…)`
-  ist HEUTE grün nur, weil der Fake vorsortiert — es „bewacht" nichts, bis der
-  Fake-Fix es scharf macht.
+- **Neu (Pflicht), fehlschlagbar über pure Funktionen — UMGESETZT (Weg B):**
+  `CustomNamesShapingTest` (`buildCustomNamesViews`, Assertion auf `displayedApps`
+  UND `appsWithCustomNames`, unsortierter Master-Input) und `ToOnboardingPickerTest`
+  (`toOnboardingPicker`, unsortierter Input + Blank-Filter). Beide füttern die pure
+  Funktion **direkt** — sie umgehen die maskierende Kette, brauchen den früher
+  geforderten `ReactiveFakeInstalledAppsRepository`-Fix also NICHT (der hätte den
+  Guard gar nicht scharf gemacht). Fehlschlagbarkeit bewiesen (Sort weg → rot).
+  Der Recents-Guard (Multi-Activity, nicht-alpha-erste Fixture) folgt in Step-2.
+  Hinweis: das alte `CustomNamesViewModelTest.inOrder(…)` bleibt grün (läuft durch
+  den noch sortierenden Helfer) — es ist KEIN Guard, die pure-Funktion-Tests sind es.
 - **Impl-Ebene (Ordnungs-Nachweis für delegierte Sorts):**
   `AppUsageRepositoryImplTest`, `FavoritesOrderRepositoryImplTest` — existieren,
   müssen grün bleiben (inkl. der zwei unsortierten OOM-Fallback-Pfade, R2-M1).
