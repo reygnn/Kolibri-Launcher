@@ -81,7 +81,7 @@ class KolibriLauncherApp : Application() {
                 // blocks the Main thread; wraps the ACRA-init + consent-read
                 // sub-sections inside the delegate.
                 LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
-                    CrashReportingBootstrap.attachBaseContext(this, base)
+                    CrashReportingBootstrap.attachBaseContext(this)
                 }
             } catch (e: Throwable) {
                 // Ultra paranoid: even crash-reporting init must not crash the

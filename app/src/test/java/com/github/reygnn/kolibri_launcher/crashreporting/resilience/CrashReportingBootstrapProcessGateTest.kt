@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.app.Application
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -31,8 +32,10 @@ class CrashReportingBootstrapProcessGateTest {
     private val anrReporter = mockk<AnrReporter>(relaxed = true)
     private var treePlants = 0
     private var watchdogStarts = 0
+    private val enableCalls = mutableListOf<Boolean>()
+    private var consentReads = 0
 
-    private fun runOnCreate(sender: Boolean, scope: CoroutineScope) {
+    private fun runOnCreate(sender: Boolean, scope: CoroutineScope, granted: Boolean = false) {
         CrashReportingBootstrap.onCreate(
             app,
             scope,
@@ -40,6 +43,14 @@ class CrashReportingBootstrapProcessGateTest {
             isSenderProcess = { sender },
             plantDeliveryTree = { treePlants++ },
             startWatchdog = { watchdogStarts++ },
+            // Consent-gate seams injected too — otherwise the default readDecision
+            // hits a real DataStore on the mock Application. These also let this
+            // test pin the X2 gate over the consent read (moved into onCreate).
+            setEnabled = { enableCalls += it },
+            readDecision = {
+                consentReads++
+                if (granted) ConsentDecision.Granted else ConsentDecision.Denied
+            },
         )
     }
 
@@ -53,17 +64,25 @@ class CrashReportingBootstrapProcessGateTest {
         coVerify(exactly = 0) { anrReporter.reportPendingAnrs(any()) }
         assertEquals(0, treePlants)
         assertEquals(0, watchdogStarts)
+        // X2: the sender process must NOT read consent or toggle ACRA.
+        assertEquals(0, consentReads)
+        assertEquals(emptyList<Boolean>(), enableCalls)
     }
 
     @Test
-    fun `main process plants the tree, drains ANRs and starts the watchdog`() = runTest {
+    fun `main process gates consent, plants the tree, drains ANRs and starts the watchdog`() = runTest {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
 
-        runOnCreate(sender = false, scope)
+        runOnCreate(sender = false, scope, granted = true)
         advanceUntilIdle()
 
         coVerify(exactly = 1) { anrReporter.reportPendingAnrs(any()) }
         assertEquals(1, treePlants)
         assertEquals(1, watchdogStarts)
+        // The consent gate now runs in onCreate: read once, and A1 disable-then-
+        // enable for a Granted decision. This is the fix's core — it must run here,
+        // not attachBaseContext, where applicationContext is null.
+        assertEquals(1, consentReads)
+        assertEquals(listOf(false, true), enableCalls)
     }
 }

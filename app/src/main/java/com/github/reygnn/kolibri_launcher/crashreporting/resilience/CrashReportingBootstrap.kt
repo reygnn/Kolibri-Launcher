@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.app.Application
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
@@ -30,10 +29,12 @@ import java.io.File
  * Application stays thin glue (ACRA_SPEC.md C.5, Rule 10). Two entry points,
  * matching the two Application hooks:
  *
- *  - [attachBaseContext]: init ACRA, gate consent (X2), install the uncaught
- *    handler — the hard sequence invariants of §12 live here.
- *  - [onCreate]: plant the single delivery tree, drain post-mortem ANRs, start
- *    the recovery watchdog.
+ *  - [attachBaseContext]: init ACRA (constructed disabled, A1) + install the
+ *    uncaught handler. No DataStore/consent work here — applicationContext is
+ *    null this early, which is exactly what NPE'd the old consent read.
+ *  - [onCreate]: gate consent (X2 — enable ACRA only for a verified Granted),
+ *    then plant the delivery tree, drain post-mortem ANRs, start the watchdog.
+ *    The consent gate runs FIRST so the ANR drain sees an enabled reporter.
  *
  * Plain `Timber.e` (not `silentError`) throughout, per Rule 9: this is
  * crash-handling infrastructure on the bootstrap path — a DEBUG throw here would
@@ -61,18 +62,19 @@ object CrashReportingBootstrap {
     )
 
     /**
-     * Called from `attachBaseContext` with the base context. Enforces the §12
-     * ordering:
+     * Called from `attachBaseContext`. Enforces the §12 ordering:
      *  1. `init` → `setEnabled(false)` with no intervening statement (A1) —
-     *     ACRA is constructed disabled, only a verified `Granted` enables it.
+     *     ACRA is constructed disabled; only a verified `Granted` enables it,
+     *     and that consent read now lives in [onCreate] (see below).
      *  2. `ACRA.init` → install [UncaughtCrashHandler] AFTER, so its delegate is
      *     ACRA's reporter (installed during init), not the pre-ACRA handler.
      *
-     * The consent read + toggle are process-gated (X2): only the main process
-     * reads; in the `:acra` sender process `errorReporter` is a stub and the
-     * read would be a wasted cross-process DataStore hit.
+     * NO consent read here: `context.consentDataStore`'s androidx delegate needs
+     * `applicationContext`, which is null during `attachBaseContext` — reading it
+     * here NPE'd on every cold start and (because the throw aborted the method)
+     * also skipped step 2. Both are why the consent gate moved to [onCreate].
      */
-    fun attachBaseContext(app: Application, base: Context) {
+    fun attachBaseContext(app: Application) {
         // Traced (cold-start): ACRA config build + init, reflection-heavy.
         LaunchTrace.section(LaunchTrace.Names.COLD_START_ACRA_INIT) {
             app.initAcra {
@@ -91,54 +93,20 @@ object CrashReportingBootstrap {
             }
         }
 
-        // ⚠️ KNOWN BUG (confirmed on-device 2026-08-14, release 0.99.167, stack
-        // deobfuscated via mapping.txt) — the bootstrap consent read below throws
-        // NullPointerException on EVERY cold start. `base.consentDataStore` resolves
-        // the androidx `PreferenceDataStoreSingletonDelegate.getValue`, which
-        // dereferences `base.applicationContext` — NULL during attachBaseContext
-        // (the framework assigns LoadedApk.mApplication only AFTER newApplication()
-        // returns, i.e. after this method). The NPE aborts applyConsentGate.
-        //
-        // What that BREAKS (bootstrap-time reporting):
-        //   1. The Thread.setDefaultUncaughtExceptionHandler(UncaughtCrashHandler)
-        //      call BELOW is skipped (the throw escapes to KolibriLauncherApp's
-        //      outer catch) → the unified breadcrumb handler is never installed.
-        //   2. ACRA stays disabled through onCreate, so `reportPendingAnrsAsync`
-        //      drains post-mortem ANRs into a DISABLED reporter → ANR reports lost.
-        //   3. Crashes in the early cold-start window go unreported.
-        //
-        // What SURVIVES (do NOT overstate this as "ACRA is dead"): for a Granted
-        // user, `MainActivity.checkAndShowCrashReportConsent` → `reaffirmConsent`
-        // re-enables ACRA via the POST-Hilt repository (valid @ApplicationContext,
-        // works). That reaffirm was added as a net for EXACTLY this failed-bootstrap
-        // case (see its comment). So steady-state runtime crash/silentError
-        // reporting recovers once MainActivity starts; only the three bootstrap-time
-        // paths above are defeated.
-        //
-        // Invisible because: unit tests exercise readDecision(dataStore) with a FAKE
-        // store, never this context→extension path; Rule 7 swallows the throw
-        // ("CRITICAL: Failed to initialize crash reporting"); "ACRA off" is the
-        // privacy-safe default; and the MainActivity net masks the steady state.
-        // Present since the Cutover-B rewrite (83dbff00). FIX: gate consent where
-        // applicationContext exists + a regression test over the REAL extension
-        // path. See the fix/acra-consent-bootstrap-npe branch.
-        // §12·1: immediately after init, disable first, then read consent (A1).
-        applyConsentGate(
-            setEnabled = { ACRA.errorReporter.setEnabled(it) },
-            // X2: only the main process reads consent and toggles; the `:acra`
-            // sender process (errorReporter is a stub there) stays disabled.
-            readDecision = {
-                if (ACRA.isACRASenderServiceProcess()) null
-                // Traced (cold-start): synchronous DataStore consent read on
-                // the Main thread — prime suspect for cold-start latency.
-                else LaunchTrace.section(LaunchTrace.Names.COLD_START_CONSENT_READ) {
-                    runBlocking { ConsentBootstrap.readDecision(base) }
-                }
-            },
-        )
+        // A1: disable immediately after init, no intervening statement — ACRA is
+        // constructed disabled; only a verified Granted enables it. The consent
+        // READ that flips it is in [onCreate], NOT here: it needs the DataStore
+        // extension, whose androidx delegate dereferences applicationContext —
+        // and that is NULL during attachBaseContext (the framework assigns
+        // LoadedApk.mApplication only after newApplication() returns). Reading it
+        // here NPE'd on every cold start, silently disabling ACRA and skipping the
+        // handler install below (fixed 2026-08-14 by moving the gate to onCreate).
+        ACRA.errorReporter.setEnabled(false)
 
-        // §12·2: install AFTER init so the delegate is ACRA's ErrorReporterImpl.
-        // Unified across RELEASE and DEBUG (G1).
+        // §12·2: install AFTER init so the delegate is ACRA's ErrorReporterImpl
+        // (unified RELEASE+DEBUG, G1). UNCONDITIONAL and ahead of the consent read
+        // (now in onCreate), so a consent-read failure can never skip it — the
+        // exact regression that had left the unified handler uninstalled.
         Thread.setDefaultUncaughtExceptionHandler(
             UncaughtCrashHandler(Thread.getDefaultUncaughtExceptionHandler()),
         )
@@ -186,16 +154,32 @@ object CrashReportingBootstrap {
         isSenderProcess: () -> Boolean = { ACRA.isACRASenderServiceProcess() },
         plantDeliveryTree: () -> Unit = { Timber.plant(AcraTree()) },
         startWatchdog: () -> Unit = { startWatchdogAfterBootstrap(app) },
+        // The consent gate moved here from attachBaseContext (2026-08-14): the
+        // DataStore extension needs applicationContext, null during attach.
+        // onCreate runs after the framework wires the Application, so
+        // `app.applicationContext` (used by ConsentBootstrap.readDecision) is valid.
+        setEnabled: (Boolean) -> Unit = { ACRA.errorReporter.setEnabled(it) },
+        readDecision: () -> ConsentDecision? = {
+            // Traced (cold-start): synchronous DataStore consent read on Main.
+            LaunchTrace.section(LaunchTrace.Names.COLD_START_CONSENT_READ) {
+                runBlocking { ConsentBootstrap.readDecision(app) }
+            }
+        },
     ) {
-        // X2: the `:acra` sender process must run NONE of this — symmetric with
-        // attachBaseContext, which gates its consent read the same way. Both the
-        // ANR drain and the watchdog write process-shared state the main process
-        // owns: the settings-DataStore watermark (AnrReporter) and the LoopGuard
-        // kill-counter file under noBackupFilesDir. A second writer in `:acra`
-        // is a cross-process race — a fresh ANR's watermark advanced past without
-        // a live reporter (silent loss), plus a clobbered kill count. AcraTree
-        // would only forward to a stub errorReporter here anyway.
+        // X2: the `:acra` sender process must run NONE of this — the consent read
+        // + toggle, the ANR drain and the watchdog all write process-shared state
+        // the main process owns: the settings-DataStore watermark (AnrReporter)
+        // and the LoopGuard kill-counter file under noBackupFilesDir. A second
+        // writer in `:acra` is a cross-process race — a fresh ANR's watermark
+        // advanced past without a live reporter (silent loss), plus a clobbered
+        // kill count. AcraTree would only forward to a stub errorReporter anyway.
         if (isSenderProcess()) return
+
+        // A1 gate: disable-then-enable-if-Granted. Runs BEFORE the ANR drain so a
+        // Granted user's post-mortem ANRs report into an enabled reporter (ACRA was
+        // left disabled at attachBaseContext). MainActivity.reaffirmConsent is now
+        // a redundant backup, not the sole carrier.
+        applyConsentGate(setEnabled, readDecision)
 
         plantDeliveryTree()
         reportPendingAnrsAsync(scope, anrReporter)
