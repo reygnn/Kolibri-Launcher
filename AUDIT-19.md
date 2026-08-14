@@ -15,14 +15,17 @@
 > **bewusst minimalistischen text-only Launcher** wurde „mehr Caching/Deko" NICHT
 > als Defekt gewertet; nur echte, mess­bare Rechen-/IO-/Latenz-Verschwendung.
 >
-> **Status: F1, F3, F4 gemergt; F2 auf Branch umgesetzt (Merge ausstehend); F5–F8
-> offen.** Acht Funde in zwei Clustern (DataStore-Schreiblast, Wallpaper-Luminanz)
-> plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split), **F3 + F4** (bounded
-> Luminanz-Decode + Projektion + URI-Memo) sind nach `main` gemergt — F3/F4
-> zusätzlich per On-Device-A/B (Perfetto-Alternative: Decode-Count) bestätigt.
-> **F2** (`wallpaperState`-Projektion) ist auf Branch `fix/wallpaper-state-reparse`
-> implementiert (mit Tests), noch **nicht** gemergt. F5–F8 sind reine Read-Only-
-> Analyse, kein Code verändert; je ein eigener Branch pro Cluster empfohlen (§4).
+> **Status: F1–F4 gemergt; F5 auf Branch umgesetzt (Merge ausstehend); F6 bewusst
+> verworfen; F7–F8 offen.** Acht Funde in zwei Clustern (DataStore-Schreiblast,
+> Wallpaper-Luminanz) plus Cold-Start-Latenz. **F1** (Usage-DataStore-Split),
+> **F2** (`wallpaperState`-Projektion), **F3 + F4** (bounded Luminanz-Decode +
+> Projektion + URI-Memo) sind nach `main` gemergt — F3/F4 zusätzlich per
+> On-Device-A/B (Perfetto-Alternative: Decode-Count) bestätigt. **F5**
+> (reaktive App-Liste statt Per-`onStart`-Enumeration) ist auf Branch
+> `refactor/reactive-applist-onstart` implementiert (mit Tests), noch **nicht**
+> gemergt. **F6** (`runBlocking`-Consent-Read) wurde nach Perfetto-Messung
+> (~4 ms warm / ~9,7 ms disk-cold; alter Trace sagte <1 ms) **bewusst verworfen**
+> — Aufwand/Nutzen zu gering. F7–F8 offen.
 
 ---
 
@@ -221,7 +224,26 @@ dem `distinct`, **und** `compute()` im `@Singleton WallpaperBitmapLuminanceImpl`
 per URI memoisieren (1-Entry-Cache reicht). Der URI-Memo-Cache neutralisiert F4.2
 (Doppel-Pipeline) und F4.1 (Re-Fire) zusammen und ist die billigste Einzeländerung.
 
-### F5 — Volle `PackageManager`-Re-Enumeration bei jedem `onStart`
+### F5 — Volle `PackageManager`-Re-Enumeration bei jedem `onStart` · 🔧 auf Branch umgesetzt
+
+> **Umgesetzt** (Branch `refactor/reactive-applist-onstart`, **noch nicht gemergt**):
+> „beides" aus der Analyse — die reaktive Schicht **vervollständigt** und das
+> Per-`onStart`-Enumerieren **gedroppt** (subsumiert die Stufe-1-Cold-Start-
+> Dopplung). Konkret: (1) `PackageEvent.Changed` + `ACTION_PACKAGE_CHANGED` im
+> Receiver-Filter → enable/disable jetzt reaktiv; (2) Locale via
+> `KolibriLauncherApp.onConfigurationChanged` (feuert prozessweit) →
+> `triggerAppsUpdate` über einen erweiterten Hilt-Entry-Point (Locale ist kein
+> Package-Event, passt nicht in `PackageEvent`); (3) `MainActivity.onStart` ruft
+> nur noch `refreshDynamicUiData()` (Clock). Damit deckt die reaktive Schicht
+> install/uninstall/update (ADDED/REMOVED/ADDED-replacing) + enable/disable
+> (CHANGED) + Locale ab; Prozess-tot-Änderungen fängt der Cold-Start-Prime. Der
+> Collector ignoriert den Payload (jedes Event → Full-Refresh, RECONCILE_SPEC §9),
+> `PACKAGE_CHANGED`-Geschwätzigkeit fängt die 250 ms-Debounce + `distinctUntilChanged`
+> ab. Tests: `mapToPackageEvent(CHANGED)→Changed` + `handleReceive(CHANGED)`.
+> **Restrisiko:** `PACKAGE_CHANGED` ist chatty — durch Debounce+Distinct beherrscht,
+> aber ein On-Device-A/B auf der `drawer_apps_enumerate`-Slice (Foreground vorher/
+> nachher) wäre der saubere Beweis.
+
 `app/.../ui/main/MainActivity.kt:607-615` (`onStart` → `refreshAllData`) ·
 `app/.../delegate/AppManagementDelegate.kt:96-103,220` ·
 `data/.../data/InstalledAppsRepositoryImpl.kt:167-257`

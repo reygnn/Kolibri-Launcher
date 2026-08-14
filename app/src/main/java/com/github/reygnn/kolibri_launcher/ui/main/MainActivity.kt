@@ -606,12 +606,16 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     override fun onStart() {
         super.onStart()
-        // No try/catch: refreshAllData forwards to clockDelegate.refreshAll
-        // (sync StateFlow updates with hardcoded SimpleDateFormat patterns;
-        // getInitialBatteryState has its own internal catch) and
-        // appDelegate.refreshInstalledApps (scope.launchSafe — fire-and-
-        // forget). No realistic sync-throw path remains.
-        viewModel.refreshAllData()
+        // Clock/battery only (AUDIT-19 F5). The installed-app list is kept fresh
+        // REACTIVELY now — PackageUpdateReceiver (add/remove/update, plus
+        // enable/disable via ACTION_PACKAGE_CHANGED) and the locale hook in
+        // KolibriLauncherApp.onConfigurationChanged. Re-enumerating the whole
+        // launcher list (queryIntentActivities + one loadLabel IPC per app) on
+        // every foreground was redundant with that reactive layer and the
+        // cold-start prime, so it was dropped (it also removes the cold-start
+        // double-enumeration). refreshDynamicUiData is the synchronous clock
+        // refresh only — no realistic sync-throw path, so no try/catch.
+        viewModel.refreshDynamicUiData()
     }
 
     override fun onResume() {

@@ -22,4 +22,15 @@ sealed interface PackageEvent {
 
     /** A package was genuinely uninstalled (never a replace). */
     data class Removed(override val packageName: String) : PackageEvent
+
+    /**
+     * A package's components changed WITHOUT an install/uninstall — the
+     * `ACTION_PACKAGE_CHANGED` case: an app or one of its launcher components
+     * was enabled/disabled (e.g. an app toggling an activity-alias for an icon
+     * swap, or the user disabling an app). Drives the same full reconcile as the
+     * others today (the payload is not yet consulted — RECONCILE_SPEC §9); it
+     * exists so the reactive layer covers enable/disable instead of relying on
+     * the per-`onStart` re-enumeration that used to catch it (AUDIT-19 F5).
+     */
+    data class Changed(override val packageName: String) : PackageEvent
 }

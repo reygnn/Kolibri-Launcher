@@ -165,4 +165,30 @@ class PackageUpdateReceiverTest {
             receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_REMOVED, "com.example"),
         )
     }
+
+    // AUDIT-19 F5: enable/disable of an app or launcher component is now reactive.
+    @Test
+    fun `mapToPackageEvent - PACKAGE_CHANGED maps to Changed`() {
+        Assert.assertEquals(
+            PackageEvent.Changed("com.example"),
+            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_CHANGED, "com.example"),
+        )
+    }
+
+    @Test
+    fun `handleReceive - with package changed action - processes correctly`() = runTest {
+        every { intent.action } returns Intent.ACTION_PACKAGE_CHANGED
+
+        val mockUri = mockk<Uri>()
+        every { mockUri.schemeSpecificPart } returns "com.toggled.app"
+        every { intent.data } returns mockUri
+
+        var finishCalled = false
+
+        receiver.handleReceive(context, intent) { finishCalled = true }
+
+        advanceUntilIdle()
+
+        Assert.assertTrue(finishCalled)
+    }
 }

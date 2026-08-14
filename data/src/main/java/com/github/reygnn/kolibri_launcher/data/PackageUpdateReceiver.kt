@@ -76,7 +76,10 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 return
             }
 
-            if (action != Intent.ACTION_PACKAGE_ADDED && action != Intent.ACTION_PACKAGE_REMOVED) {
+            if (action != Intent.ACTION_PACKAGE_ADDED &&
+                action != Intent.ACTION_PACKAGE_REMOVED &&
+                action != Intent.ACTION_PACKAGE_CHANGED
+            ) {
                 Timber.d("[KOLIBRI] Irrelevant action: $action")
                 safeOnFinish(onFinish)
                 return
@@ -101,9 +104,9 @@ class PackageUpdateReceiver : BroadcastReceiver() {
             Timber.d("[KOLIBRI] Relevant action detected. Attempting to send signal...")
 
             // Map the Intent to a typed event at this :data edge; the bus stays
-            // Android-free. Only ADDED/REMOVED reach here (guards above), and a
-            // replace-removal was already filtered, so REMOVED is a genuine
-            // uninstall.
+            // Android-free. Only ADDED/REMOVED/CHANGED reach here (guards above),
+            // and a replace-removal was already filtered, so REMOVED is a genuine
+            // uninstall. CHANGED = enable/disable (AUDIT-19 F5).
             val event = mapToPackageEvent(action, packageName)
 
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -131,15 +134,15 @@ class PackageUpdateReceiver : BroadcastReceiver() {
 
     /**
      * Maps a relevant package action to a typed [PackageEvent]. Only ADDED/
-     * REMOVED reach the caller (guards in [handleReceive]); a genuine uninstall
-     * (REMOVED, replace already filtered) is the non-ADDED case.
+     * REMOVED/CHANGED reach the caller (guards in [handleReceive]); a genuine
+     * uninstall (REMOVED, replace already filtered) is the `else` case.
      */
     @VisibleForTesting
     internal fun mapToPackageEvent(action: String, packageName: String): PackageEvent =
-        if (action == Intent.ACTION_PACKAGE_ADDED) {
-            PackageEvent.Added(packageName)
-        } else {
-            PackageEvent.Removed(packageName)
+        when (action) {
+            Intent.ACTION_PACKAGE_ADDED -> PackageEvent.Added(packageName)
+            Intent.ACTION_PACKAGE_CHANGED -> PackageEvent.Changed(packageName)
+            else -> PackageEvent.Removed(packageName)
         }
 
     private suspend fun processPackageUpdate(context: Context, event: PackageEvent, onFinish: () -> Unit) {

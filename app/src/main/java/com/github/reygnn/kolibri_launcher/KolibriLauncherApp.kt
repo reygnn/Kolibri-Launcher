@@ -15,6 +15,7 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -23,10 +24,12 @@ import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +61,12 @@ class KolibriLauncherApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val packageUpdateReceiver = PackageUpdateReceiver()
+
+    /**
+     * Last known locale tags, to detect a system locale change in
+     * [onConfigurationChanged] (AUDIT-19 F5). Seeded in [onCreate].
+     */
+    private var lastLocaleTags: String? = null
 
     /**
      * ACRA must be initialised here — `attachBaseContext` runs before `onCreate`
@@ -158,6 +167,11 @@ class KolibriLauncherApp : Application() {
         Timber.d("[LIFECYCLE] Application.onCreate - Registering receiver...")
         registerPackageUpdateReceiver()
 
+        // Baseline for the locale-change detection in onConfigurationChanged
+        // (AUDIT-19 F5). Read here so the first real config change has something
+        // to compare against.
+        lastLocaleTags = resources.configuration.locales.toLanguageTags()
+
         // Wire SystemWallpaperColorsSignal to WallpaperManager. Drives the
         // AppDrawer's AUTO surface mode (and any future surface that wants
         // to react to system-wallpaper colour-hint changes). Listener +
@@ -172,11 +186,45 @@ class KolibriLauncherApp : Application() {
         }
     }
 
+    /**
+     * A system locale change re-localises third-party launcher labels (loaded
+     * via `loadLabel`). The [PackageUpdateReceiver] only covers package events,
+     * and the `LauncherViewModel` survives the configuration change, so nothing
+     * re-enumerates on its own — trigger a refresh here (AUDIT-19 F5, the path
+     * that replaced the per-`onStart` re-enumeration).
+     *
+     * Plain `Timber.e` per Rule 9 (this file is on the crash-infra exception
+     * list). The guarded body is synchronous — `applicationScope.launch` only
+     * schedules; the suspend `triggerAppsUpdate` runs inside the coroutine, not
+     * in the try — so no `CancellationException` arm is needed.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        try {
+            val newTags = newConfig.locales.toLanguageTags()
+            if (lastLocaleTags != null && newTags != lastLocaleTags) {
+                Timber.d("[LIFECYCLE] Locale changed ($lastLocaleTags -> $newTags) — refreshing app labels")
+                val repository = EntryPointAccessors.fromApplication(
+                    this,
+                    InstalledAppsRepositoryEntryPoint::class.java,
+                ).getInstalledAppsRepository()
+                applicationScope.launch { repository.triggerAppsUpdate() }
+            }
+            lastLocaleTags = newTags
+        } catch (e: Throwable) {
+            Timber.e(e, "Error handling locale change for app-list refresh")
+        }
+    }
+
     private fun registerPackageUpdateReceiver() {
         try {
             val intentFilter = IntentFilter().apply {
                 addAction(Intent.ACTION_PACKAGE_ADDED)
                 addAction(Intent.ACTION_PACKAGE_REMOVED)
+                // ACTION_PACKAGE_CHANGED: enable/disable of an app or a launcher
+                // component (AUDIT-19 F5) — makes that case reactive instead of
+                // relying on the per-onStart re-enumeration that used to catch it.
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
                 addDataScheme("package")
             }
 
