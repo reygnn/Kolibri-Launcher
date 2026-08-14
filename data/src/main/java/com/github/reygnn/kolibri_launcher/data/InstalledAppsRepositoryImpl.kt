@@ -9,6 +9,7 @@ import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -276,7 +277,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             }
         }
 
-        return appInfoList.sortedBy { it.displayNameLower }
+        return appInfoList.sortedByDisplayName()
     }
 
     override suspend fun purgeRepository() {

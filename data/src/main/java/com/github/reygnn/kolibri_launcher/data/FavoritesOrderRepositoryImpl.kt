@@ -8,6 +8,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -142,7 +143,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error sorting favorite components, falling back to alphabetical")
             try {
-                favoriteApps.sortedBy { it.displayNameLower }
+                favoriteApps.sortedByDisplayName()
             } catch (e2: Throwable) {
                 TimberWrapper.silentError(e2, "Critical error in fallback sorting, returning unsorted list")
                 favoriteApps
@@ -153,7 +154,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
     fun sortAppsWithGivenOrder(appsToSort: List<AppInfo>, order: List<String>): List<AppInfo> {
         try {
             if (order.isEmpty()) {
-                return appsToSort.sortedBy { it.displayNameLower }
+                return appsToSort.sortedByDisplayName()
             }
 
             // Component-name lookup + a consumed-key set turns the former
@@ -185,7 +186,7 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
 
             // Restliche Apps alphabetisch sortiert anhängen
             orderedApps.addAll(
-                appsToSort.filterNot { it.componentName in consumed }.sortedBy { it.displayNameLower },
+                appsToSort.filterNot { it.componentName in consumed }.sortedByDisplayName(),
             )
             return orderedApps
 

@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -150,7 +151,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
             throw e
         } catch (e: Throwable) {
             KolibriLog.w(e, "Sorting failed - using alphabetical fallback")
-            favoriteApps.sortedBy { it.displayNameLower }
+            favoriteApps.sortedByDisplayName()
         }
 
         val limitedOrderedFavorites = orderedFavorites.take(AppConstants.MAX_FAVORITES_ON_HOME)
@@ -186,7 +187,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // Filter / sortedBy / take auf String-Properties — kann nicht werfen.
         return rawApps
             .filter { !hiddenApps.contains(it.componentName) }
-            .sortedBy { it.displayNameLower }
+            .sortedByDisplayName()
             .take(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 }

@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
@@ -36,7 +37,7 @@ class ReactiveFakeInstalledAppsRepository(
                 app.originalName
             )
             app.copy(displayName = displayName)
-        }.sortedBy { it.displayName.lowercase() }
+        }.sortedByDisplayName()
 
         delegate.installedApps = processedList
     }

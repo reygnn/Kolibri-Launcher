@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
@@ -124,7 +125,7 @@ class SwipeActionsViewModel @Inject constructor(
                 // HiddenAppsViewModel.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
-                }?.sortedBy { it.displayNameLower }
+                }?.sortedByDisplayName()
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in SwipeActionsViewModel")
 
                 // Load the stored slot assignments BEFORE publishing the master

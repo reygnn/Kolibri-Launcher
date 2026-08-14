@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -143,7 +144,7 @@ class GetDrawerAppsUseCase @Inject constructor(
         }
 
         val sortedApps = when (sortOrder) {
-            SortOrder.ALPHABETICAL -> visibleApps.sortedBy { it.displayNameLower }
+            SortOrder.ALPHABETICAL -> visibleApps.sortedByDisplayName()
 
             SortOrder.TIME_WEIGHTED_USAGE -> try {
                 // Echte externe Abhängigkeit (UsageStats / System-Clock /
@@ -158,7 +159,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                     e,
                     "Error in time-weighted sort, falling back to alphabetical",
                 )
-                visibleApps.sortedBy { it.displayNameLower }
+                visibleApps.sortedByDisplayName()
             }
         }
 

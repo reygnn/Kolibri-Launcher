@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -79,7 +80,7 @@ class FavoritesSortViewModel @Inject constructor(
      * tell but still re-persists, matching the pre-extraction behavior.
      */
     fun onSortAlphabetically() {
-        val sorted = _apps.value.sortedBy { it.displayNameLower }
+        val sorted = _apps.value.sortedByDisplayName()
         _apps.value = sorted
         persistOrder(sorted, successToastResId = R.string.favorites_sorted_alphabetically)
     }

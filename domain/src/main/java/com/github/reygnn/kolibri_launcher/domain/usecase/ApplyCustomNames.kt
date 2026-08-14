@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 
 /**
  * Applies custom names onto an app list as a pure, reactive re-derivation
@@ -70,4 +71,4 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  */
 fun applyCustomNames(apps: List<AppInfo>, customNames: Map<String, String>): List<AppInfo> =
     apps.map { it.copy(displayName = customNames[it.packageName] ?: it.originalName) }
-        .sortedBy { it.displayNameLower }
+        .sortedByDisplayName()

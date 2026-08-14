@@ -14,6 +14,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.filterByName
@@ -89,7 +90,7 @@ class OnboardingViewModel @Inject constructor(
 
                     val selectedAppInfos = allApps
                         .filter { selected.contains(it.componentName) }
-                        .sortedBy { it.displayNameLower }
+                        .sortedByDisplayName()
 
                     _uiState.value.copy(
                         selectableApps = selectableList,

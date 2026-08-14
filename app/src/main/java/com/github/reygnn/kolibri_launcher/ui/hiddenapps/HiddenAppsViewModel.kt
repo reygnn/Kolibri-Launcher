@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
@@ -61,7 +62,7 @@ class HiddenAppsViewModel @Inject constructor(
 
                 val selectedAppInfos = allApps
                     .filter { selected.contains(it.componentName) }
-                    .sortedBy { it.displayNameLower }
+                    .sortedByDisplayName()
 
                 _uiState.value.copy(
                     titleResId = R.string.hidden_apps_title_screen,
@@ -99,7 +100,7 @@ class HiddenAppsViewModel @Inject constructor(
                 // bounded timeout — same pattern as BackupDataAssembler.
                 val allApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
                     getInstalledAppsUseCase().first { it.isNotEmpty() }
-                }?.sortedBy { it.displayNameLower }
+                }?.sortedByDisplayName()
                     ?: error("Timed out waiting for InstalledAppsRepository to populate in HiddenAppsViewModel")
 
                 // Load the selection BEFORE publishing the master list, then

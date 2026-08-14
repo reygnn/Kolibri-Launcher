@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -174,7 +175,7 @@ class AppUsageRepositoryImpl @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error sorting by time-weighted usage, falling back to alphabetical sort")
-            apps.sortedBy { it.displayNameLower }
+            apps.sortedByDisplayName()
         }
     }
 
