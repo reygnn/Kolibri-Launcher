@@ -123,19 +123,40 @@ class ClockDelegate(
 
     // --- Internal ---
 
+    // Cached time/date formatters — rebuilt only when the locale or the 12/24-hour
+    // setting changes, not on every minute tick. SimpleDateFormat construction
+    // parses the pattern + builds calendar/symbols, so allocating three per
+    // ACTION_TIME_TICK was pure (if small) waste on the Main thread. Safe to share
+    // a single instance: updateTimeAndDate always runs on the Main dispatcher
+    // (DelegateScope.launchSafe uses mainDispatcher; start/refresh come from the
+    // ViewModel), so there is no concurrent SimpleDateFormat.format — which is not
+    // thread-safe and was previously made safe only by per-call allocation.
+    private class ClockFormatters(
+        val locale: Locale,
+        val is24Hour: Boolean,
+        val time: SimpleDateFormat,
+        val date: SimpleDateFormat,
+    )
+
+    private var clockFormatters: ClockFormatters? = null
+
+    private fun formatters(is24Hour: Boolean): ClockFormatters {
+        val locale = Locale.getDefault()
+        clockFormatters?.let { if (it.locale == locale && it.is24Hour == is24Hour) return it }
+        return ClockFormatters(
+            locale = locale,
+            is24Hour = is24Hour,
+            time = SimpleDateFormat(if (is24Hour) "HH:mm" else "h:mm a", locale),
+            date = SimpleDateFormat("E, d MMM", locale),
+        ).also { clockFormatters = it }
+    }
+
     private fun updateTimeAndDate() {
         val now = System.currentTimeMillis()
-        val is24Hour = DateFormat.is24HourFormat(context)
+        val fmt = formatters(DateFormat.is24HourFormat(context))
 
-        val timeFormat = if (is24Hour) {
-            SimpleDateFormat("HH:mm", Locale.getDefault())
-        } else {
-            SimpleDateFormat("h:mm a", Locale.getDefault())
-        }
-        val dateFormat = SimpleDateFormat("E, d MMM", Locale.getDefault())
-
-        val newTime = timeFormat.format(now)
-        val newDate = dateFormat.format(now)
+        val newTime = fmt.time.format(now)
+        val newDate = fmt.date.format(now)
 
         // Smart update: only emit when the formatted value actually changed.
         _timeString.update { current -> if (current == newTime) current else newTime }
