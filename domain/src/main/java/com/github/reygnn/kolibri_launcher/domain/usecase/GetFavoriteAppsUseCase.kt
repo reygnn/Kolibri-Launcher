@@ -136,12 +136,14 @@ class GetFavoriteAppsUseCase @Inject constructor(
         hiddenApps: Set<String>,
         savedOrder: List<String>
     ): UiState<FavoriteAppsResult> {
-        // Markiere Favoriten-Status — Set.contains(String), .map, .filter
-        // auf Non-Null-Datenklassen können nicht werfen.
-        val appsWithFavoriteStatus = rawApps.map { app ->
-            app.copy(isFavorite = favorites.contains(app.componentName))
-        }
-        val favoriteApps = appsWithFavoriteStatus.filter { it.isFavorite }
+        // Filter to favorites FIRST, then copy only the survivors with
+        // isFavorite = true — avoids a full-list AppInfo.copy of every installed
+        // app (each copy recomputes displayNameLower + componentName) just to keep
+        // a handful. Set.contains(String) / filter / map on non-null data classes
+        // cannot throw.
+        val favoriteApps = rawApps
+            .filter { favorites.contains(it.componentName) }
+            .map { it.copy(isFavorite = true) }
 
         // Einziger Wurfkandidat: sortFavoriteComponents (suspend, Repo-Call).
         val orderedFavorites = try {

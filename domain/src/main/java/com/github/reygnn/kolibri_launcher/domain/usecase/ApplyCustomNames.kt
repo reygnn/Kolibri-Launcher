@@ -9,8 +9,15 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * drawer/favorites over `rawAppsFlow`, Site 3 = recents point-read) so a rename
  * is a `combine` re-derivation instead of a full PackageManager re-enumeration.
  *
- * `displayName = names[packageName] ?: originalName`: a package with a custom
- * name shows it, everything else falls back to its original label.
+ * A package with a custom name gets a rewritten copy (`displayName = names[pkg]`);
+ * every other app is returned UNCHANGED — it already carries its original label,
+ * because the enumeration emits `displayName == originalName`
+ * (`InstalledAppsRepositoryImpl`). An empty [customNames] map therefore returns
+ * the input list as-is (same reference, zero copies). This avoids a full-list
+ * `AppInfo.copy` — which recomputes `displayNameLower` + `componentName` per
+ * element — on the common path (a minimalist user typically has no custom names),
+ * on a hot re-derivation (drawer time-weighted re-sorts per launch; favorites
+ * per settings write).
  *
  * **Returns the input order — this function does NOT sort (RAL-4, map-only).**
  * Name resolution is a shared concern; display ORDER is not. Every displaying
@@ -32,5 +39,9 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * The detection invariant is unaffected: `originalName != displayName` still
  * identifies renamed apps — that is name resolution, not order.
  */
-fun applyCustomNames(apps: List<AppInfo>, customNames: Map<String, String>): List<AppInfo> =
-    apps.map { it.copy(displayName = customNames[it.packageName] ?: it.originalName) }
+fun applyCustomNames(apps: List<AppInfo>, customNames: Map<String, String>): List<AppInfo> {
+    if (customNames.isEmpty()) return apps
+    return apps.map { app ->
+        customNames[app.packageName]?.let { app.copy(displayName = it) } ?: app
+    }
+}
