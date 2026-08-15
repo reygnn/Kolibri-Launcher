@@ -242,6 +242,11 @@ class WallpaperViewBinder(
                 loaded.originalWidth,
                 loaded.originalHeight,
             )
+            // TEMP diagnostic (branch chore/wallpaper-mem-logging): the
+            // single-layer bitmap is now attached to the view. No suspension
+            // point — pure Main-thread view read. DISABLED — uncomment to
+            // re-measure retained wallpaper memory via `adb logcat -s WallpaperMem`.
+            // view.logRetainedWallpaperMemory("singleLayer")
 
             runWhenMeasured(view) {
                 try {
@@ -360,6 +365,12 @@ class WallpaperViewBinder(
             }
             view.activeLayerIndex = restoredIndex ?: (view.layerCount - 1)
         }
+
+        // TEMP diagnostic (branch chore/wallpaper-mem-logging): all layer
+        // bitmaps are parented now, so the retained set is fully allocated.
+        // No suspension point — pure Main-thread view read. DISABLED — uncomment
+        // to re-measure retained wallpaper memory via `adb logcat -s WallpaperMem`.
+        // view.logRetainedWallpaperMemory("fullRebuild")
 
         // Transforms and properties are applied after the view has had a
         // chance to measure — same pattern as the original code. The
