@@ -20,7 +20,10 @@ import java.util.concurrent.TimeUnit
  * app list (rename, install/uninstall, custom-name change). Since the RAL-4
  * map-only flip it is a pure `map { copy(displayName = …) }` with NO terminal
  * sort (display order is now each consumer's own concern), so this pins the cost
- * of that name-resolution map at realistic list sizes.
+ * of that name-resolution map at realistic list sizes. The `namedPercent` param
+ * covers BOTH the common no-custom-names fast path (0% → the input list is
+ * returned unchanged, zero copies) and the mixed 50% case, so the empty-map win
+ * of the map-only optimization is no longer hidden by a single 50%-named arm.
  *
  * *Historical note:* this benchmark once carried a second `mapOnly` arm to isolate
  * the terminal sort's cost — the "dead sort" the RAL-4 flip removed. With the sort
@@ -47,13 +50,20 @@ open class ApplyCustomNamesBenchmark {
     @Param("50", "200")
     var size: Int = 0
 
+    /**
+     * Percentage of packages that carry a custom name. `0` is the common real
+     * case (a user with NO custom names): the map-only fast path returns the input
+     * list unchanged, zero copies — the case the earlier single-50%-arm benchmark
+     * hid. `50` keeps the mixed-branch (only the named half copied) measurement.
+     */
+    @Param("0", "50")
+    var namedPercent: Int = 0
+
     private lateinit var apps: List<AppInfo>
     private lateinit var customNames: Map<String, String>
 
     @Setup
     fun setUp() {
-        // Reverse-ordered original labels so the terminal sort has real work to
-        // do (a pre-sorted input would flatter the sort's timsort fast path).
         apps = (0 until size).map { i ->
             val original = "App ${size - i}"
             AppInfo(
@@ -63,11 +73,15 @@ open class ApplyCustomNamesBenchmark {
                 className = "com.example.app$i.MainActivity",
             )
         }
-        // Half the packages carry a custom name (even indices): exercises both
-        // branches of `customNames[packageName] ?: originalName` and forces the
-        // custom-named entries to a different sort position than their original.
-        customNames = (0 until size step 2).associate { i ->
-            "com.example.app$i" to "Custom ${size - i}"
+        // Build the custom-name map to the requested coverage: 0% → empty (the
+        // fast path returns the input unchanged), 50% → every other package
+        // renamed (exercises both branches).
+        customNames = if (namedPercent == 0) {
+            emptyMap()
+        } else {
+            (0 until size step 2).associate { i ->
+                "com.example.app$i" to "Custom ${size - i}"
+            }
         }
     }
 

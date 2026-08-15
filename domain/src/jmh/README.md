@@ -51,8 +51,9 @@ pass/fail line** (your host will differ):
 
 | Benchmark            | size    | Score            |
 |----------------------|---------|------------------|
-| `applyCustomNames` (map-only) | 50  | ~0.60 ops/µs (~1.7 µs/call) |
-| `applyCustomNames` (map-only) | 200 | ~0.15 ops/µs (~6.7 µs/call) |
+| `applyCustomNames` 0% named  | 50 / 200 | ~1200 ops/µs — fast path: no custom names → input returned unchanged (was ~1.7 / ~6.7 µs/call copying all) |
+| `applyCustomNames` 50% named | 50  | ~0.96 ops/µs (~1.0 µs/call) — only the named half copied (was ~0.60) |
+| `applyCustomNames` 50% named | 200 | ~0.23 ops/µs (~4.3 µs/call) — was ~0.15 |
 | `luminancePass`      | 1024 px | ~0.009 ops/µs (~111 µs/call) |
 | `luminancePass`      | 4096 px | ~0.0023 ops/µs (~444 µs/call) |
 | `filterDisplayName`      | 50  | ~2.5 ops/µs (~0.4 µs/call) |
@@ -61,6 +62,8 @@ pass/fail line** (your host will differ):
 | `filterWithOriginalName` | 200 | ~0.21 ops/µs (~4.7 µs/call) |
 | `score` (usage)      | 20 ts  | ~1.3 ops/µs (~0.8 µs/call) |
 | `score` (usage)      | 100 ts | ~0.25 ops/µs (~4.0 µs/call) |
+| `parse` (usage-snapshot) | 20 pkg × 30 ts  | ~0.065 ops/µs (~15 µs/call) |
+| `parse` (usage-snapshot) | 100 pkg × 30 ts | ~0.013 ops/µs (~75 µs/call) |
 | `construct` (AppInfo)     | 50  | ~0.57 ops/µs (~1.8 µs/call) |
 | `construct` (AppInfo)     | 200 | ~0.14 ops/µs (~7.1 µs/call) |
 | `constructBare` (no vals) | 50  | ~2.3 ops/µs (~0.4 µs/call) |
@@ -72,9 +75,20 @@ pass/fail line** (your host will differ):
 | `firstElementDiffers`         | 200 | ~135 ops/µs (~0.007 µs/call) |
 | `sameListInstance`            | 200 | ~1474 ops/µs (~0.001 µs/call) |
 
-`applyCustomNames` is now a pure name-resolution `map` (no terminal sort) since
-the RAL-4 map-only flip — measured ~1.7 µs @50, ~6.7 µs @200, µs-scale off the
-Main thread (fresh single-benchmark run via `-PjmhInclude=ApplyCustomNamesBenchmark`).
+`applyCustomNames` is a pure name-resolution `map` (no terminal sort, RAL-4) with
+a map-only fast path added in the hot-path review: an empty custom-names map
+returns the input list unchanged. The `namedPercent` param shows both — the
+common **no-custom-names** case is a JIT-collapsed near-no-op (the `~1200 ops/µs`
+rows), while the 50%-named case copies only the renamed half (~1.0 µs @50,
+~4.3 µs @200, down from ~1.7 / ~6.7 µs when it copied all). `parse`
+(usage-snapshot) measures the per-package String→Long parse the `usageSnapshotFlow`
+refactor moved out of the per-sort path (~15 µs @20 pkg / ~75 µs @100 pkg — saved
+per avoided per-launch re-sort).
+
+Run both via a single alternation regex:
+`-PjmhInclude=".*(ApplyCustomNamesBenchmark|UsageSnapshotParseBenchmark).*"` — a
+comma-separated `-PjmhInclude` list does NOT OR (the patterns get combined into
+one and match nothing), so put the alternatives inside one regex with `|`.
 
 *Historical:* the benchmark once carried a second `mapOnly` arm to price the
 former terminal sort (the "dead sort" for drawer/favorites/recents). The
