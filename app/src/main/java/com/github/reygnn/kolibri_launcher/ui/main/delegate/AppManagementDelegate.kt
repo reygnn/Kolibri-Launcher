@@ -152,11 +152,23 @@ class AppManagementDelegate(
      * and a synchronous Fragment→Activity path bypassing the event bus would
      * remove both boundaries. We deliberately don't, because:
      *
-     * 1. **Measured negligible.** The `LaunchTrace` TAP→DISPATCH gap on Perfetto
-     *    is sub-millisecond. `startMainActivity` only asks the system to start
-     *    the target process; the dominant cost by far is that app's cold start
-     *    (process fork + its `Application.onCreate` + first frame) — not ours to
-     *    optimise, and it dwarfs the hop. Closing a sub-ms gap is imperceptible.
+     * 1. **Measured negligible at rest — tail under load not measured.** The
+     *    `LaunchTrace` TAP→DISPATCH gap on Perfetto is sub-millisecond. That
+     *    figure is the median with an idle Main thread; the tail under Main-loop
+     *    contention (drawer still settling, a heavy frame in flight) is NOT
+     *    measured — a buffered Channel delivers only once the loop drains, so a
+     *    synchronous launch could win there by a frame or two. We accept the
+     *    unmeasured tail because the buffer's whole reason to exist is decoupling
+     *    the hottest UI cost anyway (`startMainActivity` only asks the system to
+     *    start the target process; the dominant cost by far is that app's cold
+     *    start — process fork + its `Application.onCreate` + first frame — not
+     *    ours to optimise, and it dwarfs even a jank-inflated hop), and because a
+     *    text-only launcher runs no app-open transition that would need the tapped
+     *    view's source bounds captured synchronously in the touch frame (the one
+     *    hard reason AOSP Launcher3 must launch inline; `startMainActivity` here
+     *    passes a null options bundle — system default animation). If a custom
+     *    launch animation is ever added, revisit this: that requirement flips the
+     *    trade-off and the synchronous path below becomes the correct one.
      *
      * 2. **The call needs an Activity.** `startMainActivity` needs an Activity
      *    context the ViewModel/delegate must never hold. Going synchronous would
