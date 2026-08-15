@@ -135,6 +135,45 @@ class AppManagementDelegate(
     /** Earliest monotonic time the next launch may fire. See [onAppClicked]. */
     private var nextLaunchAllowedAt = 0L
 
+    /**
+     * Handles a tap on an app entry (drawer or favorites). The system call
+     * itself — `AppLauncher.launch` → `LauncherApps.startMainActivity` — does
+     * NOT run here: this only claims the tap (double-tap guard below) and emits
+     * [UiEvent.LaunchApp] onto `BaseViewModel`'s buffered event Channel via
+     * `scope.launchSafe`. The Activity collects that event and performs the
+     * launch (it owns the pop-vs-launch decision and the Activity context the
+     * call needs).
+     *
+     * ## Why the coroutine + Channel hop stays (it is eliminable, kept on purpose)
+     *
+     * The hop means `startMainActivity` fires on a later Main-loop iteration
+     * than the touch frame, not synchronously inside it. It *could* be removed:
+     * a `Dispatchers.Main.immediate` launch collapses the sender-side dispatch,
+     * and a synchronous Fragment→Activity path bypassing the event bus would
+     * remove both boundaries. We deliberately don't, because:
+     *
+     * 1. **Measured negligible.** The `LaunchTrace` TAP→DISPATCH gap on Perfetto
+     *    is sub-millisecond. `startMainActivity` only asks the system to start
+     *    the target process; the dominant cost by far is that app's cold start
+     *    (process fork + its `Application.onCreate` + first frame) — not ours to
+     *    optimise, and it dwarfs the hop. Closing a sub-ms gap is imperceptible.
+     *
+     * 2. **The call needs an Activity.** `startMainActivity` needs an Activity
+     *    context the ViewModel/delegate must never hold. Going synchronous would
+     *    push the guard + `AppLaunchAction.decide` + `popBackStack` orchestration
+     *    into the Activity, reintroduce the Fragment→Activity coupling the
+     *    [UiEvent] bus exists to remove, and special-case the single hottest
+     *    action out of the otherwise-uniform event bus.
+     *
+     * 3. **The coroutine is needed anyway.** [recordAppLaunchUseCase] is a
+     *    suspend store write; running it on the same `scope.launchSafe` coroutine
+     *    keeps guard → launch-event → usage-record as one cancellation-correct,
+     *    error-funnelled unit. Dropping the coroutine would only relocate it.
+     *
+     * What is worth pinning stays pure and JVM-testable regardless of the hop:
+     * the double-tap guard (a plain monotonic-time comparison) and the
+     * pop-vs-launch decision (`AppLaunchAction.decide`).
+     */
     fun onAppClicked(app: AppInfo) {
         // Double-tap guard: a second tap inside LAUNCH_THROTTLE_MS is a stray
         // double-tap, not a second intent — swallow it before scheduling any
