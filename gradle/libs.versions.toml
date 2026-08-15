@@ -99,7 +99,7 @@ timber = "5.0.1"  # Recheck 2026-05-15: 5.0.1 is the only stable release; no 6.x
 acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). proguard-rules.pro keeps are package-wide (`-keep class org.acra.**`) — verified compatible. Header comment in proguard-rules.pro updated.
 browser = "1.10.0"  # Recheck 2026-05-15: lifted 1.9.0 → 1.10.0 (developer.android.com stable channel now lists 1.10.0).
 leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
-json = "20260522"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
+json = "20260814"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
 
 # Test (JVM)
 junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration. Recheck 2026-Q3: current = latest 4.x stable. JUnit 5 lift is its own migration effort, no triggers visible.
