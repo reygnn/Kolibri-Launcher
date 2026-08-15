@@ -192,6 +192,29 @@ class WallpaperBitmapLuminanceImplTest {
         assertNull(result)
     }
 
+    @Test
+    fun `a transient load failure is not cached — a later retry re-decodes and succeeds`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // A load failure must NOT poison the one-entry memo: the file is valid
+            // and re-referenced on every AUTO-mode read. First call fails (stream
+            // null on both passes), then the file becomes readable and the SAME URI
+            // must re-decode rather than serve a cached failure-null.
+            val baos = ByteArrayOutputStream()
+            solidBitmap(Color.WHITE).compress(Bitmap.CompressFormat.PNG, 100, baos)
+            val bytes = baos.toByteArray()
+            var failNext = true
+            every { contentResolver.openInputStream(any()) } answers {
+                if (failNext) null else ByteArrayInputStream(bytes)
+            }
+
+            val first = luminance.compute("file:///flaky.png")
+            assertNull("transient load failure yields null", first)
+
+            failNext = false
+            val second = luminance.compute("file:///flaky.png")
+            assertNotNull("failure must not have been cached — retry must decode", second)
+        }
+
     // ============================================================
     // Memoization (AUDIT-19 F4): the same URI is decoded once, a
     // different URI busts the one-entry cache.

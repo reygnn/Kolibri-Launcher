@@ -90,30 +90,51 @@ class WallpaperBitmapLuminanceImpl @Inject constructor(
     // content never changes in place), so URI → luminance is stable and a
     // one-entry cache is sound. The lock deliberately spans the decode so two
     // concurrent identical calls collapse to one decode (the second waits and
-    // hits the cache). `null` results are cached too: for a given URI the
-    // outcome is deterministic (low coverage) or a gone/unreadable file that
-    // won't be re-referenced, so a retry would only re-pay the decode.
+    // hits the cache).
+    //
+    // Only outcomes where the decode actually RAN are cached: a real luminance
+    // or the deterministic low-coverage `null` produced by `classify`. A LOAD
+    // FAILURE (transient OOM / I-O, temporarily-unreadable file) is NOT cached —
+    // the file is valid and is re-referenced on every AUTO-mode read, so caching
+    // that `null` would poison the light/dark classification for the rest of the
+    // process off a single transient miss. The failure path just falls through to
+    // the system signal this time and is retried on the next call.
     private val cacheMutex = Mutex()
     private var cachedUri: String? = null
     private var cachedResult: Float? = null
     private var hasCached = false
 
+    /**
+     * Internal outcome of one uncached compute so [compute] can cache a decode
+     * that RAN (a luminance, or the deterministic low-coverage null) but never a
+     * load FAILURE. Not exposed — the public API stays `Float?`.
+     */
+    private sealed interface ComputeOutcome {
+        data class Computed(val luminance: Float?) : ComputeOutcome
+        data object LoadFailed : ComputeOutcome
+    }
+
     override suspend fun compute(uri: String): Float? = cacheMutex.withLock {
         if (hasCached && cachedUri == uri) {
             cachedResult
         } else {
-            computeUncached(uri).also { result ->
-                cachedUri = uri
-                cachedResult = result
-                hasCached = true
+            when (val outcome = computeUncached(uri)) {
+                is ComputeOutcome.Computed -> {
+                    cachedUri = uri
+                    cachedResult = outcome.luminance
+                    hasCached = true
+                    outcome.luminance
+                }
+                // Load failure — deliberately not cached (see the memo note above).
+                ComputeOutcome.LoadFailed -> null
             }
         }
     }
 
-    private suspend fun computeUncached(uri: String): Float? = withContext(Dispatchers.IO) {
-        val bitmap = loadBitmap(uri) ?: return@withContext null
+    private suspend fun computeUncached(uri: String): ComputeOutcome = withContext(Dispatchers.IO) {
+        val bitmap = loadBitmap(uri) ?: return@withContext ComputeOutcome.LoadFailed
         try {
-            classify(bitmap)
+            ComputeOutcome.Computed(classify(bitmap))
         } finally {
             // Free the decoded bitmap promptly — the scaled copy
             // produced inside `classify` is its own allocation.
