@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.update
-import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -124,18 +126,19 @@ class ClockDelegate(
     // --- Internal ---
 
     // Cached time/date formatters — rebuilt only when the locale or the 12/24-hour
-    // setting changes, not on every minute tick. SimpleDateFormat construction
-    // parses the pattern + builds calendar/symbols, so allocating three per
-    // ACTION_TIME_TICK was pure (if small) waste on the Main thread. Safe to share
-    // a single instance: updateTimeAndDate always runs on the Main dispatcher
-    // (DelegateScope.launchSafe uses mainDispatcher; start/refresh come from the
-    // ViewModel), so there is no concurrent SimpleDateFormat.format — which is not
-    // thread-safe and was previously made safe only by per-call allocation.
+    // setting changes, not on every minute tick. Formatter construction parses the
+    // pattern + builds symbols, so allocating per ACTION_TIME_TICK was pure (if
+    // small) waste on the Main thread. DateTimeFormatter is IMMUTABLE and
+    // thread-safe (unlike SimpleDateFormat, whose format() is not), so sharing one
+    // instance is safe regardless of which thread calls it — the caching no longer
+    // rests on the "updateTimeAndDate only runs on Main" invariant. The zone is
+    // resolved per format call (ZoneId.systemDefault()), so a device time-zone
+    // change is reflected on the next tick without a formatter rebuild.
     private class ClockFormatters(
         val locale: Locale,
         val is24Hour: Boolean,
-        val time: SimpleDateFormat,
-        val date: SimpleDateFormat,
+        val time: DateTimeFormatter,
+        val date: DateTimeFormatter,
     )
 
     private var clockFormatters: ClockFormatters? = null
@@ -146,17 +149,18 @@ class ClockDelegate(
         return ClockFormatters(
             locale = locale,
             is24Hour = is24Hour,
-            time = SimpleDateFormat(if (is24Hour) "HH:mm" else "h:mm a", locale),
-            date = SimpleDateFormat("E, d MMM", locale),
+            time = DateTimeFormatter.ofPattern(if (is24Hour) "HH:mm" else "h:mm a", locale),
+            date = DateTimeFormatter.ofPattern("E, d MMM", locale),
         ).also { clockFormatters = it }
     }
 
     private fun updateTimeAndDate() {
         val now = System.currentTimeMillis()
         val fmt = formatters(DateFormat.is24HourFormat(context))
+        val zoned = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
 
-        val newTime = fmt.time.format(now)
-        val newDate = fmt.date.format(now)
+        val newTime = fmt.time.format(zoned)
+        val newDate = fmt.date.format(zoned)
 
         // Smart update: only emit when the formatted value actually changed.
         _timeString.update { current -> if (current == newTime) current else newTime }
