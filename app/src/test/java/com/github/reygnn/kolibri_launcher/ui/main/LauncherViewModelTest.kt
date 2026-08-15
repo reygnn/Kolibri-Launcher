@@ -252,6 +252,7 @@ class LauncherViewModelTest {
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         appUpdateSignal = appUpdateSignal,
+        monotonicClock = neverThrottlingClock(),
         savedStateHandle = SavedStateHandle(),
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,

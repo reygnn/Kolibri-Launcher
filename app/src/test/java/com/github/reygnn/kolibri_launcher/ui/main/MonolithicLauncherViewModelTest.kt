@@ -286,6 +286,7 @@ class MonolithicLauncherViewModelTest {
             saveFabPositionUseCase,
             wallpaperFileManager,
             appUpdateSignal,
+            neverThrottlingClock(),
             SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,

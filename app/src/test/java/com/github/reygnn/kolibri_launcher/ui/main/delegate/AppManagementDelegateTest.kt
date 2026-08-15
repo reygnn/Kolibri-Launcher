@@ -24,6 +24,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.core.PackageEvent
@@ -79,6 +80,10 @@ class AppManagementDelegateTest {
     private lateinit var checkAppUsageUseCase: CheckAppUsageUseCase
     private lateinit var appUpdateSignal: AppUpdateSignal
 
+    /** Backing value for [monotonicClock]; advance it in tests to cross the throttle window. */
+    private var fakeNow = 0L
+    private val monotonicClock = MonotonicClock { fakeNow }
+
     private val testApp: AppInfo = mockk {
         every { packageName } returns "com.test.app"
         every { displayName } returns "Test App"
@@ -87,6 +92,7 @@ class AppManagementDelegateTest {
     @Before
     fun setUp() {
         sentEvents.clear()
+        fakeNow = 0L
 
         context = mockk {
             every { getString(any<Int>(), any<Any>()) } returns "formatted string"
@@ -151,6 +157,7 @@ class AppManagementDelegateTest {
         toggleSortOrderUseCase: ToggleSortOrderUseCase = this.toggleSortOrderUseCase,
         resetAppUsageUseCase: ResetAppUsageUseCase = this.resetAppUsageUseCase,
         appUpdateSignal: AppUpdateSignal = this.appUpdateSignal,
+        monotonicClock: MonotonicClock = this.monotonicClock,
         scope: DelegateScope = createDelegateScope()
     ) = AppManagementDelegate(
         context = context,
@@ -169,6 +176,7 @@ class AppManagementDelegateTest {
         getAutoShowKeyboardSettingUseCase = getAutoShowKeyboardSettingUseCase,
         checkAppUsageUseCase = checkAppUsageUseCase,
         appUpdateSignal = appUpdateSignal,
+        monotonicClock = monotonicClock,
         savedStateHandle = savedStateHandle,
         scope = scope
     )
@@ -230,6 +238,34 @@ class AppManagementDelegateTest {
 
         assertTrue(sentEvents.any { it is UiEvent.LaunchApp })
         assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+    }
+
+    @Test
+    fun `onAppClicked swallows a second tap within the throttle window`() = runTest {
+        val delegate = createDelegate()
+
+        fakeNow = 1000L
+        delegate.onAppClicked(testApp)
+        fakeNow = 1100L // +100ms, inside the 300ms double-tap window
+        delegate.onAppClicked(testApp)
+        advanceUntilIdle()
+
+        assertEquals(1, sentEvents.count { it is UiEvent.LaunchApp })
+        coVerify(exactly = 1) { recordAppLaunchUseCase.invoke(testApp) }
+    }
+
+    @Test
+    fun `onAppClicked allows a second tap after the throttle window`() = runTest {
+        val delegate = createDelegate()
+
+        fakeNow = 1000L
+        delegate.onAppClicked(testApp)
+        fakeNow = 1400L // +400ms, past the 300ms double-tap window
+        delegate.onAppClicked(testApp)
+        advanceUntilIdle()
+
+        assertEquals(2, sentEvents.count { it is UiEvent.LaunchApp })
+        coVerify(exactly = 2) { recordAppLaunchUseCase.invoke(testApp) }
     }
 
     // ===========================================

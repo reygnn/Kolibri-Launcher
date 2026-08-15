@@ -168,6 +168,7 @@ class LauncherViewModelDoomsdayTest {
         saveFabPositionUseCase = mockk(relaxed = true),
         wallpaperFileManager = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
+        monotonicClock = neverThrottlingClock(),
         savedStateHandle = savedStateHandle,
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,

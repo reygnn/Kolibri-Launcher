@@ -79,6 +79,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.delegate.LayoutDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.ThemingDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegate
 import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -136,6 +137,7 @@ class LauncherViewModel @Inject constructor(
     saveFabPositionUseCase: SaveFabPositionUseCase,
     wallpaperFileManager: WallpaperFileManager,
     appUpdateSignal: AppUpdateSignal,
+    monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
@@ -182,6 +184,7 @@ class LauncherViewModel @Inject constructor(
         getAutoShowKeyboardSettingUseCase = getAutoShowKeyboardSettingUseCase,
         checkAppUsageUseCase = checkAppUsageUseCase,
         appUpdateSignal = appUpdateSignal,
+        monotonicClock = monotonicClock,
         savedStateHandle = savedStateHandle,
         scope = delegateScope
     )

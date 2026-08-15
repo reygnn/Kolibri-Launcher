@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.di
 import android.app.WallpaperManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
@@ -10,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggle
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggleImpl
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifier
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifierImpl
+import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
 import dagger.Provides
@@ -48,6 +50,17 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
+
+    /**
+     * Monotonic clock seam ([SystemClock.elapsedRealtime]) so the app-launch
+     * double-tap throttle in
+     * [com.github.reygnn.kolibri_launcher.ui.main.delegate.AppManagementDelegate]
+     * stays JVM-testable with a fake clock.
+     */
+    @Provides
+    @Singleton
+    fun provideMonotonicClock(): MonotonicClock =
+        MonotonicClock { SystemClock.elapsedRealtime() }
 
     /**
      * The ACRA enable/disable + revoke-purge seam. Behind an interface so

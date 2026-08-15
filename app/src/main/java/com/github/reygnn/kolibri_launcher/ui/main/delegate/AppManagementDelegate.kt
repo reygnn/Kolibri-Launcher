@@ -34,6 +34,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
+import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.toStringResId
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -45,6 +46,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+
+/**
+ * Ignore-window for repeated app-launch taps. Matches the platform double-tap
+ * timeout ([android.view.ViewConfiguration.getDoubleTapTimeout] is 300 ms):
+ * a second tap within this window is a stray double-tap, not a second intent.
+ */
+private const val LAUNCH_THROTTLE_MS = 300L
 
 /**
  * Delegate responsible for app management:
@@ -68,6 +76,7 @@ class AppManagementDelegate(
     private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase,
     private val checkAppUsageUseCase: CheckAppUsageUseCase,
     private val appUpdateSignal: AppUpdateSignal,
+    private val monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
     private val scope: DelegateScope
 ) {
@@ -123,20 +132,36 @@ class AppManagementDelegate(
 
     // --- Public API: App Actions ---
 
-    fun onAppClicked(app: AppInfo) = scope.launchSafe("Error handling app click") {
-        try {
-            scope.sendEvent(UiEvent.LaunchApp(app))
-            // Recording the launch changes the usage store, which ticks
-            // AppUsageRepository.usageFlow → the drawer's TIME_WEIGHTED_USAGE order
-            // re-derives reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase()
-            // here any more: a launch must not force a full PackageManager
-            // re-enumeration.
-            recordAppLaunchUseCase(app)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error handling app click")
-            scope.sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
+    /** Earliest monotonic time the next launch may fire. See [onAppClicked]. */
+    private var nextLaunchAllowedAt = 0L
+
+    fun onAppClicked(app: AppInfo) {
+        // Double-tap guard: a second tap inside LAUNCH_THROTTLE_MS is a stray
+        // double-tap, not a second intent — swallow it before scheduling any
+        // coroutine (else the tap fires a redundant startMainActivity + usage
+        // record). Clicks arrive on the Main thread and are processed
+        // sequentially, so the plain var is race-free without synchronization.
+        // elapsedRealtime (monotonic) so a wall-clock jump can neither defeat
+        // nor stick the window.
+        val now = monotonicClock.now()
+        if (now < nextLaunchAllowedAt) return
+        nextLaunchAllowedAt = now + LAUNCH_THROTTLE_MS
+
+        scope.launchSafe("Error handling app click") {
+            try {
+                scope.sendEvent(UiEvent.LaunchApp(app))
+                // Recording the launch changes the usage store, which ticks
+                // AppUsageRepository.usageFlow → the drawer's TIME_WEIGHTED_USAGE order
+                // re-derives reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase()
+                // here any more: a launch must not force a full PackageManager
+                // re-enumeration.
+                recordAppLaunchUseCase(app)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error handling app click")
+                scope.sendEvent(UiEvent.ShowToast(R.string.error_launching_app))
+            }
         }
     }
 

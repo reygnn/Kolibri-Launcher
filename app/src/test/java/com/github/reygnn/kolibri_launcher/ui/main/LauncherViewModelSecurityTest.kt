@@ -181,6 +181,7 @@ class LauncherViewModelSecurityTest {
             saveFabPositionUseCase = mockk(relaxed = true),
             wallpaperFileManager = mockk(relaxed = true),
             appUpdateSignal = appUpdateSignal,
+            monotonicClock = neverThrottlingClock(),
             savedStateHandle = SavedStateHandle(),
             context = context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
