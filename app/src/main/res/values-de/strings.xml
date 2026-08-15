@@ -351,6 +351,14 @@
 <string name="cd_fab_save_drag">Hintergrund-Änderungen speichern. Zum Verschieben halten und ziehen.</string>
 <string name="cd_open_commands">Weitere Hintergrund-Steuerungen</string>
 <string name="cd_close_commands">Steuerungen schließen</string>
+<string name="cd_wallpaper_memory_info">Speicherverbrauch anzeigen</string>
+
+<!-- Info-Dialog Wallpaper-Speicher (opt-in über den ⓘ-Button im Edit-Overflow). -->
+<string name="wallpaper_memory_title">Wallpaper-Speicher</string>
+<string name="wallpaper_memory_row">Layer %1$d: %2$s  (%3$s)</string>
+<string name="wallpaper_memory_source">%1$d×%2$d, aus %3$d×%4$d</string>
+<string name="wallpaper_memory_total">Gesamt: %1$s</string>
+<string name="wallpaper_memory_empty">Kein Wallpaper geladen</string>
 
 <string name="rotation_lock_title">Bildschirmrotation sperren</string>
 <string name="rotation_lock_summary">Display im Hochformat fixieren</string>

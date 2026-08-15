@@ -375,6 +375,14 @@
 <string name="cd_fab_save_drag">Save wallpaper edits. Drag to move this button.</string>
 <string name="cd_open_commands">More wallpaper-edit controls</string>
 <string name="cd_close_commands">Close controls</string>
+<string name="cd_wallpaper_memory_info">Show memory usage</string>
+
+<!-- Wallpaper memory info dialog (opt-in via the ⓘ button in the edit overflow). -->
+<string name="wallpaper_memory_title">Wallpaper memory</string>
+<string name="wallpaper_memory_row">Layer %1$d: %2$s  (%3$s)</string>
+<string name="wallpaper_memory_source">%1$d×%2$d, from %3$d×%4$d</string>
+<string name="wallpaper_memory_total">Total: %1$s</string>
+<string name="wallpaper_memory_empty">No wallpaper loaded</string>
 
 <string name="rotation_lock_title">Lock screen rotation</string>
 <string name="rotation_lock_summary">Keep the display in portrait orientation</string>

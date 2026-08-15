@@ -50,6 +50,7 @@ class CommandsPanel @JvmOverloads constructor(
     private val btnLayerDelete: MaterialButton
     private val btnLayerUp: MaterialButton
     private val btnLayerDown: MaterialButton
+    private val btnMemInfo: MaterialButton
     private val btnClose: MaterialButton
     private val txtLayerIndicator: TextView
 
@@ -70,6 +71,7 @@ class CommandsPanel @JvmOverloads constructor(
         btnLayerDelete = findViewById(R.id.btnLayerDelete)
         btnLayerUp = findViewById(R.id.btnLayerUp)
         btnLayerDown = findViewById(R.id.btnLayerDown)
+        btnMemInfo = findViewById(R.id.btnLayerMemInfo)
         btnClose = findViewById(R.id.btnCloseCommands)
         txtLayerIndicator = findViewById(R.id.txtLayerIndicator)
     }
@@ -170,6 +172,9 @@ class CommandsPanel @JvmOverloads constructor(
 
     fun setOnLayerDownClicked(listener: () -> Unit) =
         btnLayerDown.setOnClickListener { listener() }
+
+    fun setOnMemInfoClicked(listener: () -> Unit) =
+        btnMemInfo.setOnClickListener { listener() }
 
     fun setOnCloseClicked(listener: () -> Unit) =
         btnClose.setOnClickListener { listener() }

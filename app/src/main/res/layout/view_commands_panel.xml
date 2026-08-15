@@ -113,6 +113,16 @@
             app:iconTint="@color/wallpaper_edit_foreground"
             app:iconSize="24dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLayerMemInfo"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/cd_wallpaper_memory_info"
+            app:icon="@drawable/ic_info"
+            app:iconTint="@color/wallpaper_edit_foreground"
+            app:iconSize="24dp" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"

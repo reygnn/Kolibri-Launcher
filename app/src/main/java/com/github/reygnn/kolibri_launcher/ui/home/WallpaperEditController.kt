@@ -1,12 +1,16 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
 import android.view.View
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryReport
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.formatMegabytes
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
@@ -212,6 +216,7 @@ internal class WallpaperEditController(
         // ── OVERFLOW (☰) toggles CommandsPanel ──
         fabCluster.setOnOpenCommandsClicked { commandsPanel.togglePanel() }
         commandsPanel.setOnCloseClicked { commandsPanel.hidePanel() }
+        commandsPanel.setOnMemInfoClicked { showWallpaperMemoryDialog() }
 
         // ── SNAP CONTROLS — wired on the panel ──
         updateSnapButtonIcon(wallpaperView.isSnapEnabled)
@@ -302,9 +307,59 @@ internal class WallpaperEditController(
         commandsPanel.setOnLayerDeleteClicked { /* no-op */ }
         commandsPanel.setOnLayerUpClicked { /* no-op */ }
         commandsPanel.setOnLayerDownClicked { /* no-op */ }
+        commandsPanel.setOnMemInfoClicked { /* no-op */ }
         commandsPanel.setOnCloseClicked { /* no-op */ }
 
         binding.wallpaperView.onLayerTapped = null
+    }
+
+    /**
+     * Shows the wallpaper-memory info dialog (opt-in via the `ⓘ` button in the
+     * CommandsPanel overflow): one line per layer with its retained size,
+     * decoded dimensions and — when the layer was downsampled — its source
+     * resolution, plus the total. The source line is the actionable bit: it
+     * reveals which layer is the memory driver, since a small-looking layer can
+     * still be a full-resolution photo (WALLPAPER_AGGREGATE_MEM_SPEC §1).
+     *
+     * No try/catch (Rule 11): building the report is pure reads, string
+     * formatting cannot throw, and showing a Material dialog from the overlay's
+     * (Activity) context is the same pattern used across the app. No suspension
+     * point.
+     */
+    private fun showWallpaperMemoryDialog() {
+        val ctx = commandsPanel.context
+        val rows = binding.wallpaperView.collectWallpaperMemoryRows()
+        val message = if (rows.isEmpty()) {
+            ctx.getString(R.string.wallpaper_memory_empty)
+        } else {
+            val report = WallpaperMemoryReport.of(rows)
+            buildString {
+                for (row in rows) {
+                    val dims = if (row.isDownsampled) {
+                        ctx.getString(
+                            R.string.wallpaper_memory_source,
+                            row.decodedWidth, row.decodedHeight,
+                            row.originalWidth, row.originalHeight,
+                        )
+                    } else {
+                        "${row.decodedWidth}×${row.decodedHeight}"
+                    }
+                    appendLine(
+                        ctx.getString(
+                            R.string.wallpaper_memory_row,
+                            row.index + 1, formatMegabytes(row.bytes), dims,
+                        )
+                    )
+                }
+                appendLine()
+                append(ctx.getString(R.string.wallpaper_memory_total, formatMegabytes(report.totalBytes)))
+            }
+        }
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.wallpaper_memory_title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     // ============================================================================

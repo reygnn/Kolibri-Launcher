@@ -18,6 +18,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryRow
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlin.math.abs
 import kotlin.math.max
@@ -630,35 +631,33 @@ class ZoomableImageView @JvmOverloads constructor(
     fun getLayer(index: Int): WallpaperLayer? = layers.getOrNull(index)
 
     /**
-     * TEMPORARY diagnostic (branch chore/wallpaper-mem-logging): logs the total
-     * RETAINED bitmap memory of the currently displayed wallpaper — the sum of
-     * every layer's `allocationByteCount` (multi-layer) or the single-layer
-     * drawable's. Per-layer lines carry the decoded dimensions and the decode
-     * `sampleSize`, so the source resolution can be back-computed.
+     * Retained-bitmap memory of the currently displayed wallpaper as pure data
+     * (Rule 10): one [WallpaperMemoryRow] per multi-layer layer, or a single row
+     * for the single-layer drawable. `allocationByteCount` is the true backing
+     * allocation (width·height·4 for these software ARGB_8888 decodes). Recycled /
+     * absent bitmaps are skipped. Feeds both the info dialog
+     * (`WallpaperEditController`) and the optional diagnostic log below.
      *
-     * Uses `android.util.Log.i` on purpose, NOT Timber: it must be visible in a
-     * RELEASE build (no Timber DebugTree is planted there), and it must NOT go
-     * through the process-wide AcraTree (a `Timber.w`+ would file a crash report).
-     * `allocationByteCount` is the true backing allocation (width·height·4 for
-     * these software ARGB_8888 decodes). Read it with `adb logcat -s WallpaperMem`.
-     *
-     * No try/catch (Rule 11): `allocationByteCount` / `width` / `height` on a
-     * non-recycled bitmap and `Log.i` cannot throw. Called from pure Main-thread
-     * view mutation in the binder, no suspension point.
+     * No try/catch (Rule 11): bitmap property reads on a non-recycled bitmap
+     * cannot throw; called from pure Main-thread view code, no suspension point.
      */
-    fun logRetainedWallpaperMemory(context: String) {
-        var totalBytes = 0L
-        val detail = StringBuilder()
+    fun collectWallpaperMemoryRows(): List<WallpaperMemoryRow> {
+        val rows = ArrayList<WallpaperMemoryRow>()
         if (isMultiLayerMode) {
             for (i in 0 until layerCount) {
                 val layer = getLayer(i) ?: continue
                 val bmp = layer.bitmap ?: continue
                 if (bmp.isRecycled) continue
-                val bytes = bmp.allocationByteCount.toLong()
-                totalBytes += bytes
-                detail.append(
-                    "\n  layer[$i] ${bmp.width}x${bmp.height} sample=${layer.sampleSize} " +
-                        "orig=${layer.originalWidth}x${layer.originalHeight} = ${bytes / 1024}KB"
+                rows.add(
+                    WallpaperMemoryRow(
+                        index = i,
+                        decodedWidth = bmp.width,
+                        decodedHeight = bmp.height,
+                        sampleSize = layer.sampleSize,
+                        originalWidth = layer.originalWidth,
+                        originalHeight = layer.originalHeight,
+                        bytes = bmp.allocationByteCount.toLong(),
+                    )
                 )
             }
         } else {
@@ -666,14 +665,47 @@ class ZoomableImageView @JvmOverloads constructor(
             if (d is BitmapDrawable) {
                 val bmp = d.bitmap
                 if (bmp != null && !bmp.isRecycled) {
-                    val bytes = bmp.allocationByteCount.toLong()
-                    totalBytes += bytes
-                    detail.append(
-                        "\n  single ${bmp.width}x${bmp.height} sample=$_singleSampleSize " +
-                            "orig=${_singleOriginalWidth}x${_singleOriginalHeight} = ${bytes / 1024}KB"
+                    rows.add(
+                        WallpaperMemoryRow(
+                            index = 0,
+                            decodedWidth = bmp.width,
+                            decodedHeight = bmp.height,
+                            sampleSize = _singleSampleSize,
+                            originalWidth = _singleOriginalWidth,
+                            originalHeight = _singleOriginalHeight,
+                            bytes = bmp.allocationByteCount.toLong(),
+                        )
                     )
                 }
             }
+        }
+        return rows
+    }
+
+    /**
+     * TEMPORARY diagnostic (branch chore/wallpaper-mem-logging): logs the total
+     * RETAINED wallpaper memory and the per-layer breakdown from
+     * [collectWallpaperMemoryRows].
+     *
+     * Uses `android.util.Log.i` on purpose, NOT Timber: it must be visible in a
+     * RELEASE build (no Timber DebugTree is planted there), and it must NOT go
+     * through the process-wide AcraTree (a `Timber.w`+ would file a crash report).
+     * Read it with `adb logcat -s WallpaperMem`. Call sites in the binder are
+     * committed DISABLED — uncomment to re-measure.
+     *
+     * No try/catch (Rule 11): pure reads + `Log.i` cannot throw; no suspension point.
+     */
+    fun logRetainedWallpaperMemory(context: String) {
+        val rows = collectWallpaperMemoryRows()
+        var totalBytes = 0L
+        val detail = StringBuilder()
+        for (row in rows) {
+            totalBytes += row.bytes
+            detail.append(
+                "\n  layer[${row.index}] ${row.decodedWidth}x${row.decodedHeight} " +
+                    "sample=${row.sampleSize} orig=${row.originalWidth}x${row.originalHeight} " +
+                    "= ${row.bytes / 1024}KB"
+            )
         }
         android.util.Log.i(
             "WallpaperMem",
