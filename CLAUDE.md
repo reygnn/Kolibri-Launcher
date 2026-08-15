@@ -221,14 +221,24 @@ activities.
    flood control (fingerprint dedup + ingestion rate-limit) is now entirely
    server-side (§S). DataStore Preferences is the only app storage.
 
-   *Migration history note:* A `DataMigrationManager` class used to live
-   in `data/` to bridge schema changes across app updates (most recently
-   ACRA-consent V1→V2 in early May 2026). It was removed once every
-   existing install had moved past V2 — since then, all new state lives
-   only in DataStore, and any future schema change has to be designed to
-   be additively backward-compatible. Git history under `data/` has the
-   full implementation if a future migration ever needs the same shape
-   back.
+   *Migration policy — NO in-code migrations.* A `DataMigrationManager`
+   class used to live in `data/` to bridge schema changes across app
+   updates (most recently ACRA-consent V1→V2 in early May 2026). It was
+   removed once every existing install had moved past V2, and the policy
+   since is deliberate and stronger: **Kolibri ships no in-code
+   data-migration logic** — no `produceMigrations`, no copy-on-init, no
+   revived `DataMigrationManager`. When a schema or DataStore split would
+   drop existing data, the sanctioned path is **user-driven: export in the
+   old version → factory reset → update → restore.** That loses nothing
+   because both exports are JSON (store-agnostic, so they survive a store
+   split): launcher settings via the backup (`BackupRepository`), usage
+   timestamps via the separate re-importable `UsageExportRepository`. The
+   user must export both. Design new state to be additively
+   backward-compatible where that is trivial, but do **not** add migration
+   code to bridge a breaking change — steer users to export/reset/restore
+   instead (the AUDIT-19 F1 usage-store split is the reference: no
+   migration, by design). Git history under `data/` has the old
+   `DataMigrationManager` shape if it is ever genuinely needed.
 
    *Purge completeness (enforced).* A "reset all settings"
    (`purgeRepository()`) must wipe **every** statically-declared preference

@@ -52,12 +52,19 @@ internal val Context.consentDataStore: DataStore<Preferences> by preferencesData
  * launch and Preferences DataStore re-serialises the whole file per edit —
  * its own file confines that churn and its collector fan-out.
  *
- * No migration from the old settings-store keys (same choice as the consent
- * store): on the update that ships this, usage history starts empty and
- * rebuilds as apps are launched. `private`: nothing outside this file touches
- * the extension — runtime consumers inject the qualified `DataStore<Preferences>`
- * from [DataStoreModule.provideUsageDataStore], and unlike the consent store
- * there is no pre-Hilt bootstrap path here.
+ * No in-code migration from the old settings-store keys — a deliberate
+ * project-wide policy (CLAUDE.md §5): Kolibri ships NO data-migration logic. A
+ * store move is handled by the USER instead: export in the old version → factory
+ * reset → update → restore. Usage timestamps survive that via the separate,
+ * re-importable UsageExport (`UsageExportRepository`, JSON so store-agnostic);
+ * launcher settings via the normal backup. On an update WITHOUT that reset the
+ * new store simply starts empty and the TIME_WEIGHTED_USAGE sort rebuilds as apps
+ * are launched. This is NOT the same as the consent store's reset: that reset is
+ * a desired privacy behaviour, whereas here the user preserves the data via the
+ * export path — do not conflate the two. `private`: nothing outside this file
+ * touches the extension — runtime consumers inject the qualified
+ * `DataStore<Preferences>` from [DataStoreModule.provideUsageDataStore], and
+ * unlike the consent store there is no pre-Hilt bootstrap path here.
  */
 private val Context.usageDataStore: DataStore<Preferences> by preferencesDataStore(
     name = AppConstants.USAGE_DATASTORE_NAME
