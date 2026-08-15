@@ -9,16 +9,18 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
@@ -54,7 +56,8 @@ import javax.inject.Singleton
 @Singleton
 class WallpaperRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-    private val wallpaperFileManager: WallpaperFileManager
+    private val wallpaperFileManager: WallpaperFileManager,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : WallpaperRepository {
 
     companion object {
@@ -102,6 +105,15 @@ class WallpaperRepositoryImpl @Inject constructor(
                 WallpaperState.NONE
             }
         }
+        // parseWallpaperState does a per-layer fileExists() disk stat (File.exists,
+        // a stat() syscall). The sole collector (WallpaperDelegate.start) runs on
+        // the main dispatcher (viewModelScope), so without this the stat ran on
+        // Main — a StrictMode DiskReadViolation the delegate already avoids for its
+        // own disk I/O (gcOrphans, getDisplayName both hop to ioDispatcher). flowOn
+        // moves the whole transform (filter + distinct + JSON parse + stats) off
+        // Main; it introduces no suspension into the map lambdas, so the catch arms
+        // above stay non-suspend (their "no suspension point" markers remain valid).
+        .flowOn(ioDispatcher)
 
     /**
      * The subset of [this] holding only the wallpaper keys (AUDIT-19 F2). Gates
@@ -346,7 +358,7 @@ class WallpaperRepositoryImpl @Inject constructor(
         // 60s-cutoff, best-effort net — not a prompt guarantee). This is the
         // Factory Reset caller clearAll()'s KDoc already documents. IO-wrapped
         // because clearAll() does blocking file deletion.
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             wallpaperFileManager.clearAll()
         }
     }

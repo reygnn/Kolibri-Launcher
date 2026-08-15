@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -33,6 +34,6 @@ class WallpaperRepositoryImplContractTest : WallpaperRepositoryContract() {
         val fakeDataStore = FakeDataStore()
         val fileManager: WallpaperFileManager = mockk(relaxed = true)
         every { fileManager.fileExists(any<Uri>()) } returns true
-        return WallpaperRepositoryImpl(fakeDataStore, fileManager)
+        return WallpaperRepositoryImpl(fakeDataStore, fileManager, UnconfinedTestDispatcher())
     }
 }
