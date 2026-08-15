@@ -16,17 +16,13 @@
     <dimen name="app_row_padding_vertical">12dp</dimen>
     <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
     <dimen name="touch_target_padding">6dp</dimen>
-    <dimen name="split_screen_border_width">2dp</dimen>
-    <dimen name="split_screen_corner_radius">8dp</dimen>
-    <dimen name="split_screen_border_inset">8dp</dimen>
-    
+
     <!-- =============================================================== -->
     <!-- == HOME FRAGMENT                                             == -->
     <!-- =============================================================== -->
     <!-- Text sizes -->
     <dimen name="text_size_time">60sp</dimen>
     <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
-    <dimen name="text_size_app_button">18sp</dimen>
     <dimen name="text_size_hint">14sp</dimen> <!-- Wallpaper-edit hint TextView -->
 
     <!-- Wallpaper-edit overflow panel: slide-in distance for the
@@ -40,9 +36,6 @@
     <!-- =============================================================== -->
     <!-- == APP DRAWER                                                == -->
     <!-- =============================================================== -->
-    <dimen name="app_drawer_padding_top">@dimen/spacing_large</dimen>
-    <dimen name="app_drawer_padding_horizontal">@dimen/spacing_large</dimen>
-    <dimen name="app_drawer_padding_bottom">@dimen/spacing_large</dimen>
     <dimen name="chip_min_height">32dp</dimen>
 
     <!-- =============================================================== -->

@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Animation Durations -->
-    <integer name="anim_duration_app_close">300</integer>
-    <integer name="anim_duration_launcher_fade_in">200</integer>
-    <integer name="anim_duration_launcher_fade_out">150</integer>
-    <integer name="anim_duration_app_close_enter">250</integer>
-    <integer name="anim_duration_screen_lock">300</integer>
     <!-- Drawer open/close slide (slide_in_up / slide_out_down). Was hardcoded
          300 in both anim XMLs; extracted here and shortened to 180 for a
          snappier drawer. -->
     <integer name="anim_duration_drawer_slide">180</integer>
-
-    <!-- Start Offsets -->
-    <integer name="anim_offset_app_close_enter">100</integer>
 </resources>

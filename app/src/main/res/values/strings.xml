@@ -15,7 +15,6 @@
     <string name="cancel">Cancel</string>
 
     <!-- Content Description -->
-    <string name="wallpaper_background">Background wallpaper</string>
     
     <!-- Accessibility Service -->
 
@@ -49,7 +48,6 @@
     <!-- App Info -->
 
     <!-- Sort Favorites -->
-    <string name="sort_favorites">Sort favorites</string>
 
     <!-- FavoritesSortFragment Strings -->
     <string name="favorites_sort_title">Sort favorites</string>
@@ -179,10 +177,6 @@
     <string name="error_loading_apps">Failed to load apps</string>
     <string name="error_loading_favorites">Could not load favorites.</string>
     <string name="onboarding_error_save_failed">Save failed. Please try again.</string>
-    <string name="crash_dialog_title">App Crashed</string>
-    <string name="crash_dialog_text">Would you like to send a crash report to help us improve the app?</string>
-    <string name="crash_dialog_send">Send</string>
-    <string name="crash_dialog_cancel">Cancel</string>
 
     <string name="crash_report_dialog_title">Improve App Stability</string>
     <string name="crash_report_button_accept">Yes, help</string>

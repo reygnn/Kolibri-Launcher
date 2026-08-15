@@ -15,7 +15,6 @@
     <string name="cancel">Abbrechen</string>
 
     <!-- Content Description -->
-    <string name="wallpaper_background">Hintergrundbild</string>
     
     <!-- Accessibility Service -->
 
@@ -49,7 +48,6 @@
     <!-- App Info -->
 
     <!-- Sort Favorites -->
-    <string name="sort_favorites">Favoriten sortieren</string>
 
     <!-- FavoritesSortFragment Strings -->
     <string name="favorites_sort_title">Favoriten sortieren</string>
@@ -158,10 +156,6 @@
     <string name="error_loading_favorites">Favoriten konnten nicht geladen werden.</string>
     <string name="onboarding_error_save_failed">Speichern fehlgeschlagen. Bitte erneut versuchen.</string>
 
-    <string name="crash_dialog_title">App abgestürzt</string>
-    <string name="crash_dialog_text">Möchten Sie einen Fehlerbericht senden, um uns bei der Verbesserung zu helfen?</string>
-    <string name="crash_dialog_send">Senden</string>
-    <string name="crash_dialog_cancel">Abbrechen</string>
 
     <string name="crash_report_dialog_title">App-Stabilität verbessern</string>
     <string name="crash_report_button_accept">Ja, helfen</string>
