@@ -31,9 +31,14 @@ data class WallpaperMemoryRow(
     val bytes: Long,
     /**
      * `Bitmap.Config` name of the decoded bitmap, e.g. `HARDWARE` (pixels in
-     * graphics memory, off the Java heap) or `ARGB_8888` (on-heap fallback).
-     * Passed as a plain String so this model stays Android-free / JVM-testable.
-     * `"?"` when the config is unknown.
+     * graphics memory, off the Java heap) or `ARGB_8888` (on-heap fallback);
+     * `"?"` when unknown. Kept as the raw config NAME (a String) on purpose: this
+     * dialog is a diagnostic that wants to show EXACTLY which config a bitmap
+     * decoded to (HARDWARE vs ARGB_8888 vs RGB_565 …), and a String keeps the
+     * model Android-free / JVM-testable without re-spelling every `Bitmap.Config`
+     * value in a local enum. A typed enum would be equally testable but would
+     * either duplicate those names or collapse away the exact one — not worth it
+     * for a diagnostic field.
      */
     val config: String,
 ) {

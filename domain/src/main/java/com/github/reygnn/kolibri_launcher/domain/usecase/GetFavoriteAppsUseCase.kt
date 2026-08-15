@@ -116,10 +116,13 @@ class GetFavoriteAppsUseCase @Inject constructor(
         TimberWrapper.silentError(e, "Critical error in favoriteApps flow")
         emit(UiState.Error("Failed to load apps"))
     }
-        // Mirror GetDrawerAppsUseCase: collapse redundant re-emissions (the shared
-        // settingsDataStore re-emits favorites/hidden/order flows on every write,
-        // e.g. a usage write on every app launch — AUDIT-14 F1) and run the
-        // applyCustomNames map+sort off the Main collector via flowOn(Default).
+        // Collapse redundant re-emissions: a settings write that leaves the
+        // favorites result identical still re-emits this flow (e.g. renaming a
+        // NON-favorite app, or an unrelated setting change), so dedup before the
+        // Main collector. Usage is no longer a source here — it moved to its own
+        // usageDataStore in AUDIT-19 F1, so an app launch no longer re-emits the
+        // settings-store flows. applyCustomNames' map+sort runs off Main via
+        // flowOn(Default).
         .distinctUntilChanged()
         .flowOn(dispatcher)
 

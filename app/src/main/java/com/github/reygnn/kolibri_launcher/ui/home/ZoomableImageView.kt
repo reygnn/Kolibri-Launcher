@@ -633,8 +633,10 @@ class ZoomableImageView @JvmOverloads constructor(
     /**
      * Retained-bitmap memory of the currently displayed wallpaper as pure data
      * (Rule 10): one [WallpaperMemoryRow] per multi-layer layer, or a single row
-     * for the single-layer drawable. `allocationByteCount` is the true backing
-     * allocation (width·height·4). Note the wallpaper bitmaps are HARDWARE bitmaps
+     * for the single-layer drawable. `allocationByteCount` is the true size of the
+     * backing pixel allocation (≈ width·height·4 for an ARGB_8888 software bitmap;
+     * a HARDWARE bitmap's GPU-side allocation may differ from that due to
+     * format/stride). The wallpaper bitmaps are HARDWARE bitmaps
      * (BoundedBitmapDecoder), so this size lives in graphics memory OFF the Java
      * heap — `allocationByteCount` reports it all the same. Recycled / absent
      * bitmaps are skipped. Feeds both the info dialog (`WallpaperEditController`)
