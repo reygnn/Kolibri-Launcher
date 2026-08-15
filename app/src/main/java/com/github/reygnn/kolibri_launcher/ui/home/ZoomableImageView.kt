@@ -634,9 +634,11 @@ class ZoomableImageView @JvmOverloads constructor(
      * Retained-bitmap memory of the currently displayed wallpaper as pure data
      * (Rule 10): one [WallpaperMemoryRow] per multi-layer layer, or a single row
      * for the single-layer drawable. `allocationByteCount` is the true backing
-     * allocation (width·height·4 for these software ARGB_8888 decodes). Recycled /
-     * absent bitmaps are skipped. Feeds both the info dialog
-     * (`WallpaperEditController`) and the optional diagnostic log below.
+     * allocation (width·height·4). Note the wallpaper bitmaps are HARDWARE bitmaps
+     * (BoundedBitmapDecoder), so this size lives in graphics memory OFF the Java
+     * heap — `allocationByteCount` reports it all the same. Recycled / absent
+     * bitmaps are skipped. Feeds both the info dialog (`WallpaperEditController`)
+     * and the optional diagnostic log below.
      *
      * No try/catch (Rule 11): bitmap property reads on a non-recycled bitmap
      * cannot throw; called from pure Main-thread view code, no suspension point.
@@ -792,6 +794,13 @@ class ZoomableImageView @JvmOverloads constructor(
 
     /**
      * Exportiert alle sichtbaren Layer als ein einzelnes Bitmap.
+     *
+     * DEAD CODE (no callers, @Suppress("unused") — WALLPAPER_RENDER_RES_SPEC §6.2)
+     * AND currently incompatible with the HARDWARE decode config: the layer
+     * bitmaps are HARDWARE bitmaps (BoundedBitmapDecoder), and drawing a HARDWARE
+     * bitmap onto the SOFTWARE Canvas below throws "unable to draw hardware
+     * bitmaps". If this is ever reactivated, decode the layers (or copy them) into
+     * a software config first, or compose on a hardware-accelerated canvas.
      */
     /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
     @Suppress("unused")

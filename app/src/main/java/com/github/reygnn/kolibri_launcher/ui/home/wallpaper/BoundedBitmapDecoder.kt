@@ -29,9 +29,17 @@ data class DecodedWallpaperBitmap(
  * both the render budget ([maxPixels], default [RENDER_WALLPAPER_PIXELS] — the
  * jank fix, spec §5) and the Canvas ~100 MB per-bitmap draw limit (#21).
  *
- * [openStream] must return a FRESH stream each call: it is invoked twice, once
- * for the bounds pass and once for the pixel decode. Returns `null` if no stream
- * can be opened or the image can't be decoded.
+ * The pixel decode targets a **HARDWARE** bitmap: every wallpaper layer is
+ * display-only — drawn on the view's hardware-accelerated canvas, never
+ * pixel-read (the luminance classifier decodes its own separate bitmap) — so the
+ * pixels can live in graphics memory OFF the Java heap. HARDWARE carries alpha,
+ * so transparent overlays qualify too. Falls back to [Bitmap.Config.ARGB_8888]
+ * when a HARDWARE decode returns null (e.g. a decoded side exceeds the GPU
+ * max-texture limit — practically never under the render budget, but defensive).
+ *
+ * [openStream] must return a FRESH stream each call: it is invoked for the bounds
+ * pass and once per decode attempt (`decodeStream` consumes the stream). Returns
+ * `null` if no stream can be opened or the image can't be decoded either way.
  *
  * This is Android-runtime code (real `BitmapFactory`), so it is pinned by an
  * INSTRUMENTED test — Robolectric neither truly decodes a real file nor enforces
@@ -49,7 +57,24 @@ fun decodeBoundedWallpaperBitmap(
     (openStream() ?: return null).use { BitmapFactory.decodeStream(it, null, bounds) }
 
     val sample = calculateWallpaperInSampleSize(bounds.outWidth, bounds.outHeight, maxPixels)
-    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-    val bitmap = openStream()?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+    val bitmap = decodeStreamWith(sample, Bitmap.Config.HARDWARE, openStream)
+        ?: decodeStreamWith(sample, Bitmap.Config.ARGB_8888, openStream)
+        ?: return null
     return DecodedWallpaperBitmap(bitmap, sample, bounds.outWidth, bounds.outHeight)
+}
+
+/**
+ * One decode attempt at [sample] into [config], from a fresh [openStream]. Returns
+ * null if the stream can't be opened or the image can't be decoded into [config].
+ */
+private fun decodeStreamWith(
+    sample: Int,
+    config: Bitmap.Config,
+    openStream: () -> InputStream?,
+): Bitmap? {
+    val opts = BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inPreferredConfig = config
+    }
+    return openStream()?.use { BitmapFactory.decodeStream(it, null, opts) }
 }
