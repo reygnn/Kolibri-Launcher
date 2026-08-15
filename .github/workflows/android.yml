@@ -55,6 +55,12 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
 
+      # Android Lint. Grandfathered by app/lint-baseline.xml (45 pre-existing
+      # warnings) so this only fails on NEW findings + the error-promoted
+      # checks (MissingTranslation/DefaultResource, UnusedResources — see the
+      # lint {} block). False positives / Rule-9 exceptions live in app/lint.xml.
+      # Regenerate the baseline after a deliberate cleanup:
+      # ./gradlew :app:updateLintBaseline
       - name: Run Android Lint
         run: ./gradlew lintDebug --stacktrace
 

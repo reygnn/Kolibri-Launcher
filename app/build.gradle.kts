@@ -178,10 +178,19 @@ android {
         checkReleaseBuilds = true
         warningsAsErrors = false
 
+        // Grandfathers the pre-existing warnings (Overdraw, PluralsCandidate,
+        // …) so CI reports only NEW findings. Regenerate with
+        // `./gradlew :app:updateLintBaseline` after a deliberate cleanup.
+        baseline = file("lint-baseline.xml")
+
         error += setOf(
             "MissingTranslation",
             "ExtraTranslation",
             "MissingDefaultResource",
+            // Fail the build on new dead resources — locks in the AUDIT
+            // cleanup (45 UnusedResources removed). The one false positive
+            // (file_paths.xml, manifest FileProvider) is ignored in lint.xml.
+            "UnusedResources",
         )
     }
 }
