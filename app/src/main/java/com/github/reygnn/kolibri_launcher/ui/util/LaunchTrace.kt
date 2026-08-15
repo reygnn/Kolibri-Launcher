@@ -9,8 +9,8 @@ import android.os.Trace
  *
  * The launcher's own share of "tap a favorite/drawer entry → the target app's
  * process is asked to start" is a Main-thread pipeline that hops across a
- * `SharedFlow` (ViewModel delegate → Activity collector). These named sections
- * pin the synchronous chunks of that pipeline; the SharedFlow hop then shows up
+ * `Channel` (ViewModel delegate → Activity collector). These named sections
+ * pin the synchronous chunks of that pipeline; the Channel hop then shows up
  * as the GAP between two sections on the Perfetto timeline, which is exactly the
  * dispatch latency we want to find. Everything after [Names.START_MAIN_ACTIVITY]
  * (process fork, the target app's `Application.onCreate`, first frame) is the

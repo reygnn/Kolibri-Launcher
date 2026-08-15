@@ -802,7 +802,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     // Traced: the synchronous Main-thread dispatch of a launch
                     // (decide + optional drawer popBackStack + launchApp). The
                     // GAP before this section on the Perfetto timeline (from the
-                    // app_launch_tap slice) is the SharedFlow hop latency.
+                    // app_launch_tap slice) is the Channel hop latency.
                     LaunchTrace.section(LaunchTrace.Names.DISPATCH) {
                         val action = AppLaunchAction.decide(
                             currentDestinationId = navController?.currentDestination?.id,

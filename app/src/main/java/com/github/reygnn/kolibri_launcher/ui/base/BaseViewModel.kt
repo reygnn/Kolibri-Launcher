@@ -17,7 +17,7 @@ import timber.log.Timber
  *
  * Catches at real boundaries only (per CLAUDE.md Rule 11):
  * - `launchSafe` and `executeSafe` wrap caller-supplied blocks (EXTERNAL).
- * - `sendEvent` wraps `MutableSharedFlow.emit` (suspend boundary).
+ * - `sendEvent` wraps `Channel.send` (suspend boundary).
  * - `coroutineExceptionHandler` is the last-resort backstop for coroutines
  *   that escape the explicit try-catch blocks.
  *
