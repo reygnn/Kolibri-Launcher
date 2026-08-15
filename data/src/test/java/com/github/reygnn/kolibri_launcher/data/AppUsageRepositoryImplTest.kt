@@ -89,7 +89,7 @@ class AppUsageRepositoryImplTest {
         fakeDataStore.setInitialData(usagePreferences)
 
         // Act
-        val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert
         Assert.assertEquals("App A", sortedApps[0].displayName) // sehr kürzlich
@@ -116,7 +116,7 @@ class AppUsageRepositoryImplTest {
         fakeDataStore.setInitialData(usagePreferences)
 
         // Act
-        val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert
         Assert.assertEquals("App Used", sortedApps[0].displayName) // genutzte App zuerst
@@ -147,7 +147,7 @@ class AppUsageRepositoryImplTest {
         fakeDataStore.setInitialData(usagePreferences)
 
         // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - häufige Nutzung sollte gewinnen
         Assert.assertEquals("Frequent", result[0].displayName)
@@ -157,7 +157,7 @@ class AppUsageRepositoryImplTest {
     @Test
     fun `sortAppsByTimeWeightedUsage - with empty app list - returns empty list`() = runTest {
         // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(emptyList())
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(emptyList(), emptyMap())
 
         // Assert
         Assert.assertTrue(result.isEmpty())
@@ -183,7 +183,7 @@ class AppUsageRepositoryImplTest {
         )
 
         // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - alphabetisch sortiert, da Timestamps ungültig
         Assert.assertEquals("Other", result[0].displayName)
@@ -210,7 +210,7 @@ class AppUsageRepositoryImplTest {
         fakeDataStore.setInitialData(usagePreferences)
 
         // Act
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - Valid sollte vor Future sein (Future wird ignoriert)
         Assert.assertEquals("Valid", result[0].displayName)
@@ -237,7 +237,7 @@ class AppUsageRepositoryImplTest {
         fakeDataStore.setInitialData(usagePreferences)
 
         // Act - should not crash due to exp() overflow
-        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - Recent sollte vor Ancient sein
         Assert.assertEquals("Recent", result[0].displayName)
@@ -283,12 +283,39 @@ class AppUsageRepositoryImplTest {
             )
 
             // Act
-            val result = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+            val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
             // Assert - alphabetisch sortiert als Fallback
             Assert.assertEquals("A", result[0].displayName)
             Assert.assertEquals("B", result[1].displayName)
             Assert.assertEquals("C", result[2].displayName)
+        }
+
+    @Test
+    fun `sortAppsByTimeWeightedUsage - scores from the passed snapshot, not the store`() =
+        runTest {
+            // The store says com.a is recently used; the passed snapshot instead
+            // gives com.b the recent usage. The sort must honor the SNAPSHOT — this
+            // pins that it no longer re-reads the store (the whole point of the
+            // usageSnapshotFlow refactor).
+            val now = System.currentTimeMillis()
+            fakeDataStore.setInitialData(
+                preferencesOf(
+                    stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.a") to
+                        setOf((now - TimeUnit.SECONDS.toMillis(5)).toString()),
+                ),
+            )
+            val apps = listOf(
+                AppInfo("A", "A", "com.a", "a"),
+                AppInfo("B", "B", "com.b", "b"),
+            )
+            val snapshot = mapOf("com.b" to listOf(now - TimeUnit.SECONDS.toMillis(5)))
+
+            val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, snapshot)
+
+            // Snapshot wins: com.b (its only recent entry) ranks first, not com.a.
+            Assert.assertEquals("B", result[0].displayName)
+            Assert.assertEquals("A", result[1].displayName)
         }
 
     // ========== HAS USAGE DATA TESTS ==========
@@ -429,7 +456,7 @@ class AppUsageRepositoryImplTest {
         Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.c"))
 
         // 3. Sortierung sollte nach Recency sein (C, A, B)
-        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
         Assert.assertEquals("App C", sorted[0].displayName) // zuletzt gestartet
         Assert.assertEquals("App A", sorted[1].displayName)
         Assert.assertEquals("App B", sorted[2].displayName)
@@ -439,7 +466,7 @@ class AppUsageRepositoryImplTest {
         Assert.assertFalse(appUsageManager.hasUsageDataForPackage("com.a"))
 
         // 5. Sortierung sollte sich ändern
-        val sortedAfterRemoval = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val sortedAfterRemoval = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
         Assert.assertEquals("App C", sortedAfterRemoval[0].displayName)
         Assert.assertEquals("App B", sortedAfterRemoval[1].displayName)
         Assert.assertEquals(
@@ -468,7 +495,7 @@ class AppUsageRepositoryImplTest {
 
         appUsageManager.recordPackageLaunch("com.other") // nur 1x
 
-        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps)
+        val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
         Assert.assertEquals("Test", sorted[0].displayName) // Mehr Starts = höherer Score
     }
 

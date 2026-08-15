@@ -13,10 +13,16 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
     val launchedPackages = mutableListOf<String>()
 
     // A monotonically-bumped version backs the change-signal: each usage
-    // mutation advances it, so the mapped Unit flow re-emits (a StateFlow of
-    // Unit would collapse — the version is what makes repeated ticks distinct).
+    // mutation advances it, so the mapped snapshot re-emits distinctly (the
+    // version is folded into the values so even a repeat launch of the same
+    // package yields a different map, keeping ticks distinct through
+    // distinctUntilChanged downstream). The pseudo-timestamp is the version — the
+    // fake's sort is identity, so real scoring is impl-only.
     private val usageVersion = MutableStateFlow(0)
-    override val usageFlow: Flow<Unit> = usageVersion.map { }
+    override val usageSnapshotFlow: Flow<Map<String, List<Long>>> =
+        usageVersion.map { version ->
+            launchedPackages.distinct().associateWith { listOf(version.toLong()) }
+        }
 
     override suspend fun recordPackageLaunch(packageName: String?) {
         if (packageName.isNullOrBlank()) return
@@ -24,7 +30,10 @@ class FakeAppUsageRepository : AppUsageRepository, Purgeable {
         usageVersion.value++
     }
 
-    override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> = apps
+    override suspend fun sortAppsByTimeWeightedUsage(
+        apps: List<AppInfo>,
+        usageSnapshot: Map<String, List<Long>>,
+    ): List<AppInfo> = apps
 
     override suspend fun removeUsageDataForPackage(packageName: String?) {
         if (packageName.isNullOrBlank()) return

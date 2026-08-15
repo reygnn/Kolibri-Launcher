@@ -69,16 +69,18 @@ class GetDrawerAppsUseCase @Inject constructor(
                             KolibriLog.w(e, "customNamesFlow error - using original names")
                             emit(emptyMap())
                         },
-                        // Usage change-signal (REACTIVE_APPLIST_SPEC): a launch
-                        // re-derives the TIME_WEIGHTED_USAGE order reactively. Value
-                        // ignored — pure trigger. Collected ONLY in this mode.
-                        appUsageRepository.usageFlow.catch { e ->
+                        // Reactive usage snapshot (REACTIVE_APPLIST_SPEC): a launch
+                        // re-derives the TIME_WEIGHTED_USAGE order reactively, and
+                        // the emitted map is the already-parsed usage passed to the
+                        // sort (read + parsed once here, not per re-sort). Collected
+                        // ONLY in this mode.
+                        appUsageRepository.usageSnapshotFlow.catch { e ->
                             if (e is CancellationException) throw e
-                            KolibriLog.w(e, "usageFlow error - proceeding without a usage tick")
-                            emit(Unit)
+                            KolibriLog.w(e, "usageSnapshotFlow error - proceeding without usage data")
+                            emit(emptyMap<String, List<Long>>())
                         },
-                    ) { rawApps, hiddenComponents, customNames, _ ->
-                        sortVisibleApps(rawApps, hiddenComponents, customNames, sortOrder)
+                    ) { rawApps, hiddenComponents, customNames, usageSnapshot ->
+                        sortVisibleApps(rawApps, hiddenComponents, customNames, sortOrder, usageSnapshot)
                     }
                 } else {
                     combine(
@@ -120,6 +122,10 @@ class GetDrawerAppsUseCase @Inject constructor(
         hiddenComponents: Set<String>,
         customNames: Map<String, String>,
         sortOrder: SortOrder,
+        // Already-parsed usage snapshot, only populated in TIME_WEIGHTED_USAGE mode
+        // (the ALPHABETICAL combine has no usage input). Passed straight to the
+        // time-weighted sort so it does not re-read/re-parse the store.
+        usageSnapshot: Map<String, List<Long>> = emptyMap(),
     ): List<AppInfo> {
         KolibriLog.d(
             "[DATAFLOW] 6. UseCase combine block triggered. " +
@@ -149,7 +155,7 @@ class GetDrawerAppsUseCase @Inject constructor(
                 // DataStore via Manager). Fallback auf Alphabetical ist
                 // bewusster Graceful-Degrade. Dies ist der einzige
                 // legitime Catch in diesem Block.
-                appUsageRepository.sortAppsByTimeWeightedUsage(visibleApps)
+                appUsageRepository.sortAppsByTimeWeightedUsage(visibleApps, usageSnapshot)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

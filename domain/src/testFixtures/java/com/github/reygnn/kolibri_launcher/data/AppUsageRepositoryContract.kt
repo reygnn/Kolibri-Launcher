@@ -192,14 +192,14 @@ abstract class AppUsageRepositoryContract {
     @Test
     fun `sortAppsByTimeWeightedUsage with empty input returns empty`() = runTest {
         val repo = createRepository()
-        assertEquals(emptyList<AppInfo>(), repo.sortAppsByTimeWeightedUsage(emptyList()))
+        assertEquals(emptyList<AppInfo>(), repo.sortAppsByTimeWeightedUsage(emptyList(), emptyMap()))
     }
 
     @Test
     fun `sortAppsByTimeWeightedUsage with single app returns same single app`() = runTest {
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA))
-        assertEquals(input, repo.sortAppsByTimeWeightedUsage(input))
+        assertEquals(input, repo.sortAppsByTimeWeightedUsage(input, emptyMap()))
     }
 
     /**
@@ -212,7 +212,7 @@ abstract class AppUsageRepositoryContract {
     fun `sortAppsByTimeWeightedUsage preserves the set of apps`() = runTest {
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB), appInfo("Gamma", pkgC))
-        val output = repo.sortAppsByTimeWeightedUsage(input)
+        val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
         assertEquals(input.size, output.size)
         assertEquals(input.toSet(), output.toSet())
     }
@@ -223,7 +223,7 @@ abstract class AppUsageRepositoryContract {
         // Beide Implementierungen müssen mit "no usage history" klarkommen.
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB))
-        val output = repo.sortAppsByTimeWeightedUsage(input)
+        val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
         assertEquals(input.toSet(), output.toSet())
     }
 
@@ -233,7 +233,7 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB), appInfo("Gamma", pkgC))
-        val output = repo.sortAppsByTimeWeightedUsage(input)
+        val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
         assertEquals(input.toSet(), output.toSet())
     }
 
@@ -296,7 +296,7 @@ abstract class AppUsageRepositoryContract {
         assertEquals(setOf(pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
     }
 
-    // ---------- usageFlow ----------
+    // ---------- usageSnapshotFlow ----------
 
     /**
      * REACTIVE_APPLIST_SPEC: the change-signal ticks once initially (so a
@@ -307,9 +307,9 @@ abstract class AppUsageRepositoryContract {
      * must expose this reactive shape.
      */
     @Test
-    fun `usageFlow signals initially and after a usage change`() = runTest {
+    fun `usageSnapshotFlow signals initially and after a usage change`() = runTest {
         val repo = createRepository()
-        repo.usageFlow.test {
+        repo.usageSnapshotFlow.test {
             awaitItem() // initial signal
             repo.recordPackageLaunch(pkgA)
             awaitItem() // signal after the usage change

@@ -10,14 +10,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface AppUsageRepository : Purgeable {
     /**
-     * Change-signal that emits once initially and again whenever the stored
-     * usage data changes (REACTIVE_APPLIST_SPEC). It carries no payload — a
-     * consumer reacts by re-running [sortAppsByTimeWeightedUsage]. This lets the
-     * drawer re-sort on a launch reactively instead of forcing a full
-     * PackageManager re-enumeration. Distinct on the usage key-set: a change to
-     * an unrelated preference does not signal.
+     * Reactive usage snapshot (REACTIVE_APPLIST_SPEC): emits once initially and
+     * again whenever the stored usage data changes, carrying the already-PARSED
+     * timestamps (package name → launch epochs, millis). A consumer re-sorts by
+     * passing the emitted map to [sortAppsByTimeWeightedUsage] — so the store is
+     * read and parsed ONCE per real change, not re-read and re-parsed on every
+     * drawer re-sort. Distinct on the usage key-set: a change to an unrelated
+     * preference does not emit.
      */
-    val usageFlow: Flow<Unit>
+    val usageSnapshotFlow: Flow<Map<String, List<Long>>>
 
     /**
      * Zeichnet einen Start für ein App-Paket auf.
@@ -25,9 +26,18 @@ interface AppUsageRepository : Purgeable {
     suspend fun recordPackageLaunch(packageName: String?)
 
     /**
-     * Sortiert eine Liste von Apps nach der zeitgewichteten Nutzung.
+     * Sorts [apps] by time-weighted usage (descending) with an alphabetical
+     * tie-break, scoring against [usageSnapshot] (from [usageSnapshotFlow]). A
+     * PURE computation: it does not read the store — the snapshot is the
+     * already-read, already-parsed data — so a drawer re-sort no longer re-reads
+     * or re-parses per launch. Timestamps are still validity-filtered against the
+     * current time here (scoring is time-dependent). `suspend` only for
+     * repository-interface symmetry; it has no suspension point.
      */
-    suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo>
+    suspend fun sortAppsByTimeWeightedUsage(
+        apps: List<AppInfo>,
+        usageSnapshot: Map<String, List<Long>>,
+    ): List<AppInfo>
 
     /**
      * Entfernt alle gespeicherten Nutzungsdaten für ein App-Paket.

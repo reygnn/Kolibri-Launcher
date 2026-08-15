@@ -10,7 +10,6 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.di.UsageDataStore
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,7 +18,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,19 +74,39 @@ class AppUsageRepositoryImpl @Inject constructor(
 ) : AppUsageRepository {
 
     /**
-     * Usage change-signal (REACTIVE_APPLIST_SPEC). Cold, fail-open read
-     * (DATASTORE_READ_SPEC): an [IOException] recovers to the empty usage set.
-     * The transform projects only the [AppConstants.KEY_USAGE_PREFIX] key subset,
-     * so [distinctUntilChanged] fires solely on a real usage change — a write to
-     * an unrelated preference in the shared store does not signal. The trailing
-     * `map { }` collapses the projected subset to a payload-free tick.
+     * Reactive usage snapshot (REACTIVE_APPLIST_SPEC). Cold, fail-open read
+     * (DATASTORE_READ_SPEC): an [IOException] recovers to an empty snapshot. The
+     * transform projects the [AppConstants.KEY_USAGE_PREFIX] subset AND parses each
+     * package's timestamp strings to `Long` exactly ONCE per change — so
+     * [distinctUntilChanged] fires solely on a real usage change, and downstream
+     * [sortAppsByTimeWeightedUsage] no longer re-reads or re-parses the store on
+     * every re-sort. Timestamps are carried raw (not age-filtered); the sort
+     * applies [isValidTimestamp] against its own current time.
      */
-    override val usageFlow: Flow<Unit> =
+    override val usageSnapshotFlow: Flow<Map<String, List<Long>>> =
         dataStore.readFlowFailOpen("Error reading usage flow") { preferences ->
-            preferences.asMap().filterKeys { it.name.startsWith(AppConstants.KEY_USAGE_PREFIX) }
+            parseUsageSnapshot(preferences)
         }
             .distinctUntilChanged()
-            .map { }
+
+    /**
+     * Projects the usage-key subset of [preferences] and parses each package's
+     * stored timestamp strings to `Long` (dropping non-numeric). Keyed by package
+     * name (prefix stripped). Empty lists are omitted. Pure — cannot throw.
+     */
+    private fun parseUsageSnapshot(preferences: Preferences): Map<String, List<Long>> {
+        val result = HashMap<String, List<Long>>()
+        for ((key, value) in preferences.asMap()) {
+            if (!key.name.startsWith(AppConstants.KEY_USAGE_PREFIX)) continue
+            @Suppress("UNCHECKED_CAST")
+            val timestamps = (value as? Set<String>) ?: continue
+            val parsed = timestamps.mapNotNull { it.toLongOrNull() }
+            if (parsed.isNotEmpty()) {
+                result[key.name.removePrefix(AppConstants.KEY_USAGE_PREFIX)] = parsed
+            }
+        }
+        return result
+    }
 
     /**
      * Zeichnet einen App-Start mit dem aktuellen Zeitstempel auf.
@@ -146,38 +164,31 @@ class AppUsageRepositoryImpl @Inject constructor(
      * - Häufige, aktuelle Starts → hoher Score
      * - Seltene oder alte Starts → niedriger Score
      */
-    override suspend fun sortAppsByTimeWeightedUsage(apps: List<AppInfo>): List<AppInfo> {
+    override suspend fun sortAppsByTimeWeightedUsage(
+        apps: List<AppInfo>,
+        usageSnapshot: Map<String, List<Long>>,
+    ): List<AppInfo> {
         if (apps.isEmpty()) return emptyList()
 
-        return try {
-            val allUsagePreferences = dataStore.data
-                .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-                .first()
+        // Pure: no store read, no re-parse — the snapshot is already parsed. No
+        // try/catch (Rule 11): the map lookup, the validity filter, the scoring
+        // (timeWeightedUsageScore) and the sort are pure and cannot throw. The
+        // graceful alphabetical fallback lives in the caller (GetDrawerAppsUseCase),
+        // and an empty snapshot already degrades to the alphabetical tie-break.
+        val currentTime = System.currentTimeMillis()
 
-            val currentTime = System.currentTimeMillis()
-
-            apps.map { appInfo ->
-                val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + appInfo.packageName)
-                val timestamps = allUsagePreferences[key]
-                    ?.mapNotNull { it.toLongOrNull() }
+        return apps
+            .map { appInfo ->
+                val timestamps = usageSnapshot[appInfo.packageName]
                     ?.filter { isValidTimestamp(it, currentTime) }
                     ?: emptyList()
-
-                val score = timeWeightedUsageScore(timestamps, currentTime)
-                Pair(appInfo, score)
+                appInfo to timeWeightedUsageScore(timestamps, currentTime)
             }
-                .sortedWith(
-                    compareByDescending<Pair<AppInfo, Double>> { it.second }
-                        .thenBy { it.first.displayNameLower }
-                )
-                .map { it.first }
-
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error sorting by time-weighted usage, falling back to alphabetical sort")
-            apps.sortedByDisplayName()
-        }
+            .sortedWith(
+                compareByDescending<Pair<AppInfo, Double>> { it.second }
+                    .thenBy { it.first.displayNameLower }
+            )
+            .map { it.first }
     }
 
     override suspend fun getRecentlyLaunchedPackages(limit: Int): List<String> {
