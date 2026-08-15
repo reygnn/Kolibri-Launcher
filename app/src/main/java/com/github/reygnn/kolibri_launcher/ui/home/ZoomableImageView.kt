@@ -659,6 +659,7 @@ class ZoomableImageView @JvmOverloads constructor(
                         originalWidth = layer.originalWidth,
                         originalHeight = layer.originalHeight,
                         bytes = bmp.allocationByteCount.toLong(),
+                        config = bmp.config?.name ?: "?",
                     )
                 )
             }
@@ -676,6 +677,7 @@ class ZoomableImageView @JvmOverloads constructor(
                             originalWidth = _singleOriginalWidth,
                             originalHeight = _singleOriginalHeight,
                             bytes = bmp.allocationByteCount.toLong(),
+                            config = bmp.config?.name ?: "?",
                         )
                     )
                 }

@@ -29,6 +29,13 @@ data class WallpaperMemoryRow(
     val originalHeight: Int,
     /** Retained backing allocation of the decoded bitmap in bytes. */
     val bytes: Long,
+    /**
+     * `Bitmap.Config` name of the decoded bitmap, e.g. `HARDWARE` (pixels in
+     * graphics memory, off the Java heap) or `ARGB_8888` (on-heap fallback).
+     * Passed as a plain String so this model stays Android-free / JVM-testable.
+     * `"?"` when the config is unknown.
+     */
+    val config: String,
 ) {
     /**
      * True when the bitmap was decoded BELOW its source resolution, so showing

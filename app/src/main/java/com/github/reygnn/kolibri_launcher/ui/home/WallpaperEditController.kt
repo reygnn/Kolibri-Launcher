@@ -347,7 +347,7 @@ internal class WallpaperEditController(
                     appendLine(
                         ctx.getString(
                             R.string.wallpaper_memory_row,
-                            row.index + 1, formatMegabytes(row.bytes), dims,
+                            row.index + 1, formatMegabytes(row.bytes), row.config, dims,
                         )
                     )
                 }

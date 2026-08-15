@@ -20,9 +20,16 @@ class WallpaperMemoryReportTest {
         originalWidth: Int = 1000,
         originalHeight: Int = 1000,
         bytes: Long = 4_000_000L,
+        config: String = "HARDWARE",
     ) = WallpaperMemoryRow(
-        index, decodedWidth, decodedHeight, sampleSize, originalWidth, originalHeight, bytes,
+        index, decodedWidth, decodedHeight, sampleSize, originalWidth, originalHeight, bytes, config,
     )
+
+    @Test
+    fun `config name is carried through verbatim`() {
+        assertEquals("ARGB_8888", row(config = "ARGB_8888").config)
+        assertEquals("HARDWARE", row(config = "HARDWARE").config)
+    }
 
     @Test
     fun `of sums the retained bytes across all rows`() {

@@ -355,7 +355,7 @@
 
 <!-- Info-Dialog Wallpaper-Speicher (opt-in über den ⓘ-Button im Edit-Overflow). -->
 <string name="wallpaper_memory_title">Wallpaper-Speicher</string>
-<string name="wallpaper_memory_row">Layer %1$d: %2$s  (%3$s)</string>
+<string name="wallpaper_memory_row">Layer %1$d: %2$s · %3$s  (%4$s)</string>
 <string name="wallpaper_memory_source">%1$d×%2$d, aus %3$d×%4$d</string>
 <string name="wallpaper_memory_total">Gesamt: %1$s</string>
 <string name="wallpaper_memory_empty">Kein Wallpaper geladen</string>
