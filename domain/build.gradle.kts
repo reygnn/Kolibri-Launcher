@@ -95,6 +95,18 @@ jmh {
     includeFilter?.let { includes.set(it) }
     excludeFilter?.let { excludes.set(it) }
 
+    // === Ad-hoc profiler knob ===================================================
+    // Same shape as the include/exclude filters: JMH ships profilers (`gc` for
+    // per-op allocation rate, `stack` for hot frames) that turn a throughput run
+    // into an allocation/CPU study. Off by default (they slow the run and are
+    // host-dependent); opt in ad hoc, comma-separated for several:
+    //
+    //   ./gradlew :domain:jmh -PjmhInclude=TimeWeightedSort -PjmhProfilers=gc
+    //
+    (project.findProperty("jmhProfilers") as String?)
+        ?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+        ?.let { profilers.set(it) }
+
     // A filtered run is PARTIAL, so it must not clobber the committed-baseline
     // JSON (`results.json`) with a subset — that footgun is the whole reason a
     // filtered run is worth isolating. Redirect it to a sibling file instead;
