@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Scale Values -->
-    <fraction name="anim_scale_app_open_from">85%</fraction>
-    <fraction name="anim_scale_app_open_to">100%</fraction>
     <fraction name="anim_scale_app_close_from">100%</fraction>
     <fraction name="anim_scale_app_close_to">85%</fraction>
     <fraction name="anim_scale_launcher_zoom">105%</fraction>
