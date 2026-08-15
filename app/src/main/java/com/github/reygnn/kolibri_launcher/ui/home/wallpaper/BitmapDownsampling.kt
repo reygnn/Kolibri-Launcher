@@ -49,20 +49,44 @@ const val MAX_WALLPAPER_PIXELS = 24_000_000
 const val RENDER_WALLPAPER_PIXELS = 10_500_000
 
 /**
+ * Conservative per-side cap (px) for a decoded wallpaper bitmap. An AREA budget
+ * alone ([RENDER_WALLPAPER_PIXELS] / [MAX_WALLPAPER_PIXELS]) lets an extreme-
+ * aspect-ratio image through at a huge single side — e.g. 20000×525 ≈ 10.5 MP
+ * passes at `inSampleSize` 1. Such a side exceeds the GPU max-texture size, and
+ * neither a HARDWARE nor an ARGB_8888 bitmap can then be uploaded as a texture
+ * ("Bitmap too large to be uploaded into a texture") → a blank wallpaper. 8192 is
+ * the minimum `GL_MAX_TEXTURE_SIZE` across the Android-16 device class; normal
+ * wallpapers (≤ ~3000 px/side) never approach it, so this only clamps
+ * pathological panoramas. Applied by the render decoder
+ * ([decodeBoundedWallpaperBitmap]); the legacy transform backfill
+ * ([resolveCaptureSampleSize]) deliberately does NOT apply it, so historical
+ * `S_captured` values stay unchanged (WALLPAPER_RENDER_RES_SPEC §7).
+ */
+const val MAX_WALLPAPER_TEXTURE_SIDE = 8192
+
+/**
  * The `inSampleSize` (a power of two, per `BitmapFactory` semantics) that brings
- * a [srcWidth]×[srcHeight] image to at most [maxPixels] decoded pixels. Returns 1
- * for images already within budget or for unknown/invalid dimensions (≤ 0) — the
- * caller then decodes at full size, which is correct for those cases.
+ * a [srcWidth]×[srcHeight] image to at most [maxPixels] decoded pixels AND — when
+ * [maxSide] > 0 — at most [maxSide] pixels on each side. Returns 1 for images
+ * already within budget or for unknown/invalid dimensions (≤ 0) — the caller then
+ * decodes at full size, which is correct for those cases. [maxSide] = 0 (the
+ * default) disables the per-side cap; the legacy backfill relies on that.
  */
 fun calculateWallpaperInSampleSize(
     srcWidth: Int,
     srcHeight: Int,
     maxPixels: Int = MAX_WALLPAPER_PIXELS,
+    maxSide: Int = 0,
 ): Int {
     if (srcWidth <= 0 || srcHeight <= 0 || maxPixels <= 0) return 1
     var sample = 1
     // Long arithmetic: srcWidth * srcHeight overflows Int for large images.
-    while ((srcWidth.toLong() / sample) * (srcHeight.toLong() / sample) > maxPixels) {
+    while (true) {
+        val w = srcWidth.toLong() / sample
+        val h = srcHeight.toLong() / sample
+        val overArea = w * h > maxPixels
+        val overSide = maxSide > 0 && (w > maxSide || h > maxSide)
+        if (!overArea && !overSide) break
         sample *= 2
     }
     return sample

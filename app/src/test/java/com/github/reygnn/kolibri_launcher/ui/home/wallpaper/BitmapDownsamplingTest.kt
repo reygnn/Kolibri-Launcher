@@ -98,6 +98,30 @@ class BitmapDownsamplingTest {
         assertEquals(1, calculateWallpaperInSampleSize(1080, 2424, RENDER_WALLPAPER_PIXELS))
     }
 
+    // ── per-side texture cap (blank-wallpaper guard for extreme aspect ratios) ─
+
+    @Test
+    fun `per-side cap downsamples an extreme-aspect-ratio image the area budget lets through`() {
+        // 20000×525 = 10.5 MP → within the area budget at inSampleSize 1, but the
+        // 20000 px side exceeds the GPU texture limit → un-uploadable → blank.
+        val areaOnly = calculateWallpaperInSampleSize(20000, 525, RENDER_WALLPAPER_PIXELS)
+        assertEquals("area budget alone leaves the over-wide side at full res", 1, areaOnly)
+
+        val clamped = calculateWallpaperInSampleSize(20000, 525, RENDER_WALLPAPER_PIXELS, maxSide = 8192)
+        assertTrue("per-side cap must downsample", clamped > 1)
+        assertTrue("longest decoded side must fit the cap", 20000 / clamped <= 8192)
+    }
+
+    @Test
+    fun `per-side cap leaves a normal wallpaper untouched`() {
+        // Normal side lengths are far below the cap → identical to area-only.
+        assertEquals(1, calculateWallpaperInSampleSize(1080, 2424, RENDER_WALLPAPER_PIXELS, maxSide = 8192))
+        assertEquals(
+            calculateWallpaperInSampleSize(12000, 9000, RENDER_WALLPAPER_PIXELS),
+            calculateWallpaperInSampleSize(12000, 9000, RENDER_WALLPAPER_PIXELS, maxSide = 8192),
+        )
+    }
+
     // ── resolveCaptureSampleSize (spec §4-Y / §7 backfill) ───────────────────
 
     @Test

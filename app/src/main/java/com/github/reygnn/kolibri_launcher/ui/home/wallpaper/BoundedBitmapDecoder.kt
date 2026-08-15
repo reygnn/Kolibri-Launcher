@@ -33,9 +33,13 @@ data class DecodedWallpaperBitmap(
  * display-only — drawn on the view's hardware-accelerated canvas, never
  * pixel-read (the luminance classifier decodes its own separate bitmap) — so the
  * pixels can live in graphics memory OFF the Java heap. HARDWARE carries alpha,
- * so transparent overlays qualify too. Falls back to [Bitmap.Config.ARGB_8888]
- * when a HARDWARE decode returns null (e.g. a decoded side exceeds the GPU
- * max-texture limit — practically never under the render budget, but defensive).
+ * so transparent overlays qualify too. The decode budget bounds BOTH the area
+ * ([maxPixels]) and the per-side length ([MAX_WALLPAPER_TEXTURE_SIDE]), so the
+ * result always fits a GPU texture — both the HARDWARE decode and the draw
+ * succeed even for an extreme-aspect-ratio source (an area-only budget would let
+ * an over-wide side through and neither a HARDWARE nor an ARGB_8888 bitmap could
+ * upload it). Falls back to [Bitmap.Config.ARGB_8888] only if a HARDWARE decode
+ * still returns null — a genuine graphics-memory allocation failure.
  *
  * [openStream] must return a FRESH stream each call: it is invoked for the bounds
  * pass and once per decode attempt (`decodeStream` consumes the stream). Returns
@@ -56,7 +60,9 @@ fun decodeBoundedWallpaperBitmap(
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     (openStream() ?: return null).use { BitmapFactory.decodeStream(it, null, bounds) }
 
-    val sample = calculateWallpaperInSampleSize(bounds.outWidth, bounds.outHeight, maxPixels)
+    val sample = calculateWallpaperInSampleSize(
+        bounds.outWidth, bounds.outHeight, maxPixels, MAX_WALLPAPER_TEXTURE_SIDE,
+    )
     val bitmap = decodeStreamWith(sample, Bitmap.Config.HARDWARE, openStream)
         ?: decodeStreamWith(sample, Bitmap.Config.ARGB_8888, openStream)
         ?: return null
