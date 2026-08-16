@@ -122,6 +122,12 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // NOTE: the :macrobenchmark module measures the `release` build type
+        // directly (its test variant matches via matchingFallbacks = ["release"]).
+        // No dedicated benchmark build type is needed here: release is already
+        // non-debuggable + profileable (<profileable> in the manifest) and is
+        // signed locally with the family key, so the on-device benchmark gets
+        // the true ship build. See macrobenchmark/build.gradle.kts.
     }
 
     buildFeatures {

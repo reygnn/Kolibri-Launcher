@@ -80,6 +80,16 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      # Compile-only gate for the on-device :macrobenchmark module so it cannot
+      # rot against app changes (e.g. a renamed LaunchTrace section would break
+      # the custom TraceMetric). The benchmark is NOT run here: it needs a REAL
+      # device (perf on a hosted emulator is noise) and runs locally via
+      # `./gradlew :macrobenchmark:connectedBenchmarkAndroidTest` +
+      # `:macrobenchmark:verifyLaunchBenchmark`. This step triggers only
+      # :macrobenchmark tasks — no app build, no signing, no device.
+      - name: Compile macrobenchmark module
+        run: ./gradlew :macrobenchmark:compileBenchmarkSources --stacktrace
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

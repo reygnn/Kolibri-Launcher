@@ -124,6 +124,10 @@ orchestrator = "1.6.1"  # Recheck 2026-Q3: current = latest stable.
 jmh = "1.37"  # JMH core/generator version, pinned via the jmh { } block in :domain. Recheck: current latest stable of the 1.x line.
 jmh-gradle-plugin = "0.7.3"  # me.champeau.jmh Gradle plugin (owns the src/jmh/ source set + jmh task). Latest stable.
 
+# Macrobenchmark (:macrobenchmark — on-device launch-latency gate, local device only)
+benchmark-macro = "1.4.1"  # androidx.benchmark macro-junit4. Recheck 2026-Q3: current latest stable (1.5.0 still alpha/beta/rc).
+uiautomator = "2.4.0"  # androidx.test.uiautomator, used only by :macrobenchmark to drive taps. Latest stable.
+
 
 [libraries]
 # UI & Material
@@ -191,10 +195,15 @@ androidx-test-espresso-intents = { module = "androidx.test.espresso:espresso-int
 androidx-test-espresso-web = { module = "androidx.test.espresso:espresso-web", version.ref = "espresso" }
 androidx-test-espresso-idling-resource = { module = "androidx.test.espresso:espresso-idling-resource", version.ref = "espresso" }
 
+# Macrobenchmark (:macrobenchmark only)
+benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "benchmark-macro" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+android-test = { id = "com.android.test", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

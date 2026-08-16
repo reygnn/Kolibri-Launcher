@@ -183,6 +183,43 @@ both ways.
 
 ---
 
+## Regression gate — `:macrobenchmark`
+
+The sub-frame property above is locked by an on-device Macrobenchmark
+(`:macrobenchmark`, a `com.android.test` module) so it cannot silently regress —
+e.g. a `suspend` call sneaking into the dispatch would add a frame to the hop
+with no diff-visible change. `LaunchDispatchBenchmark` opens the app drawer and
+taps the first app on the **release** build, capturing the three `LaunchTrace`
+sections plus a custom `TraceMetric` (`LaunchDispatchGapMetric`) that queries the
+trace for the TAP→DISPATCH gap via Perfetto SQL — `TraceSectionMetric` measures
+a single slice's duration, not the gap *between* two slices, so the hop needs the
+custom metric.
+
+```bash
+./gradlew :macrobenchmark:connectedBenchmarkAndroidTest   # needs a device
+./gradlew :macrobenchmark:verifyLaunchBenchmark           # threshold gate
+```
+
+`verifyLaunchBenchmark` parses the benchmark JSON and fails if the worst-iteration
+`launchDispatchGapMs` exceeds **4.0 ms** (generous, non-flaky headroom over the
+~0.85 ms measured p99, still under half a 120 Hz frame; a frame-sized regression
+lands well past it). Device-calibrated to the Pixel 9a — re-tune if the reference
+device changes.
+
+**Validated on-device (2026-08-16, release build, 40 iterations, Pixel 9a):**
+`launchDispatchGapMs` min 0.35 / median 0.50 / **max 1.15 ms** — consistent with
+the manual drawer at-rest numbers (§1). Gate result: PASS (1.15 ms « 4.0 ms).
+
+**Local device only.** It matches this project's "androidTest = real device =
+local" posture (CLAUDE.md Rule 10) and is deliberately NOT run in the device-free
+GitHub-Actions job — perf numbers on a hosted emulator are noise. CI only
+compile-checks the module (`:macrobenchmark:compileBenchmarkSources`) so it
+cannot rot against a renamed trace section. Requires a connected, unlocked device
+with the launcher past onboarding (the benchmark taps a drawer app, so no
+user-specific favorite is needed).
+
+---
+
 *Measurements: 2026-08-15 (medians) and 2026-08-16 (p99 / contention / A/B).
 Build 0.99.174, Pixel 9a. Numbers are device- and build-specific; re-measure
 after a hot-path change or on different hardware.*
