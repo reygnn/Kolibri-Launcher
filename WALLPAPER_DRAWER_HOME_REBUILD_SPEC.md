@@ -232,10 +232,11 @@ Net: D is the only option whose *steady-state* footprint drops below today
    the N-texture reveal into a 1-texture reveal (the measured jank source), and
    *lowers* resident RAM below today's — and it unblocks
    `ACCEPTED_LIMITATIONS.md` #1 for free. Does not need Option B's navigation
-   refactor. **Two real risks (§9.2), both surfaced in review:** the HARDWARE
-   decode config forces a transient software re-decode for the flatten (or a novel
-   hardware-offscreen readback), and the software-vs-hardware rasterizer means
-   fidelity is tolerance-bounded, not exact — a pixel-parity test bounds it.
+   refactor. **The two review-surfaced risks (§9.2) are now retired by the
+   Phase-1 spike:** the HARDWARE config is handled by a transient software
+   re-decode (Approach A), and the software-vs-hardware fidelity was measured at
+   mean 0.11 / max 1 (§9.7) — essentially rounding noise. Residual watch item is
+   the transient flatten heap spike (§5), not fidelity.
 2. **Fallback: Option B** (hoist the view) if flattening's fidelity proves
    unacceptable — removes the rebuild without a cache, at the cost of a
    display/edit-split refactor and keeping N layers resident.
@@ -315,19 +316,28 @@ So Option D needs one of two compositing strategies:
   readback pattern in the codebase** (novel; more moving parts, a GPU→CPU
   readback).
 
-**Fidelity caveat (corrects an earlier overstatement).** Approach A composes in
-**software** while the live edit view composes on a **hardware** canvas — two
-different rasterizers whose blend-mode / anti-alias / filtering math can differ
-subtly. So the flatten is **NOT** "pixel-identical by construction"; the parity
-test (§9.7) is checking a real cross-rasterizer delta and must allow a tolerance.
-Approach B avoids this (same rasterizer end-to-end).
+**RESOLVED — Approach A, measured across all blend modes (Phase-1 spike).**
+`WallpaperFlattenParityInstrumentedTest` on a Galaxy A36 measured the software
+flatten vs. the hardware render over NORMAL + all 11 `AVAILABLE_BLEND_MODES` at
+0.6 alpha. Worst case **EXCLUSION: mean 0.55 / max 2** per channel (0..255); most
+modes < 0.2, SCREEN and COLOR_BURN exactly 0. That is rounding noise, so
+**Approach A is chosen**; the hardware-offscreen readback (B) is not needed for
+correctness (the spike built it anyway, as the fallback and as reusable readback
+machinery). Per-mode table: §9.7.
 
-**Still worth doing regardless of approach:** `composeToBitmap` duplicates the
-`onDraw` layer loop (its own `exportPaint`/`exportMatrix`) and is untested against
-it — a latent drift liability. Unifying both onto one shared `drawLayers(canvas,
-drawSelection)` remains the right cleanup; just note the routine is
-rasterizer-sensitive (A vs B) and cannot be assumed identical to the live path
-under A.
+**Fidelity caveat (now measured).** Approach A composes in **software** while the
+live view composes on a **hardware** canvas — two rasterizers whose blend / AA /
+filtering math *could* differ. The earlier draft called this "pixel-identical by
+construction", which was too strong; the parity test (§9.7) measures the real
+delta, and it came out ~0 (mean 0.11 / max 1 above). So the tolerance is real but
+tiny. Approach B would remove even that (same rasterizer end-to-end).
+
+**Done in Phase 1:** `composeToBitmap` used to duplicate the `onDraw` layer loop
+(its own `exportPaint`/`exportMatrix`) — a latent drift liability. Both now
+delegate to one shared `drawLayers(canvas, paint, matrix, outputScale,
+drawSelection)`, so the live and flatten paths cannot drift. (The routine is still
+rasterizer-sensitive — software vs hardware canvas — which is exactly what the
+parity test bounds.)
 
 **Two-stage composition is preserved.** Blend modes compose *within* the Kolibri
 layer stack against the (transparent) offscreen bitmap — exactly as they compose
@@ -393,35 +403,44 @@ display bitmap (§9.2).
 
 ### 9.7 Testing
 
-- **Instrumented pixel-parity test** (`androidTest`): render the same layer stack
-  live vs via the flatten and assert similarity. Under Approach A this must be a
-  **tolerance** comparison, not exact equality — the live (hardware) and flatten
-  (software) rasterizers differ subtly (§9.2). This EARNS `androidTest` under Rule
-  10's value bar — HARDWARE bitmaps, `Canvas` blend-mode compositing, and true
-  `Bitmap` semantics are real-device behavior Robolectric cannot reproduce
-  (reference: darkroom `:app:halo`). This test is what bounds the §9.2 fidelity
-  delta.
+- **Instrumented pixel-parity test — BUILT (Phase 1):**
+  `WallpaperFlattenParityInstrumentedTest` renders the same layer stack live
+  (hardware, via `view.draw` → `RenderNode` → `HardwareRenderer`/`ImageReader`
+  readback) vs. the software flatten (`composeToBitmap`) and reports the
+  per-channel delta, looping NORMAL + all 11 `AVAILABLE_BLEND_MODES` at 0.6 alpha
+  and asserting on the worst. Measured on a Galaxy A36 (mean / max, 0..255):
+  SCREEN 0/0, COLOR_BURN 0/0, SOFT_LIGHT 0.03/1, COLOR_DODGE 0.04/1, DARKEN
+  0.08/1, LIGHTEN 0.08/1, MULTIPLY 0.11/1, OVERLAY 0.14/1, DIFFERENCE 0.17/1,
+  HARD_LIGHT 0.25/1, NORMAL 0.34/2, **EXCLUSION 0.55/2 (worst)**. It EARNS
+  `androidTest` under Rule 10's value bar — HARDWARE bitmaps, `Canvas` blend-mode
+  compositing, and true `Bitmap` semantics are real-device behavior Robolectric
+  cannot reproduce (reference: darkroom `:app:halo`). The hardware-readback side
+  also prototypes Approach B.
 - Unit-test the plan/state transition (multi-layer state → composite-ref state)
   and the invalidation-on-commit logic on the JVM.
 
 ### 9.8 Phasing (each phase independently shippable)
 
-1. **Extract `drawLayers(canvas, drawSelection)`** — pure refactor, no behavior
-   change, covered by the parity test.
-2. **Flatten-on-commit + persist** the composite (not yet consumed).
+1. **Extract `drawLayers(...)` + parity spike — DONE.** Shared compositor landed
+   (`onDraw` + `composeToBitmap` delegate to it); parity measured (§9.7), Approach
+   A chosen.
+2. **Flatten-on-commit + persist** the composite (not yet consumed). ← next.
 3. **Display mode reads the composite** via the single-image path (§9.4) — this
    is the phase that delivers the latency/RAM/flash win.
 4. **Classifier samples the composite** (§9.5) — closes ACCEPTED_LIMITATIONS #1.
 
 ### 9.9 Risks / non-goals recap
 
-- **HARDWARE decode config is the biggest implementation risk (§9.2).** Layers are
-  HARDWARE bitmaps; the flatten needs either a transient software re-decode
-  (Approach A, "back to 8888" for the composite step only) or a novel
-  hardware-offscreen readback (Approach B). This is real added cost that the first
-  draft of this spec missed — surfaced in review.
-- Fidelity is bounded, not guaranteed: under Approach A the software flatten vs
-  the hardware live view can differ subtly; §9.7's tolerance test bounds it.
+- **HARDWARE decode config (§9.2) — surfaced in review, retired by the Phase-1
+  spike.** Layers are HARDWARE bitmaps, so the flatten uses a transient software
+  re-decode (Approach A, "back to 8888" for the composite step only). The feared
+  fidelity cost was measured at mean 0.11 / max 1 (§9.7), so this is now a known,
+  small cost — the transient heap spike (§5) is the residual thing to watch, not
+  fidelity.
+- Fidelity: measured ~0 under Approach A across NORMAL + all 11 blend modes
+  (worst EXCLUSION 0.55 / max 2, §9.7). Was the top open risk; now closed on the
+  A36 — only residual is other-device/other-GPU variance (max 2 LSB makes a blow-up
+  unlikely).
 - Resolution/quality is the dial (Option C / `WALLPAPER_RENDER_RES_SPEC`); baking
   too low softens the wallpaper, too high grows the file + decode.
 - Hard assumption: **no per-layer effect in display mode** (parallax, independent

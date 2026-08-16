@@ -34,8 +34,9 @@ import kotlin.math.abs
  * offscreen-readback prototype: if the delta is too large for A, the machinery for
  * B is already here.
  *
- * Deliberately stacks a MULTIPLY layer at partial alpha — the worst case for
- * software-vs-hardware blend fidelity. Reports mean/max per-channel delta; the
+ * Loops NORMAL + every `WallpaperLayer.AVAILABLE_BLEND_MODES` at partial alpha —
+ * blend is where software and hardware rasterizers can diverge — and asserts on
+ * the WORST mode. Reports per-mode + worst mean/max per-channel delta; the
  * assertion bound is generous because the point is the measured NUMBER, logged
  * under tag `WallpaperParity`, not a pass/fail gate yet.
  */
@@ -52,56 +53,73 @@ class WallpaperFlattenParityInstrumentedTest {
     }
 
     @Test
-    fun softwareFlattenMatchesHardwareRenderWithinTolerance() {
+    fun softwareFlattenMatchesHardwareRenderAcrossAllBlendModes() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
 
-        // View construction, layout, layer add, compose and hardware render must
-        // all run on a thread with a Looper (the Main thread) — ZoomableImageView
-        // creates gesture detectors (Handlers) in its constructor. The heavy
-        // pixel comparison stays off the Main thread below.
-        var software: Bitmap? = null
-        var hardware: Bitmap? = null
+        // NORMAL + every blend mode the app actually offers, each stacked at 0.6
+        // alpha (the stress case). null = normal source-over.
+        val modes: List<BlendMode?> =
+            (listOf<BlendMode?>(null) + WallpaperLayer.AVAILABLE_BLEND_MODES.map { it.second })
+                .distinct()
+
+        // View + compose + hardware render must run on the Main thread (Looper) —
+        // ZoomableImageView creates gesture-detector Handlers in its constructor.
+        // The heavy pixel comparison stays off the Main thread below.
+        val rendered = mutableListOf<Triple<String, Bitmap, Bitmap?>>()
         instrumentation.runOnMainSync {
-            val view = ZoomableImageView(context).apply {
-                isEditMode = false
-                measure(
-                    View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY),
-                )
-                layout(0, 0, W, H)
+            for (mode in modes) {
+                val view = ZoomableImageView(context).apply {
+                    isEditMode = false
+                    measure(
+                        View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY),
+                    )
+                    layout(0, 0, W, H)
+                }
+                val base = solidGradient(W, H, Color.rgb(200, 120, 40))
+                val top = solidGradient(W, H, Color.rgb(40, 120, 200))
+                view.addLayer(base, centerCrop = true)
+                view.addLayer(top, centerCrop = true, alpha = 0.6f, blendMode = mode)
+
+                // Approach A: software Canvas flatten.
+                val software = view.composeToBitmap(W, H)
+                    ?: error("composeToBitmap null for blend=${mode?.name ?: "NORMAL"}")
+                // Approach B / live-equivalent: hardware render + readback.
+                val hardware = renderViewOnHardware(view, W, H)
+                rendered += Triple(mode?.name ?: "NORMAL", software, hardware)
             }
-
-            // Two distinct-content layers; the top one MULTIPLY at 0.6 alpha — the
-            // stress case for blend fidelity.
-            val base = solidGradient(W, H, Color.rgb(200, 120, 40))
-            val top = solidGradient(W, H, Color.rgb(40, 120, 200))
-            view.addLayer(base, centerCrop = true)
-            view.addLayer(top, centerCrop = true, alpha = 0.6f, blendMode = BlendMode.MULTIPLY)
-
-            // Approach A: software Canvas flatten.
-            software = view.composeToBitmap(W, H)
-            // Approach B / live-equivalent: record the view's onDraw into a
-            // RenderNode and render it on hardware, then read the pixels back.
-            hardware = renderViewOnHardware(view, W, H)
         }
 
-        val softwareBmp = software ?: error("composeToBitmap returned null")
-        val hardwareBmp = hardware
         Assume.assumeTrue(
             "hardware readback unavailable (software-rendered emulator?) — this " +
                 "spike is device-only",
-            hardwareBmp != null,
+            rendered.all { it.third != null },
         )
 
-        val (mean, max) = perChannelDelta(softwareBmp, hardwareBmp!!, W, H)
-        Log.i(TAG, "software-vs-hardware flatten delta: mean=$mean max=$max (0..255)")
+        var worstMean = 0.0
+        var worstMax = 0
+        var worstMode = ""
+        for ((name, software, hardware) in rendered) {
+            val (mean, max) = perChannelDelta(software, hardware!!, W, H)
+            Log.i(TAG, "blend=$name delta mean=$mean max=$max (0..255)")
+            if (mean > worstMean) {
+                worstMean = mean
+                worstMode = name
+            }
+            if (max > worstMax) worstMax = max
+        }
+        Log.i(
+            TAG,
+            "WORST across ${rendered.size} blend modes: mode=$worstMode " +
+                "mean=$worstMean max=$worstMax",
+        )
 
         assertTrue(
-            "mean per-channel delta $mean exceeds $MEAN_DELTA_BOUND (max=$max) — " +
-                "Approach A software flatten diverges from the hardware render; " +
-                "see the logged number and consider Approach B.",
-            mean < MEAN_DELTA_BOUND,
+            "worst mean per-channel delta $worstMean (mode $worstMode, max $worstMax) " +
+                "exceeds $MEAN_DELTA_BOUND — the software flatten diverges from the " +
+                "hardware render for some blend mode; reconsider Approach B.",
+            worstMean < MEAN_DELTA_BOUND,
         )
     }
 
