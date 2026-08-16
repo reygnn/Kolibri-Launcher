@@ -10,9 +10,24 @@ re-litigate the decision every time the limitation is noticed.
 
 ## 1. AppDrawer AUTO-mode classifier ignores layer composition
 
-- **Status:** 🟡 Intentional / Documented
+- **Status:** 🟢 Largely resolved by Option D; 🟡 residual only for composite-less multi-layer states
 - **Frequency:** Two narrow shapes — see "When the heuristic punts"
-- **Affected:** Multi-layer Kolibri-internal wallpapers in AUTO mode
+- **Affected:** Multi-layer Kolibri-internal wallpapers in AUTO mode **without a composite yet**
+
+### UPDATE — resolved for composited wallpapers (Option D)
+
+The re-evaluation trigger below predicted this: "the wallpaper editor grows a
+'preview composite as bitmap' step … the classifier could reuse the result for
+free." That is exactly Option D (`WALLPAPER_DRAWER_HOME_REBUILD_SPEC`): a multi-
+layer wallpaper is flattened to a single composite bitmap on edit-commit (and
+lazily for existing/restored wallpapers). `ClassifyWallpaperUseCase.pickDominantUri`
+now classifies **the composite** when one exists — the resolved composition of all
+layers + blend + alpha — so both soft spots below are handled. The composite is
+sampled SOFTWARE (256²) by `WallpaperBitmapLuminance`, and its coverage gate still
+routes a mostly-transparent composite to the system signal (correct — the system
+wallpaper shows through). The historical description below still applies to the
+**composite-less** fall-back (a pre-Option-D state, a just-restored backup, or the
+window before the lazy backfill runs).
 
 ### Explanation
 

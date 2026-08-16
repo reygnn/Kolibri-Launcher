@@ -122,6 +122,31 @@ class ClassifyWallpaperUseCaseTest {
         }
 
     @Test
+    fun `multi-layer with a composite classifies the composite, not the bottom layer`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The bottom layer has a non-Normal blend (MULTIPLY) — under the old
+            // heuristic it would punt to the system signal. But a composite exists,
+            // so the resolved composition is classified directly (Option D, closes
+            // ACCEPTED_LIMITATIONS #1).
+            fakeWallpaperRepository.currentState = WallpaperState(
+                layers = listOf(
+                    WallpaperLayerState(
+                        imageUri = "file:///wallpapers/bottom.png",
+                        alpha = 1.0f,
+                        blendModeName = "MULTIPLY",
+                    ),
+                    WallpaperLayerState(imageUri = "file:///wallpapers/top.png", alpha = 1.0f),
+                ),
+                flattenedWallpaperPath = "file:///wallpaper_composite/composite_1.webp",
+            )
+            // ONLY the composite is stubbed: if the bottom-layer path ran, compute()
+            // would be called with an unstubbed uri and fail. A bright composite → LIGHT.
+            coEvery { bitmapLuminance.compute("file:///wallpaper_composite/composite_1.webp") } returns 0.9f
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
+            coVerify { bitmapLuminance.compute("file:///wallpaper_composite/composite_1.webp") }
+        }
+
+    @Test
     fun `multi-layer transparent layer 0 falls through to system — alpha-gate`() =
         runTest(mainDispatcherRule.testDispatcher) {
             // The user's reported scenario: small grey motif on
