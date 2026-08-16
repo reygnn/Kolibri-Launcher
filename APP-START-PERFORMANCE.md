@@ -210,6 +210,17 @@ device changes.
 `launchDispatchGapMs` min 0.35 / median 0.50 / **max 1.15 ms** — consistent with
 the manual drawer at-rest numbers (§1). Gate result: PASS (1.15 ms « 4.0 ms).
 
+**Confirmed down-market on a mid-range Samsung (2026-08-16, release build, 40
+iterations, Galaxy A36 / SM-A366B, Snapdragon 6 Gen 3, One UI, 120 Hz):**
+`launchDispatchGapMs` min 0.36 / median 0.51 / **max 0.83 ms** (CoV 0.18) — the
+weaker CPU that must still hit the same 8.33 ms frame deadline as the Pixel, and
+the numbers land essentially on top of the reference; the tail is even lower
+(0.83 vs 1.15 ms), which fits the hop being scheduling-jitter-bound tiny
+main-thread work rather than compute-bound. Gate result: PASS (0.83 ms « 4.0 ms).
+This is why the 4.0 ms threshold is NOT re-tuned per device: the Pixel 9a
+calibration generalizes to the slowest hardware Kolibri realistically ships to,
+so one reference device is enough.
+
 **Local device only.** It matches this project's "androidTest = real device =
 local" posture (CLAUDE.md Rule 10) and is deliberately NOT run in the device-free
 GitHub-Actions job — perf numbers on a hosted emulator are noise. CI only
@@ -221,5 +232,5 @@ user-specific favorite is needed).
 ---
 
 *Measurements: 2026-08-15 (medians) and 2026-08-16 (p99 / contention / A/B).
-Build 0.99.174, Pixel 9a. Numbers are device- and build-specific; re-measure
-after a hot-path change or on different hardware.*
+Build 0.99.174, Pixel 9a + Galaxy A36. Numbers are device- and build-specific;
+re-measure after a hot-path change or on different hardware.*
