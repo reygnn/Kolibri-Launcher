@@ -289,6 +289,39 @@ class WallpaperDelegateTest {
         coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
     }
 
+    @Test
+    fun `backfills again for a later composite-less state (e_g_ a second restore)`() = runTest {
+        // A weeks-long session with two backup restores, each a different
+        // composite-less multi-layer wallpaper: BOTH must get a backfill (the guard
+        // is "in progress", not "once per process").
+        val firstRestore = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///a.jpg")))
+        val secondRestore = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///b.jpg")))
+        val stateFlow = MutableStateFlow(firstRestore)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val flattener: WallpaperFlattener = mockk()
+        val bitmap: Bitmap = mockk(relaxed = true)
+        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+
+        delegate.start()
+        advanceUntilIdle() // backfill for the first restore
+
+        stateFlow.value = secondRestore
+        advanceUntilIdle() // backfill for the second restore — must NOT be blocked
+
+        coVerify { flattener.flatten(firstRestore, any(), any()) }
+        coVerify { flattener.flatten(secondRestore, any(), any()) }
+    }
+
     // ===========================================
     // SET WALLPAPER IMAGE
     // ===========================================

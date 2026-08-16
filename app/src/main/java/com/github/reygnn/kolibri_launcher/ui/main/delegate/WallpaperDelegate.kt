@@ -249,12 +249,18 @@ class WallpaperDelegate(
     private var editSnapshot: WallpaperState? = null
 
     /**
-     * Guards the one-shot lazy composite backfill (Option D §9.6). Set true the
-     * first time a display-mode multi-layer state with no composite is observed, so
-     * the background flatten runs at most once per process (a persistent flatten
-     * failure retries next launch, not on every emission). Main-thread confined.
+     * Guards the lazy composite backfill (Option D §9.6) against CONCURRENT runs:
+     * true while a background flatten is in flight, reset when it finishes. NOT
+     * once-per-process — a launcher runs for weeks and can see several
+     * composite-less states over time (each backup restore brings a different
+     * wallpaper), and each must get its own backfill. Loop-safe without a
+     * once-flag: a SUCCESSFUL backfill sets the path, so the re-emitted state no
+     * longer qualifies; a FAILURE just retries on the next (rare) state change, not
+     * in a tight loop (state emissions for a stable wallpaper are infrequent).
+     * Main-thread confined (set on the collect, reset in the coroutine's finally,
+     * both on the delegate scope).
      */
-    private var backfillAttempted = false
+    private var backfillInProgress = false
 
     /**
      * Monotonic counter bumped ONLY when an edit session is rolled back
@@ -559,16 +565,22 @@ class WallpaperDelegate(
      * re-decodes N layers (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4a-adjacent), which
      * would regress the very cold-start path the launch benchmark protects. It runs
      * off-main via [regenerateFlattenedComposite] here, after the state has loaded,
-     * at most once per process ([backfillAttempted]) and never during edit mode
-     * (the layers are mid-change and the commit path will flatten anyway).
+     * one at a time ([backfillInProgress]) and never during edit mode (the layers
+     * are mid-change and the commit path will flatten anyway). Fires again for a
+     * later composite-less state — e.g. a subsequent backup restore in the same
+     * (weeks-long) session — see the [backfillInProgress] KDoc.
      */
     private fun maybeBackfillComposite(state: WallpaperState) {
-        if (backfillAttempted) return
+        if (backfillInProgress) return
         if (_isWallpaperEditMode.value) return
         if (!state.isMultiLayer || state.flattenedWallpaperPath != null) return
-        backfillAttempted = true
+        backfillInProgress = true
         scope.launchSafe("Error backfilling wallpaper composite") {
-            regenerateFlattenedComposite(state)
+            try {
+                regenerateFlattenedComposite(state)
+            } finally {
+                backfillInProgress = false
+            }
         }
     }
 
