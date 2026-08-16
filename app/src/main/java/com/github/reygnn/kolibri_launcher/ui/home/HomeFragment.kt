@@ -46,6 +46,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitm
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
@@ -1574,6 +1575,10 @@ class HomeFragment : Fragment() {
             // single-layer image self-invalidates (a new pick → new uri → new key).
             if (decoded != null && renderingSingleImageNow()) {
                 compositeCache.put(key, decoded)
+                // TEMP (remove later): a visual signal on each composite-cache FILL,
+                // to eyeball how often the cache is (re)populated. Posted to Main
+                // because this decode runs off the Main thread.
+                view?.post { showToastSafe("Wallpaper cache filled") }
             }
             decoded
         } catch (e: Throwable) {
