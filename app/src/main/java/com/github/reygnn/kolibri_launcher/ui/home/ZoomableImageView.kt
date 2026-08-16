@@ -325,8 +325,6 @@ class ZoomableImageView @JvmOverloads constructor(
     // PAINT OBJECTS (Multi-Layer Rendering)
     // ===========================================
 
-    private val bgPaint = Paint().apply { style = Paint.Style.FILL }
-
     private val bitmapPaint = Paint().apply {
         isAntiAlias = true
         isFilterBitmap = true
@@ -797,16 +795,20 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     /**
-     * Exportiert alle sichtbaren Layer als ein einzelnes Bitmap.
+     * Flattens all visible layers into a single bitmap via the shared [drawLayers]
+     * compositor — the offscreen flatten for Option D
+     * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.2, Approach A). Exercised by
+     * `WallpaperFlattenParityInstrumentedTest`, which measured a mean delta of
+     * ~0.1 / max 1 (0..255) vs. the hardware render on a Galaxy A36 — i.e. the
+     * software compose is faithful, so Approach A is viable.
      *
-     * DEAD CODE (no callers, @Suppress("unused") — WALLPAPER_RENDER_RES_SPEC §6.2)
-     * AND currently incompatible with the HARDWARE decode config: the layer
-     * bitmaps are HARDWARE bitmaps (BoundedBitmapDecoder), and drawing a HARDWARE
-     * bitmap onto the SOFTWARE Canvas below throws "unable to draw hardware
-     * bitmaps". If this is ever reactivated, decode the layers (or copy them) into
-     * a software config first, or compose on a hardware-accelerated canvas.
+     * REQUIRES SOFTWARE (`ARGB_8888`) layer bitmaps: the compose targets a
+     * software `Canvas`, which cannot draw the HARDWARE bitmaps that
+     * `BoundedBitmapDecoder` produces for the live view (it throws "unable to draw
+     * hardware bitmaps"). Callers decode/copy layers to a software config first
+     * (§9.2/§9.3). Not yet wired into production — Option D Phase 2/3 will;
+     * `@Suppress("unused")` stays until then.
      */
-    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
     @Suppress("unused")
     fun composeToBitmap(
         targetWidth: Int = width,
@@ -817,11 +819,6 @@ class ZoomableImageView @JvmOverloads constructor(
         return try {
             val result = createBitmap(targetWidth, targetHeight)
             val canvas = Canvas(result)
-
-            // Hintergrund (transparent bleibt transparent im Bitmap)
-            if (layerBackgroundColor != Color.TRANSPARENT) {
-                canvas.drawColor(layerBackgroundColor)
-            }
 
             val scaleX = targetWidth.toFloat() / width
             val scaleY = targetHeight.toFloat() / height
@@ -837,27 +834,16 @@ class ZoomableImageView @JvmOverloads constructor(
             val exportMatrix = Matrix()
 
             if (isMultiLayerMode) {
-                for (layer in layers) {
-                    if (!layer.isVisible) continue
-                    val bmp = layer.bitmap ?: continue
-
-                    // Alpha
-                    exportPaint.alpha = layer.alphaInt
-                    exportPaint.blendMode = layer.blendMode
-
-                    exportMatrix.reset()
-                    exportMatrix.set(layer.buildMatrix())
-                    if (scaleX != 1f || scaleY != 1f) {
-                        val outputScale = Matrix()
-                        outputScale.setScale(scaleX, scaleY)
-                        exportMatrix.postConcat(outputScale)
-                    }
-                    canvas.drawBitmap(bmp, exportMatrix, exportPaint)
-
-                    // Reset für nächstes Layer
-                    exportPaint.alpha = 255
-                    exportPaint.blendMode = null
-                }
+                // Shared compositor (single source of truth with onDraw); it fills
+                // the background and scales each layer to the target size.
+                drawLayers(
+                    canvas = canvas,
+                    paint = exportPaint,
+                    matrix = exportMatrix,
+                    outputScaleX = scaleX,
+                    outputScaleY = scaleY,
+                    drawSelection = false,
+                )
             } else {
                 // Single-Layer: Drawable rendern
                 val d = drawable
@@ -914,30 +900,59 @@ class ZoomableImageView @JvmOverloads constructor(
         // measures the Main-thread draw-command recording cost of a gesture
         // redraw — distinct from the GPU texture sampling on the RenderThread.
         LaunchTrace.section(LaunchTrace.Names.GESTURE_ONDRAW) {
-            if (layerBackgroundColor != Color.TRANSPARENT) {
-                bgPaint.color = layerBackgroundColor
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-            }
+            drawLayers(
+                canvas = canvas,
+                paint = bitmapPaint,
+                matrix = drawMatrix,
+                drawSelection = isEditMode,
+            )
+        }
+    }
 
-            for ((index, layer) in layers.withIndex()) {
-                if (!layer.isVisible) continue
-                val bmp = layer.bitmap ?: continue
+    /**
+     * Shared multi-layer compositing loop — the single source of truth for both
+     * the live [onDraw] path and the offscreen [composeToBitmap] export. Fills the
+     * optional background, then draws every visible, non-recycled layer with its
+     * alpha, blend mode and transform, optionally scaled to a target size
+     * ([outputScaleX]/[outputScaleY] = 1f for the 1:1 live view). [drawSelection]
+     * draws the edit-mode highlight on the active layer (live path only).
+     *
+     * The caller supplies [paint] and [matrix] so the two call sites stay
+     * thread-independent: [onDraw] passes the view's members (Main thread only),
+     * [composeToBitmap] passes local instances (may run off the Main thread).
+     * Keeping ONE loop here is what stops the live and export paths from drifting
+     * (the reason `composeToBitmap` used to duplicate this).
+     */
+    private fun drawLayers(
+        canvas: Canvas,
+        paint: Paint,
+        matrix: Matrix,
+        outputScaleX: Float = 1f,
+        outputScaleY: Float = 1f,
+        drawSelection: Boolean,
+    ) {
+        if (layerBackgroundColor != Color.TRANSPARENT) {
+            canvas.drawColor(layerBackgroundColor)
+        }
+        val scaled = outputScaleX != 1f || outputScaleY != 1f
+        for ((index, layer) in layers.withIndex()) {
+            if (!layer.isVisible) continue
+            val bmp = layer.bitmap ?: continue
+            // Guard: skip a recycled bitmap
+            if (bmp.isRecycled) continue
 
-                // Guard: skip a recycled bitmap
-                if (bmp.isRecycled) continue
+            paint.alpha = layer.alphaInt
+            paint.blendMode = layer.blendMode
 
-                bitmapPaint.alpha = layer.alphaInt
-                bitmapPaint.blendMode = layer.blendMode
+            layer.buildMatrixInto(matrix)
+            if (scaled) matrix.postScale(outputScaleX, outputScaleY)
+            canvas.drawBitmap(bmp, matrix, paint)
 
-                layer.buildMatrixInto(drawMatrix)
-                canvas.drawBitmap(bmp, drawMatrix, bitmapPaint)
+            paint.alpha = 255
+            paint.blendMode = null
 
-                bitmapPaint.alpha = 255
-                bitmapPaint.blendMode = null
-
-                if (isEditMode && index == activeLayerIndex) {
-                    drawSelectionHighlight(canvas, layer)
-                }
+            if (drawSelection && index == activeLayerIndex) {
+                drawSelectionHighlight(canvas, layer)
             }
         }
     }
