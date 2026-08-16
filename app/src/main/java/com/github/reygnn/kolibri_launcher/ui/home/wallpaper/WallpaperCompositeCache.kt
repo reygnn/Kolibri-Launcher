@@ -16,12 +16,13 @@ import javax.inject.Singleton
  * (a size §5 flagged as affordable, unlike the N-layer cache) lets the wallpaper
  * re-attach instantly across the view re-creation that drawer→home triggers.
  *
- * Application-scoped (survives the fragment view). Safe because the wallpaper view
- * never recycles its bitmaps (it drops references and relies on GC), so a cached
- * reference cannot be pulled out from under a still-drawing view. [invalidate]
- * therefore only drops the reference — never recycles — so the composite that is
- * still on screen keeps drawing until the next render replaces it, and GC reclaims
- * it once both this cache and the view have released it.
+ * Application-scoped (survives the fragment view). Purely key-based: a new
+ * composite gets a VERSIONED path (`WallpaperCompositeStore`), so [put] with the
+ * new key simply replaces the entry — no explicit invalidation needed. Safe
+ * because the wallpaper view never recycles its bitmaps (it drops references and
+ * relies on GC): the replaced-out bitmap that may still be on screen keeps drawing
+ * until the next render, and GC reclaims it once both this cache and the view have
+ * released it (this cache never recycles).
  */
 @Singleton
 class WallpaperCompositeCache @Inject constructor() {
@@ -46,16 +47,5 @@ class WallpaperCompositeCache @Inject constructor() {
     fun put(path: String, decoded: DecodedWallpaperBitmap) {
         cachedPath = path
         cached = decoded
-    }
-
-    /**
-     * Drops the cached composite so the next display re-decodes the fresh file.
-     * Called when a new composite is written (edit-commit). No recycle — see the
-     * class KDoc.
-     */
-    @Synchronized
-    fun invalidate() {
-        cachedPath = null
-        cached = null
     }
 }

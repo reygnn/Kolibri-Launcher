@@ -140,7 +140,6 @@ class WallpaperDelegateTest {
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeStore = compositeStore,
-        compositeCache = mockk(relaxed = true),
         ioDispatcher = ioDispatcher,
         scope = scope
     )

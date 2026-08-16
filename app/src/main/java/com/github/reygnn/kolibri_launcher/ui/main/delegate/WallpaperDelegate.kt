@@ -142,7 +142,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -177,7 +176,6 @@ class WallpaperDelegate(
     private val wallpaperFileManager: WallpaperFileManager,
     private val wallpaperFlattener: WallpaperFlattener,
     private val compositeStore: WallpaperCompositeStore,
-    private val compositeCache: WallpaperCompositeCache,
     private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
@@ -594,7 +592,6 @@ class WallpaperDelegate(
     private suspend fun regenerateFlattenedComposite(state: WallpaperState) {
         if (!state.isMultiLayer) {
             compositeStore.clear()
-            compositeCache.invalidate()
             return
         }
         // Pass explicit display dimensions (from the delegate's context) rather than
@@ -609,10 +606,9 @@ class WallpaperDelegate(
             bitmap.recycle()
         }
         path ?: return
-        // The composite file was just overwritten; drop the stale decoded copy so
-        // the next display decodes the fresh one (§9.4). The path string is fixed,
-        // so the cache would otherwise serve the previous composition.
-        compositeCache.invalidate()
+        // No explicit cache invalidation needed: the composite path is versioned
+        // (WallpaperCompositeStore), so this new path is a fresh cache key — the
+        // display decodes it on a natural miss and the old entry is dropped (§9.4a).
         // Latest-wins: only attach the path if the state has not changed since the
         // commit (a newer edit would have nulled it and needs its own flatten).
         if (_wallpaperState.value == state) {
