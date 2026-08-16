@@ -103,6 +103,16 @@ object LaunchTrace {
          * `drawBitmap` command recording during a gesture (fires only on
          * invalidate, i.e. during gestures/rebuilds, not when idle). */
         const val GESTURE_ONDRAW = "gesture_ondraw"
+
+        // --- Wallpaper save (pan/scale/save manual-trace investigation) ---
+
+        /** The save-FAB tap handler in `WallpaperEditController` — the
+         * SYNCHRONOUS Main-thread cost of committing an edit session
+         * (read view transforms + `decide` + dispatch + commit). The actual
+         * DataStore persist is launched async off this slice, so it does NOT
+         * span the write; this pins only the on-tap main-thread chunk that
+         * could drop a frame. */
+        const val WALLPAPER_SAVE = "wallpaper_save"
     }
 
     /**

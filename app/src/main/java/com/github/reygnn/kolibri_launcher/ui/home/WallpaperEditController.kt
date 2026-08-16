@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransit
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import timber.log.Timber
 
 /**
@@ -178,19 +179,24 @@ internal class WallpaperEditController(
 
         // ── SAVE (Main FAB tap, drag-aware) ──
         fabCluster.setOnSaveClicked {
-            val currentWallpaperState = viewModel.wallpaperState.value
-            // Save runs after a finished edit session, so we trust the
-            // state's isMultiLayer value directly. No race-guard against
-            // the view here — see saveCurrentViewTransforms below for the
-            // contrast.
-            val action = WallpaperSaveAction.decide(
-                isMultiLayer = currentWallpaperState.isMultiLayer,
-                hasWallpaper = currentWallpaperState.hasWallpaper,
-                allLayerTransforms = readAllLayerTransforms(wallpaperView),
-                singleTransform = readSingleTransform(wallpaperView),
-            )
-            dispatchSaveAction(action)
-            viewModel.onCommitWallpaperEditMode()
+            // Pin the synchronous on-tap cost (decide + dispatch + commit) as
+            // a Perfetto slice; the DataStore persist is launched async inside
+            // dispatchSaveAction, so it falls outside this section by design.
+            LaunchTrace.section(LaunchTrace.Names.WALLPAPER_SAVE) {
+                val currentWallpaperState = viewModel.wallpaperState.value
+                // Save runs after a finished edit session, so we trust the
+                // state's isMultiLayer value directly. No race-guard against
+                // the view here — see saveCurrentViewTransforms below for the
+                // contrast.
+                val action = WallpaperSaveAction.decide(
+                    isMultiLayer = currentWallpaperState.isMultiLayer,
+                    hasWallpaper = currentWallpaperState.hasWallpaper,
+                    allLayerTransforms = readAllLayerTransforms(wallpaperView),
+                    singleTransform = readSingleTransform(wallpaperView),
+                )
+                dispatchSaveAction(action)
+                viewModel.onCommitWallpaperEditMode()
+            }
         }
 
         // ── CANCEL ──
