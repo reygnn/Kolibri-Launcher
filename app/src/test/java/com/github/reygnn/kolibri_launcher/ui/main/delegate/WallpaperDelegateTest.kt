@@ -6,7 +6,10 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import android.graphics.Bitmap
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
@@ -123,7 +126,9 @@ class WallpaperDelegateTest {
     private fun createDelegate(
         observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = this.observeWallpaperStateUseCase,
         ioDispatcher: CoroutineDispatcher = mainDispatcherRule.testDispatcher,
-        scope: DelegateScope = createDelegateScope()
+        scope: DelegateScope = createDelegateScope(),
+        wallpaperFlattener: WallpaperFlattener = mockk(relaxed = true),
+        compositeStore: WallpaperCompositeStore = mockk(relaxed = true),
     ) = WallpaperDelegate(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
@@ -133,8 +138,8 @@ class WallpaperDelegateTest {
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
-        wallpaperFlattener = mockk(relaxed = true),
-        compositeStore = mockk(relaxed = true),
+        wallpaperFlattener = wallpaperFlattener,
+        compositeStore = compositeStore,
         compositeCache = mockk(relaxed = true),
         ioDispatcher = ioDispatcher,
         scope = scope
@@ -214,6 +219,74 @@ class WallpaperDelegateTest {
         stateFlow.value = state2
         advanceUntilIdle()
         assertEquals(state2, delegate.wallpaperState.value)
+    }
+
+    // ===========================================
+    // LAZY COMPOSITE BACKFILL (Option D §9.6)
+    // ===========================================
+
+    @Test
+    fun `start backfills composite for a display multi-layer state without one`() = runTest {
+        val multiNoComposite = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            ),
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multiNoComposite)
+
+        val flattener: WallpaperFlattener = mockk()
+        val bitmap: Bitmap = mockk(relaxed = true)
+        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify {
+            saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" })
+        }
+    }
+
+    @Test
+    fun `start does not backfill when the composite already exists`() = runTest {
+        val multiWithComposite = WallpaperState(
+            layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")),
+            flattenedWallpaperPath = "file:///existing.webp",
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multiWithComposite)
+
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, wallpaperFlattener = flattener)
+
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
+    }
+
+    @Test
+    fun `start does not backfill a single-layer wallpaper`() = runTest {
+        val single = WallpaperState(imageUri = "file:///single.jpg")
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(single)
+
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, wallpaperFlattener = flattener)
+
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
     }
 
     // ===========================================

@@ -249,6 +249,14 @@ class WallpaperDelegate(
     private var editSnapshot: WallpaperState? = null
 
     /**
+     * Guards the one-shot lazy composite backfill (Option D §9.6). Set true the
+     * first time a display-mode multi-layer state with no composite is observed, so
+     * the background flatten runs at most once per process (a persistent flatten
+     * failure retries next launch, not on every emission). Main-thread confined.
+     */
+    private var backfillAttempted = false
+
+    /**
      * Monotonic counter bumped ONLY when an edit session is rolled back
      * ([onCancelWallpaperEditMode]). [onAddWallpaperLayer] captures it
      * before its suspending file copy and re-checks it after:
@@ -356,6 +364,8 @@ class WallpaperDelegate(
                         TimberWrapper.silentError(e, "Wallpaper orphan GC failed")
                     }
                 }
+
+                maybeBackfillComposite(state)
             }
         }
     }
@@ -540,6 +550,29 @@ class WallpaperDelegate(
     }
 
     /**
+     * Lazy composite backfill (Option D §9.6): an existing multi-layer wallpaper
+     * with no composite yet — set up before Option D, restored from backup, or the
+     * slot cleared — gets one generated in the BACKGROUND on first display, so
+     * drawer→home benefits without the user having to re-edit + save.
+     *
+     * Deliberately NOT at process start / in the launch hot path: the flatten
+     * re-decodes N layers (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4a-adjacent), which
+     * would regress the very cold-start path the launch benchmark protects. It runs
+     * off-main via [regenerateFlattenedComposite] here, after the state has loaded,
+     * at most once per process ([backfillAttempted]) and never during edit mode
+     * (the layers are mid-change and the commit path will flatten anyway).
+     */
+    private fun maybeBackfillComposite(state: WallpaperState) {
+        if (backfillAttempted) return
+        if (_isWallpaperEditMode.value) return
+        if (!state.isMultiLayer || state.flattenedWallpaperPath != null) return
+        backfillAttempted = true
+        scope.launchSafe("Error backfilling wallpaper composite") {
+            regenerateFlattenedComposite(state)
+        }
+    }
+
+    /**
      * Flattens the committed multi-layer wallpaper into a single display composite
      * (Option D §9.3) and persists its path on the state. No-op that clears the
      * slot for single-layer / no wallpaper. Best-effort: a failed flatten leaves the
@@ -552,7 +585,12 @@ class WallpaperDelegate(
             compositeCache.invalidate()
             return
         }
-        val bitmap = wallpaperFlattener.flatten(state) ?: return
+        // Pass explicit display dimensions (from the delegate's context) rather than
+        // relying on the flattener's context-based defaults — keeps the call
+        // unit-testable with a mocked flattener.
+        val metrics = context.resources.displayMetrics
+        val bitmap = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
+            ?: return
         val path = try {
             compositeStore.write(bitmap)
         } finally {
