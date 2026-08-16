@@ -52,6 +52,7 @@ data class DecodedWallpaperBitmap(
  */
 fun decodeBoundedWallpaperBitmap(
     maxPixels: Int = RENDER_WALLPAPER_PIXELS,
+    preferSoftware: Boolean = false,
     openStream: () -> InputStream?,
 ): DecodedWallpaperBitmap? {
     // Bounds pass: decodeStream returns null in inJustDecodeBounds mode (by
@@ -63,9 +64,15 @@ fun decodeBoundedWallpaperBitmap(
     val sample = calculateWallpaperInSampleSize(
         bounds.outWidth, bounds.outHeight, maxPixels, MAX_WALLPAPER_TEXTURE_SIDE,
     )
-    val bitmap = decodeStreamWith(sample, Bitmap.Config.HARDWARE, openStream)
-        ?: decodeStreamWith(sample, Bitmap.Config.ARGB_8888, openStream)
-        ?: return null
+    // [preferSoftware] = ARGB_8888 only: the Option-D flatten composes on a
+    // software Canvas, which cannot draw HARDWARE bitmaps (WALLPAPER_DRAWER_HOME_
+    // REBUILD_SPEC §9.2). The live display path keeps HARDWARE (fallback 8888).
+    val bitmap = if (preferSoftware) {
+        decodeStreamWith(sample, Bitmap.Config.ARGB_8888, openStream)
+    } else {
+        decodeStreamWith(sample, Bitmap.Config.HARDWARE, openStream)
+            ?: decodeStreamWith(sample, Bitmap.Config.ARGB_8888, openStream)
+    } ?: return null
     return DecodedWallpaperBitmap(bitmap, sample, bounds.outWidth, bounds.outHeight)
 }
 

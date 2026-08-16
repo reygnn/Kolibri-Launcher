@@ -180,6 +180,8 @@ class LauncherViewModelSecurityTest {
             getFabPositionUseCase = mockk<GetFabPositionUseCase>(relaxed = true).also { every { it.invoke() } returns emptyFlow() },
             saveFabPositionUseCase = mockk(relaxed = true),
             wallpaperFileManager = mockk(relaxed = true),
+            wallpaperFlattener = mockk(relaxed = true),
+            wallpaperCompositeStore = mockk(relaxed = true),
             appUpdateSignal = appUpdateSignal,
             monotonicClock = neverThrottlingClock(),
             savedStateHandle = SavedStateHandle(),

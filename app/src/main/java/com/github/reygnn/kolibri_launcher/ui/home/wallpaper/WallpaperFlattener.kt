@@ -1,0 +1,87 @@
+package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
+import android.view.View
+import com.github.reygnn.kolibri_launcher.core.MainDispatcher
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+/**
+ * Produces the flattened display-mode composite for Option D
+ * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.2, Approach A).
+ *
+ * Reuses the LIVE render path — [WallpaperViewBinder] on a detached
+ * [ZoomableImageView] — so the composite is faithful to what the multi-layer view
+ * shows (the parity test measured mean 0.11 / max 1 across all blend modes). The
+ * only difference from the live path is the bitmap loader: it decodes SOFTWARE
+ * (`ARGB_8888`) bitmaps, because `composeToBitmap` composes on a software `Canvas`
+ * that cannot draw the HARDWARE bitmaps the live display uses.
+ *
+ * Returns a SOFTWARE bitmap; [WallpaperCompositeStore] compresses it to WEBP.
+ */
+class WallpaperFlattener @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
+) {
+    /**
+     * Flattens [state]'s layers into one software bitmap at [width]x[height]
+     * (default: display resolution), or `null` if [state] is not multi-layer, the
+     * size is invalid, or nothing rendered. View construction/mutation runs on the
+     * Main thread; the binder decodes off-Main internally.
+     */
+    suspend fun flatten(
+        state: WallpaperState,
+        width: Int = context.resources.displayMetrics.widthPixels,
+        height: Int = context.resources.displayMetrics.heightPixels,
+    ): Bitmap? {
+        if (!state.isMultiLayer || width <= 0 || height <= 0) return null
+        return withContext(mainDispatcher) {
+            try {
+                val view = ZoomableImageView(context).apply {
+                    isEditMode = false
+                    measure(
+                        View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+                    )
+                    layout(0, 0, width, height)
+                }
+                // Same binder the live view uses -> identical decode/transform/blend
+                // logic, only with a software loader.
+                val binder = WallpaperViewBinder { uri -> loadSoftware(uri) }
+                binder.bind(view, state)
+                view.composeToBitmap(width, height)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Throwable: the parallel decodes + compose are an allocation
+                // boundary (OOM). A failed flatten just means no composite this time.
+                TimberWrapper.silentError(e, "Wallpaper flatten failed")
+                null
+            }
+        }
+    }
+
+    /** SOFTWARE decode of one layer source, matching the binder's loader contract. */
+    private suspend fun loadSoftware(uri: Uri): DecodedWallpaperBitmap? =
+        withContext(Dispatchers.IO) {
+            try {
+                decodeBoundedWallpaperBitmap(preferSoftware = true) {
+                    context.contentResolver.openInputStream(uri)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Software layer decode failed for flatten")
+                null
+            }
+        }
+}

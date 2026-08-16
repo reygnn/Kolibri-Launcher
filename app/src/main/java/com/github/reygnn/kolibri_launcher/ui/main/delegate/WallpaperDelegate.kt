@@ -130,6 +130,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -141,6 +142,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -172,6 +174,8 @@ class WallpaperDelegate(
     private val getFabPositionUseCase: GetFabPositionUseCase,
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val wallpaperFileManager: WallpaperFileManager,
+    private val wallpaperFlattener: WallpaperFlattener,
+    private val compositeStore: WallpaperCompositeStore,
     private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
@@ -515,15 +519,47 @@ class WallpaperDelegate(
         editSnapshot = null
         _isWallpaperEditMode.value = false
 
-        if (filesToDelete.isEmpty()) return
+        // Snapshot the committed state now; the flatten below reads it.
+        val committedState = _wallpaperState.value
 
         scope.launchSafe("Error committing wallpaper edit") {
             // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
             // internally guarded (never throws), so a bad delete can't abort the
             // batch and no per-file wrapper is needed (Rule 11).
-            withContext(ioDispatcher) {
-                filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+            if (filesToDelete.isNotEmpty()) {
+                withContext(ioDispatcher) {
+                    filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+                }
             }
+            // Option D: regenerate the flattened display composite for the committed
+            // layers so drawer->home stops re-decoding every layer (§9.3).
+            regenerateFlattenedComposite(committedState)
+        }
+    }
+
+    /**
+     * Flattens the committed multi-layer wallpaper into a single display composite
+     * (Option D §9.3) and persists its path on the state. No-op that clears the
+     * slot for single-layer / no wallpaper. Best-effort: a failed flatten leaves the
+     * state without a composite, and the drawer->home path falls back to the
+     * per-layer rebuild (§9.6).
+     */
+    private suspend fun regenerateFlattenedComposite(state: WallpaperState) {
+        if (!state.isMultiLayer) {
+            compositeStore.clear()
+            return
+        }
+        val bitmap = wallpaperFlattener.flatten(state) ?: return
+        val path = try {
+            compositeStore.write(bitmap)
+        } finally {
+            bitmap.recycle()
+        }
+        path ?: return
+        // Latest-wins: only attach the path if the state has not changed since the
+        // commit (a newer edit would have nulled it and needs its own flatten).
+        if (_wallpaperState.value == state) {
+            saveWallpaperStateUseCase(state.withFlattenedWallpaperPath(path))
         }
     }
 

@@ -21,6 +21,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -32,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
@@ -136,6 +138,8 @@ class LauncherViewModel @Inject constructor(
     getFabPositionUseCase: GetFabPositionUseCase,
     saveFabPositionUseCase: SaveFabPositionUseCase,
     wallpaperFileManager: WallpaperFileManager,
+    wallpaperFlattener: WallpaperFlattener,
+    wallpaperCompositeStore: WallpaperCompositeStore,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
@@ -227,6 +231,8 @@ class LauncherViewModel @Inject constructor(
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
+        wallpaperFlattener = wallpaperFlattener,
+        compositeStore = wallpaperCompositeStore,
         ioDispatcher = ioDispatcher,
         scope = delegateScope
     )

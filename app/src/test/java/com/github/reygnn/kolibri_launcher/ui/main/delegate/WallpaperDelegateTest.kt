@@ -133,6 +133,8 @@ class WallpaperDelegateTest {
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
+        wallpaperFlattener = mockk(relaxed = true),
+        compositeStore = mockk(relaxed = true),
         ioDispatcher = ioDispatcher,
         scope = scope
     )
