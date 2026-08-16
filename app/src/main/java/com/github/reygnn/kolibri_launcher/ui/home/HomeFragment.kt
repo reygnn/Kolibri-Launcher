@@ -384,6 +384,14 @@ class HomeFragment : Fragment() {
      */
     private var wallpaperEditController: WallpaperEditController? = null
 
+    /**
+     * Last edit-mode value the wallpaper was rendered for, so the edit-mode
+     * observer only re-renders on an actual toggle. Without this, the observer's
+     * initial `STARTED` emission double-renders on every view re-creation
+     * (drawer→home) — Observer 7 (state) already renders the correct target there.
+     */
+    private var lastRenderedWallpaperEditMode: Boolean? = null
+
     private var layerPickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
 
 
@@ -603,11 +611,17 @@ class HomeFragment : Fragment() {
             // own outer catch as the orchestration boundary.
             wallpaperEditController?.applyEditMode(isEditMode)
             applyWallpaperEditModeToGestures(isEditMode)
-            // Swap representation: EDIT shows the real layers, DISPLAY shows the
-            // flattened composite (Option D §9.4). applyEditMode does not depend on
-            // the bound bitmaps (layer-specific UI refreshes in onRebuildComplete),
-            // so the async re-render below can follow it safely.
-            updateWallpaper(viewModel.wallpaperState.value)
+            // Swap representation ONLY on an actual toggle: EDIT shows the real
+            // layers, DISPLAY shows the flattened composite (Option D §9.4). On the
+            // initial STARTED emission (e.g. drawer→home view re-creation) Observer 7
+            // already renders the correct target, so re-rendering here would just
+            // double-decode. applyEditMode does not depend on the bound bitmaps
+            // (layer UI refreshes in onRebuildComplete), so this async re-render is
+            // safe to follow it.
+            if (lastRenderedWallpaperEditMode != null && lastRenderedWallpaperEditMode != isEditMode) {
+                updateWallpaper(viewModel.wallpaperState.value)
+            }
+            lastRenderedWallpaperEditMode = isEditMode
         }
 
         // Observer: persisted FAB position. Re-applies the cluster's
