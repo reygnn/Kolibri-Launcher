@@ -33,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
@@ -140,6 +141,7 @@ class LauncherViewModel @Inject constructor(
     wallpaperFileManager: WallpaperFileManager,
     wallpaperFlattener: WallpaperFlattener,
     wallpaperCompositeStore: WallpaperCompositeStore,
+    wallpaperCompositeCache: WallpaperCompositeCache,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
@@ -233,6 +235,7 @@ class LauncherViewModel @Inject constructor(
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeStore = wallpaperCompositeStore,
+        compositeCache = wallpaperCompositeCache,
         ioDispatcher = ioDispatcher,
         scope = delegateScope
     )

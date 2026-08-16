@@ -142,6 +142,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -176,6 +177,7 @@ class WallpaperDelegate(
     private val wallpaperFileManager: WallpaperFileManager,
     private val wallpaperFlattener: WallpaperFlattener,
     private val compositeStore: WallpaperCompositeStore,
+    private val compositeCache: WallpaperCompositeCache,
     private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
@@ -547,6 +549,7 @@ class WallpaperDelegate(
     private suspend fun regenerateFlattenedComposite(state: WallpaperState) {
         if (!state.isMultiLayer) {
             compositeStore.clear()
+            compositeCache.invalidate()
             return
         }
         val bitmap = wallpaperFlattener.flatten(state) ?: return
@@ -556,6 +559,10 @@ class WallpaperDelegate(
             bitmap.recycle()
         }
         path ?: return
+        // The composite file was just overwritten; drop the stale decoded copy so
+        // the next display decodes the fresh one (§9.4). The path string is fixed,
+        // so the cache would otherwise serve the previous composition.
+        compositeCache.invalidate()
         // Latest-wins: only attach the path if the state has not changed since the
         // commit (a newer edit would have nulled it and needs its own flatten).
         if (_wallpaperState.value == state) {

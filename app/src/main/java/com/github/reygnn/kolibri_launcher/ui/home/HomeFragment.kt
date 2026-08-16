@@ -39,6 +39,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
@@ -270,6 +271,11 @@ class HomeFragment : Fragment() {
 
     @Inject
     lateinit var launchShortcutUseCase: LaunchShortcutUseCase
+
+    /** In-memory cache of the decoded display composite (Option D §9.4) — lets
+     *  drawer→home re-attach the wallpaper without re-decoding. */
+    @Inject
+    lateinit var compositeCache: WallpaperCompositeCache
 
     // ===========================================
     // VIEWMODEL
@@ -1524,12 +1530,24 @@ class HomeFragment : Fragment() {
         // covers OOM intentionally — the caller (WallpaperViewBinder)
         // treats null as "skip this layer", which is the right user-
         // visible behavior for any of those cases.
+        val key = uri.toString()
+        // Option D §9.4: reuse the cached display composite across drawer→home
+        // instead of re-decoding it (~90 ms on the A36). The cache only ever holds
+        // the composite, so a per-layer edit uri simply misses and decodes normally.
+        compositeCache.get(key)?.let { return it }
+
         return try {
             val ctx = context ?: return null
             // Bounded decode: downsample below the Canvas ~100 MB per-bitmap draw
             // limit so a huge camera photo (POCO 108 MP) can't crash the wallpaper
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
-            decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
+            val decoded = decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
+            // Cache only the flattened composite (the current display path), never a
+            // per-layer edit bitmap. Invalidated on the next commit (WallpaperDelegate).
+            if (decoded != null && key == viewModel.wallpaperState.value.flattenedWallpaperPath) {
+                compositeCache.put(key, decoded)
+            }
+            decoded
         } catch (e: Throwable) {
             // Catch kept (Expected error, four-category frame): bitmap I/O boundary —
             // FileNotFoundException / SecurityException + OOM (Throwable umbrella); the

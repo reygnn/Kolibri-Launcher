@@ -253,6 +253,7 @@ class LauncherViewModelTest {
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeStore = mockk(relaxed = true),
+        wallpaperCompositeCache = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
         monotonicClock = neverThrottlingClock(),
         savedStateHandle = SavedStateHandle(),
