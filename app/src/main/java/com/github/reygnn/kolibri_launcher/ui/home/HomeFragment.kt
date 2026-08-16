@@ -1512,15 +1512,24 @@ class HomeFragment : Fragment() {
      * editor operates on its layers. The composite is decoded HARDWARE via the
      * normal single-image path (applySingleLayer).
      */
-    private fun displayTargetFor(state: WallpaperState): WallpaperState =
-        if (!viewModel.isWallpaperEditMode.value &&
-            state.isMultiLayer &&
-            state.flattenedWallpaperPath != null
-        ) {
-            WallpaperState(imageUri = state.flattenedWallpaperPath)
+    private fun displayTargetFor(state: WallpaperState): WallpaperState {
+        val compositePath = state.flattenedWallpaperPath
+        return if (compositePath != null && renderingCompositeNow()) {
+            WallpaperState(imageUri = compositePath)
         } else {
             state
         }
+    }
+
+    /**
+     * True when the wallpaper is being rendered as the flattened composite: DISPLAY
+     * mode + a multi-layer state that has a composite. In that state the ONLY bitmap
+     * the loader decodes is the composite, so it doubles as the cache gate — no
+     * fragile uri-vs-path string compare (which uri normalisation could break).
+     */
+    private fun renderingCompositeNow(): Boolean =
+        !viewModel.isWallpaperEditMode.value &&
+            viewModel.wallpaperState.value.let { it.isMultiLayer && it.flattenedWallpaperPath != null }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
         // Catch kept per Rule 11: this is the I/O boundary for bitmap
@@ -1542,9 +1551,10 @@ class HomeFragment : Fragment() {
             // limit so a huge camera photo (POCO 108 MP) can't crash the wallpaper
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
             val decoded = decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
-            // Cache only the flattened composite (the current display path), never a
-            // per-layer edit bitmap. Invalidated on the next commit (WallpaperDelegate).
-            if (decoded != null && key == viewModel.wallpaperState.value.flattenedWallpaperPath) {
+            // Cache only the flattened composite (the sole bitmap decoded while
+            // rendering the composite), never a per-layer edit bitmap. Invalidated
+            // on the next commit (WallpaperDelegate).
+            if (decoded != null && renderingCompositeNow()) {
                 compositeCache.put(key, decoded)
             }
             decoded
