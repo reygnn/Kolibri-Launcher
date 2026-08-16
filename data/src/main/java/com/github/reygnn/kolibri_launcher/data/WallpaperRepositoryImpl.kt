@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
@@ -57,6 +58,7 @@ import javax.inject.Singleton
 class WallpaperRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val wallpaperFileManager: WallpaperFileManager,
+    private val compositeStore: WallpaperCompositeStore,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : WallpaperRepository {
 
@@ -74,6 +76,11 @@ class WallpaperRepositoryImpl @Inject constructor(
 
         // --- Multi-Layer Key ---
         private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
+
+        // Flattened display-mode composite path (Option D). Derived; regenerated
+        // at edit-commit. Top-level, mode-independent (only multi-layer sets it).
+        private val KEY_WALLPAPER_FLATTENED_PATH =
+            stringPreferencesKey("wallpaper_flattened_path")
 
         // Defaults
         private const val DEFAULT_SCALE = 1.0f
@@ -126,6 +133,7 @@ class WallpaperRepositoryImpl @Inject constructor(
     private fun Preferences.filterToWallpaperKeys(): Preferences {
         val out = mutablePreferencesOf()
         this[KEY_LAYERS_JSON]?.let { out[KEY_LAYERS_JSON] = it }
+        this[KEY_WALLPAPER_FLATTENED_PATH]?.let { out[KEY_WALLPAPER_FLATTENED_PATH] = it }
         this[KEY_WALLPAPER_URI]?.let { out[KEY_WALLPAPER_URI] = it }
         this[KEY_WALLPAPER_SCALE]?.let { out[KEY_WALLPAPER_SCALE] = it }
         this[KEY_WALLPAPER_TRANSLATE_X]?.let { out[KEY_WALLPAPER_TRANSLATE_X] = it }
@@ -179,7 +187,10 @@ class WallpaperRepositoryImpl @Inject constructor(
                                         "removed from state (files not found on disk)"
                             )
                         }
-                        WallpaperState(layers = validLayers)
+                        WallpaperState(
+                            layers = validLayers,
+                            flattenedWallpaperPath = preferences[KEY_WALLPAPER_FLATTENED_PATH],
+                        )
                     }
                 } else {
                     parseSingleLayerState(preferences)
@@ -271,6 +282,12 @@ class WallpaperRepositoryImpl @Inject constructor(
                     // ── Kein Wallpaper → alles entfernen ──
                     removeAllKeys(preferences)
                 }
+                // Flattened composite path (Option D) — top-level and derived, so
+                // written here regardless of mode. Only multi-layer commits set it;
+                // single/none/mid-edit states carry null and clear the key.
+                state.flattenedWallpaperPath
+                    ?.let { preferences[KEY_WALLPAPER_FLATTENED_PATH] = it }
+                    ?: preferences.remove(KEY_WALLPAPER_FLATTENED_PATH)
             }
         } catch (e: CancellationException) {
             throw e
@@ -360,6 +377,9 @@ class WallpaperRepositoryImpl @Inject constructor(
         // because clearAll() does blocking file deletion.
         withContext(ioDispatcher) {
             wallpaperFileManager.clearAll()
+            // Delete the derived display composite too (Option D); it lives outside
+            // wallpapers/, so clearAll() does not reach it.
+            compositeStore.clear()
         }
     }
 
@@ -372,6 +392,7 @@ class WallpaperRepositoryImpl @Inject constructor(
         preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
         preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
         preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
+        preferences.remove(KEY_WALLPAPER_FLATTENED_PATH)
         preferences.remove(KEY_LAYERS_JSON)
     }
 

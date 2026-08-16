@@ -72,7 +72,7 @@ class WallpaperRepositoryImplTest {
         // Default: every file exists on disk. Individual tests override.
         every { fileManager.fileExists(any<Uri>()) } returns true
 
-        manager = WallpaperRepositoryImpl(dataStore, fileManager, mainDispatcherRule.testDispatcher)
+        manager = WallpaperRepositoryImpl(dataStore, fileManager, mockk(relaxed = true), mainDispatcherRule.testDispatcher)
     }
 
     // ===========================================
