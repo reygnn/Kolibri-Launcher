@@ -411,6 +411,18 @@ slices ~0.0 ms** — i.e. cache hits, the composite decoded once and reused. Thi
 where Option D delivers: ~0 ms vs ~72 ms (baseline) / ~93 ms (single composite).
 Jank dropped to ~1.8/rebuild; the remainder is the drawer→home transition itself
 (drawer-close + view re-creation + layout), no longer the wallpaper.
+**Cross-checked on a Pixel 9a (Tensor G4): same ~0.0 ms cache hits, 0
+App-Deadline-Missed frames** — and the contrast run before the composite existed
+(multi-layer, 20 layer decodes 6–55 ms, per-layer rebuild) shows the delta.
+
+**Single-layer wallpapers are cached too.** A genuine single-layer wallpaper has
+the same "re-decode one image on every drawer→home" cost as the composite, so the
+cache gate (`renderingSingleImageNow` in `HomeFragment`) covers both: DISPLAY mode
+rendering a single image — composite (multi-layer + path) OR single-layer — is
+cached; edit mode and multi-layer-without-composite (per-layer rebuild) are not.
+Single-layer needs no explicit invalidation (a new image pick → new uri → new key
+→ natural miss; a transform change keeps the same bitmap); the composite keeps its
+commit-time invalidate (fixed path).
 
 ### 9.5 AUTO-mode classifier (closes ACCEPTED_LIMITATIONS #1)
 
@@ -425,10 +437,16 @@ display bitmap (§9.2).
 
 ### 9.6 Robustness / fallback
 
-- **Composite missing** (first run after update; generation failed; cache
-  cleared): fall back to the current multi-layer `FullRebuild` (today's exact
-  behavior), then lazily generate + persist the composite once. Graceful
-  degradation, never a broken wallpaper — and no destructive migration.
+- **Composite missing — DONE (lazy backfill).** An existing multi-layer wallpaper
+  with no composite (set up before Option D, restored from backup, cache cleared)
+  falls back to the multi-layer `FullRebuild` and then **auto-generates** the
+  composite: `WallpaperDelegate.maybeBackfillComposite`, fired from the wallpaper-
+  state observer (same one-shot + edit-mode guard as the orphan GC), runs the
+  flatten in the BACKGROUND — deliberately NOT at process start / in the launch hot
+  path (the flatten re-decodes N layers, which would regress the cold-start path the
+  launch benchmark protects), once per process, never during edit mode. So the user
+  never has to re-edit + save to get a composite. Graceful degradation, no
+  destructive migration.
 - **Backup/restore**: the composite is derived, so backup may omit it and let the
   restored layers regenerate it on first display — store-agnostic, consistent
   with the export/reset/restore philosophy.
@@ -462,9 +480,13 @@ display bitmap (§9.2).
    **flash + multi-layer-rebuild** win — but NOT decode time (see §9.4's measured
    correction).
 3.5. **In-memory composite cache — DONE, the decode-time win (§9.4a).** Measured
-   ~0 ms drawer→home. This is the phase that actually delivers latency.
+   ~0 ms drawer→home on A36 and Pixel 9a. This is the phase that actually delivers
+   latency. Extended to cover single-layer wallpapers too (§9.4a).
+3.6. **Lazy composite backfill — DONE (§9.6).** Existing multi-layer wallpapers
+   without a composite auto-generate one in the background on first display, off the
+   launch hot path.
 4. **Classifier samples the composite** (§9.5) — closes ACCEPTED_LIMITATIONS #1.
-   NOT yet built.
+   NOT yet built (the only remaining phase).
 
 ### 9.9 Risks / non-goals recap
 
