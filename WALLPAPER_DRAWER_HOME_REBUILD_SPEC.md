@@ -424,16 +424,20 @@ Single-layer needs no explicit invalidation (a new image pick → new uri → ne
 → natural miss; a transform change keeps the same bitmap); the composite keeps its
 commit-time invalidate (fixed path).
 
-### 9.5 AUTO-mode classifier (closes ACCEPTED_LIMITATIONS #1)
+### 9.5 AUTO-mode classifier — DONE (closes ACCEPTED_LIMITATIONS #1)
 
-With a real composite available, the AppDrawer surface classifier can sample
-luminance from the flattened bitmap instead of the current single-dominant-layer
-heuristic. This is the "wallpaper editor grows a 'preview composite as bitmap'"
-path that `ACCEPTED_LIMITATIONS.md` #1 already names as its fix. Fold in as a
-follow-up once the composite exists. **Sampling must use a downsampled SOFTWARE
-decode of the composite file** — exactly as `WallpaperBitmapLuminanceImpl` already
-does for single images (256² software decode) — never `getPixel` on the HARDWARE
-display bitmap (§9.2).
+`ClassifyWallpaperUseCase.pickDominantUri` now classifies the flattened composite
+for a multi-layer wallpaper when one exists — the resolved composition of all
+layers + blend + alpha — instead of only the bottom layer (which punted on a
+transparent `layers[0]` or a non-Normal blend). It samples a downsampled SOFTWARE
+decode of the composite file via `WallpaperBitmapLuminance` (256², as it already
+does for single images), never `getPixel` on the HARDWARE display bitmap (§9.2);
+the existing pixel-coverage gate routes a mostly-transparent composite to the
+system signal (correct — the system wallpaper shows through). No composite yet
+(pre-Option-D / restored / mid-backfill) keeps the bottom-layer fall-back.
+`ACCEPTED_LIMITATIONS.md` #1 is updated to "largely resolved" — its own re-eval
+trigger predicted this. This is the "editor grows a 'preview composite as bitmap'"
+path it named as the fix.
 
 ### 9.6 Robustness / fallback
 
@@ -485,8 +489,14 @@ display bitmap (§9.2).
 3.6. **Lazy composite backfill — DONE (§9.6).** Existing multi-layer wallpapers
    without a composite auto-generate one in the background on first display, off the
    launch hot path.
-4. **Classifier samples the composite** (§9.5) — closes ACCEPTED_LIMITATIONS #1.
-   NOT yet built (the only remaining phase).
+4. **Classifier samples the composite — DONE (§9.5).** Closes
+   ACCEPTED_LIMITATIONS #1 for composited wallpapers.
+
+**Option D is complete** (all phases shipped). A follow-on refactor also
+content-versioned the composite path (`composite_<n>.webp`): a new composite ⇒ new
+path ⇒ natural cache miss and a distinct value for the classifier's
+`distinctUntilChanged`, which removed the fixed-path cache-invalidate coupling
+(§9.4a) — the cache and classifier are now correct by key, not by invariant.
 
 ### 9.9 Risks / non-goals recap
 
