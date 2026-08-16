@@ -1,10 +1,12 @@
 # WALLPAPER_DRAWER_HOME_REBUILD_SPEC
 
-**Status: GREENFIELD / DESIGN ONLY — not implemented, no decision taken.**
-This is a worked-out design space for eliminating (or cheapening) the full
-wallpaper rebuild that runs on every drawer→home return. It exists to capture
-the measured evidence and the option/tradeoff analysis before any code is
-written. Sibling of `WALLPAPER_PARALLEL_DECODE_SPEC`,
+**Status: IMPLEMENTED (Option D, Phases 1–3.5) on branch
+`feature/wallpaper-flatten-spike`, measured on a Galaxy A36 — not yet merged.**
+Started as a greenfield design; the option analysis below is kept as the record
+of how the decision was reached, with the as-built + as-measured results folded in
+(§9.4 correction, §9.4a cache = the actual win). Only §9.5 (classifier /
+ACCEPTED_LIMITATIONS #1) remains unbuilt. Eliminates the full wallpaper rebuild on
+drawer→home. Sibling of `WALLPAPER_PARALLEL_DECODE_SPEC`,
 `WALLPAPER_AGGREGATE_MEM_SPEC`, `WALLPAPER_RENDER_RES_SPEC`.
 
 ---
@@ -366,19 +368,49 @@ longer needs the originals to display.
 Display mode renders the composite through the **existing**
 `RebuildPlan.SwitchToSingleLayer` → `applySingleLayer` path
 (`WallpaperViewBinder.kt:113/213`) with the composite file as the single image.
-So drawer→home becomes a single-bitmap load: **1 decode, 1 texture upload** — the
-measured jank source (§3) collapses. View-size / rotation changes are handled by
-the single-image center-crop/scale that path already owns (rotation is a user
-setting, `rotationLockedFlow`, so do not assume portrait); regenerating the
-composite on a persisted orientation change is an optional refinement.
+So drawer→home becomes a single-bitmap load instead of a multi-layer rebuild.
+
+**MEASURED CORRECTION — a single decode is NOT the win (§9.4a is).** The first
+draft claimed "1 decode, 1 texture upload → the jank source collapses". Measured
+on the A36, that was wrong: one composite decode is **~93 ms** (a single,
+non-parallelisable lossless WEBP), which is NOT faster than the 5-layer parallel
+decode (~72 ms wall-clock). Rendering the composite eliminates the flash and the
+multi-layer rebuild, but on its own it does not win decode time — jank stayed
+~2.5/rebuild. Fewer/bigger decodes aren't automatically faster.
+
+View-size / rotation changes are handled by the single-image center-crop/scale
+that path already owns (rotation is a user setting, `rotationLockedFlow`, so do
+not assume portrait); regenerating the composite on a persisted orientation
+change is an optional refinement.
 
 **Composite bitmap lifecycle** (keeps the HARDWARE constraint honest): the
-display composite is loaded as a HARDWARE bitmap and is **display-only** — it is
-never read back or re-composed. When the user re-enters edit mode (before the
-next flatten), take it **offline** (release/recycle it) and restore the
-individual layers, since edit needs them again. So the HARDWARE composite exists
-only for the display phase; the software copy exists only transiently during the
+display composite is loaded as a HARDWARE bitmap and is **display-only** — never
+read back or re-composed. The software copy exists only transiently during the
 flatten (§9.2 Approach A). Neither is ever both HARDWARE and pixel-read.
+
+### 9.4a In-memory composite cache — the actual win (MEASURED)
+
+Since the composite still decodes ~93 ms from disk on each drawer→home, the real
+lever is to **not decode it repeatedly**: cache the ONE decoded HARDWARE composite
+bitmap (~10 MB — the size §5 flagged as affordable, unlike the N-layer cache) in
+an application-scoped `WallpaperCompositeCache`. It survives the fragment view, so
+drawer→home re-attaches the wallpaper without decoding.
+
+- Populated by the wallpaper bitmap loader, but **only** while rendering the
+  composite (`renderingCompositeNow()` — display mode + a multi-layer state with a
+  composite; that is the only state whose sole decoded bitmap is the composite, so
+  it is a sound cache gate without a fragile uri-vs-path string compare).
+- Invalidated when a new composite is written at commit (the path is a fixed slot,
+  so a stale decode would otherwise be served). Invalidate only **drops the
+  reference** — never recycles — because the composite may still be on screen; the
+  view never recycles bitmaps (it relies on GC), so a cached reference is safe and
+  the old bitmap is GC'd once both the view and the cache release it.
+
+**Measured on the A36 (6 drawer→home cycles, cache warm): all `wallpaper_decode`
+slices ~0.0 ms** — i.e. cache hits, the composite decoded once and reused. This is
+where Option D delivers: ~0 ms vs ~72 ms (baseline) / ~93 ms (single composite).
+Jank dropped to ~1.8/rebuild; the remainder is the drawer→home transition itself
+(drawer-close + view re-creation + layout), no longer the wallpaper.
 
 ### 9.5 AUTO-mode classifier (closes ACCEPTED_LIMITATIONS #1)
 
@@ -424,10 +456,15 @@ display bitmap (§9.2).
 1. **Extract `drawLayers(...)` + parity spike — DONE.** Shared compositor landed
    (`onDraw` + `composeToBitmap` delegate to it); parity measured (§9.7), Approach
    A chosen.
-2. **Flatten-on-commit + persist** the composite (not yet consumed). ← next.
-3. **Display mode reads the composite** via the single-image path (§9.4) — this
-   is the phase that delivers the latency/RAM/flash win.
+2. **Flatten-on-commit + persist — DONE.** State field + `WallpaperCompositeStore`
+   + detached-view flatten at commit (`WallpaperFlattener`), instrumented-verified.
+3. **Display reads the composite — DONE.** Single-image path (§9.4). Delivers the
+   **flash + multi-layer-rebuild** win — but NOT decode time (see §9.4's measured
+   correction).
+3.5. **In-memory composite cache — DONE, the decode-time win (§9.4a).** Measured
+   ~0 ms drawer→home. This is the phase that actually delivers latency.
 4. **Classifier samples the composite** (§9.5) — closes ACCEPTED_LIMITATIONS #1.
+   NOT yet built.
 
 ### 9.9 Risks / non-goals recap
 
