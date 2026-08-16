@@ -603,6 +603,11 @@ class HomeFragment : Fragment() {
             // own outer catch as the orchestration boundary.
             wallpaperEditController?.applyEditMode(isEditMode)
             applyWallpaperEditModeToGestures(isEditMode)
+            // Swap representation: EDIT shows the real layers, DISPLAY shows the
+            // flattened composite (Option D §9.4). applyEditMode does not depend on
+            // the bound bitmaps (layer-specific UI refreshes in onRebuildComplete),
+            // so the async re-render below can follow it safely.
+            updateWallpaper(viewModel.wallpaperState.value)
         }
 
         // Observer: persisted FAB position. Re-applies the cluster's
@@ -1467,7 +1472,7 @@ class HomeFragment : Fragment() {
         wallpaperRenderScheduler.render(viewLifecycleOwner.lifecycleScope) {
             wallpaperViewBinder.bind(
                 view = wallpaperView,
-                target = state,
+                target = displayTargetFor(state),
                 preferredActiveLayerId = focusHint,
                 onRebuildComplete = {
                     if (wallpaperView.isEditMode) {
@@ -1478,6 +1483,24 @@ class HomeFragment : Fragment() {
             )
         }
     }
+
+    /**
+     * The state to actually render. In DISPLAY mode, if a flattened composite
+     * exists (Option D §9.4), render it as a single image — one decode, one
+     * texture — instead of re-decoding every layer on each drawer→home rebuild.
+     * In EDIT mode (or with no composite) render the real multi-layer state so the
+     * editor operates on its layers. The composite is decoded HARDWARE via the
+     * normal single-image path (applySingleLayer).
+     */
+    private fun displayTargetFor(state: WallpaperState): WallpaperState =
+        if (!viewModel.isWallpaperEditMode.value &&
+            state.isMultiLayer &&
+            state.flattenedWallpaperPath != null
+        ) {
+            WallpaperState(imageUri = state.flattenedWallpaperPath)
+        } else {
+            state
+        }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
         // Catch kept per Rule 11: this is the I/O boundary for bitmap
