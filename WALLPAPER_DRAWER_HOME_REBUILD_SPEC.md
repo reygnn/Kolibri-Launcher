@@ -187,31 +187,41 @@ Risks / requirements:
 
 ---
 
-## 5. The RAM tradeoff (crux of Option A)
+## 5. The RAM tradeoff
 
-`Bitmap` is `ARGB_8888` = **4 bytes/px regardless of alpha** — a mostly-
-transparent collage overlay costs the same heap as an opaque one (the standing
-"transparency ≠ less RAM" fact, see `WALLPAPER_AGGREGATE_MEM_SPEC` and the
-chiaroscuro-overlay use case).
+**Two different memory pools — do not conflate them** (this section originally
+did; corrected in review):
 
-Rough retained-heap estimate for an N-layer cache at render resolution R:
+- Today's layers are **HARDWARE** bitmaps (`BoundedBitmapDecoder`), so their
+  pixels live in **graphics memory, off the Java heap** (`ZoomableImageView`
+  :637–639 notes the GPU-side allocation may differ from `w·h·4` due to
+  format/stride). So today's N layers cost ~N GPU textures in graphics memory,
+  **not** Java heap.
+- A HARDWARE bitmap's size is still ≈ `w · h · 4` (`ARGB_8888`-equivalent, and
+  **alpha-independent** — the "transparency ≠ less RAM" fact,
+  `WALLPAPER_AGGREGATE_MEM_SPEC`). At display res (1080×2340) that is ≈ **10 MB
+  per layer**, so 5 layers ≈ **50 MB of graphics memory** + 5 live GPU textures.
 
-```
-per_layer_bytes ≈ (R_width × R_height) × 4
-```
+Per option:
 
-- Full display res (1080×2340), 5 layers: ≈ 5 × 10.1 MB ≈ **50 MB** retained.
-- Downsampled ×2 (sampleSize 2), 5 layers: ≈ 5 × 2.5 MB ≈ **12.5 MB**.
+- **Option D (display steady state):** one HARDWARE composite ≈ **10 MB graphics
+  memory + 1 texture** — below today's N-layer footprint *and* the 1-texture
+  reveal is the jank win (§3). **But Approach A adds a transient cost the naive
+  view misses:** the flatten re-decodes N layers as **software (`ARGB_8888`) on
+  the Java heap** at commit — a one-time ~12–50 MB **heap** spike (render-res
+  dependent) that must not OOM on a low-RAM device with many/huge layers. Off the
+  hot path, but real.
+- **Option A (cache):** if the cache holds software bitmaps it is **Java heap**
+  (~12–50 MB always-resident) — a direct conflict with the aggregate-memory
+  budget. If it holds HARDWARE bitmaps it is graphics memory but still N textures.
+  Either way it *keeps* N, unlike D.
+- **Option B:** no cache; the N layers stay in the one living view (graphics
+  memory, no duplication).
+- **Option C** (render res) shrinks every number above — the size dial for all
+  options.
 
-So Option A trades **~12–50 MB of always-resident heap** (depending on
-`WALLPAPER_RENDER_RES_SPEC` render res and layer count) for eliminating the
-~70–90 ms re-decode on every drawer→home. That is a direct, quantified conflict
-with the aggregate-memory budget — **not a free win.** Option B avoids the cache
-entirely (bitmaps stay in the one living view, no duplication). Option C shrinks
-both the reveal and any A-cache at the cost of sharpness. **Option D inverts the
-tradeoff entirely**: display mode holds one flattened bitmap (~10 MB) instead of
-N layers (~50 MB), so it *reduces* resident RAM below today's baseline while also
-removing the re-decode — the reason it is the recommended direction.
+Net: D is the only option whose *steady-state* footprint drops below today
+(N→1 texture), at the price of a transient heap spike during the flatten.
 
 ---
 
@@ -221,8 +231,11 @@ removing the re-decode — the reason it is the recommended direction.
    only option that improves *every* axis at once — kills the re-decode, turns
    the N-texture reveal into a 1-texture reveal (the measured jank source), and
    *lowers* resident RAM below today's — and it unblocks
-   `ACCEPTED_LIMITATIONS.md` #1 for free. Main risk is blend/alpha fidelity, which
-   a pixel-parity test pins. Does not need Option B's navigation refactor.
+   `ACCEPTED_LIMITATIONS.md` #1 for free. Does not need Option B's navigation
+   refactor. **Two real risks (§9.2), both surfaced in review:** the HARDWARE
+   decode config forces a transient software re-decode for the flatten (or a novel
+   hardware-offscreen readback), and the software-vs-hardware rasterizer means
+   fidelity is tolerance-bounded, not exact — a pixel-parity test bounds it.
 2. **Fallback: Option B** (hoist the view) if flattening's fidelity proves
    unacceptable — removes the rebuild without a cache, at the cost of a
    display/edit-split refactor and keeping N layers resident.
@@ -269,34 +282,52 @@ references are the touch points, not a diff).
   clear of the NO-migration policy (CLAUDE.md Rule 5) — it is not schema, it is
   a rebuildable artifact.
 
-### 9.2 Rendering — fidelity by construction (the critical part)
+### 9.2 Rendering — the HARDWARE-bitmap constraint (the critical part)
 
-**An offscreen compositor already exists.** `ZoomableImageView.composeToBitmap()`
-(line 811) allocates a bitmap and composites every visible layer with its
-`alpha` + `blendMode` + matrix (plus output scaling) — exactly the flatten Option
-D needs. It is currently `@Suppress("unused")` **dead code**: nothing in
-production, `test/`, or `androidTest/` calls it. Option D gives it a purpose.
+**The decode config makes the naive flatten impossible.** Wallpaper layers are
+decoded to `Bitmap.Config.HARDWARE` (`BoundedBitmapDecoder:66`; ARGB_8888 only as
+a fallback when a HARDWARE decode fails) — pixels live in graphics memory, off the
+Java heap, drawn on the view's **hardware-accelerated** canvas. A HARDWARE bitmap
+**cannot be drawn onto a software `Canvas`** and its pixels **cannot be read**
+(`getPixel`/`copyPixelsToBuffer` throw).
 
-The catch — and it is the fidelity risk made concrete: `composeToBitmap`
-**duplicates** the layer-draw loop from `onDraw` (lines 922–941) with its own
-`exportPaint`/`exportMatrix`. Two independent implementations of the same
-compositing can (and over time will) drift, and `composeToBitmap` is untested
-against `onDraw` today. So the compositing must NOT stay duplicated.
+`ZoomableImageView.composeToBitmap()` (line 811) — which allocates a software
+`ARGB_8888` bitmap and composes the layers onto its `Canvas` — is therefore
+**dead code precisely because it is HARDWARE-incompatible**, not merely unused.
+Its own KDoc (lines 799–807) and `WALLPAPER_RENDER_RES_SPEC §6.2` say so: drawing
+a HARDWARE layer onto that software canvas throws *"unable to draw hardware
+bitmaps"*. **Do not treat it as a ready-made flatten routine.**
 
-**Phase-1 work is therefore a UNIFICATION, not a from-scratch build:** collapse
-`onDraw` and `composeToBitmap` onto one shared routine —
+So Option D needs one of two compositing strategies:
 
-```
-private fun drawLayers(canvas: Canvas, drawSelection: Boolean)
-```
+- **Approach A — software compose (simplest).** Obtain the layers as
+  `ARGB_8888` (software) *at flatten time only*: re-decode each layer's source
+  with a software config at edit-commit (keeps edit-mode display HARDWARE; N
+  one-time decodes off the hot path), compose on a software `Canvas`
+  (`composeToBitmap`'s shape, once it is fed software bitmaps), and persist. The
+  persisted composite is a single file, so **display mode decodes it back as a
+  HARDWARE bitmap** — HARDWARE is preserved for the steady-state home; software is
+  transient, scoped to the one-time flatten. (This is the "back to 8888" cost, but
+  only for the composite step, not app-wide.)
+- **Approach B — hardware-accelerated offscreen compose.** Draw the HARDWARE
+  layers into a `RenderNode` via `HardwareRenderer`, then read back to a bitmap.
+  Keeps everything HARDWARE and same-rasterizer, but there is **no existing
+  readback pattern in the codebase** (novel; more moving parts, a GPU→CPU
+  readback).
 
-- `onDraw` → `drawLayers(canvas, drawSelection = isEditMode)` (live).
-- `composeToBitmap` → `drawLayers(offscreenCanvas, drawSelection = false)` on an
-  `ARGB_8888` bitmap at render resolution.
+**Fidelity caveat (corrects an earlier overstatement).** Approach A composes in
+**software** while the live edit view composes on a **hardware** canvas — two
+different rasterizers whose blend-mode / anti-alias / filtering math can differ
+subtly. So the flatten is **NOT** "pixel-identical by construction"; the parity
+test (§9.7) is checking a real cross-rasterizer delta and must allow a tolerance.
+Approach B avoids this (same rasterizer end-to-end).
 
-Same code path → **pixel-identical by construction**, and an existing latent
-drift liability (two compositors) is removed as a side effect. The parity test
-(§9.7) pins it.
+**Still worth doing regardless of approach:** `composeToBitmap` duplicates the
+`onDraw` layer loop (its own `exportPaint`/`exportMatrix`) and is untested against
+it — a latent drift liability. Unifying both onto one shared `drawLayers(canvas,
+drawSelection)` remains the right cleanup; just note the routine is
+rasterizer-sensitive (A vs B) and cannot be assumed identical to the live path
+under A.
 
 **Two-stage composition is preserved.** Blend modes compose *within* the Kolibri
 layer stack against the (transparent) offscreen bitmap — exactly as they compose
@@ -307,11 +338,14 @@ system-wallpaper-shows-through-transparency behavior is unchanged.
 
 ### 9.3 Flatten-on-commit + persistence
 
-At edit-commit (`WallpaperEditController` save path, where the layers are already
-decoded in memory): call `renderComposite()`, persist via `WallpaperFileManager`
-(data/) as **lossless WEBP or PNG** (must preserve alpha — no lossy format), and
-store the composite reference in the wallpaper state. One extra offscreen render
-per save — off the hot path, invisible to the user.
+At edit-commit (`WallpaperEditController` save path): produce the composite per
+§9.2 — under Approach A the in-memory layers are HARDWARE and cannot be
+software-composed, so re-decode each layer's source with a software config for the
+flatten (do NOT reuse the HARDWARE display bitmaps). Persist via
+`WallpaperFileManager` (data/) as **lossless WEBP or PNG** (must preserve alpha —
+no lossy format), and store the composite reference in the wallpaper state. The
+extra decodes + offscreen render happen once per save — off the hot path,
+invisible to the user.
 
 Regenerate the composite on **every** commit (add/remove/transform/alpha/blend
 change). A baked composite is robust against later source-Uri deletion — it no
@@ -328,13 +362,24 @@ the single-image center-crop/scale that path already owns (rotation is a user
 setting, `rotationLockedFlow`, so do not assume portrait); regenerating the
 composite on a persisted orientation change is an optional refinement.
 
+**Composite bitmap lifecycle** (keeps the HARDWARE constraint honest): the
+display composite is loaded as a HARDWARE bitmap and is **display-only** — it is
+never read back or re-composed. When the user re-enters edit mode (before the
+next flatten), take it **offline** (release/recycle it) and restore the
+individual layers, since edit needs them again. So the HARDWARE composite exists
+only for the display phase; the software copy exists only transiently during the
+flatten (§9.2 Approach A). Neither is ever both HARDWARE and pixel-read.
+
 ### 9.5 AUTO-mode classifier (closes ACCEPTED_LIMITATIONS #1)
 
 With a real composite available, the AppDrawer surface classifier can sample
 luminance from the flattened bitmap instead of the current single-dominant-layer
 heuristic. This is the "wallpaper editor grows a 'preview composite as bitmap'"
 path that `ACCEPTED_LIMITATIONS.md` #1 already names as its fix. Fold in as a
-follow-up once the composite exists.
+follow-up once the composite exists. **Sampling must use a downsampled SOFTWARE
+decode of the composite file** — exactly as `WallpaperBitmapLuminanceImpl` already
+does for single images (256² software decode) — never `getPixel` on the HARDWARE
+display bitmap (§9.2).
 
 ### 9.6 Robustness / fallback
 
@@ -349,11 +394,13 @@ follow-up once the composite exists.
 ### 9.7 Testing
 
 - **Instrumented pixel-parity test** (`androidTest`): render the same layer stack
-  live vs via `renderComposite()` and assert pixel equality (or a tight
-  tolerance). This EARNS `androidTest` under Rule 10's value bar — `Canvas`
-  blend-mode compositing and true `Bitmap` semantics are real-device behavior
-  Robolectric cannot reproduce (reference: darkroom `:app:halo`). This test is
-  what guards §9.2's fidelity claim.
+  live vs via the flatten and assert similarity. Under Approach A this must be a
+  **tolerance** comparison, not exact equality — the live (hardware) and flatten
+  (software) rasterizers differ subtly (§9.2). This EARNS `androidTest` under Rule
+  10's value bar — HARDWARE bitmaps, `Canvas` blend-mode compositing, and true
+  `Bitmap` semantics are real-device behavior Robolectric cannot reproduce
+  (reference: darkroom `:app:halo`). This test is what bounds the §9.2 fidelity
+  delta.
 - Unit-test the plan/state transition (multi-layer state → composite-ref state)
   and the invalidation-on-commit logic on the JVM.
 
@@ -368,7 +415,13 @@ follow-up once the composite exists.
 
 ### 9.9 Risks / non-goals recap
 
-- Fidelity risk is contained by §9.2 (shared draw) + §9.7 (parity test).
+- **HARDWARE decode config is the biggest implementation risk (§9.2).** Layers are
+  HARDWARE bitmaps; the flatten needs either a transient software re-decode
+  (Approach A, "back to 8888" for the composite step only) or a novel
+  hardware-offscreen readback (Approach B). This is real added cost that the first
+  draft of this spec missed — surfaced in review.
+- Fidelity is bounded, not guaranteed: under Approach A the software flatten vs
+  the hardware live view can differ subtly; §9.7's tolerance test bounds it.
 - Resolution/quality is the dial (Option C / `WALLPAPER_RENDER_RES_SPEC`); baking
   too low softens the wallpaper, too high grows the file + decode.
 - Hard assumption: **no per-layer effect in display mode** (parallax, independent
