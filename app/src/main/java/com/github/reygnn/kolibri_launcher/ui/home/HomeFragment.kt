@@ -1531,6 +1531,21 @@ class HomeFragment : Fragment() {
         !viewModel.isWallpaperEditMode.value &&
             viewModel.wallpaperState.value.let { it.isMultiLayer && it.flattenedWallpaperPath != null }
 
+    /**
+     * True when the wallpaper is being rendered as a SINGLE image in display mode —
+     * a genuine single-layer wallpaper, OR a multi-layer one flattened to a
+     * composite. The cache gate (broader than [renderingCompositeNow], which only
+     * covers the composite): both cases decode exactly one bitmap via
+     * `applySingleLayer`, so both benefit from the ~0 ms drawer→home cache. A
+     * multi-layer state WITHOUT a composite renders per-layer (many decodes) and is
+     * excluded, as is edit mode.
+     */
+    private fun renderingSingleImageNow(): Boolean {
+        if (viewModel.isWallpaperEditMode.value) return false
+        val s = viewModel.wallpaperState.value
+        return !s.isMultiLayer || s.flattenedWallpaperPath != null
+    }
+
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
         // Catch kept per Rule 11: this is the I/O boundary for bitmap
         // loading. Real failure modes are FileNotFoundException +
@@ -1551,10 +1566,13 @@ class HomeFragment : Fragment() {
             // limit so a huge camera photo (POCO 108 MP) can't crash the wallpaper
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
             val decoded = decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
-            // Cache only the flattened composite (the sole bitmap decoded while
-            // rendering the composite), never a per-layer edit bitmap. Invalidated
-            // on the next commit (WallpaperDelegate).
-            if (decoded != null && renderingCompositeNow()) {
+            // Cache the single display bitmap — the composite for a multi-layer
+            // wallpaper, or the image itself for a single-layer one — but never a
+            // per-layer EDIT bitmap (renderingSingleImageNow excludes edit mode and
+            // the multi-layer-without-composite rebuild, which decodes many layers).
+            // The composite is invalidated on commit (WallpaperDelegate); a
+            // single-layer image self-invalidates (a new pick → new uri → new key).
+            if (decoded != null && renderingSingleImageNow()) {
                 compositeCache.put(key, decoded)
             }
             decoded

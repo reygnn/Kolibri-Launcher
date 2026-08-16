@@ -4,11 +4,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * In-memory cache of the ONE decoded display composite (Option D,
- * WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4). This is the actual latency win: on a
- * device the composite decode is ~90 ms (a single non-parallelisable lossless
- * WEBP), which is not faster than the parallel per-layer decode — so the win comes
- * from NOT decoding at all on each drawer→home. Holding one ~10 MB HARDWARE bitmap
+ * In-memory cache of the ONE decoded display wallpaper bitmap (Option D,
+ * WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4) — the flattened composite for a
+ * multi-layer wallpaper, OR the single image for a single-layer one. Both render
+ * through `applySingleLayer` and re-decode from disk on every drawer→home, so both
+ * win from NOT decoding at all. (The composite motivated it; the single-layer case
+ * has the same re-decode cost and is included via the broader cache gate in
+ * HomeFragment.) The composite decode is ~90 ms (a single non-parallelisable
+ * lossless WEBP), which is not faster than the parallel per-layer decode — so the
+ * win is the cache, not the single-image render. Holding one ~10 MB HARDWARE bitmap
  * (a size §5 flagged as affordable, unlike the N-layer cache) lets the wallpaper
  * re-attach instantly across the view re-creation that drawer→home triggers.
  *
