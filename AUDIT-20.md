@@ -31,9 +31,10 @@
 > **Follow-up 2026-08-17** (gegen `main` @ `11ef0cf7`, *nach* dem F1–F4-Fix): ein
 > zweiter Multi-Agent-Review desselben Pfads (6 Dimensionen, adversariale
 > Verifikation je Fund, 15 Agents) fand **drei neue Punkte** — alle wieder im
-> **Composite-Lebenszyklus** (Schreib-/Aufräum-Seite), keiner im Lesepfad. Siehe
-> **§4**. Der ebenfalls erneut bestätigte TEMP-Toast wird weiterhin bewusst
-> ausgeklammert (s. o.).
+> **Composite-Lebenszyklus** (Schreib-/Aufräum-Seite), keiner im Lesepfad —
+> **inzwischen alle gefixt** (F5: `fix/composite-clear-main-thread-io`; F6 + F7:
+> `fix/composite-lifecycle-clear-prune`). Siehe **§4**. Der ebenfalls erneut
+> bestätigte TEMP-Toast wird weiterhin bewusst ausgeklammert (s. o.).
 
 ---
 
@@ -311,8 +312,8 @@ einem eigenen Branch.
 | # | Cluster | Ort | Was | Severity | Verdict | Status |
 |---|---|---|---|---|---|---|
 | **F5** | Dispatcher | `WallpaperDelegate.regenerateFlattenedComposite` (`:609`) | Single-Layer-/NONE-Branch ruft `compositeStore.clear()` (blockierendes `listFiles()`+`delete()`) direkt auf dem **Main-Dispatcher** — die beiden Schwester-Call-Sites hoppen nach `ioDispatcher` | `med` | CONFIRMED | ✅ GEFIXT |
-| **F6** | Composite-Dir-Lifecycle | `WallpaperRepositoryImpl.clearWallpaper` (`:390`) + `WallpaperDelegate.onClearWallpaper` | Clear-Pfad nimmt **nicht** `compositeRegenLock` → ein paralleler lazy Backfill schreibt seinen Composite **nach** dem Clear zurück → verwaiste `composite_*.webp` (nur `wallpapers/` wird ge-gc't, nie das Composite-Dir) | `low` | CONFIRMED | 🔲 OFFEN |
-| **F7** | Composite-Dir-Lifecycle | `WallpaperDelegate.regenerateFlattenedComposite` (`:619`) | `write()` → `deleteAllExcept` läuft **unbedingt vor** dem latest-wins-Guard (`:629`); Edit→Revert-auf-gleichen-State kann `state`→`path_A` referenzieren lassen, während Disk nur `path_B` hält | `low` | PLAUSIBLE | 🔲 OFFEN |
+| **F6** | Composite-Dir-Lifecycle | `WallpaperRepositoryImpl.clearWallpaper` (`:390`) + `WallpaperDelegate.onClearWallpaper` | Clear-Pfad nimmt **nicht** `compositeRegenLock` → ein paralleler lazy Backfill schreibt seinen Composite **nach** dem Clear zurück → verwaiste `composite_*.webp` (nur `wallpapers/` wird ge-gc't, nie das Composite-Dir) | `low` | CONFIRMED | ✅ GEFIXT |
+| **F7** | Composite-Dir-Lifecycle | `WallpaperDelegate.regenerateFlattenedComposite` (`:619`) | `write()` → `deleteAllExcept` läuft **unbedingt vor** dem latest-wins-Guard (`:629`); Edit→Revert-auf-gleichen-State kann `state`→`path_A` referenzieren lassen, während Disk nur `path_B` hält | `low` | PLAUSIBLE | ✅ GEFIXT |
 
 ---
 
@@ -378,10 +379,16 @@ Severity `low`: kein Crash, kein sichtbarer Fehler, kleiner Disk-Leak, self-heil
 nächsten Multi-Layer-Commit. Widerspricht aber der `compositeRegenLock`-KDoc-Zusage, dass
 der Lock Disk-Zustand und persistierten Pfad konsistent hält.
 
-**Fix:** Den Clear-Pfad in dieselbe Serialisierung ziehen — entweder `onClearWallpaper`
-unter `compositeRegenLock` ausführen (Delegate-Ebene, wo der Lock lebt), oder den Backfill
-per `backfillInProgress`/Cancel gegen einen laufenden Clear absichern. Alternativ akzeptieren
-und in der KDoc dokumentieren + `gcOrphans` einmalig auch das Composite-Dir mitnehmen lassen.
+**Fix:** Den Clear-Pfad in dieselbe Serialisierung ziehen. **UMGESETZT**
+(`fix/composite-lifecycle-clear-prune`): `onClearWallpaper` läuft jetzt unter
+`compositeRegenLock` (Delegate-Ebene, wo der Lock lebt), sodass Clear und Regen
+gegenseitig ausschließend sind. Zusätzlich setzt der Clear-Block optimistisch
+`_wallpaperState.value = WallpaperState.NONE` (analog zu `onCancelWallpaperEditMode`s
+synchronem Restore) — ein Regen, der auf dem Lock **wartete** und mit einem pre-Clear-State
+gecaptured wurde, sieht danach NONE, sein latest-wins-Guard schlägt fehl und er löscht per
+F7 seine **eigene** Datei, statt das entfernte Wallpaper mit orphaned Composite zu
+resurrecten. Regressionstest `onClearWallpaper waits for an in-flight backfill then clears
+and resets state to NONE` in `WallpaperDelegateTest` (Gate-Pattern wie der F1-Mutex-Test).
 
 ---
 
@@ -417,10 +424,19 @@ den fehlenden Pfad beim nächsten Read, `maybeBackfillComposite` re-armt) — Ko
 transienter Per-Layer-Fallback-Render, kein bleibender Blank. Verletzt aber, wie F6, die
 Konsistenz-Zusage des Locks.
 
-**Fix:** Zusammen mit F6 lösbar — den Composite-Dir-Lebenszyklus vollständig unter
-`compositeRegenLock` serialisieren **und** `deleteAllExcept` erst *nach* dem latest-wins-Guard
-ausführen (nur prunen, wenn der neue Pfad tatsächlich persistiert wird), sodass ein überholter
-Write die noch referenzierte Datei nie unlinkt.
+**Fix:** `deleteAllExcept` erst *nach* dem latest-wins-Guard ausführen. **UMGESETZT**
+(`fix/composite-lifecycle-clear-prune`): `WallpaperCompositeStore.write()` prunt jetzt
+**nicht** mehr selbst — es schreibt nur die neue versionierte Datei (Temp + atomarer Rename)
+und lässt die vorige unangetastet. Das Aufräumen ist in zwei neue Store-Methoden entkoppelt,
+die der Delegate **erst nach** dem Guard aufruft: bei einem WIN
+`saveWallpaperStateUseCase(...)` **dann** `compositeStore.prune(path)` (droppt alle anderen
+Composites + fegt stray `.tmp`); bei einem LOSS `compositeStore.delete(path)` (droppt nur die
+**eigene** gerade geschriebene Datei). Damit unlinkt ein überholter/superseded Flatten nie die
+Datei, die der aktuelle State referenziert. Tests: `WallpaperCompositeStoreTest` (write prunt
+nicht mehr / `prune` behält nur die Kept-Datei + tmp-Sweep / `delete` trifft nur die genannte)
+plus zwei `WallpaperDelegateTest`-Fälle (WIN → `prune`, kein `delete`; superseded → `delete`,
+kein `prune`, kein Save). Store-`prune`/`delete` tragen den `CancellationException`-first-Arm
+wie `write()` (Rule 11).
 
 ---
 
@@ -435,6 +451,8 @@ Write die noch referenzierte Datei nie unlinkt.
   Key-Verwechslung.
 
 **Zuschnitt-Vorschlag:** F5 war ein isolierter Ein-Zeilen-Fix (IO-Wrap) — **UMGESETZT**
-(`fix/composite-clear-main-thread-io`, s. F5). F6 + F7 gehören als **ein** Fix zusammen
-(Composite-Dir-Lebenszyklus unter den Lock + Prune nach dem Guard); beide `:app`/`:data`-
-übergreifend → eigener Branch. **F6 + F7 noch offen.**
+(`fix/composite-clear-main-thread-io`, s. F5). F6 + F7 gehörten als **ein** Fix zusammen
+(Composite-Dir-Lebenszyklus unter den Lock + Prune nach dem Guard) — **UMGESETZT**
+(`fix/composite-lifecycle-clear-prune`, s. F6/F7): `write()` wurde in Create (kein Prune) +
+`prune`/`delete` (nach dem Guard) aufgeteilt, und `onClearWallpaper` läuft unter
+`compositeRegenLock` mit optimistischem NONE. **Alle drei Follow-up-Funde (F5–F7) gefixt.**

@@ -369,6 +369,85 @@ class WallpaperDelegateTest {
         assertEquals("commit flatten proceeds once the lock is free", 2, flattenCalls.get())
     }
 
+    @Test
+    fun `a committed flatten prunes older composites after persisting the path`() = runTest {
+        // AUDIT-20 F7: on a latest-wins WIN the delegate persists the new path and then
+        // prunes every OTHER composite — pruning is decoupled from write() and happens
+        // only after the save.
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            ),
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" }) }
+        coVerify { store.prune("file:///composite.webp") }
+        coVerify(exactly = 0) { store.delete(any()) }
+    }
+
+    @Test
+    fun `a superseded flatten deletes its own composite instead of pruning or persisting`() = runTest {
+        // AUDIT-20 F7: if the state changes while a flatten is in flight, its composite
+        // is never persisted — so it drops its OWN just-written file (delete), does NOT
+        // prune the others, and does NOT save. This is the case that would otherwise
+        // leave the current state's composite unlinked (write used to prune up front).
+        val gate = CompletableDeferred<Unit>()
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            if (flattenCalls.getAndIncrement() == 0) gate.await()
+            bitmap
+        }
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val multiA = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///a.jpg")))
+        val multiB = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///b.jpg")))
+        val stateFlow = MutableStateFlow(multiA)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+
+        delegate.start() // backfill for multiA parks on the gate, holding the lock
+        advanceUntilIdle()
+        assertEquals(1, flattenCalls.get())
+
+        stateFlow.value = multiB // state supersedes multiA while the flatten is parked
+        advanceUntilIdle()
+
+        gate.complete(Unit) // backfill's flatten(multiA) completes; latest-wins guard now fails
+        advanceUntilIdle()
+
+        coVerify { store.delete("file:///composite.webp") }
+        coVerify(exactly = 0) { store.prune(any()) }
+        coVerify(exactly = 0) {
+            saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" })
+        }
+    }
+
     // ===========================================
     // SET WALLPAPER IMAGE
     // ===========================================
@@ -563,6 +642,51 @@ class WallpaperDelegateTest {
             "clearAll must run on the injected io dispatcher, not the main thread",
             io.count > 0
         )
+    }
+
+    /**
+     * AUDIT-20 F6: the clear path is serialized with composite regeneration. While a
+     * backfill flatten holds the regen lock, `clearWallpaperUseCase` must not run until
+     * the lock frees; afterwards the delegate resets in-memory state to NONE so any
+     * regen still queued on the lock fails its latest-wins guard rather than
+     * re-persisting the removed wallpaper.
+     */
+    @Test
+    fun `onClearWallpaper waits for an in-flight backfill then clears and resets state to NONE`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            if (flattenCalls.getAndIncrement() == 0) gate.await()
+            bitmap
+        }
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val multiNoComposite = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multiNoComposite)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+
+        delegate.start() // backfill flatten parks on the gate, holding the regen lock
+        advanceUntilIdle()
+        assertEquals(1, flattenCalls.get())
+
+        delegate.onClearWallpaper() // blocks on the held regen lock
+        advanceUntilIdle()
+        coVerify(exactly = 0) { clearWallpaperUseCase.invoke() } // must wait for the lock
+
+        gate.complete(Unit) // backfill releases the lock
+        advanceUntilIdle()
+
+        coVerify { clearWallpaperUseCase.invoke() }
+        assertEquals(WallpaperState.NONE, delegate.wallpaperState.value)
     }
 
     // ===========================================

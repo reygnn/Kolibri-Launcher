@@ -263,15 +263,18 @@ class WallpaperDelegate(
     private var backfillInProgress = false
 
     /**
-     * Serializes composite regeneration across its two callers — the edit-mode
-     * commit ([onCommitWallpaperEditMode]) and the lazy backfill
-     * ([maybeBackfillComposite]) (AUDIT-20 F1). Both flatten + write + persist on
-     * the same delegate; without mutual exclusion they can run against the same
-     * `flattenedWallpaperPath == null` state at once, and one write's
-     * old-composite cleanup could unlink the file the other just persisted →
-     * a dangling path → blank home across restarts. Holding the lock over the
-     * whole flatten→write→save keeps the latest-wins path check ([_wallpaperState]
-     * comparison) consistent with what actually landed on disk.
+     * Serializes every composite-dir mutation across its callers — the edit-mode
+     * commit ([onCommitWallpaperEditMode]), the lazy backfill
+     * ([maybeBackfillComposite]) (AUDIT-20 F1), and the user clear ([onClearWallpaper])
+     * (AUDIT-20 F6). All flatten + write + persist / clear on the same delegate;
+     * without mutual exclusion they can run against the same
+     * `flattenedWallpaperPath == null` state at once, and one path's cleanup could
+     * unlink the file another just persisted → a dangling path → blank home across
+     * restarts, or a clear could race a backfill that then re-persists a removed
+     * wallpaper with an orphaned composite. Holding the lock over the whole
+     * flatten→write→save (and over the clear) keeps the latest-wins path check
+     * ([_wallpaperState] comparison) consistent with what actually landed on disk;
+     * pruning of superseded composites is deferred until after that check (F7).
      */
     private val compositeRegenLock = Mutex()
 
@@ -509,9 +512,23 @@ class WallpaperDelegate(
         errorMessage = "Error clearing wallpaper",
         defaultErrorToast = R.string.error_generic
     ) {
-        // clearAll does blocking disk I/O — hop off the main dispatcher.
-        withContext(ioDispatcher) { wallpaperFileManager.clearAll() }
-        clearWallpaperUseCase()
+        // Serialize with composite regeneration (AUDIT-20 F6): a lazy backfill or
+        // commit flatten in flight must not re-persist a composite after the wallpaper
+        // is gone. Holding the regen lock across the clear makes them mutually
+        // exclusive; the optimistic NONE below makes a regen still queued on the lock
+        // fail its latest-wins guard and drop its own file (F7) rather than resurrect
+        // the removed wallpaper with an orphaned composite.
+        compositeRegenLock.withLock {
+            // clearAll does blocking disk I/O — hop off the main dispatcher.
+            withContext(ioDispatcher) { wallpaperFileManager.clearAll() }
+            // Removes the DataStore keys AND the derived composite dir (AUDIT-20 F3).
+            clearWallpaperUseCase()
+            // Optimistic in-memory NONE, mirroring onCancelWallpaperEditMode's
+            // synchronous restore: the observe flow re-emits NONE shortly (idempotent),
+            // but setting it now closes the window in which a regen resuming right after
+            // this lock releases would still read the pre-clear state.
+            _wallpaperState.value = WallpaperState.NONE
+        }
         scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
     }
 
@@ -628,9 +645,16 @@ class WallpaperDelegate(
         // (WallpaperCompositeStore), so this new path is a fresh cache key — the
         // display decodes it on a natural miss and the old entry is dropped (§9.4a).
         // Latest-wins: only attach the path if the state has not changed since the
-        // commit (a newer edit would have nulled it and needs its own flatten).
+        // commit (a newer edit / a clear would have superseded it and needs its own
+        // flatten). Pruning of older composites is deferred until AFTER this decision
+        // (AUDIT-20 F7): on a win we persist the path and drop every other composite;
+        // on a loss we drop only our OWN just-written file, so a superseded flatten
+        // never unlinks the composite the current state still references.
         if (_wallpaperState.value == state) {
             saveWallpaperStateUseCase(state.withFlattenedWallpaperPath(path))
+            compositeStore.prune(path)
+        } else {
+            compositeStore.delete(path)
         }
     }
 

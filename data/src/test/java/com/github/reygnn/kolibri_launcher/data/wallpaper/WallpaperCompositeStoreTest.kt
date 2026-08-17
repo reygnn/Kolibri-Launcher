@@ -94,22 +94,54 @@ class WallpaperCompositeStoreTest {
     }
 
     @Test
-    fun `a second successful write replaces the previous composite`() = runTest {
+    fun `write no longer prunes — a second write leaves both composites on disk`() = runTest {
+        // AUDIT-20 F7: write() creates a NEW file and does NOT drop the previous one.
+        // Cleanup is the delegate's job (prune / delete), deferred until it has decided
+        // which path to keep — so a superseded write never unlinks a referenced file.
         val first = store.write(bitmap(success = true))
         val second = store.write(bitmap(success = true))
 
         assertNotNull(second)
         assertNotEquals("versioned name — a new write is a new path", first, second)
-        assertEquals("only the latest composite is kept", 1, compositeFiles().size)
-        assertFalse("previous composite deleted", fileBehind(first!!).exists())
+        assertEquals("write does not prune — both composites present", 2, compositeFiles().size)
+        assertTrue("previous composite survives the write", fileBehind(first!!).exists())
         assertTrue("new composite present", fileBehind(second!!).exists())
     }
 
     @Test
+    fun `prune keeps only the retained composite and sweeps the rest`() = runTest {
+        // AUDIT-20 F7: after the delegate persists a path, prune(keepUri) drops every
+        // OTHER composite. Also proves the stray-tmp sweep.
+        val first = store.write(bitmap(success = true))
+        val second = store.write(bitmap(success = true))
+        val strayTmp = File(compositeDir, "composite_stray_0.webp.tmp").apply { writeBytes(byteArrayOf(9)) }
+
+        store.prune(second!!)
+
+        assertEquals("prune retains exactly the kept composite", 1, compositeFiles().size)
+        assertTrue("kept composite survives", fileBehind(second).exists())
+        assertFalse("other composite pruned", fileBehind(first!!).exists())
+        assertFalse("stray temp swept", strayTmp.exists())
+    }
+
+    @Test
+    fun `delete drops only the named composite`() = runTest {
+        // AUDIT-20 F7: a superseded flatten drops its OWN just-written file, leaving
+        // every other composite intact.
+        val kept = store.write(bitmap(success = true))
+        val superseded = store.write(bitmap(success = true))
+
+        store.delete(superseded!!)
+
+        assertTrue("unrelated composite untouched", fileBehind(kept!!).exists())
+        assertFalse("superseded composite deleted", fileBehind(superseded).exists())
+    }
+
+    @Test
     fun `a failed write keeps the previous composite intact`() = runTest {
-        // AUDIT-20 F1: the old composite is dropped only AFTER a new one lands. A
-        // failed write must therefore leave the previous, still-referenced composite
-        // untouched rather than unlinking it up front.
+        // AUDIT-20 F1/F7: write() never unlinks an existing composite — it only creates
+        // a new file (and drops its own temp on failure). A failed write therefore
+        // leaves the previous, still-referenced composite untouched.
         val good = store.write(bitmap(success = true))
         assertNotNull(good)
 
