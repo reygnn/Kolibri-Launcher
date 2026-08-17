@@ -13,13 +13,14 @@
 > Clear-Pfad — alle bestätigt). Gegengeprüft: `CLAUDE.md`, `ACCEPTED_LIMITATIONS.md`,
 > `KNOWN_ISSUES.md`.
 >
-> **Status: OFFEN.** Vier Funde, fast alle in **einem Cluster: dem
-> Composite-Lebenszyklus** (Erzeugen / Löschen / Selbstheilung) — **nicht** im
-> Cache-*Lesepfad*, der solide ist. Kausalkette: **F1** (Race) bzw. **F4**
-> (stiller Compress-Fehler) erzeugt einen verwaisten Composite-Pfad, **F2** macht
-> ihn *permanent* (keine Selbstheilung) → **leerer Homescreen über Neustarts**.
-> **F3** ist ein separater Ressourcen-Leak auf dem „Wallpaper entfernen"-Pfad.
-> Empfohlener Zuschnitt unter §4.
+> **Status: F1 + F2 + F4 GEFIXT** (Branch `fix/composite-lifecycle-hardening`),
+> **F3 noch OFFEN** (separater Cleanup). Vier Funde, fast alle in **einem
+> Cluster: dem Composite-Lebenszyklus** (Erzeugen / Löschen / Selbstheilung) —
+> **nicht** im Cache-*Lesepfad*, der solide ist. Kausalkette: **F1** (Race) bzw.
+> **F4** (stiller Compress-Fehler) erzeugt einen verwaisten Composite-Pfad, **F2**
+> macht ihn *permanent* (keine Selbstheilung) → **leerer Homescreen über
+> Neustarts**. **F3** ist ein separater Ressourcen-Leak auf dem „Wallpaper
+> entfernen"-Pfad. Empfohlener Zuschnitt und Umsetzungsstand unter §3.
 >
 > **Nicht in diesem Dokument:** der TEMP-Debug-Toast auf jedem Cache-Fill
 > (`HomeFragment.kt:1581`, Commit `8faa14a3`) — bewusst ausgeklammert, da bereits
@@ -46,12 +47,12 @@ das Ergebnis mehrerer Iterationen (§9.4a) und trägt. Alle Funde sitzen auf der
 
 ## 1. Findings
 
-| # | Cluster | Ort | Was | Severity | Verdict |
-|---|---|---|---|---|---|
-| **F1** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:46-52`) + `WallpaperDelegate` Commit/Backfill | `write()` nicht serialisiert; `deleteAll()` eines parallelen Commit-Flatten unlinkt die noch offene Datei eines in-flight Backfills → persistierter Pfad zeigt ins Leere → **Home leer über Neustarts** | `med` | PLAUSIBLE |
-| **F2** | Composite-Lifecycle | `WallpaperRepositoryImpl.parseWallpaperState` (`:192`) + `maybeBackfillComposite` | `flattenedWallpaperPath` ungeprüft aus DataStore (Layer werden per `fileExists()` validiert, Composite nicht); Backfill auf `path != null` gegated → **dangling Composite heilt nie selbst** | `low` | CONFIRMED |
-| **F3** | Ressourcen-Leak | `WallpaperCompositeCache` (`:46`) + `clearWallpaper()` (`WallpaperRepositoryImpl:356`) | „Wallpaper entfernen" räumt weder die on-disk `composite_*.webp` noch die ~10 MB In-Memory-Bitmap ab (`compositeStore.clear()` nur in `purgeRepository`, kein `invalidate()` im Cache) | `low` | CONFIRMED |
-| **F4** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:51`) | `Bitmap.compress()`-Boolean verworfen; ein `false`-Rückgabewert *ohne* Exception ergibt einen non-null Pfad auf eine korrupte/unvollständige Datei, die persistiert wird | `low` | PLAUSIBLE |
+| # | Cluster | Ort | Was | Severity | Verdict | Status |
+|---|---|---|---|---|---|---|
+| **F1** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:46-52`) + `WallpaperDelegate` Commit/Backfill | `write()` nicht serialisiert; `deleteAll()` eines parallelen Commit-Flatten unlinkt die noch offene Datei eines in-flight Backfills → persistierter Pfad zeigt ins Leere → **Home leer über Neustarts** | `med` | PLAUSIBLE | ✅ GEFIXT |
+| **F2** | Composite-Lifecycle | `WallpaperRepositoryImpl.parseWallpaperState` (`:192`) + `maybeBackfillComposite` | `flattenedWallpaperPath` ungeprüft aus DataStore (Layer werden per `fileExists()` validiert, Composite nicht); Backfill auf `path != null` gegated → **dangling Composite heilt nie selbst** | `low` | CONFIRMED | ✅ GEFIXT |
+| **F3** | Ressourcen-Leak | `WallpaperCompositeCache` (`:46`) + `clearWallpaper()` (`WallpaperRepositoryImpl:356`) | „Wallpaper entfernen" räumt weder die on-disk `composite_*.webp` noch die ~10 MB In-Memory-Bitmap ab (`compositeStore.clear()` nur in `purgeRepository`, kein `invalidate()` im Cache) | `low` | CONFIRMED | ⬜ OFFEN |
+| **F4** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:51`) | `Bitmap.compress()`-Boolean verworfen; ein `false`-Rückgabewert *ohne* Exception ergibt einen non-null Pfad auf eine korrupte/unvollständige Datei, die persistiert wird | `low` | PLAUSIBLE | ✅ GEFIXT |
 
 ---
 
@@ -231,13 +232,37 @@ der **Schreib-/Aufräum-Seite** und clustern kausal:
 > Composite-Pfad → **F2** (keine Selbstheilung) macht ihn permanent → leerer
 > Homescreen über Neustarts.
 
-**F1 + F2 + F4 als ein Fix** (`fix/composite-lifecycle-hardening`):
-`Mutex` um die Regeneration + Temp-Write/atomic-rename + `compress()`-Rückgabe prüfen
-+ `fileExists`-Guard im `parseWallpaperState`. Diese vier Änderungen schließen die
-gesamte Kausalkette gemeinsam.
+**F1 + F2 + F4 als ein Fix** (`fix/composite-lifecycle-hardening`) — **UMGESETZT:**
+
+- **F1** — `regenerateFlattenedComposite` (beide Caller, Commit + Backfill) läuft
+  jetzt unter einem delegate-weiten `Mutex` (`compositeRegenLock`), der die ganze
+  Kette flatten→write→persist serialisiert. Zusätzlich schreibt
+  `WallpaperCompositeStore.write()` in eine **Temp-Datei**, benennt **atomar** um
+  und löscht die alten Composites **erst danach** (`deleteAllExcept`) — ein
+  fehlgeschlagener/überholter Write unlinkt nie die noch referenzierte Datei; die
+  vorige bleibt als Fallback erhalten.
+- **F2** — `parseWallpaperState` validiert den `flattenedWallpaperPath` jetzt per
+  `fileExists()` (Uri-Overload, spiegelt die Layer-Validierung) und nullt einen
+  fehlenden Pfad → der auf `path == null` gegatete Backfill regeneriert ihn. Damit
+  ist ein dangling Composite **transient statt permanent** — das neutralisiert auch
+  den schmalen Rest-Race von F1.
+- **F4** — der `compress()`-Rückgabewert wird geprüft; `false` (ohne Throw) löscht
+  die Temp-Datei und liefert `null`, statt einen Pfad auf eine korrupte Datei zu
+  persistieren.
+
+  Tests: `WallpaperCompositeStoreTest` (Temp/Rename/compress-Check + „failed write
+  behält vorheriges Composite" als F1-Ordering-Regression), zwei neue
+  `WallpaperRepositoryImplTest`-Fälle (Composite-Pfad behalten wenn Datei da /
+  nullen wenn fehlt). Der reine Mutex-Serialisierungstest wurde bewusst
+  ausgelassen: `flatten`/`write` sind `suspend` auf einer finalen Klasse und die
+  Projekt-MockK-Konvention verbietet `coAnswers`, also gibt es keinen sauberen
+  deterministischen Gate-Punkt — die Datei-Ebene (Store-Tests) und die
+  Selbstheilung (F2-Test) decken die *Sicherheit* der Kette ab, nur das
+  Ein-Zeilen-Primitive `Mutex` selbst bleibt ungetestet (Value-Bar, Rule 10).
 
 **F3 separat** als kleiner Cleanup (`compositeStore.clear()` im User-Clear-Pfad +
 `invalidate()` im Cache) — unabhängig, kein Korrektheitsrisiko, nur Ressourcen-Hygiene.
+**Noch offen.**
 
 Alle vier sind Mehr-Datei-Changes über `:app`/`:data` → nach Projektkonvention auf
 einem eigenen Branch.

@@ -189,7 +189,9 @@ class WallpaperRepositoryImpl @Inject constructor(
                         }
                         WallpaperState(
                             layers = validLayers,
-                            flattenedWallpaperPath = preferences[KEY_WALLPAPER_FLATTENED_PATH],
+                            flattenedWallpaperPath = validatedCompositePath(
+                                preferences[KEY_WALLPAPER_FLATTENED_PATH]
+                            ),
                         )
                     }
                 } else {
@@ -211,6 +213,27 @@ class WallpaperRepositoryImpl @Inject constructor(
         }
 
         return parseSingleLayerState(preferences)
+    }
+
+    /**
+     * Validates the persisted display composite path the same way layer URIs are
+     * validated above (AUDIT-20 F2). A composite file can go missing while its path
+     * lingers in DataStore — a lost write race (F1), a silent compress failure (F4),
+     * or external deletion. An unvalidated dangling path would be a PERMANENT defect:
+     * the lazy backfill ([com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegate.maybeBackfillComposite])
+     * is gated on `flattenedWallpaperPath == null`, so it would never regenerate the
+     * composite and the home screen stays blank across restarts. Nulling a missing
+     * path here re-arms that backfill.
+     */
+    private fun validatedCompositePath(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        // fileExists returns true for non-file URIs (unverifiable); the composite is
+        // always written as file:// (Uri.fromFile), so this only ever drops a real
+        // missing-file case. Uri overload (not the String one) to mirror the layer
+        // validation above.
+        if (wallpaperFileManager.fileExists(path.toUri())) return path
+        Timber.w("Composite file missing — dropping path so backfill regenerates it")
+        return null
     }
 
     /**

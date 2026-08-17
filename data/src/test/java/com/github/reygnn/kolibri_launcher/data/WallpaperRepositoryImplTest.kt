@@ -60,6 +60,7 @@ class WallpaperRepositoryImplTest {
     private val KEY_WALLPAPER_TRANSLATE_X = floatPreferencesKey("wallpaper_translate_x")
     private val KEY_WALLPAPER_TRANSLATE_Y = floatPreferencesKey("wallpaper_translate_y")
     private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
+    private val KEY_WALLPAPER_FLATTENED_PATH = stringPreferencesKey("wallpaper_flattened_path")
 
     private lateinit var dataStore: FakeDataStore
     private lateinit var fileManager: WallpaperFileManager
@@ -225,6 +226,47 @@ class WallpaperRepositoryImplTest {
         val state = manager.wallpaperState.first()
 
         assertEquals(WallpaperState.NONE, state)
+    }
+
+    @Test
+    fun `parseWallpaperState keeps the composite path when its file exists`() = runTest {
+        // setUp default: every file exists.
+        val json = """[{"id":"la","imageUri":"file:///data/a.jpg"}]"""
+        dataStore.seed {
+            it[KEY_LAYERS_JSON] = json
+            it[KEY_WALLPAPER_FLATTENED_PATH] = "file:///data/composite/composite_1.webp"
+        }
+
+        val state = manager.wallpaperState.first()
+
+        assertTrue(state.isMultiLayer)
+        assertEquals("file:///data/composite/composite_1.webp", state.flattenedWallpaperPath)
+    }
+
+    @Test
+    fun `parseWallpaperState nulls a dangling composite path so backfill can regenerate`() = runTest {
+        // AUDIT-20 F2: the composite file went missing (lost write race / silent
+        // compress failure / external deletion) while its path lingered in DataStore.
+        // The layer file is still present — only the composite is gone. The parsed
+        // state must null the dangling path so the lazy backfill (gated on
+        // flattenedWallpaperPath == null) regenerates it, instead of the state
+        // carrying a permanently dead path and the home screen staying blank.
+        val layerUri = "file:///data/a.jpg".toUri()
+        val compositeUri = "file:///data/composite/gone.webp".toUri()
+        every { fileManager.fileExists(layerUri) } returns true
+        every { fileManager.fileExists(compositeUri) } returns false
+
+        val json = """[{"id":"la","imageUri":"file:///data/a.jpg"}]"""
+        dataStore.seed {
+            it[KEY_LAYERS_JSON] = json
+            it[KEY_WALLPAPER_FLATTENED_PATH] = "file:///data/composite/gone.webp"
+        }
+
+        val state = manager.wallpaperState.first()
+
+        assertTrue(state.isMultiLayer)
+        assertEquals(1, state.layerCount)
+        assertNull("dangling composite path must be nulled (AUDIT-20 F2)", state.flattenedWallpaperPath)
     }
 
     @Test

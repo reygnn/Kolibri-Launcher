@@ -145,6 +145,8 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -259,6 +261,19 @@ class WallpaperDelegate(
      * both on the delegate scope).
      */
     private var backfillInProgress = false
+
+    /**
+     * Serializes composite regeneration across its two callers — the edit-mode
+     * commit ([onCommitWallpaperEditMode]) and the lazy backfill
+     * ([maybeBackfillComposite]) (AUDIT-20 F1). Both flatten + write + persist on
+     * the same delegate; without mutual exclusion they can run against the same
+     * `flattenedWallpaperPath == null` state at once, and one write's
+     * old-composite cleanup could unlink the file the other just persisted →
+     * a dangling path → blank home across restarts. Holding the lock over the
+     * whole flatten→write→save keeps the latest-wins path check ([_wallpaperState]
+     * comparison) consistent with what actually landed on disk.
+     */
+    private val compositeRegenLock = Mutex()
 
     /**
      * Monotonic counter bumped ONLY when an edit session is rolled back
@@ -589,23 +604,23 @@ class WallpaperDelegate(
      * state without a composite, and the drawer->home path falls back to the
      * per-layer rebuild (§9.6).
      */
-    private suspend fun regenerateFlattenedComposite(state: WallpaperState) {
+    private suspend fun regenerateFlattenedComposite(state: WallpaperState) = compositeRegenLock.withLock {
         if (!state.isMultiLayer) {
             compositeStore.clear()
-            return
+            return@withLock
         }
         // Pass explicit display dimensions (from the delegate's context) rather than
         // relying on the flattener's context-based defaults — keeps the call
         // unit-testable with a mocked flattener.
         val metrics = context.resources.displayMetrics
         val bitmap = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
-            ?: return
+            ?: return@withLock
         val path = try {
             compositeStore.write(bitmap)
         } finally {
             bitmap.recycle()
         }
-        path ?: return
+        path ?: return@withLock
         // No explicit cache invalidation needed: the composite path is versioned
         // (WallpaperCompositeStore), so this new path is a fresh cache key — the
         // display decodes it on a natural miss and the old entry is dropped (§9.4a).
