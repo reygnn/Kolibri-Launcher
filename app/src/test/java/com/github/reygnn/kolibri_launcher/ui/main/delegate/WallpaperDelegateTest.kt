@@ -1146,6 +1146,42 @@ class WallpaperDelegateTest {
         verify { wallpaperFileManager.deleteFile(layerUri) }
     }
 
+    /**
+     * AUDIT-20 F5 regression guard: committing on a single-layer / no-composite
+     * state drops the composite via `compositeStore.clear()`, which does blocking
+     * file I/O (listFiles() + delete()). It must run OFF the main dispatcher — the
+     * regen runs inside a launchSafe block that starts on it. We baseline the io
+     * dispatch count after `start()` (which hops gcOrphans onto io) and assert the
+     * commit pushes at least one more dispatch through it, carrying the clear().
+     */
+    @Test
+    fun `onCommitWallpaperEditMode clears the composite off the main dispatcher for a single-layer state`() = runTest {
+        val single = WallpaperState(imageUri = "file:///single.jpg")
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(single)
+
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            compositeStore = store,
+            ioDispatcher = io,
+        )
+        delegate.start()
+        advanceUntilIdle()
+        val countAfterStart = io.count
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        verify { store.clear() }
+        assertTrue(
+            "compositeStore.clear() must run on the injected io dispatcher, not the main thread",
+            io.count > countAfterStart
+        )
+    }
+
     @Test
     fun `onCancelWallpaperEditMode does not delete deferred-remove files`() = runTest {
         val layerUri = "file:///layer.jpg"

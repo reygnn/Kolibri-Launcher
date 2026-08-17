@@ -27,6 +27,13 @@
 > (`HomeFragment.kt:1581`, Commit `8faa14a3`) — bewusst ausgeklammert, da bereits
 > in `CLAUDE.md`/der Commit-Message als „remove later" markiert und als sofortiger
 > Ein-Zeilen-Release-Blocker separat zu behandeln.
+>
+> **Follow-up 2026-08-17** (gegen `main` @ `11ef0cf7`, *nach* dem F1–F4-Fix): ein
+> zweiter Multi-Agent-Review desselben Pfads (6 Dimensionen, adversariale
+> Verifikation je Fund, 15 Agents) fand **drei neue Punkte** — alle wieder im
+> **Composite-Lebenszyklus** (Schreib-/Aufräum-Seite), keiner im Lesepfad. Siehe
+> **§4**. Der ebenfalls erneut bestätigte TEMP-Toast wird weiterhin bewusst
+> ausgeklammert (s. o.).
 
 ---
 
@@ -286,3 +293,148 @@ der **Schreib-/Aufräum-Seite** und clustern kausal:
 
 Alle vier sind Mehr-Datei-Changes über `:app`/`:data` → nach Projektkonvention auf
 einem eigenen Branch.
+
+---
+
+## 4. Follow-up-Review (2026-08-17, post-Fix @ `11ef0cf7`)
+
+> Zweiter Durchlauf desselben Composite-Flatten-&-Cache-Pfads, **nachdem** F1–F4
+> gemerged waren. Methode: 6 parallele Review-Linsen (Memory/Bitmap-Lifecycle,
+> Concurrency/Cancellation, Cache-Kohärenz, State/Persistenz, Compositing-Korrektheit,
+> Regel-Konformität), **jeder Fund adversarial zum Widerlegen** an eine zweite Instanz
+> gegeben, dann die Substanz-Funde selbst am Code nachgelesen (15 Agents). Der Lesepfad
+> und die never-recycle-Invariante hielten erneut sauber; alle drei neuen Funde sitzen
+> wieder auf der **Schreib-/Aufräum-Seite** des Composites. F5 ist eigenständig
+> (Dispatcher-Bug), **F6 + F7 teilen eine Wurzel**: der Composite-Dir-Lebenszyklus
+> (`clear` / überholter `write`) ist **nicht** mit `compositeRegenLock` serialisiert.
+
+| # | Cluster | Ort | Was | Severity | Verdict | Status |
+|---|---|---|---|---|---|---|
+| **F5** | Dispatcher | `WallpaperDelegate.regenerateFlattenedComposite` (`:609`) | Single-Layer-/NONE-Branch ruft `compositeStore.clear()` (blockierendes `listFiles()`+`delete()`) direkt auf dem **Main-Dispatcher** — die beiden Schwester-Call-Sites hoppen nach `ioDispatcher` | `med` | CONFIRMED | ✅ GEFIXT |
+| **F6** | Composite-Dir-Lifecycle | `WallpaperRepositoryImpl.clearWallpaper` (`:390`) + `WallpaperDelegate.onClearWallpaper` | Clear-Pfad nimmt **nicht** `compositeRegenLock` → ein paralleler lazy Backfill schreibt seinen Composite **nach** dem Clear zurück → verwaiste `composite_*.webp` (nur `wallpapers/` wird ge-gc't, nie das Composite-Dir) | `low` | CONFIRMED | 🔲 OFFEN |
+| **F7** | Composite-Dir-Lifecycle | `WallpaperDelegate.regenerateFlattenedComposite` (`:619`) | `write()` → `deleteAllExcept` läuft **unbedingt vor** dem latest-wins-Guard (`:629`); Edit→Revert-auf-gleichen-State kann `state`→`path_A` referenzieren lassen, während Disk nur `path_B` hält | `low` | PLAUSIBLE | 🔲 OFFEN |
+
+---
+
+### F5 — `compositeStore.clear()` blockierend auf dem Main-Thread · `med` · CONFIRMED
+
+`app/ui/main/delegate/WallpaperDelegate.kt:607-611`
+
+```kotlin
+private suspend fun regenerateFlattenedComposite(state: WallpaperState) = compositeRegenLock.withLock {
+    if (!state.isMultiLayer) {
+        compositeStore.clear()   // ← blockierendes dir().mkdirs() + listFiles() + delete()
+        return@withLock
+    }
+    …
+}
+```
+
+`regenerateFlattenedComposite` läuft auf dem **Main-Dispatcher**: `onCommitWallpaperEditMode`
+(`:567`) startet es via `scope.launchSafe`, und `DelegateScope.launchSafe` macht
+`coroutineScope.launch(mainDispatcher)` (`DelegateScope.kt:53`, `@MainDispatcher`).
+`compositeRegenLock.withLock` wechselt den Dispatcher nicht. Der Multi-Layer-Zweig ist
+unkritisch — `flatten`/`write` hoppen intern nach IO — aber der **Single-Layer-/NONE-Branch**
+ruft `compositeStore.clear()` (non-suspend, synchrones `deleteAll()`) ohne `withContext`-Hop.
+
+Die beiden identischen Schwester-Call-Sites machen es richtig: `WallpaperRepositoryImpl.clearWallpaper`
+(`:389`) und `purgeRepository` (`:409`) wrappen `compositeStore.clear()` jeweils in
+`withContext(ioDispatcher)` mit „blocking file deletion"-Kommentar.
+
+**Failure-Szenario:** Nutzer geht auf einem Single-Layer-Wallpaper in den Edit-Mode und
+committet (oder entfernt Layer bis auf einen). `!state.isMultiLayer` ⇒ synchrones
+`listFiles()`/`delete()` im `filesDir/wallpaper_composite/` **auf dem Main-Thread** →
+StrictMode `DiskWriteViolation` + potenzieller Jank.
+
+**Fix:** `compositeStore.clear()` in `withContext(ioDispatcher)` wrappen — analog zu
+`clearWallpaper`/`purgeRepository`. **UMGESETZT** (`fix/composite-clear-main-thread-io`):
+der Single-Layer-Branch macht jetzt `withContext(ioDispatcher) { compositeStore.clear() }`.
+Regressionstest `onCommitWallpaperEditMode clears the composite off the main dispatcher for
+a single-layer state` in `WallpaperDelegateTest` — baselinet den io-Dispatch-Count nach
+`start()` und prüft, dass der Commit einen weiteren Hop durchdrückt (`CountingDispatcher`-
+Idiom, wie die AUDIT-9-#N1-Guards für `clearAll`/`deleteFile`). Rein JVM.
+
+---
+
+### F6 — Clear-Pfad nicht serialisiert → verwaister Composite · `low` · CONFIRMED
+
+`data/WallpaperRepositoryImpl.kt:379-395` (`clearWallpaper`) + `WallpaperDelegate.onClearWallpaper`
+
+`clearWallpaper()` (und sein `compositeStore.clear()`) läuft in `:data` und hat **keinen**
+Zugriff auf den Delegate-`compositeRegenLock` — der Clear-Pfad nimmt den Lock also nicht.
+Damit ist er gegen einen laufenden lazy Backfill nicht mutual-excluded.
+
+**Failure-Szenario:** State ist Multi-Layer mit `flattenedWallpaperPath == null` (frische
+Option-D-Installation oder Post-Restore) → `maybeBackfillComposite` hält den Lock und ist
+mitten in `flatten → write` (~90 ms + N Decodes). Nutzer tippt „Wallpaper entfernen" →
+`onClearWallpaper` → `clearWallpaper()` löscht das Composite-Dir. Der Backfill-`write`
+landet **danach** und legt erneut eine `composite_*.webp` an. Der latest-wins-Guard
+(`_wallpaperState.value == state` ist jetzt NONE) überspringt den DataStore-Save korrekt
+→ Wallpaper taucht nicht wieder auf, **aber** die WEBP bleibt permanenter **Orphan**
+(`gcOrphans` läuft nur über `wallpapers/`, nie über `wallpaper_composite/`), bis ein
+späterer Multi-Layer-Commit sie zufällig per `deleteAllExcept` mit-abräumt.
+
+Severity `low`: kein Crash, kein sichtbarer Fehler, kleiner Disk-Leak, self-heilt beim
+nächsten Multi-Layer-Commit. Widerspricht aber der `compositeRegenLock`-KDoc-Zusage, dass
+der Lock Disk-Zustand und persistierten Pfad konsistent hält.
+
+**Fix:** Den Clear-Pfad in dieselbe Serialisierung ziehen — entweder `onClearWallpaper`
+unter `compositeRegenLock` ausführen (Delegate-Ebene, wo der Lock lebt), oder den Backfill
+per `backfillInProgress`/Cancel gegen einen laufenden Clear absichern. Alternativ akzeptieren
+und in der KDoc dokumentieren + `gcOrphans` einmalig auch das Composite-Dir mitnehmen lassen.
+
+---
+
+### F7 — `deleteAllExcept` vor dem latest-wins-Guard · `low` · PLAUSIBLE
+
+`app/ui/main/delegate/WallpaperDelegate.kt:618-631`
+
+```kotlin
+val path = try {
+    compositeStore.write(bitmap)     // ← ruft intern deleteAllExcept(neu) — UNBEDINGT
+} finally { bitmap.recycle() }
+path ?: return@withLock
+…
+if (_wallpaperState.value == state) {         // ← latest-wins-Guard erst HIER
+    saveWallpaperStateUseCase(state.withFlattenedWallpaperPath(path))
+}
+```
+
+`write()` (bzw. sein `deleteAllExcept`, `WallpaperCompositeStore.kt:75`) unlinkt die alten
+Composites **bevor** der Guard entscheidet, ob dieser Pfad überhaupt persistiert wird. Der
+Guard vergleicht gegen den beim Start gecaptureten `state`, nicht gegen „ist seit meinem
+Capture ein Composite gelandet".
+
+**Failure-Szenario (Revert):** Regen R1(stateA) hält den Lock, flattet, schreibt `path_A`,
+`state == stateA` ⇒ speichert `stateA.withPath(path_A)`. Der Nutzer editiert zu stateB und
+**revert**iert vor R1-Ende zurück auf einen gleichen stateA. Ein danach eingereihter Backfill
+R2(stateB) bekommt den Lock, schreibt `path_B` und `deleteAllExcept` unlinkt `path_A`; sein
+Guard schlägt fehl (aktuell ist `stateA.withPath(path_A)`) → kein Save. Ergebnis: `state`
+referenziert `path_A`, während Disk nur `path_B` hält.
+
+Severity `low` / PLAUSIBLE: self-heilt über den **F2-Fix** (`validatedCompositePath` nullt
+den fehlenden Pfad beim nächsten Read, `maybeBackfillComposite` re-armt) — Konsequenz ist ein
+transienter Per-Layer-Fallback-Render, kein bleibender Blank. Verletzt aber, wie F6, die
+Konsistenz-Zusage des Locks.
+
+**Fix:** Zusammen mit F6 lösbar — den Composite-Dir-Lebenszyklus vollständig unter
+`compositeRegenLock` serialisieren **und** `deleteAllExcept` erst *nach* dem latest-wins-Guard
+ausführen (nur prunen, wenn der neue Pfad tatsächlich persistiert wird), sodass ein überholter
+Write die noch referenzierte Datei nie unlinkt.
+
+---
+
+### Gegengeprüft & erneut sauber (Follow-up)
+
+- **Bitmap-Lifecycle / never-recycle.** `bitmap.recycle()` im `finally` (`:621`), F3-`invalidate()`
+  droppt nur die Referenz — kein still-referenziertes Recycle, kein Leak auf dem Lesepfad.
+- **Cancellation-Rethrow.** `applyFullRebuild` und die Loader-Catches sind korrekt geguarded
+  (`no suspension point`-Marker bzw. `CancellationException`-first) — kein neuer Swallow.
+- **Compositing-Parität, Downsample-Math, Blend-Order.** Keine Divergenz Software↔Live gefunden.
+- **Cache-Kohärenz.** Versionierter Pfad-Key trägt weiterhin; kein Stale-Read, keine
+  Key-Verwechslung.
+
+**Zuschnitt-Vorschlag:** F5 war ein isolierter Ein-Zeilen-Fix (IO-Wrap) — **UMGESETZT**
+(`fix/composite-clear-main-thread-io`, s. F5). F6 + F7 gehören als **ein** Fix zusammen
+(Composite-Dir-Lebenszyklus unter den Lock + Prune nach dem Guard); beide `:app`/`:data`-
+übergreifend → eigener Branch. **F6 + F7 noch offen.**

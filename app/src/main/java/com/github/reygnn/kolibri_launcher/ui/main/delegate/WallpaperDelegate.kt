@@ -606,7 +606,10 @@ class WallpaperDelegate(
      */
     private suspend fun regenerateFlattenedComposite(state: WallpaperState) = compositeRegenLock.withLock {
         if (!state.isMultiLayer) {
-            compositeStore.clear()
+            // compositeStore.clear() is blocking file I/O (listFiles() + delete()) —
+            // hop off the main dispatcher, matching the sibling clear() call sites in
+            // WallpaperRepositoryImpl.clearWallpaper / purgeRepository (AUDIT-20 F5).
+            withContext(ioDispatcher) { compositeStore.clear() }
             return@withLock
         }
         // Pass explicit display dimensions (from the delegate's context) rather than
