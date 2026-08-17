@@ -381,6 +381,14 @@ class WallpaperRepositoryImpl @Inject constructor(
             dataStore.edit { preferences ->
                 removeAllKeys(preferences)
             }
+            // Delete the derived display composite too (Option D), mirroring
+            // purgeRepository (AUDIT-20 F3). Otherwise "remove wallpaper" orphans the
+            // composite_*.webp in filesDir/wallpaper_composite/ — clearAll()/gcOrphans
+            // only walk wallpapers/, never the composite dir. IO-wrapped: clear() does
+            // blocking file deletion.
+            withContext(ioDispatcher) {
+                compositeStore.clear()
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

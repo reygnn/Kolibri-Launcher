@@ -64,6 +64,7 @@ class WallpaperRepositoryImplTest {
 
     private lateinit var dataStore: FakeDataStore
     private lateinit var fileManager: WallpaperFileManager
+    private lateinit var compositeStore: com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
     private lateinit var manager: WallpaperRepositoryImpl
 
     @Before
@@ -72,8 +73,9 @@ class WallpaperRepositoryImplTest {
         fileManager = mockk(relaxed = true)
         // Default: every file exists on disk. Individual tests override.
         every { fileManager.fileExists(any<Uri>()) } returns true
+        compositeStore = mockk(relaxed = true)
 
-        manager = WallpaperRepositoryImpl(dataStore, fileManager, mockk(relaxed = true), mainDispatcherRule.testDispatcher)
+        manager = WallpaperRepositoryImpl(dataStore, fileManager, compositeStore, mainDispatcherRule.testDispatcher)
     }
 
     // ===========================================
@@ -384,6 +386,17 @@ class WallpaperRepositoryImplTest {
         val prefs = dataStore.data.first()
         assertNull(prefs[KEY_WALLPAPER_URI])
         assertNull(prefs[KEY_LAYERS_JSON])
+    }
+
+    @Test
+    fun `clearWallpaper also clears the on-disk composite`() = runTest {
+        // AUDIT-20 F3: "remove wallpaper" must delete the derived composite_*.webp
+        // too, not just the DataStore keys — clearAll()/gcOrphans only walk
+        // wallpapers/, never the composite dir. Pins the wiring to compositeStore.
+        manager.clearWallpaper()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { compositeStore.clear() }
     }
 
     @Test

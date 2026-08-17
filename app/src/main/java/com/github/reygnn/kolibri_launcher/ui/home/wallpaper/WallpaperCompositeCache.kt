@@ -48,4 +48,19 @@ class WallpaperCompositeCache @Inject constructor() {
         cachedPath = path
         cached = decoded
     }
+
+    /**
+     * Drops the held bitmap reference so GC can reclaim the ~10 MB composite once
+     * the view has also released it. Called when the wallpaper is removed / reset
+     * (AUDIT-20 F3): without a wallpaper on screen nothing ever queries this cache
+     * again, so the entry would otherwise stay resident until a later [put] replaces
+     * it or the process dies. Does NOT recycle — the never-recycle invariant holds
+     * (the replaced-out bitmap may still be drawing); it only releases this side's
+     * reference.
+     */
+    @Synchronized
+    fun invalidate() {
+        cached = null
+        cachedPath = null
+    }
 }

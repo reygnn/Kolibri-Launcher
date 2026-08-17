@@ -1473,6 +1473,16 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
         val wallpaperView = binding.wallpaperView
 
+        // Wallpaper removed / reset (AUDIT-20 F3): drop the cached ~10 MB composite
+        // bitmap. With nothing on screen nothing queries the cache again, so the
+        // entry would otherwise stay resident until a later fill or process death.
+        // Covers both the user "remove wallpaper" path and a factory reset (which
+        // re-emits NONE without restarting the process). The on-disk composite is
+        // cleared separately by the repository's clear/purge paths.
+        if (!state.hasWallpaper) {
+            compositeCache.invalidate()
+        }
+
         // Read-and-consume the one-shot focus hint (on Main, before the async
         // render): when a new layer was just added, the delegate sets this so the
         // view selects it automatically. Consuming here prevents the hint from

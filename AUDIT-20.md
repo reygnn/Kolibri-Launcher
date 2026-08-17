@@ -13,8 +13,9 @@
 > Clear-Pfad — alle bestätigt). Gegengeprüft: `CLAUDE.md`, `ACCEPTED_LIMITATIONS.md`,
 > `KNOWN_ISSUES.md`.
 >
-> **Status: F1 + F2 + F4 GEFIXT** (Branch `fix/composite-lifecycle-hardening`),
-> **F3 noch OFFEN** (separater Cleanup). Vier Funde, fast alle in **einem
+> **Status: ALLE VIER GEFIXT.** F1 + F2 + F4 auf Branch
+> `fix/composite-lifecycle-hardening` (gemerged), F3 auf Branch
+> `fix/composite-clear-leak`. Vier Funde, fast alle in **einem
 > Cluster: dem Composite-Lebenszyklus** (Erzeugen / Löschen / Selbstheilung) —
 > **nicht** im Cache-*Lesepfad*, der solide ist. Kausalkette: **F1** (Race) bzw.
 > **F4** (stiller Compress-Fehler) erzeugt einen verwaisten Composite-Pfad, **F2**
@@ -51,7 +52,7 @@ das Ergebnis mehrerer Iterationen (§9.4a) und trägt. Alle Funde sitzen auf der
 |---|---|---|---|---|---|---|
 | **F1** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:46-52`) + `WallpaperDelegate` Commit/Backfill | `write()` nicht serialisiert; `deleteAll()` eines parallelen Commit-Flatten unlinkt die noch offene Datei eines in-flight Backfills → persistierter Pfad zeigt ins Leere → **Home leer über Neustarts** | `med` | PLAUSIBLE | ✅ GEFIXT |
 | **F2** | Composite-Lifecycle | `WallpaperRepositoryImpl.parseWallpaperState` (`:192`) + `maybeBackfillComposite` | `flattenedWallpaperPath` ungeprüft aus DataStore (Layer werden per `fileExists()` validiert, Composite nicht); Backfill auf `path != null` gegated → **dangling Composite heilt nie selbst** | `low` | CONFIRMED | ✅ GEFIXT |
-| **F3** | Ressourcen-Leak | `WallpaperCompositeCache` (`:46`) + `clearWallpaper()` (`WallpaperRepositoryImpl:356`) | „Wallpaper entfernen" räumt weder die on-disk `composite_*.webp` noch die ~10 MB In-Memory-Bitmap ab (`compositeStore.clear()` nur in `purgeRepository`, kein `invalidate()` im Cache) | `low` | CONFIRMED | ⬜ OFFEN |
+| **F3** | Ressourcen-Leak | `WallpaperCompositeCache` (`:46`) + `clearWallpaper()` (`WallpaperRepositoryImpl:356`) | „Wallpaper entfernen" räumt weder die on-disk `composite_*.webp` noch die ~10 MB In-Memory-Bitmap ab (`compositeStore.clear()` nur in `purgeRepository`, kein `invalidate()` im Cache) | `low` | CONFIRMED | ✅ GEFIXT |
 | **F4** | Composite-Lifecycle | `WallpaperCompositeStore.write()` (`:51`) | `Bitmap.compress()`-Boolean verworfen; ein `false`-Rückgabewert *ohne* Exception ergibt einen non-null Pfad auf eine korrupte/unvollständige Datei, die persistiert wird | `low` | PLAUSIBLE | ✅ GEFIXT |
 
 ---
@@ -265,9 +266,23 @@ der **Schreib-/Aufräum-Seite** und clustern kausal:
   entsprechend korrigiert. Rule 10 musste dafür **nicht** gedehnt werden: der Test
   ist reine Coroutine-Logik, kein Gerät nötig.
 
-**F3 separat** als kleiner Cleanup (`compositeStore.clear()` im User-Clear-Pfad +
-`invalidate()` im Cache) — unabhängig, kein Korrektheitsrisiko, nur Ressourcen-Hygiene.
-**Noch offen.**
+**F3 separat** als kleiner Cleanup (`fix/composite-clear-leak`) — **UMGESETZT:**
+
+- **On-disk:** `WallpaperRepositoryImpl.clearWallpaper()` löscht jetzt auch das
+  abgeleitete Composite (`compositeStore.clear()`, IO-wrapped) — spiegelt
+  `purgeRepository`. Greift auch auf dem Backup-Restore-Clear-Pfad (altes Composite
+  weg, das restaurierte Multi-Layer-State bekommt via F2-Backfill ein frisches).
+- **In-Memory:** neues `WallpaperCompositeCache.invalidate()` (`@Synchronized`,
+  droppt nur die Referenz — never-recycle-Invariante bleibt). Aufgerufen in
+  `HomeFragment.updateWallpaper` sobald `!state.hasWallpaper` — **ein** Chokepoint,
+  der User-Clear *und* Factory-Reset abdeckt (Reset re-emittiert NONE ohne
+  Prozess-Neustart, siehe `SettingsViewModel.onFactoryResetConfirmed`).
+
+  Tests: neuer `WallpaperCompositeCacheTest` (get/put/recycle + `invalidate`), plus
+  `WallpaperRepositoryImplTest`-Fall „clearWallpaper also clears the on-disk
+  composite". Der Ein-Zeilen-Trigger in `HomeFragment` (`!hasWallpaper` →
+  `invalidate`) bleibt als dünner View-Glue ungetestet (Rule 10) — die Cache-Logik
+  selbst und der Disk-Clear sind gepinnt.
 
 Alle vier sind Mehr-Datei-Changes über `:app`/`:data` → nach Projektkonvention auf
 einem eigenen Branch.
