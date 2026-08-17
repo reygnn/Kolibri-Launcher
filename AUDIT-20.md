@@ -253,12 +253,17 @@ der **Schreib-/Aufräum-Seite** und clustern kausal:
   Tests: `WallpaperCompositeStoreTest` (Temp/Rename/compress-Check + „failed write
   behält vorheriges Composite" als F1-Ordering-Regression), zwei neue
   `WallpaperRepositoryImplTest`-Fälle (Composite-Pfad behalten wenn Datei da /
-  nullen wenn fehlt). Der reine Mutex-Serialisierungstest wurde bewusst
-  ausgelassen: `flatten`/`write` sind `suspend` auf einer finalen Klasse und die
-  Projekt-MockK-Konvention verbietet `coAnswers`, also gibt es keinen sauberen
-  deterministischen Gate-Punkt — die Datei-Ebene (Store-Tests) und die
-  Selbstheilung (F2-Test) decken die *Sicherheit* der Kette ab, nur das
-  Ein-Zeilen-Primitive `Mutex` selbst bleibt ungetestet (Value-Bar, Rule 10).
+  nullen wenn fehlt) **und** der eigentliche Mutex-Serialisierungstest in
+  `WallpaperDelegateTest` („commit flatten waits for an in-flight backfill flatten
+  (serialized by the regen mutex)"): eine `CompletableDeferred`-Gate parkt den
+  Backfill-Flatten *innerhalb* des Locks, ein in dieses Fenster gefeuerter Commit
+  darf seinen eigenen Flatten erst nach Lock-Freigabe starten. Rein JVM,
+  deterministisch. — Anmerkung: der erste Anlauf hielt diesen Test für unmöglich
+  (angeblich verbietet die MockK-Konvention `coAnswers`); das war eine *veraltete*
+  Konventions-Zeile — `coAnswers` existiert auf MockK 1.14.11 und ist genau der
+  suspendierende Answer-Scope für die Gate. `TESTING_CONVENTIONS.kt` wurde
+  entsprechend korrigiert. Rule 10 musste dafür **nicht** gedehnt werden: der Test
+  ist reine Coroutine-Logik, kein Gerät nötig.
 
 **F3 separat** als kleiner Cleanup (`compositeStore.clear()` im User-Clear-Pfad +
 `invalidate()` im Cache) — unabhängig, kein Korrektheitsrisiko, nur Ressourcen-Hygiene.

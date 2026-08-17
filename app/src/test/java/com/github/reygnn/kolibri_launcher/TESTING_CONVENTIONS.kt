@@ -221,22 +221,33 @@ package com.github.reygnn.kolibri_launcher
  *   coEvery { repo.saveItem(any()) } returns true
  *
  *
- * SUSPEND FUNCTIONS — coEvery + answers { }
+ * SUSPEND FUNCTIONS — coEvery + answers { } (and coAnswers { } when the
+ * answer body must itself suspend)
  * -----------------------------------------
- * coAnswers does NOT exist in MockK. For suspend functions that need to
- * return a value based on their arguments, use coEvery with regular answers:
+ * DEFAULT: for a suspend function that just returns a value — fixed or
+ * derived from its arguments — use coEvery with a plain (synchronous)
+ * answers { }. The lambda extracts/transforms the args and returns; it does
+ * NOT need to be a coroutine even though the stubbed function is suspend:
  *
- *   // ✅ correct
+ *   // ✅ correct — the common case
  *   coEvery { mock.suspendFun(any()) } returns fixedValue
  *   coEvery { mock.suspendFun(any()) } answers { secondArg() }    // arg-based return
  *   coEvery { mock.suspendFun(any()) } throws IOException("fail")
  *
- *   // ❌ coAnswers does not exist — compile error
- *   coEvery { mock.suspendFun(any()) } coAnswers { secondArg() }
+ * EXCEPTION: coAnswers { } DOES exist (verified MockK 1.14.11) and is the
+ * right — and only — tool when the ANSWER BODY must suspend: await a gate,
+ * delay, call another suspend fun. A plain answers { } cannot do that (its
+ * lambda is not a coroutine), so reach for coAnswers { } exactly there and
+ * nowhere else:
  *
- * The answers { } lambda is always synchronous. It just extracts/transforms
- * the arguments and returns a value — it does not need to be a coroutine
- * even if the stubbed function is suspend.
+ *   // ✅ correct — answer body suspends (e.g. park a mock mid-call to pin
+ *   //             ordering / mutual exclusion). See WallpaperDelegateTest's
+ *   //             "commit flatten waits for an in-flight backfill" (AUDIT-20 F1).
+ *   val gate = CompletableDeferred<Unit>()
+ *   coEvery { mock.suspendFun(any()) } coAnswers { gate.await(); result }
+ *
+ * (A much older MockK lacked coAnswers; this file used to say it did not
+ * exist. It does on the pinned version — do not "correct" it back.)
  *
  *
  * RELAXED vs RELAXUNITFUN — SUSPEND FUNCTIONS BRAUCHEN relaxed = true

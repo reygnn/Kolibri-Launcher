@@ -25,10 +25,12 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.CoroutineDispatcher
@@ -319,6 +321,52 @@ class WallpaperDelegateTest {
 
         coVerify { flattener.flatten(firstRestore, any(), any()) }
         coVerify { flattener.flatten(secondRestore, any(), any()) }
+    }
+
+    @Test
+    fun `commit flatten waits for an in-flight backfill flatten (serialized by the regen mutex)`() = runTest {
+        // AUDIT-20 F1: the two composite-regeneration callers (lazy backfill on
+        // start, and the edit-commit) must not flatten+write against the same
+        // path==null state at once. The delegate serializes them with a Mutex over
+        // the whole flatten->write->persist. This pins that: while the backfill
+        // flatten is parked mid-run (holding the lock), a commit fired into that
+        // window must NOT begin its own flatten until the backfill releases.
+        val gate = CompletableDeferred<Unit>()
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            // First flatten (the backfill) blocks on the gate while holding the lock;
+            // any later flatten returns immediately.
+            if (flattenCalls.getAndIncrement() == 0) gate.await()
+            bitmap
+        }
+        val store: WallpaperCompositeStore = mockk(relaxed = true)
+        coEvery { store.write(bitmap) } returns "file:///composite.webp"
+
+        val multiNoComposite = WallpaperState(
+            layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")),
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multiNoComposite)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeStore = store,
+        )
+
+        delegate.start() // collection -> backfill -> flatten #1 parks on the gate, holding the lock
+        advanceUntilIdle()
+        assertEquals("backfill flatten is in flight", 1, flattenCalls.get())
+
+        delegate.onCommitWallpaperEditMode() // commit -> regenerate blocks on the held lock
+        advanceUntilIdle()
+        assertEquals("commit flatten must wait for the in-flight backfill", 1, flattenCalls.get())
+
+        gate.complete(Unit) // backfill finishes and releases the lock
+        advanceUntilIdle()
+        assertEquals("commit flatten proceeds once the lock is free", 2, flattenCalls.get())
     }
 
     // ===========================================
