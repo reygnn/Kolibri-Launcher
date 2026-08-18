@@ -281,6 +281,7 @@
     <string name="cleanup_storage_action">Aufräumen</string>
     <string name="cleanup_storage_done">Alte Speicher-Einträge entfernt</string>
     <string name="cleanup_storage_none">Speicher ist bereits aufgeräumt</string>
+    <string name="cleanup_storage_error">Speicher konnte nicht aufgeräumt werden</string>
     <string name="factory_reset_title">App zurücksetzen</string>
 <string name="factory_reset_summary">Alle Einstellungen und Favoriten auf Werkseinstellungen zurücksetzen</string>
 <string name="factory_reset_dialog_title">App zurücksetzen?</string>

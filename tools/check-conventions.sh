@@ -240,6 +240,7 @@ cancel_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt"
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/DataStoreMaintenanceRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseActivity.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/ClockDelegate.kt"

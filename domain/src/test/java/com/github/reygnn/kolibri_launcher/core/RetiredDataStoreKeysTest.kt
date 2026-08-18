@@ -30,6 +30,21 @@ class RetiredDataStoreKeysTest {
     }
 
     @Test
+    fun `usage_ prefix retires EVERY usage_-prefixed key - settings store must never hold a live usage_ key`() {
+        // The usage_ prefix is the single broadest deletion rule: it retires ANY key starting with
+        // "usage_", not only per-app "usage_<package>" entries. This is safe ONLY because no live
+        // feature writes a usage_-prefixed key to the SETTINGS store (both usage producers inject
+        // @UsageDataStore). The whitelist-of-dead's "a live key must be explicitly listed first"
+        // guarantee therefore does NOT hold for this prefix — it over-matches by construction. If a
+        // future feature ever needs a live "usage_*" key in the settings store, it must be renamed
+        // (or this match narrowed to the exact per-app shape) FIRST, or cleanup will delete it. This
+        // canary pins that blast radius so the constraint is visible to the next reviewer.
+        assertTrue(RetiredDataStoreKeys.isRetiredSettingsKey("usage_com.foo"))
+        assertTrue(RetiredDataStoreKeys.isRetiredSettingsKey("usage_stats_enabled"))
+        assertTrue(RetiredDataStoreKeys.isRetiredSettingsKey("usage_anything_at_all"))
+    }
+
+    @Test
     fun `isRetiredSettingsKey does NOT match live settings keys`() {
         // A sample of live settings-store keys — must never be classified retired.
         listOf(

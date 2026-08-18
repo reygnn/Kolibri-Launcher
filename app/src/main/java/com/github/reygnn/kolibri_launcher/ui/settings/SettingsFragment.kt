@@ -936,8 +936,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     /**
-     * Zeigt den Bestätigungsdialog für das Zurücksetzen auf Werkseinstellungen an.
-     * Bei Bestätigung wird die Logik im ViewModel aufgerufen.
+     * Shows the storage-cleanup confirmation dialog. On confirm, the ViewModel removes the retired
+     * orphan keys (see [SettingsViewModel.onCleanupStorageConfirmed]).
      */
     private fun showStorageCleanupDialog() {
         try {
@@ -958,6 +958,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    /**
+     * Shows the factory-reset confirmation dialog. On confirm, the reset logic runs in the ViewModel.
+     */
     private fun showFactoryResetDialog() {
         try {
             if (!isAdded) return

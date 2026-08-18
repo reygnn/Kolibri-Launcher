@@ -9,7 +9,6 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,38 +25,25 @@ class DataStoreMaintenanceRepositoryImpl @Inject constructor(
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : DataStoreMaintenanceRepository {
 
-    override suspend fun scanOrphanKeys(): List<String> = withContext(ioDispatcher) {
-        try {
-            dataStore.data.first().asMap().keys
-                .map { it.name }
-                .filter { RetiredDataStoreKeys.isRetiredSettingsKey(it) }
-                .sorted()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // DataStore read is an I/O boundary; a scan failure is non-fatal — report nothing to
-            // clean rather than surfacing an error to the user.
-            TimberWrapper.silentError(e, "Failed to scan settings store for orphan keys")
-            emptyList()
-        }
-    }
-
-    override suspend fun removeOrphanKeys(): Int = withContext(ioDispatcher) {
-        try {
-            var removed = 0
-            dataStore.edit { preferences ->
-                // Collect first, then remove — never mutate while iterating the key view.
-                val toRemove = preferences.asMap().keys
-                    .filter { RetiredDataStoreKeys.isRetiredSettingsKey(it.name) }
-                toRemove.forEach { preferences.remove(it) }
-                removed = toRemove.size
+    override suspend fun removeOrphanKeys(): DataStoreMaintenanceRepository.Result =
+        withContext(ioDispatcher) {
+            try {
+                var removed = 0
+                dataStore.edit { preferences ->
+                    // Collect first, then remove — never mutate while iterating the key view.
+                    val toRemove = preferences.asMap().keys
+                        .filter { RetiredDataStoreKeys.isRetiredSettingsKey(it.name) }
+                    toRemove.forEach { preferences.remove(it) }
+                    removed = toRemove.size
+                }
+                DataStoreMaintenanceRepository.Result.Removed(removed)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // A write failure must stay a failure (Rule 11 / AUDIT-10): report Failed so the UI
+                // can tell the user, never collapse it to Removed(0) which reads as "already clean".
+                TimberWrapper.silentError(e, "Failed to remove orphan keys from settings store")
+                DataStoreMaintenanceRepository.Result.Failed
             }
-            removed
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to remove orphan keys from settings store")
-            0
         }
-    }
 }

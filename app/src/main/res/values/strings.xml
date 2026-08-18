@@ -304,6 +304,7 @@
     <string name="cleanup_storage_action">Clean up</string>
     <string name="cleanup_storage_done">Old storage entries removed</string>
     <string name="cleanup_storage_none">Storage is already clean</string>
+    <string name="cleanup_storage_error">Could not clean up storage</string>
     <string name="factory_reset_title">Factory Reset</string>
 <string name="factory_reset_summary">Reset all settings and favorites to their defaults</string>
 <string name="factory_reset_dialog_title">Reset app?</string>

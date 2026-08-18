@@ -462,7 +462,8 @@ class SettingsViewModelTest {
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
-            coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns 3
+            coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
+                DataStoreMaintenanceRepository.Result.Removed(3)
 
             viewModel.event.test {
                 viewModel.onCleanupStorageConfirmed()
@@ -485,7 +486,8 @@ class SettingsViewModelTest {
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
-        coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns 0
+        coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
+            DataStoreMaintenanceRepository.Result.Removed(0)
 
         viewModel.event.test {
             viewModel.onCleanupStorageConfirmed()
@@ -496,6 +498,30 @@ class SettingsViewModelTest {
             assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_none, event.messageResId)
         }
     }
+
+    @Test
+    fun `onCleanupStorageConfirmed - shows error toast when cleanup fails - failure never masquerades as clean`() =
+        runTest {
+            viewModel = SettingsViewModel(
+                getInstalledAppsUseCase,
+                factoryResetUseCase,
+                favoritesRepository,
+                favoritesOrderRepository,
+                dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                mainDispatcher = mainDispatcherRule.testDispatcher
+            )
+            coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
+                DataStoreMaintenanceRepository.Result.Failed
+
+            viewModel.event.test {
+                viewModel.onCleanupStorageConfirmed()
+                mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+                val event = awaitItem()
+                assertIs<UiEvent.ShowToast>(event)
+                assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_error, event.messageResId)
+            }
+        }
 
     // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
 

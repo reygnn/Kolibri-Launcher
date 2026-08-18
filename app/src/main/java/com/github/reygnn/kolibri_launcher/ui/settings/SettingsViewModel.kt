@@ -202,12 +202,13 @@ class SettingsViewModel @Inject constructor(
      */
     fun onCleanupStorageConfirmed() {
         launchSafe {
-            val removed = dataStoreMaintenanceRepository.removeOrphanKeys()
-            sendEvent(
-                UiEvent.ShowToast(
-                    if (removed > 0) R.string.cleanup_storage_done else R.string.cleanup_storage_none,
-                ),
-            )
+            val messageResId = when (val result = dataStoreMaintenanceRepository.removeOrphanKeys()) {
+                is DataStoreMaintenanceRepository.Result.Removed ->
+                    if (result.count > 0) R.string.cleanup_storage_done else R.string.cleanup_storage_none
+                // A failed edit must not masquerade as "already clean" (Rule 11 / AUDIT-10).
+                DataStoreMaintenanceRepository.Result.Failed -> R.string.cleanup_storage_error
+            }
+            sendEvent(UiEvent.ShowToast(messageResId))
         }
     }
 }
