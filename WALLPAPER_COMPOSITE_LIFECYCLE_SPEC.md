@@ -1,202 +1,174 @@
 # WALLPAPER_COMPOSITE_LIFECYCLE_SPEC
 
-> **Status: DESIGN / greenfield ownership spec (2026-08-18).** Not yet implemented.
-> Motivated by three adversarial review rounds + one spike all clustering on the SAME
-> bug class on the SAME code (AUDIT-20 F1–F8). This spec exists to stop that churn: name
-> the one invariant, assign one owner, enumerate the transitions, define a **bounded**
-> verify plan — and only then consolidate the five current call sites onto one
-> transactional API. Sibling of `WALLPAPER_DRAWER_HOME_REBUILD_SPEC.md` (which decided
-> the composite should exist) and `AUDIT-20.md` (which found the eight lifecycle bugs).
-> The spike `WALLPAPER_INMEMORY_COMPOSITE_SPIKE.md` already settled that the disk file
-> MUST stay (flatten-from-source is ~227 ms / O(N) vs the ~90 ms / O(1) disk read).
+> **Status: DESIGN (2026-08-18, v2 — in-memory).** Supersedes the disk-ownership design
+> (v1 of this file), which an adversarial design review falsified — see §0. Motivated by
+> three review rounds + a spike + this review all showing the on-disk composite lifecycle
+> is not cleanly solvable. Decision: **delete the on-disk composite entirely; the composite
+> lives only in the in-memory cache as a pure memoization of the layers.** Sibling of
+> `WALLPAPER_DRAWER_HOME_REBUILD_SPEC.md`, `AUDIT-20.md`, `WALLPAPER_INMEMORY_COMPOSITE_SPIKE.md`.
 
 ---
 
-## 0. The thesis
+## 0. Decision & why
 
-The eight AUDIT-20 findings are **not eight bugs. They are one bug class, found eight
-times:**
+**Diagnosis (unchanged):** AUDIT-20 F1–F8 are one bug class — *the persisted pointer, the
+on-disk file, and the in-memory bitmap can diverge* — from one root: the composite is a
+concurrently-mutated stateful **disk** resource with no single owner.
 
-> **The persisted pointer, the on-disk file, and the in-memory bitmap can diverge.**
+**Why not the disk-ownership design (v1):** it was adversarially reviewed to falsify its
+"structurally impossible" claim, and **failed** with new HIGH-severity risks it *introduces*:
 
-Every fix closed one divergence path; the next review found another — because the
-underlying invariant was never enforced in **one** place. The root cause is
-architectural, not careless coding:
+- **F7 resurrected** — a `display()` that prunes keyed on its own (possibly stale) argument
+  can unlink the *current* composite; the transition table's "content-addressing prevents
+  this" justification is unsound (it actually relies on a FIFO/last-writer property).
+- **`dirLock` across the 227 ms flatten** — a `clear()` (backup-restore / factory-reset, the
+  very cross-layer callers the lock exists for) starves for the whole flatten; the read path
+  (drawer→home decode, AUTO classifier) newly serializes behind an in-flight flatten — a
+  throughput regression today's design does not have.
 
-> **The composite is a stateful, concurrently-mutated resource with a derived pointer,
-> and it has no single owner.** Its lifecycle is spread across five sites in two modules,
-> coordinated by an app-layer lock that structurally cannot reach the data-layer callers.
+So even the *carefully-owned* disk design carries the class forward. Combined with the spike
+(the disk file is **not** the drawer→home latency win — the in-memory cache is; its only real
+benefit is a 1-texture cold-start reveal), the disk file's cost/benefit is negative.
 
-This spec fixes the *ownership*, not the symptoms.
+**Decision:** the composite exists ONLY in the in-memory `@Singleton` cache, as a pure
+memoization of the layer set. A missing/wrong cache is always safe — re-flatten from the
+source layers (the DataStore-persisted authority). This makes correctness **trivial** and
+removes the entire F1–F8 class *by construction*: no disk file, no persisted pointer, no
+cross-module lifecycle. **The one accepted cost is in §8.**
 
 ---
 
-## 1. The resource and the invariant
+## 1. The resource & the (now trivial) invariant
 
-Three pieces of state make up "the composite":
+Only one piece of derived state: `WallpaperCompositeCache` — one HARDWARE bitmap keyed by a
+**composite key**. Source of truth = the layers in DataStore.
 
-| Name | What | Where today |
+**THE INVARIANT (single):** the cache holds a bitmap for key `K` ⇒ `K == compositeKey(currentLayers, renderConfig)`. On mismatch → miss → (re)flatten. On clear → `invalidate()` (drop the reference; never recycle — a superseded bitmap may still be drawing). No pointer, no file, no lock spanning pixel work.
+
+That is the whole state machine. Everything below is *performance placement*, not correctness.
+
+---
+
+## 2. The composite key — the ONE correctness condition (review finding, HIGH)
+
+The composite is a pure function of **(layer set, render config)** — NOT the layer set alone.
+The review's decisive finding: omit a non-layer pixel input and two visually-different
+composites collide on one key → the stale one is served indefinitely.
+
+`compositeKey` = SHA-256 over EVERY input `drawLayers` / `composeToBitmap` reads:
+
+- **Per layer, order-sensitive:** `imageUri`, `scale`, `translateX`, `translateY`, `alpha`,
+  `blendModeName`, `isVisible`, `captureSampleSize`.
+- **Render config (the HIGH finding):** target **width** and **height** (display metrics) —
+  omit it and a fold/unfold, external display, or resolution override serves a
+  wrong-resolution composite forever. A metrics change now changes the key → natural miss →
+  re-flatten at the new resolution.
+- **A `RENDER_BUDGET_VERSION` prefix** — bumped when `RENDER_WALLPAPER_PIXELS` /
+  `MAX_WALLPAPER_TEXTURE_SIDE` / the `S_render`/`captureSampleSize` compensation changes
+  (covers the cross-update collision; no data migration, just a prefix bump).
+- **`layerBackgroundColor`** — hard-wired transparent today (so safe to omit now), but named
+  in the completeness contract so a future configurable background can't regress silently.
+
+**Completeness contract (enforced):** `compositeKey` MUST cover every input the draw path
+reads. Pin it with a property test that fails if a pixel-affecting field is introduced
+without a corresponding key term (the seed is the spike's `WallpaperCompositeContentKeyTest`,
+extended to assert width/height/budget terms). This is the single most important guard in the
+design — it is what makes "derived, re-flatten on miss" actually correct.
+
+---
+
+## 3. Refill strategy — the "strategic place" (review-validated)
+
+The ~227 ms flatten (software decode of N layers + compose + HARDWARE copy; **O(N)**) is paid
+only on a **miss**. Misses happen at three moments, **none on the drawer→home critical path:**
+
+1. **Cold start** — process death dropped the `@Singleton` cache.
+2. **Edit-commit** — layers changed → new key.
+3. **Render-config change** — rotate / unfold → new key.
+
+**Rule: the display path NEVER blocks on a flatten.** On a cache miss it returns *fast* —
+"no composite yet" — and the fragment renders **per-layer** (the existing `applyFullRebuild`
+path, which already handles a composite-less multi-layer state) while an **async** flatten
+warms the cache off the critical path. The next drawer→home is a cache hit (~0 ms, 1 texture,
+smooth). The review derived this independently: `display()` must fast-return on a miss and kick
+the flatten asynchronously — do NOT fold backfill into a synchronous display call.
+
+**Triggers for the async warm:** after the first home render post-cold-start; after
+edit-commit; on a render-config change. A **single-flight guard** (`backfillInProgress`, which
+already exists) prevents a backup restore's intermediate emissions from storm-flattening.
+
+---
+
+## 4. Transition table (short — because there is no disk)
+
+| Event | Action | Invariant |
 |---|---|---|
-| **FILE** | 0 or 1 `composite_<…>.webp` (+ transient `.tmp`) | `filesDir/wallpaper_composite/` (`:data` `WallpaperCompositeStore`) |
-| **POINTER** | which file is current (`flattenedWallpaperPath`) | DataStore (`:data` `WallpaperRepositoryImpl`) |
-| **CACHE** | the decoded HARDWARE bitmap of the current composite | in-memory `@Singleton` (`:app` `WallpaperCompositeCache`) |
+| **drawer→home** | cache hit → composite; miss → per-layer render + async warm | trivially held |
+| **cold-start first render** | per-layer render; async warm after home is visible | held |
+| **edit-commit** | key changes → per-layer until warm; async warm | held |
+| **layer mutation mid-edit** | editor renders the real layers (unchanged today) | held |
+| **clear / factory reset** | `cache.invalidate()` — drop the reference (never recycle) | held |
+| **backup restore** | restored layers drive display; single-flight async warm | held |
+| **rotate / display change** | key changes → miss → per-layer + async warm | held |
 
-**THE INVARIANT (must hold after every transition):**
-
-- **I1 — Uniqueness.** At most one committed composite FILE exists (transient `.tmp`
-  excepted, and swept).
-- **I2 — Pointer integrity.** A non-null POINTER names an existing FILE that is the
-  flattening of the *current* layer set. (This is the invariant F2/F4/F7/F8 broke.)
-- **I3 — Cache coherence.** CACHE holds a bitmap for key `K` ⇒ `K` is the current
-  composite's identity. A just-superseded bitmap may still be *drawing* (never-recycle),
-  but it is keyed by the old identity, so a lookup by the new identity misses. (F3/F9.)
-- **I4 — Purity.** The composite is a pure function of the layer set: identical layers ⇒
-  identical pixels. This is what makes "stale" *detectable* and "current" *derivable*.
-
-Map of the findings to the invariant they broke — proof they are one class:
-
-| Finding | Broke | Via ownership seam |
-|---|---|---|
-| F1, F6, F7, F8 | I1 / I2 | concurrent unowned mutation (two doors, app-lock can't span :data) |
-| F2, F4 | I2 | POINTER names a missing / corrupt FILE |
-| F3, F9 | I3 | CACHE / FILE outlive a cleared POINTER |
+No file operation, no persisted pointer, no cross-layer lock. `clear()` is dropping a
+reference. There is no interleaving that can leave a dangling pointer or an orphan file,
+because neither exists.
 
 ---
 
-## 2. The design: content-addressing + one owner
+## 5. The AUTO classifier (the in-memory wrinkle — review-flagged)
 
-Two moves, together, make most of the class **structurally impossible** rather than
-patched.
-
-### 2a. Content-address the FILE → delete the POINTER (kills the I2 class)
-
-By I4 the composite is a pure function of the layers. So name the file by a **content
-hash of the layer set** (the `WallpaperState.compositeContentKey` the spike already
-prototyped: SHA-256 over each layer's uri, transform, alpha, blend, visibility, order).
-Then:
-
-> **The "current composite path" is DERIVED from the persisted layers, not persisted
-> separately.** The layers already live in DataStore; the expected composite path is a
-> pure function of them. There is **no independent POINTER to go stale.**
-
-- Display: compute `expectedPath = hash(currentLayers)`. FILE exists → decode + cache.
-  Missing → flatten → atomic write → done. (Backfill and first-render collapse into the
-  same path.)
-- A layer edit changes the hash → a different expected path → automatic miss → re-flatten.
-  No "null the pointer on every mutation" dance, no dangling pointer possible.
-- **F2 vanishes** (no pointer to dangle). **F7 simplifies** (no latest-wins *pointer*
-  write to order against pruning). **F8's data-side pointer write is gone.**
-
-`flattenedWallpaperPath` is dropped from DataStore. Per Rule 5 (no in-code migration):
-the composite is *derived*, not user data — an updated install simply finds no
-content-addressed file yet and backfills on first display; any old fixed-name composite is
-pruned on the first content-addressed write. No migration code.
-
-### 2b. One owner with one lock (kills the I1 concurrency class)
-
-Introduce a single authority — extend `WallpaperCompositeStore` into the **owner of FILE +
-CACHE**, with its existing internal `dirLock` (added in F8) as the *only* serialization
-point. It exposes a small transactional API, and **nothing else may touch the composite
-dir or the cache**:
-
-```
-suspend fun display(state, flatten: suspend () -> Bitmap?): DecodedComposite?
-    // hash(state) -> cache hit? return it.
-    // file exists? decode HARDWARE, cache, return.
-    // else: flatten() (caller-supplied, :app owns the pixels) -> atomic write -> decode/cache.
-    // all under dirLock; prune non-current files after a successful write.
-
-suspend fun clear()
-    // under dirLock: delete every composite file + invalidate cache. Idempotent.
-```
-
-- The flatten stays in `:app` (it needs a `ZoomableImageView`); it is **passed in** as a
-  suspend lambda. The owner never flattens — it owns *persistence + lifecycle*. Clean
-  layering: `:app` produces pixels, `:data` owns the resource.
-- Every caller — delegate commit / backfill / display, repo clear / purge, backup restore,
-  factory reset — routes through `display()` / `clear()`. **No caller writes the DataStore
-  key or calls `deleteAll()` directly.** The cross-layer race is gone because **there is no
-  second door**, not because a lock is disciplined across modules.
+Today the AUTO light/dark classifier (`WallpaperBitmapLuminanceImpl`) decodes a *separate*
+downsampled bitmap from the composite **file** (HARDWARE bitmaps can't be pixel-read). With no
+file, it needs another source. **Design:** the flatten produces `(hardwareBitmap, luminance)`
+together — luminance is sampled from the SOFTWARE `ARGB_8888` composite *during* the flatten,
+before the HARDWARE copy, when the pixels are still readable. The cache stores the luminance
+alongside the composite key; the classifier reads the cached luminance keyed by `compositeKey`.
+This removes the classifier's file dependency and keeps its result perfectly coherent with the
+displayed composite (same key). On a miss the classifier, like the display, falls back to its
+current per-layer-unavailable behavior until the warm lands (`ACCEPTED_LIMITATIONS.md #1`
+already documents the AUTO classifier's best-effort nature).
 
 ---
 
-## 3. Transition table (the interleaving space, written down)
+## 6. What this deletes / keeps
 
-The space three reviews discovered incrementally, now enumerated. Every row is atomic
-under `dirLock`; every row preserves I1–I4.
+**Deletes:** `WallpaperCompositeStore` (file/write/prune/delete/clear/`dirLock`),
+`flattenedWallpaperPath` in DataStore (retain the `KEY_WALLPAPER_FLATTENED_PATH` literal in
+`removeAllKeys()` for one release as a one-shot orphan cleanup, then drop — review low finding),
+`validatedCompositePath`, the composite-dir clear wiring in `clearWallpaper`/`purgeRepository`,
+the `wallpaper_composite/` dir. **The AUDIT-20 F1–F8 class is gone by construction.**
 
-| Event | Owner action | Preserves |
-|---|---|---|
-| **Display multi-layer** (drawer→home, cold start) | `display()`: cache hit \| file hit (decode) \| flatten→write→prune | I1,I3,I4 |
-| **Edit-commit** (layers changed) | new hash ⇒ `display()` misses ⇒ flatten new, prune old | I1,I2,I4 |
-| **Backfill** (multi-layer, no file yet) | identical to Display miss — collapses into `display()` | I1,I4 |
-| **Layer mutation mid-edit** | no file op; hash of the new state simply differs | I2,I4 |
-| **Clear** (user remove) | `clear()`: delete all + invalidate cache | I1,I3 |
-| **Factory reset** | `clear()` (re-emits NONE, no process restart) | I1,I3 |
-| **Backup restore** | `clear()` then the restored layers drive a fresh `display()` | I1,I2,I3 |
-| **Superseded flatten** (latest-wins loss) | its write is content-addressed to ITS state; if not current, prune drops it; it never unlinks the current file | I1,I2 |
+**Keeps (smaller):** `WallpaperCompositeCache` (gains the `compositeKey` + the luminance
+entry), `WallpaperFlattener` (gains the luminance output + a HARDWARE-copy step; the disk
+write is removed), `maybeBackfillComposite` becomes the async warm.
 
-The key property: because the filename is the content hash, a "superseded" or "concurrent"
-flatten writes to a **different path** than the current one, so it can never unlink the
-file the current state needs. Prune keeps exactly `hash(currentState)`.
+Net: **less code than today**, and the delicate concurrent disk lifecycle is deleted, not
+re-owned.
 
 ---
 
-## 4. Verify plan — BOUNDED (not "until perfect")
+## 7. Verify plan (bounded — and now tiny)
 
-"Verify until perfect" is unbounded and a trap. Verify the **named invariant** against the
-**enumerated transitions**, then stop:
-
-1. **Property tests** — `compositeContentKey` is stable for identical content and changes
-   on every pixel-affecting field (the spike's `WallpaperCompositeContentKeyTest` is the
-   seed).
-2. **Concurrency gate tests** — the F1-mutex-test pattern (a `CompletableDeferred` gate
-   parks one transition inside the lock) for each interleavable pair: commit×clear,
-   backfill×restore, commit×backfill, display×clear. Assert I1–I3 hold afterward. Pure
-   JVM, deterministic (Rule 10 — no device).
-3. **One** adversarial multi-agent review **against the invariant in §1** — not
-   open-ended. The question is precisely "can any transition leave I1–I4 violated?", not
-   "find anything."
-4. **On-device sanity** — the spike's measurement harness (force-stop→home, logcat) to
-   confirm no regression in the drawer→home / cold-start paths.
-
-Done = the invariant provably holds under §3, verified by (1)+(2), audited once by (3).
+1. **`compositeKey` completeness** — property test over every pixel input, with the guard that
+   fails on a new un-hashed pixel field (§2). *The* critical test.
+2. **Cache memoization** — hit / miss / `invalidate` (extends `WallpaperCompositeCacheTest`).
+3. **Fast-return on miss** — a miss returns the per-layer signal and fires the async warm
+   exactly once (single-flight).
+4. **Cancellation cleanliness** — a cancelled flatten recycles the software bitmap, no leak
+   (the one `UNCERTAIN` review finding worth pinning).
+5. **One** adversarial review against §1's invariant — a much smaller surface than the disk
+   design (no interleaving space to enumerate).
 
 ---
 
-## 5. What this explicitly does NOT change
+## 8. The one accepted cost (state it plainly)
 
-- **The flatten cost / the disk file.** The spike settled it: flatten-from-source is
-  ~227 ms and O(N); the disk read is ~90 ms and O(1). The file stays, amortized at
-  commit/backfill. This spec is about *owning* it, not removing it.
-- **The never-recycle invariant** (I3 encodes it).
-- **The AUTO classifier**, which samples the composite — it reads through the owner.
-- **The `:app → :data → :domain` dependency chain** — the owner sits in `:data`, the
-  flatten (pixels) stays in `:app` and is injected as a lambda.
-
----
-
-## 6. Why this is worth doing now (and why it is NOT a rewrite)
-
-Three review rounds + a spike on the same write/cleanup side, all one bug class, is a
-signal that the **abstraction is wrong (distributed ownership)**, not that we are unlucky.
-That is the moment to invest.
-
-But it is **consolidation, not a from-scratch rewrite.** Rewriting working concurrent code
-trades known, fixed bugs for unknown new ones; all F1–F8 were `low`/`med`, mostly
-self-healing, review-found, **never user-reported** — the code *works*, the *churn* is the
-cost. The leverage is: one owner (one door), content-addressing (no independent pointer).
-Most of F1–F8 stop being reachable. The path stays intrinsically delicate — concurrent
-mutation of a shared resource is hard — but the delicacy becomes **explicit, owned, and
-bounded by a written invariant** instead of rediscovered one review at a time.
-
-### Rollout
-
-1. This spec reviewed / agreed.
-2. Owner API + content-addressing in `:data` (`WallpaperCompositeStore` → transactional
-   `display()`/`clear()`), `compositeContentKey` promoted from the spike branch.
-3. Route the five call sites through it; delete the DataStore `flattenedWallpaperPath` key,
-   `validatedCompositePath`, `maybeBackfillComposite`'s separate gate (collapses into
-   `display()`).
-4. The §4 verify plan.
-5. One adversarial review against §1.
+The **cold-start wallpaper reveal** reverts from a 1-texture disk-composite decode (~90 ms,
+smooth) to a **per-layer render** (N-texture reveal — the brief system-wallpaper flash,
+~2.8 dropped frames), paid **once per process life**, amid other cold-start cost. This was the
+disk file's *only* real benefit (the spike proved it is not the drawer→home win). The
+deliberate trade: **a brief cold-start flash in exchange for deleting the entire disk
+lifecycle and its recurring bug class.** drawer→home — the frequent, latency-sensitive
+interaction — stays ~0 ms via the warmed cache, unchanged.
