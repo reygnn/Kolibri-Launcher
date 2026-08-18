@@ -274,7 +274,14 @@
 <string name="import_option_time_events">Zeitbasierte Events (Kalender &amp; Wecker)</string>
 <string name="backup_import_success_settings_only">Einstellungen erfolgreich importiert</string>
 
-<string name="factory_reset_title">App zurücksetzen</string>
+<string name="cleanup_storage_title">Speicher aufräumen</string>
+    <string name="cleanup_storage_summary">Verwaiste Einstellungs-Einträge entfernter oder verschobener Funktionen löschen</string>
+    <string name="cleanup_storage_dialog_title">Speicher aufräumen?</string>
+    <string name="cleanup_storage_dialog_message">Entfernt übrig gebliebene Einstellungs-Einträge von Funktionen, die entfernt oder in einen separaten Speicher verschoben wurden. Deine aktiven Einstellungen bleiben unberührt.</string>
+    <string name="cleanup_storage_action">Aufräumen</string>
+    <string name="cleanup_storage_done">Alte Speicher-Einträge entfernt</string>
+    <string name="cleanup_storage_none">Speicher ist bereits aufgeräumt</string>
+    <string name="factory_reset_title">App zurücksetzen</string>
 <string name="factory_reset_summary">Alle Einstellungen und Favoriten auf Werkseinstellungen zurücksetzen</string>
 <string name="factory_reset_dialog_title">App zurücksetzen?</string>
 <string name="factory_reset_dialog_message">Alle deine persönlichen Einstellungen, Favoriten und Anpassungen werden dauerhaft gelöscht.</string>

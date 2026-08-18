@@ -45,6 +45,12 @@
             app:iconSpaceReserved="false" />
             
         <Preference
+            android:key="cleanup_storage"
+            android:title="@string/cleanup_storage_title"
+            android:summary="@string/cleanup_storage_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
             android:key="factory_reset"
             android:title="@string/factory_reset_title"
             android:summary="@string/factory_reset_summary"

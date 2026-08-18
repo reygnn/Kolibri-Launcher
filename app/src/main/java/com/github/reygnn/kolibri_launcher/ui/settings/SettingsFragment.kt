@@ -375,6 +375,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
+        // Storage cleanup — showStorageCleanupDialog has its own try/catch.
+        findPreference<Preference>(AppConstants.PrefKeys.CLEANUP_STORAGE)?.setOnPreferenceClickListener {
+            showStorageCleanupDialog()
+            true
+        }
+
         // Factory Reset — showFactoryResetDialog has its own try/catch.
         findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
             showFactoryResetDialog()
@@ -933,6 +939,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
      * Zeigt den Bestätigungsdialog für das Zurücksetzen auf Werkseinstellungen an.
      * Bei Bestätigung wird die Logik im ViewModel aufgerufen.
      */
+    private fun showStorageCleanupDialog() {
+        try {
+            if (!isAdded) return
+
+            currentDialog?.dismiss()
+            currentDialog = MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.cleanup_storage_dialog_title)
+                .setMessage(R.string.cleanup_storage_dialog_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cleanup_storage_action) { _, _ ->
+                    viewModel.onCleanupStorageConfirmed()
+                }
+                .show()
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend cleanup dialog, cannot see CancellationException
+            TimberWrapper.silentError(e, "Cannot show storage cleanup dialog")
+        }
+    }
+
     private fun showFactoryResetDialog() {
         try {
             if (!isAdded) return

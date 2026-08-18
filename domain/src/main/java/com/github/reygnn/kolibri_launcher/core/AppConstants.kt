@@ -246,6 +246,7 @@ object AppConstants {
         const val CUSTOM_APP_NAMES = "custom_app_names"
         const val BACKUP_RESTORE = "backup_restore"
         const val USAGE_EXPORT = "usage_export"
+        const val CLEANUP_STORAGE = "cleanup_storage"
         const val FACTORY_RESET = "factory_reset"
         const val APP_INFO = "app_info"
         const val SET_DEFAULT_LAUNCHER = "set_default_launcher"

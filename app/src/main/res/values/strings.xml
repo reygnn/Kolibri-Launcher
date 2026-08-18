@@ -297,6 +297,13 @@
     <string name="import_option_time_events">Time-Based Events (Calendar &amp; Alarm)</string>
     <string name="backup_import_success_settings_only">Settings successfully imported</string>
     
+    <string name="cleanup_storage_title">Clean up storage</string>
+    <string name="cleanup_storage_summary">Remove leftover settings entries from removed or moved features</string>
+    <string name="cleanup_storage_dialog_title">Clean up storage?</string>
+    <string name="cleanup_storage_dialog_message">Removes leftover settings entries from features that were removed or moved to a separate store. Your active settings are not affected.</string>
+    <string name="cleanup_storage_action">Clean up</string>
+    <string name="cleanup_storage_done">Old storage entries removed</string>
+    <string name="cleanup_storage_none">Storage is already clean</string>
     <string name="factory_reset_title">Factory Reset</string>
 <string name="factory_reset_summary">Reset all settings and favorites to their defaults</string>
 <string name="factory_reset_dialog_title">Reset app?</string>

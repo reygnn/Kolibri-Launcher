@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
@@ -44,6 +45,7 @@ class SettingsViewModelTest {
     private lateinit var factoryResetUseCase: FactoryResetUseCase
     private lateinit var favoritesRepository: FavoritesRepository
     private lateinit var favoritesOrderRepository: FavoritesOrderRepository
+    private lateinit var dataStoreMaintenanceRepository: DataStoreMaintenanceRepository
 
     private lateinit var viewModel: SettingsViewModel
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
@@ -58,6 +60,7 @@ class SettingsViewModelTest {
         factoryResetUseCase = mockk(relaxed = true)
         favoritesRepository = mockk(relaxed = true)
         favoritesOrderRepository = mockk(relaxed = true)
+        dataStoreMaintenanceRepository = mockk(relaxed = true)
 
         rawAppsFlow = MutableStateFlow(emptyList())
 
@@ -74,6 +77,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -87,6 +91,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -121,6 +126,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -144,6 +150,7 @@ class SettingsViewModelTest {
                 factoryResetUseCase,
                 favoritesRepository,
                 favoritesOrderRepository,
+                dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -165,6 +172,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -183,6 +191,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -211,6 +220,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -230,6 +240,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -248,6 +259,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -274,6 +286,7 @@ class SettingsViewModelTest {
                 factoryResetUseCase,
                 favoritesRepository,
                 favoritesOrderRepository,
+                dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
             val viewModel2 = SettingsViewModel(
@@ -281,6 +294,7 @@ class SettingsViewModelTest {
                 factoryResetUseCase,
                 favoritesRepository,
                 favoritesOrderRepository,
+                dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -302,6 +316,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -324,6 +339,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -352,6 +368,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -371,6 +388,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -393,6 +411,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -415,6 +434,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -427,6 +447,54 @@ class SettingsViewModelTest {
 
         // Assert
         coVerify { factoryResetUseCase(false) }
+    }
+
+    // ========== STORAGE CLEANUP TESTS ==========
+
+    @Test
+    fun `onCleanupStorageConfirmed - removes orphan keys and shows done toast when something removed`() =
+        runTest {
+            viewModel = SettingsViewModel(
+                getInstalledAppsUseCase,
+                factoryResetUseCase,
+                favoritesRepository,
+                favoritesOrderRepository,
+                dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                mainDispatcher = mainDispatcherRule.testDispatcher
+            )
+            coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns 3
+
+            viewModel.event.test {
+                viewModel.onCleanupStorageConfirmed()
+                mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+                val event = awaitItem()
+                assertIs<UiEvent.ShowToast>(event)
+                assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_done, event.messageResId)
+            }
+            coVerify { dataStoreMaintenanceRepository.removeOrphanKeys() }
+        }
+
+    @Test
+    fun `onCleanupStorageConfirmed - shows none toast when nothing removed`() = runTest {
+        viewModel = SettingsViewModel(
+            getInstalledAppsUseCase,
+            factoryResetUseCase,
+            favoritesRepository,
+            favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            mainDispatcher = mainDispatcherRule.testDispatcher
+        )
+        coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns 0
+
+        viewModel.event.test {
+            viewModel.onCleanupStorageConfirmed()
+            mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+            val event = awaitItem()
+            assertIs<UiEvent.ShowToast>(event)
+            assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_none, event.messageResId)
+        }
     }
 
     // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
@@ -443,6 +511,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -467,6 +536,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -491,6 +561,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -519,6 +590,7 @@ class SettingsViewModelTest {
             factoryResetUseCase,
             favoritesRepository,
             favoritesOrderRepository,
+            dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -540,6 +612,7 @@ class SettingsViewModelTest {
         factoryResetUseCase,
         favoritesRepository,
         favoritesOrderRepository,
+        dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
         mainDispatcher = mainDispatcherRule.testDispatcher
     )
 

@@ -5,6 +5,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
@@ -26,6 +27,7 @@ class SettingsViewModel @Inject constructor(
     private val factoryResetUseCase: FactoryResetUseCase,
     private val favoritesRepository: FavoritesRepository,
     private val favoritesOrderRepository: FavoritesOrderRepository,
+    private val dataStoreMaintenanceRepository: DataStoreMaintenanceRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -190,6 +192,22 @@ class SettingsViewModel @Inject constructor(
                     sendEvent(UiEvent.ShowToast(R.string.reset_failed))
                 }
             }
+        }
+    }
+
+    /**
+     * Removes orphaned settings-store keys (retired features / moved stores). Safe by construction —
+     * only [com.github.reygnn.kolibri_launcher.core.RetiredDataStoreKeys] entries are touched, never
+     * a live key. Reports whether anything was cleaned.
+     */
+    fun onCleanupStorageConfirmed() {
+        launchSafe {
+            val removed = dataStoreMaintenanceRepository.removeOrphanKeys()
+            sendEvent(
+                UiEvent.ShowToast(
+                    if (removed > 0) R.string.cleanup_storage_done else R.string.cleanup_storage_none,
+                ),
+            )
         }
     }
 }
