@@ -17,8 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
- * Produces the flattened display-mode composite for Option D
- * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.2, Approach A).
+ * Produces the flattened display-mode composite (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4):
+ * one SOFTWARE bitmap that the caller copies to HARDWARE and holds in the in-memory
+ * [WallpaperCompositeCache]. There is no on-disk composite in v4 — no file, no WEBP, no store.
  *
  * Reuses the LIVE render path — [WallpaperViewBinder] on a detached
  * [ZoomableImageView] — so the composite is faithful to what the multi-layer view
@@ -27,7 +28,10 @@ import javax.inject.Inject
  * (`ARGB_8888`) bitmaps, because `composeToBitmap` composes on a software `Canvas`
  * that cannot draw the HARDWARE bitmaps the live display uses.
  *
- * Returns a SOFTWARE bitmap; [WallpaperCompositeStore] compresses it to WEBP.
+ * Returns a SOFTWARE bitmap — the caller (`WallpaperDelegate.warmComposite`) samples its
+ * luminance, copies it to HARDWARE for the cache, and recycles this software temp — or `null`
+ * if [state] is not multi-layer, the size is invalid, or the flatten was partial (all-or-nothing,
+ * §3: any per-layer decode failure yields `null` so no incomplete composite is cached).
  */
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,

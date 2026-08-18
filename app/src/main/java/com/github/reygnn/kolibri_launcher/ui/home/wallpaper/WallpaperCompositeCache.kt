@@ -4,25 +4,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * In-memory cache of the ONE decoded display wallpaper bitmap (Option D,
- * WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4) — the flattened composite for a
- * multi-layer wallpaper, OR the single image for a single-layer one. Both render
- * through `applySingleLayer` and re-decode from disk on every drawer→home, so both
- * win from NOT decoding at all. (The composite motivated it; the single-layer case
- * has the same re-decode cost and is included via the broader cache gate in
- * HomeFragment.) The composite decode is ~90 ms (a single non-parallelisable
- * lossless WEBP), which is not faster than the parallel per-layer decode — so the
- * win is the cache, not the single-image render. Holding one ~10 MB HARDWARE bitmap
- * (a size §5 flagged as affordable, unlike the N-layer cache) lets the wallpaper
- * re-attach instantly across the view re-creation that drawer→home triggers.
+ * In-memory cache of the ONE decoded display wallpaper bitmap
+ * (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4) — the flattened composite for a multi-layer
+ * wallpaper, OR the single image for a single-layer one. Both render through the single-image
+ * path and would otherwise be re-produced on every drawer→home view re-creation: the composite
+ * re-flattened (O(N) software decode + compose, tens–hundreds of ms), the single image
+ * re-decoded from disk. Caching the result makes drawer→home a ~0 ms one-texture re-attach.
  *
- * Application-scoped (survives the fragment view). Purely key-based: a new
- * composite gets a VERSIONED path (`WallpaperCompositeStore`), so [put] with the
- * new key simply replaces the entry — no explicit invalidation needed. Safe
- * because the wallpaper view never recycles its bitmaps (it drops references and
- * relies on GC): the replaced-out bitmap that may still be on screen keeps drawing
- * until the next render, and GC reclaims it once both this cache and the view have
- * released it (this cache never recycles).
+ * Keyed by content, single-entry: the multi-layer composite by its `compositeKey`
+ * (`composite://<hash>`, produced by the delegate's warm), the single image by its `file://`
+ * URI. Any change — new layers/transform (new hash) or a new picked image (new URI) — is a new
+ * key, so [put] simply replaces the entry (no explicit invalidation on change). [invalidate]
+ * drops the reference on wallpaper clear / factory reset. There is no on-disk composite in v4 —
+ * no file, no WEBP, no store.
+ *
+ * Application-scoped (survives the fragment view). Never recycles its bitmap — it drops the
+ * reference and relies on GC: a replaced-out bitmap that may still be on screen keeps drawing
+ * until the next render, and GC reclaims it once both this cache and the view release it. Holds
+ * one ~10 MB HARDWARE bitmap so the wallpaper re-attaches instantly across the view re-creation
+ * that drawer→home triggers.
  */
 @Singleton
 class WallpaperCompositeCache @Inject constructor() {
