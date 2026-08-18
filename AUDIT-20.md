@@ -27,6 +27,9 @@
 > (`HomeFragment.kt:1581`, Commit `8faa14a3`) — bewusst ausgeklammert, da bereits
 > in `CLAUDE.md`/der Commit-Message als „remove later" markiert und als sofortiger
 > Ein-Zeilen-Release-Blocker separat zu behandeln.
+> **Widerrufen am 2026-08-18 (§6/F10):** aus dem einen Toast sind mit `e73f2096`
+> zwei geworden (Warm + Single-Layer-Decode) — „separat als Ein-Zeiler" trägt nicht
+> mehr, wenn die Zeile sich vermehrt, also ist er jetzt als **F10** geführt.
 >
 > **Follow-up 2026-08-17** (gegen `main` @ `11ef0cf7`, *nach* dem F1–F4-Fix): ein
 > zweiter Multi-Agent-Review desselben Pfads (6 Dimensionen, adversariale
@@ -35,6 +38,14 @@
 > **inzwischen alle gefixt** (F5: `fix/composite-clear-main-thread-io`; F6 + F7:
 > `fix/composite-lifecycle-clear-prune`). Siehe **§4**. Der ebenfalls erneut
 > bestätigte TEMP-Toast wird weiterhin bewusst ausgeklammert (s. o.).
+>
+> **Vierter Durchgang 2026-08-18** (gegen `main` @ `ebd13868`, Version 0.99.178 /
+> code 198, *nach* dem v4-Umbau auf den reinen In-Memory-Composite): gezielter
+> **manueller** Blick auf den Refill/Warm-Pfad — ausdrücklich **keine**
+> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Drei Punkte, **alle OFFEN**, keiner
+> ein Korrektheitsdefekt: **F10** (TEMP-Toasts, Release-Blocker), **F11**
+> (Edit-Cancel ohne Warm-Trigger, Performance), **F12** (unerreichbarer
+> Cache-Eintrag nach Auflösungswechsel, Speicher). Siehe **§6**.
 
 ---
 
@@ -574,3 +585,182 @@ Cache-Logik (`WallpaperCompositeCache`) ist separat gepinnt.
 `dirLock` + KDoc-Korrektur (F8), `hasWallpaper`-Gate (F9). **Beide dritten Funde (F8, F9)
 gefixt.** Der TEMP-Debug-Toast (`HomeFragment`, Commit `8faa14a3`) bleibt weiterhin bewusst
 ausgeklammert (s. o.).
+
+---
+
+## 6. Vierter Durchgang — Refill-Pfad (2026-08-18, gegen `main` @ `ebd13868`)
+
+> Vierter Blick auf denselben Pfad, diesmal **nach** dem v4-Umbau (kein On-Disk-
+> Composite mehr — `WallpaperCompositeStore` ist gelöscht, die ganze F1–F8-Disk-Klasse
+> damit gegenstandslos) und fokussiert auf den **Refill/Warm**: `maybeWarmComposite`
+> (`WallpaperDelegate.kt:626-649`), `warmComposite` (`:669-745`) und die Lesseite in
+> `HomeFragment` (`:1535-1617`).
+>
+> **Methode — bewusst anders als §1/§4/§5:** *kein* Multi-Agent-Review, sondern ein
+> manuelles Nachlesen der Warm-Trigger, ihrer Dispatcher-Zusagen und der
+> Cache-Lebensdauer. Entsprechend schmaler im Anspruch: das hier ist **keine**
+> Flächenabdeckung wie die drei Reviews davor, sondern das Ergebnis eines gezielten
+> Blicks auf die Refill-Kante. Wer Vollständigkeit will, muss die
+> Multi-Agent-Methode erneut fahren.
+>
+> **Status: alle drei OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
+> liegt gerade woanders). Kein Fund ist ein Korrektheitsdefekt: F10 ist ein
+> Release-Blocker (Debug-UI), F11 kostet Performance, F12 Speicher.
+
+| # | Cluster | Ort | Was | Severity | Verdict | Status |
+|---|---|---|---|---|---|---|
+| **F10** | Debug-Residuum | `WallpaperDelegate.kt:733-740` + `HomeFragment.kt:1604-1606` | Die TEMP-Debug-Toasts auf jedem Cache-Fill sind **nicht mehr einer, sondern zwei** (Composite-Warm + Single-Layer-Decode); beide „remove later"-markiert, beide user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
+| **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
+| **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
+
+---
+
+### F10 — Zwei TEMP-Debug-Toasts statt einem · `med` (Release-Blocker) · CONFIRMED
+
+`app/ui/main/delegate/WallpaperDelegate.kt:733-740` + `app/ui/home/HomeFragment.kt:1604-1606`
+
+Der im Kopf dieses Dokuments dreimal bewusst ausgeklammerte TEMP-Toast (ursprünglich
+`8faa14a3`, ein Site) hat sich mit Commit `e73f2096` auf **zwei** Sites vermehrt — und
+genau deshalb steht er jetzt hier drin: „separat als Ein-Zeilen-Blocker behandeln"
+funktioniert nicht mehr, wenn die Zeile sich vermehrt.
+
+```kotlin
+// WallpaperDelegate.warmComposite — nach dem key-gated put
+scope.sendEvent(
+    UiEvent.ShowToastFromString("Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})")
+)
+
+// HomeFragment.loadBitmapFromUri — nach dem Single-Layer-put
+view?.post { context?.showToastSafe("Single-layer cache filled") }
+```
+
+Beide sind unbedingt (kein `BuildConfig.DEBUG`-Gate), beide mit hartkodiertem
+englischem String (also auch an der Localization-Parität vorbei, die für echte
+UI-Strings gilt), beide in RELEASE sichtbar. Der Delegate-Toast feuert bei jedem
+Cold-Start-Warm, jedem Edit-Commit und jeder Rotation; der HomeFragment-Toast bei
+jedem Single-Layer-Erstdecode.
+
+Fachlich waren sie das richtige Instrument — die Frage „wie oft wird der Composite
+tatsächlich neu geflattet?" ließ sich ohne Perfetto-Trace sonst nicht beantworten, und
+die Auflösung im Text trennt rotationsgetriebene Refills von den übrigen. Sie sind
+nur nie wieder rausgeflogen.
+
+**Fix:** Beide Sites samt Kommentarblock entfernen. Wenn das Signal weiter gebraucht
+wird, ist die Trace-Sektion aus `54815cee` (`LaunchTrace.WALLPAPER_WARM`) der
+dauerhafte Ersatz — sie misst dasselbe, ohne UI. **Vor dem nächsten Release
+erledigen.**
+
+---
+
+### F11 — Kein Warm-Trigger beim Edit-Abbruch · `low` · CONFIRMED
+
+`app/ui/main/delegate/WallpaperDelegate.kt:772-802` (Cancel) vs. `:588-611` (Commit)
+
+`maybeWarmComposite` hat genau drei Trigger: die State-Collect-Schleife (`:400`), den
+Config-Change (`:558`) und den Edit-**Commit** (`:609`). Der Edit-**Cancel** ist in
+dieser Liste nicht — er restauriert den Snapshot synchron (`:778`) und persistiert ihn
+asynchron (`:792`), ruft aber selbst kein `maybeWarmComposite`.
+
+Meist heilt das von allein: schrieb die Session Layer-Änderungen nach DataStore,
+erzeugt das Zurückschreiben des Snapshots eine Emission → Collect → Warm. Das Loch ist
+der Fall, in dem der persistierte Wert sich **nicht** ändert, während der Cache-Key
+sich sehr wohl geändert hat:
+
+**Failure-Szenario:** Multi-Layer-Wallpaper, Nutzer geht in den Edit-Mode und **dreht
+das Gerät**. `onConfigurationChanged` → `onDisplayConfigChanged` → `maybeWarmComposite`
+kehrt sofort zurück (`if (_isWallpaperEditMode.value) return`, `:628` — korrekt, die
+Layer sind mitten in Änderung). Der Nutzer bricht die Session ohne Änderung ab: der
+Snapshot ist identisch mit dem persistierten State, also keine Emission, also kein
+Warm. Ergebnis: der Composite bleibt für die **neue** Auflösung kalt, bis irgendeine
+andere State-Emission oder eine weitere Rotation kommt. Jedes drawer→home rendert
+solange den Per-Layer-Pfad — laut Perfetto-Messung ~70–90 ms und ~2–3 verworfene
+Frames pro Rebuild, also genau der Kostenpunkt, für den der Cache existiert.
+
+Kein Korrektheitsfehler (der Per-Layer-Pfad ist bei jeder Auflösung richtig), rein
+Performance — daher `low`.
+
+**Fix:** `maybeWarmComposite(snapshot)` am Ende von `onCancelWallpaperEditMode`
+aufrufen, symmetrisch zum Commit. Es ist bereits idempotent (Cache-Hit ⇒ No-Op,
+Single-Flight über `backfillInProgress`), der Aufruf kostet im Normalfall also nichts.
+Sauberer wäre, den Warm generell an „Edit-Mode verlassen" statt an die beiden Exits
+einzeln zu hängen — dann kann kein dritter Exit-Pfad ihn erneut vergessen.
+
+---
+
+### F12 — Unerreichbarer Eintrag nach Auflösungswechsel bleibt resident · `low` · CONFIRMED
+
+`app/ui/home/wallpaper/WallpaperCompositeCache.kt:46-50` + `WallpaperDelegate.warmComposite:683-716`
+
+Der Cache ist Single-Entry und key-versioniert: ein Auflösungswechsel ändert den Key
+(`WallpaperCompositeKey.of(state, w, h)`), der alte Eintrag ist ab sofort ein
+garantierter Miss. Ersetzt wird er aber **nur** durch einen erfolgreichen `put` — es
+gibt keinen Drop-on-Key-Change:
+
+```kotlin
+@Synchronized
+fun put(path: String, decoded: DecodedWallpaperBitmap) {
+    cachedPath = path
+    cached = decoded          // ← der einzige Weg, wie ein alter Eintrag verschwindet
+}
+```
+
+`warmComposite` hat drei Abbruchpfade, die **vor** dem `put` liegen: Flatten liefert
+null (`:683`), HARDWARE-Copy/Luminanz wirft (`:702-709`, u. a. OOM), `hardware == null`
+(`:713`). Alle drei rufen `dropLuminanceIfCurrent(key)` — die Composite-**Luminanz**
+wird also sauber invalidiert, damit der AUTO-Classifier keinen Fremdwert weiterbenutzt
+(Review #1). Für die ~10 MB **Bitmap** existiert diese Symmetrie nicht.
+
+**Failure-Szenario:** Multi-Layer-Wallpaper, Composite für Portrait gecacht. Nutzer
+dreht auf Landscape → neuer Key → `displayTargetFor` fällt auf den Per-Layer-Pfad,
+Warm startet. Der Warm scheitert (partieller Flatten, oder die HARDWARE-Copy wirft
+OOM — plausibel gerade unter Speicherdruck, und die Copy ist die dokumentierte
+Allokationsgrenze). Jetzt hält der Cache eine Portrait-Bitmap unter einem Key, den
+niemand mehr abfragt, und die Self-Reschedule-Regel feuert denselben Key bewusst nicht
+erneut (`:643`, Schutz gegen die Endlosschleife). Die ~10 MB bleiben bis zur nächsten
+Rotation, zum nächsten State-Wechsel oder zum Prozessende resident.
+
+Exakt die F3-Klasse („residieren, während nichts es anzeigen kann"), nur über die
+Auflösungs- statt die Clear-Kante — und mit demselben `low`-Argument: **ein** Bitmap,
+akkumuliert nicht, self-heilt beim nächsten erfolgreichen Warm.
+
+**Fix (zwei Varianten, bewusst nicht vorentschieden):**
+
+- **Konservativ:** In den drei Fehlerpfaden von `warmComposite` neben
+  `dropLuminanceIfCurrent(key)` auch `compositeCache.invalidate()` aufrufen — aber
+  **nur** key-gated wie die Luminanz, sonst löscht ein überholter Warm den Eintrag
+  eines neueren. Stellt die Bitmap/Luminanz-Symmetrie her.
+- **Strukturell:** Dem Cache ein `invalidateIfNotKey(currentKey)` geben und es auf dem
+  Config-Change-Pfad aufrufen — dann ist „Eintrag für tote Auflösung" gar nicht erst
+  ein Zustand, unabhängig davon, ob der Warm gelingt. Kostet dafür den Fallback-
+  Eintrag im Fenster zwischen Rotation und fertigem Warm (kein Render-Nachteil — der
+  Eintrag ist in diesem Fenster ohnehin unerreichbar).
+
+Die zweite Variante ist die ehrlichere Invariante, die erste der kleinere Diff.
+
+---
+
+### Gegengeprüft & sauber (vierter Durchgang)
+
+Zwei Verdachtsmomente sind beim Nachlesen **zerfallen** — hier notiert, damit sie nicht
+ein viertes Mal aufgemacht werden:
+
+- **`backfillInProgress` als unsynchronisiertes `Boolean`** (`:276`). Kein Defekt: die
+  KDoc sagt Main-Thread-Confinement zu, und die Zusage hält über **alle drei** Trigger
+  — der Collect (`:400`) läuft auf dem Main-Dispatcher, `onDisplayConfigChanged`
+  (`:558`) wird aus `HomeFragment.onConfigurationChanged` (`:514`) gerufen, und der
+  Commit-Pfad (`:609`) liegt in `scope.launchSafe`, das per `DelegateScope.kt:53`
+  explizit `launch(mainDispatcher)` macht. Set **und** Reset (im `finally`, `:637`)
+  liegen damit auf demselben Thread. Ein `@Volatile`/`AtomicBoolean` wäre hier
+  Kosmetik, die eine Confinement-Zusage durch eine schwächere Zusage ersetzt.
+- **Das doppelte `compositeCache.invalidate()`** (Delegate `:539` im Clear unter dem
+  Regen-Lock, HomeFragment `:1492` bei `!state.hasWallpaper`). Keine Redundanz aus
+  Versehen: beide Seiten tragen ihre eigene Begründung im Kommentar (Serialisierung
+  gegen den Warm-`put` bzw. der eine View-Chokepoint, der User-Clear **und**
+  Factory-Reset abdeckt, weil der Reset NONE ohne Prozess-Neustart re-emittiert).
+  Das ist die belt-and-braces-Konstruktion aus F3/F6, nicht ihr Rest.
+
+Ebenfalls unverändert sauber: der key-gated `put` (`:721`), das F9-`hasWallpaper`-Gate
+in `renderingSingleImageNow` (`HomeFragment:1566-1570`), die never-recycle-Invariante
+(das einzige `recycle()` trifft den SOFTWARE-Temp, `:711`) und die
+Cancellation-Disziplin im Warm (`CancellationException`-first vor dem `Throwable`-Arm,
+`:702-704`).
