@@ -42,11 +42,11 @@
 > **Vierter Durchgang 2026-08-18** (gegen `main` @ `ebd13868`, Version 0.99.178 /
 > code 198, *nach* dem v4-Umbau auf den reinen In-Memory-Composite): gezielter
 > **manueller** Blick auf den Refill/Warm-Pfad — ausdrücklich **keine**
-> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Vier Punkte, **alle OFFEN**, keiner
+> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Fünf Punkte, **alle OFFEN**, keiner
 > ein Korrektheitsdefekt: **F10** (TEMP-Toasts, Release-Blocker), **F11**
 > (Edit-Cancel ohne Warm-Trigger, Performance), **F12** (unerreichbarer
-> Cache-Eintrag nach Auflösungswechsel, Speicher) und **F13** (Single→Multi ist
-> eine Einbahnstraße, bewusst konservativ). Siehe **§6**.
+> Cache-Eintrag nach Auflösungswechsel, Speicher), **F13** (Single→Multi ist eine
+> Einbahnstraße) und **F14** (Layer-Alpha/Blend/Sichtbarkeit ohne UI). Siehe **§6**.
 
 ---
 
@@ -604,24 +604,29 @@ ausgeklammert (s. o.).
 > Blicks auf die Refill-Kante. Wer Vollständigkeit will, muss die
 > Multi-Agent-Methode erneut fahren.
 >
-> **Status: alle vier OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
+> **Status: alle fünf OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
 > liegt gerade woanders). Kein Fund ist ein Korrektheitsdefekt: F10 ist ein
 > Release-Blocker (Debug-UI), F11 kostet Performance, F12 Speicher, F13 ist eine
-> bewusst konservative Modell-Asymmetrie.
+> Modell-Asymmetrie, F14 eine halbfertige Feature-Fläche.
 >
-> **F13 kam nicht aus dem Review, sondern aus dem Betrieb:** der F10-Toast meldete
-> nach einem Editor-Save „Composite" für ein gefühltes Einzelbild. Der naheliegende
-> Verdacht (Edit-Mode konvertiert Single→Multi) war falsch; die Ursache ist die
-> fehlende Rückrichtung beim Layer-Löschen. Die Toast-Beschriftung ist inzwischen
-> korrigiert (`layerCount == 1` meldet als Single-Layer-Fill), die
-> Modell-Asymmetrie selbst bleibt offen — siehe F13.
+> **F13 und F14 kamen nicht aus dem Review, sondern aus dem Betrieb** — und beide aus
+> derselben Beobachtung: der F10-Toast meldete nach einem Editor-Save „Composite" für
+> ein gefühltes Einzelbild. Der naheliegende Verdacht (Edit-Mode konvertiert
+> Single→Multi) war **falsch**; die Ursache ist die fehlende Rückrichtung beim
+> Layer-Löschen (**F13**). Beim Prüfen von F13s Begründung — „ein Collapse wäre
+> verlustbehaftet, weil Layer Alpha/Blend/Sichtbarkeit tragen" — stellte sich heraus,
+> dass genau diese drei Eigenschaften **kein UI** haben (**F14**), die Begründung also
+> auf einer Fähigkeit steht, die es in Produktion nicht gibt. Die Reihenfolge ist
+> Absicht so festgehalten: F14 ist die Vorentscheidung für F13. Die Toast-Beschriftung
+> selbst ist inzwischen korrigiert (`layerCount == 1` meldet als Single-Layer-Fill).
 
 | # | Cluster | Ort | Was | Severity | Verdict | Status |
 |---|---|---|---|---|---|---|
 | **F10** | Debug-Residuum | `WallpaperDelegate.kt:733-740` + `HomeFragment.kt:1604-1606` | Die TEMP-Debug-Toasts auf jedem Cache-Fill sind **nicht mehr einer, sondern zwei** (Composite-Warm + Single-Layer-Decode); beide „remove later"-markiert, beide user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
 | **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
-| **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre aber verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) | `low` | CONFIRMED | ⛔ OFFEN (bewusst) |
+| **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ⛔ OFFEN (bewusst) |
+| **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ⛔ OFFEN (Produktentscheidung) |
 
 ---
 
@@ -772,13 +777,25 @@ Layer **nicht** zurück in die Single-Layer-Darstellung. Wer einen Layer hinzuf�
 Cache unter `composite://`) statt des Decode-Cache-Pfads (`file://`-Key), obwohl
 inhaltlich ein Einzelbild vorliegt.
 
-**Warum das NICHT einfach kollabiert wird:** `WallpaperLayerState` ist echt reicher
-als die Single-Layer-Felder von `WallpaperState`. Ein Layer trägt `alpha`,
-`blendModeName`, `isVisible` und `label`; die Single-Layer-Darstellung kennt nur
+**Warum das NICHT einfach kollabiert wird — mit einer wichtigen Einschränkung:**
+`WallpaperLayerState` ist echt reicher als die Single-Layer-Felder von
+`WallpaperState`. Ein Layer trägt `alpha`, `blendModeName`, `isVisible` und `label`;
+die Single-Layer-Darstellung kennt nur
 `imageUri`/`scale`/`translateX`/`translateY`/`captureSampleSize`. Ein pauschaler
 Collapse würde Deckkraft, Blend-Modus und Sichtbarkeit stillschweigend verwerfen —
 ein Layer auf `alpha = 0.5f` würde beim Löschen seines Nachbarn schlagartig voll
-deckend. Die Einbahnstraße ist damit die **konservative** Seite, nicht ein Versehen.
+deckend.
+
+**Die Einschränkung (F14):** genau diese drei Eigenschaften sind heute **nicht
+einstellbar** — es gibt kein UI, das die Setter aufruft. In Produktion trägt damit
+jeder Layer `alpha == 1f`, `blendModeName == null`, `isVisible == true`. Der
+Verlust, gegen den die Einbahnstraße schützt, ist also aktuell **hypothetisch**;
+der einzige reale Weg zu abweichenden Werten ist ein von Hand editiertes
+Backup-JSON (der Importer liest die Felder). Das macht den bedingten Collapse
+unten deutlich attraktiver, als die reine Modell-Betrachtung nahelegt: er würde
+heute praktisch immer greifen und wäre trotzdem gegen den Backup-Edge korrekt.
+Sollte F14 dagegen zugunsten eines echten Alpha-/Blend-UIs entschieden werden,
+kippt die Rechnung zurück — dann ist die Einbahnstraße die richtige Seite.
 
 **Kosten:** schmal. Beide Pfade rendern korrekt und liefern eine Ein-Textur-Anbindung;
 der Flatten kostet pro Refill eine zusätzliche Vollbild-Allokation plus Copy, und
@@ -801,6 +818,62 @@ Hidden-Layer bleiben multi).
 **Der Rückweg existiert heute schon:** „Hintergrund wählen" setzt via
 `SetWallpaperImageUseCase` einen frischen Single-Layer-State und verwirft den
 Layer-Stack.
+
+---
+
+### F14 — Layer-Alpha / Blend-Modus / Sichtbarkeit haben kein UI · `low` · CONFIRMED
+
+`ui/main/delegate/WallpaperDelegate.kt:993-1006` + `ui/home/WallpaperLayer.kt:112-125`
+
+Beim Nachprüfen der F13-Begründung aufgefallen — auf die Frage, ob die drei
+Layer-Eigenschaften überhaupt erreichbar sind. Sie sind es nicht. Die Feature-Kette
+ist **bis auf das letzte Glied** vollständig gebaut:
+
+- **Modell:** `WallpaperLayerState.alpha` / `.blendModeName` / `.isVisible` / `.label`.
+- **Persistenz:** als Layer-JSON in DataStore; `BackupSerializer.parseWallpaperLayerFromJson`
+  liest alle drei, `WallpaperLayerBackup.fromLayerState` schreibt sie — der
+  Backup-Round-Trip erhält sie.
+- **Render:** `ZoomableImageView.drawLayers` setzt `paint.blendMode` (`:945`), wendet
+  Alpha an und überspringt unsichtbare Layer (`:939`); `RebuildPlan` (`:128`, `:174-175`)
+  und `WallpaperViewBinder` (`:335`, `:444-445`) reichen die Werte durch. Der Flattener
+  nutzt denselben `drawLayers`-Pfad, deshalb greift der
+  `WallpaperFlattenParityInstrumentedTest` über alle Blend-Modi bei Teil-Alpha.
+- **Domain-Setter:** `onSetLayerAlpha` / `onSetLayerBlendMode` / `onSetLayerVisibility`
+  im Delegate, durchgereicht von `LauncherViewModel:416-418`.
+- **UI:** — **fehlt**. Eine repo-weite Suche über `app/src/main` findet für die drei
+  ViewModel-Methoden ausschließlich ihre Definitionen, keinen einzigen Aufrufer.
+  `WallpaperLayer.AVAILABLE_BLEND_MODES` (12 Modi mit eigenen
+  `translatable="false"`-Strings, explizit als „useful for a UI picker" dokumentiert)
+  hat in Produktion **null** Konsumenten — ein KDoc-Verweis in `ZoomableImageView` und
+  eine Referenz im `androidTest`. Die Setter stammen aus `f549fa06 wallpaper
+  multilayer support` und haben nie einen Aufrufer bekommen.
+
+Der Wallpaper-Editor bietet tatsächlich an (alle `viewModel.on*`-Aufrufe in
+`WallpaperEditController` plus den Layer-Picker in `HomeFragment`): Layer hinzufügen,
+Layer entfernen, Reihenfolge tauschen, Pan/Zoom pro Layer, Speicher-Info, Save/Cancel.
+Kein Deckkraft-Regler, kein Blend-Picker, kein Sichtbarkeits-Toggle.
+
+Kein Defekt im engeren Sinn — nichts ist kaputt, nichts lügt den Nutzer an. Was es
+ist: eine **halb fertige Feature-Fläche**, die als fertig *aussieht*, wenn man das
+Modell liest, und die deshalb bereits Folge-Argumentation trägt, die auf ihrer
+Verfügbarkeit aufbaut — F13s „Collapse wäre verlustbehaftet" ist genau so ein
+Argument, und `ACCEPTED_LIMITATIONS.md` §1 begründet die Gates des AUTO-Classifiers
+(`layers[0].alpha ≥ 0.8` und Normal-Blend) ebenfalls gegen Werte, die heute niemand
+erzeugen kann. Die Gates sind dadurch nicht falsch, nur derzeit gegenstandslos.
+
+**Zwei mögliche Richtungen, bewusst offen gelassen:**
+
+- **UI nachziehen** — Deckkraft-Slider + Blend-Picker (`AVAILABLE_BLEND_MODES` ist
+  fertig verdrahtet) + Sichtbarkeits-Toggle im Editor. Die gesamte Kette dahinter
+  steht bereits, inklusive Flatten-Parität und Composite-Key
+  (`WallpaperCompositeKey:51-52` hasht `blendModeName` und `isVisible` bereits mit,
+  ein Wechsel invalidiert den Cache also korrekt).
+- **Zurückbauen** — die drei Setter, die Model-Felder und die zwölf Blend-Strings
+  entfernen. Macht F13s Collapse trivial korrekt, kostet aber die Render-Fähigkeit
+  und bricht Backups, die die Felder tragen.
+
+Die Entscheidung ist eine Produkt-, keine Technikfrage — deshalb hier nur
+dokumentiert.
 
 ---
 
