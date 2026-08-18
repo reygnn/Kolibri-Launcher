@@ -679,7 +679,13 @@ class WallpaperDelegate(
             wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
         } finally {
             LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_FLATTEN, FLATTEN_TRACE_COOKIE)
-        } ?: return@withLock
+        }
+        if (software == null) {
+            // Failed/partial flatten: drop any stale luminance so the AUTO classifier does not keep
+            // a PREVIOUS wallpaper's value for this state's un-producible composite (review #1).
+            dropLuminanceIfCurrent(key)
+            return@withLock
+        }
         // Sample the composite LUMINANCE from the SOFTWARE bitmap (readable) BEFORE the HARDWARE
         // copy makes it unreadable (v4.3) — the AUTO classifier reads it via CompositeLuminanceSignal.
         // Then copy to HARDWARE for the display cache. Recycle the software temp either way.
@@ -699,11 +705,15 @@ class WallpaperDelegate(
             // copy() of a full-screen composite is an allocation boundary (OOM). A failure just
             // means no composite this time; the display stays on the per-layer path.
             TimberWrapper.silentError(e, "Composite HARDWARE copy / luminance failed")
+            dropLuminanceIfCurrent(key)
             return@withLock
         } finally {
             software.recycle()
         }
-        hardware ?: return@withLock
+        if (hardware == null) {
+            dropLuminanceIfCurrent(key)
+            return@withLock
+        }
         // Key-gated put (spec §1): only cache if this key is still the current wallpaper's key.
         // A warm that finishes after a clear (NONE, not multi-layer) or a supersede drops its
         // bitmap (uncached -> GC) rather than stranding a stale ~10 MB entry.
@@ -731,6 +741,21 @@ class WallpaperDelegate(
         }
         } finally {
             LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_WARM, WARM_TRACE_COOKIE)
+        }
+    }
+
+    /**
+     * On a warm that could not produce a composite for [key], drop a now-stale composite luminance
+     * (review #1) — but only if [key] is still the current wallpaper's key, so a superseded warm's
+     * failure never clobbers a newer valid signal. Without this, a failed warm for a new wallpaper
+     * would leave the AUTO classifier using the PREVIOUS wallpaper's luminance (a wrong LIGHT/DARK
+     * until the next successful warm / rotate / restart); emitting null makes it fall back to this
+     * wallpaper's own `layers[0]` heuristic instead.
+     */
+    private fun dropLuminanceIfCurrent(key: String) {
+        val current = _wallpaperState.value
+        if (current.isMultiLayer && compositeKey(current) == key) {
+            compositeLuminanceSignal.emit(null)
         }
     }
 

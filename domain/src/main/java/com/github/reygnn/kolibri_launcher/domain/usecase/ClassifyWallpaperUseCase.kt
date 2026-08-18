@@ -18,13 +18,17 @@ import javax.inject.Inject
  *
  * 1. **Kolibri-internal wallpaper** (preferred when present and
  *    visually dominant). Single-layer: classify the only image.
- *    Multi-layer: classify `layers[0]` (the bottom-most layer,
- *    painted first) but only when it is "opaque enough to dominate
- *    perception" — the flattened composite is NOT sampled (it lives
- *    only in the in-memory display cache, no file a `:domain` use
- *    case could read; see `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC` §5 and
- *    the re-opened `ACCEPTED_LIMITATIONS.md` #1). Two cooperating
- *    gates decide "opaque enough":
+ *    Multi-layer: classify the flattened **composite** — its median
+ *    luminance is sampled during the warm's flatten and delivered via
+ *    [CompositeLuminanceSignal] (v4.3; the composite lives only in the
+ *    in-memory display cache, so a `:domain` use case reaches it through
+ *    this IoC signal, not a file). Until the warm emits (cold start, or
+ *    just after an edit), it falls back to `layers[0]` (the bottom-most
+ *    layer, painted first) "only when opaque enough to dominate
+ *    perception". See `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC` §5 and
+ *    `ACCEPTED_LIMITATIONS.md` #1 (closed again in v4.3, with transient
+ *    residuals #1a/#1b). Two cooperating gates decide the fallback's
+ *    "opaque enough":
  *
  *    - **Layer-level alpha gate** (this use case): the persisted
  *      `WallpaperLayerState.alpha` ≥ [DOMINANT_ALPHA_THRESHOLD]
@@ -42,13 +46,11 @@ import javax.inject.Inject
  *    system signal — that's what the user actually sees through the
  *    transparent or low-coverage Kolibri layer.
  *
- *    Known soft spots of this bottom-layer heuristic — a transparent
- *    `layers[0]` over an opaque higher layer, or an opaque `layers[0]`
- *    with a non-Normal blend (e.g. MULTIPLY at alpha 1.0) — are what a
- *    true composite classification would resolve. Sampling the
- *    composite was tried (Option D) and removed with the on-disk
- *    composite; these are the accepted limitation
- *    (`ACCEPTED_LIMITATIONS.md` #1).
+ *    The bottom-layer soft spots — a transparent `layers[0]` over an
+ *    opaque higher layer, or an opaque `layers[0]` with a non-Normal
+ *    blend (e.g. MULTIPLY at alpha 1.0) — are exactly what the composite
+ *    luminance resolves once the warm has emitted; they apply only during
+ *    the brief fallback window (`ACCEPTED_LIMITATIONS.md` #1a/#1b).
  *
  * 2. **System-wallpaper `colorHints`** via
  *    [SystemWallpaperColorsSignal]. The OS publishes

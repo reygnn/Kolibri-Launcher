@@ -66,9 +66,16 @@ class WallpaperFlattener @Inject constructor(
                 // §3, all-or-nothing). parseWallpaperState already drops missing-file layers,
                 // so a null here is a TRANSIENT decode failure — returning null makes the warm
                 // skip caching and re-flatten on the next miss, exactly like the live path heals.
+                // Only a VISIBLE layer's decode failure makes the composite INCOMPLETE: drawLayers
+                // skips invisible layers, so a hidden layer failing to decode changes no pixels and
+                // must NOT block the cache (spec §3b, review #2). The binder decodes every
+                // image-bearing layer regardless of visibility, so filter here.
+                val visibleUris = state.layers.filter { it.isVisible }.mapNotNull { it.imageUri }.toSet()
                 val anyLayerFailed = AtomicBoolean(false)
                 val binder = WallpaperViewBinder { uri ->
-                    loadSoftware(uri).also { if (it == null) anyLayerFailed.set(true) }
+                    loadSoftware(uri).also {
+                        if (it == null && uri.toString() in visibleUris) anyLayerFailed.set(true)
+                    }
                 }
                 binder.bind(view, state)
                 val composite = view.composeToBitmap(width, height)

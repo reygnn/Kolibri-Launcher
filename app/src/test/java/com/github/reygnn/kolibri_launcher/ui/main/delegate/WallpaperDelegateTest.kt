@@ -275,6 +275,35 @@ class WallpaperDelegateTest {
         coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
     }
 
+    @Test
+    fun `a failed warm drops the composite luminance instead of stranding the previous value`() = runTest {
+        // Review #1: a warm that cannot produce a composite (failed/partial flatten -> null) must
+        // emit null so the AUTO classifier stops using a PREVIOUS wallpaper's luminance for this
+        // state, rather than leaving the stale value in the signal.
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } returns null // failed / partial flatten
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // miss -> the warm fires
+        val luminanceSignal: com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+            compositeLuminanceSignal = luminanceSignal,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        verify { luminanceSignal.emit(null) }
+    }
+
     // ===========================================
     // SET WALLPAPER IMAGE
     // ===========================================
