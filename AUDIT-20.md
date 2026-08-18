@@ -42,10 +42,11 @@
 > **Vierter Durchgang 2026-08-18** (gegen `main` @ `ebd13868`, Version 0.99.178 /
 > code 198, *nach* dem v4-Umbau auf den reinen In-Memory-Composite): gezielter
 > **manueller** Blick auf den Refill/Warm-Pfad — ausdrücklich **keine**
-> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Drei Punkte, **alle OFFEN**, keiner
+> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Vier Punkte, **alle OFFEN**, keiner
 > ein Korrektheitsdefekt: **F10** (TEMP-Toasts, Release-Blocker), **F11**
 > (Edit-Cancel ohne Warm-Trigger, Performance), **F12** (unerreichbarer
-> Cache-Eintrag nach Auflösungswechsel, Speicher). Siehe **§6**.
+> Cache-Eintrag nach Auflösungswechsel, Speicher) und **F13** (Single→Multi ist
+> eine Einbahnstraße, bewusst konservativ). Siehe **§6**.
 
 ---
 
@@ -603,15 +604,24 @@ ausgeklammert (s. o.).
 > Blicks auf die Refill-Kante. Wer Vollständigkeit will, muss die
 > Multi-Agent-Methode erneut fahren.
 >
-> **Status: alle drei OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
+> **Status: alle vier OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
 > liegt gerade woanders). Kein Fund ist ein Korrektheitsdefekt: F10 ist ein
-> Release-Blocker (Debug-UI), F11 kostet Performance, F12 Speicher.
+> Release-Blocker (Debug-UI), F11 kostet Performance, F12 Speicher, F13 ist eine
+> bewusst konservative Modell-Asymmetrie.
+>
+> **F13 kam nicht aus dem Review, sondern aus dem Betrieb:** der F10-Toast meldete
+> nach einem Editor-Save „Composite" für ein gefühltes Einzelbild. Der naheliegende
+> Verdacht (Edit-Mode konvertiert Single→Multi) war falsch; die Ursache ist die
+> fehlende Rückrichtung beim Layer-Löschen. Die Toast-Beschriftung ist inzwischen
+> korrigiert (`layerCount == 1` meldet als Single-Layer-Fill), die
+> Modell-Asymmetrie selbst bleibt offen — siehe F13.
 
 | # | Cluster | Ort | Was | Severity | Verdict | Status |
 |---|---|---|---|---|---|---|
 | **F10** | Debug-Residuum | `WallpaperDelegate.kt:733-740` + `HomeFragment.kt:1604-1606` | Die TEMP-Debug-Toasts auf jedem Cache-Fill sind **nicht mehr einer, sondern zwei** (Composite-Warm + Single-Layer-Decode); beide „remove later"-markiert, beide user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
 | **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
+| **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre aber verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) | `low` | CONFIRMED | ⛔ OFFEN (bewusst) |
 
 ---
 
@@ -736,6 +746,61 @@ akkumuliert nicht, self-heilt beim nächsten erfolgreichen Warm.
   Eintrag ist in diesem Fenster ohnehin unerreichbar).
 
 Die zweite Variante ist die ehrlichere Invariante, die erste der kleinere Diff.
+
+---
+
+### F13 — Single→Multi ist eine Einbahnstraße · `low` · CONFIRMED
+
+`domain/model/WallpaperState.kt:233-238` (`withRemovedLayer`) + `:157` (`isMultiLayer`)
+
+Aufgefallen über F10: nach einem Save im Wallpaper-Editor meldete der Toast
+„Composite cache filled" für ein Wallpaper, das der Nutzer als **ein Bild**
+wahrnimmt. Der Verdacht „Edit-Mode konvertiert Single→Multi" ist beim Nachlesen
+**zerfallen** — `onEnterWallpaperEditMode` (`WallpaperDelegate:576-581`) macht nur
+Snapshot + Flag, und die einzige Konvertierung im ganzen `:app` ist
+`onAddWallpaperLayer` (`:869`, `toMultiLayer()`), die erst beim tatsächlichen
+Hinzufügen eines Layers feuert. Auch der Backup-Round-Trip erhält die Darstellung
+(`BackupDataAssembler:122-135`: Single-Layer exportiert `wallpaperLayers = emptyList()`
+plus Flachfelder). Ein Single-Layer-Wallpaper durch Edit + Save zu schicken lässt es
+also Single-Layer.
+
+Der echte Auslöser ist die fehlende Rückrichtung: `isMultiLayer` ist
+`layers.isNotEmpty()`, und `withRemovedLayer` kollabiert beim letzten verbleibenden
+Layer **nicht** zurück in die Single-Layer-Darstellung. Wer einen Layer hinzufügt
+(→ 2 Layer) und dann wieder auf einen runterlöscht, hat dauerhaft einen
+1-Layer-Multi-State. Der nimmt den Flatten-Pfad (Decode → Compose → HARDWARE-Copy,
+Cache unter `composite://`) statt des Decode-Cache-Pfads (`file://`-Key), obwohl
+inhaltlich ein Einzelbild vorliegt.
+
+**Warum das NICHT einfach kollabiert wird:** `WallpaperLayerState` ist echt reicher
+als die Single-Layer-Felder von `WallpaperState`. Ein Layer trägt `alpha`,
+`blendModeName`, `isVisible` und `label`; die Single-Layer-Darstellung kennt nur
+`imageUri`/`scale`/`translateX`/`translateY`/`captureSampleSize`. Ein pauschaler
+Collapse würde Deckkraft, Blend-Modus und Sichtbarkeit stillschweigend verwerfen —
+ein Layer auf `alpha = 0.5f` würde beim Löschen seines Nachbarn schlagartig voll
+deckend. Die Einbahnstraße ist damit die **konservative** Seite, nicht ein Versehen.
+
+**Kosten:** schmal. Beide Pfade rendern korrekt und liefern eine Ein-Textur-Anbindung;
+der Flatten kostet pro Refill eine zusätzliche Vollbild-Allokation plus Copy, und
+Refills sind selten. Für den AUTO-Classifier ist der Composite-Weg sogar der genauere
+(echte Composite-Luminanz statt `layers[0]`-Heuristik). Der einzige spürbare Effekt
+war die falsche Toast-Beschriftung — behoben, indem `warmComposite` bei
+`layerCount == 1` als Single-Layer-Fill meldet (die Mechanik bleibt der Flatten; der
+Kommentar an der Stelle hält das fest).
+
+**Option, falls die Einbahnstraße doch aufgemacht werden soll:** ein **bedingter**
+Collapse in `withRemovedLayer` — nur wenn genau ein Layer übrig bleibt **und** der
+schlicht ist (`alpha == 1f`, `blendModeName == null`, `isVisible`), sonst bleibt der
+State multi. Das ist verlustfrei bzgl. der Layer-Eigenschaften (Label und Layer-ID
+gehen verloren), bringt solche Wallpaper zurück auf den billigeren Pfad und macht die
+Toast-Unterscheidung gegenstandslos. Bewusst **nicht** jetzt umgesetzt: es ist ein
+Verhaltenswechsel im Render-/Cache-Pfad, an dem AUDIT-20 bereits viermal iteriert hat,
+und er braucht eigene Tests (Collapse trifft nur den schlichten Fall; Alpha-/Blend-/
+Hidden-Layer bleiben multi).
+
+**Der Rückweg existiert heute schon:** „Hintergrund wählen" setzt via
+`SetWallpaperImageUseCase` einen frischen Single-Layer-State und verwirft den
+Layer-Stack.
 
 ---
 
