@@ -1,9 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
-import android.content.ContentResolver
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import android.graphics.Bitmap
@@ -60,7 +58,6 @@ class WallpaperDelegateTest {
     private val sentEvents = mutableListOf<UiEvent>()
 
     private lateinit var context: Context
-    private lateinit var contentResolver: ContentResolver
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
@@ -78,13 +75,7 @@ class WallpaperDelegateTest {
         sentEvents.clear()
         every { internalUri.toString() } returns internalUriString
 
-        contentResolver = mockk {
-            every { query(any(), any(), any(), any(), any()) } returns null
-        }
-
         context = mockk(relaxed = true)
-        every { context.contentResolver } returns contentResolver
-        every { context.getContentResolver() } returns contentResolver
 
         observeWallpaperStateUseCase = mockk(relaxed = true)
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
@@ -319,63 +310,22 @@ class WallpaperDelegateTest {
         coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
     }
 
-    @Test
-    fun `onSetWallpaperImage shows toast on success`() = runTest {
-        val delegate = createDelegate()
-
-        delegate.onSetWallpaperImage(testUri)
-        advanceUntilIdle()
-
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
-    }
-
-    @Test
-    fun `onSetWallpaperImage shows display name in toast when available`() = runTest {
-        val cursor: Cursor = mockk {
-            every { moveToFirst() } returns true
-            every { getString(0) } returns "my_wallpaper.jpg"
-            every { close() } returns Unit
-        }
-        every { contentResolver.query(any(), any(), any(), any(), any()) } returns cursor
-
-        val delegate = createDelegate()
-
-        delegate.onSetWallpaperImage(testUri)
-        advanceUntilIdle()
-
-        val toastEvent = sentEvents.filterIsInstance<UiEvent.ShowToastFromString>().firstOrNull()
-        assertTrue(toastEvent != null)
-    }
-
     /**
-     * AUDIT-9 #4 regression guard: [WallpaperDelegate.getDisplayName] must
-     * resolve the DISPLAY_NAME via a `ContentResolver.query` hop OFF the main
-     * dispatcher — on a SAF/cloud `content://` URI that query is a blocking
-     * binder IPC that would otherwise stall the HOME activity's main thread.
-     * We prove the hop by routing the delegate's io work through a counting
-     * dispatcher and asserting the display-name query ran through it.
+     * Setting a wallpaper emits NO success toast — the wallpaper itself is the
+     * confirmation. Pinned as a guard: the removed toast showed the picked file's
+     * DISPLAY_NAME (an opaque temporary name on SAF/cloud providers) and cost a
+     * blocking binder IPC into a foreign provider. Error toasts are unaffected —
+     * see the two `shows error` cases below.
      */
     @Test
-    fun `onSetWallpaperImage resolves display name off the main dispatcher`() = runTest {
-        val cursor: Cursor = mockk {
-            every { moveToFirst() } returns true
-            every { getString(0) } returns "my_wallpaper.jpg"
-            every { close() } returns Unit
-        }
-        every { contentResolver.query(any(), any(), any(), any(), any()) } returns cursor
-
-        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
-        val delegate = createDelegate(ioDispatcher = io)
+    fun `onSetWallpaperImage emits no success toast`() = runTest {
+        val delegate = createDelegate()
 
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
-        assertTrue(
-            "getDisplayName must dispatch its ContentResolver.query onto the io dispatcher",
-            io.count > 0
-        )
-        verify { contentResolver.query(any(), any(), any(), any(), any()) }
-        assertTrue(sentEvents.filterIsInstance<UiEvent.ShowToastFromString>().isNotEmpty())
+        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
+        assertTrue(sentEvents.isEmpty())
     }
 
     @Test

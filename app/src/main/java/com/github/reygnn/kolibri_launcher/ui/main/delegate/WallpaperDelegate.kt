@@ -486,8 +486,6 @@ class WallpaperDelegate(
         errorMessage = "Error setting wallpaper image",
         defaultErrorToast = R.string.error_generic
     ) {
-        val displayName = getDisplayName(imageUri)
-
         val internalUri = wallpaperFileManager.copyToInternal(imageUri)
         if (internalUri == null) {
             TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
@@ -495,9 +493,11 @@ class WallpaperDelegate(
             return@launchSafe
         }
         setWallpaperImageUseCase(internalUri.toString())
-
-        val message = displayName ?: context.getString(R.string.wallpaper_set_success)
-        scope.sendEvent(UiEvent.ShowToastFromString(message))
+        // No success toast: the new wallpaper IS the confirmation — it is on screen
+        // before any toast could be read. The previous one showed the picked file's
+        // DISPLAY_NAME, which on a SAF/cloud provider is an opaque temporary name.
+        // Dropping it also drops a blocking binder IPC into a foreign provider
+        // (the DISPLAY_NAME query) from the wallpaper-set path.
     }
 
     fun onSaveWallpaperTransform(
@@ -996,34 +996,4 @@ class WallpaperDelegate(
             it.copy(isVisible = isVisible)
         }
 
-    // ===========================================
-    // INTERNAL
-    // ===========================================
-
-    /**
-     * Resolves a content URI's display name. Runs on [ioDispatcher]
-     * because `ContentResolver.query` on a SAF/cloud `content://` URI is a
-     * binder IPC into a possibly-cold foreign provider — blocking it on the
-     * caller's main dispatcher risks a StrictMode DiskReadViolation and, in
-     * the worst case, a short freeze/ANR on the HOME activity. The caller
-     * ([onSetWallpaperImage]) launches on the main dispatcher, so this hop
-     * must live inside the method, not at the call site.
-     */
-    private suspend fun getDisplayName(uri: Uri): String? = withContext(ioDispatcher) {
-        try {
-            context.contentResolver.query(
-                uri,
-                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-                null, null, null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else null
-            }
-        } catch (e: CancellationException) {
-            throw e  // Coroutine control flow — must propagate, never collapse to null.
-        } catch (e: Throwable) {
-            // Foreign SAF/cloud provider query can genuinely fail — null is the
-            // correct fallback for that; cancellation is handled above.
-            null
-        }
-    }
 }
