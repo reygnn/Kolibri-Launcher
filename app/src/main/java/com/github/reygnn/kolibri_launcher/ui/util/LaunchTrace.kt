@@ -113,6 +113,19 @@ object LaunchTrace {
          * span the write; this pins only the on-tap main-thread chunk that
          * could drop a frame. */
         const val WALLPAPER_SAVE = "wallpaper_save"
+
+        // --- Composite warm (in-memory fill, WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4) ---
+        // ASYNC sections: the warm suspends / hops threads (flatten on Main, decodes on IO),
+        // so the sync `section` (thread-local begin/end) would mis-report. Measured on device
+        // via the `:macrobenchmark` TraceSectionMetric.
+
+        /** The whole background composite warm: flatten -> luminance -> HARDWARE copy ->
+         * cache put. Off the critical path (once per process / edit / rotate). */
+        const val WALLPAPER_WARM = "wallpaper_warm"
+
+        /** Just the flatten (SOFTWARE decode of N layers + compose) — the dominant part of
+         * [WALLPAPER_WARM]. */
+        const val WALLPAPER_FLATTEN = "wallpaper_flatten"
     }
 
     /**
@@ -132,4 +145,14 @@ object LaunchTrace {
             Trace.endSection()
         }
     }
+
+    /**
+     * Async trace section — for spans that SUSPEND or hop threads, where the thread-local sync
+     * [section] would mis-report (begin and end may land on different threads). Begin/end are
+     * matched by [cookie]; the caller MUST balance them (try/finally). Cheap no-op when no tracer
+     * is attached, like [section]. `beginAsyncSection` needs API 29+ (minSdk 36 here).
+     */
+    fun beginAsync(name: String, cookie: Int) = Trace.beginAsyncSection(name, cookie)
+
+    fun endAsync(name: String, cookie: Int) = Trace.endAsyncSection(name, cookie)
 }

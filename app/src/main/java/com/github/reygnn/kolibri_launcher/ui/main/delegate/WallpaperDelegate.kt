@@ -140,6 +140,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
@@ -172,6 +173,11 @@ import kotlinx.coroutines.flow.stateIn
  *   the session defer their physical file deletion until commit, so that
  *   cancel can truly restore the state — including the file on disk.
  */
+// Async-trace cookies for the composite warm (see warmComposite). Constants are safe because
+// single-flight guarantees no two warms overlap; warm and flatten nest by distinct name+cookie.
+private const val WARM_TRACE_COOKIE = 0x7A31
+private const val FLATTEN_TRACE_COOKIE = 0x7A32
+
 class WallpaperDelegate(
     private val context: Context,
     private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
@@ -661,9 +667,19 @@ class WallpaperDelegate(
      * cannot interleave a warm's cache put.
      */
     private suspend fun warmComposite(state: WallpaperState, key: String) = compositeRegenLock.withLock {
+        // Async trace sections (measured by :macrobenchmark) — the warm suspends / hops threads,
+        // so sync sections would mis-report. Cookies are constants: single-flight guarantees no
+        // two warms overlap, and warm/flatten nest by distinct name+cookie. try/finally keeps
+        // them balanced across the `?:` early returns.
+        LaunchTrace.beginAsync(LaunchTrace.Names.WALLPAPER_WARM, WARM_TRACE_COOKIE)
+        try {
         val metrics = context.resources.displayMetrics
-        val software = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
-            ?: return@withLock
+        LaunchTrace.beginAsync(LaunchTrace.Names.WALLPAPER_FLATTEN, FLATTEN_TRACE_COOKIE)
+        val software = try {
+            wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
+        } finally {
+            LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_FLATTEN, FLATTEN_TRACE_COOKIE)
+        } ?: return@withLock
         // Sample the composite LUMINANCE from the SOFTWARE bitmap (readable) BEFORE the HARDWARE
         // copy makes it unreadable (v4.3) — the AUTO classifier reads it via CompositeLuminanceSignal.
         // Then copy to HARDWARE for the display cache. Recycle the software temp either way.
@@ -712,6 +728,9 @@ class WallpaperDelegate(
                     "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
                 )
             )
+        }
+        } finally {
+            LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_WARM, WARM_TRACE_COOKIE)
         }
     }
 
