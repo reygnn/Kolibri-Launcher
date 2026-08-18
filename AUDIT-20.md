@@ -618,6 +618,53 @@ ausgeklammert (s. o.).
 > steht in F15: eine geschlossene Aufrufkette ist kein Nachweis, dass sie läuft —
 > und der fehlende Test „State-Emission ⇒ Warm" ist der Grund, dass die Frage
 > überhaupt offen sein kann.
+
+### 6.0 Refill-Matrix: welche Aktion braucht einen Nachfüller, und wer feuert ihn
+
+Die Findings unten lesen sich einzeln wie Sonderfälle. Sie sind es nicht — es sind
+Löcher in **einer** Abbildung: die Liste der Aktionen, nach denen der Cache neu
+gefüllt werden muss, wird von der Liste der Trigger im Code nicht vollständig
+gedeckt. Das Raster steht deshalb vor den Funden.
+
+**Wann ein Nachfüllen nötig ist,** ergibt sich aus dem Key (`WallpaperCompositeKey.of`,
+`:39-62`): `RENDER_BUDGET_VERSION`, `widthPx × heightPx`, und pro Layer in Reihenfolge
+`imageUri, scale, translateX, translateY, alpha, blendModeName, isVisible,
+captureSampleSize`. Ändert sich davon etwas, ist es ein **neuer Key** — also ein Miss,
+kein Überschreiben.
+
+**Wer nachfüllt,** sind genau zwei Stellen: der Warm im Delegate (`:722`, nur
+`composite://`-Keys, nur Multi-Layer) und der Decode in `HomeFragment` (`:1603`, nur
+`file://`-Keys, nur echte Single-Layer). Und drei Trigger rufen den Warm: die
+State-Collect-Schleife (`:400`), der Config-Change (`:558`) und der Edit-Commit
+(`:609`). Der Self-Reschedule im `finally` (`:638-646`) ist kein vierter Trigger,
+sondern eine Wiedervorlage des ersten.
+
+| Aktion | Warum neuer Key / leerer Cache | Trigger heute | Lücke |
+|---|---|---|---|
+| **Inhalt: Edit-Commit** (Layer hinzu/weg, Reihenfolge, Pan/Zoom) | Layer-Terme im Hash | Edit-Commit (`:609`) | — |
+| **Inhalt: Edit-Cancel** | Key kann sich geändert haben, ohne dass der persistierte Wert es tut | *keiner* | **F11** |
+| **Inhalt: „Hintergrund wählen"** | neue `file://`-URI | *kein Warm* — lazy beim nächsten Decode (`:1603`) | by design, aber siehe F15 |
+| **Inhalt: Backup-Restore** | neuer State | Collect (`:400`) — greift laut Gerätebeobachtung nicht | **F15** |
+| **Auflösung** (Rotation, Falten, Multi-Window) | `widthPx × heightPx` im Hash — **nur** für `composite://`; der Single-Layer-Key kennt keine Maße und überlebt eine Rotation als Treffer | Config-Change (`:558`) | im Edit-Mode ausgesetzt → **F11** |
+| **Prozessneustart** | Cache ist rein in-memory (kein On-Disk-Composite seit v4) | erste Emission nach `start()` (`:400`) | — |
+| **App-Update mit `RENDER_BUDGET_VERSION`-Bump** | Versions-Term im Hash — bewusst als natürlicher Miss statt Migration | braucht keinen eigenen: der nächste Trigger greift | — |
+| **Fehlgeschlagener Warm** (partieller Flatten, OOM bei der HARDWARE-Copy) | kein Eintrag für den aktuellen Key | *keiner* — der Self-Reschedule feuert denselben Key bewusst nicht (Schleifenschutz, `:643`) | **F12** |
+
+Was **keinen** Refill braucht, obwohl man es vermuten könnte: drawer→home (das ist der
+Treffer, für den der Cache existiert), Edit-Mode betreten und verlassen (die View
+rendert dort per-Layer, überschreibt den Eintrag aber nicht — `renderingSingleImageNow`
+schließt Edit-Mode aus) und „Wallpaper entfernen" (invalidiert, danach gibt es nichts
+zu füllen).
+
+Das Muster hinter F11, F12 und F15 ist damit dasselbe: **der Warm ist an
+Zustandsänderungen gehängt, die über DataStore laufen** — und jede Kante, die den Key
+ändert, *ohne* eine Emission zu erzeugen (Cancel nach Rotation), oder die eine
+Emission erzeugt, *ohne* dass der Warm greift (Restore), oder die den Eintrag verliert,
+*ohne* dass sich etwas ändert (fehlgeschlagener Warm), fällt durch. Ein vierter Fund
+derselben Klasse ist zu erwarten, solange die Abbildung nicht geschlossen ist; der
+strukturelle Fix wäre, den Warm nicht an Emissionen, sondern an „aktueller Key ≠
+gecachter Key" zu hängen und diese Prüfung an den Stellen zu fahren, an denen der
+Cache tatsächlich gebraucht wird.
 >
 > **F13 und F14 kamen nicht aus dem Review, sondern aus dem Betrieb** — und beide aus
 > derselben Beobachtung: der F10-Toast meldete nach einem Editor-Save „Composite" für
