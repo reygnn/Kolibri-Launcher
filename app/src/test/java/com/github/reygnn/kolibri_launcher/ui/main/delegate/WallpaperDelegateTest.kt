@@ -7,7 +7,7 @@ import android.database.Cursor
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import android.graphics.Bitmap
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -130,7 +130,7 @@ class WallpaperDelegateTest {
         ioDispatcher: CoroutineDispatcher = mainDispatcherRule.testDispatcher,
         scope: DelegateScope = createDelegateScope(),
         wallpaperFlattener: WallpaperFlattener = mockk(relaxed = true),
-        compositeStore: WallpaperCompositeStore = mockk(relaxed = true),
+        compositeCache: WallpaperCompositeCache = mockk(relaxed = true),
     ) = WallpaperDelegate(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
@@ -141,7 +141,7 @@ class WallpaperDelegateTest {
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
-        compositeStore = compositeStore,
+        compositeCache = compositeCache,
         ioDispatcher = ioDispatcher,
         scope = scope
     )
@@ -223,60 +223,17 @@ class WallpaperDelegateTest {
     }
 
     // ===========================================
-    // LAZY COMPOSITE BACKFILL (Option D §9.6)
+    // COMPOSITE WARM (in-memory, v4)
     // ===========================================
+    //
+    // The warm itself (flatten -> HARDWARE copy -> cache put) is not JVM-tested: the
+    // software->HARDWARE Bitmap.copy needs a real bitmap (a mock can't), so a JVM test would be
+    // mock theater (Rule 10). It is covered on-device; the flatten completeness and the content
+    // key are unit-tested in WallpaperFlattener/WallpaperCompositeKey tests. What IS honestly
+    // JVM-testable is the warm TRIGGER GATE — that a flatten is (not) kicked — pinned here.
 
     @Test
-    fun `start backfills composite for a display multi-layer state without one`() = runTest {
-        val multiNoComposite = WallpaperState(
-            layers = listOf(
-                WallpaperLayerState(imageUri = "file:///l1.jpg"),
-                WallpaperLayerState(imageUri = "file:///l2.jpg"),
-            ),
-        )
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(multiNoComposite)
-
-        val flattener: WallpaperFlattener = mockk()
-        val bitmap: Bitmap = mockk(relaxed = true)
-        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeStore = store,
-        )
-
-        delegate.start()
-        advanceUntilIdle()
-
-        coVerify {
-            saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" })
-        }
-    }
-
-    @Test
-    fun `start does not backfill when the composite already exists`() = runTest {
-        val multiWithComposite = WallpaperState(
-            layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")),
-            flattenedWallpaperPath = "file:///existing.webp",
-        )
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(multiWithComposite)
-
-        val flattener: WallpaperFlattener = mockk(relaxed = true)
-        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, wallpaperFlattener = flattener)
-
-        delegate.start()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
-    }
-
-    @Test
-    fun `start does not backfill a single-layer wallpaper`() = runTest {
+    fun `does not warm a single-layer wallpaper`() = runTest {
         val single = WallpaperState(imageUri = "file:///single.jpg")
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(single)
@@ -291,161 +248,27 @@ class WallpaperDelegateTest {
     }
 
     @Test
-    fun `backfills again for a later composite-less state (e_g_ a second restore)`() = runTest {
-        // A weeks-long session with two backup restores, each a different
-        // composite-less multi-layer wallpaper: BOTH must get a backfill (the guard
-        // is "in progress", not "once per process").
-        val firstRestore = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///a.jpg")))
-        val secondRestore = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///b.jpg")))
-        val stateFlow = MutableStateFlow(firstRestore)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-
-        val flattener: WallpaperFlattener = mockk()
-        val bitmap: Bitmap = mockk(relaxed = true)
-        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeStore = store,
-        )
-
-        delegate.start()
-        advanceUntilIdle() // backfill for the first restore
-
-        stateFlow.value = secondRestore
-        advanceUntilIdle() // backfill for the second restore — must NOT be blocked
-
-        coVerify { flattener.flatten(firstRestore, any(), any()) }
-        coVerify { flattener.flatten(secondRestore, any(), any()) }
-    }
-
-    @Test
-    fun `commit flatten waits for an in-flight backfill flatten (serialized by the regen mutex)`() = runTest {
-        // AUDIT-20 F1: the two composite-regeneration callers (lazy backfill on
-        // start, and the edit-commit) must not flatten+write against the same
-        // path==null state at once. The delegate serializes them with a Mutex over
-        // the whole flatten->write->persist. This pins that: while the backfill
-        // flatten is parked mid-run (holding the lock), a commit fired into that
-        // window must NOT begin its own flatten until the backfill releases.
-        val gate = CompletableDeferred<Unit>()
-        val flattenCalls = AtomicInteger(0)
-        val bitmap: Bitmap = mockk(relaxed = true)
-        val flattener: WallpaperFlattener = mockk()
-        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
-            // First flatten (the backfill) blocks on the gate while holding the lock;
-            // any later flatten returns immediately.
-            if (flattenCalls.getAndIncrement() == 0) gate.await()
-            bitmap
-        }
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
-        val multiNoComposite = WallpaperState(
-            layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")),
-        )
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(multiNoComposite)
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeStore = store,
-        )
-
-        delegate.start() // collection -> backfill -> flatten #1 parks on the gate, holding the lock
-        advanceUntilIdle()
-        assertEquals("backfill flatten is in flight", 1, flattenCalls.get())
-
-        delegate.onCommitWallpaperEditMode() // commit -> regenerate blocks on the held lock
-        advanceUntilIdle()
-        assertEquals("commit flatten must wait for the in-flight backfill", 1, flattenCalls.get())
-
-        gate.complete(Unit) // backfill finishes and releases the lock
-        advanceUntilIdle()
-        assertEquals("commit flatten proceeds once the lock is free", 2, flattenCalls.get())
-    }
-
-    @Test
-    fun `a committed flatten prunes older composites after persisting the path`() = runTest {
-        // AUDIT-20 F7: on a latest-wins WIN the delegate persists the new path and then
-        // prunes every OTHER composite — pruning is decoupled from write() and happens
-        // only after the save.
-        val bitmap: Bitmap = mockk(relaxed = true)
-        val flattener: WallpaperFlattener = mockk()
-        coEvery { flattener.flatten(any(), any(), any()) } returns bitmap
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
-        val multi = WallpaperState(
-            layers = listOf(
-                WallpaperLayerState(imageUri = "file:///l1.jpg"),
-                WallpaperLayerState(imageUri = "file:///l2.jpg"),
-            ),
-        )
+    fun `does not warm when the composite is already cached`() = runTest {
+        // v4: the warm is gated on a compositeCache MISS. A cache hit means the composite is
+        // already in memory, so no flatten runs (replaces the old "composite path exists" gate).
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns mockk(relaxed = true) // hit for any key
+
         val delegate = createDelegate(
             observeWallpaperStateUseCase = useCase,
             wallpaperFlattener = flattener,
-            compositeStore = store,
+            compositeCache = cache,
         )
+
         delegate.start()
         advanceUntilIdle()
 
-        coVerify { saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" }) }
-        coVerify { store.prune("file:///composite.webp") }
-        coVerify(exactly = 0) { store.delete(any()) }
-    }
-
-    @Test
-    fun `a superseded flatten deletes its own composite instead of pruning or persisting`() = runTest {
-        // AUDIT-20 F7: if the state changes while a flatten is in flight, its composite
-        // is never persisted — so it drops its OWN just-written file (delete), does NOT
-        // prune the others, and does NOT save. This is the case that would otherwise
-        // leave the current state's composite unlinked (write used to prune up front).
-        val gate = CompletableDeferred<Unit>()
-        val flattenCalls = AtomicInteger(0)
-        val bitmap: Bitmap = mockk(relaxed = true)
-        val flattener: WallpaperFlattener = mockk()
-        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
-            if (flattenCalls.getAndIncrement() == 0) gate.await()
-            bitmap
-        }
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
-        val multiA = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///a.jpg")))
-        val multiB = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///b.jpg")))
-        val stateFlow = MutableStateFlow(multiA)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeStore = store,
-        )
-
-        delegate.start() // backfill for multiA parks on the gate, holding the lock
-        advanceUntilIdle()
-        assertEquals(1, flattenCalls.get())
-
-        stateFlow.value = multiB // state supersedes multiA while the flatten is parked
-        advanceUntilIdle()
-
-        gate.complete(Unit) // backfill's flatten(multiA) completes; latest-wins guard now fails
-        advanceUntilIdle()
-
-        coVerify { store.delete("file:///composite.webp") }
-        coVerify(exactly = 0) { store.prune(any()) }
-        coVerify(exactly = 0) {
-            saveWallpaperStateUseCase.invoke(match { it.flattenedWallpaperPath == "file:///composite.webp" })
-        }
+        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
     }
 
     // ===========================================
@@ -661,20 +484,20 @@ class WallpaperDelegateTest {
             if (flattenCalls.getAndIncrement() == 0) gate.await()
             bitmap
         }
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        coEvery { store.write(bitmap) } returns "file:///composite.webp"
-
         val multiNoComposite = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multiNoComposite)
 
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // cache miss -> the warm fires and holds the lock
+
         val delegate = createDelegate(
             observeWallpaperStateUseCase = useCase,
             wallpaperFlattener = flattener,
-            compositeStore = store,
+            compositeCache = cache,
         )
 
-        delegate.start() // backfill flatten parks on the gate, holding the regen lock
+        delegate.start() // warm flatten parks on the gate, holding the regen lock
         advanceUntilIdle()
         assertEquals(1, flattenCalls.get())
 
@@ -1268,42 +1091,6 @@ class WallpaperDelegateTest {
 
         // Post-commit: deferred file deletion executed
         verify { wallpaperFileManager.deleteFile(layerUri) }
-    }
-
-    /**
-     * AUDIT-20 F5 regression guard: committing on a single-layer / no-composite
-     * state drops the composite via `compositeStore.clear()`, which does blocking
-     * file I/O (listFiles() + delete()). It must run OFF the main dispatcher — the
-     * regen runs inside a launchSafe block that starts on it. We baseline the io
-     * dispatch count after `start()` (which hops gcOrphans onto io) and assert the
-     * commit pushes at least one more dispatch through it, carrying the clear().
-     */
-    @Test
-    fun `onCommitWallpaperEditMode clears the composite off the main dispatcher for a single-layer state`() = runTest {
-        val single = WallpaperState(imageUri = "file:///single.jpg")
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(single)
-
-        val store: WallpaperCompositeStore = mockk(relaxed = true)
-        val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            compositeStore = store,
-            ioDispatcher = io,
-        )
-        delegate.start()
-        advanceUntilIdle()
-        val countAfterStart = io.count
-
-        delegate.onEnterWallpaperEditMode()
-        delegate.onCommitWallpaperEditMode()
-        advanceUntilIdle()
-
-        coVerify { store.clear() }
-        assertTrue(
-            "compositeStore.clear() must run on the injected io dispatcher, not the main thread",
-            io.count > countAfterStart
-        )
     }
 
     @Test

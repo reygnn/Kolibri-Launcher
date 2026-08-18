@@ -286,7 +286,7 @@ class MonolithicLauncherViewModelTest {
             saveFabPositionUseCase,
             wallpaperFileManager,
             mockk(relaxed = true), // wallpaperFlattener
-            mockk(relaxed = true), // wallpaperCompositeStore
+            mockk(relaxed = true), // wallpaperCompositeCache
             appUpdateSignal,
             neverThrottlingClock(),
             SavedStateHandle(),

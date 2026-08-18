@@ -34,6 +34,6 @@ class WallpaperRepositoryImplContractTest : WallpaperRepositoryContract() {
         val fakeDataStore = FakeDataStore()
         val fileManager: WallpaperFileManager = mockk(relaxed = true)
         every { fileManager.fileExists(any<Uri>()) } returns true
-        return WallpaperRepositoryImpl(fakeDataStore, fileManager, mockk(relaxed = true), UnconfinedTestDispatcher())
+        return WallpaperRepositoryImpl(fakeDataStore, fileManager, UnconfinedTestDispatcher())
     }
 }

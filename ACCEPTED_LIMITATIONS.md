@@ -10,11 +10,28 @@ re-litigate the decision every time the limitation is noticed.
 
 ## 1. AppDrawer AUTO-mode classifier ignores layer composition
 
-- **Status:** 🟢 Largely resolved by Option D; 🟡 residual only for composite-less multi-layer states
+- **Status:** 🟡 RE-OPENED (2026-08-18, v4) — the composite is no longer sampled; bottom-layer heuristic only
 - **Frequency:** Two narrow shapes — see "When the heuristic punts"
-- **Affected:** Multi-layer Kolibri-internal wallpapers in AUTO mode **without a composite yet**
+- **Affected:** ALL multi-layer Kolibri-internal wallpapers in AUTO mode
 
-### UPDATE — resolved for composited wallpapers (Option D)
+### RE-OPENED (2026-08-18) — composite classification removed with the on-disk composite (v4)
+
+The Option D resolution below was **reverted**. `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC`
+v4 deleted the on-disk composite entirely (the composite now lives only in an
+in-memory `:app` cache) after three review rounds showed the on-disk lifecycle was
+not cleanly solvable, and a fourth review showed that letting the `:domain`
+classifier sample the composite needs a cross-module re-trigger signal whose cost is
+not justified by a light/dark surface choice. So `ClassifyWallpaperUseCase.pickDominantUri`
+no longer classifies the composite — it always uses the `layers[0]` bottom-layer
+heuristic described below, for **every** multi-layer wallpaper (not just the
+composite-less transient). The two soft spots are the accepted cost, mitigated by the
+manual LIGHT/DARK override. **Re-evaluation trigger:** revisit only if a clean
+cross-module composite-luminance path becomes cheap — e.g. the classifier moves to
+`:app`, or a buffered `CompositeReadySignal` is justified by another feature. The
+"resolved for composited wallpapers (Option D)" note below is retained for history
+but no longer describes shipped behavior.
+
+### (Historical) UPDATE — resolved for composited wallpapers (Option D)
 
 The re-evaluation trigger below predicted this: "the wallpaper editor grows a
 'preview composite as bitmap' step … the classifier could reuse the result for

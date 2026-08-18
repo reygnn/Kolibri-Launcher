@@ -1,5 +1,14 @@
 # WALLPAPER_DRAWER_HOME_REBUILD_SPEC
 
+> **⚠️ SUPERSEDED IN PART by `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC` v4 (2026-08-18).** The
+> drawer→home cache win (§9.4a, the in-memory decode cache) still stands and is the whole point.
+> But the **on-disk** flattened composite this spec describes (the persisted
+> `flattenedWallpaperPath` pointer, `WallpaperCompositeStore`, the disk file) was **deleted** in
+> v4 — the composite now lives only in the in-memory cache, keyed by a content hash, and a miss
+> re-flattens. The §9.5 AUTO-classifier-samples-the-composite step was also reverted (see
+> `ACCEPTED_LIMITATIONS #1`, re-opened). Read v4 for current behavior; the disk/pointer/classifier
+> parts below are history.
+
 **Status: IMPLEMENTED (Option D, Phases 1–3.5) on branch
 `feature/wallpaper-flatten-spike`, measured on a Galaxy A36 — not yet merged.**
 Started as a greenfield design; the option analysis below is kept as the record
