@@ -134,16 +134,6 @@ data class WallpaperState(
      * captured against. MUST be `null` when [layers] is non-empty. See spec §4-Y.
      */
     val captureSampleSize: Int? = null,
-
-    /**
-     * Path (`file://`) of the flattened display-mode composite for this exact
-     * layer set (WALLPAPER_DRAWER_HOME_REBUILD_SPEC Option D). `null` = none/stale;
-     * regenerated at edit-commit. A DERIVED artifact, not user data: it is stored
-     * OUTSIDE the `wallpapers/` dir (so orphan-GC and backup ignore it) and is
-     * NOT part of [referencedUris]. Every layer mutation nulls it, because the
-     * composite no longer matches the layers — see the `with*Layer` helpers.
-     */
-    val flattenedWallpaperPath: String? = null
 ) {
     companion object {
         const val DEFAULT_SCALE = WallpaperLayerState.DEFAULT_SCALE
@@ -227,22 +217,15 @@ data class WallpaperState(
         if (index !in layers.indices) return this
         val newLayers = layers.toMutableList()
         newLayers[index] = update(newLayers[index])
-        return copy(layers = newLayers, flattenedWallpaperPath = null)
+        return copy(layers = newLayers)
     }
 
     /**
      * Erstellt eine Kopie mit einem neuen Layer am Ende.
      */
     fun withAddedLayer(layer: WallpaperLayerState): WallpaperState {
-        return copy(layers = layers + layer, flattenedWallpaperPath = null)
+        return copy(layers = layers + layer)
     }
-
-    /**
-     * Sets (or clears) the flattened-composite path. Used at edit-commit after a
-     * fresh flatten; independent of the single/multi invariant.
-     */
-    fun withFlattenedWallpaperPath(path: String?): WallpaperState =
-        copy(flattenedWallpaperPath = path)
 
     /**
      * Erstellt eine Kopie ohne das Layer an [index].
@@ -251,7 +234,6 @@ data class WallpaperState(
         if (index !in layers.indices) return this
         return copy(
             layers = layers.filterIndexed { i, _ -> i != index },
-            flattenedWallpaperPath = null,
         )
     }
 
@@ -264,7 +246,7 @@ data class WallpaperState(
         val temp = newLayers[indexA]
         newLayers[indexA] = newLayers[indexB]
         newLayers[indexB] = temp
-        return copy(layers = newLayers, flattenedWallpaperPath = null)
+        return copy(layers = newLayers)
     }
 
     // ===========================================
@@ -300,7 +282,6 @@ data class WallpaperState(
             translateY = 0f,
             captureSampleSize = null,
             layers = listOf(singleLayer),
-            flattenedWallpaperPath = null,
         )
     }
 }

@@ -17,14 +17,13 @@ import javax.inject.Inject
  *
  * 1. **Kolibri-internal wallpaper** (preferred when present and
  *    visually dominant). Single-layer: classify the only image.
- *    Multi-layer: classify the **flattened composite** when one
- *    exists (Option D) — the resolved composition of all layers,
- *    which closes `ACCEPTED_LIMITATIONS.md` #1. When there is no
- *    composite yet (pre-Option-D state, restored backup, or before
- *    the lazy backfill runs), fall back to classifying `layers[0]`
- *    (the bottom-most layer, painted first) but only when it is
- *    "opaque enough to dominate perception". Two cooperating gates
- *    decide that:
+ *    Multi-layer: classify `layers[0]` (the bottom-most layer,
+ *    painted first) but only when it is "opaque enough to dominate
+ *    perception" — the flattened composite is NOT sampled (it lives
+ *    only in the in-memory display cache, no file a `:domain` use
+ *    case could read; see `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC` §5 and
+ *    the re-opened `ACCEPTED_LIMITATIONS.md` #1). Two cooperating
+ *    gates decide "opaque enough":
  *
  *    - **Layer-level alpha gate** (this use case): the persisted
  *      `WallpaperLayerState.alpha` ≥ [DOMINANT_ALPHA_THRESHOLD]
@@ -42,14 +41,13 @@ import javax.inject.Inject
  *    system signal — that's what the user actually sees through the
  *    transparent or low-coverage Kolibri layer.
  *
- *    This bottom-layer fall-back only applies when there is NO
- *    composite. Its soft spots — a transparent `layers[0]` over an
- *    opaque higher layer, or an opaque `layers[0]` with a
- *    non-Normal blend (e.g. MULTIPLY at alpha 1.0) — are exactly
- *    what a composite resolves. With a composite present the
- *    resolved composition is classified directly, closing
- *    `ACCEPTED_LIMITATIONS.md` #1 for that case; the fall-back
- *    covers only the transient composite-less path.
+ *    Known soft spots of this bottom-layer heuristic — a transparent
+ *    `layers[0]` over an opaque higher layer, or an opaque `layers[0]`
+ *    with a non-Normal blend (e.g. MULTIPLY at alpha 1.0) — are what a
+ *    true composite classification would resolve. Sampling the
+ *    composite was tried (Option D) and removed with the on-disk
+ *    composite; these are the accepted limitation
+ *    (`ACCEPTED_LIMITATIONS.md` #1).
  *
  * 2. **System-wallpaper `colorHints`** via
  *    [SystemWallpaperColorsSignal]. The OS publishes
@@ -116,20 +114,13 @@ class ClassifyWallpaperUseCase @Inject constructor(
      */
     private fun pickDominantUri(state: WallpaperState): String? {
         if (state.isMultiLayer) {
-            // Prefer the flattened composite: it IS the actual composited
-            // appearance (all layers + blend + alpha), so classifying it closes
-            // ACCEPTED_LIMITATIONS #1 — the resolved composition, not just the
-            // bottom layer. WallpaperBitmapLuminance decodes it SOFTWARE (256²),
-            // and its pixel-coverage gate handles a mostly-transparent composite
-            // (system wallpaper shows through) by returning null → fall through to
-            // the system signal, which is exactly what the user then perceives.
-            // The composite path is versioned, so a new composite is a distinct
-            // value here and distinctUntilChanged re-classifies correctly.
-            state.flattenedWallpaperPath?.let { return it }
-            // No composite yet (pre-Option-D / restored / mid-backfill): fall back
-            // to the bottom layer with the alpha + Normal-blend gates — anything
-            // below either bar means the system wallpaper bleeds through and should
-            // drive classification instead.
+            // Multi-layer: classify the bottom-most layer (painted first) behind the
+            // alpha + Normal-blend gates — anything below either bar means the system
+            // wallpaper bleeds through and should drive classification instead. The
+            // flattened composite is NOT sampled: it lives only in the in-memory
+            // display cache (no file, no persisted pointer), so a :domain use case
+            // cannot reach it. See WALLPAPER_COMPOSITE_LIFECYCLE_SPEC §5 and the
+            // re-opened ACCEPTED_LIMITATIONS #1.
             val bottom = state.layers.firstOrNull() ?: return null
             if (bottom.alpha < DOMINANT_ALPHA_THRESHOLD) return null
             if (bottom.blendModeName != null) return null

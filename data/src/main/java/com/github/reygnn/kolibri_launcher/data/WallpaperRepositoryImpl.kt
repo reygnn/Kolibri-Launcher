@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
@@ -58,7 +57,6 @@ import javax.inject.Singleton
 class WallpaperRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val wallpaperFileManager: WallpaperFileManager,
-    private val compositeStore: WallpaperCompositeStore,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : WallpaperRepository {
 
@@ -76,11 +74,6 @@ class WallpaperRepositoryImpl @Inject constructor(
 
         // --- Multi-Layer Key ---
         private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
-
-        // Flattened display-mode composite path (Option D). Derived; regenerated
-        // at edit-commit. Top-level, mode-independent (only multi-layer sets it).
-        private val KEY_WALLPAPER_FLATTENED_PATH =
-            stringPreferencesKey("wallpaper_flattened_path")
 
         // Defaults
         private const val DEFAULT_SCALE = 1.0f
@@ -133,7 +126,6 @@ class WallpaperRepositoryImpl @Inject constructor(
     private fun Preferences.filterToWallpaperKeys(): Preferences {
         val out = mutablePreferencesOf()
         this[KEY_LAYERS_JSON]?.let { out[KEY_LAYERS_JSON] = it }
-        this[KEY_WALLPAPER_FLATTENED_PATH]?.let { out[KEY_WALLPAPER_FLATTENED_PATH] = it }
         this[KEY_WALLPAPER_URI]?.let { out[KEY_WALLPAPER_URI] = it }
         this[KEY_WALLPAPER_SCALE]?.let { out[KEY_WALLPAPER_SCALE] = it }
         this[KEY_WALLPAPER_TRANSLATE_X]?.let { out[KEY_WALLPAPER_TRANSLATE_X] = it }
@@ -187,12 +179,7 @@ class WallpaperRepositoryImpl @Inject constructor(
                                         "removed from state (files not found on disk)"
                             )
                         }
-                        WallpaperState(
-                            layers = validLayers,
-                            flattenedWallpaperPath = validatedCompositePath(
-                                preferences[KEY_WALLPAPER_FLATTENED_PATH]
-                            ),
-                        )
+                        WallpaperState(layers = validLayers)
                     }
                 } else {
                     parseSingleLayerState(preferences)
@@ -213,27 +200,6 @@ class WallpaperRepositoryImpl @Inject constructor(
         }
 
         return parseSingleLayerState(preferences)
-    }
-
-    /**
-     * Validates the persisted display composite path the same way layer URIs are
-     * validated above (AUDIT-20 F2). A composite file can go missing while its path
-     * lingers in DataStore — a lost write race (F1), a silent compress failure (F4),
-     * or external deletion. An unvalidated dangling path would be a PERMANENT defect:
-     * the lazy backfill ([com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegate.maybeBackfillComposite])
-     * is gated on `flattenedWallpaperPath == null`, so it would never regenerate the
-     * composite and the home screen stays blank across restarts. Nulling a missing
-     * path here re-arms that backfill.
-     */
-    private fun validatedCompositePath(path: String?): String? {
-        if (path.isNullOrBlank()) return null
-        // fileExists returns true for non-file URIs (unverifiable); the composite is
-        // always written as file:// (Uri.fromFile), so this only ever drops a real
-        // missing-file case. Uri overload (not the String one) to mirror the layer
-        // validation above.
-        if (wallpaperFileManager.fileExists(path.toUri())) return path
-        Timber.w("Composite file missing — dropping path so backfill regenerates it")
-        return null
     }
 
     /**
@@ -305,12 +271,6 @@ class WallpaperRepositoryImpl @Inject constructor(
                     // ── Kein Wallpaper → alles entfernen ──
                     removeAllKeys(preferences)
                 }
-                // Flattened composite path (Option D) — top-level and derived, so
-                // written here regardless of mode. Only multi-layer commits set it;
-                // single/none/mid-edit states carry null and clear the key.
-                state.flattenedWallpaperPath
-                    ?.let { preferences[KEY_WALLPAPER_FLATTENED_PATH] = it }
-                    ?: preferences.remove(KEY_WALLPAPER_FLATTENED_PATH)
             }
         } catch (e: CancellationException) {
             throw e
@@ -381,14 +341,6 @@ class WallpaperRepositoryImpl @Inject constructor(
             dataStore.edit { preferences ->
                 removeAllKeys(preferences)
             }
-            // Delete the derived display composite too (Option D), mirroring
-            // purgeRepository (AUDIT-20 F3). Otherwise "remove wallpaper" orphans the
-            // composite_*.webp in filesDir/wallpaper_composite/ — clearAll()/gcOrphans
-            // only walk wallpapers/, never the composite dir. IO-wrapped: clear() does
-            // blocking file deletion.
-            withContext(ioDispatcher) {
-                compositeStore.clear()
-            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -408,9 +360,6 @@ class WallpaperRepositoryImpl @Inject constructor(
         // because clearAll() does blocking file deletion.
         withContext(ioDispatcher) {
             wallpaperFileManager.clearAll()
-            // Delete the derived display composite too (Option D); it lives outside
-            // wallpapers/, so clearAll() does not reach it.
-            compositeStore.clear()
         }
     }
 
@@ -423,7 +372,6 @@ class WallpaperRepositoryImpl @Inject constructor(
         preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
         preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
         preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
-        preferences.remove(KEY_WALLPAPER_FLATTENED_PATH)
         preferences.remove(KEY_LAYERS_JSON)
     }
 
