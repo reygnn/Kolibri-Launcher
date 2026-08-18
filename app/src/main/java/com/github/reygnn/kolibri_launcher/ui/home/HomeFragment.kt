@@ -1601,6 +1601,9 @@ class HomeFragment : Fragment() {
             // single-layer image self-invalidates (a new pick → new uri → new key).
             if (decoded != null && renderingSingleImageNow()) {
                 compositeCache.put(key, decoded)
+                // TEMP (remove later): visual signal on each SINGLE-LAYER cache fill. A
+                // multi-layer composite fill is toasted separately from the delegate warm.
+                view?.post { context?.showToastSafe("Single-layer cache filled") }
             }
             decoded
         } catch (e: Throwable) {

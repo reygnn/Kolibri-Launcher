@@ -704,6 +704,14 @@ class WallpaperDelegate(
             )
             // Publish the composite luminance for the AUTO classifier (v4.3, ACCEPTED_LIMITATIONS #1).
             compositeLuminanceSignal.emit(luminance)
+            // TEMP (remove later): visual signal on each composite cache (re)fill — to gauge how
+            // often a re-flatten is actually needed (cold start / edit-commit / rotate). The
+            // resolution in the text distinguishes a rotate-triggered refill from the rest.
+            scope.sendEvent(
+                UiEvent.ShowToastFromString(
+                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
+                )
+            )
         }
     }
 
